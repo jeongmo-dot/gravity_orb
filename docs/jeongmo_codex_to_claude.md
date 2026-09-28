@@ -38,6 +38,41 @@
 
 ## 미확인
 
+### [2026-09-28] 대상 #3 — M2 입력 추상화
+- 상태: 완료
+- 브랜치 / PR: `m2-input-abstraction` / PR 생성 후 링크 반영 예정
+- 변경 파일: `project.godot`, `config/GameConfig.gd`, `config/default_config.tres`, `scripts/autoload/InputRouter.gd`, `scripts/core/SwipeDetector.gd`, `scripts/core/Main.gd`, `tests/test_config.gd`, `tests/test_input_router.gd`, `tests/test_swipe.gd`, Godot 생성 `.gd.uid` 4개
+- Done-when 대조:
+  - [x] 방향키·WASD와 마우스 드래그가 같은 `swipe(Vector2i)` 신호로 들어가고 `Main`이 `Board.set_gravity`에 연결 — `test_arrow_and_wasd_bindings_map_to_four_directions`, `test_mouse_left_drag_emits_once`, 메인 씬 스모크 자동 검증
+  - [x] 마우스·터치 에뮬레이션 이중 이벤트가 드래그 1회당 신호 1회 — `test_emulated_touch_duplicate_emits_once` 자동 검증
+  - [x] 짧은 이동·애매한 대각선 무시, 최소 거리·우세 비율 경계 포함 — `test_swipe.gd`와 `test_short_drag_is_ignored` 자동 검증
+  - [x] 터치 index 0만 허용, 마우스 좌클릭만 허용, source 소유권 유지 — `test_input_router.gd` 자동 검증
+  - [x] 잠금 중 입력과 잠금 중 시작한 뒤 해제된 제스처 무시 — `test_locked_drag_is_ignored`, `test_drag_started_locked_stays_ignored_after_unlock`, `test_locked_keyboard_action_is_ignored` 자동 검증
+  - [x] 키 에코 제외 — `test_keyboard_action_emits_once_and_echo_is_ignored` 자동 검증
+  - [x] 입력 격리 — `rg -n "Input\\.|InputEvent" scripts -g "*.gd"` 결과 9줄 모두 `scripts/autoload/InputRouter.gd`, 그 외 0건
+  - [x] Input Map에는 `gravity_up/down/left/right` 4개만 등록 — 정적 검사, `restart`·`debug_*` 0개
+  - [x] §10.1 명령 3종 종료 코드 0 — 자동 검증 완료
+  - [ ] 실제 창에서 키보드·마우스 조작 체감과 에뮬레이션 설정 확인 — 미실행, 아래 수동 확인 절차 필요
+- QA 관측값:
+  - 실행 환경: `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe`, 버전 `4.8.dev3.mono.official.51105ccbe`
+  - `godot --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR` 0건, `Parse Error` 0건
+  - `godot --headless --fixed-fps 240 --path . -s res://tests/run_tests.gd` → 18/18 통과, 실패 0건, 종료 코드 0
+  - 입력 테스트 세부 → `test_swipe.gd` 3/3, `test_input_router.gd` 11/11, `test_config.gd` M2 기본값 포함 3/3 통과
+  - 기존 물리 회귀 → 22시드 이탈 0건, 최대 관통 `8.623px`, 시나리오 1/1 통과
+  - `godot --headless --path . --quit-after 300` → 종료 코드 0, `SCRIPT ERROR` 0건, `Parse Error` 0건
+  - 정적 검사 → 물리 `240 tick/s`, `contact_max_allowed_penetration=0.1` 유지; `emulate_touch_from_mouse` 항목 없음(기본값 false 유지)
+- 수동 확인 절차:
+  1. `& 'C:\work\Godot\Godot_v4.8-dev3_mono_win64.exe' --path .` 실행 후 ↑·↓·←·→와 W·S·A·D를 각각 누름 → 매 키마다 모든 구체가 대응하는 벽 쪽으로 가속하는지 확인한다.
+  2. 보드 안팎에서 80px보다 긴 드래그를 상·하·좌·우로 각각 수행 → 우세 축 방향으로 중력이 바뀌는지 확인한다.
+  3. 에디터에서 `Input Devices > Pointing > Emulate Touch From Mouse`를 임시로 켜고 마우스 드래그 1회 수행 → 중력 전환이 중복 없이 1회만 일어나는지 확인한 뒤 설정을 false로 되돌린다.
+  4. 이동 30px의 짧은 클릭·드래그와 1:1 대각선 드래그를 수행 → 중력이 바뀌지 않는지 확인한다.
+- 결정 사항: WASD는 키보드 배열과 무관하게 같은 물리 위치를 쓰도록 physical key로, 방향키는 logical key로 Input Map에 등록했다. 에뮬레이션 중 먼저 들어온 MOUSE/TOUCH source가 제스처를 소유하고 해당 source의 뗌만 종료 처리한다.
+- 남은 것 · 질문: 실제 창 수동 QA는 미실행이다. 공개 API·수치 변경과 알려진 문제는 없다.
+
+---
+
+## 확인됨
+
 ### [2026-09-28] 대상 #2 — 추가 요구 2: 시나리오 시간 보정과 접촉 설정
 - 상태: 완료
 - 브랜치 / PR: `m1-board-physics` / [PR #2](https://github.com/jeongmo-dot/gravity_orb/pull/2)
@@ -186,10 +221,6 @@
   3. 각 방향으로 충분히 굴린 뒤 보드 모서리와 벽을 관찰 → 구체가 흰 테두리 밖으로 완전히 빠져나가지 않는지 확인한다.
 - 결정 사항: 명세에 수치가 없던 보드 테두리 두께는 연출 상수 `4.0px`로 두었다. 임시 구체는 보드를 셀로 나눈 뒤 각 셀의 반지름 안전 영역 안에서 RNG 오프셋을 뽑아 초기 겹침을 방지한다. 인박스 지시에 따라 M5의 `generation` 인자·필드와 접촉 신호는 추가하지 않았다. 작업 전 에디터가 다시 쓴 `project.godot` 변경은 되돌리지 않고 포함했다.
 - 남은 것 · 질문: 방향키 입력과 시각적 크기 차이 수동 QA가 필요하다. 자동 검증은 4.8-dev3 Mono에서 수행했다.
-
----
-
-## 확인됨
 
 ### [2026-09-28] 대상 #1 — M0 프로젝트 셋업
 - 상태: 완료
