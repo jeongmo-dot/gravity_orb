@@ -30,8 +30,58 @@
 
 ## 대기 중
 
-### [2026-09-28 #4] M3 턴 상태 머신
+### [2026-09-28 #5] M4 구체 생성
 - 상태: 대기
+- 근거: [technical_design.md](technical_design.md) §4 (M4 필드), §5.3 `spawn_line`, §5.9 `Spawner`, §6 (`_on_settled`의 SPAWNING 분기), §11.3 (1~3단계), §12 M4
+- 요구:
+  - `GameConfig` M4 필드: `enum SpawnPositionMode { RANDOM, CENTER }`, `spawn_level_weights`([0.9, 0.1]), `spawn_color_weights`([1, 1, 1]), `spawn_position_mode`(RANDOM), `spawn_margin`(4.0), `rng_seed`(0), `initial_orb_count`(2)
+  - **M1 임시 코드 삭제**: `debug_test_orb_count` 필드, `Main`의 `_test_rng`·`_spawn_test_orbs()`·`DEBUG_LEVEL_VARIANTS`. `test_board_physics.gd`가 쓰던 `debug_test_orb_count`는 테스트 내부 상수 `5`로 바꾼다 (물리 회귀 수치가 그대로 나와야 한다)
+  - `Board.spawn_line(gravity, radius) -> Dictionary` — §5.3 공식 그대로. `is_circle_free()`는 **M7에서 만든다** (이번엔 막혀도 선호 위치에 생성)
+  - `scripts/core/Spawner.gd` (`%Spawner`) — §5.9. 이번 공개: `signal next_changed(color, level)`, `seed_used`, `init_rng(seed) -> int`, `spawn_initial(board, gravity)`, `try_spawn(board, gravity) -> Orb` (M4에선 항상 생성, null 없음), `peek_next() -> Dictionary`
+    - **RNG 소비 순서 고정**: 구체 1개당 정확히 `level(rand_weighted) → color(rand_weighted) → position(randf)` 3회. CENTER 모드여도 position을 뽑고 버린다
+    - "다음 구체"는 뽑을 때 3개 값을 함께 저장해 두고, 생성 시 그 값을 쓴다 (position도 미리 뽑힌 값)
+    - 선호 위치: RANDOM `s = lerpf(-extent, extent, t)`, CENTER `s = 0`. 생성 좌표 `origin + axis * s`, 초기 속도 0
+    - `init_rng(0)`이면 `randomize()` 후 실제 `seed`를 `seed_used`에 저장하고 반환
+  - **초기 구체** `spawn_initial`: `initial_orb_count`개를 일반 구체와 같은 3회 뽑기로 만들되 위치는 **바닥(중력 DOWN)에 등간격** — `i`번째(0부터) `x = lerpf(-half, half, (i + 1) / (n + 1))`, `y = half - r - spawn_margin`. 뽑은 position 값은 버린다. 초기 구체 뒤에 "다음 구체" 1개를 뽑아 `next_changed` 발신
+  - `TurnManager`: settle 루프를 `SPAWNING`에서도 돌린다. `SIMULATING` 안정 → `Spawner.try_spawn(board, gravity)` → `_begin_settle()` → `SPAWNING` 안정 → `CHECK_GAMEOVER` → `WAITING_INPUT` (§6). 초기 settle은 여전히 생성 단계를 건너뛴다
+  - `Main`: `Spawner` 노드 추가. `_ready`에서 `init_rng(Config.data.rng_seed)` → `spawn_initial()` → `start_game()`
+  - **다음 구체 미리보기**: `UI.tscn`에 `Hud`(Control, 전체 화면, `mouse_filter = IGNORE`) + `scripts/ui/Hud.gd`. 상단 HUD 오른쪽(대략 (900, 240))에 "NEXT" 라벨과 `OrbVisual` 1개. `Spawner.next_changed`로 갱신. 모든 Control `mouse_filter = IGNORE`
+  - 디버그 라벨에 `Seed: <seed_used>` 줄 추가
+  - 테스트 `tests/test_spawner.gd`, `tests/scenarios/test_spawn_flow.gd`, 기존 `test_turn_manager.gd`·`test_board_physics.gd` 갱신
+- 수치: 위 필드 기본값 그대로. 임의 변경 금지
+- 건드리지 말 것: `docs/` (회신 파일 제외), 물리 설정, `InputRouter`, 입력 잠금 규칙, 전역 난수(`randf/randi/shuffle/pick_random` — `Spawner` 외 사용 금지)
+- Done-when:
+  - [ ] 아래로 스와이프하면 위쪽 벽에서, 왼쪽이면 오른쪽 벽에서 생성된다 (4방향 모두)
+  - [ ] 미리보기와 실제 생성 구체가 일치한다
+  - [ ] 같은 시드로 시작하면 같은 순서로 생성된다
+  - [ ] `grep -rn "randf\|randi\|shuffle\|pick_random\|RandomNumberGenerator" scripts --include=*.gd` 결과가 `Spawner.gd`뿐이다
+  - [ ] 아래 테스트 전부 통과, 물리 회귀 22시드 수치 변동 없음 (이탈 0, 8.623px)
+  - [ ] §10.1 명령 3종 에러 0 (`--fixed-fps 240` 허용)
+- 테스트:
+
+| 파일 | 조건 | 기대 |
+|---|---|---|
+| test_spawner | 시드 1234로 Spawner 2개, 각각 50개 뽑기 | (level, color, t) 시퀀스 50개 완전 일치 |
+| test_spawner | 시드 1234 vs 1235 | 시퀀스 불일치 |
+| test_spawner | 시드 42, 10000개 뽑기 | 레벨1 비율 0.90 ± 0.02, 각 색 1/3 ± 0.02 |
+| test_spawner | 같은 시드, RANDOM 모드 vs CENTER 모드 50개 | (level, color) 시퀀스 일치 (position 소비 확인) |
+| test_spawner | `init_rng(0)` | `seed_used != 0`이고 반환값과 같다 |
+| test_spawn_flow | 4방향 `spawn_line` (레벨1 반지름) | DOWN→ y = −(half − r − margin), UP→ y = +(…), LEFT→ x = +(…), RIGHT→ x = −(…) (오차 0.001) |
+| test_spawn_flow | 초기 구체 2개 | 2개, 바닥 등간격 좌표, 서로·벽과 겹침 0 |
+| test_spawn_flow | `peek_next()` 기록 → 스와이프 1턴 | 새로 생긴 구체의 color·level이 기록값과 같고, 생성 좌표가 생성 벽 선분 위 |
+| test_spawn_flow | 시드 777로 2회 독립 실행, 각 5턴 (DOWN, LEFT, UP, RIGHT, DOWN) | 매 턴 생성 구체의 (color, level)과 생성 좌표가 두 실행에서 일치 |
+| test_spawn_flow | 스와이프 3턴 | 구체 수 = 초기 2 + 3, 상태 순서에 SPAWNING settle 포함 |
+| test_turn_manager | T1~T7 | 생성 단계가 추가된 흐름에 맞게 갱신 후 전부 통과 (T4·T5 타이밍 기준 유지) |
+
+- QA: 테스트별 결과, 4방향 생성 좌표 표. 수동 확인 절차(시작 시 구체 2개·NEXT 표시, 스와이프마다 반대편 벽 생성, NEXT와 실제 일치, `rng_seed`를 고정값으로 바꿔 2회 실행 비교)를 회신에 적는다
+
+---
+
+## 처리 완료
+
+### [2026-09-28 #4] M3 턴 상태 머신 — 완료
+- 상태: 완료 (2026-09-28 Claude 검수 통과 · [PR #4](https://github.com/jeongmo-dot/gravity_orb/pull/4) 병합 `cdebea3`)
+- 검수: 26/26, T4 0.333초/80틱, T5 3.000초/720틱 Claude 재실행 일치. 입력 잠금·재개·라벨 표시는 사용자 수동 확인 완료. 비차단 메모: `DebugHud`·테스트가 `_settle_elapsed` 비공개 필드 참조 → M9에서 정리
 - 근거: [technical_design.md](technical_design.md) §3.2~3.3 (노드 트리·신호), §4 (M3 필드), §5.6 `TurnManager`, §6 (턴 처리 알고리즘), §11.1, §12 M3
 - 요구:
   - `GameConfig`에 M3 필드 추가: `stable_linear_speed`(12.0), `stable_angular_speed`(1.0), **`stable_duration`(0.33, 초)**, `max_settle_time`(3.0), `allow_same_direction_swipe`(true). 프레임 수 기반 `stable_frames`는 **만들지 않는다** (§4 갱신 내용)
@@ -50,12 +100,12 @@
 - 수치: 위 5개 필드 기본값 그대로. 임의 변경 금지
 - 건드리지 말 것: `docs/` (회신 파일 제외), 물리 설정, `InputRouter`·`SwipeDetector` 판정 로직, `Board`·`Orb` 공개 API
 - Done-when:
-  - [ ] 구체가 굴러가는 동안 입력이 무시된다
-  - [ ] 멈추면 다시 입력이 받아진다
-  - [ ] 계속 흔들리는 상황에서도 최대 대기 시간 후 턴이 넘어간다
-  - [ ] 디버그 텍스트로 현재 상태가 화면에 표시된다
-  - [ ] 아래 시나리오 테스트 전부 통과
-  - [ ] §10.1 명령 3종 에러 0 (`--fixed-fps 240` 허용), 기존 테스트 18개 회귀 없음
+  - [x] 구체가 굴러가는 동안 입력이 무시된다
+  - [x] 멈추면 다시 입력이 받아진다
+  - [x] 계속 흔들리는 상황에서도 최대 대기 시간 후 턴이 넘어간다
+  - [x] 디버그 텍스트로 현재 상태가 화면에 표시된다
+  - [x] 아래 시나리오 테스트 전부 통과
+  - [x] §10.1 명령 3종 에러 0 (`--fixed-fps 240` 허용), 기존 테스트 18개 회귀 없음
 - 시나리오 테스트 (`Main.tscn`이 아니라 `Board` + `TurnManager`를 직접 조립, 고정 시드 구체 배치). **`Config.data`를 바꾼 테스트는 끝에 원래 값으로 복구**:
 
 | # | 조건 | 기대 |
@@ -69,10 +119,6 @@
 | T7 | `allow_same_direction_swipe = true`, 같은 방향 스와이프 | 턴 진행 (`turn_index` +1) |
 
 - QA: 테스트별 결과와 T4·T5의 실측 settle 시간(초·tick). 수동 확인 절차(구르는 중 키 연타 → 무시, 멈춘 뒤 입력 → 반응, 디버그 라벨 상태 변화)를 회신에 적는다
-
----
-
-## 처리 완료
 
 ### [2026-09-28 #3] M2 입력 추상화 — 완료
 - 상태: 완료 (2026-09-28 Claude 검수 통과 · [PR #3](https://github.com/jeongmo-dot/gravity_orb/pull/3) 병합 `2657670`)
