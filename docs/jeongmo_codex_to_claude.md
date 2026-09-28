@@ -38,9 +38,52 @@
 
 ## 미확인
 
+### [2026-09-28] 대상 #7 — M5 합체 규칙
+- 상태: 완료
+- 브랜치 / PR: `m5-merge-rules` / PR 생성 후 링크 반영 예정
+- 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, `scenes/Main.tscn`, `scenes/UI.tscn`, `scripts/core/Board.gd`, `scripts/core/CollisionResolver.gd`, `scripts/core/Orb.gd`, `scripts/core/ReactionRules.gd`, `scripts/core/TurnManager.gd`, `scripts/ui/DebugHud.gd`, `tests/test_config.gd`, `tests/test_rules.gd`, `tests/scenarios/test_merge_scenario.gd`, `tests/scenarios/test_spawn_flow.gd`, `tests/scenarios/test_turn_manager.gd`, 신규 `.gd.uid` 4개, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 같은 색·같은 레벨 L1~L6만 MERGE, 같은 색 L7은 MAX_CLEAR, 다른 색·레벨 조합은 NONE — `test_rules.gd` 3개 자동 검증
+  - [x] 빨강 L1 두 개 접촉 후 0.5초 내 합체 1회, L2·generation 1·clamp된 중간 위치 — `test_matching_pair_merges_once_at_clamped_midpoint`
+  - [x] 빨강 L1 세 개 동시 접촉 시 합체 정확히 1회, L2 1개 + L1 1개 유지 — `test_three_simultaneous_contacts_apply_exactly_one_merge`
+  - [x] 빨강/파랑 L1 및 빨강 L1/L2 접촉은 반응 0회·구체 2개 유지 — `test_nonmatching_pairs_do_not_merge`
+  - [x] 합체 결과가 다시 합체하면 chain 1 → 2, `chain_changed`도 `[1, 2]`, 최종 L3 generation 2 — `test_merge_result_reacts_again_as_chain_two`
+  - [x] 떨어진 두 곳의 동시 합체는 모두 chain 1, `turn_max_chain` 1 — `test_independent_simultaneous_merges_are_both_chain_one`
+  - [x] L7 두 개는 MAX_CLEAR 후 구체 0개, 벽 옆 합체 결과는 새 반지름 기준 보드 안쪽 — MAX_CLEAR·clamp 시나리오 자동 검증
+  - [x] TurnManager 턴 중 합체 후 `WAITING_INPUT` 복귀, `turn_finished.max_chain ≥ 1` — `test_turn_manager_finishes_turn_after_merge`
+  - [x] 물리 콜백은 `orb_contact` 발신만 수행하고 트리 변경은 `CollisionResolver.flush()`에서 수행 — 정적 검사 및 전체 출력 `flushing queries` 0건
+  - [x] 디버그 라벨에 `Chain: <turn_max_chain>` 추가 — 씬 정적 검사 및 300프레임 스모크
+  - [x] §10.1 명령 3종 종료 코드 0, 전체 51/51 통과 — 자동 검증 완료
+  - [ ] 실제 창에서 합체·비합체·Chain 표시를 눈으로 확인 — 미실행, 아래 수동 확인 절차 필요
+- QA 관측값:
+  - 실행 환경: `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe`, 버전 `4.8.dev3.mono.official.51105ccbe`
+  - `godot --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR` 0건, `Parse Error` 0건
+  - `godot --headless --path . -s res://tests/run_tests.gd` → 51/51 통과, 실패 0건, 종료 코드 0
+  - 테스트 세부 → M5 config 1/1, `test_rules.gd` 3/3, `test_merge_scenario.gd` 8/8, 기존 39/39 회귀 통과
+  - 연쇄 시나리오 → 반응 순서 chain `[1, 2]`, `chain_changed` `[1, 2]`, 최종 빨강 L3 1개·generation 2
+  - 동시 접촉 → L1 세 개는 반응 1회·잔여 L2 1 + L1 1; 독립 L1 두 쌍은 반응 2회·chain `[1, 1]`·최대 chain 1
+  - MAX_CLEAR → 빨강 L7 두 개 제거, `result_level = 0`, `result_orb = null`; 벽 옆 MERGE 결과는 L2 반지름 기준 각 축 보드 내부
+  - 오류 검색 → 전체 출력에서 `flushing queries` 0건, `SCRIPT ERROR` 0건, `Parse Error` 0건
+  - 기존 물리 회귀 → 22시드 이탈 0건, 최대 관통 `8.623px`, 최대 속도 `1935.529px/s`
+  - 생성 겹침 회귀 → 이탈 0건, 최대 관통 `3.149px`, 최대 속도 `1142.834px/s`
+  - 전체 테스트 `forced settle` → 18건(20턴 회귀 15건 + TurnManager T2·T3·T5 각 1건). 기존 알려진 문제의 관측 횟수이며 명세 동작으로 판정하지 않음
+  - `godot --headless --path . --quit-after 300` → 종료 코드 0, `SCRIPT ERROR` 0건, `Parse Error` 0건
+  - 정적 검사 → Input 참조는 `InputRouter.gd`에만 9줄, 난수 API는 `Spawner.gd`에만 1줄, 물리 240 tick·접촉 허용 관통 0.1 유지
+- 수동 확인 절차:
+  1. `& 'C:\work\Godot\Godot_v4.8-dev3_mono_win64.exe' --path .` 실행 후 같은 색·같은 크기의 구체가 닿도록 여러 턴 진행 → 두 구체가 사라지고 같은 색의 한 단계 큰 구체 1개가 나타나는지 확인한다.
+  2. 서로 다른 색 또는 같은 색·다른 크기의 구체가 닿는 상황 관찰 → 합체하지 않고 물리적으로 튕기기만 하는지 확인한다.
+  3. 합체 결과가 같은 색·같은 크기의 다른 구체와 연속으로 닿는 상황 관찰 → 디버그 라벨 `Chain`이 1에서 2 이상으로 올라가는지 확인한다.
+  4. 합체가 일어난 턴이 끝날 때까지 대기 → 상태가 `WAITING_INPUT`으로 복귀하고 다음 스와이프를 정상 수신하는지 확인한다.
+- 결정 사항: `CollisionResolver`가 `_ready()`에서 `Board.orb_contact`를, `TurnManager`가 `reaction_applied`를 직접 구독한다. 기존 생성·턴 테스트 fixture는 해당 기능만 격리 검증하도록 Board→Resolver 접촉 연결을 끊고, 실제 결합은 신규 TurnManager 합체 시나리오에서 검증했다. M6의 ANNIHILATE 분기와 `sweep_resting_contacts()`는 추가하지 않았다.
+- 남은 것 · 질문: 실제 창 수동 QA는 미실행이다. 기본 설정의 강제 settle 다발은 기존 알려진 문제이며 후속 M5+ 튜닝 대상이다.
+
+---
+
+## 확인됨
+
 ### [2026-09-28] 대상 #6 — 생성 시점 변경: 스와이프 순간 생성
 - 상태: 완료
-- 브랜치 / PR: `m4-spawn-on-swipe` / PR 생성 후 링크 반영 예정
+- 브랜치 / PR: `m4-spawn-on-swipe` / [PR #6](https://github.com/jeongmo-dot/gravity_orb/pull/6)
 - 변경 파일: `scripts/core/TurnManager.gd`, `tests/scenarios/test_spawn_flow.gd`, `tests/scenarios/test_turn_manager.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 스와이프 직후 `SPAWNING`, 다음 물리 프레임에 구체 수 +1·생성선 위 배치·`SIMULATING` 진입 — `test_preview_matches_spawned_orb_and_spawn_line` 자동 검증
@@ -73,10 +116,6 @@
   4. 네 방향을 반복해 20턴 이상 진행 → 생성 겹침 여부와 무관하게 매 턴 구체가 1개씩 늘고, 게임오버 화면이나 경고 UI 없이 계속 진행되는지 확인한다.
 - 결정 사항: 공개 API·config 값·물리 설정·RNG 순서는 변경하지 않았다. 겹침 회귀 테스트는 8개를 DOWN으로 안정시킨 뒤 중앙 dummy를 다음 구체의 UP 생성선 원점에 맞춰 확정적으로 겹치도록 구성했다.
 - 남은 것 · 질문: 실제 창 수동 QA는 미실행이다. 20턴의 강제 settle이 독립 실행에서 15회와 16회로 달라지는 물리 안정화 변동을 관측했으며, 기존 알려진 문제로 횟수만 보고한다.
-
----
-
-## 확인됨
 
 ### [2026-09-28] 대상 #5 — M4 구체 생성
 - 상태: 완료

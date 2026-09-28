@@ -1,0 +1,27 @@
+class_name ReactionRules
+extends RefCounted
+
+enum Type { NONE, MERGE, MAX_CLEAR, ANNIHILATE }
+
+
+static func classify(
+	color_a: int,
+	level_a: int,
+	color_b: int,
+	level_b: int,
+	cfg: GameConfig
+) -> Dictionary:
+	if color_a == color_b and level_a == level_b:
+		if level_a == cfg.orb_max_level:
+			return _result(Type.MAX_CLEAR, 0, color_a)
+		return _result(Type.MERGE, level_a + 1, color_a)
+	return _result(Type.NONE, 0, color_a)
+
+
+static func _result(type: Type, result_level: int, result_color: int) -> Dictionary:
+	return {
+		"type": type,
+		"result_level": result_level,
+		"result_color": result_color,
+		"survivor": 0,
+	}

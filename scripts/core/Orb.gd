@@ -6,6 +6,8 @@ extends RigidBody2D
 
 var color: int
 var level: int
+var generation: int = 0
+var consumed: bool = false
 var _radius: float = 0.0
 
 
@@ -17,6 +19,8 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	gravity_scale = 0.0
 	can_sleep = false
 	continuous_cd = RigidBody2D.CCD_MODE_CAST_SHAPE
+	contact_monitor = true
+	max_contacts_reported = cfg.contact_max_reported
 	mass = cfg.mass_for_level(level)
 	linear_damp = cfg.orb_linear_damp
 	angular_damp = cfg.orb_angular_damp

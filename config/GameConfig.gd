@@ -32,6 +32,7 @@ enum SpawnPositionMode { RANDOM, CENTER }
 @export var spawn_margin: float = 4.0
 @export var rng_seed: int = 0
 @export var initial_orb_count: int = 2
+@export var contact_max_reported: int = 6
 
 
 func radius_for_level(level: int) -> float:
