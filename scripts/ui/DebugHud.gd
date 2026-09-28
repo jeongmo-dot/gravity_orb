@@ -17,6 +17,7 @@ const STATE_NAMES: Array[String] = [
 var _state: TurnManager.State = TurnManager.State.WAITING_INPUT
 var _gravity: Vector2i = Vector2i.DOWN
 var _turn_index: int = 0
+var _turn_max_chain: int = 0
 
 
 func _ready() -> void:
@@ -24,10 +25,12 @@ func _ready() -> void:
 	_state = _turn_manager.state
 	_gravity = _turn_manager.gravity
 	_turn_index = _turn_manager.turn_index
+	_turn_max_chain = _turn_manager.turn_max_chain
 	_turn_manager.state_changed.connect(_on_state_changed)
 	_turn_manager.gravity_changed.connect(_on_gravity_changed)
 	_turn_manager.turn_started.connect(_on_turn_started)
 	_turn_manager.turn_finished.connect(_on_turn_finished)
+	_turn_manager.chain_changed.connect(_on_chain_changed)
 	_update_label()
 
 
@@ -45,17 +48,24 @@ func _on_gravity_changed(direction: Vector2i) -> void:
 
 func _on_turn_started(next_turn_index: int, _direction: Vector2i) -> void:
 	_turn_index = next_turn_index
+	_turn_max_chain = 0
 
 
 func _on_turn_finished(finished_turn_index: int, _max_chain: int) -> void:
 	_turn_index = finished_turn_index
+	_turn_max_chain = _max_chain
+
+
+func _on_chain_changed(chain: int) -> void:
+	_turn_max_chain = chain
 
 
 func _update_label() -> void:
-	_label.text = "State: %s\nGravity: %s\nTurn: %d\nSettle: %.2f s\nSeed: %d" % [
+	_label.text = "State: %s\nGravity: %s\nTurn: %d\nChain: %d\nSettle: %.2f s\nSeed: %d" % [
 		STATE_NAMES[_state],
 		OrbTypes.dir_name(_gravity),
 		_turn_index,
+		_turn_max_chain,
 		_turn_manager._settle_elapsed,
 		_spawner.seed_used,
 	]

@@ -1,6 +1,8 @@
 class_name Board
 extends Node2D
 
+signal orb_contact(a: Orb, b: Orb)
+
 const ORB_SCENE: PackedScene = preload("res://scenes/Orb.tscn")
 const FRAME_WIDTH: float = 4.0
 
@@ -34,21 +36,25 @@ func spawn_orb(
 	p_color: int,
 	p_level: int,
 	p_position: Vector2,
-	p_velocity: Vector2 = Vector2.ZERO
+	p_velocity: Vector2 = Vector2.ZERO,
+	p_generation: int = 0
 ) -> Orb:
 	var orb: Orb = ORB_SCENE.instantiate() as Orb
 	_orbs_node.add_child(orb)
 	orb.setup(p_color, p_level, Config.data)
 	orb.position = p_position
 	orb.linear_velocity = p_velocity
+	orb.generation = p_generation
 	orb.set_gravity(_gravity_direction, Config.data.gravity_strength)
+	orb.body_entered.connect(_on_orb_body_entered.bind(orb))
 	_orbs.append(orb)
 	return orb
 
 
 func remove_orb(orb: Orb) -> void:
-	if not is_instance_valid(orb):
+	if not is_instance_valid(orb) or orb.consumed:
 		return
+	orb.consumed = true
 	_orbs.erase(orb)
 	orb.collision_layer = 0
 	orb.collision_mask = 0
@@ -57,7 +63,11 @@ func remove_orb(orb: Orb) -> void:
 
 
 func get_orbs() -> Array[Orb]:
-	return _orbs.duplicate()
+	var active_orbs: Array[Orb] = []
+	for orb: Orb in _orbs:
+		if is_instance_valid(orb) and not orb.consumed:
+			active_orbs.append(orb)
+	return active_orbs
 
 
 func clear() -> void:
@@ -73,6 +83,14 @@ func spawn_line(gravity: Vector2i, radius: float) -> Dictionary:
 		"axis": Vector2(OrbTypes.perpendicular(gravity)),
 		"extent": half - radius,
 	}
+
+
+func _on_orb_body_entered(other_body: Node, orb: Orb) -> void:
+	var other: Orb = other_body as Orb
+	if other == null or orb.consumed or other.consumed:
+		return
+	if orb.get_instance_id() < other.get_instance_id():
+		orb_contact.emit(orb, other)
 
 
 func _configure_walls() -> void:

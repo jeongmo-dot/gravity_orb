@@ -7,21 +7,29 @@ signal state_changed(state: State)
 signal gravity_changed(dir: Vector2i)
 signal turn_started(turn_index: int, dir: Vector2i)
 signal turn_finished(turn_index: int, max_chain: int)
+signal chain_changed(chain: int)
 
 @onready var _board: Board = %Board
 @onready var _spawner: Spawner = %Spawner
+@onready var _collision_resolver: CollisionResolver = %CollisionResolver
 
 var state: State = State.WAITING_INPUT
 var gravity: Vector2i = Vector2i.DOWN
 var turn_index: int = 0
+var turn_max_chain: int = 0
 
 var _stable_time: float = 0.0
 var _settle_elapsed: float = 0.0
 var _is_initial_settle: bool = false
 
 
+func _ready() -> void:
+	_collision_resolver.reaction_applied.connect(on_reaction)
+
+
 func start_game() -> void:
 	turn_index = 0
+	turn_max_chain = 0
 	gravity = Vector2i.DOWN
 	_is_initial_settle = true
 	InputRouter.set_locked(true)
@@ -38,6 +46,9 @@ func on_swipe(dir: Vector2i) -> void:
 		return
 
 	turn_index += 1
+	turn_max_chain = 0
+	for orb: Orb in _board.get_orbs():
+		orb.generation = 0
 	InputRouter.set_locked(true)
 	gravity = dir
 	_board.set_gravity(gravity)
@@ -55,6 +66,9 @@ func _physics_process(delta: float) -> void:
 
 	if state != State.SIMULATING:
 		return
+
+	if _collision_resolver.flush() > 0:
+		_stable_time = 0.0
 
 	_settle_elapsed += delta
 	if _all_below_threshold():
@@ -80,6 +94,15 @@ func _all_below_threshold() -> bool:
 	return true
 
 
+func on_reaction(reaction: Dictionary) -> void:
+	_stable_time = 0.0
+	var chain: int = int(reaction["chain"])
+	if chain <= turn_max_chain:
+		return
+	turn_max_chain = chain
+	chain_changed.emit(turn_max_chain)
+
+
 func _begin_settle() -> void:
 	_stable_time = 0.0
 	_settle_elapsed = 0.0
@@ -93,7 +116,7 @@ func _on_settled() -> void:
 		return
 
 	_set_state(State.CHECK_GAMEOVER)
-	turn_finished.emit(turn_index, 0)
+	turn_finished.emit(turn_index, turn_max_chain)
 	InputRouter.set_locked(false)
 	_set_state(State.WAITING_INPUT)
 

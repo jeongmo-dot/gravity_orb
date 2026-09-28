@@ -54,3 +54,8 @@ func test_m4_spawn_defaults() -> void:
 	assert_near(config.spawn_margin, 4.0, TOLERANCE, "spawn margin")
 	assert_eq(config.rng_seed, 0, "random seed default")
 	assert_eq(config.initial_orb_count, 2, "initial orb count")
+
+
+func test_m5_contact_defaults() -> void:
+	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
+	assert_eq(config.contact_max_reported, 6, "maximum reported contacts")

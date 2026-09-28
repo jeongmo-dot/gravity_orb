@@ -3,6 +3,7 @@ extends TestCase
 const BOARD_SCENE: PackedScene = preload("res://scenes/Board.tscn")
 const TURN_MANAGER_SCRIPT: Script = preload("res://scripts/core/TurnManager.gd")
 const SPAWNER_SCRIPT: Script = preload("res://scripts/core/Spawner.gd")
+const COLLISION_RESOLVER_SCRIPT: Script = preload("res://scripts/core/CollisionResolver.gd")
 const FIXTURE_SEED: int = 3000
 const HIGH_THRESHOLD: float = 1.0e9
 const WAIT_TIMEOUT_SECONDS: float = 7.0
@@ -194,6 +195,12 @@ func _create_fixture(seed: int) -> Dictionary:
 	fixture_root.add_child(spawner)
 	spawner.owner = fixture_root
 
+	var resolver: CollisionResolver = COLLISION_RESOLVER_SCRIPT.new() as CollisionResolver
+	resolver.name = "CollisionResolver"
+	resolver.unique_name_in_owner = true
+	fixture_root.add_child(resolver)
+	resolver.owner = fixture_root
+
 	var manager: TurnManager = TURN_MANAGER_SCRIPT.new() as TurnManager
 	manager.name = "TurnManager"
 	fixture_root.add_child(manager)
@@ -201,6 +208,7 @@ func _create_fixture(seed: int) -> Dictionary:
 
 	tree.root.add_child(fixture_root)
 	await tree.process_frame
+	board.orb_contact.disconnect(resolver.report_contact)
 
 	spawner.init_rng(seed)
 	spawner.spawn_initial(board, Vector2i.DOWN)
@@ -208,6 +216,7 @@ func _create_fixture(seed: int) -> Dictionary:
 		"root": fixture_root,
 		"board": board,
 		"spawner": spawner,
+		"resolver": resolver,
 		"manager": manager,
 	}
 
