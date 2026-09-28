@@ -18,6 +18,8 @@ extends Resource
 	[Color("#E5484D"), Color("#3E7BFA"), Color("#30A46C")]
 )
 @export var debug_test_orb_count: int = 5
+@export var swipe_min_distance: float = 80.0
+@export var swipe_dominance_ratio: float = 1.5
 
 
 func radius_for_level(level: int) -> float:

@@ -29,3 +29,9 @@ func test_radius_for_levels_one_through_seven() -> void:
 func test_mass_for_level_two() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	assert_near(config.mass_for_level(2), 1.5625, TOLERANCE, "mass for level 2")
+
+
+func test_m2_swipe_defaults() -> void:
+	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
+	assert_near(config.swipe_min_distance, 80.0, TOLERANCE, "swipe minimum distance")
+	assert_near(config.swipe_dominance_ratio, 1.5, TOLERANCE, "swipe dominance ratio")

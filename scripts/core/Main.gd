@@ -12,27 +12,9 @@ var _test_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 func _ready() -> void:
 	RenderingServer.set_default_clear_color(BACKGROUND_COLOR)
+	InputRouter.swipe.connect(_board.set_gravity)
 	_board.set_gravity(Vector2i.DOWN)
 	_spawn_test_orbs()
-
-
-# TEMP(M1): M2에서 InputRouter로 교체
-func _unhandled_input(event: InputEvent) -> void:
-	if not (event is InputEventKey):
-		return
-	var key_event: InputEventKey = event as InputEventKey
-	if not key_event.pressed or key_event.echo:
-		return
-
-	match key_event.keycode:
-		KEY_UP:
-			_board.set_gravity(Vector2i.UP)
-		KEY_DOWN:
-			_board.set_gravity(Vector2i.DOWN)
-		KEY_LEFT:
-			_board.set_gravity(Vector2i.LEFT)
-		KEY_RIGHT:
-			_board.set_gravity(Vector2i.RIGHT)
 
 
 func _spawn_test_orbs() -> void:
