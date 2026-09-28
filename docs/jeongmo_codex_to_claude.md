@@ -38,9 +38,45 @@
 
 ## 미확인
 
+### [2026-09-28] 대상 #4 — M3 턴 상태 머신
+- 상태: 완료
+- 브랜치 / PR: `m3-turn-state-machine` / PR 생성 후 링크 반영 예정
+- 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, `scenes/Main.tscn`, `scenes/UI.tscn`, `scripts/core/Main.gd`, `scripts/core/TurnManager.gd`, `scripts/ui/DebugHud.gd`, `tests/test_config.gd`, `tests/scenarios/test_turn_manager.gd`, Godot 생성 `.gd.uid` 3개
+- Done-when 대조:
+  - [x] 구체가 굴러가는 `SIMULATING` 중 추가 입력 무시, 입력 잠금 유지 — T3 자동 검증
+  - [x] 안정 조건이 `stable_duration` 동안 유지되면 입력 재개 — T1·T2·T4 자동 검증
+  - [x] 안정 불가 시 `max_settle_time`에 강제 안정 후 턴 완료 — T5 자동 검증
+  - [x] `SIMULATING → SPAWNING → CHECK_GAMEOVER → WAITING_INPUT` 상태 신호 순서와 턴 신호 각 1회 — T2 자동 검증
+  - [x] 같은 방향 스와이프 허용 토글의 잠금·턴 수 동작 — T6·T7 자동 검증
+  - [x] `Main`의 입력 연결을 `TurnManager.on_swipe`로 교체하고 `Board.set_gravity` 직접 호출을 `TurnManager`로 한정 — 정적 검사와 메인 씬 스모크 자동 검증
+  - [x] 임시 디버그 라벨에 state·gravity·turn index·settle 초 표시, `mouse_filter = IGNORE`, 상단 HUD 영역 배치 — 씬 정적 검사와 메인 씬 스모크 자동 검증
+  - [x] §10.1 명령 3종 종료 코드 0, 기존 M0~M2 회귀 포함 — 자동 검증 완료
+  - [ ] 실제 창에서 입력 잠금 체감과 디버그 라벨 상태 변화 확인 — 미실행, 아래 수동 확인 절차 필요
+- QA 관측값:
+  - 실행 환경: `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe`, 버전 `4.8.dev3.mono.official.51105ccbe`
+  - `godot --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR` 0건, `Parse Error` 0건
+  - `godot --headless --fixed-fps 240 --path . -s res://tests/run_tests.gd` → 26/26 통과, 실패 0건, 종료 코드 0
+  - M3 시나리오 → T1~T7 7/7 통과; 기존 테스트 18/18 회귀 없음; M3 config 기본값 테스트 1/1 통과
+  - T4 안정 settle → `0.333333초`, `80틱`, 목표 `0.33초`, 허용 오차 1물리틱 이내
+  - T5 강제 settle → `3.000000초`, `720틱`, 목표 `3.00초`, 허용 오차 1물리틱 이내; 명세의 `forced settle turn=1 elapsed=3.000` 경고 1건 관측
+  - 기존 물리 회귀 → 22시드 이탈 0건, 최대 관통 `8.623px`
+  - `godot --headless --path . --quit-after 300` → 종료 코드 0, `SCRIPT ERROR` 0건, `Parse Error` 0건
+  - 정적 검사 → 상태 대입은 `_set_state()` 내부 1곳, 미래 M5/M7 API·호출 0건, 물리 설정 240 tick·접촉 허용 관통 0.1 유지
+- 수동 확인 절차:
+  1. `& 'C:\work\Godot\Godot_v4.8-dev3_mono_win64.exe' --path .` 실행 → 화면 상단 라벨에 `State`, `Gravity`, `Turn`, `Settle` 네 항목이 표시되고 마우스 입력을 가로막지 않는지 확인한다.
+  2. 초기 `SIMULATING`이 끝나 라벨이 `WAITING_INPUT`으로 바뀐 뒤 방향키나 드래그 입력 → `Turn`이 1 증가하고 `Gravity`와 `State`가 즉시 바뀌는지 확인한다.
+  3. 구체가 구르는 동안 서로 다른 방향키를 연타하거나 여러 방향으로 드래그 → 첫 입력 뒤 `SIMULATING` 동안 중력·턴 수가 더 바뀌지 않는지 확인한다.
+  4. 라벨이 다시 `WAITING_INPUT`이 된 뒤 새 방향을 입력 → 다음 턴으로 정상 진행하는지 확인한다.
+- 결정 사항: 임시 HUD는 `scripts/ui/DebugHud.gd`가 state·gravity·turn 신호를 구독하며, 화면 표시용 settle 경과만 `_process()`에서 `TurnManager`의 내부 누적값을 읽는다. T4·T5는 동일한 240Hz 물리 delta를 보존하면서 실행 시간을 줄이기 위해 `--fixed-fps 240`으로 측정했다.
+- 남은 것 · 질문: 실제 창 수동 QA는 미실행이다. 공개 API·밸런스 수치 변경과 알려진 문제는 없다.
+
+---
+
+## 확인됨
+
 ### [2026-09-28] 대상 #3 — M2 입력 추상화
 - 상태: 완료
-- 브랜치 / PR: `m2-input-abstraction` / PR 생성 후 링크 반영 예정
+- 브랜치 / PR: `m2-input-abstraction` / [PR #3](https://github.com/jeongmo-dot/gravity_orb/pull/3)
 - 변경 파일: `project.godot`, `config/GameConfig.gd`, `config/default_config.tres`, `scripts/autoload/InputRouter.gd`, `scripts/core/SwipeDetector.gd`, `scripts/core/Main.gd`, `tests/test_config.gd`, `tests/test_input_router.gd`, `tests/test_swipe.gd`, Godot 생성 `.gd.uid` 4개
 - Done-when 대조:
   - [x] 방향키·WASD와 마우스 드래그가 같은 `swipe(Vector2i)` 신호로 들어가고 `Main`이 `Board.set_gravity`에 연결 — `test_arrow_and_wasd_bindings_map_to_four_directions`, `test_mouse_left_drag_emits_once`, 메인 씬 스모크 자동 검증
@@ -68,10 +104,6 @@
   4. 이동 30px의 짧은 클릭·드래그와 1:1 대각선 드래그를 수행 → 중력이 바뀌지 않는지 확인한다.
 - 결정 사항: WASD는 키보드 배열과 무관하게 같은 물리 위치를 쓰도록 physical key로, 방향키는 logical key로 Input Map에 등록했다. 에뮬레이션 중 먼저 들어온 MOUSE/TOUCH source가 제스처를 소유하고 해당 source의 뗌만 종료 처리한다.
 - 남은 것 · 질문: 실제 창 수동 QA는 미실행이다. 공개 API·수치 변경과 알려진 문제는 없다.
-
----
-
-## 확인됨
 
 ### [2026-09-28] 대상 #2 — 추가 요구 2: 시나리오 시간 보정과 접촉 설정
 - 상태: 완료

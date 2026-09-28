@@ -1,0 +1,17 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/DebugHud.gd" id="1_debug_hud"]
+
+[node name="UI" type="CanvasLayer"]
+script = ExtResource("1_debug_hud")
+
+[node name="DebugLabel" type="Label" parent="."]
+unique_name_in_owner = true
+offset_left = 24.0
+offset_top = 24.0
+offset_right = 624.0
+offset_bottom = 224.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 28
+text = "State: WAITING_INPUT\nGravity: DOWN\nTurn: 0\nSettle: 0.00 s"

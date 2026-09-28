@@ -5,6 +5,7 @@ const BACKGROUND_COLOR: Color = Color.BLACK
 const DEBUG_LEVEL_VARIANTS: int = 4
 
 @onready var _board: Board = $Board
+@onready var _turn_manager: TurnManager = %TurnManager
 
 # TEMP(M1): M4에서 Spawner로 교체
 var _test_rng: RandomNumberGenerator = RandomNumberGenerator.new()
@@ -12,9 +13,9 @@ var _test_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 func _ready() -> void:
 	RenderingServer.set_default_clear_color(BACKGROUND_COLOR)
-	InputRouter.swipe.connect(_board.set_gravity)
-	_board.set_gravity(Vector2i.DOWN)
+	InputRouter.swipe.connect(_turn_manager.on_swipe)
 	_spawn_test_orbs()
+	_turn_manager.start_game()
 
 
 func _spawn_test_orbs() -> void:
