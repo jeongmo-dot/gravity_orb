@@ -39,9 +39,31 @@
 ## 미확인
 
 ### [2026-09-29] 대상 #8 — 턴 소요 시간 튜닝: 구름 저항
-- 상태: 질문 — 추가 요구 1 결과
+- 상태: 질문 — 추가 요구 2 기본값 경로 회귀 불일치
 - 브랜치 / PR: `m5-turn-time-tuning` / PR 미생성
-- 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, `scripts/core/Orb.gd`, `tests/test_config.gd`, `tests/scenarios/test_turn_time.gd`, `tests/scenarios/test_turn_time.gd.uid`, `docs/jeongmo_codex_to_claude.md`
+- 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, `scripts/core/Orb.gd`, `tests/test_config.gd`, `tests/scenarios/test_board_physics.gd`, `tests/scenarios/test_spawn_flow.gd`, `tests/scenarios/test_turn_time.gd`, `tests/scenarios/test_turn_time.gd.uid`, `docs/jeongmo_codex_to_claude.md`
+- 추가 요구 2 Done-when 대조:
+  - [x] 지정 기본값 `rolling_resistance 1.0`, 저속 제동 `0/0`, 안정 임계 `30/3`을 `default_config.tres`와 config 테스트에 반영
+  - [x] 물리·겹침·스윕 선택 조건의 관통 기준을 12px로 변경
+  - [x] 스윕의 `1.0 / 0·0 / 30·3` 행은 추가 요구 1 수치와 정확히 일치 — 강제 0, p50 1.733333초, p90 2.045833초, 물리 관통 10.450px, 20턴 이탈 0, 겹침 4.693px
+  - [ ] 같은 실행 끝의 기본값 재측정과 스윕 행 일치 — 강제 4, p50 1.737500초, p90 2.112500초로 불일치
+  - [ ] 지정 기본값으로 전체 테스트 통과 — 물리 회귀와 20턴 회귀 2개 실패, 52/54 통과
+  - [ ] §10.1 명령 3종 에러 0 — import·300프레임 스모크는 종료 코드 0, 전체 테스트는 종료 코드 1
+  - [x] 같은 브랜치 push — 질문 상태의 재현 코드·관측값 공유용이며 병합은 보류
+- 추가 요구 2 QA 관측값:
+  - 독립 기본값 실행을 3회 반복한 결과 모두 동일: 물리 22시드 이탈 0·최대 관통 **12.891px**(시드 1008), 20턴은 11턴째 UP에서 중심 이탈 1회·최대 관통 **57.279px**, 겹침 이탈 0·관통 4.599px
+  - 독립 기본값 턴 시간 → 강제 3/120, 평균 1.803576초, p50 1.745833초, p90 2.041667초, 최대 3.004167초, 최종 구체 평균 11.167. 시간 목표 자체는 충족
+  - 전체 테스트 `forced settle` 경고 → 4건. T5 의도적 1건을 제외하면 신규 턴 시간 시나리오의 3건
+  - 같은 스윕 프로세스의 후보 행 → 강제 0/120, 평균 1.774687초, p50 1.733333초, p90 2.045833초, 최대 2.400000초, 최종 구체 평균 10.333, 물리 관통 10.450px, 20턴 이탈 0, 겹침 4.693px
+  - 같은 스윕 프로세스 끝의 기본값 재측정 → 강제 4/120, 평균 1.808715초, p50 1.737500초, p90 2.112500초, 최대 3.004167초, 최종 구체 평균 10.667. exact parity assert 실패
+  - 실행 순서별 결과는 각각 반복 재현되며, fixture 제거 후 물리 프레임 추가 대기와 fixture 시작을 물리 프레임 경계로 맞춘 실험에서도 독립 실행 수치가 바뀌지 않아 두 실험은 되돌림
+  - 원인 관측: 동일 설정·시드라도 앞서 생성·해제된 물리 body 이력에 따라 접촉 솔버 순서가 달라지는 실행 순서 의존성이 있다. 힘 기반 저항이 더미를 조밀하게 유지해 이 차이가 관통·중심 이탈까지 증폭되는 것으로 추정한다
+  - `godot --headless --path . --import` → 종료 코드 0, 파싱 오류 0건
+  - `godot --headless --fixed-fps 240 --path . -s res://tests/run_tests.gd` → 52/54 통과, 종료 코드 1. 실패는 `test_board_physics`와 `test_seed_4242_completes_twenty_turns_without_departures`
+  - `godot --headless --path . --quit-after 300` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+- 추가 요구 2 수동 확인: 자동 물리 안전 회귀가 실패해 미실행
+- 추가 요구 2 남은 것 · 질문: 지정 기본값은 시간 목표를 만족하지만 독립 실행에서 12px 관통 기준과 중심 이탈 0 조건을 만족하지 않는다. 특히 20턴 최대 관통 57.279px은 허용치 완화로 처리할 수준이 아니다. 기본값 또는 힘 적용 방식을 다시 지정해야 하며, 질문 상태의 재현 코드와 관측값은 같은 브랜치에 push하고 병합은 보류한다.
+
 - 추가 요구 1 Done-when 대조:
   - [x] `Orb.gd`의 `linear_velocity =`·`angular_velocity =` 대입 제거 — 정적 검색 0건
   - [x] 접촉 중 구름 속도 반대 방향의 중앙 힘을 `min(rolling_resistance × gravity_strength, rolling_speed / delta) × mass`로 적용하고, 원형 관성 모멘트 기반 토크로 각속도를 같은 비율 감속

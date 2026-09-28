@@ -8,7 +8,7 @@ const HIGH_THRESHOLD: float = 1.0e9
 const WAIT_TIMEOUT_SECONDS: float = 8.0
 const POSITION_TOLERANCE: float = 0.001
 const OVERLAP_OBSERVE_SECONDS: float = 0.5
-const OVERLAP_PENETRATION_LIMIT: float = 10.0
+const OVERLAP_PENETRATION_LIMIT: float = 12.0
 const REPRO_DIRECTIONS: Array[Vector2i] = [
 	Vector2i.DOWN,
 	Vector2i.LEFT,
@@ -267,6 +267,7 @@ func test_seed_4242_completes_twenty_turns_without_departures() -> void:
 		Vector2i.LEFT,
 	]
 	var total_departures: int = 0
+	var maximum_penetration: float = 0.0
 	var forced_settle_count: int = 0
 	var tick_seconds: float = 1.0 / float(Engine.physics_ticks_per_second)
 
@@ -281,22 +282,25 @@ func test_seed_4242_completes_twenty_turns_without_departures() -> void:
 		if forced:
 			forced_settle_count += 1
 		total_departures += int(metrics["departures"])
+		maximum_penetration = maxf(maximum_penetration, float(metrics["max_penetration"]))
 		print(
-			"Spawn flow seed=4242 turn=%d gravity=%s settle=%.6f forced=%s orbs=%d departures=%d" % [
+			"Spawn flow seed=4242 turn=%d gravity=%s settle=%.6f forced=%s orbs=%d departures=%d max_penetration=%.3f" % [
 				turn_offset + 1,
 				OrbTypes.dir_name(direction),
 				settle_elapsed,
 				str(forced),
 				board.get_orbs().size(),
 				int(metrics["departures"]),
+				float(metrics["max_penetration"]),
 			]
 		)
 		assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "turn returns to input")
 
 	print(
-		"Spawn flow seed=4242 summary turns=20 orbs=%d departures=%d forced_settles=%d" % [
+		"Spawn flow seed=4242 summary turns=20 orbs=%d departures=%d max_penetration=%.3f forced_settles=%d" % [
 			board.get_orbs().size(),
 			total_departures,
+			maximum_penetration,
 			forced_settle_count,
 		]
 	)
