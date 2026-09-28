@@ -35,3 +35,12 @@ func test_m2_swipe_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	assert_near(config.swipe_min_distance, 80.0, TOLERANCE, "swipe minimum distance")
 	assert_near(config.swipe_dominance_ratio, 1.5, TOLERANCE, "swipe dominance ratio")
+
+
+func test_m3_turn_defaults() -> void:
+	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
+	assert_near(config.stable_linear_speed, 12.0, TOLERANCE, "stable linear speed")
+	assert_near(config.stable_angular_speed, 1.0, TOLERANCE, "stable angular speed")
+	assert_near(config.stable_duration, 0.33, TOLERANCE, "stable duration")
+	assert_near(config.max_settle_time, 3.0, TOLERANCE, "maximum settle time")
+	assert_eq(config.allow_same_direction_swipe, true, "same direction default")

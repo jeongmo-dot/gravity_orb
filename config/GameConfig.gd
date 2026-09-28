@@ -20,6 +20,11 @@ extends Resource
 @export var debug_test_orb_count: int = 5
 @export var swipe_min_distance: float = 80.0
 @export var swipe_dominance_ratio: float = 1.5
+@export var stable_linear_speed: float = 12.0
+@export var stable_angular_speed: float = 1.0
+@export var stable_duration: float = 0.33
+@export var max_settle_time: float = 3.0
+@export var allow_same_direction_swipe: bool = true
 
 
 func radius_for_level(level: int) -> float:
