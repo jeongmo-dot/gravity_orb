@@ -7,7 +7,7 @@ const DIRECTIONS: Array[Vector2i] = [
 	Vector2i.UP,
 	Vector2i.LEFT,
 ]
-const PHYSICS_FRAMES_PER_DIRECTION: int = 120
+const SIMULATION_SECONDS_PER_DIRECTION: float = 2.0
 const LAPS: int = 4
 const STANDARD_SEED_START: int = 1000
 const STANDARD_SEED_END_EXCLUSIVE: int = 1020
@@ -71,12 +71,15 @@ func _run_scenario(seed: int, scenario_name: String, levels: Array[int]) -> Dict
 	var maximum_speed: float = 0.0
 	var first_departure_recorded: bool = false
 	var scenario_frame: int = 0
+	var frames_per_direction: int = int(
+		Engine.physics_ticks_per_second * SIMULATION_SECONDS_PER_DIRECTION
+	)
 
 	assert_eq(initial_overlap_count, 0, "seed %d initial wall or orb overlaps" % seed)
 	for lap: int in range(LAPS):
 		for direction: Vector2i in DIRECTIONS:
 			board.set_gravity(direction)
-			for _frame: int in range(PHYSICS_FRAMES_PER_DIRECTION):
+			for _frame: int in range(frames_per_direction):
 				await tree.physics_frame
 				scenario_frame += 1
 				var orbs: Array[Orb] = board.get_orbs()
