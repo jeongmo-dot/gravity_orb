@@ -59,3 +59,10 @@ func test_m4_spawn_defaults() -> void:
 func test_m5_contact_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	assert_eq(config.contact_max_reported, 6, "maximum reported contacts")
+
+
+func test_m5_plus_tuning_defaults_remain_disabled_without_a_matching_sweep_result() -> void:
+	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
+	assert_near(config.rolling_resistance, 0.0, TOLERANCE, "rolling resistance")
+	assert_near(config.rest_speed, 0.0, TOLERANCE, "rest speed")
+	assert_near(config.rest_damp, 0.0, TOLERANCE, "rest damping")

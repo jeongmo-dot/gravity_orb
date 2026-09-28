@@ -32,3 +32,6 @@ spawn_margin = 4.0
 rng_seed = 0
 initial_orb_count = 2
 contact_max_reported = 6
+rolling_resistance = 0.0
+rest_speed = 0.0
+rest_damp = 0.0
