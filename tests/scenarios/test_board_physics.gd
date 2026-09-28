@@ -14,15 +14,16 @@ const STANDARD_SEED_END_EXCLUSIVE: int = 1020
 const KNOWN_REGRESSION_SEED: int = 1047
 const WORST_CASE_SEED: int = 2000
 const MAX_ALLOWED_PENETRATION: float = 10.0
+const STANDARD_ORB_COUNT: int = 5
 
 
 func test_seeded_orbs_remain_inside_board_during_gravity_cycles() -> void:
 	var results: Array[Dictionary] = []
 	for seed: int in range(STANDARD_SEED_START, STANDARD_SEED_END_EXCLUSIVE):
-		var standard_levels: Array[int] = _standard_levels(Config.data.debug_test_orb_count)
+		var standard_levels: Array[int] = _standard_levels(STANDARD_ORB_COUNT)
 		results.append(await _run_scenario(seed, "standard", standard_levels))
 
-	var regression_levels: Array[int] = _standard_levels(Config.data.debug_test_orb_count)
+	var regression_levels: Array[int] = _standard_levels(STANDARD_ORB_COUNT)
 	results.append(await _run_scenario(KNOWN_REGRESSION_SEED, "regression", regression_levels))
 
 	var worst_case_levels: Array[int] = [4, 4, 4, 4, 1, 1, 1, 1]
