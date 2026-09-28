@@ -191,8 +191,8 @@ Board.orb_contact(a, b) ──────────────▶ CollisionR
 CollisionResolver.reaction_applied(r) ─▶ ScoreManager / Effects / TurnManager(연쇄·안정 카운터)
 TurnManager.state_changed(s) ─────────▶ UI / DebugOverlay   (입력 잠금은 TurnManager가 직접 호출)
 TurnManager.gravity_changed(dir) ─────▶ UI / Effects        (Board.set_gravity는 직접 호출)
-TurnManager.warning_changed(walls) ───▶ Board.Frame / Effects
-TurnManager.game_over() ──────────────▶ ScoreManager.commit / UI(게임오버 패널) / PlayLogger
+TurnManager.warning_changed(walls) ───▶ Board.Frame / Effects          (보류 — 11.4)
+TurnManager.game_over() ──────────────▶ ScoreManager.commit / UI(게임오버 패널) / PlayLogger  (보류 — 11.2)
 Spawner.next_changed(color, level) ───▶ UI(다음 구체 미리보기)
 ScoreManager.score_changed(...) ──────▶ UI
 InputRouter.restart_requested ────────▶ Main.restart()
@@ -254,9 +254,8 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M7 | `level_scores` | PackedInt32Array | [2,4,8,16,32,64,128] | 인덱스 0 = 레벨1 |
 | M7 | `annihilation_score_factor` | float | 0.5 | |
 | M7 | `max_merge_bonus_factor` | float | 5.0 | |
-| M7 | `spawn_candidate_count` | int | 9 | 생성 위치 후보 수 (11.3) |
-| M7 | `spawn_fallback_to_free_slot` | bool | true | 선택 위치가 막히면 빈 후보로 대체 |
-| M7 | `warning_distance` | float | 60.0 | 경고 여유 거리 (11.4) |
+| ~~M7~~ | ~~`spawn_candidate_count`, `spawn_fallback_to_free_slot`~~ | | | **폐기** (기획서 0.2: 빈자리와 무관하게 생성) |
+| 보류 | `warning_distance` | | | 게임오버 조건 재설계 후 결정 (11.4) |
 | M8 | `hitstop_duration` | float | 0.06 | 실시간 초 |
 | M8 | `hitstop_time_scale` | float | 0.05 | |
 | M8 | `tilt_angle_deg` | float | 3.0 | |
@@ -355,7 +354,6 @@ func spawn_orb(color: int, level: int, pos: Vector2, vel: Vector2 = Vector2.ZERO
 func remove_orb(orb: Orb) -> void
 func get_orbs() -> Array[Orb]                            # consumed가 아닌 Orb만
 func clear() -> void
-func is_circle_free(pos: Vector2, radius: float) -> bool # 물리 공간 쿼리, 물리 프레임 흐름에서만 호출 (M4)
 func spawn_line(gravity: Vector2i, radius: float) -> Dictionary  # {origin: Vector2, axis: Vector2, extent: float} (M4)
 ```
 
@@ -415,8 +413,8 @@ signal gravity_changed(dir: Vector2i)
 signal turn_started(turn_index: int, dir: Vector2i)
 signal turn_finished(turn_index: int, max_chain: int)
 signal chain_changed(chain: int)                    # M5, 턴 내 최대 연쇄 갱신 시
-signal warning_changed(walls: Array[Vector2i])      # M7, 경고 중인 벽을 "그 벽에서 생성되는 중력 방향"으로 표기
-signal game_over                                    # M7
+signal warning_changed(walls: Array[Vector2i])      # 보류 (11.4)
+signal game_over                                    # 보류 (11.2)
 
 var state: State
 var gravity: Vector2i = Vector2i.DOWN
@@ -475,7 +473,7 @@ signal next_changed(color: int, level: int)
 var seed_used: int
 func init_rng(seed: int) -> int          # 0이면 무작위 시드 생성, 실제 시드 반환·보관
 func spawn_initial(board: Board, gravity: Vector2i) -> void
-func try_spawn(board: Board, gravity: Vector2i) -> Orb   # 막혀 있으면 null (= 게임오버 조건, M7)
+func try_spawn(board: Board, gravity: Vector2i) -> Orb   # 항상 생성 (겹침 무관, 기획서 0.2)
 func peek_next() -> Dictionary           # {color, level}
 ```
 
@@ -521,9 +519,13 @@ WAITING_INPUT
     모든 Orb.generation = 0
     InputRouter.set_locked(true)
     gravity = dir; Board.set_gravity(dir); emit gravity_changed, turn_started
+    → SPAWNING
+
+SPAWNING (1 물리 프레임):                  # 기획서 0.2: 스와이프 순간 생성
+    Spawner.try_spawn(board, gravity)       # 새 중력의 반대편 벽, 무작위 위치, 겹침 검사 없음
     _begin_settle(); → SIMULATING
 
-SIMULATING / SPAWNING 공통 settle 루프 (매 물리 프레임):
+SIMULATING settle 루프 (매 물리 프레임):
     if CollisionResolver.flush() > 0: stable_time = 0.0
     settle_elapsed += delta                 # 스케일된 시간
     if _all_below_threshold(): stable_time += delta else: stable_time = 0.0
@@ -534,15 +536,10 @@ SIMULATING / SPAWNING 공통 settle 루프 (매 물리 프레임):
         push_warning("forced settle"); _on_settled()
 
 _on_settled():
-    SIMULATING:
-        orb = Spawner.try_spawn(board, gravity)
-        if orb == null: spawn_blocked = true; → CHECK_GAMEOVER
-        else: _begin_settle(); → SPAWNING       # 생성 구체가 떨어져 멈출 때까지 대기 (기획서 4장 8번)
-    SPAWNING: → CHECK_GAMEOVER
+    → CHECK_GAMEOVER
 
 CHECK_GAMEOVER (1프레임):
-    if spawn_blocked: → GAME_OVER; emit game_over; return
-    경고 벽 계산 (11.4) → 변했을 때만 emit warning_changed
+    (게임오버·경고 판정 보류 — 11.2·11.4. 조건이 정해지면 여기서 판정)
     emit turn_finished(turn_index, turn_max_chain)
     InputRouter.set_locked(false); → WAITING_INPUT
 ```
@@ -551,6 +548,7 @@ CHECK_GAMEOVER (1프레임):
 - `_begin_settle()`: `stable_time = 0.0`, `settle_elapsed = 0.0`.
 - `start_game()`: 중력 DOWN → 초기 구체 생성 → settle(`SIMULATING` 재사용, `_is_initial_settle = true`면 `_on_settled`에서 생성 단계를 건너뛰고 바로 `WAITING_INPUT`).
 - **M3 시점**: `SPAWNING`, `CHECK_GAMEOVER`는 즉시 통과. `flush`/`sweep`/`try_spawn` 호출은 해당 마일스톤에서 추가.
+- **변경 이력**: M4(PR #5)는 "안정 후 생성 → SPAWNING settle" 순서로 구현됐다. 기획서 0.2에서 스와이프 순간 생성으로 바뀌어 인박스 #6에서 위 흐름으로 교체한다. SPAWNING은 이제 1프레임 상태다.
 
 ---
 
@@ -684,21 +682,17 @@ godot --headless --path . --quit-after 300
 ### 11.1 같은 방향 스와이프
 기획서 3.2 표는 "유효 입력", 7장은 미정. **기본 허용(true)**, 토글 제공. 비허용이면 입력을 잠그지 않고 무시만 한다.
 
-### 11.2 게임오버 판정 시점
-"신규 구체 생성 시 생성 영역이 기존 구체와 겹치면"을 **생성을 시도하는 순간 공간 쿼리로 판정**한다고 해석한다. 결과는 `spawn_blocked` 플래그로 남기고 `CHECK_GAMEOVER`에서 소비한다.
+### 11.2 게임오버 조건 — 보류
+기획서 0.2에서 생성이 빈자리와 무관해져 0.1의 "생성 영역이 겹치면 게임오버"는 폐기됐다. 새 조건은 사용자 결정 전까지 **보류**하며, 그동안 구체는 계속 쌓이고 게임은 끝나지 않는다. `GAME_OVER` 상태·`game_over` 신호는 정의만 두고 진입 경로를 만들지 않는다.
+후보 (기획서 7장): ① 턴 종료 시 이번 턴 생성 구체가 생성 벽 근처(지름 이내)에 남아 있으면 ② 어떤 구체든 생성 벽 근처에 걸쳐 있으면.
 
 ### 11.3 생성 위치 결정
-1. `spawn_line` 선분 위에 `spawn_candidate_count`개 후보를 등간격으로 둔다.
-2. 선호 위치: RANDOM이면 `s = lerpf(-extent, extent, rng.randf())`, CENTER면 `s = 0`.
-3. 선호 위치가 비어 있으면(`is_circle_free`) 거기 생성.
-4. 막혔고 `spawn_fallback_to_free_slot`이면, 빈 후보 중 선호 위치에 가장 가까운 곳에 생성 (동률이면 `s`가 작은 쪽).
-5. 빈 곳이 없으면 게임오버.
+- 스와이프 순간(SPAWNING 1프레임) 새 중력의 반대편 벽 `spawn_line` 위에 생성한다.
+- 위치: RANDOM이면 `s = lerpf(-extent, extent, t)`(`t`는 미리 뽑아 둔 값), CENTER면 `s = 0`.
+- **겹침 검사·빈자리 탐색을 하지 않는다.** 기존 구체와 겹치면 물리 엔진이 밀어낸다. 과도한 튕김 여부는 시나리오 테스트로 측정한다 (M4 교체 항목 #6).
 
-M4에서는 1~3단계만 구현하고 막혀도 선호 위치에 그냥 생성한다. M7에서 4~5단계를 추가한다.
-무작위 모드에서 "선호 위치 한 점이 막혔다고 즉시 게임오버"는 운에 너무 좌우되므로 4단계를 기본 on으로 둔다.
-
-### 11.4 경고 신호
-다음 생성 벽은 다음 스와이프에 따라 달라지므로 **네 벽 각각**에 대해 경고 여부를 계산한다. 벽의 경고 조건: 어떤 구체든 그 벽 안쪽 면에서 구체 가장자리까지의 거리가 `2 × radius_for_level(1) + spawn_margin + warning_distance` 미만. 결과는 "그 벽에서 생성되는 중력 방향" 목록으로 `warning_changed`에 담는다 (위쪽 벽 경고 → `Vector2i.DOWN`). 연출(M8)은 해당 벽을 붉게 점멸한다.
+### 11.4 경고 신호 — 보류
+게임오버 조건과 함께 재설계한다.
 
 ### 11.5 연쇄 정의
 8.1의 세대 방식. 기획서 4장 "합체·소멸 후 다시 4번으로"와 동치이며 독립적인 동시 반응을 연쇄로 세지 않는다.
@@ -749,7 +743,7 @@ M4에서는 1~3단계만 구현하고 막혀도 선호 위치에 그냥 생성�
 - 강제 안정 발생 시 `push_warning`.
 
 ### M4. 구체 생성
-- `Spawner.gd` (5.9, 11.3의 1~3단계). `init_rng(Config.data.rng_seed)`, 실제 시드를 디버그 라벨에 표시.
+- `Spawner.gd` (5.9, 11.3). `init_rng(Config.data.rng_seed)`, 실제 시드를 디버그 라벨에 표시.
 - `Hud`에 다음 구체 미리보기 (`OrbVisual` 재사용).
 - M1 테스트 구체·임시 RNG·`debug_test_orb_count` 삭제. 초기 구체 `initial_orb_count`개는 Spawner RNG로 보드 하단 절반에 배치.
 - 테스트: `test_spawner.gd`.
@@ -773,6 +767,7 @@ M4 검수(2026-09-28)에서 발견. 합체가 없는 M4 상태에서 **이동·�
 
 - 할 일: 합체가 들어간 상태에서 다시 측정한다. **턴 소요 시간**(스와이프 → 입력 재개)과 **강제 안정 비율**을 시나리오 테스트 지표로 추가하고, 감쇠·마찰·`gravity_strength`·`stable_*`를 함께 조정한다. 목표값은 측정 후 Claude가 정한다. 물리 회귀(관통 ≤ 10px)를 유지한다.
 - 이 항목 전까지 시나리오 테스트의 강제 안정 경고는 **기지의 문제**로 취급한다. "명세 동작"이 아니다.
+- 기획서 0.2로 생성이 턴 시작으로 옮겨져 settle 단계가 턴당 1회로 줄었다. 위 표는 변경 전(이동·생성 2단계) 측정값이다.
 
 ### M6. 상극 소멸
 - `opposite_pairs`, `annihilation_rule`, `is_opposite` 추가. `ReactionRules`에 ANNIHILATE (5.8 표 전체).
@@ -782,8 +777,8 @@ M4 검수(2026-09-28)에서 발견. 합체가 없는 M4 상태에서 **이동·�
 
 ### M7. 게임오버와 점수
 - `ScoreManager.gd` (5.10, 8.2), `save.cfg`.
-- `Spawner.try_spawn`에 11.3의 4~5단계, `TurnManager`에 `spawn_blocked`·`GAME_OVER`, 경고 계산(11.4, 이 단계에선 신호만).
-- `GameOverPanel`: 점수, 최고 점수, 최대 연쇄, 재시작 버튼. 버튼과 R키(`InputRouter.restart_requested`)가 같은 `Main.restart()` 호출.
+- 게임오버·경고는 **보류** (11.2·11.4). 조건이 정해지기 전까지 M7은 점수·최고 점수 저장·재시작(R키)까지만 한다.
+- `GameOverPanel`: 조건 확정 후. 재시작은 R키(`InputRouter.restart_requested`)로 `Main.restart()` 호출.
 - 재시작: `get_tree().reload_current_scene()`. 설정은 `Config` 오토로드에 남아 유지된다.
 - 테스트: `test_score.gd`.
 
@@ -828,7 +823,7 @@ M4 검수(2026-09-28)에서 발견. 합체가 없는 M4 상태에서 **이동·�
 | 빠른 구체가 벽을 뚫음 | 두꺼운 벽 + `CCD_MODE_CAST_SHAPE` |
 | `emulate_touch_from_mouse`로 마우스·터치 이벤트 이중 입력 | 제스처 source 고정 (5.5) |
 | `contact_monitor` 꺼짐 또는 `max_contacts_reported = 0`이면 `body_entered` 미발생 | 둘 다 설정 |
-| `PhysicsDirectSpaceState2D` 쿼리를 물리 프레임 밖에서 호출하면 실패 | `is_circle_free`는 `_physics_process` 흐름에서만 |
+| `PhysicsDirectSpaceState2D` 쿼리를 물리 프레임 밖에서 호출하면 실패 | 공간 쿼리는 `_physics_process` 흐름에서만 |
 | `preload`한 리소스는 캐시 공유 → 런타임 수정이 원본 참조 전체에 퍼짐 | `Config`에서 `duplicate(true)` 한 번, 모두 `Config.data` 참조 |
 | 고속 구체가 다른 구체에 밀려 벽 안으로 수십 px 파고듦 (60Hz 최대 53px, 시드 1047에서 중심 이탈) | 240 tick/s + `contact_max_allowed_penetration = 0.1` (방향당 2초·22시드 기준 최대 8.6px). solver 반복 증가·120Hz·`default_contact_bias` 상향은 효과 없음. M10에서 모바일 비용 재평가 |
 | `Engine.time_scale` 복구 누락 | 히트스톱 종료 타이머 + `_exit_tree`에서 1.0 복구 |

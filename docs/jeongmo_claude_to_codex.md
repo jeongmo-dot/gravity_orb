@@ -30,8 +30,51 @@
 
 ## 대기 중
 
-### [2026-09-28 #5] M4 구체 생성
+### [2026-09-28 #6] 생성 시점 변경 — 스와이프 순간 생성
 - 상태: 대기
+- 근거: 기획서 0.2 ([gravity_orb_design.md](reference/gravity_orb_design.md) 3.6, 4장, 5.1), [technical_design.md](technical_design.md) §6 (턴 흐름), §11.2~11.4
+- 배경: M4는 "이동 안정 → 생성 → 생성 구체 안정" 순서라 새 구체가 스와이프 후 수 초 뒤에 들어왔다. 사용자 결정으로 **스와이프와 동시에 생성**해 함께 떨어지게 한다. 위치는 빈자리와 무관한 무작위. 게임오버는 조건 재설계 전까지 **없음** (계속 쌓인다)
+- 요구:
+  - `TurnManager` 흐름을 §6대로 교체: `WAITING_INPUT → SPAWNING(1 물리 프레임) → SIMULATING → CHECK_GAMEOVER → WAITING_INPUT`
+    - `on_swipe`: 잠금·중력 전환·신호 후 `SPAWNING`
+    - `_physics_process`에서 `SPAWNING`이면 `Spawner.try_spawn(board, gravity)` → `_begin_settle()` → `SIMULATING`
+    - settle 루프는 `SIMULATING`에서만. `_on_settled()` → `CHECK_GAMEOVER` → `turn_finished` → 잠금 해제 → `WAITING_INPUT`
+    - 생성 후 두 번째 settle(M4의 SPAWNING settle)은 **제거**
+    - 초기 settle(`start_game`)은 기존대로 생성 없이 `WAITING_INPUT`
+  - `Spawner.try_spawn`: 겹침 검사 없이 항상 생성 (현재 구현 유지 확인)
+  - `GAME_OVER`·`game_over`·`warning_changed`는 만들지 않는다 (보류)
+  - 테스트 갱신·추가 (아래 표)
+- 수치: 변경 없음. 물리·감쇠·임계값은 #7 이후 튜닝 항목에서 다룬다
+- 건드리지 말 것: `docs/` (회신 파일 제외), 물리 설정, `GameConfig` 값, `Spawner` RNG 소비 순서, `InputRouter`
+- Done-when:
+  - [ ] 스와이프 후 **다음 물리 프레임**에 새 구체가 생성 벽에 존재한다 (구르는 구체들과 동시에 떨어진다)
+  - [ ] 상태 순서 `SPAWNING → SIMULATING → CHECK_GAMEOVER → WAITING_INPUT`
+  - [ ] 겹친 위치에 생성돼도 이탈 0건·관통 10px 이하, 생성 직후 최대 속도를 관측값으로 보고
+  - [ ] 게임오버 없이 20턴 연속 진행된다
+  - [ ] 기존 테스트 전부 통과 (갱신 포함), §10.1 명령 3종 에러 0
+- 테스트:
+
+| 파일 | 조건 | 기대 |
+|---|---|---|
+| test_turn_manager | T2 스와이프 RIGHT | 상태 순서 `SPAWNING → SIMULATING → CHECK_GAMEOVER → WAITING_INPUT`, `turn_started`·`turn_finished` 각 1회 |
+| test_turn_manager | T3 `SPAWNING`·`SIMULATING` 중 `on_swipe` | 무시 |
+| test_turn_manager | T4·T5 | 기존 타이밍 기준 유지 (settle 1회) |
+| test_spawn_flow | `on_swipe` 직후 물리 프레임 1회 대기 | 구체 수 +1, 새 구체가 생성 벽 선분 위, 이때 상태 `SIMULATING` |
+| test_spawn_flow | 기존 5턴 시드 재현·미리보기 일치·4방향 생성 벽 | 새 흐름에서 전부 통과 |
+| test_spawn_flow | **겹침 생성**: 레벨1 8개를 바닥(DOWN)에 쌓아 안정시킨 뒤 CENTER 모드로 UP 스와이프 (생성 벽 = 바닥, 더미와 겹침) | 이탈 0, 관통 ≤ 10px. 생성 후 0.5초 동안 전체 최대 속도·최대 관통을 출력 |
+| test_spawn_flow | 20턴 (DOWN, RIGHT, UP, LEFT 반복), 시드 4242 | 20턴 모두 `WAITING_INPUT` 복귀, 구체 수 = 초기 2 + 20, 이탈 0 |
+
+- QA: 테스트 결과, 겹침 생성 시 최대 속도·관통, 20턴 동안 턴별 settle 시간(강제 안정 횟수 포함). 강제 안정은 기지의 문제이므로 **횟수만 보고**하고 명세 동작이라고 쓰지 않는다
+- 수동 확인 절차: 스와이프 즉시 새 공이 나타나 함께 떨어지는지, 계속 쌓여도 게임이 멈추지 않는지
+
+---
+
+## 처리 완료
+
+### [2026-09-28 #5] M4 구체 생성 — 완료
+- 상태: 완료 (2026-09-28 Claude 검수 통과 · [PR #5](https://github.com/jeongmo-dot/gravity_orb/pull/5) 병합 `d8b0ec9`)
+- 검수: 37/37·물리 회귀·RNG 격리 Claude 재실행 일치. 구현은 명세대로다. 단 회신의 "T2·T3 강제 settle 경고는 명세 동작"은 **오판** — 기본 설정에서 settle 대부분이 3초 강제 안정으로 끝나는 기지의 문제다 (설계서 §12 M5+). 경고가 예상 밖이면 `상태: 질문`으로 올릴 것
+- 후속: 사용자 플레이 결과 "생성 구체가 늦게 들어온다" → 기획서 0.2로 **스와이프 순간 생성**으로 변경, #6에서 교체
 - 근거: [technical_design.md](technical_design.md) §4 (M4 필드), §5.3 `spawn_line`, §5.9 `Spawner`, §6 (`_on_settled`의 SPAWNING 분기), §11.3 (1~3단계), §12 M4
 - 요구:
   - `GameConfig` M4 필드: `enum SpawnPositionMode { RANDOM, CENTER }`, `spawn_level_weights`([0.9, 0.1]), `spawn_color_weights`([1, 1, 1]), `spawn_position_mode`(RANDOM), `spawn_margin`(4.0), `rng_seed`(0), `initial_orb_count`(2)
@@ -51,12 +94,12 @@
 - 수치: 위 필드 기본값 그대로. 임의 변경 금지
 - 건드리지 말 것: `docs/` (회신 파일 제외), 물리 설정, `InputRouter`, 입력 잠금 규칙, 전역 난수(`randf/randi/shuffle/pick_random` — `Spawner` 외 사용 금지)
 - Done-when:
-  - [ ] 아래로 스와이프하면 위쪽 벽에서, 왼쪽이면 오른쪽 벽에서 생성된다 (4방향 모두)
-  - [ ] 미리보기와 실제 생성 구체가 일치한다
-  - [ ] 같은 시드로 시작하면 같은 순서로 생성된다
-  - [ ] `grep -rn "randf\|randi\|shuffle\|pick_random\|RandomNumberGenerator" scripts --include=*.gd` 결과가 `Spawner.gd`뿐이다
-  - [ ] 아래 테스트 전부 통과, 물리 회귀 22시드 수치 변동 없음 (이탈 0, 8.623px)
-  - [ ] §10.1 명령 3종 에러 0 (`--fixed-fps 240` 허용)
+  - [x] 아래로 스와이프하면 위쪽 벽에서, 왼쪽이면 오른쪽 벽에서 생성된다 (4방향 모두)
+  - [x] 미리보기와 실제 생성 구체가 일치한다
+  - [x] 같은 시드로 시작하면 같은 순서로 생성된다
+  - [x] `grep -rn "randf\|randi\|shuffle\|pick_random\|RandomNumberGenerator" scripts --include=*.gd` 결과가 `Spawner.gd`뿐이다
+  - [x] 아래 테스트 전부 통과, 물리 회귀 22시드 수치 변동 없음 (이탈 0, 8.623px)
+  - [x] §10.1 명령 3종 에러 0 (`--fixed-fps 240` 허용)
 - 테스트:
 
 | 파일 | 조건 | 기대 |
@@ -74,10 +117,6 @@
 | test_turn_manager | T1~T7 | 생성 단계가 추가된 흐름에 맞게 갱신 후 전부 통과 (T4·T5 타이밍 기준 유지) |
 
 - QA: 테스트별 결과, 4방향 생성 좌표 표. 수동 확인 절차(시작 시 구체 2개·NEXT 표시, 스와이프마다 반대편 벽 생성, NEXT와 실제 일치, `rng_seed`를 고정값으로 바꿔 2회 실행 비교)를 회신에 적는다
-
----
-
-## 처리 완료
 
 ### [2026-09-28 #4] M3 턴 상태 머신 — 완료
 - 상태: 완료 (2026-09-28 Claude 검수 통과 · [PR #4](https://github.com/jeongmo-dot/gravity_orb/pull/4) 병합 `cdebea3`)

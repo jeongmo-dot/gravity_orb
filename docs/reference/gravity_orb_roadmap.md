@@ -90,7 +90,7 @@ res://
 
 **목표**: 스와이프 → 물리 진행 → 안정 → 다음 입력의 흐름이 명확히 구분된다.
 
-- `TurnManager` 상태: `WAITING_INPUT → SIMULATING → SPAWNING → CHECK_GAMEOVER → WAITING_INPUT`
+- `TurnManager` 상태: `WAITING_INPUT → SPAWNING → SIMULATING → CHECK_GAMEOVER → WAITING_INPUT` (기획서 0.2: 스와이프 순간 생성)
 - 스와이프 수신 시 입력 잠금, 중력 전환, `SIMULATING` 진입
 - 안정 판정: 모든 구체 속도가 임계값 이하인 상태가 N프레임 연속 유지
 - 최대 대기 시간 초과 시 강제 안정 (config 값, 기본 3초)
@@ -166,8 +166,7 @@ res://
 
 **목표**: 한 판이 시작부터 끝까지 성립한다.
 
-- 게임오버: 생성 영역이 기존 구체와 겹치면 종료 (`CHECK_GAMEOVER` 단계에서 판정)
-- 경고: 생성 영역 근처까지 구체가 차오르면 경고 상태 신호 발생
+- 게임오버·경고: **보류** (기획서 0.2 5.1 — 조건 재설계 전까지 게임오버 없이 계속 쌓인다). 조건이 정해지면 `CHECK_GAMEOVER`에서 판정
 - `ScoreManager`: 기획서 5.2 규칙 (합체, 소멸, 최대 레벨 보너스, 연쇄 배수)
 - 최고 점수 로컬 저장 (`user://`)
 - 게임오버 화면: 점수, 최고 점수, 최대 연쇄, 재시작 버튼 (키보드 R로도 재시작)
