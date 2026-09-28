@@ -1,0 +1,810 @@
+# 기술 설계서 — 「그래비티 오브」 프로토타입
+
+> 버전 1.0 · 2026-09-28
+> 입력 문서: [`reference/gravity_orb_design.md`](reference/gravity_orb_design.md) (기획서 v0.1), [`reference/gravity_orb_roadmap.md`](reference/gravity_orb_roadmap.md) (구현 로드맵)
+> 대상 독자: 구현 에이전트(Codex) 및 리뷰어
+
+이 문서는 기획서와 로드맵을 **구현 가능한 수준의 구조·API·수치·알고리즘**으로 구체화한다.
+기획서가 "무엇을", 로드맵이 "어떤 순서로"를 정한다면, 이 문서는 "어떻게"를 정한다.
+
+- 문서 간 충돌 시 우선순위: **기획서 > 이 문서 > 로드맵**. 단, 11장 "설계 해석"은 기획서의 빈칸을 채운 결정이므로 기획서가 갱신되기 전까지 이 문서를 따른다.
+- 모든 수치는 가안이며 `GameConfig`로 조정 가능해야 한다.
+
+---
+
+## 목차
+
+1. 기술 스택과 프로젝트 설정
+2. 좌표계·레이아웃
+3. 아키텍처 개요 (씬 트리, 오토로드, 신호 흐름)
+4. `GameConfig` 명세
+5. 모듈 명세
+6. 턴 처리 알고리즘
+7. 충돌 반응(합체·소멸) 알고리즘
+8. 점수·연쇄
+9. 저장 데이터
+10. 테스트 전략
+11. 설계 해석 (기획서 빈칸을 채운 결정)
+12. 마일스톤별 구현 명세
+13. 알려진 함정 (Godot 4)
+
+---
+
+## 1. 기술 스택과 프로젝트 설정
+
+| 항목 | 값 |
+|---|---|
+| 엔진 | Godot 4.x 최신 안정판 (최소 4.4) |
+| 언어 | GDScript, **모든 변수·인자·반환값 타입 명시** |
+| 렌더러 | `gl_compatibility` (저사양 Android 대응) |
+| 물리 | 기본 GodotPhysics2D, 60 tick/s |
+| 외부 애드온 | 사용하지 않음 (테스트 프레임워크 포함) |
+
+### 1.1 `project.godot` 필수 설정
+
+| 키 | 값 |
+|---|---|
+| `application/run/main_scene` | `res://scenes/Main.tscn` |
+| `display/window/size/viewport_width` | `1080` |
+| `display/window/size/viewport_height` | `1920` |
+| `display/window/size/window_width_override` | `540` |
+| `display/window/size/window_height_override` | `960` |
+| `display/window/stretch/mode` | `canvas_items` |
+| `display/window/stretch/aspect` | `keep` |
+| `display/window/handheld/orientation` | `1` (portrait) |
+| `rendering/renderer/rendering_method` | `gl_compatibility` |
+| `rendering/renderer/rendering_method.mobile` | `gl_compatibility` |
+| `physics/common/physics_ticks_per_second` | `60` |
+| `input_devices/pointing/emulate_touch_from_mouse` | `false` (M2 검증 시 `true`로도 확인) |
+
+### 1.2 입력 액션 (Input Map)
+
+| 액션 | 키 | 도입 |
+|---|---|---|
+| `gravity_up` | ↑, W | M2 |
+| `gravity_down` | ↓, S | M2 |
+| `gravity_left` | ←, A | M2 |
+| `gravity_right` | →, D | M2 |
+| `restart` | R | M7 |
+| `debug_toggle` | F1 | M9 |
+| `debug_step` | N | M9 |
+
+### 1.3 폴더 구조
+
+로드맵의 권장 구조를 확장한다. 파일명은 PascalCase, `class_name`은 파일명과 동일.
+
+```
+res://
+├─ project.godot
+├─ config/
+│   ├─ GameConfig.gd            # class_name GameConfig extends Resource
+│   └─ default_config.tres
+├─ scenes/
+│   ├─ Main.tscn                # 조립 루트
+│   ├─ Board.tscn
+│   ├─ Orb.tscn
+│   ├─ UI.tscn                  # HUD + 게임오버 화면
+│   └─ DebugOverlay.tscn        # M9
+├─ scripts/
+│   ├─ autoload/
+│   │   ├─ Config.gd            # 오토로드 "Config"
+│   │   └─ InputRouter.gd       # 오토로드 "InputRouter" (로드맵의 scripts/input/ 대신 여기)
+│   ├─ core/
+│   │   ├─ Main.gd
+│   │   ├─ Board.gd
+│   │   ├─ Orb.gd
+│   │   ├─ OrbVisual.gd
+│   │   ├─ OrbTypes.gd          # 색 enum, 방향 유틸 (정적)
+│   │   ├─ TurnManager.gd
+│   │   ├─ CollisionResolver.gd
+│   │   ├─ ReactionRules.gd     # 순수 로직 (정적 함수)
+│   │   ├─ Spawner.gd
+│   │   ├─ ScoreManager.gd
+│   │   └─ SwipeDetector.gd     # 순수 로직 (RefCounted)
+│   ├─ fx/
+│   │   └─ Effects.gd           # M8
+│   ├─ ui/
+│   │   ├─ Hud.gd
+│   │   └─ GameOverPanel.gd     # M7
+│   ├─ platform/
+│   │   └─ Haptics.gd           # M10
+│   └─ debug/
+│       ├─ DebugOverlay.gd      # M9
+│       └─ PlayLogger.gd        # M9
+├─ tests/
+│   ├─ run_tests.gd             # extends SceneTree, 헤드리스 러너
+│   ├─ TestCase.gd              # 최소 assert 헬퍼
+│   ├─ test_*.gd                # 단위 테스트
+│   └─ scenarios/               # 물리 시나리오 테스트 (M5~)
+└─ assets/
+```
+
+---
+
+## 2. 좌표계·레이아웃
+
+- 모든 좌표·거리 단위는 **기준 해상도(1080×1920) 픽셀**이다. `canvas_items` 스트레치이므로 `InputEvent`의 위치도 이 좌표계로 들어온다.
+- 방향은 `Vector2i`로 표현하며 Godot 화면 좌표(y 아래가 +)를 그대로 쓴다. `Vector2i.DOWN == (0, 1)`.
+- **스와이프 방향 = 중력 방향**. 아래로 스와이프 → 중력 `(0,1)` → 생성 벽은 반대편인 위쪽 벽.
+
+### 2.1 화면 배치 (월드 좌표 = 뷰포트 좌표, Camera2D 중심 (540, 960))
+
+```
+y=0     ┌──────────────────────┐
+        │ HUD 상단 (0~480)      │  점수 / 최고점수 / 다음 구체
+y=480   ├──┬────────────────┬──┤
+        │  │  보드 960×960   │  │  Board.position = (540, 960)
+        │  │  (x 60~1020)    │  │  보드 로컬 좌표: 중심 원점, -480~+480
+y=1440  ├──┴────────────────┴──┤
+        │ HUD 하단 (1440~1920)  │  중력 방향 화살표
+y=1920  └──────────────────────┘
+```
+
+- `Board` 노드는 **보드 중심이 로컬 원점**이다. `half := board_size / 2`.
+- 벽은 보드 경계 밖에 두께 `wall_thickness`로 배치한다 (안쪽 면이 정확히 `±half`).
+- HUD는 `CanvasLayer`에 두어 카메라 기울기 연출(M8)의 영향을 받지 않게 한다.
+
+---
+
+## 3. 아키텍처 개요
+
+### 3.1 오토로드
+
+| 이름 | 스크립트 | 역할 |
+|---|---|---|
+| `Config` | `scripts/autoload/Config.gd` | 런타임 `GameConfig` 인스턴스 보관 (`Config.data`). 씬 재시작에도 유지 |
+| `InputRouter` | `scripts/autoload/InputRouter.gd` | 모든 사용자 입력의 유일한 진입점 (M2) |
+
+- `Config.data`는 `default_config.tres`를 `duplicate(true)`한 복사본이다. 디버그 패널에서 바꾼 값은 디스크에 쓰지 않는다.
+- 그 외 전역 상태는 두지 않는다. RNG도 오토로드가 아니라 `Spawner`가 소유한다.
+
+### 3.2 `Main.tscn` 노드 트리
+
+```
+Main (Node2D) ── Main.gd                       # 조립 루트: 신호 연결, 재시작
+├─ Camera2D                                    # position (540,960), 기울기 연출용 (M8)
+├─ Board (Board.tscn) ── Board.gd
+│   ├─ Walls (Node2D)
+│   │   └─ WallTop / WallBottom / WallLeft / WallRight (StaticBody2D + RectangleShape2D)
+│   ├─ Frame (Node2D)                          # 보드 테두리·중력 강조·경고 점멸 그리기
+│   └─ Orbs (Node2D)                           # 모든 Orb의 부모
+├─ TurnManager (Node)          (M3)
+├─ CollisionResolver (Node)    (M5)
+├─ Spawner (Node)              (M4)
+├─ ScoreManager (Node)         (M7)
+├─ Effects (Node2D)            (M8)
+├─ UI (UI.tscn, CanvasLayer)
+└─ DebugOverlay (CanvasLayer)  (M9, 디버그 빌드에서만 인스턴스)
+```
+
+- 형제 노드 참조는 씬 고유 이름(`%TurnManager` 등)을 쓴다. `get_parent().get_node(...)` 체인 금지.
+- 모듈 간 결합은 **신호 우선**. 직접 호출은 "지휘하는 쪽 → 지휘받는 쪽"(`TurnManager → Board/Spawner/CollisionResolver`, `CollisionResolver → Board`) 방향만 허용한다.
+
+### 3.3 신호 흐름
+
+```
+InputRouter.swipe(dir) ───────────────▶ TurnManager.on_swipe(dir)
+Board.orb_contact(a, b) ──────────────▶ CollisionResolver.report_contact(a, b)
+CollisionResolver.reaction_applied(r) ─▶ ScoreManager / Effects / TurnManager(연쇄·안정 카운터)
+TurnManager.state_changed(s) ─────────▶ UI / DebugOverlay   (입력 잠금은 TurnManager가 직접 호출)
+TurnManager.gravity_changed(dir) ─────▶ UI / Effects        (Board.set_gravity는 직접 호출)
+TurnManager.warning_changed(walls) ───▶ Board.Frame / Effects
+TurnManager.game_over() ──────────────▶ ScoreManager.commit / UI(게임오버 패널) / PlayLogger
+Spawner.next_changed(color, level) ───▶ UI(다음 구체 미리보기)
+ScoreManager.score_changed(...) ──────▶ UI
+InputRouter.restart_requested ────────▶ Main.restart()
+```
+
+### 3.4 공통 규칙 (로드맵 0장 구체화)
+
+1. **입력 격리**: `Input` 싱글턴과 `InputEvent*` 타입은 `InputRouter.gd`에서만 참조한다. 예외: `Haptics.gd`의 `Input.vibrate_handheld()` (출력이므로 허용). M1의 임시 입력은 M2에서 제거한다.
+2. **하드코딩 금지**: 밸런스 수치는 `Config.data.*`에서 읽는다. 레이아웃·연출용 고정값(폰트 크기 등)만 스크립트 상단 `const`로 허용.
+3. **물리 콜백에서 트리 변경 금지**: `body_entered` 등에서는 기록만 하고, 생성·삭제는 `TurnManager._physics_process` 처리 단계(7장)에서 한다.
+4. **단일 RNG**: `Spawner`가 가진 `RandomNumberGenerator` 하나만 쓴다. 전역 `randi()`, `randf()`, `Array.shuffle()`, `pick_random()` 금지.
+5. **타입 명시**: `var x := ...` 또는 `var x: T`, 반환 타입(`-> void` 포함) 필수.
+
+---
+
+## 4. `GameConfig` 명세
+
+`config/GameConfig.gd` — `class_name GameConfig extends Resource`. 모든 필드는 `@export`.
+필드는 **해당 마일스톤에서 추가**한다. "M" 열이 추가 시점이다.
+
+```gdscript
+enum SpawnPositionMode { RANDOM, CENTER }                     # M4
+enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
+```
+
+| M | 필드 | 타입 | 기본값 | 설명 |
+|---|---|---|---|---|
+| M1 | `board_size` | float | 960.0 | 보드 한 변 (px) |
+| M1 | `wall_thickness` | float | 256.0 | 터널링 방지용으로 두껍게 |
+| M1 | `orb_base_radius` | float | 50.0 | r₀ |
+| M1 | `orb_radius_growth` | float | 1.25 | 레벨당 반지름 배율 |
+| M1 | `orb_max_level` | int | 7 | |
+| M1 | `orb_base_mass` | float | 1.0 | 질량 = base × (r/r₀)² |
+| M1 | `gravity_strength` | float | 2400.0 | 중력 가속도 (px/s²) |
+| M1 | `orb_friction` | float | 0.3 | |
+| M1 | `orb_bounce` | float | 0.15 | |
+| M1 | `wall_friction` | float | 0.3 | |
+| M1 | `wall_bounce` | float | 0.1 | |
+| M1 | `orb_linear_damp` | float | 0.1 | |
+| M1 | `orb_angular_damp` | float | 1.0 | |
+| M1 | `color_display` | PackedColorArray | 빨 `#E5484D`, 파 `#3E7BFA`, 초 `#30A46C` | 인덱스 = `OrbTypes.OrbColor` |
+| M1 | `debug_test_orb_count` | int | 5 | M1 전용. M4에서 삭제 |
+| M2 | `swipe_min_distance` | float | 80.0 | 스와이프 최소 이동 거리 (기준 해상도 px) |
+| M2 | `swipe_dominance_ratio` | float | 1.5 | 주 방향 성분 ≥ 보조 성분 × 이 값 |
+| M3 | `stable_linear_speed` | float | 12.0 | 안정 판정 선속도 임계값 (px/s) |
+| M3 | `stable_angular_speed` | float | 1.0 | 안정 판정 각속도 임계값 (rad/s) |
+| M3 | `stable_frames` | int | 20 | 연속 유지 물리 프레임 수 |
+| M3 | `max_settle_time` | float | 3.0 | 강제 안정까지 최대 대기 (초, 스케일된 시간) |
+| M3 | `allow_same_direction_swipe` | bool | true | 11.1 참조 |
+| M4 | `spawn_level_weights` | PackedFloat32Array | [0.9, 0.1] | 인덱스 0 = 레벨1 |
+| M4 | `spawn_color_weights` | PackedFloat32Array | [1, 1, 1] | 인덱스 = 색 |
+| M4 | `spawn_position_mode` | SpawnPositionMode | RANDOM | |
+| M4 | `spawn_margin` | float | 4.0 | 생성 벽 안쪽 면과 구체 사이 여백 |
+| M4 | `rng_seed` | int | 0 | 0이면 시작 시 무작위 시드를 뽑아 기록 |
+| M4 | `initial_orb_count` | int | 2 | |
+| M5 | `contact_max_reported` | int | 6 | `Orb.max_contacts_reported` |
+| M6 | `opposite_pairs` | Array[Vector2i] | [(RED, BLUE)] | 상극 쌍 (순서 무관) |
+| M6 | `annihilation_rule` | AnnihilationRule | A_BOTH | |
+| M7 | `level_scores` | PackedInt32Array | [2,4,8,16,32,64,128] | 인덱스 0 = 레벨1 |
+| M7 | `annihilation_score_factor` | float | 0.5 | |
+| M7 | `max_merge_bonus_factor` | float | 5.0 | |
+| M7 | `spawn_candidate_count` | int | 9 | 생성 위치 후보 수 (11.3) |
+| M7 | `spawn_fallback_to_free_slot` | bool | true | 선택 위치가 막히면 빈 후보로 대체 |
+| M7 | `warning_distance` | float | 60.0 | 경고 여유 거리 (11.4) |
+| M8 | `hitstop_duration` | float | 0.06 | 실시간 초 |
+| M8 | `hitstop_time_scale` | float | 0.05 | |
+| M8 | `tilt_angle_deg` | float | 3.0 | |
+| M8 | `tilt_duration` | float | 0.25 | |
+| M8 | `merge_pop_scale` | float | 1.2 | |
+| M8 | `chain_pitch_step` | float | 0.08 | 연쇄당 `pitch_scale` 증가량 |
+| M10 | `vibration_enabled` | bool | true | |
+| M10 | `vibration_ms` | int | 20 | |
+
+`GameConfig` 도우미 함수 (해당 필드와 같은 마일스톤에 추가):
+
+```gdscript
+func radius_for_level(level: int) -> float:
+    return orb_base_radius * pow(orb_radius_growth, level - 1)
+
+func mass_for_level(level: int) -> float:
+    var k := radius_for_level(level) / orb_base_radius
+    return orb_base_mass * k * k
+
+func score_for_level(level: int) -> int:        # M7
+    return level_scores[level - 1]
+
+func is_opposite(c1: int, c2: int) -> bool:     # M6
+    for p: Vector2i in opposite_pairs:
+        if (p.x == c1 and p.y == c2) or (p.x == c2 and p.y == c1):
+            return true
+    return false
+```
+
+---
+
+## 5. 모듈 명세
+
+아래 시그니처는 계약이다. 내부 구현은 자유지만 공개 API·신호 이름을 바꾸려면 이 문서도 함께 수정한다.
+
+### 5.1 `OrbTypes` (정적 유틸)
+
+```gdscript
+class_name OrbTypes
+enum OrbColor { RED, BLUE, GREEN }
+const DIRECTIONS: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
+static func dir_name(d: Vector2i) -> String          # "UP" 등, 디버그 표시용
+static func perpendicular(d: Vector2i) -> Vector2i   # 벽을 따라가는 축
+```
+
+색은 정수 인덱스로 다룬다. 색 추가(기획서 9장) 시 enum·`color_display`·`spawn_color_weights`만 늘리면 되도록, 코드에서 색 개수를 3으로 가정하지 않는다.
+
+### 5.2 `Orb` (`Orb.tscn`, RigidBody2D)
+
+```
+Orb (RigidBody2D) ── Orb.gd
+├─ CollisionShape2D (CircleShape2D — 인스턴스마다 새로 생성)
+└─ Visual (Node2D) ── OrbVisual.gd    # 원 + 문양 그리기, 스케일 애니메이션 대상
+```
+
+```gdscript
+class_name Orb extends RigidBody2D
+var color: int
+var level: int
+var generation: int = 0     # 연쇄 세대 (8장, M5)
+var consumed: bool = false  # 반응 처리 예정/완료. true면 이후 모든 반응에서 제외 (M5)
+
+func setup(p_color: int, p_level: int, cfg: GameConfig) -> void
+func get_radius() -> float
+func set_gravity(dir: Vector2i, strength: float) -> void   # constant_force = Vector2(dir) * strength * mass
+```
+
+`setup()`에서 설정할 속성:
+
+| 속성 | 값 |
+|---|---|
+| `gravity_scale` | 0.0 |
+| `can_sleep` | false (안정 판정은 직접 한다) |
+| `continuous_cd` | `CCD_MODE_CAST_SHAPE` |
+| `contact_monitor` | true (M5부터) |
+| `max_contacts_reported` | `cfg.contact_max_reported` (M5부터) |
+| `mass` | `cfg.mass_for_level(level)` |
+| `physics_material_override` | 새 PhysicsMaterial(friction, bounce) |
+| `linear_damp` / `angular_damp` | config 값 |
+| `collision_layer` / `collision_mask` | 레이어 2 / 마스크 1+2 |
+
+- 중력은 로드맵의 "매 물리 프레임 힘"과 동등한 **`constant_force`** 로 구현한다. 방향이 바뀔 때와 생성 시에만 갱신한다.
+- 크기 변화 연출은 **`Visual` 노드의 scale만** 바꾼다. RigidBody2D·CollisionShape2D는 절대 스케일하지 않는다.
+
+**충돌 레이어**: 1 = 벽, 2 = 구체.
+
+### 5.3 `Board`
+
+```gdscript
+class_name Board extends Node2D
+signal orb_contact(a: Orb, b: Orb)   # 구체-구체 접촉 시작 (M5)
+
+func half_size() -> float
+func set_gravity(dir: Vector2i) -> void                  # 모든 Orb에 전파, 이후 생성 Orb에도 적용
+func spawn_orb(color: int, level: int, pos: Vector2, vel: Vector2 = Vector2.ZERO, generation: int = 0) -> Orb
+func remove_orb(orb: Orb) -> void
+func get_orbs() -> Array[Orb]                            # consumed가 아닌 Orb만
+func clear() -> void
+func is_circle_free(pos: Vector2, radius: float) -> bool # 물리 공간 쿼리, 물리 프레임 흐름에서만 호출 (M4)
+func spawn_line(gravity: Vector2i, radius: float) -> Dictionary  # {origin: Vector2, axis: Vector2, extent: float} (M4)
+```
+
+- `Board`는 `_orbs: Array[Orb]` 목록을 직접 관리한다(`get_children()`에 의존하지 않음).
+- `spawn_orb`에서 `orb.body_entered`를 연결한다: 상대가 `Orb`이고 `orb.get_instance_id() < other.get_instance_id()`일 때만 `orb_contact(orb, other)` 발신 (양쪽 중복 신호 제거).
+- `remove_orb`는 즉시 `consumed = true`, `_orbs`에서 제거, `collision_layer = 0`, `collision_mask = 0`, `freeze = true`로 만든 뒤 `queue_free()`. 같은 프레임에 다른 반응이 이 구체를 다시 잡지 않게 한다.
+- `spawn_line`: 중력 `g`일 때 생성 벽은 `-g` 쪽 벽.
+  - `origin = -Vector2(g) * (half - radius - spawn_margin)`
+  - `axis = Vector2(OrbTypes.perpendicular(g))`
+  - `extent = half - radius` (선분은 `origin + axis * s`, `s ∈ [-extent, extent]`)
+
+### 5.4 `SwipeDetector` (순수 로직)
+
+```gdscript
+class_name SwipeDetector extends RefCounted
+static func classify(delta: Vector2, min_distance: float, dominance_ratio: float) -> Vector2i
+    # 조건 미달이면 Vector2i.ZERO
+```
+
+판정 규칙 (손을 뗄 때 1회):
+1. `delta.length() < min_distance` → 무시
+2. `major = max(|x|, |y|)`, `minor = min(|x|, |y|)`; `major < minor * dominance_ratio` → 무시 (대각선)
+3. 우세 축의 부호로 방향 결정
+
+### 5.5 `InputRouter` (오토로드)
+
+```gdscript
+extends Node
+signal swipe(direction: Vector2i)
+signal restart_requested                 # M7
+signal debug_toggle_requested            # M9
+signal debug_step_requested              # M9
+signal debug_click(world_pos: Vector2)   # M9, 디버그 모드에서만
+
+func set_locked(locked: bool) -> void    # swipe만 막는다. restart/debug는 막지 않음
+func is_locked() -> bool
+```
+
+- `_unhandled_input`에서 처리한다 (UI 버튼 클릭이 스와이프로 새지 않게).
+- 키보드: `event.is_action_pressed("gravity_*")` (에코 제외) → 즉시 `swipe` 발신.
+- 포인터 제스처 상태: `{active, source: MOUSE|TOUCH, start: Vector2, started_locked: bool}`.
+  - 누름: 활성 제스처가 없을 때만 시작. `InputEventScreenTouch`(index 0만) 또는 `InputEventMouseButton`(좌클릭).
+  - 뗌: **시작한 source와 같은 source의 이벤트일 때만** 종료하고 `SwipeDetector.classify(end - start, ...)` 판정.
+  - 이 source 고정 규칙이 "마우스로 터치 에뮬레이션"/"터치로 마우스 에뮬레이션"에서 생기는 이중 이벤트를 제거한다.
+- 잠금 중에 시작된 제스처는 잠금이 풀린 뒤 떼어도 무시한다 (`started_locked`).
+- 이벤트 좌표는 이미 기준 해상도 좌표다. 추가 변환하지 않는다.
+
+### 5.6 `TurnManager`
+
+```gdscript
+class_name TurnManager extends Node
+enum State { WAITING_INPUT, SIMULATING, SPAWNING, CHECK_GAMEOVER, GAME_OVER }
+signal state_changed(state: State)
+signal gravity_changed(dir: Vector2i)
+signal turn_started(turn_index: int, dir: Vector2i)
+signal turn_finished(turn_index: int, max_chain: int)
+signal chain_changed(chain: int)                    # M5, 턴 내 최대 연쇄 갱신 시
+signal warning_changed(walls: Array[Vector2i])      # M7, 경고 중인 벽을 "그 벽에서 생성되는 중력 방향"으로 표기
+signal game_over                                    # M7
+
+var state: State
+var gravity: Vector2i = Vector2i.DOWN
+var turn_index: int = 0
+var turn_max_chain: int = 0
+
+func start_game() -> void
+func on_swipe(dir: Vector2i) -> void
+func on_reaction(reaction: Dictionary) -> void      # M5, 안정 카운터 리셋 + 연쇄 갱신
+```
+
+알고리즘은 6장.
+
+### 5.7 `CollisionResolver` (M5)
+
+```gdscript
+class_name CollisionResolver extends Node
+signal reaction_applied(reaction: Dictionary)
+    # {type: ReactionRules.Type, chain: int, levels: Array[int], colors: Array[int],
+    #  position: Vector2, result_level: int (없으면 0), result_color: int, result_orb: Orb (없으면 null)}
+
+func report_contact(a: Orb, b: Orb) -> void   # 기록만. 트리 변경 금지
+func flush() -> int                            # 기록된 쌍 처리, 적용된 반응 수 반환
+func sweep_resting_contacts() -> int           # 안정 직전 안전망 (7.3, M6)
+```
+
+### 5.8 `ReactionRules` (순수 로직, M5~M6)
+
+```gdscript
+class_name ReactionRules
+enum Type { NONE, MERGE, MAX_CLEAR, ANNIHILATE }
+
+static func classify(color_a: int, level_a: int, color_b: int, level_b: int, cfg: GameConfig) -> Dictionary
+    # 반환: {type: Type, result_level: int, result_color: int, survivor: int (0=없음, 1=a, 2=b)}
+```
+
+| 조건 (위에서부터 먼저 맞는 것) | type | 결과 |
+|---|---|---|
+| 같은 색, 같은 레벨, 레벨 == max | MAX_CLEAR | 둘 다 제거 |
+| 같은 색, 같은 레벨 | MERGE | 레벨+1, 같은 색, 중간 지점 |
+| 상극 쌍, 규칙 A | ANNIHILATE | 둘 다 제거 |
+| 상극 쌍, 규칙 B, 같은 레벨 | ANNIHILATE | 둘 다 제거 |
+| 상극 쌍, 규칙 B, 다른 레벨 | NONE | |
+| 상극 쌍, 규칙 C, 같은 레벨 | ANNIHILATE | 둘 다 제거 |
+| 상극 쌍, 규칙 C, 다른 레벨 | ANNIHILATE | 큰 쪽 색으로 레벨 `|La − Lb|` 구체 1개가 큰 쪽 위치에 남음 (`survivor` 지정) |
+| 그 외 | NONE | |
+
+`classify`는 호출 시점의 `cfg`를 읽으므로 디버그에서 규칙을 바꾸면 다음 충돌부터 즉시 반영된다 (M6 완료 조건).
+
+### 5.9 `Spawner` (M4)
+
+```gdscript
+class_name Spawner extends Node
+signal next_changed(color: int, level: int)
+
+var seed_used: int
+func init_rng(seed: int) -> int          # 0이면 무작위 시드 생성, 실제 시드 반환·보관
+func spawn_initial(board: Board, gravity: Vector2i) -> void
+func try_spawn(board: Board, gravity: Vector2i) -> Orb   # 막혀 있으면 null (= 게임오버 조건, M7)
+func peek_next() -> Dictionary           # {color, level}
+```
+
+**RNG 소비 순서 고정** (같은 시드 → 같은 생성 순서 보장):
+구체 1개를 뽑을 때마다 항상 `level → color → position(randf)` 순으로 정확히 3회 소비한다. `CENTER` 모드나 대체 위치를 쓸 때도 position 값은 뽑고 버린다.
+
+- 가중치 선택은 `rng.rand_weighted(weights)` 사용.
+- "다음 구체"는 항상 1개 미리 뽑혀 있다. 생성 성공 시 다음 것을 새로 뽑고 `next_changed` 발신.
+- 생성 실패(게임오버) 시 "다음 구체"는 소비하지 않는다.
+- 물리 결과(구체 위치)는 시드로 재현되지 않는다. 보장 범위는 **(레벨, 색, 선호 위치) 시퀀스**까지다.
+- 위치 결정은 11.3.
+
+### 5.10 `ScoreManager` (M7)
+
+```gdscript
+class_name ScoreManager extends Node
+signal score_changed(score: int, best: int)
+signal max_chain_changed(max_chain: int)
+
+var score: int
+var best_score: int
+var max_chain: int
+var max_level_reached: int
+
+func reset() -> void
+func on_reaction(reaction: Dictionary) -> void
+func commit() -> void   # 게임오버 시 최고 점수 저장
+static func points_for(reaction: Dictionary, cfg: GameConfig) -> int  # 순수 계산, 테스트 대상
+```
+
+---
+
+## 6. 턴 처리 알고리즘
+
+모든 상태 처리는 `TurnManager._physics_process(delta)`에서 한다. 상태 전이는 반드시 `_set_state()` 한 곳을 거치며 여기서 `state_changed`를 발신한다.
+
+```
+WAITING_INPUT
+  on_swipe(dir):
+    if state != WAITING_INPUT: return
+    if dir == gravity and not cfg.allow_same_direction_swipe: return   # 잠그지 않고 무시
+    turn_index += 1; turn_max_chain = 0
+    모든 Orb.generation = 0
+    InputRouter.set_locked(true)
+    gravity = dir; Board.set_gravity(dir); emit gravity_changed, turn_started
+    _begin_settle(); → SIMULATING
+
+SIMULATING / SPAWNING 공통 settle 루프 (매 물리 프레임):
+    if CollisionResolver.flush() > 0: stable_count = 0
+    settle_elapsed += delta                 # 스케일된 시간
+    if _all_below_threshold(): stable_count += 1 else: stable_count = 0
+    if stable_count >= cfg.stable_frames:
+        if CollisionResolver.sweep_resting_contacts() > 0: stable_count = 0; return
+        _on_settled()
+    elif settle_elapsed >= cfg.max_settle_time:
+        push_warning("forced settle"); _on_settled()
+
+_on_settled():
+    SIMULATING:
+        orb = Spawner.try_spawn(board, gravity)
+        if orb == null: spawn_blocked = true; → CHECK_GAMEOVER
+        else: _begin_settle(); → SPAWNING       # 생성 구체가 떨어져 멈출 때까지 대기 (기획서 4장 8번)
+    SPAWNING: → CHECK_GAMEOVER
+
+CHECK_GAMEOVER (1프레임):
+    if spawn_blocked: → GAME_OVER; emit game_over; return
+    경고 벽 계산 (11.4) → 변했을 때만 emit warning_changed
+    emit turn_finished(turn_index, turn_max_chain)
+    InputRouter.set_locked(false); → WAITING_INPUT
+```
+
+- `_all_below_threshold()`: 모든 Orb에 대해 `linear_velocity.length() <= stable_linear_speed` 그리고 `absf(angular_velocity) <= stable_angular_speed`. Orb가 0개면 true.
+- `_begin_settle()`: `stable_count = 0`, `settle_elapsed = 0.0`.
+- `start_game()`: 중력 DOWN → 초기 구체 생성 → settle(`SIMULATING` 재사용, `_is_initial_settle = true`면 `_on_settled`에서 생성 단계를 건너뛰고 바로 `WAITING_INPUT`).
+- **M3 시점**: `SPAWNING`, `CHECK_GAMEOVER`는 즉시 통과. `flush`/`sweep`/`try_spawn` 호출은 해당 마일스톤에서 추가.
+
+---
+
+## 7. 충돌 반응 알고리즘 (M5~M6)
+
+### 7.1 접촉 수집
+
+1. `Board`가 `body_entered`를 받아 id 순서로 정리된 쌍을 `orb_contact(a, b)`로 발신 (5.3).
+2. `CollisionResolver.report_contact(a, b)`는 `_pending`에 `[a, b]`를 append만 한다.
+3. 실제 처리는 `TurnManager`가 settle 루프에서 호출하는 `flush()`에서 한다. 물리 콜백 밖이므로 `add_child`/`queue_free`가 안전하다. 만약 엔진이 "flushing queries" 에러를 내면 `Board.spawn_orb`의 `add_child`를 `call_deferred`로 바꾸되, `_orbs` 목록에는 즉시 넣는다.
+
+### 7.2 `flush()`
+
+```
+applied = 0
+for [a, b] in _pending (삽입 순서):
+    if not is_instance_valid(a) or not is_instance_valid(b): continue
+    if a.consumed or b.consumed: continue
+    r = ReactionRules.classify(a.color, a.level, b.color, b.level, Config.data)
+    if r.type == NONE: continue
+    chain = max(a.generation, b.generation) + 1
+    pos_a, pos_b, vel_a, vel_b 저장
+    board.remove_orb(a); board.remove_orb(b)
+    match r.type:
+      MERGE:      result = board.spawn_orb(a.color, r.result_level, (pos_a+pos_b)/2, (vel_a+vel_b)/2, chain)
+      MAX_CLEAR:  (생성 없음)
+      ANNIHILATE: if r.survivor != 0:   # 규칙 C 잔존
+                      result = board.spawn_orb(r.result_color, r.result_level, 큰 쪽 pos, 큰 쪽 vel, chain)
+    emit reaction_applied({...}); applied += 1
+_pending.clear()
+return applied
+```
+
+- "처리 예정" 표시 = `consumed`. `remove_orb`가 즉시 true로 만들어 같은 flush 안의 이후 쌍이 건너뛴다 → 3개 동시 접촉 시 중복 합체 없음.
+- 새 구체가 기존 구체와 겹쳐 생성될 수 있다. 물리 엔진이 밀어내며, 겹친 상대와의 `body_entered`가 발생해 연쇄가 이어진다.
+- `TurnManager`는 `reaction_applied`를 받아 `turn_max_chain = max(turn_max_chain, chain)`을 갱신하고 `chain_changed`를 발신한다.
+
+### 7.3 안전망 `sweep_resting_contacts()` (M6)
+
+`body_entered`는 "접촉 시작"에만 발생하므로, 규칙이 런타임에 바뀌었거나 접촉 보고가 누락된 경우 반응 대상 쌍이 붙은 채 남을 수 있다. 안정 판정 직전에 모든 Orb의 `get_colliding_bodies()`를 훑어 쌍을 `_pending`에 넣고 `flush()`한 결과를 반환한다.
+
+---
+
+## 8. 점수·연쇄
+
+### 8.1 연쇄 세대 (M5)
+
+- 턴 시작 시 모든 구체의 `generation = 0`. 새로 생성되는 구체(`Spawner`)도 0.
+- 반응 1건의 연쇄 번호: `chain = max(a.generation, b.generation) + 1`.
+- 반응으로 생긴 구체(합체 결과, 규칙 C 잔존)는 `generation = chain`.
+- 턴 내 연쇄 수 = 이번 턴 반응들의 `chain` 최댓값. 1이면 연쇄 없음, 2 이상이면 "n연쇄".
+- 스와이프 후 settle과 생성 후 settle 모두 같은 턴이다.
+
+독립적으로 동시에 일어난 두 합체는 둘 다 chain 1이므로 연쇄로 세지 않는다. "반응으로 생긴 구체가 다시 반응"한 경우만 연쇄다.
+
+### 8.2 점수 (기획서 5.2, M7)
+
+| 반응 | 기본 점수 |
+|---|---|
+| MERGE | `score_for_level(result_level)` |
+| ANNIHILATE | `floor((score_for_level(La) + score_for_level(Lb)) × annihilation_score_factor)` — 규칙 C도 원래 두 레벨 기준 |
+| MAX_CLEAR | `score_for_level(orb_max_level) × max_merge_bonus_factor` (기본 128 × 5 = 640) |
+
+최종 = `int(기본 점수) × chain`.
+
+예: 레벨2 빨강 둘 합체(chain 1) → 레벨3 생성 = 8점. 그 레벨3이 곧바로 다른 레벨3 빨강과 합체(chain 2) → 레벨4 = 16 × 2 = 32점.
+
+---
+
+## 9. 저장 데이터
+
+| 파일 | 형식 | 내용 |
+|---|---|---|
+| `user://save.cfg` | `ConfigFile` | `[records] best_score` (M7), `[settings] vibration` (M10) |
+| `user://playlog.csv` | CSV (append) | M9. 헤더: `timestamp,seed,turns,score,max_chain,max_level,duration_sec,annihilation_rule,spawn_mode,same_dir_swipe` |
+
+파일이 없거나 손상돼도 기본값으로 진행한다 (에러로 멈추지 않음).
+
+---
+
+## 10. 테스트 전략
+
+외부 애드온 없이 헤드리스로 돌리는 최소 러너를 둔다. **순수 로직(`SwipeDetector`, `ReactionRules`, `ScoreManager.points_for`, `GameConfig` 도우미, Spawner의 뽑기)은 씬 없이 테스트 가능하게** 분리한다.
+
+### 10.1 실행 명령
+
+```bash
+# 임포트·스크립트 파싱 검사
+godot --headless --path . --import
+# 단위·시나리오 테스트 (실패 시 종료 코드 1)
+godot --headless --path . -s res://tests/run_tests.gd
+# 메인 씬 스모크: 300프레임 실행 후 종료, 출력에 SCRIPT ERROR가 없어야 함
+godot --headless --path . --quit-after 300
+```
+
+`godot` 실행 파일 경로는 환경마다 다르다. `GODOT` 환경변수가 있으면 그것을 쓴다.
+
+### 10.2 러너 규약
+
+- `tests/run_tests.gd` (`extends SceneTree`): `res://tests/`와 `res://tests/scenarios/`의 `test_*.gd`를 찾아 인스턴스화하고 `test_`로 시작하는 메서드를 모두 호출 (코루틴이면 `await`). 테스트별 결과와 실패 수를 출력하고 `quit(1 if failed > 0 else 0)`.
+- `tests/TestCase.gd` (`extends RefCounted`): `assert_eq(a, b, msg)`, `assert_true(c, msg)`, `assert_near(a, b, eps, msg)` — 실패를 기록하고 계속 진행. 시나리오 테스트용으로 러너의 `SceneTree` 참조(`tree`)를 주입받는다.
+
+### 10.3 마일스톤별 필수 테스트
+
+| M | 파일 | 검증 |
+|---|---|---|
+| M1 | `test_config.gd` | `radius_for_level` 표 값 (1.00 / 1.25 / 1.5625 …) |
+| M2 | `test_swipe.gd` | 짧은 이동·대각선 무시, 4방향 판정, 경계값 |
+| M4 | `test_spawner.gd` | 같은 시드 → 같은 (레벨, 색) 50개 시퀀스, 가중치 분포 대략 검증 |
+| M5 | `test_rules.gd` | 합체·최대레벨·무반응 조합 |
+| M5 | `scenarios/test_merge_scenario.gd` | 같은 구체 2개 맞닿게 배치 → N프레임 후 레벨+1 구체 1개. 같은 구체 3개 동시 접촉 → 에러 없음, 합체 1회 |
+| M6 | `test_rules.gd` | A/B/C 규칙 전수, 초록은 무반응 |
+| M7 | `test_score.gd` | 8.2 표와 예시 |
+
+시나리오 테스트는 `Board.tscn`을 루트에 붙이고 `await tree.physics_frame`으로 프레임을 진행한다.
+
+### 10.4 수동 검증
+
+로드맵 완료 조건 중 자동화하지 못한 항목(체감, 화면 확인 등)은 `docs/progress.md`에 **수동 확인 절차**로 적는다.
+
+---
+
+## 11. 설계 해석 (기획서 빈칸을 채운 결정)
+
+기획서에 명시되지 않았거나 모호한 부분에 대한 이 문서의 결정이다. 플레이테스트 후 기획서에 반영하거나 뒤집는다.
+
+### 11.1 같은 방향 스와이프
+기획서 3.2 표는 "유효 입력", 7장은 미정. **기본 허용(true)**, 토글 제공. 비허용이면 입력을 잠그지 않고 무시만 한다.
+
+### 11.2 게임오버 판정 시점
+"신규 구체 생성 시 생성 영역이 기존 구체와 겹치면"을 **생성을 시도하는 순간 공간 쿼리로 판정**한다고 해석한다. 결과는 `spawn_blocked` 플래그로 남기고 `CHECK_GAMEOVER`에서 소비한다.
+
+### 11.3 생성 위치 결정
+1. `spawn_line` 선분 위에 `spawn_candidate_count`개 후보를 등간격으로 둔다.
+2. 선호 위치: RANDOM이면 `s = lerpf(-extent, extent, rng.randf())`, CENTER면 `s = 0`.
+3. 선호 위치가 비어 있으면(`is_circle_free`) 거기 생성.
+4. 막혔고 `spawn_fallback_to_free_slot`이면, 빈 후보 중 선호 위치에 가장 가까운 곳에 생성 (동률이면 `s`가 작은 쪽).
+5. 빈 곳이 없으면 게임오버.
+
+M4에서는 1~3단계만 구현하고 막혀도 선호 위치에 그냥 생성한다. M7에서 4~5단계를 추가한다.
+무작위 모드에서 "선호 위치 한 점이 막혔다고 즉시 게임오버"는 운에 너무 좌우되므로 4단계를 기본 on으로 둔다.
+
+### 11.4 경고 신호
+다음 생성 벽은 다음 스와이프에 따라 달라지므로 **네 벽 각각**에 대해 경고 여부를 계산한다. 벽의 경고 조건: 어떤 구체든 그 벽 안쪽 면에서 구체 가장자리까지의 거리가 `2 × radius_for_level(1) + spawn_margin + warning_distance` 미만. 결과는 "그 벽에서 생성되는 중력 방향" 목록으로 `warning_changed`에 담는다 (위쪽 벽 경고 → `Vector2i.DOWN`). 연출(M8)은 해당 벽을 붉게 점멸한다.
+
+### 11.5 연쇄 정의
+8.1의 세대 방식. 기획서 4장 "합체·소멸 후 다시 4번으로"와 동치이며 독립적인 동시 반응을 연쇄로 세지 않는다.
+
+### 11.6 생성 후 반응
+생성된 구체가 떨어져 일으킨 합체·소멸도 **같은 턴의 반응**으로 점수·연쇄에 포함한다.
+
+### 11.7 소멸 규칙 C의 잔존 구체
+큰 쪽의 색·위치·속도를 이어받고 레벨은 차이값. 점수는 원래 두 레벨 기준 소멸 공식.
+
+### 11.8 히트스톱과 안정 판정
+히트스톱은 `Engine.time_scale`을 낮추는 방식이다. 안정 판정의 프레임 카운트와 `max_settle_time`은 스케일된 물리 시간 기준이라 히트스톱이 강제 안정 시간을 잡아먹지 않는다. 해제 타이머는 `get_tree().create_timer(dur, true, false, true)`(ignore_time_scale)로 실시간 기준.
+
+### 11.9 보드 기울기 연출
+물리 보드를 회전하면 벽이 움직여 시뮬레이션이 깨지므로 **`Camera2D.rotation`만 트윈**한다.
+
+---
+
+## 12. 마일스톤별 구현 명세
+
+각 마일스톤은 로드맵의 "목표·완료 조건"을 그대로 따르며, 아래는 구현 세부다. **다음 마일스톤의 필드·기능을 미리 넣지 않는다.**
+
+### M0. 프로젝트 셋업
+- 1.1 설정으로 `project.godot` 생성, 1.3 폴더 생성 (빈 폴더는 `.gitkeep`).
+- `GameConfig.gd`(필드 없음), `default_config.tres`, `Config` 오토로드.
+- `Main.tscn`: Main(Node2D) + Camera2D(540, 960). 배경색은 `RenderingServer.set_default_clear_color`.
+- git 저장소와 `.gitignore`(`.godot/`, `*.tmp`, `/android/`, `/build/`)는 이미 준비되어 있다. 필요한 항목만 추가한다. (`*.import` 파일은 Godot 4에서 커밋 대상이므로 무시하지 않는다.)
+- `tests/run_tests.gd`, `tests/TestCase.gd` 뼈대 (테스트 0개로 통과).
+- 검증: 10.1 명령 3종이 에러 없이 끝난다.
+
+### M1. 보드와 구체 물리
+- `Board.tscn`: 5.3 트리. 벽 4개의 크기·위치는 `_ready`에서 config 값으로 설정.
+- `Frame`: 보드 경계선만 그린다.
+- `Orb.tscn` + `Orb.gd` + `OrbVisual.gd`(단색 원). `CircleShape2D`는 `setup()`에서 새로 생성.
+- `Main.gd`에 **임시** 방향키 처리 → `Board.set_gravity`. 주석 `# TEMP(M1): M2에서 InputRouter로 교체`.
+- 테스트 구체 `debug_test_orb_count`개를 겹치지 않게 배치 (레벨 1~4 혼합). 여기서 쓰는 임시 RNG는 M4에서 제거.
+- 테스트: `test_config.gd`.
+
+### M2. 입력 추상화
+- `SwipeDetector.gd`, `InputRouter.gd`(오토로드 등록), Input Map 액션 등록.
+- `Main.gd`의 M1 임시 입력 제거 → `InputRouter.swipe` 연결 (M3 전까지는 바로 `Board.set_gravity`).
+- 검증: `grep -rn "Input\.\|InputEvent" scripts --include=*.gd`가 `InputRouter.gd`, `SwipeDetector.gd`(타입 참조 없음이 이상적) 외에는 비어 있어야 한다.
+- 테스트: `test_swipe.gd`.
+
+### M3. 턴 상태 머신
+- `TurnManager.gd` (6장). `SPAWNING`·`CHECK_GAMEOVER`는 즉시 통과.
+- UI에 임시 디버그 라벨: `state`, `gravity`, `turn_index`, settle 경과. M9에서 DebugOverlay로 흡수.
+- 강제 안정 발생 시 `push_warning`.
+
+### M4. 구체 생성
+- `Spawner.gd` (5.9, 11.3의 1~3단계). `init_rng(Config.data.rng_seed)`, 실제 시드를 디버그 라벨에 표시.
+- `Hud`에 다음 구체 미리보기 (`OrbVisual` 재사용).
+- M1 테스트 구체·임시 RNG·`debug_test_orb_count` 삭제. 초기 구체 `initial_orb_count`개는 Spawner RNG로 보드 하단 절반에 배치.
+- 테스트: `test_spawner.gd`.
+
+### M5. 합체 규칙
+- `ReactionRules.gd`(MERGE, MAX_CLEAR만), `CollisionResolver.gd`(7.1~7.2), Orb의 `contact_monitor`·`generation`·`consumed`, Board의 `orb_contact`.
+- `TurnManager` settle 루프에 `flush()` 연결, 연쇄 갱신. 디버그 라벨에 턴 연쇄 수.
+- 테스트: `test_rules.gd`, `scenarios/test_merge_scenario.gd`.
+
+### M6. 상극 소멸
+- `opposite_pairs`, `annihilation_rule`, `is_opposite` 추가. `ReactionRules`에 ANNIHILATE (5.8 표 전체).
+- `sweep_resting_contacts` (7.3).
+- 규칙 즉시 전환 확인용 임시 키(디버그 빌드 한정, `InputRouter` 경유)를 둬도 된다. M9 패널로 대체.
+- 테스트: `test_rules.gd` 확장.
+
+### M7. 게임오버와 점수
+- `ScoreManager.gd` (5.10, 8.2), `save.cfg`.
+- `Spawner.try_spawn`에 11.3의 4~5단계, `TurnManager`에 `spawn_blocked`·`GAME_OVER`, 경고 계산(11.4, 이 단계에선 신호만).
+- `GameOverPanel`: 점수, 최고 점수, 최대 연쇄, 재시작 버튼. 버튼과 R키(`InputRouter.restart_requested`)가 같은 `Main.restart()` 호출.
+- 재시작: `get_tree().reload_current_scene()`. 설정은 `Config` 오토로드에 남아 유지된다.
+- 테스트: `test_score.gd`.
+
+### M8. 피드백과 UI
+- `Effects.gd`가 `reaction_applied`, `gravity_changed`, `warning_changed`, `chain_changed`를 구독.
+  - 합체: 결과 Orb의 `Visual.scale` 트윈 0.8 → `merge_pop_scale` → 1.0
+  - 소멸·최대 합체: `CPUParticles2D` one-shot 파편. 합체와 시각적으로 확실히 다를 것
+  - 연쇄(chain ≥ 2): "n연쇄" 라벨 팝업, 히트스톱(11.8), 효과음 `pitch_scale = 1 + (chain − 1) × chain_pitch_step`
+  - 중력 전환: 카메라 기울기(11.9), 중력 방향 벽 강조(Frame), 하단 화살표 회전
+  - 경고: 해당 벽 붉게 점멸 (Frame)
+- `OrbVisual` 문양: 빨강 ▲, 파랑 ●(안쪽 작은 원), 초록 ■. 흰색 반투명, `draw_colored_polygon`/`draw_circle`로 그린다 (폰트 의존 없음).
+- 임시 효과음: `assets/sfx/`의 짧은 `.wav` (합체음과 소멸음은 달라야 함). 직접 생성 가능하면 `AudioStreamWAV` 코드 생성도 허용.
+- 연출은 **물리 상태를 바꾸지 않는다** (Visual·카메라·파티클·UI만).
+
+### M9. 디버그·밸런스 도구
+- `DebugOverlay.tscn`은 `Main._ready`에서 `OS.is_debug_build()`일 때만 인스턴스화. `process_mode = PROCESS_MODE_ALWAYS`. 기존 임시 디버그 라벨 흡수.
+- 표시: 상태, 구체 수, 턴 연쇄, 시드, FPS, 턴 수.
+- 조작: 색·레벨 선택 후 보드 클릭 → 구체 생성(`InputRouter.debug_click`), 보드 초기화, 시드 입력 후 재시작, 스텝 모드.
+  - 스텝 모드: 켜면 `TurnManager`가 상태 전이마다 `get_tree().paused = true`로 멈추고, N(`debug_step_requested`)으로 다음 전이까지 진행.
+- 토글: 같은 방향 스와이프, 소멸 A/B/C, 생성 위치 모드. 슬라이더: 마찰, 반발, 반지름 증가율, 보드 크기, 중력 세기.
+  - 반지름 증가율·보드 크기는 "보드 초기화" 시 반영. 마찰·반발·중력은 즉시 모든 Orb에 재적용.
+- `PlayLogger.gd`: 게임오버 시 `playlog.csv`에 한 줄 append.
+- 완료 확인: 기획서 7장 미정 사항 6개 모두 패널에서 변경 가능.
+
+### M10. 모바일 포팅
+- `export_presets.cfg` (Android). 키스토어 등 민감정보는 커밋하지 않는다.
+- 세이프 영역: `DisplayServer.get_display_safe_area()`로 HUD 여백 조정.
+- `Haptics.gd`: 스와이프 확정 시 `Input.vibrate_handheld(vibration_ms)` (설정 on일 때).
+- `NOTIFICATION_APPLICATION_PAUSED` / `NOTIFICATION_APPLICATION_FOCUS_OUT` → 일시정지 패널, 복귀 시 이어하기.
+- 실기기 재조정 값은 `default_config.tres`에 반영하고 `docs/progress.md`에 기기명과 함께 기록.
+
+---
+
+## 13. 알려진 함정 (Godot 4)
+
+| 함정 | 대응 |
+|---|---|
+| `Orb.tscn`의 `CircleShape2D`가 인스턴스 간 공유되어 반지름을 바꾸면 모든 구체가 같이 변함 | `setup()`에서 `CircleShape2D.new()` |
+| RigidBody2D·CollisionShape2D 스케일 변경은 물리가 무시하거나 깨짐 | 크기 연출은 `Visual` 노드만 |
+| `body_entered` 안에서 `add_child`/`queue_free` → "Can't change this state while flushing queries" | 기록 후 `flush()`에서 처리 (7장) |
+| 잠든 바디가 새 힘에 반응하지 않음 | `can_sleep = false` |
+| 빠른 구체가 벽을 뚫음 | 두꺼운 벽 + `CCD_MODE_CAST_SHAPE` |
+| `emulate_touch_from_mouse`로 마우스·터치 이벤트 이중 입력 | 제스처 source 고정 (5.5) |
+| `contact_monitor` 꺼짐 또는 `max_contacts_reported = 0`이면 `body_entered` 미발생 | 둘 다 설정 |
+| `PhysicsDirectSpaceState2D` 쿼리를 물리 프레임 밖에서 호출하면 실패 | `is_circle_free`는 `_physics_process` 흐름에서만 |
+| `preload`한 리소스는 캐시 공유 → 런타임 수정이 원본 참조 전체에 퍼짐 | `Config`에서 `duplicate(true)` 한 번, 모두 `Config.data` 참조 |
+| `Engine.time_scale` 복구 누락 | 히트스톱 종료 타이머 + `_exit_tree`에서 1.0 복구 |
+| 전역 난수 사용 시 시드 재현 불가 | 5.9의 RNG만. 리뷰 시 `grep -rn "randf\|randi\|shuffle\|pick_random" scripts` |
