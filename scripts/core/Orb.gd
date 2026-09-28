@@ -1,6 +1,8 @@
 class_name Orb
 extends RigidBody2D
 
+signal escape_guard_triggered(axis: String, depth: float)
+
 @onready var _collision_shape: CollisionShape2D = $CollisionShape2D
 @onready var _visual: OrbVisual = $Visual
 
@@ -11,6 +13,7 @@ var consumed: bool = false
 var _radius: float = 0.0
 var _gravity_direction: Vector2 = Vector2.DOWN
 var _rest_braking_active: bool = false
+var _last_rolling_resistance_force: Vector2 = Vector2.ZERO
 
 
 func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
@@ -50,6 +53,10 @@ func set_gravity(direction: Vector2i, strength: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_last_rolling_resistance_force = Vector2.ZERO
+	if _apply_escape_guard():
+		return
+
 	if _rest_braking_active:
 		linear_damp = Config.data.orb_linear_damp
 		angular_damp = Config.data.orb_angular_damp
@@ -59,7 +66,13 @@ func _physics_process(delta: float) -> void:
 	if resistance <= 0.0 and Config.data.rest_speed <= 0.0:
 		return
 
-	if get_contact_count() <= 0:
+	var gravity_axis: Vector2 = _gravity_direction.normalized()
+	var floor_limit: float = (
+		Config.data.board_size * 0.5
+		- _radius
+		- Config.data.floor_contact_tolerance
+	)
+	if position.dot(gravity_axis) < floor_limit:
 		return
 
 	if (
@@ -73,7 +86,6 @@ func _physics_process(delta: float) -> void:
 	if resistance <= 0.0:
 		return
 
-	var gravity_axis: Vector2 = _gravity_direction.normalized()
 	var gravity_velocity: Vector2 = gravity_axis * linear_velocity.dot(gravity_axis)
 	var rolling_velocity: Vector2 = linear_velocity - gravity_velocity
 	var rolling_speed: float = rolling_velocity.length()
@@ -84,6 +96,7 @@ func _physics_process(delta: float) -> void:
 	if not is_zero_approx(rolling_speed):
 		var deceleration: float = minf(resistance, rolling_speed / delta)
 		var resistance_force: Vector2 = -rolling_velocity.normalized() * deceleration * mass
+		_last_rolling_resistance_force = resistance_force
 		apply_central_force(resistance_force)
 		remaining_ratio = maxf(1.0 - deceleration * delta / rolling_speed, 0.0)
 
@@ -92,3 +105,46 @@ func _physics_process(delta: float) -> void:
 	var circle_inertia: float = 0.5 * mass * _radius * _radius
 	var angular_acceleration: float = -angular_velocity * (1.0 - remaining_ratio) / delta
 	apply_torque(angular_acceleration * circle_inertia)
+
+
+func _apply_escape_guard() -> bool:
+	var half: float = Config.data.board_size * 0.5
+	var corrected_position: Vector2 = position
+	var corrected_velocity: Vector2 = linear_velocity
+	var triggered: bool = false
+	for axis_index: int in range(2):
+		var coordinate: float = position[axis_index]
+		var depth: float = absf(coordinate) + _radius - half
+		if depth <= Config.data.escape_guard_depth:
+			continue
+		var wall_sign: float = signf(coordinate)
+		corrected_position[axis_index] = wall_sign * (half - _radius)
+		if corrected_velocity[axis_index] * wall_sign > 0.0:
+			corrected_velocity[axis_index] = 0.0
+		var axis_name: String = "x" if axis_index == 0 else "y"
+		escape_guard_triggered.emit(axis_name, depth)
+		push_warning(
+			"[ESCAPE_GUARD] level=%d axis=%s depth=%.3f" % [level, axis_name, depth]
+		)
+		triggered = true
+	if not triggered:
+		return false
+
+	var corrected_transform: Transform2D = global_transform
+	var parent_2d: Node2D = get_parent() as Node2D
+	corrected_transform.origin = (
+		corrected_position
+		if parent_2d == null
+		else parent_2d.to_global(corrected_position)
+	)
+	PhysicsServer2D.body_set_state(
+		get_rid(),
+		PhysicsServer2D.BODY_STATE_TRANSFORM,
+		corrected_transform
+	)
+	PhysicsServer2D.body_set_state(
+		get_rid(),
+		PhysicsServer2D.BODY_STATE_LINEAR_VELOCITY,
+		corrected_velocity
+	)
+	return true

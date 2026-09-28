@@ -16,19 +16,14 @@ const DIRECTION_PATTERN: Array[Vector2i] = [
 	Vector2i.UP,
 	Vector2i.RIGHT,
 ]
-const SWEEP_ROLLING_RESISTANCES: Array[float] = [0.3, 0.5, 0.7, 1.0]
-const SWEEP_REST_SETTINGS: Array[Vector2] = [
-	Vector2(0.0, 0.0),
-	Vector2(60.0, 8.0),
-	Vector2(120.0, 10.0),
-]
+const SWEEP_ROLLING_RESISTANCES: Array[float] = [0.5, 1.0, 1.5]
 const SWEEP_STABLE_THRESHOLDS: Vector2 = Vector2(30.0, 3.0)
 const TARGET_MAX_FORCED_SETTLES: int = 6
 const TARGET_MAX_P50: float = 1.9
 const TARGET_MAX_P90: float = 2.2
 const MAX_ALLOWED_PENETRATION: float = 12.0
 const WAIT_TIMEOUT_SECONDS: float = 5.0
-const SWEEP_ARGUMENT: String = "--turn-time-sweep"
+const CANDIDATE_ARGUMENT_PREFIX: String = "--turn-time-candidate="
 const PHYSICS_DIRECTIONS: Array[Vector2i] = [
 	Vector2i.DOWN,
 	Vector2i.RIGHT,
@@ -49,12 +44,16 @@ const OVERLAP_OBSERVE_SECONDS: float = 0.5
 
 
 func test_selected_defaults_meet_turn_time_targets() -> void:
-	if OS.get_cmdline_user_args().has(SWEEP_ARGUMENT):
+	if not _candidate_argument().is_empty():
 		return
 	var snapshot: Dictionary = _snapshot_config()
 	var metrics: Dictionary = await _measure_current_config()
 	_print_metrics("selected", metrics)
-	assert_eq(int(metrics["turns"]), SEEDS.size() * TURNS_PER_SEED, "measured turns")
+	assert_eq(
+		int(metrics["turns"]),
+		SEEDS.size() * TURNS_PER_SEED,
+		"measured turns"
+	)
 	assert_true(
 		int(metrics["forced_settles"]) <= TARGET_MAX_FORCED_SETTLES,
 		"forced settles target"
@@ -64,61 +63,55 @@ func test_selected_defaults_meet_turn_time_targets() -> void:
 	_restore_config(snapshot)
 
 
-func test_sweep_reports_all_twelve_combinations_when_requested() -> void:
-	if not OS.get_cmdline_user_args().has(SWEEP_ARGUMENT):
+func test_independent_candidate_report_when_requested() -> void:
+	var candidate_argument: String = _candidate_argument()
+	if candidate_argument.is_empty():
 		return
 	var snapshot: Dictionary = _snapshot_config()
-	var result_count: int = 0
-	var qualifying_count: int = 0
-	var first_qualifying_config: Dictionary = {}
-	var default_sweep_metrics: Dictionary = {}
-	for rolling_resistance: float in SWEEP_ROLLING_RESISTANCES:
-		for rest_setting: Vector2 in SWEEP_REST_SETTINGS:
-			Config.data.rolling_resistance = rolling_resistance
-			Config.data.rest_speed = rest_setting.x
-			Config.data.rest_damp = rest_setting.y
-			Config.data.stable_linear_speed = SWEEP_STABLE_THRESHOLDS.x
-			Config.data.stable_angular_speed = SWEEP_STABLE_THRESHOLDS.y
-			var turn_metrics: Dictionary = await _measure_current_config()
-			var physics_metrics: Dictionary = await _measure_physics_regression()
-			var continuous_metrics: Dictionary = await _measure_continuous_turns()
-			var overlap_metrics: Dictionary = await _measure_overlap_spawn()
-			var qualifies: bool = _candidate_meets_targets(
-				turn_metrics,
-				physics_metrics,
-				continuous_metrics,
-				overlap_metrics
-			)
-			_print_candidate_metrics(
-				turn_metrics,
-				physics_metrics,
-				continuous_metrics,
-				overlap_metrics,
-				qualifies
-			)
-			if qualifies:
-				qualifying_count += 1
-				if first_qualifying_config.is_empty():
-					first_qualifying_config = {
-						"rolling_resistance": rolling_resistance,
-						"rest_speed": rest_setting.x,
-						"rest_damp": rest_setting.y,
-					}
-			if _matches_snapshot(snapshot):
-				default_sweep_metrics = turn_metrics.duplicate(true)
-			result_count += 1
-	assert_eq(result_count, 12, "sweep combination count")
-	_restore_config(snapshot)
-	print(
-		"Turn-time sweep selection qualifying=%d first=%s" % [
-			qualifying_count,
-			str(first_qualifying_config),
-		]
+	var rolling_resistance: float = candidate_argument.to_float()
+	assert_true(
+		is_zero_approx(rolling_resistance)
+		or SWEEP_ROLLING_RESISTANCES.has(rolling_resistance),
+		"supported independent candidate"
 	)
-	if not default_sweep_metrics.is_empty():
-		var default_metrics: Dictionary = await _measure_current_config()
-		_print_metrics("default-parity", default_metrics)
-		assert_eq(default_metrics, default_sweep_metrics, "sweep/default metrics parity")
+	Config.data.rolling_resistance = rolling_resistance
+	Config.data.rest_speed = 0.0
+	Config.data.rest_damp = 0.0
+	Config.data.stable_linear_speed = SWEEP_STABLE_THRESHOLDS.x
+	Config.data.stable_angular_speed = SWEEP_STABLE_THRESHOLDS.y
+	var metrics: Dictionary = await _measure_candidate()
+	var qualifies: bool = _candidate_meets_targets(
+		metrics["turn"] as Dictionary,
+		metrics["physics"] as Dictionary,
+		metrics["continuous"] as Dictionary,
+		metrics["overlap"] as Dictionary
+	)
+	_print_candidate_metrics(
+		metrics["turn"] as Dictionary,
+		metrics["physics"] as Dictionary,
+		metrics["continuous"] as Dictionary,
+		metrics["overlap"] as Dictionary,
+		qualifies
+	)
+	assert_eq(
+		int((metrics["turn"] as Dictionary)["turns"]),
+		SEEDS.size() * TURNS_PER_SEED,
+		"independent candidate measured turns"
+	)
+	_restore_config(snapshot)
+
+
+func _measure_candidate() -> Dictionary:
+	var physics_metrics: Dictionary = await _measure_physics_regression()
+	var continuous_metrics: Dictionary = await _measure_continuous_turns()
+	var overlap_metrics: Dictionary = await _measure_overlap_spawn()
+	var turn_metrics: Dictionary = await _measure_current_config()
+	return {
+		"turn": turn_metrics,
+		"physics": physics_metrics,
+		"continuous": continuous_metrics,
+		"overlap": overlap_metrics,
+	}
 
 
 func _measure_current_config() -> Dictionary:
@@ -131,6 +124,7 @@ func _measure_current_config() -> Dictionary:
 	}
 	var forced_settles: int = 0
 	var final_orb_total: int = 0
+	var escape_guard_total: int = 0
 	var tick_seconds: float = 1.0 / float(Engine.physics_ticks_per_second)
 
 	for seed: int in SEEDS:
@@ -149,6 +143,7 @@ func _measure_current_config() -> Dictionary:
 			if manager._settle_elapsed + tick_seconds >= Config.data.max_settle_time:
 				forced_settles += 1
 		final_orb_total += board.get_orbs().size()
+		escape_guard_total += board.escape_guard_count
 		await _cleanup_fixture(fixture)
 
 	return {
@@ -159,6 +154,7 @@ func _measure_current_config() -> Dictionary:
 		"p90": _percentile(turn_times, 0.90),
 		"maximum": _percentile(turn_times, 1.0),
 		"final_orb_average": float(final_orb_total) / float(SEEDS.size()),
+		"escape_guards": escape_guard_total,
 		"direction_p50": {
 			"DOWN": _percentile(direction_times["DOWN"] as Array[float], 0.50),
 			"RIGHT": _percentile(direction_times["RIGHT"] as Array[float], 0.50),
@@ -360,10 +356,15 @@ func _empty_board_metrics() -> Dictionary:
 	return {
 		"departures": 0,
 		"max_penetration": 0.0,
+		"escape_guards": 0,
 	}
 
 
 func _accumulate_board_metrics(board: Board, metrics: Dictionary) -> void:
+	metrics["escape_guards"] = maxi(
+		int(metrics["escape_guards"]),
+		board.escape_guard_count
+	)
 	for orb: Orb in board.get_orbs():
 		var center_extent: float = maxf(absf(orb.position.x), absf(orb.position.y))
 		var penetration: float = maxf(
@@ -380,6 +381,9 @@ func _accumulate_board_metrics(board: Board, metrics: Dictionary) -> void:
 
 func _merge_board_metrics(aggregate: Dictionary, metrics: Dictionary) -> void:
 	aggregate["departures"] = int(aggregate["departures"]) + int(metrics["departures"])
+	aggregate["escape_guards"] = (
+		int(aggregate["escape_guards"]) + int(metrics["escape_guards"])
+	)
 	aggregate["max_penetration"] = maxf(
 		float(aggregate["max_penetration"]),
 		float(metrics["max_penetration"])
@@ -442,7 +446,7 @@ func _percentile(values: Array[float], quantile: float) -> float:
 func _print_metrics(label: String, metrics: Dictionary) -> void:
 	var direction_p50: Dictionary = metrics["direction_p50"] as Dictionary
 	print(
-		"Turn-time %s rr=%.1f rest=%.0f/%.0f stable=%.0f/%.0f turns=%d forced=%d average=%.6f p50=%.6f p90=%.6f max=%.6f final_orbs_avg=%.3f direction_p50=[D %.6f R %.6f U %.6f L %.6f]" % [
+		"Turn-time %s rr=%.1f rest=%.0f/%.0f stable=%.0f/%.0f turns=%d forced=%d average=%.6f p50=%.6f p90=%.6f max=%.6f final_orbs_avg=%.3f escape_guards=%d direction_p50=[D %.6f R %.6f U %.6f L %.6f]" % [
 			label,
 			Config.data.rolling_resistance,
 			Config.data.rest_speed,
@@ -456,6 +460,7 @@ func _print_metrics(label: String, metrics: Dictionary) -> void:
 			float(metrics["p90"]),
 			float(metrics["maximum"]),
 			float(metrics["final_orb_average"]),
+			int(metrics["escape_guards"]),
 			float(direction_p50["DOWN"]),
 			float(direction_p50["RIGHT"]),
 			float(direction_p50["UP"]),
@@ -479,6 +484,9 @@ func _candidate_meets_targets(
 		and int(continuous_metrics["departures"]) == 0
 		and int(overlap_metrics["departures"]) == 0
 		and float(overlap_metrics["max_penetration"]) <= MAX_ALLOWED_PENETRATION
+		and int(physics_metrics["escape_guards"]) == 0
+		and int(continuous_metrics["escape_guards"]) == 0
+		and int(overlap_metrics["escape_guards"]) == 0
 	)
 
 
@@ -491,7 +499,7 @@ func _print_candidate_metrics(
 ) -> void:
 	var direction_p50: Dictionary = turn_metrics["direction_p50"] as Dictionary
 	print(
-		"Turn-time candidate rr=%.1f rest=%.0f/%.0f stable=%.0f/%.0f forced=%d average=%.6f p50=%.6f p90=%.6f max=%.6f final_orbs_avg=%.3f physics_departures=%d physics_penetration=%.3f continuous_departures=%d overlap_departures=%d overlap_penetration=%.3f qualifies=%s direction_p50=[D %.6f R %.6f U %.6f L %.6f]" % [
+		"Turn-time candidate rr=%.1f rest=%.0f/%.0f stable=%.0f/%.0f forced=%d average=%.6f p50=%.6f p90=%.6f max=%.6f final_orbs_avg=%.3f physics_departures=%d physics_penetration=%.3f continuous_departures=%d continuous_penetration=%.3f overlap_departures=%d overlap_penetration=%.3f guards=[turn %d physics %d continuous %d overlap %d] qualifies=%s direction_p50=[D %.6f R %.6f U %.6f L %.6f]" % [
 			Config.data.rolling_resistance,
 			Config.data.rest_speed,
 			Config.data.rest_damp,
@@ -506,8 +514,13 @@ func _print_candidate_metrics(
 			int(physics_metrics["departures"]),
 			float(physics_metrics["max_penetration"]),
 			int(continuous_metrics["departures"]),
+			float(continuous_metrics["max_penetration"]),
 			int(overlap_metrics["departures"]),
 			float(overlap_metrics["max_penetration"]),
+			int(turn_metrics["escape_guards"]),
+			int(physics_metrics["escape_guards"]),
+			int(continuous_metrics["escape_guards"]),
+			int(overlap_metrics["escape_guards"]),
 			str(qualifies),
 			float(direction_p50["DOWN"]),
 			float(direction_p50["RIGHT"]),
@@ -517,23 +530,11 @@ func _print_candidate_metrics(
 	)
 
 
-func _matches_snapshot(snapshot: Dictionary) -> bool:
-	return (
-		is_equal_approx(
-			Config.data.rolling_resistance,
-			float(snapshot["rolling_resistance"])
-		)
-		and is_equal_approx(Config.data.rest_speed, float(snapshot["rest_speed"]))
-		and is_equal_approx(Config.data.rest_damp, float(snapshot["rest_damp"]))
-		and is_equal_approx(
-			Config.data.stable_linear_speed,
-			float(snapshot["stable_linear_speed"])
-		)
-		and is_equal_approx(
-			Config.data.stable_angular_speed,
-			float(snapshot["stable_angular_speed"])
-		)
-	)
+func _candidate_argument() -> String:
+	for argument: String in OS.get_cmdline_user_args():
+		if argument.begins_with(CANDIDATE_ARGUMENT_PREFIX):
+			return argument.trim_prefix(CANDIDATE_ARGUMENT_PREFIX)
+	return ""
 
 
 func _snapshot_config() -> Dictionary:

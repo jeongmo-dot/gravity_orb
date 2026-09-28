@@ -15,6 +15,7 @@ const FRAME_WIDTH: float = 4.0
 
 var _orbs: Array[Orb] = []
 var _gravity_direction: Vector2i = Vector2i.DOWN
+var escape_guard_count: int = 0
 
 
 func _ready() -> void:
@@ -47,6 +48,7 @@ func spawn_orb(
 	orb.generation = p_generation
 	orb.set_gravity(_gravity_direction, Config.data.gravity_strength)
 	orb.body_entered.connect(_on_orb_body_entered.bind(orb))
+	orb.escape_guard_triggered.connect(_on_orb_escape_guard_triggered)
 	_orbs.append(orb)
 	return orb
 
@@ -91,6 +93,10 @@ func _on_orb_body_entered(other_body: Node, orb: Orb) -> void:
 		return
 	if orb.get_instance_id() < other.get_instance_id():
 		orb_contact.emit(orb, other)
+
+
+func _on_orb_escape_guard_triggered(_axis: String, _depth: float) -> void:
+	escape_guard_count += 1
 
 
 func _configure_walls() -> void:

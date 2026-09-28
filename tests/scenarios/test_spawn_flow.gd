@@ -235,14 +235,16 @@ func test_center_spawn_overlap_remains_inside_board_for_half_second() -> void:
 
 	var metrics: Dictionary = await _observe_board(board, OVERLAP_OBSERVE_SECONDS)
 	print(
-		"Spawn overlap seed=4006 duration=%.2f departures=%d max_penetration=%.3f max_speed=%.3f" % [
+		"Spawn overlap seed=4006 duration=%.2f departures=%d max_penetration=%.3f max_speed=%.3f escape_guards=%d" % [
 			OVERLAP_OBSERVE_SECONDS,
 			int(metrics["departures"]),
 			float(metrics["max_penetration"]),
 			float(metrics["max_speed"]),
+			int(metrics["escape_guards"]),
 		]
 	)
 	assert_eq(int(metrics["departures"]), 0, "overlap case orb center departures")
+	assert_eq(int(metrics["escape_guards"]), 0, "overlap case escape guard activations")
 	assert_true(
 		float(metrics["max_penetration"]) <= OVERLAP_PENETRATION_LIMIT,
 		"overlap wall penetration must be at most %.3fpx, got %.3fpx" % [
@@ -297,16 +299,18 @@ func test_seed_4242_completes_twenty_turns_without_departures() -> void:
 		assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "turn returns to input")
 
 	print(
-		"Spawn flow seed=4242 summary turns=20 orbs=%d departures=%d max_penetration=%.3f forced_settles=%d" % [
+		"Spawn flow seed=4242 summary turns=20 orbs=%d departures=%d max_penetration=%.3f forced_settles=%d escape_guards=%d" % [
 			board.get_orbs().size(),
 			total_departures,
 			maximum_penetration,
 			forced_settle_count,
+			board.escape_guard_count,
 		]
 	)
 	assert_eq(manager.turn_index, 20, "twenty turns completed")
 	assert_eq(board.get_orbs().size(), 22, "initial two plus twenty turn spawns")
 	assert_eq(total_departures, 0, "twenty-turn orb center departures")
+	assert_eq(board.escape_guard_count, 0, "twenty-turn escape guard activations")
 
 	await _cleanup_fixture(fixture)
 	_restore_config(snapshot)
@@ -446,10 +450,15 @@ func _empty_physics_metrics() -> Dictionary:
 		"departures": 0,
 		"max_penetration": 0.0,
 		"max_speed": 0.0,
+		"escape_guards": 0,
 	}
 
 
 func _accumulate_board_metrics(board: Board, metrics: Dictionary) -> void:
+	metrics["escape_guards"] = maxi(
+		int(metrics["escape_guards"]),
+		board.escape_guard_count
+	)
 	for orb: Orb in board.get_orbs():
 		var center_extent: float = maxf(absf(orb.position.x), absf(orb.position.y))
 		var penetration: float = maxf(

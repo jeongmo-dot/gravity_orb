@@ -15,9 +15,68 @@ const KNOWN_REGRESSION_SEED: int = 1047
 const WORST_CASE_SEED: int = 2000
 const MAX_ALLOWED_PENETRATION: float = 12.0
 const STANDARD_ORB_COUNT: int = 5
+const POSITION_TOLERANCE: float = 0.1
 
 
-func test_seeded_orbs_remain_inside_board_during_gravity_cycles() -> void:
+func test_floor_resistance_is_zero_for_airborne_orb_contact() -> void:
+	var original_resistance: float = Config.data.rolling_resistance
+	Config.data.rolling_resistance = 1.5
+	var board: Board = BOARD_SCENE.instantiate() as Board
+	tree.root.add_child(board)
+	await tree.process_frame
+	var radius: float = Config.data.radius_for_level(1)
+	var left: Orb = board.spawn_orb(0, 1, Vector2(-radius, 0.0), Vector2(100.0, 0.0))
+	var right: Orb = board.spawn_orb(1, 1, Vector2(radius, 0.0), Vector2(-100.0, 0.0))
+	await tree.physics_frame
+	assert_true(
+		left._last_rolling_resistance_force.is_zero_approx(),
+		"airborne left orb rolling force"
+	)
+	assert_true(
+		right._last_rolling_resistance_force.is_zero_approx(),
+		"airborne right orb rolling force"
+	)
+	assert_eq(board.escape_guard_count, 0, "airborne contact escape guards")
+	board.queue_free()
+	await tree.process_frame
+	Config.data.rolling_resistance = original_resistance
+
+
+func test_guard_restores_orb_after_forty_pixel_penetration() -> void:
+	var board: Board = BOARD_SCENE.instantiate() as Board
+	tree.root.add_child(board)
+	await tree.process_frame
+	var radius: float = Config.data.radius_for_level(1)
+	var boundary: float = board.half_size() - radius
+	var orb: Orb = board.spawn_orb(
+		0,
+		1,
+		Vector2(boundary + 40.0, 0.0),
+		Vector2(100.0, 0.0)
+	)
+	orb.set_physics_process(false)
+	orb._physics_process(1.0 / float(Engine.physics_ticks_per_second))
+	var body_transform: Transform2D = PhysicsServer2D.body_get_state(
+		orb.get_rid(),
+		PhysicsServer2D.BODY_STATE_TRANSFORM
+	) as Transform2D
+	var body_velocity: Vector2 = PhysicsServer2D.body_get_state(
+		orb.get_rid(),
+		PhysicsServer2D.BODY_STATE_LINEAR_VELOCITY
+	) as Vector2
+	assert_eq(board.escape_guard_count, 1, "forty-pixel penetration guard count")
+	assert_near(
+		body_transform.origin.x,
+		boundary,
+		POSITION_TOLERANCE,
+		"guarded boundary position"
+	)
+	assert_true(body_velocity.x <= 0.0, "outward velocity component cleared")
+	board.queue_free()
+	await tree.process_frame
+
+
+func test_cycle_seeded_orbs_remain_inside_board_during_gravity_cycles() -> void:
 	var results: Array[Dictionary] = []
 	for seed: int in range(STANDARD_SEED_START, STANDARD_SEED_END_EXCLUSIVE):
 		var standard_levels: Array[int] = _standard_levels(STANDARD_ORB_COUNT)
@@ -30,10 +89,12 @@ func test_seeded_orbs_remain_inside_board_during_gravity_cycles() -> void:
 	results.append(await _run_scenario(WORST_CASE_SEED, "worst", worst_case_levels))
 
 	var total_departures: int = 0
+	var total_escape_guards: int = 0
 	var overall_maximum_penetration: float = 0.0
 	var overall_maximum_speed: float = 0.0
 	for result: Dictionary in results:
 		total_departures += int(result["departures"])
+		total_escape_guards += int(result["escape_guards"])
 		overall_maximum_penetration = maxf(
 			overall_maximum_penetration,
 			float(result["max_penetration"])
@@ -41,14 +102,16 @@ func test_seeded_orbs_remain_inside_board_during_gravity_cycles() -> void:
 		overall_maximum_speed = maxf(overall_maximum_speed, float(result["max_speed"]))
 
 	print(
-		"Scenario summary: seeds=%d departures=%d max_penetration=%.3f max_speed=%.3f" % [
+		"Scenario summary: seeds=%d departures=%d max_penetration=%.3f max_speed=%.3f escape_guards=%d" % [
 			results.size(),
 			total_departures,
 			overall_maximum_penetration,
 			overall_maximum_speed,
+			total_escape_guards,
 		]
 	)
 	assert_eq(total_departures, 0, "total orb center departures")
+	assert_eq(total_escape_guards, 0, "total escape guard activations")
 	assert_true(
 		overall_maximum_penetration <= MAX_ALLOWED_PENETRATION,
 		"overall wall penetration must be at most %.3fpx, got %.3fpx" % [
@@ -114,16 +177,18 @@ func _run_scenario(seed: int, scenario_name: String, levels: Array[int]) -> Dict
 					)
 
 	print(
-		"Scenario seed=%d kind=%s initial_overlaps=%d departures=%d max_penetration=%.3f max_speed=%.3f" % [
+		"Scenario seed=%d kind=%s initial_overlaps=%d departures=%d max_penetration=%.3f max_speed=%.3f escape_guards=%d" % [
 			seed,
 			scenario_name,
 			initial_overlap_count,
 			departure_count,
 			maximum_penetration,
 			maximum_speed,
+			board.escape_guard_count,
 		]
 	)
 	assert_eq(departure_count, 0, "seed %d orb center departures" % seed)
+	assert_eq(board.escape_guard_count, 0, "seed %d escape guard activations" % seed)
 	assert_true(
 		maximum_penetration <= MAX_ALLOWED_PENETRATION,
 		"seed %d wall penetration must be at most %.3fpx, got %.3fpx" % [
@@ -133,6 +198,7 @@ func _run_scenario(seed: int, scenario_name: String, levels: Array[int]) -> Dict
 		]
 	)
 
+	var escape_guard_count: int = board.escape_guard_count
 	board.queue_free()
 	await tree.process_frame
 	return {
@@ -141,6 +207,7 @@ func _run_scenario(seed: int, scenario_name: String, levels: Array[int]) -> Dict
 		"departures": departure_count,
 		"max_penetration": maximum_penetration,
 		"max_speed": maximum_speed,
+		"escape_guards": escape_guard_count,
 	}
 
 

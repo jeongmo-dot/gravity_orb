@@ -36,6 +36,8 @@ enum SpawnPositionMode { RANDOM, CENTER }
 @export var rolling_resistance: float = 0.0
 @export var rest_speed: float = 0.0
 @export var rest_damp: float = 0.0
+@export var floor_contact_tolerance: float = 2.0
+@export var escape_guard_depth: float = 25.0
 
 
 func radius_for_level(level: int) -> float:

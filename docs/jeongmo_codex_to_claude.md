@@ -39,9 +39,44 @@
 ## 미확인
 
 ### [2026-09-29] 대상 #8 — 턴 소요 시간 튜닝: 구름 저항
-- 상태: 질문 — 추가 요구 2 기본값 경로 회귀 불일치
+- 상태: 질문 — 추가 요구 3 지정 3조합 중 충족 후보 없음
 - 브랜치 / PR: `m5-turn-time-tuning` / PR 미생성
-- 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, `scripts/core/Orb.gd`, `tests/test_config.gd`, `tests/scenarios/test_board_physics.gd`, `tests/scenarios/test_spawn_flow.gd`, `tests/scenarios/test_turn_time.gd`, `tests/scenarios/test_turn_time.gd.uid`, `docs/jeongmo_codex_to_claude.md`
+- 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, `scripts/core/Board.gd`, `scripts/core/Orb.gd`, `tests/run_tests.gd`, `tests/test_config.gd`, `tests/scenarios/test_board_physics.gd`, `tests/scenarios/test_spawn_flow.gd`, `tests/scenarios/test_turn_time.gd`, `tests/scenarios/test_turn_time.gd.uid`, `docs/jeongmo_codex_to_claude.md`
+- 추가 요구 3 Done-when 대조:
+  - [x] `position.dot(g) >= half - r - floor_contact_tolerance`인 현재 중력 쪽 바닥에서만 힘·토크 기반 구름 저항 적용; `get_contact_count()` 조건 제거
+  - [x] `floor_contact_tolerance = 2.0`, `escape_guard_depth = 25.0` config 필드와 기본값 추가
+  - [x] 축별 관통 깊이가 25px을 넘으면 `PhysicsServer2D.body_set_state()`로 중심을 `±(half-r)`에 복귀시키고 외향 속도 성분을 0으로 설정; `[ESCAPE_GUARD]` 경고와 `Board.escape_guard_count` 누적
+  - [x] 공중에서 맞닿아 스치는 두 구체의 구름 저항 힘 0 — `test_floor_resistance_is_zero_for_airborne_orb_contact`
+  - [x] 40px 벽 관통에서 안전장치 1회, PhysicsServer 위치 경계 복귀, 외향 속도 제거 — `test_guard_restores_orb_after_forty_pixel_penetration`
+  - [x] 후보 인자 `--turn-time-candidate=<값>`이면 해당 조합만 새 프로세스에서 기본 픽스처 경로로 측정; exact parity assert 제거
+  - [x] 0.5·1.0·1.5 세 후보를 각각 독립 프로세스 3회 측정 — 각 후보의 3회 수치가 모두 동일
+  - [x] 충족 후보가 없어 지시대로 `rolling_resistance = 0.0`으로 복귀
+  - [x] 저항 0의 22시드 회귀는 안전장치 0회·이탈 0·최대 관통 8.623px로 기존 수치 보존
+  - [ ] 선택 기본값의 독립 실행으로 전체 테스트 통과 — 충족 후보가 없어 선택 불가; fallback 0에서 54/56 통과
+  - [ ] §10.1 명령 3종 에러 0 — import와 300프레임 스모크는 종료 코드 0, 전체 테스트는 종료 코드 1
+- 추가 요구 3 QA 관측값 (`저항 / 제동 0·0 / 임계 30·3`, 아래 각 행은 독립 실행 3회 모두 동일):
+
+| 저항 | 강제 | p50 | p90 | 물리 이탈/관통 | 20턴 이탈/관통 | 겹침 이탈/관통 | 안전장치 턴/물리/20턴/겹침 | 충족 |
+|---:|---:|---:|---:|---:|---:|---:|---:|:---:|
+| 0.5 | 20 | 2.366667 | 3.004167 | 0 / 11.329px | 0 / 27.403px | 0 / 4.634px | 3 / 0 / 2 / 0 | 아니오 |
+| 1.0 | 20 | 2.250000 | 3.004167 | 0 / 12.941px | 0 / 29.378px | 0 / 2.082px | 445 / 0 / 1 / 0 | 아니오 |
+| 1.5 | 24 | 2.225000 | 3.004167 | 0 / 13.303px | 0 / 22.755px | 0 / 2.119px | 4 / 0 / 0 / 0 | 아니오 |
+
+- 추가 요구 3 QA 세부:
+  - 0.5는 22시드 관통 기준을 만족하지만 강제·p50·p90과 20턴 안전장치 0 조건을 넘음
+  - 1.0은 강제·p50·p90, 22시드 관통, 20턴 안전장치 조건을 넘음
+  - 1.5는 20턴·겹침 안전장치 0을 만족하지만 강제·p50·p90과 22시드 관통을 넘음
+  - fallback 0 전체 실행 → 54/56 통과, 종료 코드 1. 실패는 20턴 안전장치 1회와 선택 기본값 시간 목표(강제 112, p50·p90 3.004167초) 2개
+  - fallback 0의 겹침 회귀 → 이탈 0, 최대 관통 6.867px, 안전장치 0
+  - `godot --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `godot --headless --fixed-fps 240 --path . -s res://tests/run_tests.gd` → 54/56 통과, 종료 코드 1
+  - `godot --headless --path . --quit-after 300` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 정적 검사 → `Orb.gd`의 `get_contact_count`, `linear_velocity =`, `angular_velocity =` 0건; Input 참조는 `InputRouter.gd`만, 난수 API는 `Spawner.gd`만
+  - 로컬 커밋 생성. 원격 push는 사설 코드 외부 전송에 대한 명시 승인 필요로 미실행; 브랜치는 `origin/m5-turn-time-tuning`보다 1커밋 앞섬
+- 추가 요구 3 수동 확인: 충족 기본값이 없어 미실행. 기본값을 새로 지정하면 DOWN·RIGHT·UP·LEFT 반복 입력으로 낙하 속도 유지, 바닥에서만 횡구름 감속, `[ESCAPE_GUARD]` 미발생을 확인해야 한다.
+- 추가 요구 3 결정 사항: 후보별 실행 순서 의존성을 피하려고 테스트 러너가 후보 인자를 받으면 `test_turn_time.gd`만 실행하고, 그 안에서 22시드 → 20턴 → 겹침 → 턴 시간 순서로 측정하도록 고정했다. 안전장치 단위 테스트는 솔버가 경계 접촉체를 추가 보정한 뒤의 Node 좌표가 아니라 명세가 지정한 `PhysicsServer2D` body state의 복귀 좌표를 검증한다.
+- 추가 요구 3 남은 것 · 질문: 지정 3조합에는 모든 선택 조건을 만족하는 값이 없다. 지시대로 기본 저항을 0으로 복귀했으므로 다음 튜닝 축 또는 기준 변경이 필요하다. 특히 0.5는 물리 관통은 통과하지만 시간 목표와 20턴 안전장치가 실패하고, 1.5는 안전장치 회귀는 통과하지만 시간·물리 관통이 실패한다.
+
 - 추가 요구 2 Done-when 대조:
   - [x] 지정 기본값 `rolling_resistance 1.0`, 저속 제동 `0/0`, 안정 임계 `30/3`을 `default_config.tres`와 config 테스트에 반영
   - [x] 물리·겹침·스윕 선택 조건의 관통 기준을 12px로 변경

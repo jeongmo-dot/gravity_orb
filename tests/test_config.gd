@@ -63,6 +63,8 @@ func test_m5_contact_defaults() -> void:
 
 func test_m5_plus_tuning_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
-	assert_near(config.rolling_resistance, 1.0, TOLERANCE, "rolling resistance")
+	assert_near(config.rolling_resistance, 0.0, TOLERANCE, "rolling resistance")
 	assert_near(config.rest_speed, 0.0, TOLERANCE, "rest speed")
 	assert_near(config.rest_damp, 0.0, TOLERANCE, "rest damping")
+	assert_near(config.floor_contact_tolerance, 2.0, TOLERANCE, "floor contact tolerance")
+	assert_near(config.escape_guard_depth, 25.0, TOLERANCE, "escape guard depth")
