@@ -38,9 +38,49 @@
 
 ## 미확인
 
+### [2026-09-28] 대상 #5 — M4 구체 생성
+- 상태: 완료
+- 브랜치 / PR: `m4-orb-spawning` / PR 생성 후 링크 반영 예정
+- 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, `scenes/Main.tscn`, `scenes/UI.tscn`, `scripts/core/Board.gd`, `scripts/core/Main.gd`, `scripts/core/Spawner.gd`, `scripts/core/TurnManager.gd`, `scripts/ui/DebugHud.gd`, `scripts/ui/Hud.gd`, `tests/run_tests.gd`, `tests/test_config.gd`, `tests/test_spawner.gd`, `tests/scenarios/test_board_physics.gd`, `tests/scenarios/test_spawn_flow.gd`, `tests/scenarios/test_turn_manager.gd`, Godot 생성 `.gd.uid` 4개
+- Done-when 대조:
+  - [x] 4방향 모두 중력 반대편 생성 벽의 `spawn_line` 공식과 실제 생성 좌표 일치 — `test_spawn_line_matches_all_four_generation_walls`, 시드 777의 5턴 시나리오 자동 검증
+  - [x] 시작 시 바닥에 초기 구체 2개를 등간격 배치하고 벽·서로 겹침 0건 — `test_initial_two_orbs_use_even_bottom_positions_without_overlap` 자동 검증
+  - [x] 미리보기의 color·level과 다음 실제 생성 구체 일치 — `test_preview_matches_spawned_orb_and_spawn_line` 자동 검증
+  - [x] 같은 시드의 `(level, color, t)` 50개 시퀀스 및 시드 777의 5턴 실제 생성 결과 재현 — `test_spawner.gd`, `test_seed_777_reproduces_five_turn_sequence` 자동 검증
+  - [x] CENTER 모드에서도 position 난수를 소비해 RANDOM과 level·color 순서 유지 — `test_center_mode_consumes_position_and_preserves_item_sequence` 자동 검증
+  - [x] `SIMULATING` 안정 후 1개 생성, `SPAWNING`에서 다시 settle한 뒤 턴 종료 — `test_three_turns_add_three_orbs_and_settle_in_spawning_state` 및 갱신된 T1~T7 자동 검증
+  - [x] M1 임시 RNG·구체 생성 코드와 `debug_test_orb_count` 제거 — 정적 검사 0건, 물리 시나리오는 내부 상수 5 사용
+  - [x] RNG API 참조를 `Spawner.gd`로 격리 — `rg -n "randf|randi|shuffle|pick_random|RandomNumberGenerator" scripts -g "*.gd"` 결과 파일 1개
+  - [x] NEXT 미리보기와 실제 seed 표시, 모든 Control `mouse_filter = IGNORE` — 씬 정적 검사와 메인 씬 스모크 자동 검증
+  - [x] §10.1 명령 3종 종료 코드 0, 기존 물리 회귀 수치 유지 — 자동 검증 완료
+  - [ ] 실제 창에서 초기 배치·NEXT 시각·4방향 생성과 고정 시드 재실행 확인 — 미실행, 아래 수동 확인 절차 필요
+- QA 관측값:
+  - 실행 환경: `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe`, 버전 `4.8.dev3.mono.official.51105ccbe`
+  - `godot --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR` 0건, `Parse Error` 0건
+  - `godot --headless --fixed-fps 240 --path . -s res://tests/run_tests.gd` → 37/37 통과, 실패 0건, 종료 코드 0
+  - 테스트 세부 → `test_spawner.gd` 5/5, `test_spawn_flow.gd` 5/5, 갱신된 `test_turn_manager.gd` 7/7, 나머지 회귀 20/20
+  - 시드 42, 10,000회 분포 → 레벨1 `0.8971`; 색상 `0.3360 / 0.3302 / 0.3338` (각 목표 대비 허용 오차 ±0.02 이내)
+  - 4방향 레벨1 생성선 원점 → DOWN `(0, -426)`, UP `(0, 426)`, LEFT `(426, 0)`, RIGHT `(-426, 0)`
+  - 시드 777, 5턴 생성 `(중력 / color / level / position)` → DOWN `0/1/(-360.4127,-426)`, LEFT `1/1/(426,285.0786)`, UP `2/1/(-35.29215,426)`, RIGHT `1/1/(-426,136.5205)`, DOWN `2/1/(283.709,-426)`; 독립 실행 2회 완전 일치
+  - M3 시간 회귀 → T4 `0.333333초/80틱`, T5 `3.000000초/720틱`; 강제 settle 경고 4건은 T2·T3·T5의 명세 동작으로 관측
+  - 기존 물리 회귀 → 22시드 이탈 0건, 최대 관통 `8.623px`, 최대 속도 `1935.529px/s`
+  - `godot --headless --path . --quit-after 300` → 종료 코드 0, `SCRIPT ERROR` 0건, `Parse Error` 0건
+  - 정적 검사 → 물리 240 tick·접촉 허용 관통 0.1 유지, M7 `is_circle_free`·후보 대체 API 0건
+- 수동 확인 절차:
+  1. `& 'C:\work\Godot\Godot_v4.8-dev3_mono_win64.exe' --path .` 실행 → 보드 바닥에 구체 2개가 간격을 두고 나타나며, 우측 상단에 `NEXT` 구체와 좌측 디버그 라벨의 실제 `Seed`가 표시되는지 확인한다.
+  2. DOWN·LEFT·UP·RIGHT 순서로 스와이프 → 각각 위·오른쪽·아래·왼쪽 벽에서 새 구체가 나타나고 `SPAWNING` 상태에서 구른 뒤 `WAITING_INPUT`으로 돌아오는지 확인한다.
+  3. 각 스와이프 직전 `NEXT`의 색·크기를 기억 → 생성된 구체와 일치하고, 생성 직후 NEXT가 다음 구체로 갱신되는지 확인한다.
+  4. `default_config.tres`의 `rng_seed`를 임시로 `777`로 설정해 두 번 실행 → 초기 구체와 이후 5턴의 색·레벨·선호 생성 위치가 반복되는지 확인하고 값을 `0`으로 복구한다.
+- 결정 사항: 중첩 UI 씬 내부의 `Hud`는 바깥 씬 고유 이름을 직접 찾을 수 없어 `UI` 루트가 `%Spawner` 참조를 주입하고, 이후 `Hud`가 `next_changed`를 직접 구독한다. 테스트 러너는 파싱 실패 스크립트가 잘못 통과하지 않도록 `Script.can_instantiate()` 검사를 추가했다.
+- 남은 것 · 질문: 실제 창 수동 QA는 미실행이다. 공개 API·밸런스 수치 변경과 알려진 문제는 없다.
+
+---
+
+## 확인됨
+
 ### [2026-09-28] 대상 #4 — M3 턴 상태 머신
 - 상태: 완료
-- 브랜치 / PR: `m3-turn-state-machine` / PR 생성 후 링크 반영 예정
+- 브랜치 / PR: `m3-turn-state-machine` / [PR #4](https://github.com/jeongmo-dot/gravity_orb/pull/4)
 - 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, `scenes/Main.tscn`, `scenes/UI.tscn`, `scripts/core/Main.gd`, `scripts/core/TurnManager.gd`, `scripts/ui/DebugHud.gd`, `tests/test_config.gd`, `tests/scenarios/test_turn_manager.gd`, Godot 생성 `.gd.uid` 3개
 - Done-when 대조:
   - [x] 구체가 굴러가는 `SIMULATING` 중 추가 입력 무시, 입력 잠금 유지 — T3 자동 검증
@@ -69,10 +109,6 @@
   4. 라벨이 다시 `WAITING_INPUT`이 된 뒤 새 방향을 입력 → 다음 턴으로 정상 진행하는지 확인한다.
 - 결정 사항: 임시 HUD는 `scripts/ui/DebugHud.gd`가 state·gravity·turn 신호를 구독하며, 화면 표시용 settle 경과만 `_process()`에서 `TurnManager`의 내부 누적값을 읽는다. T4·T5는 동일한 240Hz 물리 delta를 보존하면서 실행 시간을 줄이기 위해 `--fixed-fps 240`으로 측정했다.
 - 남은 것 · 질문: 실제 창 수동 QA는 미실행이다. 공개 API·밸런스 수치 변경과 알려진 문제는 없다.
-
----
-
-## 확인됨
 
 ### [2026-09-28] 대상 #3 — M2 입력 추상화
 - 상태: 완료

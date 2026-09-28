@@ -9,6 +9,7 @@ signal turn_started(turn_index: int, dir: Vector2i)
 signal turn_finished(turn_index: int, max_chain: int)
 
 @onready var _board: Board = %Board
+@onready var _spawner: Spawner = %Spawner
 
 var state: State = State.WAITING_INPUT
 var gravity: Vector2i = Vector2i.DOWN
@@ -47,7 +48,7 @@ func on_swipe(dir: Vector2i) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if state != State.SIMULATING:
+	if state != State.SIMULATING and state != State.SPAWNING:
 		return
 
 	_settle_elapsed += delta
@@ -86,7 +87,12 @@ func _on_settled() -> void:
 		_set_state(State.WAITING_INPUT)
 		return
 
-	_set_state(State.SPAWNING)
+	if state == State.SIMULATING:
+		_spawner.try_spawn(_board, gravity)
+		_begin_settle()
+		_set_state(State.SPAWNING)
+		return
+
 	_set_state(State.CHECK_GAMEOVER)
 	turn_finished.emit(turn_index, 0)
 	InputRouter.set_locked(false)

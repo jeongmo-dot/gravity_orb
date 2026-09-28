@@ -2,9 +2,10 @@ extends TestCase
 
 const BOARD_SCENE: PackedScene = preload("res://scenes/Board.tscn")
 const TURN_MANAGER_SCRIPT: Script = preload("res://scripts/core/TurnManager.gd")
+const SPAWNER_SCRIPT: Script = preload("res://scripts/core/Spawner.gd")
 const FIXTURE_SEED: int = 3000
 const HIGH_THRESHOLD: float = 1.0e9
-const WAIT_TIMEOUT_SECONDS: float = 4.0
+const WAIT_TIMEOUT_SECONDS: float = 7.0
 
 var _states: Array[TurnManager.State] = []
 var _turn_starts: Array[Dictionary] = []
@@ -179,6 +180,12 @@ func _create_fixture(seed: int) -> Dictionary:
 	fixture_root.add_child(board)
 	board.owner = fixture_root
 
+	var spawner: Spawner = SPAWNER_SCRIPT.new() as Spawner
+	spawner.name = "Spawner"
+	spawner.unique_name_in_owner = true
+	fixture_root.add_child(spawner)
+	spawner.owner = fixture_root
+
 	var manager: TurnManager = TURN_MANAGER_SCRIPT.new() as TurnManager
 	manager.name = "TurnManager"
 	fixture_root.add_child(manager)
@@ -187,14 +194,14 @@ func _create_fixture(seed: int) -> Dictionary:
 	tree.root.add_child(fixture_root)
 	await tree.process_frame
 
-	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
-	rng.seed = seed
-	var position: Vector2 = Vector2(
-		rng.randf_range(-120.0, 120.0),
-		rng.randf_range(-120.0, 120.0)
-	)
-	board.spawn_orb(OrbTypes.OrbColor.RED, 1, position)
-	return {"root": fixture_root, "board": board, "manager": manager}
+	spawner.init_rng(seed)
+	spawner.spawn_initial(board, Vector2i.DOWN)
+	return {
+		"root": fixture_root,
+		"board": board,
+		"spawner": spawner,
+		"manager": manager,
+	}
 
 
 func _wait_for_state(manager: TurnManager, target: TurnManager.State) -> void:

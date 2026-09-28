@@ -10,7 +10,9 @@ const STATE_NAMES: Array[String] = [
 ]
 
 @onready var _turn_manager: TurnManager = %TurnManager
+@onready var _spawner: Spawner = %Spawner
 @onready var _label: Label = %DebugLabel
+@onready var _hud: Hud = %Hud
 
 var _state: TurnManager.State = TurnManager.State.WAITING_INPUT
 var _gravity: Vector2i = Vector2i.DOWN
@@ -18,6 +20,7 @@ var _turn_index: int = 0
 
 
 func _ready() -> void:
+	_hud.bind_spawner(_spawner)
 	_state = _turn_manager.state
 	_gravity = _turn_manager.gravity
 	_turn_index = _turn_manager.turn_index
@@ -49,9 +52,10 @@ func _on_turn_finished(finished_turn_index: int, _max_chain: int) -> void:
 
 
 func _update_label() -> void:
-	_label.text = "State: %s\nGravity: %s\nTurn: %d\nSettle: %.2f s" % [
+	_label.text = "State: %s\nGravity: %s\nTurn: %d\nSettle: %.2f s\nSeed: %d" % [
 		STATE_NAMES[_state],
 		OrbTypes.dir_name(_gravity),
 		_turn_index,
 		_turn_manager._settle_elapsed,
+		_spawner.seed_used,
 	]

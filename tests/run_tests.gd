@@ -36,6 +36,9 @@ func _run_test_file(path: String) -> void:
 	if test_script == null:
 		_record_runner_failure(path, "could not load script")
 		return
+	if not test_script.can_instantiate():
+		_record_runner_failure(path, "script has parse or compile errors")
+		return
 
 	var instance_value: Variant = test_script.new()
 	if not (instance_value is TestCase):

@@ -44,3 +44,13 @@ func test_m3_turn_defaults() -> void:
 	assert_near(config.stable_duration, 0.33, TOLERANCE, "stable duration")
 	assert_near(config.max_settle_time, 3.0, TOLERANCE, "maximum settle time")
 	assert_eq(config.allow_same_direction_swipe, true, "same direction default")
+
+
+func test_m4_spawn_defaults() -> void:
+	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
+	assert_eq(config.spawn_level_weights, PackedFloat32Array([0.9, 0.1]), "level weights")
+	assert_eq(config.spawn_color_weights, PackedFloat32Array([1.0, 1.0, 1.0]), "color weights")
+	assert_eq(config.spawn_position_mode, GameConfig.SpawnPositionMode.RANDOM, "position mode")
+	assert_near(config.spawn_margin, 4.0, TOLERANCE, "spawn margin")
+	assert_eq(config.rng_seed, 0, "random seed default")
+	assert_eq(config.initial_orb_count, 2, "initial orb count")

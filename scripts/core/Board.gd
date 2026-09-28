@@ -66,6 +66,15 @@ func clear() -> void:
 		remove_orb(orb)
 
 
+func spawn_line(gravity: Vector2i, radius: float) -> Dictionary:
+	var half: float = half_size()
+	return {
+		"origin": -Vector2(gravity) * (half - radius - Config.data.spawn_margin),
+		"axis": Vector2(OrbTypes.perpendicular(gravity)),
+		"extent": half - radius,
+	}
+
+
 func _configure_walls() -> void:
 	var half: float = half_size()
 	var thickness: float = Config.data.wall_thickness
