@@ -35,6 +35,10 @@ window/handheld/orientation=1
 
 project/assembly_name="Gravity Orb"
 
+[physics]
+
+common/physics_ticks_per_second=240
+
 [rendering]
 
 renderer/rendering_method="gl_compatibility"
