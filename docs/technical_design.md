@@ -573,7 +573,7 @@ for [a, b] in _pending (삽입 순서):
     pos_a, pos_b, vel_a, vel_b 저장
     board.remove_orb(a); board.remove_orb(b)
     match r.type:
-      MERGE:      result = board.spawn_orb(a.color, r.result_level, (pos_a+pos_b)/2, (vel_a+vel_b)/2, chain)
+      MERGE:      result = board.spawn_orb(a.color, r.result_level, clamp_inside((pos_a+pos_b)/2, r_new), (vel_a+vel_b)/2, chain)
       MAX_CLEAR:  (생성 없음)
       ANNIHILATE: if r.survivor != 0:   # 규칙 C 잔존
                       result = board.spawn_orb(r.result_color, r.result_level, 큰 쪽 pos, 큰 쪽 vel, chain)
@@ -582,6 +582,7 @@ _pending.clear()
 return applied
 ```
 
+- `clamp_inside(p, r)`: 각 축을 `[-half + r, half - r]`로 제한한다. 벽 옆에서 합체하면 커진 구체가 벽과 겹쳐 생성되는 것을 막는다 (규칙 C 잔존 구체는 레벨이 줄어 필요 없음).
 - "처리 예정" 표시 = `consumed`. `remove_orb`가 즉시 true로 만들어 같은 flush 안의 이후 쌍이 건너뛴다 → 3개 동시 접촉 시 중복 합체 없음.
 - 새 구체가 기존 구체와 겹쳐 생성될 수 있다. 물리 엔진이 밀어내며, 겹친 상대와의 `body_entered`가 발생해 연쇄가 이어진다.
 - `TurnManager`는 `reaction_applied`를 받아 `turn_max_chain = max(turn_max_chain, chain)`을 갱신하고 `chain_changed`를 발신한다.

@@ -30,8 +30,56 @@
 
 ## 대기 중
 
-### [2026-09-28 #6] 생성 시점 변경 — 스와이프 순간 생성
+### [2026-09-28 #7] M5 합체 규칙
 - 상태: 대기
+- 근거: [technical_design.md](technical_design.md) §4 (M5 필드), §5.2 (`generation`·`consumed`·`contact_monitor`), §5.3 (`orb_contact`·`spawn_orb`의 `generation`·`remove_orb`), §5.6 (`chain_changed`·`on_reaction`), §5.7 `CollisionResolver`, §5.8 `ReactionRules`, §6 settle 루프의 `flush()`, §7.1~7.2, §8.1, §12 M5
+- 요구:
+  - `GameConfig` M5 필드 `contact_max_reported`(6)
+  - `Orb`: `generation: int = 0`, `consumed: bool = false`, `contact_monitor = true`, `max_contacts_reported = cfg.contact_max_reported`
+  - `Board`: `signal orb_contact(a, b)` — `body_entered`에서 상대가 `Orb`이고 `a.get_instance_id() < b.get_instance_id()`일 때만 발신. `spawn_orb(..., generation := 0)` 인자 추가. `remove_orb`는 즉시 `consumed = true` 후 기존 처리. `get_orbs()`는 consumed 제외
+  - `scripts/core/ReactionRules.gd` — §5.8 중 **MERGE·MAX_CLEAR·NONE만**. `ANNIHILATE`는 enum에 두되 분기는 M6
+  - `scripts/core/CollisionResolver.gd` (`%CollisionResolver`) — §5.7·§7.2. `report_contact`는 기록만, `flush()`에서 처리하고 적용 수 반환. `sweep_resting_contacts`는 M6
+    - 합체 위치는 중간 지점을 **`clamp_inside`** 로 보드 안쪽에 제한 (§7.2에 추가됨), 속도는 두 구체 평균
+    - 결과 구체 `generation = chain = max(a.gen, b.gen) + 1`
+    - `reaction_applied` 딕셔너리는 §5.7 키 전부
+  - `TurnManager`: `signal chain_changed(chain)`, `var turn_max_chain`, `on_reaction(reaction)` (안정 누적 리셋 + 연쇄 갱신). settle 루프 시작에서 `CollisionResolver.flush()`, 반환값 > 0이면 `stable_time = 0`. 턴 시작(`on_swipe`)에서 `turn_max_chain = 0`, 모든 구체 `generation = 0` (생성 구체도 0). `turn_finished`에 실제 `turn_max_chain`
+  - 디버그 라벨에 `Chain: <turn_max_chain>` 줄
+  - 테스트 `tests/test_rules.gd`, `tests/scenarios/test_merge_scenario.gd`
+- 수치: `contact_max_reported` 6. 그 외 변경 없음
+- 건드리지 말 것: `docs/` (회신 파일 제외), 물리·감쇠·임계값 (튜닝은 다음 항목), `Spawner`, `InputRouter`, 턴 흐름 순서
+- Done-when:
+  - [ ] 같은 색·같은 레벨만 합체되고, 다른 조합은 튕기기만 한다
+  - [ ] 세 개가 동시에 붙어도 오류나 중복 합체가 없다
+  - [ ] 연쇄가 일어나면 턴 내 연쇄 수가 올라간다 (디버그 표시)
+  - [ ] 합체 중에도 턴 상태 머신이 정상적으로 안정 판정을 한다
+  - [ ] 물리 콜백에서 트리 변경 0건 — 전체 테스트 출력에 `flushing queries`·`SCRIPT ERROR` 0건
+  - [ ] 기존 테스트 전부 통과, §10.1 명령 3종 에러 0
+- 테스트:
+
+| 파일 | 조건 | 기대 |
+|---|---|---|
+| test_rules | 같은 색·같은 레벨 L1~L6 | MERGE, result_level = L+1, result_color 동일 |
+| test_rules | 같은 색 L7 둘 | MAX_CLEAR |
+| test_rules | 같은 색·다른 레벨 / 다른 색·같은 레벨 (3색 전 조합) | NONE (M5에서는 상극도 NONE) |
+| test_merge_scenario | 빨강 L1 2개 맞닿게 배치 (중력 DOWN, 바닥) | 0.5초 내 합체 1회, 빨강 L2 1개, 위치 ≈ 중간 지점 (clamp 전 기준 오차 1px 또는 clamp 결과), 결과 구체 generation 1 |
+| test_merge_scenario | 빨강 L1 3개 삼각형으로 동시에 맞닿게 | 합체 **정확히 1회**, 남은 구체 = L2 1 + L1 1, 에러 0 |
+| test_merge_scenario | 빨강 L1 + 파랑 L1 / 빨강 L1 + 빨강 L2 맞닿게 | 합체 0회, 구체 2개 유지 |
+| test_merge_scenario | 연쇄: 빨강 L1 2개가 합체하면 결과 L2가 바로 옆 빨강 L2와 닿는 배치 | 반응 2회, chain 1 → 2, `chain_changed(2)` 발신, 최종 빨강 L3 1개 |
+| test_merge_scenario | 동시 독립 합체: 떨어진 두 곳에서 L1 쌍이 각각 합체 | 두 반응 모두 chain 1, `turn_max_chain` 1 |
+| test_merge_scenario | 빨강 L7 2개 맞닿게 | MAX_CLEAR, 구체 0개 |
+| test_merge_scenario | 벽에 붙은 L1 두 개 합체 | 결과 구체가 보드 안쪽 (`abs(x), abs(y) <= half - r`) |
+| test_merge_scenario | `TurnManager` 조립 후 스와이프로 합체가 일어나는 턴 | `WAITING_INPUT` 복귀, `turn_finished` max_chain ≥ 1 |
+
+- QA: 테스트별 결과, 연쇄 시나리오의 반응 순서(chain 값), 전체 실행 `forced settle` 횟수 (기지의 문제, 횟수만)
+- 수동 확인 절차: 같은 색·같은 크기가 닿으면 한 단계 커지는지, 다른 조합은 합쳐지지 않는지, 디버그 라벨 Chain 표시
+
+---
+
+## 처리 완료
+
+### [2026-09-28 #6] 생성 시점 변경 — 스와이프 순간 생성 — 완료
+- 상태: 완료 (2026-09-28 Claude 검수 통과 · [PR #6](https://github.com/jeongmo-dot/gravity_orb/pull/6) 병합 `f031b51`)
+- 검수: 39/39·겹침 생성(관통 2.513px, 최대 1142px/s)·20턴 Claude 재실행 일치. 즉시 생성·입력 무시·연속 진행은 사용자 수동 확인 완료. 강제 안정은 횟수만 보고한 점 좋음
 - 근거: 기획서 0.2 ([gravity_orb_design.md](reference/gravity_orb_design.md) 3.6, 4장, 5.1), [technical_design.md](technical_design.md) §6 (턴 흐름), §11.2~11.4
 - 배경: M4는 "이동 안정 → 생성 → 생성 구체 안정" 순서라 새 구체가 스와이프 후 수 초 뒤에 들어왔다. 사용자 결정으로 **스와이프와 동시에 생성**해 함께 떨어지게 한다. 위치는 빈자리와 무관한 무작위. 게임오버는 조건 재설계 전까지 **없음** (계속 쌓인다)
 - 요구:
@@ -47,11 +95,11 @@
 - 수치: 변경 없음. 물리·감쇠·임계값은 #7 이후 튜닝 항목에서 다룬다
 - 건드리지 말 것: `docs/` (회신 파일 제외), 물리 설정, `GameConfig` 값, `Spawner` RNG 소비 순서, `InputRouter`
 - Done-when:
-  - [ ] 스와이프 후 **다음 물리 프레임**에 새 구체가 생성 벽에 존재한다 (구르는 구체들과 동시에 떨어진다)
-  - [ ] 상태 순서 `SPAWNING → SIMULATING → CHECK_GAMEOVER → WAITING_INPUT`
-  - [ ] 겹친 위치에 생성돼도 이탈 0건·관통 10px 이하, 생성 직후 최대 속도를 관측값으로 보고
-  - [ ] 게임오버 없이 20턴 연속 진행된다
-  - [ ] 기존 테스트 전부 통과 (갱신 포함), §10.1 명령 3종 에러 0
+  - [x] 스와이프 후 **다음 물리 프레임**에 새 구체가 생성 벽에 존재한다 (구르는 구체들과 동시에 떨어진다)
+  - [x] 상태 순서 `SPAWNING → SIMULATING → CHECK_GAMEOVER → WAITING_INPUT`
+  - [x] 겹친 위치에 생성돼도 이탈 0건·관통 10px 이하, 생성 직후 최대 속도를 관측값으로 보고
+  - [x] 게임오버 없이 20턴 연속 진행된다
+  - [x] 기존 테스트 전부 통과 (갱신 포함), §10.1 명령 3종 에러 0
 - 테스트:
 
 | 파일 | 조건 | 기대 |
@@ -66,10 +114,6 @@
 
 - QA: 테스트 결과, 겹침 생성 시 최대 속도·관통, 20턴 동안 턴별 settle 시간(강제 안정 횟수 포함). 강제 안정은 기지의 문제이므로 **횟수만 보고**하고 명세 동작이라고 쓰지 않는다
 - 수동 확인 절차: 스와이프 즉시 새 공이 나타나 함께 떨어지는지, 계속 쌓여도 게임이 멈추지 않는지
-
----
-
-## 처리 완료
 
 ### [2026-09-28 #5] M4 구체 생성 — 완료
 - 상태: 완료 (2026-09-28 Claude 검수 통과 · [PR #5](https://github.com/jeongmo-dot/gravity_orb/pull/5) 병합 `d8b0ec9`)
