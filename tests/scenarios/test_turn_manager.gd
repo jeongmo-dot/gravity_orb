@@ -40,8 +40,8 @@ func test_t2_swipe_emits_full_state_and_turn_signal_sequence() -> void:
 	assert_eq(
 		_states,
 		[
-			TurnManager.State.SIMULATING,
 			TurnManager.State.SPAWNING,
+			TurnManager.State.SIMULATING,
 			TurnManager.State.CHECK_GAMEOVER,
 			TurnManager.State.WAITING_INPUT,
 		],
@@ -59,7 +59,7 @@ func test_t2_swipe_emits_full_state_and_turn_signal_sequence() -> void:
 	await _cleanup_fixture(fixture, snapshot)
 
 
-func test_t3_swipe_during_simulation_is_ignored() -> void:
+func test_t3_swipes_during_spawning_and_simulation_are_ignored() -> void:
 	var snapshot: Dictionary = _snapshot_m3_config()
 	var fixture: Dictionary = await _create_ready_fixture(FIXTURE_SEED + 3)
 	var manager: TurnManager = fixture["manager"] as TurnManager
@@ -68,6 +68,14 @@ func test_t3_swipe_during_simulation_is_ignored() -> void:
 	var gravity_before_ignored_swipe: Vector2i = manager.gravity
 
 	manager.on_swipe(Vector2i.UP)
+	assert_eq(manager.state, TurnManager.State.SPAWNING, "state remains SPAWNING")
+	assert_eq(manager.turn_index, turn_before_ignored_swipe, "turn unchanged while spawning")
+	assert_eq(manager.gravity, gravity_before_ignored_swipe, "gravity unchanged while spawning")
+	assert_eq(InputRouter.is_locked(), true, "input locked while spawning")
+
+	await _wait_for_state(manager, TurnManager.State.SIMULATING)
+	manager.on_swipe(Vector2i.UP)
+	assert_eq(manager.state, TurnManager.State.SIMULATING, "state remains SIMULATING")
 	assert_eq(manager.turn_index, turn_before_ignored_swipe, "turn unchanged while simulating")
 	assert_eq(manager.gravity, gravity_before_ignored_swipe, "gravity unchanged while simulating")
 	assert_eq(InputRouter.is_locked(), true, "input locked while simulating")
@@ -156,7 +164,7 @@ func test_t7_allowed_same_direction_swipe_starts_turn() -> void:
 
 	manager.on_swipe(Vector2i.DOWN)
 	assert_eq(manager.turn_index, 1, "same direction starts turn")
-	assert_eq(manager.state, TurnManager.State.SIMULATING, "same direction simulates")
+	assert_eq(manager.state, TurnManager.State.SPAWNING, "same direction starts spawning")
 	await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
 	await _cleanup_fixture(fixture, snapshot)
 

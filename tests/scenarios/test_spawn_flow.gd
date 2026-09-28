@@ -6,6 +6,8 @@ const TURN_MANAGER_SCRIPT: Script = preload("res://scripts/core/TurnManager.gd")
 const HIGH_THRESHOLD: float = 1.0e9
 const WAIT_TIMEOUT_SECONDS: float = 8.0
 const POSITION_TOLERANCE: float = 0.001
+const OVERLAP_OBSERVE_SECONDS: float = 0.5
+const OVERLAP_PENETRATION_LIMIT: float = 10.0
 const REPRO_DIRECTIONS: Array[Vector2i] = [
 	Vector2i.DOWN,
 	Vector2i.LEFT,
@@ -108,8 +110,17 @@ func test_preview_matches_spawned_orb_and_spawn_line() -> void:
 	var preview: Dictionary = spawner.peek_next()
 	_arm_spawn_capture(manager, board)
 
+	var frame_before_swipe: int = Engine.get_physics_frames()
 	manager.on_swipe(Vector2i.RIGHT)
-	await _wait_for_state(manager, TurnManager.State.SPAWNING)
+	assert_eq(manager.state, TurnManager.State.SPAWNING, "swipe enters SPAWNING")
+	await tree.physics_frame
+	assert_eq(manager.state, TurnManager.State.SIMULATING, "spawn starts simulation")
+	assert_eq(
+		Engine.get_physics_frames() - frame_before_swipe,
+		1,
+		"spawn happens on the next physics frame"
+	)
+	assert_eq(board.get_orbs().size(), 3, "one orb exists after one physics frame")
 	assert_eq(_captured_spawn["color"], preview["color"], "preview color")
 	assert_eq(_captured_spawn["level"], preview["level"], "preview level")
 	_assert_position_on_spawn_line(
@@ -135,7 +146,7 @@ func test_seed_777_reproduces_five_turn_sequence() -> void:
 	_restore_config(snapshot)
 
 
-func test_three_turns_add_three_orbs_and_settle_in_spawning_state() -> void:
+func test_three_turns_spawn_before_one_settle_each() -> void:
 	var snapshot: Dictionary = _snapshot_config()
 	_set_fast_settle()
 	var fixture: Dictionary = await _create_ready_fixture(4005)
@@ -146,10 +157,11 @@ func test_three_turns_add_three_orbs_and_settle_in_spawning_state() -> void:
 	var directions: Array[Vector2i] = [Vector2i.RIGHT, Vector2i.UP, Vector2i.LEFT]
 
 	for direction: Vector2i in directions:
+		var orb_count_before: int = board.get_orbs().size()
 		manager.on_swipe(direction)
-		await _wait_for_state(manager, TurnManager.State.SPAWNING)
-		await tree.physics_frame
-		assert_eq(manager.state, TurnManager.State.SPAWNING, "SPAWNING persists for settle")
+		assert_eq(manager.state, TurnManager.State.SPAWNING, "swipe enters SPAWNING")
+		await _wait_for_state(manager, TurnManager.State.SIMULATING)
+		assert_eq(board.get_orbs().size(), orb_count_before + 1, "spawn precedes settling")
 		await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
 
 	assert_eq(board.get_orbs().size(), 5, "initial two plus three turn spawns")
@@ -157,13 +169,139 @@ func test_three_turns_add_three_orbs_and_settle_in_spawning_state() -> void:
 	for _turn: int in range(3):
 		expected_states.append_array(
 			[
-				TurnManager.State.SIMULATING,
 				TurnManager.State.SPAWNING,
+				TurnManager.State.SIMULATING,
 				TurnManager.State.CHECK_GAMEOVER,
 				TurnManager.State.WAITING_INPUT,
 			]
 		)
 	assert_eq(_states, expected_states, "three-turn state sequence")
+
+	await _cleanup_fixture(fixture)
+	_restore_config(snapshot)
+
+
+func test_center_spawn_overlap_remains_inside_board_for_half_second() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.spawn_position_mode = GameConfig.SpawnPositionMode.CENTER
+	var fixture: Dictionary = await _create_fixture(4006, false)
+	var board: Board = fixture["board"] as Board
+	var spawner: Spawner = fixture["spawner"] as Spawner
+	var manager: TurnManager = fixture["manager"] as TurnManager
+
+	var configured_initial_count: int = Config.data.initial_orb_count
+	Config.data.initial_orb_count = 0
+	spawner.spawn_initial(board, Vector2i.DOWN)
+	Config.data.initial_orb_count = configured_initial_count
+
+	var radius: float = Config.data.radius_for_level(1)
+	var bottom_y: float = board.half_size() - radius - Config.data.spawn_margin
+	var bottom_x_positions: Array[float] = [-360.0, -240.0, -120.0, 0.0, 120.0, 240.0, 360.0]
+	var overlap_dummy: Orb
+	for index: int in range(bottom_x_positions.size()):
+		var orb: Orb = board.spawn_orb(
+			index % Config.data.color_display.size(),
+			1,
+			Vector2(bottom_x_positions[index], bottom_y)
+		)
+		if is_zero_approx(bottom_x_positions[index]):
+			overlap_dummy = orb
+	board.spawn_orb(1, 1, Vector2(0.0, bottom_y - radius * 2.0))
+
+	manager.start_game()
+	await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
+	assert_eq(board.get_orbs().size(), 8, "eight level-1 orbs stabilized at bottom")
+
+	var preview: Dictionary = spawner.peek_next()
+	var spawned_radius: float = Config.data.radius_for_level(int(preview["level"]))
+	var spawn_line: Dictionary = board.spawn_line(Vector2i.UP, spawned_radius)
+	var overlap_position: Vector2 = spawn_line["origin"] as Vector2
+	overlap_dummy.position = overlap_position
+	overlap_dummy.linear_velocity = Vector2.ZERO
+	overlap_dummy.angular_velocity = 0.0
+	_arm_spawn_capture(manager, board)
+
+	manager.on_swipe(Vector2i.UP)
+	var state_after_spawn: TurnManager.State = await manager.state_changed
+	assert_eq(state_after_spawn, TurnManager.State.SIMULATING, "overlap spawn starts simulation")
+	var spawn_distance: float = overlap_dummy.position.distance_to(
+		_captured_spawn["position"] as Vector2
+	)
+	assert_true(
+		spawn_distance < overlap_dummy.get_radius() + float(_captured_spawn["radius"]),
+		"CENTER spawn overlaps the prepared dummy at creation"
+	)
+
+	var metrics: Dictionary = await _observe_board(board, OVERLAP_OBSERVE_SECONDS)
+	print(
+		"Spawn overlap seed=4006 duration=%.2f departures=%d max_penetration=%.3f max_speed=%.3f" % [
+			OVERLAP_OBSERVE_SECONDS,
+			int(metrics["departures"]),
+			float(metrics["max_penetration"]),
+			float(metrics["max_speed"]),
+		]
+	)
+	assert_eq(int(metrics["departures"]), 0, "overlap case orb center departures")
+	assert_true(
+		float(metrics["max_penetration"]) <= OVERLAP_PENETRATION_LIMIT,
+		"overlap wall penetration must be at most %.3fpx, got %.3fpx" % [
+			OVERLAP_PENETRATION_LIMIT,
+			float(metrics["max_penetration"]),
+		]
+	)
+
+	await _cleanup_fixture(fixture)
+	_restore_config(snapshot)
+
+
+func test_seed_4242_completes_twenty_turns_without_departures() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	var fixture: Dictionary = await _create_ready_fixture(4242)
+	var board: Board = fixture["board"] as Board
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	var directions: Array[Vector2i] = [
+		Vector2i.DOWN,
+		Vector2i.RIGHT,
+		Vector2i.UP,
+		Vector2i.LEFT,
+	]
+	var total_departures: int = 0
+	var forced_settle_count: int = 0
+	var tick_seconds: float = 1.0 / float(Engine.physics_ticks_per_second)
+
+	for turn_offset: int in range(20):
+		var direction: Vector2i = directions[turn_offset % directions.size()]
+		manager.on_swipe(direction)
+		var metrics: Dictionary = await _wait_for_turn_with_metrics(manager, board)
+		var settle_elapsed: float = manager._settle_elapsed
+		var forced: bool = (
+			settle_elapsed + tick_seconds >= Config.data.max_settle_time
+		)
+		if forced:
+			forced_settle_count += 1
+		total_departures += int(metrics["departures"])
+		print(
+			"Spawn flow seed=4242 turn=%d gravity=%s settle=%.6f forced=%s orbs=%d departures=%d" % [
+				turn_offset + 1,
+				OrbTypes.dir_name(direction),
+				settle_elapsed,
+				str(forced),
+				board.get_orbs().size(),
+				int(metrics["departures"]),
+			]
+		)
+		assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "turn returns to input")
+
+	print(
+		"Spawn flow seed=4242 summary turns=20 orbs=%d departures=%d forced_settles=%d" % [
+			board.get_orbs().size(),
+			total_departures,
+			forced_settle_count,
+		]
+	)
+	assert_eq(manager.turn_index, 20, "twenty turns completed")
+	assert_eq(board.get_orbs().size(), 22, "initial two plus twenty turn spawns")
+	assert_eq(total_departures, 0, "twenty-turn orb center departures")
 
 	await _cleanup_fixture(fixture)
 	_restore_config(snapshot)
@@ -179,7 +317,7 @@ func _run_seeded_turns(seed: int) -> Array[Dictionary]:
 	for direction: Vector2i in REPRO_DIRECTIONS:
 		_captured_spawn.clear()
 		manager.on_swipe(direction)
-		await _wait_for_state(manager, TurnManager.State.SPAWNING)
+		await _wait_for_state(manager, TurnManager.State.SIMULATING)
 		var spawn_position: Vector2 = _captured_spawn["position"] as Vector2
 		_assert_position_on_spawn_line(
 			board,
@@ -265,6 +403,58 @@ func _wait_for_state(manager: TurnManager, target: TurnManager.State) -> void:
 	assert_eq(manager.state, target, "state wait timeout")
 
 
+func _wait_for_turn_with_metrics(manager: TurnManager, board: Board) -> Dictionary:
+	var metrics: Dictionary = _empty_physics_metrics()
+	var max_frames: int = ceili(
+		float(Engine.physics_ticks_per_second) * WAIT_TIMEOUT_SECONDS
+	)
+	for _frame: int in range(max_frames):
+		await tree.physics_frame
+		_accumulate_board_metrics(board, metrics)
+		if manager.state == TurnManager.State.WAITING_INPUT:
+			return metrics
+	assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "turn wait timeout")
+	return metrics
+
+
+func _observe_board(board: Board, duration_seconds: float) -> Dictionary:
+	var metrics: Dictionary = _empty_physics_metrics()
+	var frame_count: int = ceili(
+		float(Engine.physics_ticks_per_second) * duration_seconds
+	)
+	for _frame: int in range(frame_count):
+		await tree.physics_frame
+		_accumulate_board_metrics(board, metrics)
+	return metrics
+
+
+func _empty_physics_metrics() -> Dictionary:
+	return {
+		"departures": 0,
+		"max_penetration": 0.0,
+		"max_speed": 0.0,
+	}
+
+
+func _accumulate_board_metrics(board: Board, metrics: Dictionary) -> void:
+	for orb: Orb in board.get_orbs():
+		var center_extent: float = maxf(absf(orb.position.x), absf(orb.position.y))
+		var penetration: float = maxf(
+			center_extent + orb.get_radius() - board.half_size(),
+			0.0
+		)
+		metrics["max_penetration"] = maxf(
+			float(metrics["max_penetration"]),
+			penetration
+		)
+		metrics["max_speed"] = maxf(
+			float(metrics["max_speed"]),
+			orb.linear_velocity.length()
+		)
+		if center_extent > board.half_size():
+			metrics["departures"] = int(metrics["departures"]) + 1
+
+
 func _assert_position_on_spawn_line(
 	board: Board,
 	position: Vector2,
@@ -325,7 +515,7 @@ func _arm_spawn_capture(manager: TurnManager, board: Board) -> void:
 
 
 func _capture_spawn_on_state_change(next_state: TurnManager.State) -> void:
-	if next_state != TurnManager.State.SPAWNING or not is_instance_valid(_capture_board):
+	if next_state != TurnManager.State.SIMULATING or not is_instance_valid(_capture_board):
 		return
 	var orbs: Array[Orb] = _capture_board.get_orbs()
 	var spawned: Orb = orbs[orbs.size() - 1]
