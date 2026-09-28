@@ -30,8 +30,53 @@
 
 ## 대기 중
 
-### [2026-09-28 #3] M2 입력 추상화
+### [2026-09-28 #4] M3 턴 상태 머신
 - 상태: 대기
+- 근거: [technical_design.md](technical_design.md) §3.2~3.3 (노드 트리·신호), §4 (M3 필드), §5.6 `TurnManager`, §6 (턴 처리 알고리즘), §11.1, §12 M3
+- 요구:
+  - `GameConfig`에 M3 필드 추가: `stable_linear_speed`(12.0), `stable_angular_speed`(1.0), **`stable_duration`(0.33, 초)**, `max_settle_time`(3.0), `allow_same_direction_swipe`(true). 프레임 수 기반 `stable_frames`는 **만들지 않는다** (§4 갱신 내용)
+  - `scripts/core/TurnManager.gd` — §5.6·§6. 이번 범위:
+    - `enum State { WAITING_INPUT, SIMULATING, SPAWNING, CHECK_GAMEOVER, GAME_OVER }` (GAME_OVER는 정의만, 진입 경로 없음)
+    - 신호: `state_changed`, `gravity_changed`, `turn_started`, `turn_finished` (이번엔 `max_chain`에 항상 0). `chain_changed`·`warning_changed`·`game_over`는 **M5·M7**
+    - 공개: `state`, `gravity`, `turn_index`, `start_game()`, `on_swipe(dir)`. `on_reaction()`은 M5
+    - settle 루프는 `_physics_process(delta)`에서 **스케일된 delta**로 `stable_time`·`settle_elapsed` 누적. `flush`/`sweep`/`try_spawn` 호출은 넣지 않는다
+    - `SPAWNING`·`CHECK_GAMEOVER`는 **각각 1회 `_set_state()`를 거쳐** 즉시 통과 (신호 순서가 관측되도록)
+    - 강제 안정 시 `push_warning("forced settle ...")`에 턴 번호·경과 시간 포함
+    - 상태 전이는 `_set_state()` 한 곳에서만. 입력 잠금은 `TurnManager`가 `InputRouter.set_locked()` 직접 호출
+    - `start_game()`: 중력 DOWN → 초기 settle(`SIMULATING` 재사용, `_is_initial_settle`) → 생성 단계 건너뛰고 `WAITING_INPUT`. 초기 settle 동안 입력 잠금
+  - `Main`: `TurnManager` 노드 추가(`%TurnManager`). `InputRouter.swipe` → `TurnManager.on_swipe` 로 **교체** (M2의 `Board.set_gravity` 직결 제거). `Board.set_gravity`는 `TurnManager`만 호출. 테스트 구체 배치 후 `start_game()`
+  - `scenes/UI.tscn`(CanvasLayer) + 임시 디버그 `Label` — 상태 이름, 중력 방향, `turn_index`, settle 경과(소수 2자리). 상단 HUD 영역(y 0~480)에 배치, **`mouse_filter = IGNORE`** (§5.5). 신호 구독으로 갱신, TurnManager를 폴링하지 않는다 (settle 경과만 `_process`에서 읽어도 됨)
+  - 테스트 `tests/scenarios/test_turn_manager.gd`
+- 수치: 위 5개 필드 기본값 그대로. 임의 변경 금지
+- 건드리지 말 것: `docs/` (회신 파일 제외), 물리 설정, `InputRouter`·`SwipeDetector` 판정 로직, `Board`·`Orb` 공개 API
+- Done-when:
+  - [ ] 구체가 굴러가는 동안 입력이 무시된다
+  - [ ] 멈추면 다시 입력이 받아진다
+  - [ ] 계속 흔들리는 상황에서도 최대 대기 시간 후 턴이 넘어간다
+  - [ ] 디버그 텍스트로 현재 상태가 화면에 표시된다
+  - [ ] 아래 시나리오 테스트 전부 통과
+  - [ ] §10.1 명령 3종 에러 0 (`--fixed-fps 240` 허용), 기존 테스트 18개 회귀 없음
+- 시나리오 테스트 (`Main.tscn`이 아니라 `Board` + `TurnManager`를 직접 조립, 고정 시드 구체 배치). **`Config.data`를 바꾼 테스트는 끝에 원래 값으로 복구**:
+
+| # | 조건 | 기대 |
+|---|---|---|
+| T1 | `start_game()` | 초기 settle 후 `WAITING_INPUT`, 잠금 해제. `turn_index` 0 |
+| T2 | 스와이프 RIGHT | 상태 순서 `SIMULATING → SPAWNING → CHECK_GAMEOVER → WAITING_INPUT` (state_changed 기록), `turn_started(1, RIGHT)`·`turn_finished(1, 0)` 각 1회, `gravity == RIGHT` |
+| T3 | `SIMULATING` 중 `on_swipe(UP)` | 무시 — `turn_index`·`gravity` 불변. 이 동안 `InputRouter.is_locked()` true |
+| T4 | 속도 임계값을 매우 크게(1e9) 설정 후 스와이프 | settle 시간 = `stable_duration` (±1 물리 tick) |
+| T5 | `stable_linear_speed = 0.0`으로 안정 불가 후 스와이프 | **강제 안정** — settle 시간 = `max_settle_time` (±1 tick), 턴 완료 |
+| T6 | `allow_same_direction_swipe = false`, 현재 중력과 같은 방향 스와이프 | 무시, 잠금 안 걸림, `turn_index` 불변 |
+| T7 | `allow_same_direction_swipe = true`, 같은 방향 스와이프 | 턴 진행 (`turn_index` +1) |
+
+- QA: 테스트별 결과와 T4·T5의 실측 settle 시간(초·tick). 수동 확인 절차(구르는 중 키 연타 → 무시, 멈춘 뒤 입력 → 반응, 디버그 라벨 상태 변화)를 회신에 적는다
+
+---
+
+## 처리 완료
+
+### [2026-09-28 #3] M2 입력 추상화 — 완료
+- 상태: 완료 (2026-09-28 Claude 검수 통과 · [PR #3](https://github.com/jeongmo-dot/gravity_orb/pull/3) 병합 `2657670`)
+- 검수: 테스트 18/18·물리 회귀 동일 수치 Claude 재실행 일치, 입력 격리 grep `InputRouter.gd`만. 키보드·마우스·터치 에뮬레이션·무시 조건은 사용자 수동 확인 완료. 리뷰 중 §5.5에 GUI `mouse_filter`·터치 취소(M10) 주의 추가
 - 근거: [technical_design.md](technical_design.md) §1.2 (입력 액션), §3.4-1 (입력 격리), §4 (M2 필드), §5.4 `SwipeDetector`, §5.5 `InputRouter`, §12 M2, §13 (이중 이벤트)
 - 요구:
   - `GameConfig`에 M2 필드 `swipe_min_distance`(80.0), `swipe_dominance_ratio`(1.5) 추가, `default_config.tres` 기록
@@ -47,13 +92,13 @@
 - 수치: `swipe_min_distance` 80.0 (기준 해상도 px), `swipe_dominance_ratio` 1.5. 임의 변경 금지
 - 건드리지 말 것: `docs/` (회신 파일 제외), 물리 설정(240 tick·접촉 설정), `Board`·`Orb` 공개 API, `project.godot`의 `emulate_touch_from_mouse`(기본값 false 유지, 검증 때만 임시로 켠다)
 - Done-when:
-  - [ ] 키보드(방향키·WASD)와 마우스 드래그 모두로 중력 전환이 된다
-  - [ ] "마우스로 터치 에뮬레이션"을 켜도 드래그 1회에 `swipe`가 **정확히 1회** 발신된다
-  - [ ] 짧은 클릭·대각선 애매한 드래그는 무시된다
-  - [ ] `grep -rn "Input\.\|InputEvent" scripts --include=*.gd` 결과가 `InputRouter.gd`뿐이다
-  - [ ] `test_swipe.gd`: 아래 표 전부
-  - [ ] `test_input_router.gd`: 아래 표 전부 (`_handle_event`에 합성 이벤트 주입, `swipe` 발신 횟수·방향 기록)
-  - [ ] §10.1 명령 3종 에러 0, 테스트 종료 코드 0 (`--fixed-fps 240` 허용)
+  - [x] 키보드(방향키·WASD)와 마우스 드래그 모두로 중력 전환이 된다
+  - [x] "마우스로 터치 에뮬레이션"을 켜도 드래그 1회에 `swipe`가 **정확히 1회** 발신된다
+  - [x] 짧은 클릭·대각선 애매한 드래그는 무시된다
+  - [x] `grep -rn "Input\.\|InputEvent" scripts --include=*.gd` 결과가 `InputRouter.gd`뿐이다
+  - [x] `test_swipe.gd`: 아래 표 전부
+  - [x] `test_input_router.gd`: 아래 표 전부 (`_handle_event`에 합성 이벤트 주입, `swipe` 발신 횟수·방향 기록)
+  - [x] §10.1 명령 3종 에러 0, 테스트 종료 코드 0 (`--fixed-fps 240` 허용)
 - 테스트 케이스 (min 80, ratio 1.5):
 
 | 파일 | 입력 | 기대 |
@@ -75,10 +120,6 @@
 | test_input_router | 키 이벤트 `gravity_left` 액션 (A) / 에코 | LEFT 1회 / 0회 |
 
 - QA: 테스트 결과 요약. 수동 확인 절차(키보드 8키, 마우스 드래그 4방향, 에뮬레이션 켜고 드래그, 짧은 클릭·대각선)를 회신에 적는다
-
----
-
-## 처리 완료
 
 ### [2026-09-28 #2] M1 보드와 구체 물리 — 완료
 - 상태: 완료 (2026-09-28 Claude 검수 통과 · [PR #2](https://github.com/jeongmo-dot/gravity_orb/pull/2) 병합 `1df430d`)
