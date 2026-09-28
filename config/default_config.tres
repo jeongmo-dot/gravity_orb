@@ -4,3 +4,18 @@
 
 [resource]
 script = ExtResource("1_game_config")
+board_size = 960.0
+wall_thickness = 256.0
+orb_base_radius = 50.0
+orb_radius_growth = 1.25
+orb_max_level = 7
+orb_base_mass = 1.0
+gravity_strength = 2400.0
+orb_friction = 0.3
+orb_bounce = 0.15
+wall_friction = 0.3
+wall_bounce = 0.1
+orb_linear_damp = 0.1
+orb_angular_damp = 1.0
+color_display = PackedColorArray(0.8980392156862745, 0.2823529411764706, 0.30196078431372547, 1, 0.24313725490196078, 0.4823529411764706, 0.9803921568627451, 1, 0.18823529411764706, 0.6431372549019608, 0.4235294117647059, 1)
+debug_test_orb_count = 5
