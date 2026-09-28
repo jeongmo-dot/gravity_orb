@@ -31,7 +31,7 @@
 ## 대기 중
 
 ### [2026-09-28 #2] M1 보드와 구체 물리
-- 상태: 진행중 — **추가 요구 있음** (아래 「추가 요구 1」, [PR #2](https://github.com/jeongmo-dot/gravity_orb/pull/2) 병합 보류)
+- 상태: 진행중 — **추가 요구 있음** (아래 「추가 요구 2」, [PR #2](https://github.com/jeongmo-dot/gravity_orb/pull/2) 병합 보류)
 - 근거: [technical_design.md](technical_design.md) §2 (좌표·레이아웃), §4 (M1 필드·`radius_for_level`·`mass_for_level`), §5.1~5.3 (`OrbTypes`·`Orb`·`Board`), §12 M1, §13
 - 요구:
   - `GameConfig`에 §4 표의 **M1 필드만** 추가하고 `default_config.tres`에 기본값 기록. 도우미 `radius_for_level()`, `mass_for_level()` 추가
@@ -75,6 +75,31 @@ Claude 재실행 결과 `run_tests.gd` **15회 중 1회 실패**: `departures=1 
   - [ ] `run_tests.gd` **연속 10회** 전부 종료 코드 0
 - QA: 시드별 `departures / 최대 관통 깊이 / max_speed` 표, 연속 10회 실행 결과
 - 커밋: 같은 브랜치 `m1-board-physics`에 추가 커밋 (PR #2 갱신)
+
+**추가 요구 2 (2026-09-28) — 시나리오 시간 보정 + 접촉 설정**
+
+추가 요구 1 회신 검수: 진단(60Hz 틱 해상도 부족, solver 반복 무효)은 타당하다. 단 **테스트가 방향당 120프레임 고정**이라
+240Hz에서는 방향당 0.5초만 시뮬레이션된다 (60Hz 때 2초). 수정 전·후 비교 조건이 달랐다.
+Claude가 스크래치 복사본에서 방향당 **2초**로 맞춰 재측정한 결과 (22시드, `--fixed-fps`):
+
+| 설정 | 이탈 | 최대 관통 |
+|---|---:|---:|
+| 240Hz (현재 브랜치) | 0 | **11.399px** (시드 1003) — 기준 초과 |
+| 240Hz + `2d/solver/contact_max_allowed_penetration=0.1` | 0 | **8.623px** |
+| 240Hz + `2d/solver/default_contact_bias=0.95` | 0 | 16.069px |
+| 120Hz + `contact_max_allowed_penetration=0.1` | 0 | 27.394px |
+
+1. 시나리오 길이를 **방향당 2.0 시뮬레이션 초**로 바꾼다. 프레임 수는 `Engine.physics_ticks_per_second × 2.0`으로 계산하고 상수로 박지 않는다 ([technical_design.md](technical_design.md) §10.3 아래 규약)
+2. `project.godot`에 `physics/2d/solver/contact_max_allowed_penetration = 0.1` 추가. 물리 틱 240 유지
+3. 시나리오 테스트는 결정적이므로 「연속 10회」 조건은 **3회**로 줄인다. `--fixed-fps 240` 사용 허용
+
+- 설계서 반영 (Claude, 이 브랜치): §1 물리 240 tick·접촉 설정, §4 `stable_frames` → **`stable_duration` (초, 0.33)** (M3에서 이 이름으로 구현), §10 시나리오 규약, §13 함정
+- Done-when (추가 요구 1 대체):
+  - [ ] 22시드(1000~1019, 1047, 2000) × 방향당 2초 × 4바퀴에서 중심 이탈 **0건**
+  - [ ] 전체 최대 관통 깊이 **10px 이하**
+  - [ ] `run_tests.gd` 3회 종료 코드 0, §10.1 `--import`·`--quit-after 300` 에러 0
+- QA: 시드별 `departures / 최대 관통 / max_speed` 표 (Claude 수치와 대조용)
+- 커밋: 같은 브랜치 `m1-board-physics`
 
 ---
 
