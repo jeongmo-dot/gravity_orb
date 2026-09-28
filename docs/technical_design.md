@@ -34,7 +34,7 @@
 
 | 항목 | 값 |
 |---|---|
-| 엔진 | Godot 4.x 최신 안정판 (최소 4.4) |
+| 엔진 | **Godot 4.8** (현재 `4.8.dev3.mono`, 4.8 정식판 출시 시 교체). C#은 쓰지 않으며 mono 에디터가 추가하는 `[dotnet]` 섹션은 그대로 둔다 |
 | 언어 | GDScript, **모든 변수·인자·반환값 타입 명시** |
 | 렌더러 | `gl_compatibility` (저사양 Android 대응) |
 | 물리 | 기본 GodotPhysics2D, 60 tick/s |
@@ -55,6 +55,8 @@
 | `rendering/renderer/rendering_method` | `gl_compatibility` |
 | `rendering/renderer/rendering_method.mobile` | `gl_compatibility` |
 | `physics/common/physics_ticks_per_second` | `60` |
+
+> 에디터는 기본값과 같은 항목을 `project.godot`에서 지운다 (`aspect=keep`, `emulate_touch_from_mouse=false`, `physics_ticks_per_second=60`). 파일에 없어도 값이 같으면 준수한 것으로 본다.
 | `input_devices/pointing/emulate_touch_from_mouse` | `false` (M2 검증 시 `true`로도 확인) |
 
 ### 1.2 입력 액션 (Input Map)

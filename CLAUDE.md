@@ -1,6 +1,6 @@
 # CLAUDE.md — Gravity Orb
 
-Godot 4 / GDScript 턴제 물리 퍼즐 프로토타입. Codex와 역할을 나눠 진행한다.
+Godot 4.8 / GDScript 턴제 물리 퍼즐 프로토타입. Codex와 역할을 나눠 진행한다.
 
 ## 역할 분담
 
