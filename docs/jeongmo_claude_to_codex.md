@@ -30,8 +30,59 @@
 
 ## 대기 중
 
-### [2026-09-28 #2] M1 보드와 구체 물리
-- 상태: 진행중 — **추가 요구 있음** (아래 「추가 요구 2」, [PR #2](https://github.com/jeongmo-dot/gravity_orb/pull/2) 병합 보류)
+### [2026-09-28 #3] M2 입력 추상화
+- 상태: 대기
+- 근거: [technical_design.md](technical_design.md) §1.2 (입력 액션), §3.4-1 (입력 격리), §4 (M2 필드), §5.4 `SwipeDetector`, §5.5 `InputRouter`, §12 M2, §13 (이중 이벤트)
+- 요구:
+  - `GameConfig`에 M2 필드 `swipe_min_distance`(80.0), `swipe_dominance_ratio`(1.5) 추가, `default_config.tres` 기록
+  - Input Map에 `gravity_up/down/left/right` 등록 (↑↓←→ + WASD). `restart`·`debug_*` 액션은 **이번에 넣지 않는다**
+  - `scripts/core/SwipeDetector.gd` — §5.4. `static func classify(delta, min_distance, dominance_ratio) -> Vector2i`. `InputEvent` 타입을 참조하지 않는 순수 함수
+  - `scripts/autoload/InputRouter.gd` — §5.5, 오토로드 등록. 이번 공개 API는 `signal swipe(direction: Vector2i)`, `set_locked()`, `is_locked()`만 (`restart_requested`·`debug_*`는 M7·M9)
+    - `_unhandled_input`에서 받는다. 이벤트 처리 본문은 `_handle_event(event: InputEvent) -> void`로 분리해 테스트가 직접 호출할 수 있게 한다
+    - 포인터 제스처: 누름 시 활성 제스처가 없을 때만 시작, **시작한 source(MOUSE/TOUCH)의 뗌만** 종료·판정. 터치는 index 0만, 마우스는 좌클릭만
+    - 잠금 중 시작한 제스처는 잠금이 풀린 뒤 떼어도 무시 (`started_locked`)
+    - 키보드는 `is_action_pressed(..., false)`(에코 제외)로 즉시 발신
+  - `Main.gd`: `# TEMP(M1)` 방향키 처리 제거 → `InputRouter.swipe`를 `Board.set_gravity`에 연결 (M3에서 `TurnManager`로 교체). `# TEMP(M1): M4에서 Spawner로 교체` 테스트 구체는 유지
+  - 테스트 `tests/test_swipe.gd`, `tests/test_input_router.gd`
+- 수치: `swipe_min_distance` 80.0 (기준 해상도 px), `swipe_dominance_ratio` 1.5. 임의 변경 금지
+- 건드리지 말 것: `docs/` (회신 파일 제외), 물리 설정(240 tick·접촉 설정), `Board`·`Orb` 공개 API, `project.godot`의 `emulate_touch_from_mouse`(기본값 false 유지, 검증 때만 임시로 켠다)
+- Done-when:
+  - [ ] 키보드(방향키·WASD)와 마우스 드래그 모두로 중력 전환이 된다
+  - [ ] "마우스로 터치 에뮬레이션"을 켜도 드래그 1회에 `swipe`가 **정확히 1회** 발신된다
+  - [ ] 짧은 클릭·대각선 애매한 드래그는 무시된다
+  - [ ] `grep -rn "Input\.\|InputEvent" scripts --include=*.gd` 결과가 `InputRouter.gd`뿐이다
+  - [ ] `test_swipe.gd`: 아래 표 전부
+  - [ ] `test_input_router.gd`: 아래 표 전부 (`_handle_event`에 합성 이벤트 주입, `swipe` 발신 횟수·방향 기록)
+  - [ ] §10.1 명령 3종 에러 0, 테스트 종료 코드 0 (`--fixed-fps 240` 허용)
+- 테스트 케이스 (min 80, ratio 1.5):
+
+| 파일 | 입력 | 기대 |
+|---|---|---|
+| test_swipe | delta (200, 0) / (−200, 0) / (0, 200) / (0, −200) | RIGHT / LEFT / DOWN / UP |
+| test_swipe | (79.9, 0) | ZERO (짧음) |
+| test_swipe | (80, 0) | RIGHT (경계 포함) |
+| test_swipe | (150, 100) | RIGHT (150 ≥ 100×1.5 경계 포함) |
+| test_swipe | (149, 100) | ZERO (대각선) |
+| test_swipe | (100, 100) | ZERO |
+| test_input_router | 마우스 좌클릭 누름 (100,100) → 뗌 (300,110) | RIGHT 1회 |
+| test_input_router | 터치 index 0 누름 → 뗌 (위로 200) | UP 1회 |
+| test_input_router | 에뮬레이션 재현: 마우스 누름·터치 누름 → 마우스 뗌·터치 뗌 (같은 좌표, 아래로 200) | DOWN **1회** |
+| test_input_router | 터치 index 1 누름·뗌 | 0회 |
+| test_input_router | 마우스 우클릭 드래그 | 0회 |
+| test_input_router | 짧은 클릭 (이동 30) | 0회 |
+| test_input_router | `set_locked(true)` 상태 드래그 | 0회 |
+| test_input_router | 잠금 중 누름 → `set_locked(false)` → 뗌 | 0회 |
+| test_input_router | 키 이벤트 `gravity_left` 액션 (A) / 에코 | LEFT 1회 / 0회 |
+
+- QA: 테스트 결과 요약. 수동 확인 절차(키보드 8키, 마우스 드래그 4방향, 에뮬레이션 켜고 드래그, 짧은 클릭·대각선)를 회신에 적는다
+
+---
+
+## 처리 완료
+
+### [2026-09-28 #2] M1 보드와 구체 물리 — 완료
+- 상태: 완료 (2026-09-28 Claude 검수 통과 · [PR #2](https://github.com/jeongmo-dot/gravity_orb/pull/2) 병합 `1df430d`)
+- 검수: 22시드 × 방향당 2초 × 4바퀴 이탈 0건·최대 관통 8.623px, Claude 재실행 일치. 방향키 중력 전환·레벨별 크기 차이는 사용자 수동 확인 완료. 확정 설정: 물리 240 tick/s + `contact_max_allowed_penetration=0.1`
 - 근거: [technical_design.md](technical_design.md) §2 (좌표·레이아웃), §4 (M1 필드·`radius_for_level`·`mass_for_level`), §5.1~5.3 (`OrbTypes`·`Orb`·`Board`), §12 M1, §13
 - 요구:
   - `GameConfig`에 §4 표의 **M1 필드만** 추가하고 `default_config.tres`에 기본값 기록. 도우미 `radius_for_level()`, `mass_for_level()` 추가
@@ -47,11 +98,11 @@
 - 건드리지 말 것: `docs/` (회신 파일 제외), `.gitattributes`, M2 이후 필드·신호·API
 - 참고: 워킹트리의 `project.godot`에 에디터(4.8 mono)가 자동으로 다시 쓴 변경이 있다 (기본값 항목 제거, `features` 4.8, `[dotnet]` 추가). 되돌리지 말고 이 항목 커밋에 그대로 포함한다. 그 외 설정은 §1.1과 동등해야 한다
 - Done-when:
-  - [ ] 방향키 4개로 중력이 바뀌고 모든 구체가 그 벽으로 굴러간다
-  - [ ] 구체가 벽을 뚫거나 보드 밖으로 나가지 않는다
-  - [ ] 레벨이 다른 구체의 크기가 눈에 띄게 다르다
-  - [ ] `test_config.gd`: `radius_for_level(1..7)`이 50 × {1.00, 1.25, 1.5625, 1.953125, 2.44140625, 3.0517578125, 3.814697265625} (오차 1e-3), `mass_for_level(2)` = 1.5625
-  - [ ] §10.1 명령 3종 에러 0, 테스트 종료 코드 0
+  - [x] 방향키 4개로 중력이 바뀌고 모든 구체가 그 벽으로 굴러간다
+  - [x] 구체가 벽을 뚫거나 보드 밖으로 나가지 않는다
+  - [x] 레벨이 다른 구체의 크기가 눈에 띄게 다르다
+  - [x] `test_config.gd`: `radius_for_level(1..7)`이 50 × {1.00, 1.25, 1.5625, 1.953125, 2.44140625, 3.0517578125, 3.814697265625} (오차 1e-3), `mass_for_level(2)` = 1.5625
+  - [x] §10.1 명령 3종 에러 0, 테스트 종료 코드 0
 - QA:
   - 자동: §10.1 명령 3종. 가능하면 헤드리스 시나리오로 **보드 밖 이탈 0건**을 수치로 확인 — 테스트 구체 배치 후 중력을 DOWN→RIGHT→UP→LEFT 순으로 각 120 물리 프레임씩 바꿔가며 4바퀴, 매 프레임 모든 구체 중심이 `|x|,|y| <= half`인지 검사. 이탈 건수·최대 속도를 회신
   - 수동: 방향키 조작·크기 차이 확인 절차를 회신에 적는다
@@ -70,9 +121,9 @@ Claude 재실행 결과 `run_tests.gd` **15회 중 1회 실패**: `departures=1 
 4. 20개 시드 모두 원인 불명으로 재현되지 않으면 시드 범위를 **1000~1099**로 넓혀 한 번 더 확인한다
 
 - Done-when (추가):
-  - [ ] 시드 20개 + 최악 조건 1건에서 중심 이탈 **0건**
-  - [ ] 전체 최대 관통 깊이 **10px 이하**
-  - [ ] `run_tests.gd` **연속 10회** 전부 종료 코드 0
+  - [x] 시드 20개 + 최악 조건 1건에서 중심 이탈 **0건**
+  - [x] 전체 최대 관통 깊이 **10px 이하**
+  - [x] `run_tests.gd` **연속 10회** 전부 종료 코드 0
 - QA: 시드별 `departures / 최대 관통 깊이 / max_speed` 표, 연속 10회 실행 결과
 - 커밋: 같은 브랜치 `m1-board-physics`에 추가 커밋 (PR #2 갱신)
 
@@ -95,15 +146,11 @@ Claude가 스크래치 복사본에서 방향당 **2초**로 맞춰 재측정한
 
 - 설계서 반영 (Claude, 이 브랜치): §1 물리 240 tick·접촉 설정, §4 `stable_frames` → **`stable_duration` (초, 0.33)** (M3에서 이 이름으로 구현), §10 시나리오 규약, §13 함정
 - Done-when (추가 요구 1 대체):
-  - [ ] 22시드(1000~1019, 1047, 2000) × 방향당 2초 × 4바퀴에서 중심 이탈 **0건**
-  - [ ] 전체 최대 관통 깊이 **10px 이하**
-  - [ ] `run_tests.gd` 3회 종료 코드 0, §10.1 `--import`·`--quit-after 300` 에러 0
+  - [x] 22시드(1000~1019, 1047, 2000) × 방향당 2초 × 4바퀴에서 중심 이탈 **0건**
+  - [x] 전체 최대 관통 깊이 **10px 이하**
+  - [x] `run_tests.gd` 3회 종료 코드 0, §10.1 `--import`·`--quit-after 300` 에러 0
 - QA: 시드별 `departures / 최대 관통 / max_speed` 표 (Claude 수치와 대조용)
 - 커밋: 같은 브랜치 `m1-board-physics`
-
----
-
-## 처리 완료
 
 ### [2026-09-28 #1] M0 프로젝트 셋업 — 완료
 - 상태: 완료 (2026-09-28 Claude 검수 통과 · [PR #1](https://github.com/jeongmo-dot/gravity_orb/pull/1) 병합 `29c9d1e`)
