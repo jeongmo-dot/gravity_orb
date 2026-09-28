@@ -664,7 +664,7 @@ godot --headless --path . --quit-after 300
 
 ### 10.4 수동 검증
 
-로드맵 완료 조건 중 자동화하지 못한 항목(체감, 화면 확인 등)은 `docs/progress.md`에 **수동 확인 절차**로 적는다.
+로드맵 완료 조건 중 자동화하지 못한 항목(체감, 화면 확인 등)은 `docs/jeongmo_codex_to_claude.md` 회신에 **수동 확인 절차**로 적는다.
 
 ---
 
@@ -789,7 +789,7 @@ M4에서는 1~3단계만 구현하고 막혀도 선호 위치에 그냥 생성�
 - 세이프 영역: `DisplayServer.get_display_safe_area()`로 HUD 여백 조정.
 - `Haptics.gd`: 스와이프 확정 시 `Input.vibrate_handheld(vibration_ms)` (설정 on일 때).
 - `NOTIFICATION_APPLICATION_PAUSED` / `NOTIFICATION_APPLICATION_FOCUS_OUT` → 일시정지 패널, 복귀 시 이어하기.
-- 실기기 재조정 값은 `default_config.tres`에 반영하고 `docs/progress.md`에 기기명과 함께 기록.
+- 실기기 재조정은 Codex가 측정값·기기명을 회신(`docs/jeongmo_codex_to_claude.md`)에 제안값으로 올리고, `default_config.tres` 반영은 Claude가 한다.
 
 ---
 

@@ -2,26 +2,52 @@
 
 Godot 4 / GDScript 기반 턴제 물리 퍼즐 프로토타입. 이 파일은 구현 에이전트(Codex)의 작업 규칙이다.
 
+## 역할 분담
+
+| 담당 | 역할 | 편집 대상 |
+|---|---|---|
+| **Claude** | 설계·명세 작성, 코드 리뷰, QA 결과 판정 | `docs/technical_design.md`, `docs/jeongmo_claude_to_codex.md`, `config/default_config.tres`의 **기존 값** |
+| **Codex** | 구현, 테스트 작성·실행, QA 관측 | `.gd`, `.tscn`, `.tres`, `project.godot`, `tests/`, `GameConfig` **새 필드**, `docs/jeongmo_codex_to_claude.md` |
+
+- 수치는 기획이다. 명세에 적힌 값은 Claude가 정한다. Codex는 **임의로 값을 바꾸지 않고** `상태: 질문`으로 올린다.
+- 합격·불합격 판정은 Claude가 한다. Codex는 관측값만 보고한다.
+
 ## 문서
 
 | 문서 | 역할 |
 |---|---|
+| [`docs/jeongmo_claude_to_codex.md`](docs/jeongmo_claude_to_codex.md) | **작업 지시 인박스.** 무엇을 할지는 여기서 시작한다 |
+| [`docs/jeongmo_codex_to_claude.md`](docs/jeongmo_codex_to_claude.md) | **회신 인박스.** 결과·QA 관측값·질문을 여기에 쓴다 |
 | [`docs/technical_design.md`](docs/technical_design.md) | **구현 기준.** 구조, API 시그니처, 수치, 알고리즘, 마일스톤별 구현 명세 |
 | [`docs/reference/gravity_orb_design.md`](docs/reference/gravity_orb_design.md) | 기획서 (게임 규칙의 원본) |
 | [`docs/reference/gravity_orb_roadmap.md`](docs/reference/gravity_orb_roadmap.md) | 마일스톤 목표·완료 조건 |
-| `docs/progress.md` | 진행 기록. 에이전트가 생성·갱신한다 |
 
-충돌 시 우선순위: 기획서 > technical_design.md > 로드맵. 문서에 없는 결정을 내렸다면 `docs/progress.md`의 해당 마일스톤 "결정 사항"에 기록한다.
+충돌 시 우선순위: 인박스 지시 > 기획서 > technical_design.md > 로드맵. `docs/reference/`는 원본 사본이므로 수정하지 않는다.
+
+## 핸드오프 창구 — 고정 파일 2개
+
+| 파일 | 쓰는 쪽 | 읽는 쪽 |
+|---|---|---|
+| `docs/jeongmo_claude_to_codex.md` | **Claude** | Codex |
+| `docs/jeongmo_codex_to_claude.md` | **Codex** | Claude |
+
+- **각자 자기 파일만 쓴다.** 상대 파일은 절대 고치지 않는다. (로컬에서는 워킹트리를, 클라우드에서는 브랜치 병합을 공유하므로 같은 파일을 양쪽이 쓰면 충돌·손실이 난다)
+- 새 항목은 맨 위에 추가한다. 인수인계 번호(#N)는 Claude가 매기며 재사용하지 않는다.
+- **긴 명세는 인박스에 붙여넣지 않는다.** `technical_design.md` 또는 별도 문서에 두고 링크와 요약만 적는다.
+- 모호하면 `상태: 질문`으로 올리고 멈춘다. 추측으로 진행하지 않는다.
+- 완료 항목이 30건을 넘으면 `docs/archive/`로 옮긴다.
+- 새 `handoff_*.md` 같은 파일을 따로 만들지 않는다.
 
 ## 작업 방식
 
-1. **한 번에 한 마일스톤만** 구현한다 (M0 → M1 → …). 요청받은 마일스톤 외의 기능·config 필드를 미리 넣지 않는다.
-2. 시작 전 `technical_design.md` 12장의 해당 마일스톤 항목과 로드맵의 완료 조건을 읽는다.
-3. 마일스톤 완료 시 `docs/progress.md`를 갱신한다:
-   - 완료 조건 체크리스트 (자동 검증 / 수동 확인 구분)
+1. `jeongmo_claude_to_codex.md`의 「대기 중」 항목 중 **가장 번호가 낮은 것 하나만** 처리한다. 항목에 없는 기능·config 필드를 미리 넣지 않는다.
+2. 항목의 `근거` 링크(보통 `technical_design.md` 12장 해당 마일스톤)와 로드맵의 완료 조건을 읽는다.
+3. 구현 → 검증 명령 실행 → `jeongmo_codex_to_claude.md`에 회신을 쓴다. 회신에는:
+   - Done-when 대조 (자동 검증 / 수동 확인 구분)
    - 자동화하지 못한 항목의 **수동 확인 절차** (무엇을 누르고 무엇을 봐야 하는지)
-   - 결정 사항, 알려진 문제
-4. 공개 API·신호 이름을 설계서와 다르게 바꿔야 하면 `technical_design.md`도 같은 변경에서 수정한다.
+   - 문서에 없던 결정 사항, 알려진 문제
+4. 공개 API·신호 이름을 설계서와 다르게 바꿔야 하면 **먼저 질문으로 올린다.** (`technical_design.md`는 Claude가 고친다)
+5. 회신 파일 갱신은 구현과 같은 커밋·PR에 포함한다.
 
 ## 코딩 규칙 (요약 — 상세는 technical_design.md 3.4, 13장)
 
@@ -44,7 +70,8 @@ godot --headless --path . -s res://tests/run_tests.gd
 godot --headless --path . --quit-after 300
 ```
 
-마일스톤 완료 전 세 명령 모두 에러 없이 통과해야 한다 (`SCRIPT ERROR`, `Parse Error` 출력 없음, 테스트 종료 코드 0).
+항목 완료 전 세 명령 모두 에러 없이 통과해야 한다 (`SCRIPT ERROR`, `Parse Error` 출력 없음, 테스트 종료 코드 0).
+Godot를 실행할 수 없는 환경이면 회신에 **"미실행"과 사유**를 명시한다. 실행하지 않은 검증을 통과했다고 적지 않는다.
 
 규칙 점검용:
 
@@ -53,9 +80,8 @@ grep -rn "Input\.\|InputEvent" scripts --include=*.gd      # InputRouter.gd, Hap
 grep -rn "randf\|randi\|shuffle\|pick_random" scripts --include=*.gd   # Spawner.gd 외 없어야 함
 ```
 
-## 커밋
+## 브랜치·커밋
 
-- 마일스톤 단위 브랜치 권장: `m1-board-physics`, `m2-input-router` …
-- 커밋 메시지 접두어: `[M1] 보드 벽과 구체 중력 구현` 형식.
-- `docs/progress.md` 갱신은 해당 마일스톤 커밋에 함께 포함한다.
-- `docs/reference/`는 원본 기획 문서의 사본이다. 에이전트는 수정하지 않는다 (원본 갱신 시 사람이 다시 복사한다).
+- 항목 단위 브랜치: `m0-project-setup`, `m1-board-physics` …
+- 커밋 메시지 접두어: `[#1 M0] 프로젝트 셋업` 형식.
+- `main`에 직접 push하지 않는다. PR로 올리고 병합은 Claude(또는 사용자)가 한다.
