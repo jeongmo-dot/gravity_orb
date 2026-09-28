@@ -77,11 +77,18 @@ func _physics_process(delta: float) -> void:
 	var gravity_velocity: Vector2 = gravity_axis * linear_velocity.dot(gravity_axis)
 	var rolling_velocity: Vector2 = linear_velocity - gravity_velocity
 	var rolling_speed: float = rolling_velocity.length()
-	if is_zero_approx(rolling_speed):
-		angular_velocity = 0.0
+	if delta <= 0.0:
 		return
 
-	var remaining_speed: float = maxf(rolling_speed - resistance * delta, 0.0)
-	var remaining_ratio: float = remaining_speed / rolling_speed
-	linear_velocity = gravity_velocity + rolling_velocity * remaining_ratio
-	angular_velocity *= remaining_ratio
+	var remaining_ratio: float = 0.0
+	if not is_zero_approx(rolling_speed):
+		var deceleration: float = minf(resistance, rolling_speed / delta)
+		var resistance_force: Vector2 = -rolling_velocity.normalized() * deceleration * mass
+		apply_central_force(resistance_force)
+		remaining_ratio = maxf(1.0 - deceleration * delta / rolling_speed, 0.0)
+
+	if is_zero_approx(angular_velocity):
+		return
+	var circle_inertia: float = 0.5 * mass * _radius * _radius
+	var angular_acceleration: float = -angular_velocity * (1.0 - remaining_ratio) / delta
+	apply_torque(angular_acceleration * circle_inertia)
