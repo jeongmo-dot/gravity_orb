@@ -402,6 +402,8 @@ func is_locked() -> bool
   - 이 source 고정 규칙이 "마우스로 터치 에뮬레이션"/"터치로 마우스 에뮬레이션"에서 생기는 이중 이벤트를 제거한다.
 - 잠금 중에 시작된 제스처는 잠금이 풀린 뒤 떼어도 무시한다 (`started_locked`).
 - 이벤트 좌표는 이미 기준 해상도 좌표다. 추가 변환하지 않는다.
+- `_unhandled_input`은 GUI가 소비한 이벤트를 받지 못한다. 기획서 6.1 "보드 밖에서도 스와이프 인식"을 지키려면 **HUD·패널의 Control은 `mouse_filter = MOUSE_FILTER_IGNORE`** 로 두고, 클릭을 받아야 하는 버튼만 `STOP`으로 둔다. UI를 추가하는 마일스톤(M4 미리보기, M7 게임오버, M9 디버그)에서 HUD 영역 드래그가 `swipe`로 들어오는지 확인한다.
+- 터치 취소(`InputEventScreenTouch.canceled`)·포커스 상실 시 활성 제스처가 남을 수 있다. M10에서 `canceled` 처리와 `NOTIFICATION_APPLICATION_FOCUS_OUT` 시 제스처 초기화를 추가한다.
 
 ### 5.6 `TurnManager`
 
