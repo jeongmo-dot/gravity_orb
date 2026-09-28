@@ -38,9 +38,49 @@
 
 ## 미확인
 
+### [2026-09-28] 대상 #6 — 생성 시점 변경: 스와이프 순간 생성
+- 상태: 완료
+- 브랜치 / PR: `m4-spawn-on-swipe` / PR 생성 후 링크 반영 예정
+- 변경 파일: `scripts/core/TurnManager.gd`, `tests/scenarios/test_spawn_flow.gd`, `tests/scenarios/test_turn_manager.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 스와이프 직후 `SPAWNING`, 다음 물리 프레임에 구체 수 +1·생성선 위 배치·`SIMULATING` 진입 — `test_preview_matches_spawned_orb_and_spawn_line` 자동 검증
+  - [x] 상태 순서 `SPAWNING → SIMULATING → CHECK_GAMEOVER → WAITING_INPUT`, `turn_started`·`turn_finished` 각 1회 — TurnManager T2 자동 검증
+  - [x] `SPAWNING`과 `SIMULATING` 중 추가 스와이프 무시 — TurnManager T3 자동 검증
+  - [x] 생성 전 settle을 제거해 턴당 settle 1회, 초기 settle은 생성 없이 유지 — TurnManager T1·T4·T5와 `test_three_turns_spawn_before_one_settle_each` 자동 검증
+  - [x] 기존 미리보기 일치·시드 777 재현·4방향 생성선 회귀 유지 — `test_spawn_flow.gd` 자동 검증
+  - [x] 바닥에 안정시킨 레벨1 구체 8개 중 dummy와 CENTER/UP 생성 구체를 겹치게 한 뒤 0.5초 관측 — 이탈 0건, 최대 관통 `2.513px`, 최대 속도 `1142.434px/s`
+  - [x] 시드 4242, DOWN·RIGHT·UP·LEFT 반복 20턴 — 매 턴 `WAITING_INPUT` 복귀, 최종 구체 22개, 이탈 0건
+  - [x] `Spawner.try_spawn()`의 무조건 생성 및 RNG 소비 순서 유지, GAME_OVER·경고 API 추가 없음 — 코드 확인과 회귀 테스트
+  - [x] §10.1 명령 3종 종료 코드 0, 전체 39/39 테스트 통과 — 자동 검증 완료
+  - [ ] 실제 창에서 스와이프 즉시 생성·기존 구체와 함께 이동·게임오버 없이 연속 진행 확인 — 미실행, 아래 수동 확인 절차 필요
+- QA 관측값:
+  - 실행 환경: `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe`, 버전 `4.8.dev3.mono.official.51105ccbe`
+  - `godot --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR` 0건, `Parse Error` 0건
+  - `godot --headless --path . -s res://tests/run_tests.gd` → 39/39 통과, 실패 0건, 종료 코드 0
+  - #6 테스트 세부 → `test_spawn_flow.gd` 7/7, 갱신된 `test_turn_manager.gd` 7/7; 전체 회귀 25/25
+  - 겹침 생성 관측(시드 4006, 생성 후 0.5초) → 이탈 0건, 최대 관통 `2.513px`, 최대 속도 `1142.434px/s`
+  - 20턴 최종 통과 실행 settle 초 → T1 `1.725000`; T2~T17 각 `3.000000`(강제); T18 `2.758333`; T19 `2.975000`; T20 `2.679167`. 방향은 DOWN·RIGHT·UP·LEFT 5회 반복, 매 턴 이탈 0건
+  - 20턴 최종 통과 실행 → 강제 settle 16회, 최종 구체 22개, 이탈 0건. 직전 독립 실행에서는 강제 settle 15회(T1 `1.725000`, T2~T12·T14~T16·T20 강제, T13 `2.400000`, T17 `2.508333`, T18 `2.620833`, T19 `2.833333`)로 실행 간 변동 관측
+  - 기존 물리 회귀 → 22시드 이탈 0건, 최대 관통 `8.623px`, 최대 속도 `1935.529px/s`
+  - T4 안정 settle → `0.333333초/80틱`; T5 강제 settle → `3.000000초/720틱`
+  - 전체 테스트 경고 → 최종 실행에서 `forced settle` 19건(20턴 16건 + T2·T3·T5 각 1건). 강제 settle은 기존 알려진 문제의 관측 횟수이며 명세 동작으로 판정하지 않음
+  - `godot --headless --path . --quit-after 300` → 종료 코드 0, `SCRIPT ERROR` 0건, `Parse Error` 0건
+  - 정적 검사 → `InputEvent`는 `InputRouter.gd`에만 9줄, 난수 API는 `Spawner.gd`에만 1줄; config 값·물리 설정·RNG 소비 순서 변경 없음
+- 수동 확인 절차:
+  1. `& 'C:\work\Godot\Godot_v4.8-dev3_mono_win64.exe' --path .` 실행 후 초기 settle이 끝날 때까지 대기한다.
+  2. 방향키나 80px 이상의 드래그로 한 번 스와이프 → 반대편 생성 벽에 NEXT와 같은 구체가 즉시 나타나고 기존 구체와 함께 같은 중력 방향으로 움직이는지 확인한다.
+  3. 구체가 움직이는 동안 추가 입력 → 현재 턴의 중력·턴 수가 바뀌지 않고, `WAITING_INPUT` 복귀 뒤 다음 입력만 받아들이는지 확인한다.
+  4. 네 방향을 반복해 20턴 이상 진행 → 생성 겹침 여부와 무관하게 매 턴 구체가 1개씩 늘고, 게임오버 화면이나 경고 UI 없이 계속 진행되는지 확인한다.
+- 결정 사항: 공개 API·config 값·물리 설정·RNG 순서는 변경하지 않았다. 겹침 회귀 테스트는 8개를 DOWN으로 안정시킨 뒤 중앙 dummy를 다음 구체의 UP 생성선 원점에 맞춰 확정적으로 겹치도록 구성했다.
+- 남은 것 · 질문: 실제 창 수동 QA는 미실행이다. 20턴의 강제 settle이 독립 실행에서 15회와 16회로 달라지는 물리 안정화 변동을 관측했으며, 기존 알려진 문제로 횟수만 보고한다.
+
+---
+
+## 확인됨
+
 ### [2026-09-28] 대상 #5 — M4 구체 생성
 - 상태: 완료
-- 브랜치 / PR: `m4-orb-spawning` / PR 생성 후 링크 반영 예정
+- 브랜치 / PR: `m4-orb-spawning` / [PR #5](https://github.com/jeongmo-dot/gravity_orb/pull/5)
 - 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, `scenes/Main.tscn`, `scenes/UI.tscn`, `scripts/core/Board.gd`, `scripts/core/Main.gd`, `scripts/core/Spawner.gd`, `scripts/core/TurnManager.gd`, `scripts/ui/DebugHud.gd`, `scripts/ui/Hud.gd`, `tests/run_tests.gd`, `tests/test_config.gd`, `tests/test_spawner.gd`, `tests/scenarios/test_board_physics.gd`, `tests/scenarios/test_spawn_flow.gd`, `tests/scenarios/test_turn_manager.gd`, Godot 생성 `.gd.uid` 4개
 - Done-when 대조:
   - [x] 4방향 모두 중력 반대편 생성 벽의 `spawn_line` 공식과 실제 생성 좌표 일치 — `test_spawn_line_matches_all_four_generation_walls`, 시드 777의 5턴 시나리오 자동 검증
@@ -62,7 +102,7 @@
   - 시드 42, 10,000회 분포 → 레벨1 `0.8971`; 색상 `0.3360 / 0.3302 / 0.3338` (각 목표 대비 허용 오차 ±0.02 이내)
   - 4방향 레벨1 생성선 원점 → DOWN `(0, -426)`, UP `(0, 426)`, LEFT `(426, 0)`, RIGHT `(-426, 0)`
   - 시드 777, 5턴 생성 `(중력 / color / level / position)` → DOWN `0/1/(-360.4127,-426)`, LEFT `1/1/(426,285.0786)`, UP `2/1/(-35.29215,426)`, RIGHT `1/1/(-426,136.5205)`, DOWN `2/1/(283.709,-426)`; 독립 실행 2회 완전 일치
-  - M3 시간 회귀 → T4 `0.333333초/80틱`, T5 `3.000000초/720틱`; 강제 settle 경고 4건은 T2·T3·T5의 명세 동작으로 관측
+  - M3 시간 회귀 → T4 `0.333333초/80틱`, T5 `3.000000초/720틱`; 강제 settle 경고 4건은 기존 알려진 문제로 관측했으며 명세 동작으로 판정하지 않음
   - 기존 물리 회귀 → 22시드 이탈 0건, 최대 관통 `8.623px`, 최대 속도 `1935.529px/s`
   - `godot --headless --path . --quit-after 300` → 종료 코드 0, `SCRIPT ERROR` 0건, `Parse Error` 0건
   - 정적 검사 → 물리 240 tick·접촉 허용 관통 0.1 유지, M7 `is_circle_free`·후보 대체 API 0건
@@ -72,11 +112,7 @@
   3. 각 스와이프 직전 `NEXT`의 색·크기를 기억 → 생성된 구체와 일치하고, 생성 직후 NEXT가 다음 구체로 갱신되는지 확인한다.
   4. `default_config.tres`의 `rng_seed`를 임시로 `777`로 설정해 두 번 실행 → 초기 구체와 이후 5턴의 색·레벨·선호 생성 위치가 반복되는지 확인하고 값을 `0`으로 복구한다.
 - 결정 사항: 중첩 UI 씬 내부의 `Hud`는 바깥 씬 고유 이름을 직접 찾을 수 없어 `UI` 루트가 `%Spawner` 참조를 주입하고, 이후 `Hud`가 `next_changed`를 직접 구독한다. 테스트 러너는 파싱 실패 스크립트가 잘못 통과하지 않도록 `Script.can_instantiate()` 검사를 추가했다.
-- 남은 것 · 질문: 실제 창 수동 QA는 미실행이다. 공개 API·밸런스 수치 변경과 알려진 문제는 없다.
-
----
-
-## 확인됨
+- 남은 것 · 질문: 실제 창 수동 QA는 미실행이다. 기본 설정의 많은 턴이 3초 강제 settle로 끝나는 기존 알려진 문제가 있다.
 
 ### [2026-09-28] 대상 #4 — M3 턴 상태 머신
 - 상태: 완료

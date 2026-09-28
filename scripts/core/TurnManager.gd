@@ -43,12 +43,17 @@ func on_swipe(dir: Vector2i) -> void:
 	_board.set_gravity(gravity)
 	gravity_changed.emit(gravity)
 	turn_started.emit(turn_index, gravity)
-	_begin_settle()
-	_set_state(State.SIMULATING)
+	_set_state(State.SPAWNING)
 
 
 func _physics_process(delta: float) -> void:
-	if state != State.SIMULATING and state != State.SPAWNING:
+	if state == State.SPAWNING:
+		_spawner.try_spawn(_board, gravity)
+		_begin_settle()
+		_set_state(State.SIMULATING)
+		return
+
+	if state != State.SIMULATING:
 		return
 
 	_settle_elapsed += delta
@@ -85,12 +90,6 @@ func _on_settled() -> void:
 		_is_initial_settle = false
 		InputRouter.set_locked(false)
 		_set_state(State.WAITING_INPUT)
-		return
-
-	if state == State.SIMULATING:
-		_spawner.try_spawn(_board, gravity)
-		_begin_settle()
-		_set_state(State.SPAWNING)
 		return
 
 	_set_state(State.CHECK_GAMEOVER)
