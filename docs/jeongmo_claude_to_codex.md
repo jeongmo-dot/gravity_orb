@@ -30,8 +30,39 @@
 
 ## 대기 중
 
-### [2026-09-28 #7] M5 합체 규칙
+### [2026-09-28 #8] 턴 소요 시간 튜닝 — 구름 저항
 - 상태: 대기
+- 근거: [technical_design.md](technical_design.md) §12 "M5+. 턴 소요 시간 튜닝" (Claude 측정값·진단 포함)
+- 배경: 현재 기본값으로 턴(스와이프 → `WAITING_INPUT`)의 96%가 3초 강제 안정으로 끝난다. GodotPhysics2D에 구름 저항이 없어 벽·바닥을 따라 구르는 공이 멈추지 않는 것이 원인이다 (측정 속도 = 실제 이동, 떨림 아님)
+- 요구:
+  1. **측정 도구 먼저** — `tests/scenarios/test_turn_time.gd`: `Board`+`Spawner`+`CollisionResolver`+`TurnManager` 실제 조립(합체 **연결 유지**), 시드 **101~106** × **20턴**, 방향 순서 `DOWN, RIGHT, UP, LEFT, DOWN, LEFT, UP, RIGHT` 반복. 턴별 소요 시간(시뮬레이션 초)을 모아 **강제 안정 수 / 평균 / p50 / p90 / 최대**, 최종 구체 수 평균을 출력. `--fixed-fps 240` 전제
+  2. **구름 저항 구현** — `Orb`에서 매 물리 프레임(`_integrate_forces` 권장): 접촉 중(`get_contact_count() > 0`)이면 속도의 **중력 수직 성분**에 크기 `rolling_resistance × gravity_strength`의 감속을 건다. 한 틱에 그 성분의 부호를 넘기지 않게 0에서 멈춘다. 각속도도 같은 비율로 줄여 구름이 유지되지 않게 한다. 중력 방향 성분(낙하)은 건드리지 않는다
+  3. **저속 제동 (선택)** — 접촉 중이고 속도 < `rest_speed`이면 선·각 감쇠를 `rest_damp`로 올린다. 구름 저항만으로 목표를 달성하면 `rest_speed = 0`(비활성)으로 둔다
+  4. `GameConfig` 새 필드: `rolling_resistance`, `rest_speed`, `rest_damp` (기존 필드 이름 변경 금지)
+  5. **스윕** — 아래 격자를 측정 도구로 돌려 표로 보고한다. 기존 감쇠·마찰·임계값은 스윕 축으로만 바꾼다:
+     - `rolling_resistance`: 0, 0.1, 0.2, 0.3, 0.5
+     - `rest_speed / rest_damp`: 0/0, 60/8, 120/10
+     - `stable_linear_speed / stable_angular_speed`: 12/1, 30/3
+     - 감쇠·마찰은 현재값(0.1 / 1 / 0.3) 고정
+  6. **기본값 선택 규칙** — 목표를 만족하는 조합 중 `rolling_resistance`가 가장 작은 것, 동률이면 `rest_speed`가 작은 것, 그다음 임계값이 엄격한(작은) 것. 이 조합을 `default_config.tres`에 반영하고 근거 표와 함께 회신한다. **목표를 만족하는 조합이 없으면 기본값을 바꾸지 말고 `상태: 질문`** 으로 표를 올린다
+- 목표 (Claude 결정): 120턴 기준 **강제 안정 ≤ 6 (5%)**, **p50 ≤ 1.6초**, **p90 ≤ 2.2초**
+- 건드리지 말 것: `docs/` (회신 파일 제외), `gravity_strength`, 물리 틱·접촉 설정, 턴 흐름, `Spawner` RNG 순서, 합체 규칙
+- Done-when:
+  - [ ] `test_turn_time.gd`가 목표를 assert하고 통과한다 (선택된 기본값으로)
+  - [ ] 기존 물리 회귀 22시드: 이탈 0, 관통 ≤ 10px (기존 테스트가 쓰는 감쇠 조건 그대로 + 새 기본값 적용 상태 둘 다 보고)
+  - [ ] 겹침 생성·합체·턴 테스트 전부 통과
+  - [ ] 전체 테스트의 `forced settle` 횟수 보고 (T5 의도적 1건 제외 목표 0에 가깝게)
+  - [ ] §10.1 명령 3종 에러 0
+- QA: 스윕 전체 표 (30조합 × 강제/평균/p50/p90/최대/최종 구체 수), 선택 조합과 선택 근거, 선택 조합의 방향별(DOWN/RIGHT/UP/LEFT) p50
+- 수동 확인 절차: 기울이면 여전히 시원하게 쏟아지는지(낙하가 느려지지 않았는지), 멈출 때 딱 멈추는지, 다음 입력까지 기다림이 짧아졌는지
+
+---
+
+## 처리 완료
+
+### [2026-09-28 #7] M5 합체 규칙 — 완료
+- 상태: 완료 (2026-09-28 Claude 검수 통과 · [PR #7](https://github.com/jeongmo-dot/gravity_orb/pull/7) 병합 `690ef58`)
+- 검수: 51/51·연쇄 [1, 2]·콜백 에러 0 Claude 재실행 일치. 합체·비합체·Chain 표시는 사용자 수동 확인 완료. 비차단 메모: 안정 직후 보고된 접촉이 다음 턴 연쇄로 잡힐 수 있음 → M6 `sweep_resting_contacts`에서 확인
 - 근거: [technical_design.md](technical_design.md) §4 (M5 필드), §5.2 (`generation`·`consumed`·`contact_monitor`), §5.3 (`orb_contact`·`spawn_orb`의 `generation`·`remove_orb`), §5.6 (`chain_changed`·`on_reaction`), §5.7 `CollisionResolver`, §5.8 `ReactionRules`, §6 settle 루프의 `flush()`, §7.1~7.2, §8.1, §12 M5
 - 요구:
   - `GameConfig` M5 필드 `contact_max_reported`(6)
@@ -48,12 +79,12 @@
 - 수치: `contact_max_reported` 6. 그 외 변경 없음
 - 건드리지 말 것: `docs/` (회신 파일 제외), 물리·감쇠·임계값 (튜닝은 다음 항목), `Spawner`, `InputRouter`, 턴 흐름 순서
 - Done-when:
-  - [ ] 같은 색·같은 레벨만 합체되고, 다른 조합은 튕기기만 한다
-  - [ ] 세 개가 동시에 붙어도 오류나 중복 합체가 없다
-  - [ ] 연쇄가 일어나면 턴 내 연쇄 수가 올라간다 (디버그 표시)
-  - [ ] 합체 중에도 턴 상태 머신이 정상적으로 안정 판정을 한다
-  - [ ] 물리 콜백에서 트리 변경 0건 — 전체 테스트 출력에 `flushing queries`·`SCRIPT ERROR` 0건
-  - [ ] 기존 테스트 전부 통과, §10.1 명령 3종 에러 0
+  - [x] 같은 색·같은 레벨만 합체되고, 다른 조합은 튕기기만 한다
+  - [x] 세 개가 동시에 붙어도 오류나 중복 합체가 없다
+  - [x] 연쇄가 일어나면 턴 내 연쇄 수가 올라간다 (디버그 표시)
+  - [x] 합체 중에도 턴 상태 머신이 정상적으로 안정 판정을 한다
+  - [x] 물리 콜백에서 트리 변경 0건 — 전체 테스트 출력에 `flushing queries`·`SCRIPT ERROR` 0건
+  - [x] 기존 테스트 전부 통과, §10.1 명령 3종 에러 0
 - 테스트:
 
 | 파일 | 조건 | 기대 |
@@ -72,10 +103,6 @@
 
 - QA: 테스트별 결과, 연쇄 시나리오의 반응 순서(chain 값), 전체 실행 `forced settle` 횟수 (기지의 문제, 횟수만)
 - 수동 확인 절차: 같은 색·같은 크기가 닿으면 한 단계 커지는지, 다른 조합은 합쳐지지 않는지, 디버그 라벨 Chain 표시
-
----
-
-## 처리 완료
 
 ### [2026-09-28 #6] 생성 시점 변경 — 스와이프 순간 생성 — 완료
 - 상태: 완료 (2026-09-28 Claude 검수 통과 · [PR #6](https://github.com/jeongmo-dot/gravity_orb/pull/6) 병합 `f031b51`)
