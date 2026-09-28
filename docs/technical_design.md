@@ -237,8 +237,8 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M1 | `debug_test_orb_count` | int | 5 | M1 전용. M4에서 삭제 |
 | M2 | `swipe_min_distance` | float | 80.0 | 스와이프 최소 이동 거리 (기준 해상도 px) |
 | M2 | `swipe_dominance_ratio` | float | 1.5 | 주 방향 성분 ≥ 보조 성분 × 이 값 |
-| M3 | `stable_linear_speed` | float | 12.0 | 안정 판정 선속도 임계값 (px/s) |
-| M3 | `stable_angular_speed` | float | 1.0 | 안정 판정 각속도 임계값 (rad/s) |
+| M3 | `stable_linear_speed` | float | 12.0 → #8에서 30.0 | 안정 판정 선속도 임계값 (px/s) |
+| M3 | `stable_angular_speed` | float | 1.0 → #8에서 3.0 | 안정 판정 각속도 임계값 (rad/s) |
 | M3 | `stable_duration` | float | 0.33 | 임계값 이하가 연속 유지되어야 하는 시간 (초, 스케일된 시간). 물리 틱 수와 무관하게 초 단위로 정한다 |
 | M3 | `max_settle_time` | float | 3.0 | 강제 안정까지 최대 대기 (초, 스케일된 시간) |
 | M3 | `allow_same_direction_swipe` | bool | true | 11.1 참조 |
@@ -249,6 +249,10 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M4 | `rng_seed` | int | 0 | 0이면 시작 시 무작위 시드를 뽑아 기록 |
 | M4 | `initial_orb_count` | int | 2 | |
 | M5 | `contact_max_reported` | int | 6 | `Orb.max_contacts_reported` |
+| M5+ | `rolling_resistance` | float | #8에서 결정 | 바닥(중력 쪽 벽) 접촉 구체의 중력 수직 속도 감속 = 값 × `gravity_strength`. 힘으로 건다 |
+| M5+ | `rest_speed` / `rest_damp` | float | 0 / 0 | 저속 제동 (0이면 비활성) |
+| M5+ | `floor_contact_tolerance` | float | 2.0 | 바닥 접촉 기하 판정 여유 (px) |
+| M5+ | `escape_guard_depth` | float | 25.0 | 벽 관통이 이 깊이를 넘으면 경계로 되돌리는 안전장치 (회귀 테스트는 발동 0 요구) |
 | M6 | `opposite_pairs` | Array[Vector2i] | [(RED, BLUE)] | 상극 쌍 (순서 무관) |
 | M6 | `annihilation_rule` | AnnihilationRule | A_BOTH | |
 | M7 | `level_scores` | PackedInt32Array | [2,4,8,16,32,64,128] | 인덱스 0 = 레벨1 |
