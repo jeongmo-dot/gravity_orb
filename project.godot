@@ -1,13 +1,22 @@
 ; Engine configuration file.
-; Edit through the Godot editor when possible.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
 
 config_version=5
+
+[animation]
+
+compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 [application]
 
 config/name="Gravity Orb"
 run/main_scene="res://scenes/Main.tscn"
-config/features=PackedStringArray("4.4", "GL Compatibility")
+config/features=PackedStringArray("4.8", "GL Compatibility")
 
 [autoload]
 
@@ -20,16 +29,16 @@ window/size/viewport_height=1920
 window/size/window_width_override=540
 window/size/window_height_override=960
 window/stretch/mode="canvas_items"
-window/stretch/aspect="keep"
 window/handheld/orientation=1
 
-[input_devices]
+[dotnet]
 
-pointing/emulate_touch_from_mouse=false
+project/assembly_name="Gravity Orb"
 
 [physics]
 
-common/physics_ticks_per_second=60
+common/physics_ticks_per_second=240
+2d/solver/contact_max_allowed_penetration=0.1
 
 [rendering]
 

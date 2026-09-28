@@ -37,7 +37,7 @@
 | 엔진 | **Godot 4.8** (현재 `4.8.dev3.mono`, 4.8 정식판 출시 시 교체). C#은 쓰지 않으며 mono 에디터가 추가하는 `[dotnet]` 섹션은 그대로 둔다 |
 | 언어 | GDScript, **모든 변수·인자·반환값 타입 명시** |
 | 렌더러 | `gl_compatibility` (저사양 Android 대응) |
-| 물리 | 기본 GodotPhysics2D, 60 tick/s |
+| 물리 | 기본 GodotPhysics2D, **240 tick/s** (13장 "벽 관통" 참조) |
 | 외부 애드온 | 사용하지 않음 (테스트 프레임워크 포함) |
 
 ### 1.1 `project.godot` 필수 설정
@@ -54,9 +54,10 @@
 | `display/window/handheld/orientation` | `1` (portrait) |
 | `rendering/renderer/rendering_method` | `gl_compatibility` |
 | `rendering/renderer/rendering_method.mobile` | `gl_compatibility` |
-| `physics/common/physics_ticks_per_second` | `60` |
+| `physics/common/physics_ticks_per_second` | `240` |
+| `physics/2d/solver/contact_max_allowed_penetration` | `0.1` |
 
-> 에디터는 기본값과 같은 항목을 `project.godot`에서 지운다 (`aspect=keep`, `emulate_touch_from_mouse=false`, `physics_ticks_per_second=60`). 파일에 없어도 값이 같으면 준수한 것으로 본다.
+> 에디터는 기본값과 같은 항목을 `project.godot`에서 지운다 (`aspect=keep`, `emulate_touch_from_mouse=false`). 파일에 없어도 값이 같으면 준수한 것으로 본다.
 | `input_devices/pointing/emulate_touch_from_mouse` | `false` (M2 검증 시 `true`로도 확인) |
 
 ### 1.2 입력 액션 (Input Map)
@@ -238,7 +239,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M2 | `swipe_dominance_ratio` | float | 1.5 | 주 방향 성분 ≥ 보조 성분 × 이 값 |
 | M3 | `stable_linear_speed` | float | 12.0 | 안정 판정 선속도 임계값 (px/s) |
 | M3 | `stable_angular_speed` | float | 1.0 | 안정 판정 각속도 임계값 (rad/s) |
-| M3 | `stable_frames` | int | 20 | 연속 유지 물리 프레임 수 |
+| M3 | `stable_duration` | float | 0.33 | 임계값 이하가 연속 유지되어야 하는 시간 (초, 스케일된 시간). 물리 틱 수와 무관하게 초 단위로 정한다 |
 | M3 | `max_settle_time` | float | 3.0 | 강제 안정까지 최대 대기 (초, 스케일된 시간) |
 | M3 | `allow_same_direction_swipe` | bool | true | 11.1 참조 |
 | M4 | `spawn_level_weights` | PackedFloat32Array | [0.9, 0.1] | 인덱스 0 = 레벨1 |
@@ -521,11 +522,11 @@ WAITING_INPUT
     _begin_settle(); → SIMULATING
 
 SIMULATING / SPAWNING 공통 settle 루프 (매 물리 프레임):
-    if CollisionResolver.flush() > 0: stable_count = 0
+    if CollisionResolver.flush() > 0: stable_time = 0.0
     settle_elapsed += delta                 # 스케일된 시간
-    if _all_below_threshold(): stable_count += 1 else: stable_count = 0
-    if stable_count >= cfg.stable_frames:
-        if CollisionResolver.sweep_resting_contacts() > 0: stable_count = 0; return
+    if _all_below_threshold(): stable_time += delta else: stable_time = 0.0
+    if stable_time >= cfg.stable_duration:
+        if CollisionResolver.sweep_resting_contacts() > 0: stable_time = 0.0; return
         _on_settled()
     elif settle_elapsed >= cfg.max_settle_time:
         push_warning("forced settle"); _on_settled()
@@ -545,7 +546,7 @@ CHECK_GAMEOVER (1프레임):
 ```
 
 - `_all_below_threshold()`: 모든 Orb에 대해 `linear_velocity.length() <= stable_linear_speed` 그리고 `absf(angular_velocity) <= stable_angular_speed`. Orb가 0개면 true.
-- `_begin_settle()`: `stable_count = 0`, `settle_elapsed = 0.0`.
+- `_begin_settle()`: `stable_time = 0.0`, `settle_elapsed = 0.0`.
 - `start_game()`: 중력 DOWN → 초기 구체 생성 → settle(`SIMULATING` 재사용, `_is_initial_settle = true`면 `_on_settled`에서 생성 단계를 건너뛰고 바로 `WAITING_INPUT`).
 - **M3 시점**: `SPAWNING`, `CHECK_GAMEOVER`는 즉시 통과. `flush`/`sweep`/`try_spawn` 호출은 해당 마일스톤에서 추가.
 
@@ -663,6 +664,10 @@ godot --headless --path . --quit-after 300
 | M7 | `test_score.gd` | 8.2 표와 예시 |
 
 시나리오 테스트는 `Board.tscn`을 루트에 붙이고 `await tree.physics_frame`으로 프레임을 진행한다.
+
+- 시나리오 길이는 **시뮬레이션 초**로 정하고 프레임 수는 `Engine.physics_ticks_per_second × 초`로 계산한다. 프레임 수를 상수로 박으면 물리 틱을 바꿀 때 시험 강도가 몰래 달라진다.
+- 구체 배치는 고정 시드 RNG로 한다. `randomize()` 금지 (실패 재현 불가).
+- 헤드리스 실시간 동기화 때문에 오래 걸리면 `--fixed-fps <physics_ticks_per_second>`로 실행해도 된다 (물리 delta 동일).
 
 ### 10.4 수동 검증
 
@@ -808,5 +813,6 @@ M4에서는 1~3단계만 구현하고 막혀도 선호 위치에 그냥 생성�
 | `contact_monitor` 꺼짐 또는 `max_contacts_reported = 0`이면 `body_entered` 미발생 | 둘 다 설정 |
 | `PhysicsDirectSpaceState2D` 쿼리를 물리 프레임 밖에서 호출하면 실패 | `is_circle_free`는 `_physics_process` 흐름에서만 |
 | `preload`한 리소스는 캐시 공유 → 런타임 수정이 원본 참조 전체에 퍼짐 | `Config`에서 `duplicate(true)` 한 번, 모두 `Config.data` 참조 |
+| 고속 구체가 다른 구체에 밀려 벽 안으로 수십 px 파고듦 (60Hz 최대 53px, 시드 1047에서 중심 이탈) | 240 tick/s + `contact_max_allowed_penetration = 0.1` (방향당 2초·22시드 기준 최대 8.6px). solver 반복 증가·120Hz·`default_contact_bias` 상향은 효과 없음. M10에서 모바일 비용 재평가 |
 | `Engine.time_scale` 복구 누락 | 히트스톱 종료 타이머 + `_exit_tree`에서 1.0 복구 |
 | 전역 난수 사용 시 시드 재현 불가 | 5.9의 RNG만. 리뷰 시 `grep -rn "randf\|randi\|shuffle\|pick_random" scripts` |
