@@ -30,8 +30,30 @@
 
 ## 대기 중
 
-### [2026-09-30 #13] M7 점수·최고 점수·재시작 (게임오버 보류)
+### [2026-09-30 #14] 레벨별 반지름 표 + 질량 지수 + 안전 기준 재측정
 - 상태: 대기
+- 근거: 기획서 **0.4.2** 3.4 (사용자 결정: L1~L3 크기 차이가 안 보임), [technical_design.md](technical_design.md) §4 (`level_radii`, `mass_exponent`)
+- 요구:
+  1. `GameConfig`: `level_radii = [25, 40, 60, 85, 115, 150, 190]`, `mass_exponent`. `orb_base_radius`·`orb_radius_growth` **제거**하고 참조를 모두 `radius_for_level()`로 바꾼다. `radius_for_level(level) = level_radii[level - 1]`, `mass_for_level(level) = orb_base_mass × (r / r_L1)^mass_exponent`
+  2. 테스트 기대값 갱신 (`test_config` 반지름 표 등). 물리 22시드 시나리오의 레벨 구성(1~4, 최악 4×4+1×4)은 그대로 쓴다
+  3. **측정 1단계 — 현재 안전 기준 그대로**: `mass_exponent` **2 / 1.5 / 1** 각각 독립 프로세스로 물리 22시드·겹침·20턴·120턴(fixed·실시간) 실행. 표 항목: 안전장치·사전 복구·유령 타임아웃 수, 이탈, 발산, 최대 관통(px), **최대 관통 ÷ 해당 구체 반지름**의 최대값과 그때 레벨, 120턴 잔여 구체 평균
+  4. **값은 Claude가 정한다** — 1단계 표를 회신하고 `상태: 질문`으로 멈춘다. `mass_exponent` 기본값과 안전 기준(`escape_guard_depth` 25, `wall_penetration_limit` 16, 테스트 관통 한도 12/16px)은 **바꾸지 않는다** (L1 반지름이 25가 되어 기준 재설정이 필요하다 — 측정 후 Claude가 지정)
+  5. 측정 동안 기본값은 `mass_exponent = 2` (기존 면적 비례와 같은 의미)
+  6. 사전 벽 복구마다 **마지막 유령 타임아웃 이후 물리 프레임 수**를 경고·표에 포함 (#12 가설: 타임아웃 보정은 `_integrate_forces`로 1프레임 뒤 적용되므로 "같은 프레임" 판정으로는 못 잡는다. 두 사례 모두 since_last_spawn 145 = 타임아웃 144 + 1)
+- 건드리지 말 것: `docs/` (회신 파일 제외), 물리 틱·접촉 설정, 성장·유령 값, 턴·반응 규칙
+- Done-when (1단계):
+  - [ ] 반지름 표 적용, 기존 공식 필드 제거, 전체 테스트가 새 반지름에서 통과하거나 실패 목록과 원인이 회신에 있다
+  - [ ] 3개 지수 × 측정 표
+- QA: 위 표, NEXT 미리보기·HUD가 새 크기로 보이는지 스모크
+- 커밋: 항목 단위 브랜치, push까지
+
+---
+
+## 처리 완료
+
+### [2026-09-30 #13] M7 점수·최고 점수·재시작 (게임오버 보류) — 완료
+- 상태: 완료 (2026-09-30 Claude 검수 통과 · [PR #13](https://github.com/jeongmo-dot/gravity_orb/pull/13) 병합 `76be3b6`)
+- 검수: 92/92, 점수 표·120턴 시드별 점수 Claude 재실행 일치. 기획 관찰: 규칙 B 120턴 점수 50~80·최대 연쇄 1~2·최고 레벨 3~4 → #14 이후 재확인. 수동 확인 보류
 - 근거: 기획서 5.2, [technical_design.md](technical_design.md) §5.10 `ScoreManager`, §8.2, §9 (`save.cfg`), §12 M7 (게임오버·경고는 보류). 기획서 0.3: 입력 대기 중 반응도 반응 시점에 점수 반영
 - 요구:
   - `GameConfig` M7 필드: `level_scores`([2,4,8,16,32,64,128]), `annihilation_score_factor`(0.5), `max_merge_bonus_factor`(5.0), 도우미 `score_for_level(level)`
@@ -67,27 +89,6 @@
 - QA: 테스트 결과, 120턴 회귀 점수 분포(시드별 최종 점수·max chain) 참고값
 - 수동 확인 절차: 합체·소멸 때 점수가 오르는지, 게임 재실행 후 BEST 유지, R키 재시작
 - 커밋: 항목 단위 브랜치, push까지
-
-### [2026-09-30 #14] 레벨별 반지름 표 + 질량 지수 + 안전 기준 재측정
-- 상태: 대기 (#13 다음)
-- 근거: 기획서 **0.4.2** 3.4 (사용자 결정: L1~L3 크기 차이가 안 보임), [technical_design.md](technical_design.md) §4 (`level_radii`, `mass_exponent`)
-- 요구:
-  1. `GameConfig`: `level_radii = [25, 40, 60, 85, 115, 150, 190]`, `mass_exponent`. `orb_base_radius`·`orb_radius_growth` **제거**하고 참조를 모두 `radius_for_level()`로 바꾼다. `radius_for_level(level) = level_radii[level - 1]`, `mass_for_level(level) = orb_base_mass × (r / r_L1)^mass_exponent`
-  2. 테스트 기대값 갱신 (`test_config` 반지름 표 등). 물리 22시드 시나리오의 레벨 구성(1~4, 최악 4×4+1×4)은 그대로 쓴다
-  3. **측정 1단계 — 현재 안전 기준 그대로**: `mass_exponent` **2 / 1.5 / 1** 각각 독립 프로세스로 물리 22시드·겹침·20턴·120턴(fixed·실시간) 실행. 표 항목: 안전장치·사전 복구·유령 타임아웃 수, 이탈, 발산, 최대 관통(px), **최대 관통 ÷ 해당 구체 반지름**의 최대값과 그때 레벨, 120턴 잔여 구체 평균
-  4. **값은 Claude가 정한다** — 1단계 표를 회신하고 `상태: 질문`으로 멈춘다. `mass_exponent` 기본값과 안전 기준(`escape_guard_depth` 25, `wall_penetration_limit` 16, 테스트 관통 한도 12/16px)은 **바꾸지 않는다** (L1 반지름이 25가 되어 기준 재설정이 필요하다 — 측정 후 Claude가 지정)
-  5. 측정 동안 기본값은 `mass_exponent = 2` (기존 면적 비례와 같은 의미)
-  6. 사전 벽 복구마다 **마지막 유령 타임아웃 이후 물리 프레임 수**를 경고·표에 포함 (#12 가설: 타임아웃 보정은 `_integrate_forces`로 1프레임 뒤 적용되므로 "같은 프레임" 판정으로는 못 잡는다. 두 사례 모두 since_last_spawn 145 = 타임아웃 144 + 1)
-- 건드리지 말 것: `docs/` (회신 파일 제외), 물리 틱·접촉 설정, 성장·유령 값, 턴·반응 규칙
-- Done-when (1단계):
-  - [ ] 반지름 표 적용, 기존 공식 필드 제거, 전체 테스트가 새 반지름에서 통과하거나 실패 목록과 원인이 회신에 있다
-  - [ ] 3개 지수 × 측정 표
-- QA: 위 표, NEXT 미리보기·HUD가 새 크기로 보이는지 스모크
-- 커밋: 항목 단위 브랜치, push까지
-
----
-
-## 처리 완료
 
 ### [2026-09-30 #12] 물리 보정 관측 카운터 + 기본 규칙 B — 완료
 - 상태: 완료 (2026-09-30 Claude 검수 통과 · [PR #12](https://github.com/jeongmo-dot/gravity_orb/pull/12) 병합 `09c41a3`)
