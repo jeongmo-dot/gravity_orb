@@ -70,3 +70,31 @@ func test_m5_plus_tuning_defaults() -> void:
 	assert_near(config.escape_guard_depth, 25.0, TOLERANCE, "escape guard depth")
 	assert_near(config.grow_duration, 0.06, TOLERANCE, "growth duration")
 	assert_near(config.grow_start_ratio, 0.3, TOLERANCE, "growth start ratio")
+
+
+func test_m6_annihilation_defaults() -> void:
+	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
+	assert_eq(config.opposite_pairs.size(), 1, "opposite pair count")
+	if config.opposite_pairs.size() == 1:
+		assert_eq(
+			config.opposite_pairs[0],
+			Vector2i(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE),
+			"default opposite pair"
+		)
+	assert_eq(
+		config.annihilation_rule,
+		GameConfig.AnnihilationRule.A_BOTH,
+		"default annihilation rule"
+	)
+	assert_true(
+		config.is_opposite(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE),
+		"opposite pair forward"
+	)
+	assert_true(
+		config.is_opposite(OrbTypes.OrbColor.BLUE, OrbTypes.OrbColor.RED),
+		"opposite pair reverse"
+	)
+	assert_true(
+		not config.is_opposite(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.GREEN),
+		"green is not opposite"
+	)

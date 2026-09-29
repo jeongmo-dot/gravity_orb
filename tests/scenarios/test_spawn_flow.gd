@@ -3,7 +3,9 @@ extends TestCase
 const BOARD_SCENE: PackedScene = preload("res://scenes/Board.tscn")
 const SPAWNER_SCRIPT: Script = preload("res://scripts/core/Spawner.gd")
 const TURN_MANAGER_SCRIPT: Script = preload("res://scripts/core/TurnManager.gd")
-const COLLISION_RESOLVER_SCRIPT: Script = preload("res://scripts/core/CollisionResolver.gd")
+const COLLISION_RESOLVER_SCRIPT: Script = preload(
+	"res://tests/support/PassiveCollisionResolver.gd"
+)
 const HIGH_THRESHOLD: float = 1.0e9
 const WAIT_TIMEOUT_SECONDS: float = 8.0
 const POSITION_TOLERANCE: float = 0.001

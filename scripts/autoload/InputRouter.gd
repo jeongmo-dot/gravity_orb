@@ -1,6 +1,7 @@
 extends Node
 
 signal swipe(direction: Vector2i)
+signal debug_cycle_annihilation_rule
 
 enum PointerSource { NONE, MOUSE, TOUCH }
 
@@ -32,6 +33,13 @@ func _handle_event(event: InputEvent) -> void:
 
 
 func _handle_keyboard(event: InputEvent) -> bool:
+	# TEMP(M6): M9 디버그 패널이 규칙 선택을 대체할 때 제거한다.
+	if (
+		OS.is_debug_build()
+		and event.is_action_pressed(&"debug_cycle_annihilation_rule", false)
+	):
+		debug_cycle_annihilation_rule.emit()
+		return true
 	if _locked:
 		return false
 	if event.is_action_pressed(&"gravity_up", false):

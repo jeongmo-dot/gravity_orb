@@ -38,6 +38,41 @@
 
 ## 미확인
 
+### [2026-09-29] 대상 #10 — M6 상극 소멸
+- 상태: 완료
+- 브랜치 / PR: `m6-annihilation` / push 완료, PR 미생성
+- 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, `project.godot`, `scripts/autoload/InputRouter.gd`, `scripts/core/CollisionResolver.gd`, `scripts/core/Main.gd`, `scripts/core/ReactionRules.gd`, `scripts/core/TurnManager.gd`, `scripts/ui/DebugHud.gd`, `tests/test_config.gd`, `tests/test_input_router.gd`, `tests/test_rules.gd`, `tests/scenarios/test_annihilation_scenario.gd`, `tests/scenarios/test_merge_scenario.gd`, `tests/scenarios/test_spawn_flow.gd`, `tests/scenarios/test_turn_manager.gd`, `tests/support/PassiveCollisionResolver.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 빨강↔파랑 규칙 A 전 레벨 49조합 소멸, 규칙 B 같은 레벨만 소멸, 규칙 C 차이 레벨 잔존 — `test_rules.gd` 자동 검증
+  - [x] 초록은 상극 반응 없음, 같은 초록·같은 레벨 합체 유지 — `test_green_is_not_opposite_under_any_rule`
+  - [x] 같은 색 합체 우선순위 유지 — `(RED, RED)`를 상극 목록에 넣어도 같은 레벨 빨강은 MERGE 자동 검증
+  - [x] 규칙 변경을 매 `classify`/`flush` 시점에 읽어 다음 충돌부터 즉시 적용 — 순수 규칙·시나리오 자동 검증
+  - [x] 규칙 C 잔존체가 큰 쪽의 색·위치·속도, 차이 레벨, `generation = chain`으로 생성 — 시나리오 자동 검증
+  - [x] 합체 후 소멸 연쇄 순서 `[1, 2]`, 최종 구체 0개 — `test_merge_then_annihilation_reports_chain_one_two`
+  - [x] 정지 접촉 규칙 B→A 전환 뒤 `sweep_resting_contacts()` 적용 수 1, 최종 구체 0개 — `test_sweep_rechecks_resting_pair_after_rule_change`
+  - [x] 안정 종료 직전 스윕 반응 시 settle 연장, 1.5초 상한에서는 스윕 결과와 무관하게 종료 — `TurnManager` 구현 및 전체 턴 회귀
+  - [x] 디버그 빌드 F2 입력 신호와 A→B→C 순환, `Rule: A/B/C` 라벨 추가 — 신호 자동 검증, 실제 라벨·플레이 반응은 아래 수동 절차
+  - [x] §10.1 명령 3종 종료 코드 0, 전체 71/71 통과, `SCRIPT ERROR`·`Parse Error` 0건
+- QA 관측값:
+  - 상극 시나리오 → 규칙 A `반응 1 / 구체 0`, 규칙 B 다른 레벨 `반응 0 / 구체 2`, 규칙 C 빨강 L4+파랑 L1 `빨강 L3 / generation 1`, 즉시 규칙 전환의 두 번째 충돌 `반응 0`
+  - 소멸 연쇄 → chain `[1, 2]`, 최종 구체 0; 정지 접촉 스윕 → 적용 수 1
+  - 22시드 물리 회귀 → 중심 이탈 0, 안전장치 0, 최대 관통 8.517px, 최대 속도 1976.520px/s
+  - 겹침 생성 회귀 → 중심 이탈 0, 안전장치 0, 최대 관통 9.465px, 최대 속도 1142.404px/s
+  - 20턴 생성 회귀 → 20/20 완료, 최종 구체 22개(반응 격리 픽스처), 중심 이탈 0, 안전장치 0, 최대 관통 7.747px
+  - 기본 규칙 A 120턴 회귀 → 120/120 입력 복귀, 상한 도달 117회, 평균 1.497812초, 최대 1.504167초, 중심 이탈 0, 안전장치 0, 최대 관통 15.507px, 최대 잔여 속도 942.110px/s, 최종 구체 수 평균 3.333, 위치·속도 발산 0
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . -s res://tests/run_tests.gd` → 71/71 통과, 종료 코드 0
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --quit-after 300` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 정적 검사 → `Input`/`InputEvent` 참조는 `InputRouter.gd`만, 난수 API는 `Spawner.gd`만
+- 수동 확인 절차:
+  1. 디버그 빌드로 프로젝트를 실행한다 → 디버그 라벨에 기본 `Rule: A`가 표시되는지 본다.
+  2. F2를 세 번 누른다 → 라벨이 `B → C → A` 순서로 즉시 바뀌는지 본다. settle 중 F2도 같은 방식으로 바뀌어야 한다.
+  3. Rule A에서 빨강·파랑을 접촉시킨다 → 레벨과 무관하게 둘 다 사라지는지, 초록이 포함된 접촉은 사라지지 않는지 본다.
+  4. Rule B에서 서로 다른 레벨 빨강·파랑을 접촉시킨다 → 둘 다 남고, 같은 레벨끼리는 둘 다 사라지는지 본다.
+  5. Rule C에서 서로 다른 레벨 빨강·파랑을 접촉시킨다 → 큰 쪽 색으로 레벨 차이 구체 하나가 큰 쪽 위치에 남는지 본다.
+- 결정 사항: M6 스윕 도입 뒤 기존 생성/M3 전용 테스트가 의도적으로 끊어 둔 충돌 신호를 스윕이 다시 수집하므로, 해당 두 테스트 픽스처만 `tests/support/PassiveCollisionResolver.gd`로 반응을 격리했다. 게임 리졸버와 실제 120턴 회귀는 기본 M6 스윕을 사용한다. 그 외 문서 밖 게임 동작·수치 결정 없음.
+- 남은 것 · 질문: 자동 완료 조건은 충족. 실제 창에서 색 접촉과 F2 라벨 전환의 시각 확인은 위 수동 절차로 남는다.
+
 ### [2026-09-29] 대상 #9 추가 요구 1 — 0.06/0.3 채택 및 fixed 0.20/0.3 발산 조사
 - 상태: 완료
 - 브랜치 / PR: `m5-orb-growth` / PR 미생성

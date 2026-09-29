@@ -80,11 +80,15 @@ func _physics_process(delta: float) -> void:
 	else:
 		_stable_time = 0.0
 
-	if _stable_time >= Config.data.stable_duration:
-		_on_settled()
-	elif _settle_elapsed >= Config.data.max_settle_time:
+	if _settle_elapsed >= Config.data.max_settle_time:
+		_collision_resolver.sweep_resting_contacts()
 		if not _is_initial_settle:
 			capped_turn_count += 1
+		_on_settled()
+	elif _stable_time >= Config.data.stable_duration:
+		if _collision_resolver.sweep_resting_contacts() > 0:
+			_stable_time = 0.0
+			return
 		_on_settled()
 
 

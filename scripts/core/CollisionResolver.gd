@@ -16,6 +16,17 @@ func report_contact(a: Orb, b: Orb) -> void:
 	_pending.append([a, b])
 
 
+func sweep_resting_contacts() -> int:
+	for a: Orb in _board.get_orbs():
+		for body: Node2D in a.get_colliding_bodies():
+			var b: Orb = body as Orb
+			if b == null or b.consumed:
+				continue
+			if a.get_instance_id() < b.get_instance_id():
+				report_contact(a, b)
+	return flush()
+
+
 func flush() -> int:
 	var pending: Array[Array] = _pending
 	_pending = []
@@ -49,6 +60,7 @@ func flush() -> int:
 		var reaction_position: Vector2 = (position_a + position_b) * 0.5
 		var result_level: int = int(classified["result_level"])
 		var result_color: int = int(classified["result_color"])
+		var survivor: int = int(classified["survivor"])
 		var result_orb: Orb = null
 
 		_board.remove_orb(a)
@@ -61,6 +73,16 @@ func flush() -> int:
 				result_level,
 				reaction_position,
 				(velocity_a + velocity_b) * 0.5,
+				chain
+			)
+		elif reaction_type == ReactionRules.Type.ANNIHILATE and survivor != 0:
+			reaction_position = position_a if survivor == 1 else position_b
+			var survivor_velocity: Vector2 = velocity_a if survivor == 1 else velocity_b
+			result_orb = _board.spawn_orb(
+				result_color,
+				result_level,
+				reaction_position,
+				survivor_velocity,
 				chain
 			)
 

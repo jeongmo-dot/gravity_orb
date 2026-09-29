@@ -2,6 +2,7 @@ class_name GameConfig
 extends Resource
 
 enum SpawnPositionMode { RANDOM, CENTER }
+enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 
 @export var board_size: float = 960.0
 @export var wall_thickness: float = 256.0
@@ -40,6 +41,10 @@ enum SpawnPositionMode { RANDOM, CENTER }
 @export var escape_guard_depth: float = 25.0
 @export var grow_duration: float = 0.06
 @export var grow_start_ratio: float = 0.3
+@export var opposite_pairs: Array[Vector2i] = [
+	Vector2i(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE),
+]
+@export var annihilation_rule: AnnihilationRule = AnnihilationRule.A_BOTH
 
 
 func radius_for_level(level: int) -> float:
@@ -49,3 +54,10 @@ func radius_for_level(level: int) -> float:
 func mass_for_level(level: int) -> float:
 	var radius_ratio: float = radius_for_level(level) / orb_base_radius
 	return orb_base_mass * radius_ratio * radius_ratio
+
+
+func is_opposite(c1: int, c2: int) -> bool:
+	for pair: Vector2i in opposite_pairs:
+		if (pair.x == c1 and pair.y == c2) or (pair.x == c2 and pair.y == c1):
+			return true
+	return false

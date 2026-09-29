@@ -65,12 +65,12 @@ func test_three_simultaneous_contacts_apply_exactly_one_merge() -> void:
 	await _cleanup_fixture(fixture)
 
 
-func test_nonmatching_pairs_do_not_merge() -> void:
+func test_nonmatching_pairs_do_not_react() -> void:
 	var color_fixture: Dictionary = await _create_fixture()
 	var color_board: Board = color_fixture["board"] as Board
 	var color_resolver: CollisionResolver = color_fixture["resolver"] as CollisionResolver
 	color_board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(-49.5, 0.0))
-	color_board.spawn_orb(OrbTypes.OrbColor.BLUE, 1, Vector2(49.5, 0.0))
+	color_board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(49.5, 0.0))
 	var color_applied: int = await _advance_and_flush(
 		color_board,
 		color_resolver,

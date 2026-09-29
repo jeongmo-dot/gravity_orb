@@ -39,3 +39,5 @@ floor_contact_tolerance = 2.0
 escape_guard_depth = 25.0
 grow_duration = 0.06
 grow_start_ratio = 0.3
+opposite_pairs = Array[Vector2i]([Vector2i(0, 1)])
+annihilation_rule = 0
