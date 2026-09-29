@@ -259,7 +259,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M5+ | `wall_penetration_limit` | float | 16.0 | 사전 벽 복구: 관통이 이 값을 넘으면 25px 안전장치 전에 경계로 복구 (#11, 사용자 승인). 회귀 테스트는 발동 0 요구 (#12) |
 | M5+ | `escape_guard_depth` | float | 25.0 | 벽 관통이 이 깊이를 넘으면 경계로 되돌리는 안전장치 (회귀 테스트는 발동 0 요구) |
 | M6 | `opposite_pairs` | Array[Vector2i] | [(RED, BLUE)] | 상극 쌍 (순서 무관) |
-| M6 | `annihilation_rule` | AnnihilationRule | A_BOTH | |
+| M6 | `annihilation_rule` | AnnihilationRule | A_BOTH → **B_SAME_LEVEL** (2026-09-30 플레이테스트, 기획서 0.4.1) | |
 | M7 | `level_scores` | PackedInt32Array | [2,4,8,16,32,64,128] | 인덱스 0 = 레벨1 |
 | M7 | `annihilation_score_factor` | float | 0.5 | |
 | M7 | `max_merge_bonus_factor` | float | 5.0 | |
