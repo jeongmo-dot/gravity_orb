@@ -240,7 +240,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M3 | `stable_linear_speed` | float | 12.0 → #8에서 30.0 | 안정 판정 선속도 임계값 (px/s) |
 | M3 | `stable_angular_speed` | float | 1.0 → #8에서 3.0 | 안정 판정 각속도 임계값 (rad/s) |
 | M3 | `stable_duration` | float | 0.33 | 임계값 이하가 연속 유지되어야 하는 시간 (초, 스케일된 시간). 물리 틱 수와 무관하게 초 단위로 정한다 |
-| M3 | `max_settle_time` | float | 3.0 | 강제 안정까지 최대 대기 (초, 스케일된 시간) |
+| M3 | `max_settle_time` | float | 3.0 → **1.5** (기획서 0.3) | 턴 최대 길이 (초, 스케일된 시간). 도달하면 움직임이 남아도 턴 종료 — 정상 동작 |
 | M3 | `allow_same_direction_swipe` | bool | true | 11.1 참조 |
 | M4 | `spawn_level_weights` | PackedFloat32Array | [0.9, 0.1] | 인덱스 0 = 레벨1 |
 | M4 | `spawn_color_weights` | PackedFloat32Array | [1, 1, 1] | 인덱스 = 색 |
@@ -249,7 +249,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M4 | `rng_seed` | int | 0 | 0이면 시작 시 무작위 시드를 뽑아 기록 |
 | M4 | `initial_orb_count` | int | 2 | |
 | M5 | `contact_max_reported` | int | 6 | `Orb.max_contacts_reported` |
-| M5+ | `rolling_resistance` | float | #8에서 결정 | 바닥(중력 쪽 벽) 접촉 구체의 중력 수직 속도 감속 = 값 × `gravity_strength`. 힘으로 건다 |
+| M5+ | `rolling_resistance` | float | **0.0** (#8 결론: 비활성) | 바닥(중력 쪽 벽) 접촉 구체의 중력 수직 속도 감속 = 값 × `gravity_strength`. 힘으로 건다 |
 | M5+ | `rest_speed` / `rest_damp` | float | 0 / 0 | 저속 제동 (0이면 비활성) |
 | M5+ | `floor_contact_tolerance` | float | 2.0 | 바닥 접촉 기하 판정 여유 (px) |
 | M5+ | `escape_guard_depth` | float | 25.0 | 벽 관통이 이 깊이를 넘으면 경계로 되돌리는 안전장치 (회귀 테스트는 발동 0 요구) |
@@ -529,15 +529,18 @@ SPAWNING (1 물리 프레임):                  # 기획서 0.2: 스와이프 �
     Spawner.try_spawn(board, gravity)       # 새 중력의 반대편 벽, 무작위 위치, 겹침 검사 없음
     _begin_settle(); → SIMULATING
 
+모든 상태 공통 (매 물리 프레임, 기획서 0.3):
+    CollisionResolver.flush()               # 입력 대기 중에도 반응을 즉시 처리 (남은 움직임이 턴을 넘어 이어짐)
+
 SIMULATING settle 루프 (매 물리 프레임):
-    if CollisionResolver.flush() > 0: stable_time = 0.0
+    if 이번 프레임 flush 적용 수 > 0: stable_time = 0.0
     settle_elapsed += delta                 # 스케일된 시간
     if _all_below_threshold(): stable_time += delta else: stable_time = 0.0
     if stable_time >= cfg.stable_duration:
         if CollisionResolver.sweep_resting_contacts() > 0: stable_time = 0.0; return
         _on_settled()
     elif settle_elapsed >= cfg.max_settle_time:
-        push_warning("forced settle"); _on_settled()
+        _on_settled()                       # 시간 상한 도달 — 정상 동작, 경고 없음. 횟수는 통계로만 센다
 
 _on_settled():
     → CHECK_GAMEOVER
@@ -550,6 +553,7 @@ CHECK_GAMEOVER (1프레임):
 
 - `_all_below_threshold()`: 모든 Orb에 대해 `linear_velocity.length() <= stable_linear_speed` 그리고 `absf(angular_velocity) <= stable_angular_speed`. Orb가 0개면 true.
 - `_begin_settle()`: `stable_time = 0.0`, `settle_elapsed = 0.0`.
+- **연쇄의 턴 귀속** (기획서 0.3): 입력 재개 후 일어난 반응은 `generation`이 다음 스와이프까지 유지되므로 직전 턴의 연쇄로 이어서 센다. `turn_max_chain`은 다음 `on_swipe`에서 0으로 초기화되기 전까지 갱신될 수 있다 (`turn_finished`에 실린 값보다 커질 수 있음). 점수(M7)는 반응 시점에 즉시 더하므로 귀속 문제가 없다.
 - `start_game()`: 중력 DOWN → 초기 구체 생성 → settle(`SIMULATING` 재사용, `_is_initial_settle = true`면 `_on_settled`에서 생성 단계를 건너뛰고 바로 `WAITING_INPUT`).
 - **M3 시점**: `SPAWNING`, `CHECK_GAMEOVER`는 즉시 통과. `flush`/`sweep`/`try_spawn` 호출은 해당 마일스톤에서 추가.
 - **변경 이력**: M4(PR #5)는 "안정 후 생성 → SPAWNING settle" 순서로 구현됐다. 기획서 0.2에서 스와이프 순간 생성으로 바뀌어 인박스 #6에서 위 흐름으로 교체한다. SPAWNING은 이제 1프레임 상태다.
@@ -786,6 +790,9 @@ M4 검수(2026-09-28)에서 발견. 합체가 없는 M4 상태에서 **이동·�
 - 결론: **구름 저항**이 필요하다. 접촉 중인 구체의 속도 중 **중력에 수직인 성분**에만 일정 감속을 건다 (낙하 속도는 유지). 필요하면 저속 제동을 함께 쓴다. 인박스 #8.
 - **#8 결과 (2026-09-29)**: 구름 저항은 속도 대입이 아니라 **힘·토크**로 건다 (속도 대입은 솔버 보정을 지워 관통 12px·이탈 발생). 12조합 스윕 후 기본값 `rolling_resistance 1.0`, 저속 제동 없음, 임계 30/3 지정 → 120턴 강제 0, p50 1.73초, p90 2.05초. 관통 기준 10 → 12px.
 - **알려진 위험 — 물리 여유 부족**: 저항이 클수록 관통이 늘고(10~16px), 12조합 중 4개에서 20턴 중 이탈 1건이 났다. 지정 조합은 0건이지만 여유가 작다. 후속 후보: 관통 안전 보정(중심이 보드 밖이면 안쪽으로 되돌림), 벽 CCD·충돌 여유, `gravity_strength` 하향과 턴 시간 재측정. M9 전 별도 항목으로 다룬다.
+- **최종 결론 (2026-09-29, 사용자 결정)**: 구름 저항 방식은 폐기한다. 바닥 한정으로 바꾸자 시간 개선이 거의 사라졌고(p50 2.2~2.4초), 저항 0에서도 20턴 회귀에 25px 초과 관통(안전장치 발동)이 있음이 드러났다 — 관통은 구름 저항과 별개인 기존 물리 약점이다. 두 문제를 분리한다:
+  - **턴 시간 → 규칙으로 해결**: 기획서 0.3, `max_settle_time` 1.5초 상한. 움직임이 남아도 턴을 끝낸다. `rolling_resistance` 0, 임계 30/3 유지
+  - **물리 안정성 → 별도 항목**: 이탈 안전장치(`escape_guard_depth` 25px)는 실제 플레이 보호막으로 유지. 관통 원인 조사는 후속 항목
 
 ### M6. 상극 소멸
 - `opposite_pairs`, `annihilation_rule`, `is_opposite` 추가. `ReactionRules`에 ANNIHILATE (5.8 표 전체).
