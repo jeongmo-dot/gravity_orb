@@ -41,6 +41,10 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 @export var escape_guard_depth: float = 25.0
 @export var grow_duration: float = 0.06
 @export var grow_start_ratio: float = 0.3
+@export var ghost_exit_overlap: float = 4.0
+@export var ghost_max_time: float = 0.6
+@export var ghost_alpha: float = 0.55
+@export var wall_penetration_limit: float = 16.0
 @export var opposite_pairs: Array[Vector2i] = [
 	Vector2i(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE),
 ]

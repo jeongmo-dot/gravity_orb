@@ -10,6 +10,8 @@ var color: int
 var level: int
 var generation: int = 0
 var consumed: bool = false
+var is_ghost: bool = false
+var ghost_elapsed: float = 0.0
 var _radius: float = 0.0
 var _current_radius: float = 0.0
 var _growth_start_radius: float = 0.0
@@ -21,6 +23,9 @@ var _last_escape_guard_physics_frame: int = -1
 var _gravity_direction: Vector2 = Vector2.DOWN
 var _rest_braking_active: bool = false
 var _last_rolling_resistance_force: Vector2 = Vector2.ZERO
+var _timeout_correction_pending: bool = false
+var _timeout_corrected_position: Vector2 = Vector2.ZERO
+var _timeout_corrected_velocity: Vector2 = Vector2.ZERO
 
 
 func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
@@ -66,6 +71,37 @@ func get_current_radius() -> float:
 	return _current_radius
 
 
+func enter_ghost_state(alpha: float) -> void:
+	is_ghost = true
+	ghost_elapsed = 0.0
+	collision_layer = 4
+	collision_mask = 1
+	_visual.set_alpha(alpha)
+
+
+func exit_ghost_state() -> void:
+	is_ghost = false
+	collision_layer = 2
+	collision_mask = 3
+	_visual.set_alpha(1.0)
+
+
+func advance_ghost(delta: float) -> void:
+	if is_ghost:
+		ghost_elapsed += delta
+
+
+func queue_timeout_correction(
+	corrected_position: Vector2,
+	corrected_velocity: Vector2
+) -> void:
+	_timeout_correction_pending = true
+	_timeout_corrected_position = corrected_position
+	_timeout_corrected_velocity = corrected_velocity
+	position = corrected_position
+	linear_velocity = corrected_velocity
+
+
 func note_board_spawn(physics_frame: int) -> void:
 	_last_board_spawn_physics_frame = physics_frame
 
@@ -73,6 +109,55 @@ func note_board_spawn(physics_frame: int) -> void:
 func set_gravity(direction: Vector2i, strength: float) -> void:
 	_gravity_direction = Vector2(direction)
 	constant_force = _gravity_direction * strength * mass
+
+
+func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
+	if _timeout_correction_pending:
+		_timeout_correction_pending = false
+		var timeout_transform: Transform2D = state.transform
+		var timeout_parent: Node2D = get_parent() as Node2D
+		timeout_transform.origin = (
+			_timeout_corrected_position
+			if timeout_parent == null
+			else timeout_parent.to_global(_timeout_corrected_position)
+		)
+		state.transform = timeout_transform
+		state.linear_velocity = _timeout_corrected_velocity
+	_apply_proactive_wall_recovery(state)
+
+
+func _apply_proactive_wall_recovery(state: PhysicsDirectBodyState2D) -> void:
+	var parent_2d: Node2D = get_parent() as Node2D
+	var local_position: Vector2 = (
+		state.transform.origin
+		if parent_2d == null
+		else parent_2d.to_local(state.transform.origin)
+	)
+	var corrected_position: Vector2 = local_position
+	var corrected_velocity: Vector2 = state.linear_velocity
+	var half: float = Config.data.board_size * 0.5
+	var center_limit: float = maxf(half - _current_radius, 0.0)
+	var corrected: bool = false
+	for axis_index: int in range(2):
+		var coordinate: float = local_position[axis_index]
+		var penetration: float = absf(coordinate) - center_limit
+		if penetration <= Config.data.wall_penetration_limit:
+			continue
+		var wall_sign: float = signf(coordinate)
+		corrected_position[axis_index] = wall_sign * center_limit
+		if corrected_velocity[axis_index] * wall_sign > 0.0:
+			corrected_velocity[axis_index] = 0.0
+		corrected = true
+	if not corrected:
+		return
+	var corrected_transform: Transform2D = state.transform
+	corrected_transform.origin = (
+		corrected_position
+		if parent_2d == null
+		else parent_2d.to_global(corrected_position)
+	)
+	state.transform = corrected_transform
+	state.linear_velocity = corrected_velocity
 
 
 func _physics_process(delta: float) -> void:
