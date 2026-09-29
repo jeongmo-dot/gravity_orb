@@ -39,10 +39,10 @@ func test_m2_swipe_defaults() -> void:
 
 func test_m3_turn_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
-	assert_near(config.stable_linear_speed, 12.0, TOLERANCE, "stable linear speed")
-	assert_near(config.stable_angular_speed, 1.0, TOLERANCE, "stable angular speed")
+	assert_near(config.stable_linear_speed, 30.0, TOLERANCE, "stable linear speed")
+	assert_near(config.stable_angular_speed, 3.0, TOLERANCE, "stable angular speed")
 	assert_near(config.stable_duration, 0.33, TOLERANCE, "stable duration")
-	assert_near(config.max_settle_time, 3.0, TOLERANCE, "maximum settle time")
+	assert_near(config.max_settle_time, 1.5, TOLERANCE, "maximum settle time")
 	assert_eq(config.allow_same_direction_swipe, true, "same direction default")
 
 
@@ -59,3 +59,12 @@ func test_m4_spawn_defaults() -> void:
 func test_m5_contact_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	assert_eq(config.contact_max_reported, 6, "maximum reported contacts")
+
+
+func test_m5_plus_tuning_defaults() -> void:
+	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
+	assert_near(config.rolling_resistance, 0.0, TOLERANCE, "rolling resistance")
+	assert_near(config.rest_speed, 0.0, TOLERANCE, "rest speed")
+	assert_near(config.rest_damp, 0.0, TOLERANCE, "rest damping")
+	assert_near(config.floor_contact_tolerance, 2.0, TOLERANCE, "floor contact tolerance")
+	assert_near(config.escape_guard_depth, 25.0, TOLERANCE, "escape guard depth")

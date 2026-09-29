@@ -22,6 +22,7 @@ func test_t1_start_game_settles_without_starting_turn() -> void:
 
 	assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "initial state after settle")
 	assert_eq(manager.turn_index, 0, "initial settle must not start a turn")
+	assert_eq(manager.capped_turn_count, 0, "initial settle is not a capped turn")
 	assert_eq(InputRouter.is_locked(), false, "input unlocked after initial settle")
 	await _cleanup_fixture(fixture, snapshot)
 
@@ -111,7 +112,7 @@ func test_t4_stable_duration_uses_scaled_seconds() -> void:
 	await _cleanup_fixture(fixture, snapshot)
 
 
-func test_t5_unstable_motion_forces_settle_at_maximum_time() -> void:
+func test_t5_unstable_motion_caps_turn_at_maximum_time() -> void:
 	var snapshot: Dictionary = _snapshot_m3_config()
 	Config.data.stable_linear_speed = HIGH_THRESHOLD
 	Config.data.stable_angular_speed = HIGH_THRESHOLD
@@ -126,7 +127,7 @@ func test_t5_unstable_motion_forces_settle_at_maximum_time() -> void:
 	var tick_seconds: float = 1.0 / float(Engine.physics_ticks_per_second)
 	var elapsed_ticks: int = roundi(elapsed * float(Engine.physics_ticks_per_second))
 	print(
-		"TurnManager T5 forced settle: elapsed=%.6f ticks=%d target=%.2f" % [
+		"TurnManager T5 capped turn: elapsed=%.6f ticks=%d target=%.2f" % [
 			elapsed,
 			elapsed_ticks,
 			Config.data.max_settle_time,
@@ -134,9 +135,10 @@ func test_t5_unstable_motion_forces_settle_at_maximum_time() -> void:
 	)
 	assert_true(
 		absf(elapsed - Config.data.max_settle_time) <= tick_seconds,
-		"forced settle within one physics tick"
+		"capped turn within one physics tick"
 	)
-	assert_eq(manager.turn_index, 1, "forced settle completes the turn")
+	assert_eq(manager.turn_index, 1, "capped turn completes the turn")
+	assert_eq(manager.capped_turn_count, 1, "capped turn count")
 	await _cleanup_fixture(fixture, snapshot)
 
 

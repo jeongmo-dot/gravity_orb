@@ -20,8 +20,6 @@ func _run_all_tests() -> void:
 	var total: int = _passed + _failed
 	print("Tests: %d passed, %d failed, %d total" % [_passed, _failed, total])
 	quit(1 if _failed > 0 else 0)
-
-
 func _run_directory(directory: String) -> void:
 	var files: PackedStringArray = DirAccess.get_files_at(directory)
 	files.sort()

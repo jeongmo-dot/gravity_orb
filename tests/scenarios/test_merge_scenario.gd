@@ -206,6 +206,88 @@ func test_turn_manager_finishes_turn_after_merge() -> void:
 	_restore_turn_config(snapshot)
 
 
+func test_waiting_input_flush_continues_previous_turn_chain() -> void:
+	var snapshot: Dictionary = _snapshot_turn_config()
+	Config.data.stable_linear_speed = HIGH_THRESHOLD
+	Config.data.stable_angular_speed = HIGH_THRESHOLD
+	var fixture: Dictionary = await _create_fixture()
+	var board: Board = fixture["board"] as Board
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var spawner: Spawner = fixture["spawner"] as Spawner
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	spawner.init_rng(5010)
+	var initial_count: int = Config.data.initial_orb_count
+	Config.data.initial_orb_count = 0
+	spawner.spawn_initial(board, Vector2i.DOWN)
+	Config.data.initial_orb_count = initial_count
+	manager.turn_finished.connect(_record_turn_finished)
+	manager.start_game()
+	await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
+
+	board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		1,
+		Vector2(-80.0, 0.0),
+		Vector2(400.0, 0.0)
+	)
+	board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		1,
+		Vector2(80.0, 0.0),
+		Vector2(-400.0, 0.0)
+	)
+	manager.on_swipe(Vector2i.DOWN)
+	await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
+
+	var chain_result: Orb = null
+	for reaction_index: int in range(_reactions.size() - 1, -1, -1):
+		var candidate: Orb = _reactions[reaction_index]["result_orb"] as Orb
+		if candidate != null and is_instance_valid(candidate) and not candidate.consumed:
+			chain_result = candidate
+			break
+	assert_true(chain_result != null, "turn leaves a merge result for waiting-input chain")
+	if chain_result == null:
+		await _cleanup_fixture(fixture)
+		_restore_turn_config(snapshot)
+		return
+
+	var finished_chain: int = manager.turn_max_chain
+	var expected_chain: int = chain_result.generation + 1
+	var result_radius: float = chain_result.get_radius()
+	chain_result.position = Vector2(-result_radius + 0.5, 0.0)
+	chain_result.linear_velocity = Vector2.ZERO
+	chain_result.angular_velocity = 0.0
+	var reaction_count_before: int = _reactions.size()
+	var waiting_partner: Orb = board.spawn_orb(
+		chain_result.color,
+		chain_result.level,
+		Vector2(result_radius - 0.5, 0.0)
+	)
+	resolver.report_contact(chain_result, waiting_partner)
+
+	for _frame: int in range(120):
+		if _reactions.size() > reaction_count_before:
+			break
+		await tree.physics_frame
+	assert_true(
+		_reactions.size() > reaction_count_before,
+		"waiting input emits reaction_applied"
+	)
+	assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "reaction keeps waiting state")
+	assert_true(expected_chain > finished_chain, "waiting reaction continues finished chain")
+	assert_eq(manager.turn_max_chain, expected_chain, "waiting reaction updates turn maximum")
+	if _reactions.size() > reaction_count_before:
+		var waiting_reaction: Dictionary = _reactions[_reactions.size() - 1]
+		assert_eq(int(waiting_reaction["chain"]), expected_chain, "waiting reaction chain")
+		var waiting_result: Orb = waiting_reaction["result_orb"] as Orb
+		assert_true(waiting_result != null, "waiting reaction result orb")
+		if waiting_result != null:
+			assert_eq(waiting_result.generation, expected_chain, "waiting result generation")
+
+	await _cleanup_fixture(fixture)
+	_restore_turn_config(snapshot)
+
+
 func _create_fixture() -> Dictionary:
 	InputRouter.set_locked(false)
 	_reset_records()
@@ -248,13 +330,12 @@ func _create_fixture() -> Dictionary:
 	}
 
 
-func _advance_and_flush(resolver: CollisionResolver, seconds: float) -> int:
-	var applied: int = 0
+func _advance_and_flush(_resolver: CollisionResolver, seconds: float) -> int:
+	var reaction_count_before: int = _reactions.size()
 	var frame_count: int = ceili(float(Engine.physics_ticks_per_second) * seconds)
 	for _frame: int in range(frame_count):
 		await tree.physics_frame
-		applied += resolver.flush()
-	return applied
+	return _reactions.size() - reaction_count_before
 
 
 func _wait_for_state(manager: TurnManager, target: TurnManager.State) -> void:

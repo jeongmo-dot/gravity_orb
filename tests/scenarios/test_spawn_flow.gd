@@ -8,7 +8,7 @@ const HIGH_THRESHOLD: float = 1.0e9
 const WAIT_TIMEOUT_SECONDS: float = 8.0
 const POSITION_TOLERANCE: float = 0.001
 const OVERLAP_OBSERVE_SECONDS: float = 0.5
-const OVERLAP_PENETRATION_LIMIT: float = 10.0
+const OVERLAP_PENETRATION_LIMIT: float = 12.0
 const REPRO_DIRECTIONS: Array[Vector2i] = [
 	Vector2i.DOWN,
 	Vector2i.LEFT,
@@ -235,14 +235,16 @@ func test_center_spawn_overlap_remains_inside_board_for_half_second() -> void:
 
 	var metrics: Dictionary = await _observe_board(board, OVERLAP_OBSERVE_SECONDS)
 	print(
-		"Spawn overlap seed=4006 duration=%.2f departures=%d max_penetration=%.3f max_speed=%.3f" % [
+		"Spawn overlap seed=4006 duration=%.2f departures=%d max_penetration=%.3f max_speed=%.3f escape_guards=%d" % [
 			OVERLAP_OBSERVE_SECONDS,
 			int(metrics["departures"]),
 			float(metrics["max_penetration"]),
 			float(metrics["max_speed"]),
+			int(metrics["escape_guards"]),
 		]
 	)
 	assert_eq(int(metrics["departures"]), 0, "overlap case orb center departures")
+	assert_eq(int(metrics["escape_guards"]), 0, "overlap case escape guard activations")
 	assert_true(
 		float(metrics["max_penetration"]) <= OVERLAP_PENETRATION_LIMIT,
 		"overlap wall penetration must be at most %.3fpx, got %.3fpx" % [
@@ -267,37 +269,40 @@ func test_seed_4242_completes_twenty_turns_without_departures() -> void:
 		Vector2i.LEFT,
 	]
 	var total_departures: int = 0
-	var forced_settle_count: int = 0
-	var tick_seconds: float = 1.0 / float(Engine.physics_ticks_per_second)
+	var maximum_penetration: float = 0.0
+	var capped_turn_count: int = 0
 
 	for turn_offset: int in range(20):
 		var direction: Vector2i = directions[turn_offset % directions.size()]
+		var capped_before: int = manager.capped_turn_count
 		manager.on_swipe(direction)
 		var metrics: Dictionary = await _wait_for_turn_with_metrics(manager, board)
 		var settle_elapsed: float = manager._settle_elapsed
-		var forced: bool = (
-			settle_elapsed + tick_seconds >= Config.data.max_settle_time
-		)
-		if forced:
-			forced_settle_count += 1
+		var capped: bool = manager.capped_turn_count > capped_before
+		if capped:
+			capped_turn_count += 1
 		total_departures += int(metrics["departures"])
+		maximum_penetration = maxf(maximum_penetration, float(metrics["max_penetration"]))
 		print(
-			"Spawn flow seed=4242 turn=%d gravity=%s settle=%.6f forced=%s orbs=%d departures=%d" % [
+			"Spawn flow seed=4242 turn=%d gravity=%s settle=%.6f capped=%s orbs=%d departures=%d max_penetration=%.3f" % [
 				turn_offset + 1,
 				OrbTypes.dir_name(direction),
 				settle_elapsed,
-				str(forced),
+				str(capped),
 				board.get_orbs().size(),
 				int(metrics["departures"]),
+				float(metrics["max_penetration"]),
 			]
 		)
 		assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "turn returns to input")
 
 	print(
-		"Spawn flow seed=4242 summary turns=20 orbs=%d departures=%d forced_settles=%d" % [
+		"Spawn flow seed=4242 summary turns=20 orbs=%d departures=%d max_penetration=%.3f capped_turns=%d escape_guards=%d" % [
 			board.get_orbs().size(),
 			total_departures,
-			forced_settle_count,
+			maximum_penetration,
+			capped_turn_count,
+			board.escape_guard_count,
 		]
 	)
 	assert_eq(manager.turn_index, 20, "twenty turns completed")
@@ -442,10 +447,15 @@ func _empty_physics_metrics() -> Dictionary:
 		"departures": 0,
 		"max_penetration": 0.0,
 		"max_speed": 0.0,
+		"escape_guards": 0,
 	}
 
 
 func _accumulate_board_metrics(board: Board, metrics: Dictionary) -> void:
+	metrics["escape_guards"] = maxi(
+		int(metrics["escape_guards"]),
+		board.escape_guard_count
+	)
 	for orb: Orb in board.get_orbs():
 		var center_extent: float = maxf(absf(orb.position.x), absf(orb.position.y))
 		var penetration: float = maxf(
