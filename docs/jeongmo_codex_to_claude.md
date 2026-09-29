@@ -38,6 +38,39 @@
 
 ## 미확인
 
+### [2026-09-30] 대상 #12 추가 요구 1 — 물리 보정 관측 카운터 + 기본 규칙 B
+- 상태: 완료
+- 브랜치 / PR: `m5-physics-observability` / PR 미생성
+- 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, `scripts/core/Board.gd`, `scripts/core/Orb.gd`, `tests/test_config.gd`, `tests/scenarios/test_board_physics.gd`, `tests/scenarios/test_ghost_scenario.gd`, `tests/scenarios/test_spawn_flow.gd`, `tests/scenarios/test_turn_time.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `Board.wall_recovery_count`(복구 축 단위)와 `Board.timeout_correction_count`(보정 구체 단위) 추가 — 자동 검증
+  - [x] `[WALL_RECOVERY]`에 `level/axis/depth/ghost/age_frames/since_last_spawn_frames/on_ghost_timeout_frame` 출력 — 단위·120턴 시나리오에서 관측
+  - [x] 물리 22시드·겹침 생성·20턴은 `wall_recovery_count == 0`, fixed·실시간 120턴은 추가 요구의 `wall_recovery_count <= 2` assert 적용 — 자동 검증
+  - [x] 현재 반지름 기준 벽 안쪽 20px 배치 단위 시나리오에서 사전 복구 1회, 안전장치 0 — 자동 검증
+  - [x] 물리 22시드·겹침 생성·20턴·120턴 출력에 두 카운터 포함, 타임아웃 보정 경로의 증가를 자동 검증
+  - [x] `GameConfig` 선언·기본 리소스·config 테스트를 기본 규칙 `B_SAME_LEVEL`로 변경. 시작 디버그 라벨은 `Config.data.annihilation_rule`에 따라 `Rule: B`
+  - [x] 전체 테스트 79/79 및 검증 명령 3종 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - [ ] 실제 창의 `Rule: B` 라벨 및 규칙 B 접촉 결과 — 수동 확인 필요(아래 절차)
+- QA 관측값:
+  - 물리 22시드 → 중심 이탈 0, 최대 관통 9.365px, 안전장치 0, 사전 복구 0, 타임아웃 보정 0
+  - 겹침 생성 → 중심 이탈 0, 최대 관통 0.000px, 안전장치 0, 사전 복구 0, 타임아웃 보정 0
+  - 20턴 시드 4242 → 최종 구체 22개, 중심 이탈 0, 최대 관통 7.747px, 안전장치 0, 사전 복구 0, 타임아웃 보정 20, 유령 타임아웃 3
+  - fixed 240Hz 120턴 단독 → 최종 구체 평균 5.500, 중심 이탈 0, 최대 관통 11.682px, 안전장치 0, **사전 복구 1(≤2)**, 타임아웃 보정 39, 유령 타임아웃 12. 경고는 `L2 / y / 20.461px / ghost=false / age=276 / since_last_spawn=145 / on_ghost_timeout_frame=false`
+  - 실시간 120턴 단독 → fixed 단독과 동일하게 최종 구체 평균 5.500, 중심 이탈 0, 최대 관통 11.682px, 안전장치 0, **사전 복구 1(≤2)**, 타임아웃 보정 39, 유령 타임아웃 12, `on_ghost_timeout_frame=false`
+  - 전체 테스트 내부 120턴 → 최종 구체 평균 5.667, 중심 이탈 0, 최대 관통 8.844px, 최대 잔여 속도 843.538px/s, 안전장치 0, **사전 복구 1(≤2)**, 타임아웃 보정 57, 유령 타임아웃 17. 경고는 `L1 / x / 24.769px / ghost=false / age=869 / since_last_spawn=145 / on_ghost_timeout_frame=false`
+  - 20px 단위 시나리오 → `[WALL_RECOVERY]` 1건, `wall_recovery_count=1`, `escape_guard_count=0`, `on_ghost_timeout_frame=false`
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . -s res://tests/run_tests.gd` → 79/79 통과, 종료 코드 0
+  - fixed 240Hz·실시간 120턴 단독 실행 → 각각 1/1 통과, 종료 코드 0
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --quit-after 300` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 환경 진단 → 사용자 로그/Windows 루트 인증서/에디터 설정 접근 오류가 출력됐으나 프로젝트 스크립트 로드와 위 종료 코드에는 영향 없음
+  - 정적 검사 → `Input`/`InputEvent` 참조는 `InputRouter.gd`만, 난수 API는 `Spawner.gd`만; `git diff --check` 이상 없음
+- 수동 확인 절차:
+  1. 디버그 빌드로 실행한다 → 시작 라벨이 `Rule: B`인지 확인한다.
+  2. 서로 다른 레벨의 빨강·파랑을 접촉시킨다 → 둘 다 남고, 같은 레벨끼리는 소멸하는지 확인한다.
+- 결정 사항: 추가 요구 1에 따라 120턴만 사전 복구 허용치를 `<= 2`로 적용했고, 물리 22시드·겹침 생성·20턴은 0 기준을 유지했다. 같은 물리 프레임의 유령 타임아웃 여부를 경고 시점에 판별하도록 진단 로그만 지연 출력했으며 복구·타임아웃 보정의 조건과 적용 순서, 밸런스 수치는 변경하지 않았다.
+- 남은 것 · 질문: 코드·자동 검증 기준 남은 항목 없음. 관측된 120턴 사전 복구는 fixed·실시간 모두 유령 타임아웃과 같은 물리 프레임이 아니었다(`on_ghost_timeout_frame=false`). 실제 창의 라벨·접촉 결과는 위 수동 절차로 확인 필요.
+
 ### [2026-09-29] 대상 #11 — 새 구체 유령 상태 (생성 직후 통과)
 - 상태: 완료
 - 브랜치 / PR: `m5-ghost-state` / PR 미생성

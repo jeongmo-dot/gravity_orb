@@ -48,7 +48,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 @export var opposite_pairs: Array[Vector2i] = [
 	Vector2i(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE),
 ]
-@export var annihilation_rule: AnnihilationRule = AnnihilationRule.A_BOTH
+@export var annihilation_rule: AnnihilationRule = AnnihilationRule.B_SAME_LEVEL
 
 
 func radius_for_level(level: int) -> float:

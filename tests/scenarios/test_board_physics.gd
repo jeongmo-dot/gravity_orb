@@ -96,11 +96,15 @@ func test_cycle_seeded_orbs_remain_inside_board_during_gravity_cycles() -> void:
 
 	var total_departures: int = 0
 	var total_escape_guards: int = 0
+	var total_wall_recoveries: int = 0
+	var total_timeout_corrections: int = 0
 	var overall_maximum_penetration: float = 0.0
 	var overall_maximum_speed: float = 0.0
 	for result: Dictionary in results:
 		total_departures += int(result["departures"])
 		total_escape_guards += int(result["escape_guards"])
+		total_wall_recoveries += int(result["wall_recoveries"])
+		total_timeout_corrections += int(result["timeout_corrections"])
 		overall_maximum_penetration = maxf(
 			overall_maximum_penetration,
 			float(result["max_penetration"])
@@ -108,16 +112,19 @@ func test_cycle_seeded_orbs_remain_inside_board_during_gravity_cycles() -> void:
 		overall_maximum_speed = maxf(overall_maximum_speed, float(result["max_speed"]))
 
 	print(
-		"Scenario summary: seeds=%d departures=%d max_penetration=%.3f max_speed=%.3f escape_guards=%d" % [
+		"Scenario summary: seeds=%d departures=%d max_penetration=%.3f max_speed=%.3f escape_guards=%d wall_recoveries=%d timeout_corrections=%d" % [
 			results.size(),
 			total_departures,
 			overall_maximum_penetration,
 			overall_maximum_speed,
 			total_escape_guards,
+			total_wall_recoveries,
+			total_timeout_corrections,
 		]
 	)
 	assert_eq(total_departures, 0, "total orb center departures")
 	assert_eq(total_escape_guards, 0, "total escape guard activations")
+	assert_eq(total_wall_recoveries, 0, "total wall recovery activations")
 	assert_true(
 		overall_maximum_penetration <= MAX_ALLOWED_PENETRATION,
 		"overall wall penetration must be at most %.3fpx, got %.3fpx" % [
@@ -187,7 +194,7 @@ func _run_scenario(seed: int, scenario_name: String, levels: Array[int]) -> Dict
 					)
 
 	print(
-		"Scenario seed=%d kind=%s initial_overlaps=%d departures=%d max_penetration=%.3f max_speed=%.3f escape_guards=%d" % [
+		"Scenario seed=%d kind=%s initial_overlaps=%d departures=%d max_penetration=%.3f max_speed=%.3f escape_guards=%d wall_recoveries=%d timeout_corrections=%d" % [
 			seed,
 			scenario_name,
 			initial_overlap_count,
@@ -195,10 +202,13 @@ func _run_scenario(seed: int, scenario_name: String, levels: Array[int]) -> Dict
 			maximum_penetration,
 			maximum_speed,
 			board.escape_guard_count,
+			board.wall_recovery_count,
+			board.timeout_correction_count,
 		]
 	)
 	assert_eq(departure_count, 0, "seed %d orb center departures" % seed)
 	assert_eq(board.escape_guard_count, 0, "seed %d escape guard activations" % seed)
+	assert_eq(board.wall_recovery_count, 0, "seed %d wall recovery activations" % seed)
 	assert_true(
 		maximum_penetration <= MAX_ALLOWED_PENETRATION,
 		"seed %d wall penetration must be at most %.3fpx, got %.3fpx" % [
@@ -209,6 +219,8 @@ func _run_scenario(seed: int, scenario_name: String, levels: Array[int]) -> Dict
 	)
 
 	var escape_guard_count: int = board.escape_guard_count
+	var wall_recovery_count: int = board.wall_recovery_count
+	var timeout_correction_count: int = board.timeout_correction_count
 	board.queue_free()
 	await tree.process_frame
 	return {
@@ -218,6 +230,8 @@ func _run_scenario(seed: int, scenario_name: String, levels: Array[int]) -> Dict
 		"max_penetration": maximum_penetration,
 		"max_speed": maximum_speed,
 		"escape_guards": escape_guard_count,
+		"wall_recoveries": wall_recovery_count,
+		"timeout_corrections": timeout_correction_count,
 	}
 
 

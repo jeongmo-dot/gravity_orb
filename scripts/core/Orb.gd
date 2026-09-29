@@ -2,6 +2,15 @@ class_name Orb
 extends RigidBody2D
 
 signal escape_guard_triggered(axis: String, depth: float)
+signal wall_recovery_triggered(
+	level: int,
+	axis: String,
+	depth: float,
+	ghost: bool,
+	age_frames: int,
+	since_last_spawn_frames: int,
+	physics_frame: int
+)
 
 @onready var _collision_shape: CollisionShape2D = $CollisionShape2D
 @onready var _visual: OrbVisual = $Visual
@@ -147,6 +156,22 @@ func _apply_proactive_wall_recovery(state: PhysicsDirectBodyState2D) -> void:
 		corrected_position[axis_index] = wall_sign * center_limit
 		if corrected_velocity[axis_index] * wall_sign > 0.0:
 			corrected_velocity[axis_index] = 0.0
+		var axis_name: String = "x" if axis_index == 0 else "y"
+		var physics_frame: int = Engine.get_physics_frames()
+		var age_frames: int = maxi(physics_frame - _spawn_physics_frame, 0)
+		var since_last_spawn_frames: int = maxi(
+			physics_frame - _last_board_spawn_physics_frame,
+			0
+		)
+		wall_recovery_triggered.emit(
+			level,
+			axis_name,
+			penetration,
+			is_ghost,
+			age_frames,
+			since_last_spawn_frames,
+			physics_frame
+		)
 		corrected = true
 	if not corrected:
 		return

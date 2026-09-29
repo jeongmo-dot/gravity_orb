@@ -44,4 +44,4 @@ ghost_max_time = 0.6
 ghost_alpha = 0.55
 wall_penetration_limit = 16.0
 opposite_pairs = Array[Vector2i]([Vector2i(0, 1)])
-annihilation_rule = 0
+annihilation_rule = 1
