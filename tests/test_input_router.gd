@@ -3,6 +3,7 @@ extends TestCase
 const INPUT_ROUTER_SCRIPT: Script = preload("res://scripts/autoload/InputRouter.gd")
 
 var _received: Array[Vector2i] = []
+var _debug_cycles: int = 0
 
 
 func test_mouse_left_drag_emits_once() -> void:
@@ -121,15 +122,29 @@ func test_locked_keyboard_action_is_ignored() -> void:
 	router.free()
 
 
+func test_f2_debug_action_emits_even_while_locked() -> void:
+	var router: Variant = _new_router()
+	router.set_locked(true)
+	router._handle_event(_logical_key(KEY_F2))
+	assert_eq(_debug_cycles, 1, "debug cycle signal count")
+	router.free()
+
+
 func _new_router() -> Variant:
 	_received.clear()
+	_debug_cycles = 0
 	var router: Variant = INPUT_ROUTER_SCRIPT.new()
 	router.swipe.connect(_record_swipe)
+	router.debug_cycle_annihilation_rule.connect(_record_debug_cycle)
 	return router
 
 
 func _record_swipe(direction: Vector2i) -> void:
 	_received.append(direction)
+
+
+func _record_debug_cycle() -> void:
+	_debug_cycles += 1
 
 
 func _assert_swipes(expected: Array[Vector2i]) -> void:
