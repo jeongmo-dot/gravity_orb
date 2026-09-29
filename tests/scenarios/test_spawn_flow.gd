@@ -9,6 +9,7 @@ const WAIT_TIMEOUT_SECONDS: float = 8.0
 const POSITION_TOLERANCE: float = 0.001
 const OVERLAP_OBSERVE_SECONDS: float = 0.5
 const OVERLAP_PENETRATION_LIMIT: float = 12.0
+const CONTINUOUS_PENETRATION_LIMIT: float = 16.0
 const REPRO_DIRECTIONS: Array[Vector2i] = [
 	Vector2i.DOWN,
 	Vector2i.LEFT,
@@ -115,6 +116,7 @@ func test_preview_matches_spawned_orb_and_spawn_line() -> void:
 	manager.on_swipe(Vector2i.RIGHT)
 	assert_eq(manager.state, TurnManager.State.SPAWNING, "swipe enters SPAWNING")
 	await tree.physics_frame
+	assert_board_motion_bounds(board, "preview spawn frame")
 	assert_eq(manager.state, TurnManager.State.SIMULATING, "spawn starts simulation")
 	assert_eq(
 		Engine.get_physics_frames() - frame_before_swipe,
@@ -214,8 +216,8 @@ func test_center_spawn_overlap_remains_inside_board_for_half_second() -> void:
 	assert_eq(board.get_orbs().size(), 8, "eight level-1 orbs stabilized at bottom")
 
 	var preview: Dictionary = spawner.peek_next()
-	var spawned_radius: float = Config.data.radius_for_level(int(preview["level"]))
-	var spawn_line: Dictionary = board.spawn_line(Vector2i.UP, spawned_radius)
+	var spawned_final_radius: float = Config.data.radius_for_level(int(preview["level"]))
+	var spawn_line: Dictionary = board.spawn_line(Vector2i.UP, spawned_final_radius)
 	var overlap_position: Vector2 = spawn_line["origin"] as Vector2
 	overlap_dummy.position = overlap_position
 	overlap_dummy.linear_velocity = Vector2.ZERO
@@ -229,7 +231,7 @@ func test_center_spawn_overlap_remains_inside_board_for_half_second() -> void:
 		_captured_spawn["position"] as Vector2
 	)
 	assert_true(
-		spawn_distance < overlap_dummy.get_radius() + float(_captured_spawn["radius"]),
+		spawn_distance < overlap_dummy.get_current_radius() + float(_captured_spawn["current_radius"]),
 		"CENTER spawn overlaps the prepared dummy at creation"
 	)
 
@@ -308,6 +310,14 @@ func test_seed_4242_completes_twenty_turns_without_departures() -> void:
 	assert_eq(manager.turn_index, 20, "twenty turns completed")
 	assert_eq(board.get_orbs().size(), 22, "initial two plus twenty turn spawns")
 	assert_eq(total_departures, 0, "twenty-turn orb center departures")
+	assert_eq(board.escape_guard_count, 0, "twenty-turn escape guard activations")
+	assert_true(
+		maximum_penetration <= CONTINUOUS_PENETRATION_LIMIT,
+		"twenty-turn wall penetration must be at most %.3fpx, got %.3fpx" % [
+			CONTINUOUS_PENETRATION_LIMIT,
+			maximum_penetration,
+		]
+	)
 
 	await _cleanup_fixture(fixture)
 	_restore_config(snapshot)
@@ -414,6 +424,8 @@ func _wait_for_state(manager: TurnManager, target: TurnManager.State) -> void:
 		if manager.state == target:
 			return
 		await tree.physics_frame
+		var board: Board = manager.get_parent().get_node("Board") as Board
+		assert_board_motion_bounds(board, "spawn-flow state wait")
 	assert_eq(manager.state, target, "state wait timeout")
 
 
@@ -424,6 +436,7 @@ func _wait_for_turn_with_metrics(manager: TurnManager, board: Board) -> Dictiona
 	)
 	for _frame: int in range(max_frames):
 		await tree.physics_frame
+		assert_board_motion_bounds(board, "spawn-flow turn wait")
 		_accumulate_board_metrics(board, metrics)
 		if manager.state == TurnManager.State.WAITING_INPUT:
 			return metrics
@@ -438,6 +451,7 @@ func _observe_board(board: Board, duration_seconds: float) -> Dictionary:
 	)
 	for _frame: int in range(frame_count):
 		await tree.physics_frame
+		assert_board_motion_bounds(board, "spawn-flow observation")
 		_accumulate_board_metrics(board, metrics)
 	return metrics
 
@@ -543,4 +557,5 @@ func _capture_spawn_on_state_change(next_state: TurnManager.State) -> void:
 		"level": spawned.level,
 		"position": spawned.position,
 		"radius": spawned.get_radius(),
+		"current_radius": spawned.get_current_radius(),
 	}

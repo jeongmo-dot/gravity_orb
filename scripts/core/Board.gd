@@ -55,6 +55,7 @@ func spawn_orb(
 	orb.body_entered.connect(_on_orb_body_entered.bind(orb))
 	orb.escape_guard_triggered.connect(_on_orb_escape_guard_triggered)
 	_orbs.append(orb)
+	_print_growth_spawn_diagnostic(orb, spawn_physics_frame)
 	return orb
 
 
@@ -102,6 +103,43 @@ func _on_orb_body_entered(other_body: Node, orb: Orb) -> void:
 
 func _on_orb_escape_guard_triggered(_axis: String, _depth: float) -> void:
 	escape_guard_count += 1
+
+
+func _print_growth_spawn_diagnostic(orb: Orb, physics_frame: int) -> void:
+	if not OS.get_cmdline_user_args().has("--growth-diagnose"):
+		return
+	var overlaps: Array[String] = []
+	for other: Orb in _orbs:
+		if other == orb or other.consumed:
+			continue
+		var distance: float = orb.position.distance_to(other.position)
+		var penetration: float = (
+			orb.get_current_radius() + other.get_current_radius() - distance
+		)
+		if penetration <= 0.0:
+			continue
+		overlaps.append(
+			"id=%d level=%d distance=%.3f penetration=%.3f current_radius=%.3f velocity=%s" % [
+				other.get_instance_id(),
+				other.level,
+				distance,
+				penetration,
+				other.get_current_radius(),
+				str(other.linear_velocity),
+			]
+		)
+	print(
+		"GROWTH_SPAWN frame=%d id=%d level=%d current_radius=%.3f final_radius=%.3f position=%s velocity=%s overlaps=%s" % [
+			physics_frame,
+			orb.get_instance_id(),
+			orb.level,
+			orb.get_current_radius(),
+			orb.get_radius(),
+			str(orb.position),
+			str(orb.linear_velocity),
+			str(overlaps),
+		]
+	)
 
 
 func _configure_walls() -> void:

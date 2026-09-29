@@ -28,6 +28,7 @@ func test_floor_resistance_is_zero_for_airborne_orb_contact() -> void:
 	var left: Orb = board.spawn_orb(0, 1, Vector2(-radius, 0.0), Vector2(100.0, 0.0))
 	var right: Orb = board.spawn_orb(1, 1, Vector2(radius, 0.0), Vector2(-100.0, 0.0))
 	await tree.physics_frame
+	assert_board_motion_bounds(board, "airborne contact")
 	assert_true(
 		left._last_rolling_resistance_force.is_zero_approx(),
 		"airborne left orb rolling force"
@@ -150,6 +151,10 @@ func _run_scenario(seed: int, scenario_name: String, levels: Array[int]) -> Dict
 			board.set_gravity(direction)
 			for _frame: int in range(frames_per_direction):
 				await tree.physics_frame
+				assert_board_motion_bounds(
+					board,
+					"physics seed %d frame %d" % [seed, scenario_frame + 1]
+				)
 				scenario_frame += 1
 				var orbs: Array[Orb] = board.get_orbs()
 				for orb_index: int in range(orbs.size()):

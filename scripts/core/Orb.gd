@@ -17,6 +17,7 @@ var _growth_duration: float = 0.0
 var _growth_elapsed: float = 0.0
 var _spawn_physics_frame: int = 0
 var _last_board_spawn_physics_frame: int = 0
+var _last_escape_guard_physics_frame: int = -1
 var _gravity_direction: Vector2 = Vector2.DOWN
 var _rest_braking_active: bool = false
 var _last_rolling_resistance_force: Vector2 = Vector2.ZERO
@@ -147,6 +148,7 @@ func _apply_escape_guard() -> bool:
 		var axis_name: String = "x" if axis_index == 0 else "y"
 		escape_guard_triggered.emit(axis_name, depth)
 		var physics_frame: int = Engine.get_physics_frames()
+		_last_escape_guard_physics_frame = physics_frame
 		var age_frames: int = maxi(physics_frame - _spawn_physics_frame, 0)
 		var since_last_spawn_frames: int = maxi(
 			physics_frame - _last_board_spawn_physics_frame,

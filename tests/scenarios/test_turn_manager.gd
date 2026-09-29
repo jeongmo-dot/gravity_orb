@@ -231,6 +231,8 @@ func _wait_for_state(manager: TurnManager, target: TurnManager.State) -> void:
 		if manager.state == target:
 			return
 		await tree.physics_frame
+		var board: Board = manager.get_parent().get_node("Board") as Board
+		assert_board_motion_bounds(board, "turn-manager state wait")
 	assert_eq(manager.state, target, "state wait timeout")
 
 
