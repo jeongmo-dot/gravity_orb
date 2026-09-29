@@ -16,11 +16,18 @@ const FRAME_WIDTH: float = 4.0
 var _orbs: Array[Orb] = []
 var _gravity_direction: Vector2i = Vector2i.DOWN
 var escape_guard_count: int = 0
+var ghost_timeout_count: int = 0
+var ghost_completed_count: int = 0
+var ghost_total_duration: float = 0.0
 
 
 func _ready() -> void:
 	_configure_walls()
 	_configure_frame()
+
+
+func _physics_process(delta: float) -> void:
+	_update_ghost_orbs(delta)
 
 
 func half_size() -> float:
@@ -52,6 +59,7 @@ func spawn_orb(
 	orb.linear_velocity = p_velocity
 	orb.generation = p_generation
 	orb.set_gravity(_gravity_direction, Config.data.gravity_strength)
+	orb.enter_ghost_state(Config.data.ghost_alpha)
 	orb.body_entered.connect(_on_orb_body_entered.bind(orb))
 	orb.escape_guard_triggered.connect(_on_orb_escape_guard_triggered)
 	_orbs.append(orb)
@@ -91,6 +99,228 @@ func spawn_line(gravity: Vector2i, radius: float) -> Dictionary:
 		"axis": Vector2(OrbTypes.perpendicular(gravity)),
 		"extent": half - radius,
 	}
+
+
+func average_ghost_duration() -> float:
+	if ghost_completed_count == 0:
+		return 0.0
+	return ghost_total_duration / float(ghost_completed_count)
+
+
+func _update_ghost_orbs(delta: float) -> void:
+	for orb: Orb in get_orbs():
+		if not orb.is_ghost:
+			continue
+		orb.advance_ghost(delta)
+		var maximum_overlap: float = _maximum_normal_overlap(orb)
+		if maximum_overlap <= Config.data.ghost_exit_overlap:
+			_complete_ghost(orb, false, maximum_overlap)
+		elif (
+			orb.ghost_elapsed >= Config.data.ghost_max_time
+			or is_equal_approx(
+				orb.ghost_elapsed,
+				Config.data.ghost_max_time
+			)
+		):
+			_complete_ghost(orb, true, maximum_overlap)
+
+
+func _maximum_normal_overlap(ghost: Orb) -> float:
+	var maximum_overlap: float = 0.0
+	for other: Orb in _orbs:
+		if (
+			other == ghost
+			or not is_instance_valid(other)
+			or other.consumed
+			or other.is_ghost
+		):
+			continue
+		var overlap: float = (
+			ghost.get_current_radius()
+			+ other.get_current_radius()
+			- ghost.position.distance_to(other.position)
+		)
+		maximum_overlap = maxf(maximum_overlap, overlap)
+	return maximum_overlap
+
+
+func _complete_ghost(orb: Orb, timed_out: bool, maximum_overlap: float) -> void:
+	var duration: float = orb.ghost_elapsed
+	if timed_out:
+		_restore_existing_orbs_inside_board(orb)
+		_relieve_timeout_overlap(orb)
+	orb.exit_ghost_state()
+	ghost_completed_count += 1
+	ghost_total_duration += duration
+	if not timed_out:
+		return
+	ghost_timeout_count += 1
+	push_warning(
+		"[GHOST_TIMEOUT] id=%d level=%d elapsed=%.3f max_overlap=%.3f" % [
+			orb.get_instance_id(),
+			orb.level,
+			duration,
+			maximum_overlap,
+		]
+	)
+
+
+func _restore_existing_orbs_inside_board(excluded_orb: Orb) -> void:
+	for orb: Orb in _orbs:
+		if (
+			orb == excluded_orb
+			or not is_instance_valid(orb)
+			or orb.consumed
+		):
+			continue
+		var center_limit: float = maxf(
+			half_size()
+			- orb.get_current_radius()
+			- Config.data.ghost_exit_overlap,
+			0.0
+		)
+		var corrected_position: Vector2 = Vector2(
+			clampf(orb.position.x, -center_limit, center_limit),
+			clampf(orb.position.y, -center_limit, center_limit)
+		)
+		if corrected_position.is_equal_approx(orb.position):
+			continue
+		var corrected_velocity: Vector2 = orb.linear_velocity
+		for axis_index: int in range(2):
+			var original_coordinate: float = orb.position[axis_index]
+			var velocity_component: float = corrected_velocity[axis_index]
+			if (
+				original_coordinate > center_limit
+				and velocity_component > 0.0
+			) or (
+				original_coordinate < -center_limit
+				and velocity_component < 0.0
+			):
+				corrected_velocity[axis_index] = 0.0
+		orb.queue_timeout_correction(corrected_position, corrected_velocity)
+
+
+func _relieve_timeout_overlap(orb: Orb) -> void:
+	var normal_orbs: Array[Orb] = []
+	for other: Orb in _orbs:
+		if (
+			other != orb
+			and is_instance_valid(other)
+			and not other.consumed
+			and not other.is_ghost
+		):
+			normal_orbs.append(other)
+	if normal_orbs.is_empty():
+		return
+
+	var original_position: Vector2 = orb.position
+	var corrected_position: Vector2 = original_position
+	var maximum_passes: int = normal_orbs.size() * normal_orbs.size()
+	for _pass: int in range(maximum_passes):
+		var changed: bool = false
+		for other: Orb in normal_orbs:
+			var other_position: Vector2 = _clamp_orb_center(
+				other.position,
+				other.get_current_radius()
+			)
+			var target_distance: float = (
+				orb.get_current_radius()
+				+ other.get_current_radius()
+				+ Config.data.ghost_exit_overlap
+			)
+			var offset: Vector2 = corrected_position - other_position
+			if offset.length_squared() >= target_distance * target_distance:
+				continue
+			var best_position: Vector2 = corrected_position
+			var best_overlap: float = _maximum_overlap_at(
+				orb,
+				corrected_position,
+				normal_orbs
+			)
+			var best_distance_squared: float = INF
+			for direction: Vector2 in _timeout_relief_directions(offset):
+				var candidate: Vector2 = _clamp_orb_center(
+					other_position + direction * target_distance,
+					orb.get_current_radius()
+				)
+				var candidate_overlap: float = _maximum_overlap_at(
+					orb,
+					candidate,
+					normal_orbs
+				)
+				var candidate_distance_squared: float = (
+					candidate.distance_squared_to(corrected_position)
+				)
+				if (
+					candidate_overlap < best_overlap
+					or (
+						is_equal_approx(candidate_overlap, best_overlap)
+						and candidate_distance_squared < best_distance_squared
+					)
+				):
+					best_position = candidate
+					best_overlap = candidate_overlap
+					best_distance_squared = candidate_distance_squared
+			if not best_position.is_equal_approx(corrected_position):
+				corrected_position = best_position
+				changed = true
+		if (
+			not changed
+			or is_zero_approx(
+				_maximum_overlap_at(orb, corrected_position, normal_orbs)
+			)
+		):
+			break
+
+	if not corrected_position.is_equal_approx(orb.position):
+		orb.queue_timeout_correction(corrected_position, orb.linear_velocity)
+
+
+func _timeout_relief_directions(offset: Vector2) -> Array[Vector2]:
+	var directions: Array[Vector2] = []
+	if not offset.is_zero_approx():
+		directions.append(offset.normalized())
+	var gravity_axis: Vector2 = Vector2(_gravity_direction).normalized()
+	if gravity_axis.is_zero_approx():
+		gravity_axis = Vector2.DOWN
+	var perpendicular: Vector2 = Vector2(-gravity_axis.y, gravity_axis.x)
+	for direction: Vector2 in [
+		-gravity_axis,
+		perpendicular,
+		-perpendicular,
+		gravity_axis,
+	]:
+		if not directions.has(direction):
+			directions.append(direction)
+	return directions
+
+
+func _maximum_overlap_at(
+	orb: Orb,
+	position: Vector2,
+	normal_orbs: Array[Orb]
+) -> float:
+	var maximum_overlap: float = 0.0
+	for other: Orb in normal_orbs:
+		var other_position: Vector2 = _clamp_orb_center(
+			other.position,
+			other.get_current_radius()
+		)
+		var overlap: float = (
+			orb.get_current_radius()
+			+ other.get_current_radius()
+			- position.distance_to(other_position)
+		)
+		maximum_overlap = maxf(maximum_overlap, overlap)
+	return maximum_overlap
+
+
+func _clamp_orb_center(position: Vector2, radius: float) -> Vector2:
+	var center_limit: float = maxf(half_size() - radius, 0.0)
+	return Vector2(
+		clampf(position.x, -center_limit, center_limit),
+		clampf(position.y, -center_limit, center_limit)
+	)
 
 
 func _on_orb_body_entered(other_body: Node, orb: Orb) -> void:

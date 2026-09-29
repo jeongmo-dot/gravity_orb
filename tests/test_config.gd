@@ -70,6 +70,15 @@ func test_m5_plus_tuning_defaults() -> void:
 	assert_near(config.escape_guard_depth, 25.0, TOLERANCE, "escape guard depth")
 	assert_near(config.grow_duration, 0.06, TOLERANCE, "growth duration")
 	assert_near(config.grow_start_ratio, 0.3, TOLERANCE, "growth start ratio")
+	assert_near(config.ghost_exit_overlap, 4.0, TOLERANCE, "ghost exit overlap")
+	assert_near(config.ghost_max_time, 0.6, TOLERANCE, "ghost maximum time")
+	assert_near(config.ghost_alpha, 0.55, TOLERANCE, "ghost alpha")
+	assert_near(
+		config.wall_penetration_limit,
+		16.0,
+		TOLERANCE,
+		"wall penetration limit"
+	)
 
 
 func test_m6_annihilation_defaults() -> void:

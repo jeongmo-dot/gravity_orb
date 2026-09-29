@@ -62,6 +62,9 @@ func _measure_current_config() -> Dictionary:
 	var capped_turns: int = 0
 	var final_orb_total: int = 0
 	var escape_guard_total: int = 0
+	var ghost_timeout_total: int = 0
+	var ghost_completed_total: int = 0
+	var ghost_duration_total: float = 0.0
 	var maximum_residual_speed: float = 0.0
 	var maximum_penetration: float = 0.0
 	var center_departures: int = 0
@@ -95,6 +98,9 @@ func _measure_current_config() -> Dictionary:
 		capped_turns += manager.capped_turn_count
 		final_orb_total += board.get_orbs().size()
 		escape_guard_total += board.escape_guard_count
+		ghost_timeout_total += board.ghost_timeout_count
+		ghost_completed_total += board.ghost_completed_count
+		ghost_duration_total += board.ghost_total_duration
 		await _cleanup_fixture(fixture)
 
 	return {
@@ -110,6 +116,13 @@ func _measure_current_config() -> Dictionary:
 		"departures": center_departures,
 		"final_orb_average": float(final_orb_total) / float(SEEDS.size()),
 		"escape_guards": escape_guard_total,
+		"ghost_timeouts": ghost_timeout_total,
+		"ghost_completed": ghost_completed_total,
+		"ghost_average_duration": (
+			ghost_duration_total / float(ghost_completed_total)
+			if ghost_completed_total > 0
+			else 0.0
+		),
 		"direction_p50": {
 			"DOWN": _percentile(direction_times["DOWN"] as Array[float], 0.50),
 			"RIGHT": _percentile(direction_times["RIGHT"] as Array[float], 0.50),
@@ -368,7 +381,7 @@ func _percentile(values: Array[float], quantile: float) -> float:
 func _print_metrics(metrics: Dictionary) -> void:
 	var direction_p50: Dictionary = metrics["direction_p50"] as Dictionary
 	print(
-		"Turn-time cap=%.3f turns=%d capped=%d capped_ratio=%.6f average=%.6f p50=%.6f p90=%.6f max=%.6f max_residual_speed=%.3f max_penetration=%.3f departures=%d final_orbs_avg=%.3f escape_guards=%d direction_p50=[D %.6f R %.6f U %.6f L %.6f]" % [
+		"Turn-time cap=%.3f turns=%d capped=%d capped_ratio=%.6f average=%.6f p50=%.6f p90=%.6f max=%.6f max_residual_speed=%.3f max_penetration=%.3f departures=%d final_orbs_avg=%.3f escape_guards=%d ghost_timeouts=%d ghost_completed=%d ghost_avg=%.6f direction_p50=[D %.6f R %.6f U %.6f L %.6f]" % [
 			Config.data.max_settle_time,
 			int(metrics["turns"]),
 			int(metrics["capped_turns"]),
@@ -382,6 +395,9 @@ func _print_metrics(metrics: Dictionary) -> void:
 			int(metrics["departures"]),
 			float(metrics["final_orb_average"]),
 			int(metrics["escape_guards"]),
+			int(metrics["ghost_timeouts"]),
+			int(metrics["ghost_completed"]),
+			float(metrics["ghost_average_duration"]),
 			float(direction_p50["DOWN"]),
 			float(direction_p50["RIGHT"]),
 			float(direction_p50["UP"]),

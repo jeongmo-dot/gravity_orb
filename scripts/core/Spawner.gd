@@ -34,7 +34,8 @@ func spawn_initial(board: Board, gravity: Vector2i) -> void:
 			lerpf(-half, half, fraction),
 			half - radius - Config.data.spawn_margin
 		)
-		board.spawn_orb(int(candidate["color"]), level, position)
+		var orb: Orb = board.spawn_orb(int(candidate["color"]), level, position)
+		orb.exit_ghost_state()
 	_draw_and_publish_next()
 
 

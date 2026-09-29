@@ -78,6 +78,7 @@ func test_initial_two_orbs_use_even_bottom_positions_without_overlap() -> void:
 	var half: float = board.half_size()
 	for index: int in range(orbs.size()):
 		var orb: Orb = orbs[index]
+		assert_true(not orb.is_ghost, "initial orb %d is normal" % index)
 		var fraction: float = float(index + 1) / float(orbs.size() + 1)
 		var expected_position: Vector2 = Vector2(
 			lerpf(-half, half, fraction),
@@ -128,6 +129,15 @@ func test_preview_matches_spawned_orb_and_spawn_line() -> void:
 	assert_eq(board.get_orbs().size(), 3, "one orb exists after one physics frame")
 	assert_eq(_captured_spawn["color"], preview["color"], "preview color")
 	assert_eq(_captured_spawn["level"], preview["level"], "preview level")
+	assert_eq(_captured_spawn["is_ghost"], true, "turn spawn starts as ghost")
+	assert_eq(_captured_spawn["collision_layer"], 4, "turn spawn ghost layer")
+	assert_eq(_captured_spawn["collision_mask"], 1, "turn spawn wall-only mask")
+	assert_near(
+		float(_captured_spawn["alpha"]),
+		Config.data.ghost_alpha,
+		POSITION_TOLERANCE,
+		"turn spawn ghost alpha"
+	)
 	_assert_position_on_spawn_line(
 		board,
 		_captured_spawn["position"] as Vector2,
@@ -239,12 +249,14 @@ func test_center_spawn_overlap_remains_inside_board_for_half_second() -> void:
 
 	var metrics: Dictionary = await _observe_board(board, OVERLAP_OBSERVE_SECONDS)
 	print(
-		"Spawn overlap seed=4006 duration=%.2f departures=%d max_penetration=%.3f max_speed=%.3f escape_guards=%d" % [
+		"Spawn overlap seed=4006 duration=%.2f departures=%d max_penetration=%.3f max_speed=%.3f escape_guards=%d ghost_timeouts=%d ghost_avg=%.6f" % [
 			OVERLAP_OBSERVE_SECONDS,
 			int(metrics["departures"]),
 			float(metrics["max_penetration"]),
 			float(metrics["max_speed"]),
 			int(metrics["escape_guards"]),
+			board.ghost_timeout_count,
+			board.average_ghost_duration(),
 		]
 	)
 	assert_eq(int(metrics["departures"]), 0, "overlap case orb center departures")
@@ -301,12 +313,14 @@ func test_seed_4242_completes_twenty_turns_without_departures() -> void:
 		assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "turn returns to input")
 
 	print(
-		"Spawn flow seed=4242 summary turns=20 orbs=%d departures=%d max_penetration=%.3f capped_turns=%d escape_guards=%d" % [
+		"Spawn flow seed=4242 summary turns=20 orbs=%d departures=%d max_penetration=%.3f capped_turns=%d escape_guards=%d ghost_timeouts=%d ghost_avg=%.6f" % [
 			board.get_orbs().size(),
 			total_departures,
 			maximum_penetration,
 			capped_turn_count,
 			board.escape_guard_count,
+			board.ghost_timeout_count,
+			board.average_ghost_duration(),
 		]
 	)
 	assert_eq(manager.turn_index, 20, "twenty turns completed")
@@ -554,10 +568,15 @@ func _capture_spawn_on_state_change(next_state: TurnManager.State) -> void:
 		return
 	var orbs: Array[Orb] = _capture_board.get_orbs()
 	var spawned: Orb = orbs[orbs.size() - 1]
+	var visual: OrbVisual = spawned.get_node("Visual") as OrbVisual
 	_captured_spawn = {
 		"color": spawned.color,
 		"level": spawned.level,
 		"position": spawned.position,
 		"radius": spawned.get_radius(),
 		"current_radius": spawned.get_current_radius(),
+		"is_ghost": spawned.is_ghost,
+		"collision_layer": spawned.collision_layer,
+		"collision_mask": spawned.collision_mask,
+		"alpha": visual.get_alpha(),
 	}

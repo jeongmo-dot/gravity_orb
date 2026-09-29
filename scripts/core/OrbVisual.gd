@@ -19,6 +19,15 @@ func get_radius() -> float:
 	return _radius
 
 
+func set_alpha(alpha: float) -> void:
+	_display_color.a = clampf(alpha, 0.0, 1.0)
+	queue_redraw()
+
+
+func get_alpha() -> float:
+	return _display_color.a
+
+
 func _draw() -> void:
 	if _radius <= 0.0:
 		return
