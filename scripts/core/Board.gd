@@ -15,7 +15,12 @@ const FRAME_WIDTH: float = 4.0
 
 var _orbs: Array[Orb] = []
 var _gravity_direction: Vector2i = Vector2i.DOWN
+var _last_ghost_timeout_physics_frame: int = -1
+var _pending_wall_recovery_warnings: Array[Dictionary] = []
+var _wall_recovery_warning_flush_scheduled: bool = false
 var escape_guard_count: int = 0
+var wall_recovery_count: int = 0
+var timeout_correction_count: int = 0
 var ghost_timeout_count: int = 0
 var ghost_completed_count: int = 0
 var ghost_total_duration: float = 0.0
@@ -62,6 +67,7 @@ func spawn_orb(
 	orb.enter_ghost_state(Config.data.ghost_alpha)
 	orb.body_entered.connect(_on_orb_body_entered.bind(orb))
 	orb.escape_guard_triggered.connect(_on_orb_escape_guard_triggered)
+	orb.wall_recovery_triggered.connect(_on_orb_wall_recovery_triggered)
 	_orbs.append(orb)
 	_print_growth_spawn_diagnostic(orb, spawn_physics_frame)
 	return orb
@@ -147,6 +153,7 @@ func _maximum_normal_overlap(ghost: Orb) -> float:
 func _complete_ghost(orb: Orb, timed_out: bool, maximum_overlap: float) -> void:
 	var duration: float = orb.ghost_elapsed
 	if timed_out:
+		_last_ghost_timeout_physics_frame = Engine.get_physics_frames()
 		_restore_existing_orbs_inside_board(orb)
 		_relieve_timeout_overlap(orb)
 	orb.exit_ghost_state()
@@ -198,6 +205,7 @@ func _restore_existing_orbs_inside_board(excluded_orb: Orb) -> void:
 			):
 				corrected_velocity[axis_index] = 0.0
 		orb.queue_timeout_correction(corrected_position, corrected_velocity)
+		timeout_correction_count += 1
 
 
 func _relieve_timeout_overlap(orb: Orb) -> void:
@@ -274,6 +282,7 @@ func _relieve_timeout_overlap(orb: Orb) -> void:
 
 	if not corrected_position.is_equal_approx(orb.position):
 		orb.queue_timeout_correction(corrected_position, orb.linear_velocity)
+		timeout_correction_count += 1
 
 
 func _timeout_relief_directions(offset: Vector2) -> Array[Vector2]:
@@ -333,6 +342,50 @@ func _on_orb_body_entered(other_body: Node, orb: Orb) -> void:
 
 func _on_orb_escape_guard_triggered(_axis: String, _depth: float) -> void:
 	escape_guard_count += 1
+
+
+func _on_orb_wall_recovery_triggered(
+	level: int,
+	axis: String,
+	depth: float,
+	ghost: bool,
+	age_frames: int,
+	since_last_spawn_frames: int,
+	physics_frame: int
+) -> void:
+	wall_recovery_count += 1
+	_pending_wall_recovery_warnings.append(
+		{
+			"level": level,
+			"axis": axis,
+			"depth": depth,
+			"ghost": ghost,
+			"age_frames": age_frames,
+			"since_last_spawn_frames": since_last_spawn_frames,
+			"physics_frame": physics_frame,
+		}
+	)
+	if not _wall_recovery_warning_flush_scheduled:
+		_wall_recovery_warning_flush_scheduled = true
+		call_deferred("_flush_wall_recovery_warnings")
+
+
+func _flush_wall_recovery_warnings() -> void:
+	_wall_recovery_warning_flush_scheduled = false
+	for event: Dictionary in _pending_wall_recovery_warnings:
+		var recovery_frame: int = int(event["physics_frame"])
+		push_warning(
+			"[WALL_RECOVERY] level=%d axis=%s depth=%.3f ghost=%s age_frames=%d since_last_spawn_frames=%d on_ghost_timeout_frame=%s" % [
+				int(event["level"]),
+				str(event["axis"]),
+				float(event["depth"]),
+				str(bool(event["ghost"])),
+				int(event["age_frames"]),
+				int(event["since_last_spawn_frames"]),
+				str(recovery_frame == _last_ghost_timeout_physics_frame),
+			]
+		)
+	_pending_wall_recovery_warnings.clear()
 
 
 func _print_growth_spawn_diagnostic(orb: Orb, physics_frame: int) -> void:

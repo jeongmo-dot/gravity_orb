@@ -92,7 +92,7 @@ func test_m6_annihilation_defaults() -> void:
 		)
 	assert_eq(
 		config.annihilation_rule,
-		GameConfig.AnnihilationRule.A_BOTH,
+		GameConfig.AnnihilationRule.B_SAME_LEVEL,
 		"default annihilation rule"
 	)
 	assert_true(

@@ -207,6 +207,10 @@ func test_packed_floor_times_out_once_without_divergence() -> void:
 	_assert_ghost_state(ghost, "packed floor spawn")
 	await _advance(board, Config.data.ghost_max_time + 0.15)
 	assert_eq(board.ghost_timeout_count, 1, "packed floor timeout count")
+	assert_true(
+		board.timeout_correction_count > 0,
+		"packed floor timeout correction count"
+	)
 	_assert_normal_state(ghost, "packed floor timeout exit")
 	assert_board_motion_bounds(board, "packed floor after timeout")
 	assert_eq(board.escape_guard_count, 0, "packed floor escape guards")
@@ -248,6 +252,10 @@ func test_timeout_restores_existing_wall_penetration_without_guard() -> void:
 		timeout_wait_frames += 1
 
 	assert_eq(board.ghost_timeout_count, 1, "wall penetration timeout count")
+	assert_true(
+		board.timeout_correction_count > 0,
+		"wall penetration timeout correction count"
+	)
 	assert_eq(board.escape_guard_count, 0, "wall penetration escape guards")
 	assert_true(
 		existing.position.x + existing.get_current_radius() <= board.half_size(),
@@ -260,26 +268,21 @@ func test_timeout_restores_existing_wall_penetration_without_guard() -> void:
 func test_proactive_wall_recovery_precedes_escape_guard() -> void:
 	var fixture: Dictionary = await _create_fixture(false)
 	var board: Board = fixture["board"] as Board
-	var radius: float = Config.data.radius_for_level(1)
 	var orb: Orb = _spawn_normal(
 		board,
 		OrbTypes.OrbColor.GREEN,
 		1,
-		Vector2(
-			board.half_size()
-			- radius
-			+ Config.data.wall_penetration_limit
-			+ Config.data.ghost_exit_overlap,
-			0.0
-		)
+		Vector2.ZERO
 	)
+	var recovery_position: Vector2 = Vector2(
+		board.half_size() - orb.get_current_radius() + 20.0,
+		0.0
+	)
+	orb.queue_timeout_correction(recovery_position, Vector2.ZERO)
 	await tree.physics_frame
 	await tree.physics_frame
 
-	assert_true(
-		orb.position.x + orb.get_current_radius() <= board.half_size(),
-		"proactive recovery restores orb inside right wall"
-	)
+	assert_eq(board.wall_recovery_count, 1, "proactive recovery axis count")
 	assert_eq(board.escape_guard_count, 0, "proactive recovery escape guards")
 	await _cleanup_fixture(fixture)
 

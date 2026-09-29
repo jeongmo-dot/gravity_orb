@@ -249,18 +249,21 @@ func test_center_spawn_overlap_remains_inside_board_for_half_second() -> void:
 
 	var metrics: Dictionary = await _observe_board(board, OVERLAP_OBSERVE_SECONDS)
 	print(
-		"Spawn overlap seed=4006 duration=%.2f departures=%d max_penetration=%.3f max_speed=%.3f escape_guards=%d ghost_timeouts=%d ghost_avg=%.6f" % [
+		"Spawn overlap seed=4006 duration=%.2f departures=%d max_penetration=%.3f max_speed=%.3f escape_guards=%d wall_recoveries=%d timeout_corrections=%d ghost_timeouts=%d ghost_avg=%.6f" % [
 			OVERLAP_OBSERVE_SECONDS,
 			int(metrics["departures"]),
 			float(metrics["max_penetration"]),
 			float(metrics["max_speed"]),
 			int(metrics["escape_guards"]),
+			board.wall_recovery_count,
+			board.timeout_correction_count,
 			board.ghost_timeout_count,
 			board.average_ghost_duration(),
 		]
 	)
 	assert_eq(int(metrics["departures"]), 0, "overlap case orb center departures")
 	assert_eq(int(metrics["escape_guards"]), 0, "overlap case escape guard activations")
+	assert_eq(board.wall_recovery_count, 0, "overlap case wall recovery activations")
 	assert_true(
 		float(metrics["max_penetration"]) <= OVERLAP_PENETRATION_LIMIT,
 		"overlap wall penetration must be at most %.3fpx, got %.3fpx" % [
@@ -313,12 +316,14 @@ func test_seed_4242_completes_twenty_turns_without_departures() -> void:
 		assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "turn returns to input")
 
 	print(
-		"Spawn flow seed=4242 summary turns=20 orbs=%d departures=%d max_penetration=%.3f capped_turns=%d escape_guards=%d ghost_timeouts=%d ghost_avg=%.6f" % [
+		"Spawn flow seed=4242 summary turns=20 orbs=%d departures=%d max_penetration=%.3f capped_turns=%d escape_guards=%d wall_recoveries=%d timeout_corrections=%d ghost_timeouts=%d ghost_avg=%.6f" % [
 			board.get_orbs().size(),
 			total_departures,
 			maximum_penetration,
 			capped_turn_count,
 			board.escape_guard_count,
+			board.wall_recovery_count,
+			board.timeout_correction_count,
 			board.ghost_timeout_count,
 			board.average_ghost_duration(),
 		]
@@ -327,6 +332,7 @@ func test_seed_4242_completes_twenty_turns_without_departures() -> void:
 	assert_eq(board.get_orbs().size(), 22, "initial two plus twenty turn spawns")
 	assert_eq(total_departures, 0, "twenty-turn orb center departures")
 	assert_eq(board.escape_guard_count, 0, "twenty-turn escape guard activations")
+	assert_eq(board.wall_recovery_count, 0, "twenty-turn wall recovery activations")
 	assert_true(
 		maximum_penetration <= CONTINUOUS_PENETRATION_LIMIT,
 		"twenty-turn wall penetration must be at most %.3fpx, got %.3fpx" % [
