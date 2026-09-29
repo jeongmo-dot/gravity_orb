@@ -30,8 +30,68 @@
 
 ## 대기 중
 
-### [2026-09-29 #11] 새 구체 유령 상태 (생성 직후 통과)
+### [2026-09-30 #12] 물리 보정 관측 카운터
 - 상태: 대기
+- 근거: #11 검수 메모. 보정 장치가 조용히 동작하면 테스트 지표(관통·안전장치)가 실제 안정성을 반영하지 못한다
+- 요구:
+  1. `Board`에 카운터 `wall_recovery_count`(사전 벽 복구 발동 수, 축 단위), `timeout_correction_count`(타임아웃 시 보정된 구체 수) 추가
+  2. 사전 벽 복구 발동 시 `push_warning("[WALL_RECOVERY] level=... axis=... depth=... ghost=... age_frames=... since_last_spawn_frames=...")`
+  3. 20턴·120턴·물리 22시드·겹침 생성 시나리오 출력에 두 카운터를 추가하고, **`wall_recovery_count == 0`을 assert** (22시드·겹침·20턴·120턴). `timeout_correction_count`는 보고만
+  4. 코드 동작은 바꾸지 않는다
+- 건드리지 말 것: 물리·성장·유령·안전장치 값과 동작
+- Done-when:
+  - [ ] 카운터·경고 추가, 시나리오 출력에 포함
+  - [ ] 기존 회귀에서 `wall_recovery_count` 0 assert 통과
+  - [ ] 단위 시나리오: 구체를 벽 안으로 20px 밀어 넣으면 `wall_recovery_count` 1, 안전장치 0
+  - [ ] 전체 테스트 통과, §10.1 명령 3종 에러 0
+- QA: 각 시나리오의 두 카운터 값
+- 커밋: 항목 단위 브랜치, push까지
+
+### [2026-09-30 #13] M7 점수·최고 점수·재시작 (게임오버 보류)
+- 상태: 대기 (#12 다음)
+- 근거: 기획서 5.2, [technical_design.md](technical_design.md) §5.10 `ScoreManager`, §8.2, §9 (`save.cfg`), §12 M7 (게임오버·경고는 보류). 기획서 0.3: 입력 대기 중 반응도 반응 시점에 점수 반영
+- 요구:
+  - `GameConfig` M7 필드: `level_scores`([2,4,8,16,32,64,128]), `annihilation_score_factor`(0.5), `max_merge_bonus_factor`(5.0), 도우미 `score_for_level(level)`
+  - `scripts/core/ScoreManager.gd` (`%ScoreManager`) — §5.10. `CollisionResolver.reaction_applied` 구독, `static points_for(reaction, cfg) -> int` (§8.2 표 × chain), `score`·`best_score`·`max_chain`·`max_level_reached`, 신호 `score_changed(score, best)`·`max_chain_changed(max_chain)`
+    - `max_level_reached`는 MERGE 결과 레벨·생성 구체 레벨 중 최대
+    - 최고 점수 저장: `user://save.cfg` `[records] best_score`. **점수가 최고 점수를 넘을 때마다 즉시 저장** (게임오버가 없으므로 `commit()` 대신). 파일 없음·손상 시 0으로 시작, 에러로 멈추지 않음. 테스트용으로 저장 경로를 바꿀 수 있게 한다
+  - 재시작: Input Map `restart`(R), `InputRouter.restart_requested` (잠금과 무관), `Main.restart()` → `get_tree().reload_current_scene()`. `Config.data`(F2로 바꾼 규칙 포함)는 유지
+  - HUD: 상단 중앙에 `SCORE`(큰 글씨)와 `BEST`, 그 아래 `MAX CHAIN`. 모든 Control `mouse_filter = IGNORE`. 신호로 갱신
+  - `GameOverPanel`·게임오버·경고는 만들지 않는다 (보류)
+  - 테스트 `tests/test_score.gd`, `tests/scenarios/test_score_flow.gd`
+- 수치: 위 기본값 (기획서 5.2)
+- 건드리지 말 것: `docs/` (회신 파일 제외), 물리·턴·반응 규칙, #12 카운터
+- Done-when:
+  - [ ] 점수가 기획서 5.2 규칙대로 계산된다
+  - [ ] 재실행해도 최고 점수가 유지된다
+  - [ ] R키로 재시작하면 점수 0, 최고 점수 유지, 규칙 설정 유지
+  - [ ] 전체 테스트 통과, §10.1 명령 3종 에러 0
+- 테스트:
+
+| 파일 | 조건 | 기대 |
+|---|---|---|
+| test_score | MERGE L2 → L3, chain 1 | 8 |
+| test_score | MERGE L3 → L4, chain 2 | 32 |
+| test_score | ANNIHILATE L2 + L1, chain 1 | floor((4 + 2) × 0.5) = 3 |
+| test_score | ANNIHILATE 규칙 C L4 + L1, chain 3 | floor((16 + 2) × 0.5) × 3 = 27 |
+| test_score | MAX_CLEAR (L7), chain 1 / chain 2 | 640 / 1280 |
+| test_score_flow | 합체 연쇄 시나리오 (L1+L1 → L2가 옆 L2와 합체) | 점수 4 + 8×2 = 20, `max_chain` 2 |
+| test_score_flow | 입력 대기 중 반응 | 반응 즉시 점수 증가 |
+| test_score_flow | 점수가 최고를 넘음 → 새 ScoreManager 인스턴스(같은 임시 경로) | `best_score` 유지 |
+| test_score_flow | 손상된 save 파일 | 0으로 시작, 에러 없음 |
+| test_score_flow | `restart_requested` → 재시작 | 점수 0, `best_score` 유지, `annihilation_rule` 유지 |
+
+- QA: 테스트 결과, 120턴 회귀 점수 분포(시드별 최종 점수·max chain) 참고값
+- 수동 확인 절차: 합체·소멸 때 점수가 오르는지, 게임 재실행 후 BEST 유지, R키 재시작
+- 커밋: 항목 단위 브랜치, push까지
+
+---
+
+## 처리 완료
+
+### [2026-09-29 #11] 새 구체 유령 상태 (생성 직후 통과) — 완료
+- 상태: 완료 (2026-09-30 Claude 검수 통과 · [PR #11](https://github.com/jeongmo-dot/gravity_orb/pull/11) 병합 `614a741`)
+- 검수: 79/79, 120턴 안전장치 0·관통 8.095px Claude 재실행 일치. 명세에 없던 타임아웃 보정·사전 벽 복구(16px)가 추가됐다 — 사전 복구는 카운터·로그가 없어 지표를 가릴 수 있어 Claude가 스크래치 계측: 전체 테스트 발동 0회. 관측 카운터는 #12. 명세 밖 동작은 추가 전에 `상태: 질문`으로 올릴 것. 수동 확인 보류
 - 근거: 기획서 **0.4** 3.6, [technical_design.md](technical_design.md) §4 (유령 필드), §5.2 충돌 레이어, §12 M5+ "유령 상태 채택"·"엔진 발산"
 - 배경: #9에서 새 구체 중심이 큰 구체 내부에 생기고 3체가 맞닿으면 GodotPhysics2D 좌표가 발산하는 사례를 재현했다. 사용자 결정으로 새 구체는 **겹침이 풀릴 때까지 다른 구체를 통과**한다
 - 요구:
@@ -65,10 +125,6 @@
 - QA: 테스트 결과, 120턴·20턴 안전장치·관통·발산·유령 타임아웃 수, 평균 유령 지속 시간
 - 수동 확인 절차: 새 공이 반투명하게 나타나 더미를 통과해 떨어지다 불투명해지는 모습이 자연스러운지, 이웃 공이 튕겨 나가지 않는지
 - 커밋: 항목 단위 브랜치, push까지
-
----
-
-## 처리 완료
 
 ### [2026-09-29 #10] M6 상극 소멸 — 완료
 - 상태: 완료 (2026-09-29 Claude 검수 통과 · [PR #10](https://github.com/jeongmo-dot/gravity_orb/pull/10) 병합 `2c43c0b`)
