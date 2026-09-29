@@ -49,6 +49,9 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 	Vector2i(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE),
 ]
 @export var annihilation_rule: AnnihilationRule = AnnihilationRule.B_SAME_LEVEL
+@export var level_scores: PackedInt32Array = PackedInt32Array([2, 4, 8, 16, 32, 64, 128])
+@export var annihilation_score_factor: float = 0.5
+@export var max_merge_bonus_factor: float = 5.0
 
 
 func radius_for_level(level: int) -> float:
@@ -58,6 +61,10 @@ func radius_for_level(level: int) -> float:
 func mass_for_level(level: int) -> float:
 	var radius_ratio: float = radius_for_level(level) / orb_base_radius
 	return orb_base_mass * radius_ratio * radius_ratio
+
+
+func score_for_level(level: int) -> int:
+	return level_scores[level - 1]
 
 
 func is_opposite(c1: int, c2: int) -> bool:

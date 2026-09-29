@@ -38,6 +38,39 @@
 
 ## 미확인
 
+### [2026-09-30] 대상 #13 — M7 점수·최고 점수·재시작 (게임오버 보류)
+- 상태: 완료
+- 브랜치 / PR: `m7-score-restart` / PR 미생성
+- 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, `project.godot`, `scenes/Main.tscn`, `scenes/UI.tscn`, `scripts/autoload/InputRouter.gd`, `scripts/core/Main.gd`, `scripts/core/ScoreManager.gd`, `scripts/core/ScoreManager.gd.uid`, `scripts/core/Spawner.gd`, `scripts/ui/DebugHud.gd`, `scripts/ui/Hud.gd`, `tests/test_config.gd`, `tests/test_input_router.gd`, `tests/test_score.gd`, `tests/test_score.gd.uid`, `tests/scenarios/test_score_flow.gd`, `tests/scenarios/test_score_flow.gd.uid`, `tests/scenarios/test_turn_time.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] MERGE·ANNIHILATE·MAX_CLEAR 기본 점수와 chain 배수 계산 — `test_score.gd` 5/5 자동 검증(8, 32, 3, 27, 640/1280)
+  - [x] 반응 시점 즉시 점수 반영, 합체 연쇄 `4 + 8×2 = 20`, 최대 연쇄 2 — `test_score_flow.gd` 자동 검증
+  - [x] 점수가 최고점을 넘을 때마다 `[records] best_score` 즉시 저장, 새 `ScoreManager`가 같은 경로에서 최고점 8 복원 — 자동 검증
+  - [x] 저장 파일 없음·손상 시 0으로 시작하고 `ConfigFile` 파서 오류 없이 진행 — 자동 검증
+  - [x] R 입력이 잠금과 무관하게 `restart_requested`를 발신하고 `Main.restart()`에 연결; 재시작 의미에서 점수 0·최고점 유지·`Config.data.annihilation_rule` 유지 — 입력·메인 씬 바인딩·ScoreManager reset 자동 검증
+  - [x] SCORE/BEST/MAX CHAIN HUD가 신호로 갱신되고 관련 Control의 `mouse_filter = IGNORE` — 메인 씬 자동 검증
+  - [x] 120턴 시드별 최종 점수·최대 연쇄·최고 도달 레벨 출력 — 자동 관측
+  - [x] 전체 테스트 92/92 및 §10.1 명령 3종 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - [ ] 실제 창의 HUD 배치·BEST 재실행 유지·R 씬 재로드 체감 — 수동 확인 필요(아래 절차)
+- QA 관측값:
+  - 점수 순수 계산 5/5 → MERGE L2→L3 chain1 `8`, MERGE L3→L4 chain2 `32`, ANNIHILATE L2+L1 `3`, 규칙 C L4+L1 chain3 `27`, MAX_CLEAR chain1/2 `640/1280`
+  - 점수 흐름 6/6 → 합체 연쇄 최종 `20점 / max_chain 2 / max_level 3`, 입력 대기 반응 직후 `4점`, 새 인스턴스 `score 0 / best 8`, 손상 저장 `score 0 / best 0`, 재시작 의미 `score 0 / best 8 / 규칙 C 유지`, HUD `SCORE 32 / BEST 32 / MAX CHAIN 2`
+  - 120턴 시드 101~106 최종 점수 → `[80, 80, 62, 58, 64, 50]`; 최대 연쇄 → `[2, 2, 1, 2, 1, 2]`; 최고 도달 레벨 → `[3, 4, 3, 3, 4, 3]`
+  - 120턴 물리 회귀 → 120/120 입력 복귀, 상한 도달 118회, 평균 1.501354초, 최대 1.504167초, 중심 이탈 0, 안전장치 0, 사전 복구 1(≤2), 최대 관통 10.974px, 최종 구체 평균 5.167, 타임아웃 보정 37, 유령 타임아웃 11
+  - 물리 22시드 → 중심 이탈 0, 안전장치 0, 사전 복구 0, 최대 관통 9.365px, 최대 속도 1938.483px/s
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . -s res://tests/run_tests.gd` → 92/92 통과, 종료 코드 0
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --quit-after 300` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 환경 진단 → 사용자 로그/Windows 루트 인증서/에디터 설정 접근 오류가 출력됐으나 프로젝트 스크립트 로드와 위 종료 코드에는 영향 없음
+  - 정적 검사 → `Input`/`InputEvent` 참조는 `InputRouter.gd`만, 난수 API는 `Spawner.gd`만; `git diff --check` 이상 없음
+- 수동 확인 절차:
+  1. 프로젝트를 실행한다 → 상단 중앙에 큰 `SCORE`, 오른쪽 `BEST`, 그 아래 `MAX CHAIN`이 겹치거나 잘리지 않고 표시되며 해당 영역에서 드래그해도 중력 입력이 되는지 본다.
+  2. 같은 색·레벨 구체를 합체시키고 빨강·파랑 같은 레벨을 소멸시킨다 → 반응 즉시 SCORE가 각각 명세 점수만큼 오르고 연쇄 시 MAX CHAIN이 갱신되는지 본다.
+  3. 점수를 올린 뒤 프로그램을 종료하고 다시 실행한다 → SCORE는 0, BEST는 직전 최고점으로 유지되는지 본다.
+  4. F2로 규칙을 C로 바꾸고 점수를 올린 뒤 시뮬레이션 중 R을 누른다 → 즉시 씬이 재시작되어 SCORE는 0, BEST와 `Rule: C`는 유지되는지 본다.
+- 결정 사항: 실제 생성 구체 레벨 추적을 위해 `Spawner.orb_spawned(level)` 신호를 추가해 `ScoreManager.on_orb_spawned()`에 연결했다. 제품 저장 경로는 명세대로 `user://save.cfg`이며 export된 `save_path`로 테스트 경로를 바꿀 수 있다. 현재 샌드박스의 `user://` 쓰기 제한 때문에 저장 자동 테스트는 워크스페이스의 임시 `res://tests/*.tmp.cfg`를 사용하고 매 테스트 뒤 제거한다. 손상 파일은 `ConfigFile.load()`가 자체 오류를 출력하기 전에 `[records] best_score=<int>` 최소 형식을 검사해 0으로 복구한다. 게임오버·경고·패널은 추가하지 않았다.
+- 남은 것 · 질문: 코드·자동 검증 기준 남은 항목 없음. 실제 창의 HUD 배치, 프로세스 재실행 BEST 유지, R키 씬 재로드 체감은 위 수동 절차로 확인 필요.
+
 ### [2026-09-30] 대상 #12 추가 요구 1 — 물리 보정 관측 카운터 + 기본 규칙 B
 - 상태: 완료
 - 브랜치 / PR: `m5-physics-observability` / PR 미생성

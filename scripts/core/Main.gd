@@ -6,11 +6,16 @@ const BACKGROUND_COLOR: Color = Color.BLACK
 @onready var _board: Board = $Board
 @onready var _turn_manager: TurnManager = %TurnManager
 @onready var _spawner: Spawner = %Spawner
+@onready var _collision_resolver: CollisionResolver = %CollisionResolver
+@onready var _score_manager: ScoreManager = %ScoreManager
 
 
 func _ready() -> void:
 	RenderingServer.set_default_clear_color(BACKGROUND_COLOR)
 	InputRouter.swipe.connect(_turn_manager.on_swipe)
+	InputRouter.restart_requested.connect(restart)
+	_collision_resolver.reaction_applied.connect(_score_manager.on_reaction)
+	_spawner.orb_spawned.connect(_score_manager.on_orb_spawned)
 	# TEMP(M6): M9 디버그 패널이 규칙 선택을 대체할 때 제거한다.
 	if OS.is_debug_build():
 		InputRouter.debug_cycle_annihilation_rule.connect(
@@ -19,6 +24,10 @@ func _ready() -> void:
 	_spawner.init_rng(Config.data.rng_seed)
 	_spawner.spawn_initial(_board, Vector2i.DOWN)
 	_turn_manager.start_game()
+
+
+func restart() -> void:
+	get_tree().reload_current_scene()
 
 
 func _cycle_annihilation_rule() -> void:

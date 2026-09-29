@@ -1,0 +1,204 @@
+extends TestCase
+
+const BOARD_SCENE: PackedScene = preload("res://scenes/Board.tscn")
+const COLLISION_RESOLVER_SCRIPT: Script = preload("res://scripts/core/CollisionResolver.gd")
+const INPUT_ROUTER_SCRIPT: Script = preload("res://scripts/autoload/InputRouter.gd")
+const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
+const SCORE_MANAGER_SCRIPT: Script = preload("res://scripts/core/ScoreManager.gd")
+const BEST_SAVE_PATH: String = "res://tests/test_score_flow_best.tmp.cfg"
+const CORRUPT_SAVE_PATH: String = "res://tests/test_score_flow_corrupt.tmp.cfg"
+
+
+func test_merge_chain_scores_twenty_and_tracks_chain_two() -> void:
+	var fixture: Dictionary = await _create_reaction_fixture()
+	var board: Board = fixture["board"] as Board
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var score_manager: ScoreManager = fixture["score_manager"] as ScoreManager
+	var first: Orb = board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(-120.0, 0.0))
+	var second: Orb = board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2.ZERO)
+	var next: Orb = board.spawn_orb(OrbTypes.OrbColor.RED, 2, Vector2(120.0, 0.0))
+
+	resolver.report_contact(first, second)
+	assert_eq(resolver.flush(), 1, "first merge count")
+	var merge_result: Orb = _find_active_level(board, 2, next)
+	assert_true(merge_result != null, "first merge result")
+	if merge_result != null:
+		resolver.report_contact(merge_result, next)
+		assert_eq(resolver.flush(), 1, "second merge count")
+
+	assert_eq(score_manager.score, 20, "merge chain score")
+	assert_eq(score_manager.best_score, 20, "merge chain best score")
+	assert_eq(score_manager.max_chain, 2, "merge chain maximum")
+	assert_eq(score_manager.max_level_reached, 3, "merge chain maximum level")
+	await _cleanup_fixture(fixture)
+
+
+func test_waiting_input_reaction_scores_immediately() -> void:
+	var fixture: Dictionary = await _create_reaction_fixture()
+	var board: Board = fixture["board"] as Board
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var score_manager: ScoreManager = fixture["score_manager"] as ScoreManager
+	var first: Orb = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(-60.0, 0.0))
+	var second: Orb = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(60.0, 0.0))
+
+	resolver.report_contact(first, second)
+	assert_eq(resolver.flush(), 1, "waiting-input reaction count")
+	assert_eq(score_manager.score, 4, "score updates in reaction flush")
+	await _cleanup_fixture(fixture)
+
+
+func test_best_score_is_saved_immediately_and_loaded_by_new_manager() -> void:
+	_remove_test_file(BEST_SAVE_PATH)
+	var first: ScoreManager = await _create_score_manager(BEST_SAVE_PATH)
+	first.on_reaction(_reaction(ReactionRules.Type.MERGE, 1, [2, 2], 3))
+	assert_eq(first.score, 8, "first manager score")
+	assert_eq(first.best_score, 8, "first manager best")
+	first.queue_free()
+	await tree.process_frame
+
+	var second: ScoreManager = await _create_score_manager(BEST_SAVE_PATH)
+	assert_eq(second.score, 0, "new manager score starts at zero")
+	assert_eq(second.best_score, 8, "new manager loads best")
+	second.queue_free()
+	await tree.process_frame
+	_remove_test_file(BEST_SAVE_PATH)
+
+
+func test_corrupt_save_starts_at_zero_without_stopping() -> void:
+	_remove_test_file(CORRUPT_SAVE_PATH)
+	var file: FileAccess = FileAccess.open(CORRUPT_SAVE_PATH, FileAccess.WRITE)
+	assert_true(file != null, "corrupt save fixture opens")
+	if file != null:
+		file.store_string("[records\nbest_score=this is not valid")
+		file.close()
+	var score_manager: ScoreManager = await _create_score_manager(CORRUPT_SAVE_PATH)
+	assert_eq(score_manager.score, 0, "corrupt save score")
+	assert_eq(score_manager.best_score, 0, "corrupt save best")
+	score_manager.queue_free()
+	await tree.process_frame
+	_remove_test_file(CORRUPT_SAVE_PATH)
+
+
+func test_restart_request_resets_score_and_preserves_best_and_rule() -> void:
+	var original_rule: GameConfig.AnnihilationRule = Config.data.annihilation_rule
+	var score_manager: ScoreManager = await _create_score_manager("")
+	score_manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 1, [2, 2], 3))
+	Config.data.annihilation_rule = GameConfig.AnnihilationRule.C_REMAINDER
+	var router: Variant = INPUT_ROUTER_SCRIPT.new()
+	router.restart_requested.connect(score_manager.reset)
+	router.set_locked(true)
+	router._handle_event(_restart_key_event())
+
+	assert_eq(score_manager.score, 0, "restart score reset")
+	assert_eq(score_manager.best_score, 8, "restart best preserved")
+	assert_eq(
+		Config.data.annihilation_rule,
+		GameConfig.AnnihilationRule.C_REMAINDER,
+		"restart rule preserved"
+	)
+	router.free()
+	score_manager.queue_free()
+	await tree.process_frame
+	Config.data.annihilation_rule = original_rule
+
+
+func test_main_scene_binds_score_hud_and_restart() -> void:
+	var main: Main = MAIN_SCENE.instantiate() as Main
+	var score_manager: ScoreManager = main.get_node("ScoreManager") as ScoreManager
+	score_manager.save_path = ""
+	tree.root.add_child(main)
+	await tree.process_frame
+	assert_true(
+		InputRouter.restart_requested.is_connected(Callable(main, "restart")),
+		"main restart binding"
+	)
+	score_manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 2, [3, 3], 4))
+	var score_label: Label = main.get_node("UI/Hud/ScoreLabel") as Label
+	var best_label: Label = main.get_node("UI/Hud/BestLabel") as Label
+	var max_chain_label: Label = main.get_node("UI/Hud/MaxChainLabel") as Label
+	assert_eq(score_label.text, "SCORE\n32", "score HUD text")
+	assert_eq(best_label.text, "BEST\n32", "best HUD text")
+	assert_eq(max_chain_label.text, "MAX CHAIN  2", "chain HUD text")
+	assert_eq(score_label.mouse_filter, Control.MOUSE_FILTER_IGNORE, "score ignores pointer")
+	assert_eq(best_label.mouse_filter, Control.MOUSE_FILTER_IGNORE, "best ignores pointer")
+	assert_eq(max_chain_label.mouse_filter, Control.MOUSE_FILTER_IGNORE, "chain ignores pointer")
+	main.queue_free()
+	await tree.process_frame
+	InputRouter.set_locked(false)
+
+
+func _create_reaction_fixture() -> Dictionary:
+	var fixture_root: Node = Node.new()
+	fixture_root.name = "ScoreFlowFixture"
+	var board: Board = BOARD_SCENE.instantiate() as Board
+	board.name = "Board"
+	board.unique_name_in_owner = true
+	fixture_root.add_child(board)
+	board.owner = fixture_root
+	var resolver: CollisionResolver = COLLISION_RESOLVER_SCRIPT.new() as CollisionResolver
+	resolver.name = "CollisionResolver"
+	resolver.unique_name_in_owner = true
+	fixture_root.add_child(resolver)
+	resolver.owner = fixture_root
+	var score_manager: ScoreManager = SCORE_MANAGER_SCRIPT.new() as ScoreManager
+	score_manager.name = "ScoreManager"
+	score_manager.save_path = ""
+	fixture_root.add_child(score_manager)
+	score_manager.owner = fixture_root
+	tree.root.add_child(fixture_root)
+	await tree.process_frame
+	board.set_gravity(Vector2i.ZERO)
+	resolver.reaction_applied.connect(score_manager.on_reaction)
+	return {
+		"root": fixture_root,
+		"board": board,
+		"resolver": resolver,
+		"score_manager": score_manager,
+	}
+
+
+func _create_score_manager(path: String) -> ScoreManager:
+	var score_manager: ScoreManager = SCORE_MANAGER_SCRIPT.new() as ScoreManager
+	score_manager.save_path = path
+	tree.root.add_child(score_manager)
+	await tree.process_frame
+	return score_manager
+
+
+func _cleanup_fixture(fixture: Dictionary) -> void:
+	var fixture_root: Node = fixture["root"] as Node
+	fixture_root.queue_free()
+	await tree.process_frame
+
+
+func _find_active_level(board: Board, level: int, excluded: Orb) -> Orb:
+	for orb: Orb in board.get_orbs():
+		if orb != excluded and orb.level == level:
+			return orb
+	return null
+
+
+func _reaction(
+	type: ReactionRules.Type,
+	chain: int,
+	levels: Array[int],
+	result_level: int = 0
+) -> Dictionary:
+	return {
+		"type": type,
+		"chain": chain,
+		"levels": levels,
+		"result_level": result_level,
+	}
+
+
+func _restart_key_event() -> InputEventKey:
+	var event: InputEventKey = InputEventKey.new()
+	event.physical_keycode = KEY_R
+	event.pressed = true
+	return event
+
+
+func _remove_test_file(path: String) -> void:
+	if FileAccess.file_exists(path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))

@@ -2,6 +2,7 @@ class_name Spawner
 extends Node
 
 signal next_changed(color: int, level: int)
+signal orb_spawned(level: int)
 
 var seed_used: int = 0
 
@@ -36,6 +37,7 @@ func spawn_initial(board: Board, gravity: Vector2i) -> void:
 		)
 		var orb: Orb = board.spawn_orb(int(candidate["color"]), level, position)
 		orb.exit_ghost_state()
+		orb_spawned.emit(level)
 	_draw_and_publish_next()
 
 
@@ -59,6 +61,7 @@ func try_spawn(board: Board, gravity: Vector2i) -> Orb:
 		+ (line["axis"] as Vector2) * offset
 	)
 	var orb: Orb = board.spawn_orb(int(candidate["color"]), level, position)
+	orb_spawned.emit(level)
 	_draw_and_publish_next()
 	return orb
 

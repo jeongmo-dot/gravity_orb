@@ -4,6 +4,7 @@ const INPUT_ROUTER_SCRIPT: Script = preload("res://scripts/autoload/InputRouter.
 
 var _received: Array[Vector2i] = []
 var _debug_cycles: int = 0
+var _restart_requests: int = 0
 
 
 func test_mouse_left_drag_emits_once() -> void:
@@ -130,11 +131,21 @@ func test_f2_debug_action_emits_even_while_locked() -> void:
 	router.free()
 
 
+func test_restart_action_emits_even_while_locked() -> void:
+	var router: Variant = _new_router()
+	router.set_locked(true)
+	router._handle_event(_key(KEY_R, true, false))
+	assert_eq(_restart_requests, 1, "restart request signal count")
+	router.free()
+
+
 func _new_router() -> Variant:
 	_received.clear()
 	_debug_cycles = 0
+	_restart_requests = 0
 	var router: Variant = INPUT_ROUTER_SCRIPT.new()
 	router.swipe.connect(_record_swipe)
+	router.restart_requested.connect(_record_restart_request)
 	router.debug_cycle_annihilation_rule.connect(_record_debug_cycle)
 	return router
 
@@ -145,6 +156,10 @@ func _record_swipe(direction: Vector2i) -> void:
 
 func _record_debug_cycle() -> void:
 	_debug_cycles += 1
+
+
+func _record_restart_request() -> void:
+	_restart_requests += 1
 
 
 func _assert_swipes(expected: Array[Vector2i]) -> void:
