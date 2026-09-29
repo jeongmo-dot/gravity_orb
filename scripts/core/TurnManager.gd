@@ -17,6 +17,7 @@ var state: State = State.WAITING_INPUT
 var gravity: Vector2i = Vector2i.DOWN
 var turn_index: int = 0
 var turn_max_chain: int = 0
+var capped_turn_count: int = 0
 
 var _stable_time: float = 0.0
 var _settle_elapsed: float = 0.0
@@ -30,6 +31,7 @@ func _ready() -> void:
 func start_game() -> void:
 	turn_index = 0
 	turn_max_chain = 0
+	capped_turn_count = 0
 	gravity = Vector2i.DOWN
 	_is_initial_settle = true
 	InputRouter.set_locked(true)
@@ -58,6 +60,8 @@ func on_swipe(dir: Vector2i) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	var applied_reactions: int = _collision_resolver.flush()
+
 	if state == State.SPAWNING:
 		_spawner.try_spawn(_board, gravity)
 		_begin_settle()
@@ -67,7 +71,7 @@ func _physics_process(delta: float) -> void:
 	if state != State.SIMULATING:
 		return
 
-	if _collision_resolver.flush() > 0:
+	if applied_reactions > 0:
 		_stable_time = 0.0
 
 	_settle_elapsed += delta
@@ -79,9 +83,8 @@ func _physics_process(delta: float) -> void:
 	if _stable_time >= Config.data.stable_duration:
 		_on_settled()
 	elif _settle_elapsed >= Config.data.max_settle_time:
-		push_warning(
-			"forced settle turn=%d elapsed=%.3f" % [turn_index, _settle_elapsed]
-		)
+		if not _is_initial_settle:
+			capped_turn_count += 1
 		_on_settled()
 
 

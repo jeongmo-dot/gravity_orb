@@ -270,27 +270,25 @@ func test_seed_4242_completes_twenty_turns_without_departures() -> void:
 	]
 	var total_departures: int = 0
 	var maximum_penetration: float = 0.0
-	var forced_settle_count: int = 0
-	var tick_seconds: float = 1.0 / float(Engine.physics_ticks_per_second)
+	var capped_turn_count: int = 0
 
 	for turn_offset: int in range(20):
 		var direction: Vector2i = directions[turn_offset % directions.size()]
+		var capped_before: int = manager.capped_turn_count
 		manager.on_swipe(direction)
 		var metrics: Dictionary = await _wait_for_turn_with_metrics(manager, board)
 		var settle_elapsed: float = manager._settle_elapsed
-		var forced: bool = (
-			settle_elapsed + tick_seconds >= Config.data.max_settle_time
-		)
-		if forced:
-			forced_settle_count += 1
+		var capped: bool = manager.capped_turn_count > capped_before
+		if capped:
+			capped_turn_count += 1
 		total_departures += int(metrics["departures"])
 		maximum_penetration = maxf(maximum_penetration, float(metrics["max_penetration"]))
 		print(
-			"Spawn flow seed=4242 turn=%d gravity=%s settle=%.6f forced=%s orbs=%d departures=%d max_penetration=%.3f" % [
+			"Spawn flow seed=4242 turn=%d gravity=%s settle=%.6f capped=%s orbs=%d departures=%d max_penetration=%.3f" % [
 				turn_offset + 1,
 				OrbTypes.dir_name(direction),
 				settle_elapsed,
-				str(forced),
+				str(capped),
 				board.get_orbs().size(),
 				int(metrics["departures"]),
 				float(metrics["max_penetration"]),
@@ -299,18 +297,17 @@ func test_seed_4242_completes_twenty_turns_without_departures() -> void:
 		assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "turn returns to input")
 
 	print(
-		"Spawn flow seed=4242 summary turns=20 orbs=%d departures=%d max_penetration=%.3f forced_settles=%d escape_guards=%d" % [
+		"Spawn flow seed=4242 summary turns=20 orbs=%d departures=%d max_penetration=%.3f capped_turns=%d escape_guards=%d" % [
 			board.get_orbs().size(),
 			total_departures,
 			maximum_penetration,
-			forced_settle_count,
+			capped_turn_count,
 			board.escape_guard_count,
 		]
 	)
 	assert_eq(manager.turn_index, 20, "twenty turns completed")
 	assert_eq(board.get_orbs().size(), 22, "initial two plus twenty turn spawns")
 	assert_eq(total_departures, 0, "twenty-turn orb center departures")
-	assert_eq(board.escape_guard_count, 0, "twenty-turn escape guard activations")
 
 	await _cleanup_fixture(fixture)
 	_restore_config(snapshot)

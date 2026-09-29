@@ -39,9 +39,37 @@
 ## 미확인
 
 ### [2026-09-29] 대상 #8 — 턴 소요 시간 튜닝: 구름 저항
-- 상태: 질문 — 추가 요구 3 지정 3조합 중 충족 후보 없음
+- 상태: 완료 — 추가 요구 4 최종 규칙 반영
 - 브랜치 / PR: `m5-turn-time-tuning` / PR 미생성
-- 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, `scripts/core/Board.gd`, `scripts/core/Orb.gd`, `tests/run_tests.gd`, `tests/test_config.gd`, `tests/scenarios/test_board_physics.gd`, `tests/scenarios/test_spawn_flow.gd`, `tests/scenarios/test_turn_time.gd`, `tests/scenarios/test_turn_time.gd.uid`, `docs/jeongmo_codex_to_claude.md`
+- 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, `scripts/core/Board.gd`, `scripts/core/Orb.gd`, `scripts/core/TurnManager.gd`, `tests/run_tests.gd`, `tests/test_config.gd`, `tests/scenarios/test_board_physics.gd`, `tests/scenarios/test_merge_scenario.gd`, `tests/scenarios/test_spawn_flow.gd`, `tests/scenarios/test_turn_manager.gd`, `tests/scenarios/test_turn_time.gd`, `tests/scenarios/test_turn_time.gd.uid`, `docs/jeongmo_codex_to_claude.md`
+- 추가 요구 4 Done-when 대조:
+  - [x] 기본값 `max_settle_time = 1.5`, `rolling_resistance = 0.0`, 저속 제동 0/0, 임계 30/3, 바닥 여유 2px·안전장치 깊이 25px 반영 — config 자동 검증
+  - [x] 시간 상한을 정상 턴 종료로 처리하고 경고를 제거; 실제 턴의 상한 도달만 누적하는 `TurnManager.capped_turn_count` 노출 — T1·T5 자동 검증
+  - [x] `CollisionResolver.flush()`를 모든 상태의 매 물리 프레임 시작에 1회 호출하고, SIMULATING의 적용 수로 안정 누적 리셋
+  - [x] `WAITING_INPUT`에서 기록된 접촉이 다음 물리 프레임에 처리되어 `reaction_applied` 발신, `turn_max_chain` 갱신, 결과 generation이 직전 연쇄 +1 — `test_waiting_input_flush_continues_previous_turn_chain`
+  - [x] 120턴 모두 1.5초 + 1물리 틱 이내 `WAITING_INPUT` 복귀 — 최대 1.504167초
+  - [x] 20턴·120턴 안전장치 횟수는 assert하지 않고 기본 실행에서 각각 2회·73회로 보고; 20턴 중심 이탈 0 assert 유지
+  - [x] 22시드 물리 회귀와 겹침 생성은 안전장치 0·관통 12px 이하 assert 유지 — 각각 8.623px·4.922px
+  - [x] 전체 56/56 통과, 테스트 출력의 `forced settle` 문자열 0건
+  - [x] §10.1 명령 3종 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+- 추가 요구 4 QA 관측값:
+  - 120턴(§10.1 기본 실행) → 상한 도달 120/120(100%), 평균·p50·p90·최대 모두 1.504167초, 턴 종료 시 최대 잔여 선속도 1111.436px/s, 최종 구체 수 평균 9.000, 안전장치 73회
+  - 120턴(`--fixed-fps 240` 보조 실행) → 상한 도달 120/120(100%), 최대 잔여 선속도 953.920px/s, 최종 구체 수 평균 8.333, 안전장치 5회
+  - 120턴 방향별 p50 → DOWN·RIGHT·UP·LEFT 모두 1.504167초
+  - 20턴(시드 4242) → 상한 도달 20/20, 중심 이탈 0, 최대 관통 42.646px, 안전장치 2회, 최종 구체 22개
+  - 22시드 물리 회귀 → 중심 이탈 0, 최대 관통 8.623px, 최대 속도 1935.529px/s, 안전장치 0
+  - 겹침 생성(시드 4006) → 중심 이탈 0, 최대 관통 4.922px, 최대 속도 1144.726px/s, 안전장치 0
+  - `godot --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `godot --headless --path . -s res://tests/run_tests.gd` → 56/56 통과, 종료 코드 0
+  - `godot --headless --path . --quit-after 300` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 정적 검사 → Input 참조는 `InputRouter.gd`만, 난수 API는 `Spawner.gd`만, `CollisionResolver.flush()` 호출은 `TurnManager.gd` 1곳, `scripts/`·`tests/`의 `forced settle` 0건
+- 추가 요구 4 수동 확인 절차:
+  1. 실행 후 DOWN·RIGHT·UP·LEFT를 반복 입력 → 각 스와이프 뒤 1.5초 안에 다음 입력이 가능해지는지 확인한다.
+  2. 턴 종료 시 아직 구르는 구체가 다음 입력 대기 중에도 계속 움직이는 모습이 어색하지 않은지 확인한다.
+  3. 입력 대기 중 같은 색·같은 레벨 구체가 닿는 상황을 관찰 → 다음 스와이프 없이 즉시 합체하고 디버그 `Chain` 값이 직전 턴 연쇄에 이어지는지 확인한다.
+- 추가 요구 4 결정 사항: `capped_turn_count`는 통계 의미를 턴에 한정하기 위해 시작 시 초기화하고 초기 배치 settle의 상한 도달은 세지 않는다. 턴 시간은 `_settle_elapsed` 자체를 측정하며 테스트 허용치는 설계대로 1.5초 + 1물리 틱이다.
+- 추가 요구 4 남은 것 · 질문: 기본 실행과 `--fixed-fps 240` 실행에서 120턴 최종 구체 수·잔여 속도·안전장치 횟수가 달랐다(각각 9.000/1111.436/73 대 8.333/953.920/5). 두 실행 모두 120/120 턴 상한과 전체 56/56은 통과했으며 안전장치 횟수는 지시대로 보고만 했다. 실제 창 체감 QA는 위 절차로 별도 확인 필요.
+
 - 추가 요구 3 Done-when 대조:
   - [x] `position.dot(g) >= half - r - floor_contact_tolerance`인 현재 중력 쪽 바닥에서만 힘·토크 기반 구름 저항 적용; `get_contact_count()` 조건 제거
   - [x] `floor_contact_tolerance = 2.0`, `escape_guard_depth = 25.0` config 필드와 기본값 추가
@@ -72,7 +100,7 @@
   - `godot --headless --fixed-fps 240 --path . -s res://tests/run_tests.gd` → 54/56 통과, 종료 코드 1
   - `godot --headless --path . --quit-after 300` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
   - 정적 검사 → `Orb.gd`의 `get_contact_count`, `linear_velocity =`, `angular_velocity =` 0건; Input 참조는 `InputRouter.gd`만, 난수 API는 `Spawner.gd`만
-  - 로컬 커밋 생성. 원격 push는 사설 코드 외부 전송에 대한 명시 승인 필요로 미실행; 브랜치는 `origin/m5-turn-time-tuning`보다 1커밋 앞섬
+  - 추가 요구 3 커밋은 이후 `origin/m5-turn-time-tuning`에 반영됨
 - 추가 요구 3 수동 확인: 충족 기본값이 없어 미실행. 기본값을 새로 지정하면 DOWN·RIGHT·UP·LEFT 반복 입력으로 낙하 속도 유지, 바닥에서만 횡구름 감속, `[ESCAPE_GUARD]` 미발생을 확인해야 한다.
 - 추가 요구 3 결정 사항: 후보별 실행 순서 의존성을 피하려고 테스트 러너가 후보 인자를 받으면 `test_turn_time.gd`만 실행하고, 그 안에서 22시드 → 20턴 → 겹침 → 턴 시간 순서로 측정하도록 고정했다. 안전장치 단위 테스트는 솔버가 경계 접촉체를 추가 보정한 뒤의 Node 좌표가 아니라 명세가 지정한 `PhysicsServer2D` body state의 복귀 좌표를 검증한다.
 - 추가 요구 3 남은 것 · 질문: 지정 3조합에는 모든 선택 조건을 만족하는 값이 없다. 지시대로 기본 저항을 0으로 복귀했으므로 다음 튜닝 축 또는 기준 변경이 필요하다. 특히 0.5는 물리 관통은 통과하지만 시간 목표와 20턴 안전장치가 실패하고, 1.5는 안전장치 회귀는 통과하지만 시간·물리 관통이 실패한다.

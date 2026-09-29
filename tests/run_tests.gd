@@ -4,8 +4,6 @@ const TEST_DIRECTORIES: Array[String] = ["res://tests", "res://tests/scenarios"]
 const TEST_FILE_PREFIX: String = "test_"
 const TEST_FILE_SUFFIX: String = ".gd"
 const TEST_METHOD_PREFIX: String = "test_"
-const TURN_TIME_CANDIDATE_PREFIX: String = "--turn-time-candidate="
-const TURN_TIME_TEST_PATH: String = "res://tests/scenarios/test_turn_time.gd"
 
 var _passed: int = 0
 var _failed: int = 0
@@ -16,24 +14,12 @@ func _init() -> void:
 
 
 func _run_all_tests() -> void:
-	if _has_turn_time_candidate_argument():
-		await _run_test_file(TURN_TIME_TEST_PATH)
-	else:
-		for directory: String in TEST_DIRECTORIES:
-			await _run_directory(directory)
+	for directory: String in TEST_DIRECTORIES:
+		await _run_directory(directory)
 
 	var total: int = _passed + _failed
 	print("Tests: %d passed, %d failed, %d total" % [_passed, _failed, total])
 	quit(1 if _failed > 0 else 0)
-
-
-func _has_turn_time_candidate_argument() -> bool:
-	for argument: String in OS.get_cmdline_user_args():
-		if argument.begins_with(TURN_TIME_CANDIDATE_PREFIX):
-			return true
-	return false
-
-
 func _run_directory(directory: String) -> void:
 	var files: PackedStringArray = DirAccess.get_files_at(directory)
 	files.sort()
