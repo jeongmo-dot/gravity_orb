@@ -30,38 +30,8 @@
 
 ## 대기 중
 
-### [2026-09-30 #12] 물리 보정 관측 카운터 + 기본 규칙 B
-- 상태: 진행중 — **추가 요구 있음** (아래 「추가 요구 1」)
-- 근거: #11 검수 메모. 보정 장치가 조용히 동작하면 테스트 지표(관통·안전장치)가 실제 안정성을 반영하지 못한다
-- 요구:
-  1. `Board`에 카운터 `wall_recovery_count`(사전 벽 복구 발동 수, 축 단위), `timeout_correction_count`(타임아웃 시 보정된 구체 수) 추가
-  2. 사전 벽 복구 발동 시 `push_warning("[WALL_RECOVERY] level=... axis=... depth=... ghost=... age_frames=... since_last_spawn_frames=...")`
-  3. 20턴·120턴·물리 22시드·겹침 생성 시나리오 출력에 두 카운터를 추가하고, **`wall_recovery_count == 0`을 assert** (22시드·겹침·20턴·120턴). `timeout_correction_count`는 보고만
-  4. 코드 동작은 바꾸지 않는다
-  5. **기본 상극 규칙 B로 변경** (사용자 결정, 기획서 0.4.1): `default_config.tres` `annihilation_rule = B_SAME_LEVEL`, `GameConfig` 선언 기본값도 B, `test_config.gd` 기본값 검증 갱신. 규칙을 명시적으로 설정하는 기존 시나리오는 그대로 둔다. (Claude 사전 확인: 이 변경으로 실패하는 테스트는 `test_m6_annihilation_defaults` 1건뿐, 120턴 잔여 구체 평균 3.3 → 5.8)
-- 건드리지 말 것: 물리·성장·유령·안전장치 값과 동작
-- Done-when:
-  - [ ] 카운터·경고 추가, 시나리오 출력에 포함
-  - [ ] 기존 회귀에서 `wall_recovery_count` 0 assert 통과
-  - [ ] 단위 시나리오: 구체를 벽 안으로 20px 밀어 넣으면 `wall_recovery_count` 1, 안전장치 0
-  - [ ] 기본 규칙 B (`Rule: B` 라벨로 시작)
-  - [ ] 전체 테스트 통과, §10.1 명령 3종 에러 0
-- QA: 각 시나리오의 두 카운터 값, 규칙 B 기본값의 120턴 잔여 구체 평균
-- 커밋: 항목 단위 브랜치, push까지
-
-**추가 요구 1 (2026-09-30) — (A) 채택: 120턴 사전 복구 ≤ 2, 관측 유지**
-
-질문 회신 검수: 카운터가 숨어 있던 실제 발동을 드러낸 것이 이 항목의 목적이었다. 멈춘 판단이 옳다.
-Claude 관찰: 두 발동 모두 `since_last_spawn_frames = 145` ≈ `ghost_max_time` 0.6초(144프레임) — 생성 직후가 아니라 **유령 타임아웃 보정 프레임**에 이웃이 벽으로 밀린 것으로 보인다. #14에서 반지름이 바뀌면 안전 기준 전체를 재설정하므로 지금 물리 동작은 바꾸지 않는다.
-
-1. 120턴(fixed·실시간) 시나리오: `wall_recovery_count <= 2` assert로 변경, 값은 계속 출력. 22시드·겹침·20턴은 0 유지
-2. `[WALL_RECOVERY]` 경고에 **같은 프레임 유령 타임아웃 발생 여부**(`on_ghost_timeout_frame=true/false`) 추가
-3. 코드 동작 변경 없음
-- Done-when: 전체 테스트 통과, §10.1 명령 3종 에러 0, 120턴 두 모드의 `wall_recovery_count`·`on_ghost_timeout_frame` 보고
-- 커밋: 같은 브랜치, push까지
-
 ### [2026-09-30 #13] M7 점수·최고 점수·재시작 (게임오버 보류)
-- 상태: 대기 (#12 다음)
+- 상태: 대기
 - 근거: 기획서 5.2, [technical_design.md](technical_design.md) §5.10 `ScoreManager`, §8.2, §9 (`save.cfg`), §12 M7 (게임오버·경고는 보류). 기획서 0.3: 입력 대기 중 반응도 반응 시점에 점수 반영
 - 요구:
   - `GameConfig` M7 필드: `level_scores`([2,4,8,16,32,64,128]), `annihilation_score_factor`(0.5), `max_merge_bonus_factor`(5.0), 도우미 `score_for_level(level)`
@@ -107,7 +77,7 @@ Claude 관찰: 두 발동 모두 `since_last_spawn_frames = 145` ≈ `ghost_max_
   3. **측정 1단계 — 현재 안전 기준 그대로**: `mass_exponent` **2 / 1.5 / 1** 각각 독립 프로세스로 물리 22시드·겹침·20턴·120턴(fixed·실시간) 실행. 표 항목: 안전장치·사전 복구·유령 타임아웃 수, 이탈, 발산, 최대 관통(px), **최대 관통 ÷ 해당 구체 반지름**의 최대값과 그때 레벨, 120턴 잔여 구체 평균
   4. **값은 Claude가 정한다** — 1단계 표를 회신하고 `상태: 질문`으로 멈춘다. `mass_exponent` 기본값과 안전 기준(`escape_guard_depth` 25, `wall_penetration_limit` 16, 테스트 관통 한도 12/16px)은 **바꾸지 않는다** (L1 반지름이 25가 되어 기준 재설정이 필요하다 — 측정 후 Claude가 지정)
   5. 측정 동안 기본값은 `mass_exponent = 2` (기존 면적 비례와 같은 의미)
-  6. 사전 벽 복구가 유령 타임아웃 보정 프레임과 겹치는지(`on_ghost_timeout_frame`) 표에 포함 (#12 가설: 타임아웃 보정이 이웃을 벽으로 민다)
+  6. 사전 벽 복구마다 **마지막 유령 타임아웃 이후 물리 프레임 수**를 경고·표에 포함 (#12 가설: 타임아웃 보정은 `_integrate_forces`로 1프레임 뒤 적용되므로 "같은 프레임" 판정으로는 못 잡는다. 두 사례 모두 since_last_spawn 145 = 타임아웃 144 + 1)
 - 건드리지 말 것: `docs/` (회신 파일 제외), 물리 틱·접촉 설정, 성장·유령 값, 턴·반응 규칙
 - Done-when (1단계):
   - [ ] 반지름 표 적용, 기존 공식 필드 제거, 전체 테스트가 새 반지름에서 통과하거나 실패 목록과 원인이 회신에 있다
@@ -118,6 +88,37 @@ Claude 관찰: 두 발동 모두 `since_last_spawn_frames = 145` ≈ `ghost_max_
 ---
 
 ## 처리 완료
+
+### [2026-09-30 #12] 물리 보정 관측 카운터 + 기본 규칙 B — 완료
+- 상태: 완료 (2026-09-30 Claude 검수 통과 · [PR #12](https://github.com/jeongmo-dot/gravity_orb/pull/12) 병합 `09c41a3`)
+- 검수: 79/79, 120턴 사전 복구 1·안전장치 0 Claude 재실행 일치. `on_ghost_timeout_frame=false`이나 두 사례 모두 since_last_spawn 145(타임아웃 144 + 보정 적용 1프레임 지연 가능) → #14에서 재확인. 수동 확인 보류
+- 근거: #11 검수 메모. 보정 장치가 조용히 동작하면 테스트 지표(관통·안전장치)가 실제 안정성을 반영하지 못한다
+- 요구:
+  1. `Board`에 카운터 `wall_recovery_count`(사전 벽 복구 발동 수, 축 단위), `timeout_correction_count`(타임아웃 시 보정된 구체 수) 추가
+  2. 사전 벽 복구 발동 시 `push_warning("[WALL_RECOVERY] level=... axis=... depth=... ghost=... age_frames=... since_last_spawn_frames=...")`
+  3. 20턴·120턴·물리 22시드·겹침 생성 시나리오 출력에 두 카운터를 추가하고, **`wall_recovery_count == 0`을 assert** (22시드·겹침·20턴·120턴). `timeout_correction_count`는 보고만
+  4. 코드 동작은 바꾸지 않는다
+  5. **기본 상극 규칙 B로 변경** (사용자 결정, 기획서 0.4.1): `default_config.tres` `annihilation_rule = B_SAME_LEVEL`, `GameConfig` 선언 기본값도 B, `test_config.gd` 기본값 검증 갱신. 규칙을 명시적으로 설정하는 기존 시나리오는 그대로 둔다. (Claude 사전 확인: 이 변경으로 실패하는 테스트는 `test_m6_annihilation_defaults` 1건뿐, 120턴 잔여 구체 평균 3.3 → 5.8)
+- 건드리지 말 것: 물리·성장·유령·안전장치 값과 동작
+- Done-when:
+  - [ ] 카운터·경고 추가, 시나리오 출력에 포함
+  - [ ] 기존 회귀에서 `wall_recovery_count` 0 assert 통과
+  - [ ] 단위 시나리오: 구체를 벽 안으로 20px 밀어 넣으면 `wall_recovery_count` 1, 안전장치 0
+  - [ ] 기본 규칙 B (`Rule: B` 라벨로 시작)
+  - [ ] 전체 테스트 통과, §10.1 명령 3종 에러 0
+- QA: 각 시나리오의 두 카운터 값, 규칙 B 기본값의 120턴 잔여 구체 평균
+- 커밋: 항목 단위 브랜치, push까지
+
+**추가 요구 1 (2026-09-30) — (A) 채택: 120턴 사전 복구 ≤ 2, 관측 유지**
+
+질문 회신 검수: 카운터가 숨어 있던 실제 발동을 드러낸 것이 이 항목의 목적이었다. 멈춘 판단이 옳다.
+Claude 관찰: 두 발동 모두 `since_last_spawn_frames = 145` ≈ `ghost_max_time` 0.6초(144프레임) — 생성 직후가 아니라 **유령 타임아웃 보정 프레임**에 이웃이 벽으로 밀린 것으로 보인다. #14에서 반지름이 바뀌면 안전 기준 전체를 재설정하므로 지금 물리 동작은 바꾸지 않는다.
+
+1. 120턴(fixed·실시간) 시나리오: `wall_recovery_count <= 2` assert로 변경, 값은 계속 출력. 22시드·겹침·20턴은 0 유지
+2. `[WALL_RECOVERY]` 경고에 **같은 프레임 유령 타임아웃 발생 여부**(`on_ghost_timeout_frame=true/false`) 추가
+3. 코드 동작 변경 없음
+- Done-when: 전체 테스트 통과, §10.1 명령 3종 에러 0, 120턴 두 모드의 `wall_recovery_count`·`on_ghost_timeout_frame` 보고
+- 커밋: 같은 브랜치, push까지
 
 ### [2026-09-29 #11] 새 구체 유령 상태 (생성 직후 통과) — 완료
 - 상태: 완료 (2026-09-30 Claude 검수 통과 · [PR #11](https://github.com/jeongmo-dot/gravity_orb/pull/11) 병합 `614a741`)
