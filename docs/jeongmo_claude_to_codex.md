@@ -30,46 +30,8 @@
 
 ## 대기 중
 
-### [2026-09-29 #10] M6 상극 소멸
-- 상태: 대기
-- 근거: [technical_design.md](technical_design.md) §4 (M6 필드), §5.8 표 전체, §7.2 (ANNIHILATE·survivor), §7.3 `sweep_resting_contacts`, §8.1, §12 M6. 기획서 3.5
-- 요구:
-  - `GameConfig`: `opposite_pairs: Array[Vector2i]` (기본 `[Vector2i(RED, BLUE)]`), `enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }`, `annihilation_rule` (기본 A_BOTH), 도우미 `is_opposite(c1, c2)`
-  - `ReactionRules.classify` — §5.8 표 **전체** (위에서부터 먼저 맞는 규칙). `classify`는 호출 시점의 `cfg`를 읽는다 (규칙 즉시 전환)
-  - `CollisionResolver.flush` — ANNIHILATE: 두 구체 제거. `survivor != 0`(규칙 C 잔존)이면 큰 쪽의 색·위치·속도로 레벨 `|La − Lb|` 구체를 `spawn_orb(..., generation = chain)`로 생성 (점진 성장 적용됨). `reaction_applied` 딕셔너리 키는 기존과 같다
-  - `sweep_resting_contacts() -> int` — §7.3. 현재 접촉 중인 구체 쌍(`get_colliding_bodies`)을 모아 `_pending`에 넣고 `flush()` 결과를 반환. **호출 시점**: `TurnManager`가 턴을 끝내기 직전(안정 판정·1.5초 상한 둘 다)에 1회. 반환값 > 0이면 그 턴을 바로 끝내지 않고 settle을 이어간다 (단 `max_settle_time` 상한은 그대로 — 상한 도달 시에는 sweep 결과와 무관하게 종료)
-  - 디버그 빌드 한정 임시 키: `InputRouter`에 `debug_cycle_annihilation_rule` 신호 + Input Map 액션(F2), `Main`이 A → B → C 순환하고 디버그 라벨에 `Rule: A/B/C` 표시. M9 디버그 패널로 대체 예정 (`# TEMP(M6)`)
-  - 테스트 `tests/test_rules.gd` 확장, `tests/scenarios/test_annihilation_scenario.gd`
-- 수치: 기본 `opposite_pairs = [(RED, BLUE)]`, `annihilation_rule = A_BOTH` (기획서 3.5 프로토타입 기본값)
-- 건드리지 말 것: `docs/` (회신 파일 제외), 물리·성장·안전장치 값, 턴 규칙, 합체 규칙 결과
-- Done-when:
-  - [ ] 빨강↔파랑 충돌 시 규칙에 맞게 소멸한다
-  - [ ] 초록은 어떤 색과도 소멸하지 않는다
-  - [ ] 규칙을 바꾸면 재시작 없이 다음 충돌부터 바뀐다
-  - [ ] 소멸도 연쇄 카운트에 포함된다
-  - [ ] 전체 테스트 통과 (발산 감지·안전장치 0 포함), §10.1 명령 3종 에러 0
-- 테스트:
-
-| 파일 | 조건 | 기대 |
-|---|---|---|
-| test_rules | 규칙 A: 빨강 L1~L7 × 파랑 L1~L7 전 조합 | ANNIHILATE, survivor 0 |
-| test_rules | 규칙 B: 같은 레벨 / 다른 레벨 | ANNIHILATE / NONE |
-| test_rules | 규칙 C: 빨강 L4 × 파랑 L1 / 파랑 L2 × 빨강 L5 / 같은 레벨 | 빨강 L3 잔존 (survivor 1) / 빨강 L3 잔존 (survivor 2) / 둘 다 제거 |
-| test_rules | 초록 × 빨강·파랑·초록(다른 레벨) 모든 규칙 | NONE (초록끼리 같은 레벨은 MERGE) |
-| test_rules | 같은 색 합체가 상극보다 우선 (`opposite_pairs`에 (RED, RED)를 넣어도 같은 레벨 빨강은 MERGE) | MERGE |
-| test_annihilation_scenario | 빨강 L2 + 파랑 L1 맞닿게, 규칙 A | 반응 1회, 구체 0개 |
-| test_annihilation_scenario | 같은 배치, 규칙 B | 반응 0회, 구체 2개 |
-| test_annihilation_scenario | 빨강 L4 + 파랑 L1, 규칙 C | 빨강 L3 1개가 빨강 위치 근처에 잔존, generation 1 |
-| test_annihilation_scenario | 연쇄: 빨강 L1 두 개 합체 → L2가 옆 파랑 L2와 닿음 (규칙 A) | chain [1, 2], 최종 구체 0 |
-| test_annihilation_scenario | 규칙 B로 빨강 L2·파랑 L1이 맞닿아 멈춘 뒤 규칙을 A로 바꾸고 턴 종료 처리 | `sweep_resting_contacts`가 1을 반환, 두 구체 제거 |
-| test_annihilation_scenario | 규칙 즉시 전환: 규칙 A에서 한 쌍 소멸 → B로 바꾼 뒤 다른 레벨 쌍 충돌 | 두 번째는 반응 0 |
-
-- QA: 테스트별 결과, 연쇄 시나리오 chain 순서, sweep 발동 수, 120턴 회귀(안전장치·관통·발산) 수치
-- 수동 확인 절차: 빨강·파랑이 닿으면 사라지는지, 초록은 안 사라지는지, F2로 규칙을 바꾸면 라벨이 바뀌고 다음 충돌부터 적용되는지
-- 커밋: 항목 단위 브랜치, push까지
-
 ### [2026-09-29 #11] 새 구체 유령 상태 (생성 직후 통과)
-- 상태: 대기 (#10 다음)
+- 상태: 대기
 - 근거: 기획서 **0.4** 3.6, [technical_design.md](technical_design.md) §4 (유령 필드), §5.2 충돌 레이어, §12 M5+ "유령 상태 채택"·"엔진 발산"
 - 배경: #9에서 새 구체 중심이 큰 구체 내부에 생기고 3체가 맞닿으면 GodotPhysics2D 좌표가 발산하는 사례를 재현했다. 사용자 결정으로 새 구체는 **겹침이 풀릴 때까지 다른 구체를 통과**한다
 - 요구:
@@ -107,6 +69,45 @@
 ---
 
 ## 처리 완료
+
+### [2026-09-29 #10] M6 상극 소멸 — 완료
+- 상태: 완료 (2026-09-29 Claude 검수 통과 · [PR #10](https://github.com/jeongmo-dot/gravity_orb/pull/10) 병합 `2c43c0b`)
+- 검수: 71/71, 22시드 8.517px, 120턴 안전장치 0·관통 15.507px Claude 재실행 일치. 기획 관찰: 규칙 A에서 120턴 후 잔여 구체 평균 3~3.5개 — 규칙 B/C 체감 비교를 사용자 수동 확인에 추가. 수동 확인 보류
+- 근거: [technical_design.md](technical_design.md) §4 (M6 필드), §5.8 표 전체, §7.2 (ANNIHILATE·survivor), §7.3 `sweep_resting_contacts`, §8.1, §12 M6. 기획서 3.5
+- 요구:
+  - `GameConfig`: `opposite_pairs: Array[Vector2i]` (기본 `[Vector2i(RED, BLUE)]`), `enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }`, `annihilation_rule` (기본 A_BOTH), 도우미 `is_opposite(c1, c2)`
+  - `ReactionRules.classify` — §5.8 표 **전체** (위에서부터 먼저 맞는 규칙). `classify`는 호출 시점의 `cfg`를 읽는다 (규칙 즉시 전환)
+  - `CollisionResolver.flush` — ANNIHILATE: 두 구체 제거. `survivor != 0`(규칙 C 잔존)이면 큰 쪽의 색·위치·속도로 레벨 `|La − Lb|` 구체를 `spawn_orb(..., generation = chain)`로 생성 (점진 성장 적용됨). `reaction_applied` 딕셔너리 키는 기존과 같다
+  - `sweep_resting_contacts() -> int` — §7.3. 현재 접촉 중인 구체 쌍(`get_colliding_bodies`)을 모아 `_pending`에 넣고 `flush()` 결과를 반환. **호출 시점**: `TurnManager`가 턴을 끝내기 직전(안정 판정·1.5초 상한 둘 다)에 1회. 반환값 > 0이면 그 턴을 바로 끝내지 않고 settle을 이어간다 (단 `max_settle_time` 상한은 그대로 — 상한 도달 시에는 sweep 결과와 무관하게 종료)
+  - 디버그 빌드 한정 임시 키: `InputRouter`에 `debug_cycle_annihilation_rule` 신호 + Input Map 액션(F2), `Main`이 A → B → C 순환하고 디버그 라벨에 `Rule: A/B/C` 표시. M9 디버그 패널로 대체 예정 (`# TEMP(M6)`)
+  - 테스트 `tests/test_rules.gd` 확장, `tests/scenarios/test_annihilation_scenario.gd`
+- 수치: 기본 `opposite_pairs = [(RED, BLUE)]`, `annihilation_rule = A_BOTH` (기획서 3.5 프로토타입 기본값)
+- 건드리지 말 것: `docs/` (회신 파일 제외), 물리·성장·안전장치 값, 턴 규칙, 합체 규칙 결과
+- Done-when:
+  - [ ] 빨강↔파랑 충돌 시 규칙에 맞게 소멸한다
+  - [ ] 초록은 어떤 색과도 소멸하지 않는다
+  - [ ] 규칙을 바꾸면 재시작 없이 다음 충돌부터 바뀐다
+  - [ ] 소멸도 연쇄 카운트에 포함된다
+  - [ ] 전체 테스트 통과 (발산 감지·안전장치 0 포함), §10.1 명령 3종 에러 0
+- 테스트:
+
+| 파일 | 조건 | 기대 |
+|---|---|---|
+| test_rules | 규칙 A: 빨강 L1~L7 × 파랑 L1~L7 전 조합 | ANNIHILATE, survivor 0 |
+| test_rules | 규칙 B: 같은 레벨 / 다른 레벨 | ANNIHILATE / NONE |
+| test_rules | 규칙 C: 빨강 L4 × 파랑 L1 / 파랑 L2 × 빨강 L5 / 같은 레벨 | 빨강 L3 잔존 (survivor 1) / 빨강 L3 잔존 (survivor 2) / 둘 다 제거 |
+| test_rules | 초록 × 빨강·파랑·초록(다른 레벨) 모든 규칙 | NONE (초록끼리 같은 레벨은 MERGE) |
+| test_rules | 같은 색 합체가 상극보다 우선 (`opposite_pairs`에 (RED, RED)를 넣어도 같은 레벨 빨강은 MERGE) | MERGE |
+| test_annihilation_scenario | 빨강 L2 + 파랑 L1 맞닿게, 규칙 A | 반응 1회, 구체 0개 |
+| test_annihilation_scenario | 같은 배치, 규칙 B | 반응 0회, 구체 2개 |
+| test_annihilation_scenario | 빨강 L4 + 파랑 L1, 규칙 C | 빨강 L3 1개가 빨강 위치 근처에 잔존, generation 1 |
+| test_annihilation_scenario | 연쇄: 빨강 L1 두 개 합체 → L2가 옆 파랑 L2와 닿음 (규칙 A) | chain [1, 2], 최종 구체 0 |
+| test_annihilation_scenario | 규칙 B로 빨강 L2·파랑 L1이 맞닿아 멈춘 뒤 규칙을 A로 바꾸고 턴 종료 처리 | `sweep_resting_contacts`가 1을 반환, 두 구체 제거 |
+| test_annihilation_scenario | 규칙 즉시 전환: 규칙 A에서 한 쌍 소멸 → B로 바꾼 뒤 다른 레벨 쌍 충돌 | 두 번째는 반응 0 |
+
+- QA: 테스트별 결과, 연쇄 시나리오 chain 순서, sweep 발동 수, 120턴 회귀(안전장치·관통·발산) 수치
+- 수동 확인 절차: 빨강·파랑이 닿으면 사라지는지, 초록은 안 사라지는지, F2로 규칙을 바꾸면 라벨이 바뀌고 다음 충돌부터 적용되는지
+- 커밋: 항목 단위 브랜치, push까지
 
 ### [2026-09-29 #9] 물리 안정성 — 새 구체 점진 성장 — 완료
 - 상태: 완료 (2026-09-29 Claude 검수 통과 · [PR #9](https://github.com/jeongmo-dot/gravity_orb/pull/9) 병합 `7197aeb`)
