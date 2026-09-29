@@ -2,6 +2,7 @@ extends TestCase
 
 const BOARD_SCENE: PackedScene = preload("res://scenes/Board.tscn")
 const COLLISION_RESOLVER_SCRIPT: Script = preload("res://scripts/core/CollisionResolver.gd")
+const SCORE_MANAGER_SCRIPT: Script = preload("res://scripts/core/ScoreManager.gd")
 const SPAWNER_SCRIPT: Script = preload("res://scripts/core/Spawner.gd")
 const TURN_MANAGER_SCRIPT: Script = preload("res://scripts/core/TurnManager.gd")
 const SEEDS: Array[int] = [101, 102, 103, 104, 105, 106]
@@ -76,11 +77,15 @@ func _measure_current_config() -> Dictionary:
 	var maximum_residual_speed: float = 0.0
 	var maximum_penetration: float = 0.0
 	var center_departures: int = 0
+	var scores_by_seed: Array[int] = []
+	var max_chains_by_seed: Array[int] = []
+	var max_levels_by_seed: Array[int] = []
 
 	for seed: int in SEEDS:
 		var fixture: Dictionary = await _create_ready_fixture(seed)
 		var board: Board = fixture["board"] as Board
 		var manager: TurnManager = fixture["manager"] as TurnManager
+		var score_manager: ScoreManager = fixture["score_manager"] as ScoreManager
 		for turn_offset: int in range(TURNS_PER_SEED):
 			var direction: Vector2i = DIRECTION_PATTERN[turn_offset % DIRECTION_PATTERN.size()]
 			manager.on_swipe(direction)
@@ -111,6 +116,17 @@ func _measure_current_config() -> Dictionary:
 		ghost_timeout_total += board.ghost_timeout_count
 		ghost_completed_total += board.ghost_completed_count
 		ghost_duration_total += board.ghost_total_duration
+		scores_by_seed.append(score_manager.score)
+		max_chains_by_seed.append(score_manager.max_chain)
+		max_levels_by_seed.append(score_manager.max_level_reached)
+		print(
+			"Turn-time seed=%d score=%d max_chain=%d max_level=%d" % [
+				seed,
+				score_manager.score,
+				score_manager.max_chain,
+				score_manager.max_level_reached,
+			]
+		)
 		await _cleanup_fixture(fixture)
 
 	return {
@@ -135,6 +151,9 @@ func _measure_current_config() -> Dictionary:
 			if ghost_completed_total > 0
 			else 0.0
 		),
+		"scores_by_seed": scores_by_seed,
+		"max_chains_by_seed": max_chains_by_seed,
+		"max_levels_by_seed": max_levels_by_seed,
 		"direction_p50": {
 			"DOWN": _percentile(direction_times["DOWN"] as Array[float], 0.50),
 			"RIGHT": _percentile(direction_times["RIGHT"] as Array[float], 0.50),
@@ -197,8 +216,16 @@ func _create_fixture(seed: int) -> Dictionary:
 	fixture_root.add_child(manager)
 	manager.owner = fixture_root
 
+	var score_manager: ScoreManager = SCORE_MANAGER_SCRIPT.new() as ScoreManager
+	score_manager.name = "ScoreManager"
+	score_manager.save_path = ""
+	fixture_root.add_child(score_manager)
+	score_manager.owner = fixture_root
+
 	tree.root.add_child(fixture_root)
 	await tree.process_frame
+	resolver.reaction_applied.connect(score_manager.on_reaction)
+	spawner.orb_spawned.connect(score_manager.on_orb_spawned)
 	spawner.init_rng(seed)
 	return {
 		"root": fixture_root,
@@ -206,6 +233,7 @@ func _create_fixture(seed: int) -> Dictionary:
 		"spawner": spawner,
 		"resolver": resolver,
 		"manager": manager,
+		"score_manager": score_manager,
 	}
 
 
@@ -416,5 +444,12 @@ func _print_metrics(metrics: Dictionary) -> void:
 			float(direction_p50["RIGHT"]),
 			float(direction_p50["UP"]),
 			float(direction_p50["LEFT"]),
+		]
+	)
+	print(
+		"Turn-time scores_by_seed=%s max_chains_by_seed=%s max_levels_by_seed=%s" % [
+			str(metrics["scores_by_seed"]),
+			str(metrics["max_chains_by_seed"]),
+			str(metrics["max_levels_by_seed"]),
 		]
 	)

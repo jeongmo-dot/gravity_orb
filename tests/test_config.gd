@@ -107,3 +107,30 @@ func test_m6_annihilation_defaults() -> void:
 		not config.is_opposite(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.GREEN),
 		"green is not opposite"
 	)
+
+
+func test_m7_score_defaults() -> void:
+	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
+	assert_eq(
+		config.level_scores,
+		PackedInt32Array([2, 4, 8, 16, 32, 64, 128]),
+		"level scores"
+	)
+	assert_near(
+		config.annihilation_score_factor,
+		0.5,
+		TOLERANCE,
+		"annihilation score factor"
+	)
+	assert_near(
+		config.max_merge_bonus_factor,
+		5.0,
+		TOLERANCE,
+		"maximum merge bonus factor"
+	)
+	for level: int in range(1, config.orb_max_level + 1):
+		assert_eq(
+			config.score_for_level(level),
+			config.level_scores[level - 1],
+			"score for level %d" % level
+		)

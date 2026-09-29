@@ -12,6 +12,7 @@ const ANNIHILATION_RULE_NAMES: Array[String] = ["A", "B", "C"]
 
 @onready var _turn_manager: TurnManager = %TurnManager
 @onready var _spawner: Spawner = %Spawner
+@onready var _score_manager: ScoreManager = %ScoreManager
 @onready var _label: Label = %DebugLabel
 @onready var _hud: Hud = %Hud
 
@@ -23,6 +24,7 @@ var _turn_max_chain: int = 0
 
 func _ready() -> void:
 	_hud.bind_spawner(_spawner)
+	_hud.bind_score_manager(_score_manager)
 	_state = _turn_manager.state
 	_gravity = _turn_manager.gravity
 	_turn_index = _turn_manager.turn_index
