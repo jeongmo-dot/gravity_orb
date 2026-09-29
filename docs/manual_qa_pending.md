@@ -3,7 +3,7 @@
 사용자가 실제 창에서 확인할 항목. 자동 검증으로 먼저 병합하고, 사용자 확인 후 체크한다.
 문제가 있으면 Claude에게 알려 인박스 항목으로 만든다.
 
-실행: `C:\work\Godot\Godot_v4.8-dev3_mono_win64.exe --path C:\Workspaceepos\game\gravity_orb`
+실행: `C:\work\Godot\Godot_v4.8-dev3_mono_win64.exe --path C:\Workspace\repos\game\gravity_orb`
 
 ## PR #8 — 턴 시간 1.5초 상한 (병합 `c61f9f3`)
 - [ ] 스와이프 후 1.5초 안에 다음 입력이 된다
