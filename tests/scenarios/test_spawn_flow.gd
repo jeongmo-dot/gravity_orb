@@ -459,7 +459,7 @@ func _accumulate_board_metrics(board: Board, metrics: Dictionary) -> void:
 	for orb: Orb in board.get_orbs():
 		var center_extent: float = maxf(absf(orb.position.x), absf(orb.position.y))
 		var penetration: float = maxf(
-			center_extent + orb.get_radius() - board.half_size(),
+			center_extent + orb.get_current_radius() - board.half_size(),
 			0.0
 		)
 		metrics["max_penetration"] = maxf(

@@ -68,3 +68,5 @@ func test_m5_plus_tuning_defaults() -> void:
 	assert_near(config.rest_damp, 0.0, TOLERANCE, "rest damping")
 	assert_near(config.floor_contact_tolerance, 2.0, TOLERANCE, "floor contact tolerance")
 	assert_near(config.escape_guard_depth, 25.0, TOLERANCE, "escape guard depth")
+	assert_near(config.grow_duration, 0.0, TOLERANCE, "growth duration")
+	assert_near(config.grow_start_ratio, 1.0, TOLERANCE, "growth start ratio")

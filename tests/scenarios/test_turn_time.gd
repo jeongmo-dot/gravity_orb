@@ -46,6 +46,8 @@ func _measure_current_config() -> Dictionary:
 	var final_orb_total: int = 0
 	var escape_guard_total: int = 0
 	var maximum_residual_speed: float = 0.0
+	var maximum_penetration: float = 0.0
+	var center_departures: int = 0
 
 	for seed: int in SEEDS:
 		var fixture: Dictionary = await _create_ready_fixture(seed)
@@ -54,7 +56,16 @@ func _measure_current_config() -> Dictionary:
 		for turn_offset: int in range(TURNS_PER_SEED):
 			var direction: Vector2i = DIRECTION_PATTERN[turn_offset % DIRECTION_PATTERN.size()]
 			manager.on_swipe(direction)
-			await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
+			var turn_metrics: Dictionary = await _wait_for_state_with_metrics(
+				manager,
+				board,
+				TurnManager.State.WAITING_INPUT
+			)
+			maximum_penetration = maxf(
+				maximum_penetration,
+				float(turn_metrics["max_penetration"])
+			)
+			center_departures += int(turn_metrics["departures"])
 			var turn_time: float = manager._settle_elapsed
 			turn_times.append(turn_time)
 			var direction_name: String = OrbTypes.dir_name(direction)
@@ -78,6 +89,8 @@ func _measure_current_config() -> Dictionary:
 		"p90": _percentile(turn_times, 0.90),
 		"maximum": _percentile(turn_times, 1.0),
 		"maximum_residual_speed": maximum_residual_speed,
+		"maximum_penetration": maximum_penetration,
+		"departures": center_departures,
 		"final_orb_average": float(final_orb_total) / float(SEEDS.size()),
 		"escape_guards": escape_guard_total,
 		"direction_p50": {
@@ -156,6 +169,36 @@ func _wait_for_state(manager: TurnManager, target: TurnManager.State) -> void:
 	assert_eq(manager.state, target, "state wait timeout")
 
 
+func _wait_for_state_with_metrics(
+	manager: TurnManager,
+	board: Board,
+	target: TurnManager.State
+) -> Dictionary:
+	var metrics: Dictionary = {
+		"max_penetration": 0.0,
+		"departures": 0,
+	}
+	var max_frames: int = ceili(float(Engine.physics_ticks_per_second) * WAIT_TIMEOUT_SECONDS)
+	for _frame: int in range(max_frames):
+		await tree.physics_frame
+		for orb: Orb in board.get_orbs():
+			var center_extent: float = maxf(absf(orb.position.x), absf(orb.position.y))
+			var penetration: float = maxf(
+				center_extent + orb.get_current_radius() - board.half_size(),
+				0.0
+			)
+			metrics["max_penetration"] = maxf(
+				float(metrics["max_penetration"]),
+				penetration
+			)
+			if center_extent > board.half_size():
+				metrics["departures"] = int(metrics["departures"]) + 1
+		if manager.state == target:
+			return metrics
+	assert_eq(manager.state, target, "state wait timeout")
+	return metrics
+
+
 func _cleanup_fixture(fixture: Dictionary) -> void:
 	InputRouter.set_locked(false)
 	var fixture_root: Node = fixture["root"] as Node
@@ -180,7 +223,7 @@ func _percentile(values: Array[float], quantile: float) -> float:
 func _print_metrics(metrics: Dictionary) -> void:
 	var direction_p50: Dictionary = metrics["direction_p50"] as Dictionary
 	print(
-		"Turn-time cap=%.3f turns=%d capped=%d capped_ratio=%.6f average=%.6f p50=%.6f p90=%.6f max=%.6f max_residual_speed=%.3f final_orbs_avg=%.3f escape_guards=%d direction_p50=[D %.6f R %.6f U %.6f L %.6f]" % [
+		"Turn-time cap=%.3f turns=%d capped=%d capped_ratio=%.6f average=%.6f p50=%.6f p90=%.6f max=%.6f max_residual_speed=%.3f max_penetration=%.3f departures=%d final_orbs_avg=%.3f escape_guards=%d direction_p50=[D %.6f R %.6f U %.6f L %.6f]" % [
 			Config.data.max_settle_time,
 			int(metrics["turns"]),
 			int(metrics["capped_turns"]),
@@ -190,6 +233,8 @@ func _print_metrics(metrics: Dictionary) -> void:
 			float(metrics["p90"]),
 			float(metrics["maximum"]),
 			float(metrics["maximum_residual_speed"]),
+			float(metrics["maximum_penetration"]),
+			int(metrics["departures"]),
 			float(metrics["final_orb_average"]),
 			int(metrics["escape_guards"]),
 			float(direction_p50["DOWN"]),

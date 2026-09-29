@@ -40,9 +40,14 @@ func spawn_orb(
 	p_velocity: Vector2 = Vector2.ZERO,
 	p_generation: int = 0
 ) -> Orb:
+	var spawn_physics_frame: int = Engine.get_physics_frames()
+	for existing_orb: Orb in _orbs:
+		if is_instance_valid(existing_orb) and not existing_orb.consumed:
+			existing_orb.note_board_spawn(spawn_physics_frame)
 	var orb: Orb = ORB_SCENE.instantiate() as Orb
 	_orbs_node.add_child(orb)
 	orb.setup(p_color, p_level, Config.data)
+	orb.note_board_spawn(spawn_physics_frame)
 	orb.position = p_position
 	orb.linear_velocity = p_velocity
 	orb.generation = p_generation

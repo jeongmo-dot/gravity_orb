@@ -11,6 +11,12 @@ var level: int
 var generation: int = 0
 var consumed: bool = false
 var _radius: float = 0.0
+var _current_radius: float = 0.0
+var _growth_start_radius: float = 0.0
+var _growth_duration: float = 0.0
+var _growth_elapsed: float = 0.0
+var _spawn_physics_frame: int = 0
+var _last_board_spawn_physics_frame: int = 0
 var _gravity_direction: Vector2 = Vector2.DOWN
 var _rest_braking_active: bool = false
 var _last_rolling_resistance_force: Vector2 = Vector2.ZERO
@@ -20,6 +26,14 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	color = p_color
 	level = p_level
 	_radius = cfg.radius_for_level(level)
+	_growth_duration = maxf(cfg.grow_duration, 0.0)
+	_growth_start_radius = _radius * clampf(cfg.grow_start_ratio, 0.0, 1.0)
+	_current_radius = (
+		_radius if _growth_duration <= 0.0 else _growth_start_radius
+	)
+	_growth_elapsed = 0.0
+	_spawn_physics_frame = Engine.get_physics_frames()
+	_last_board_spawn_physics_frame = _spawn_physics_frame
 
 	gravity_scale = 0.0
 	can_sleep = false
@@ -38,13 +52,21 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	physics_material_override = material
 
 	var circle: CircleShape2D = CircleShape2D.new()
-	circle.radius = _radius
+	circle.radius = _current_radius
 	_collision_shape.shape = circle
-	_visual.setup(cfg.color_display[color], _radius)
+	_visual.setup(cfg.color_display[color], _current_radius)
 
 
 func get_radius() -> float:
 	return _radius
+
+
+func get_current_radius() -> float:
+	return _current_radius
+
+
+func note_board_spawn(physics_frame: int) -> void:
+	_last_board_spawn_physics_frame = physics_frame
 
 
 func set_gravity(direction: Vector2i, strength: float) -> void:
@@ -53,6 +75,7 @@ func set_gravity(direction: Vector2i, strength: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_advance_growth(delta)
 	_last_rolling_resistance_force = Vector2.ZERO
 	if _apply_escape_guard():
 		return
@@ -69,7 +92,7 @@ func _physics_process(delta: float) -> void:
 	var gravity_axis: Vector2 = _gravity_direction.normalized()
 	var floor_limit: float = (
 		Config.data.board_size * 0.5
-		- _radius
+		- _current_radius
 		- Config.data.floor_contact_tolerance
 	)
 	if position.dot(gravity_axis) < floor_limit:
@@ -102,7 +125,7 @@ func _physics_process(delta: float) -> void:
 
 	if is_zero_approx(angular_velocity):
 		return
-	var circle_inertia: float = 0.5 * mass * _radius * _radius
+	var circle_inertia: float = 0.5 * mass * _current_radius * _current_radius
 	var angular_acceleration: float = -angular_velocity * (1.0 - remaining_ratio) / delta
 	apply_torque(angular_acceleration * circle_inertia)
 
@@ -114,17 +137,29 @@ func _apply_escape_guard() -> bool:
 	var triggered: bool = false
 	for axis_index: int in range(2):
 		var coordinate: float = position[axis_index]
-		var depth: float = absf(coordinate) + _radius - half
+		var depth: float = absf(coordinate) + _current_radius - half
 		if depth <= Config.data.escape_guard_depth:
 			continue
 		var wall_sign: float = signf(coordinate)
-		corrected_position[axis_index] = wall_sign * (half - _radius)
+		corrected_position[axis_index] = wall_sign * (half - _current_radius)
 		if corrected_velocity[axis_index] * wall_sign > 0.0:
 			corrected_velocity[axis_index] = 0.0
 		var axis_name: String = "x" if axis_index == 0 else "y"
 		escape_guard_triggered.emit(axis_name, depth)
+		var physics_frame: int = Engine.get_physics_frames()
+		var age_frames: int = maxi(physics_frame - _spawn_physics_frame, 0)
+		var since_last_spawn_frames: int = maxi(
+			physics_frame - _last_board_spawn_physics_frame,
+			0
+		)
 		push_warning(
-			"[ESCAPE_GUARD] level=%d axis=%s depth=%.3f" % [level, axis_name, depth]
+			"[ESCAPE_GUARD] level=%d axis=%s depth=%.3f age_frames=%d since_last_spawn_frames=%d" % [
+				level,
+				axis_name,
+				depth,
+				age_frames,
+				since_last_spawn_frames,
+			]
 		)
 		triggered = true
 	if not triggered:
@@ -148,3 +183,19 @@ func _apply_escape_guard() -> bool:
 		corrected_velocity
 	)
 	return true
+
+
+func _advance_growth(delta: float) -> void:
+	if _current_radius >= _radius or _growth_duration <= 0.0:
+		return
+	_growth_elapsed = minf(_growth_elapsed + delta, _growth_duration)
+	var progress: float = _growth_elapsed / _growth_duration
+	_set_current_radius(lerpf(_growth_start_radius, _radius, progress))
+
+
+func _set_current_radius(radius: float) -> void:
+	_current_radius = minf(radius, _radius)
+	var circle: CircleShape2D = _collision_shape.shape as CircleShape2D
+	if circle != null:
+		circle.radius = _current_radius
+	_visual.set_radius(_current_radius)

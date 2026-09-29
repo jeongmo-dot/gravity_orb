@@ -46,8 +46,13 @@ func test_guard_restores_orb_after_forty_pixel_penetration() -> void:
 	var board: Board = BOARD_SCENE.instantiate() as Board
 	tree.root.add_child(board)
 	await tree.process_frame
-	var radius: float = Config.data.radius_for_level(1)
-	var boundary: float = board.half_size() - radius
+	var final_radius: float = Config.data.radius_for_level(1)
+	var current_radius: float = (
+		final_radius
+		if Config.data.grow_duration <= 0.0
+		else final_radius * Config.data.grow_start_ratio
+	)
+	var boundary: float = board.half_size() - current_radius
 	var orb: Orb = board.spawn_orb(
 		0,
 		1,
@@ -55,7 +60,7 @@ func test_guard_restores_orb_after_forty_pixel_penetration() -> void:
 		Vector2(100.0, 0.0)
 	)
 	orb.set_physics_process(false)
-	orb._physics_process(1.0 / float(Engine.physics_ticks_per_second))
+	orb._physics_process(0.0)
 	var body_transform: Transform2D = PhysicsServer2D.body_get_state(
 		orb.get_rid(),
 		PhysicsServer2D.BODY_STATE_TRANSFORM
@@ -151,7 +156,7 @@ func _run_scenario(seed: int, scenario_name: String, levels: Array[int]) -> Dict
 					var orb: Orb = orbs[orb_index]
 					var center_extent: float = maxf(absf(orb.position.x), absf(orb.position.y))
 					var penetration: float = maxf(
-						center_extent + orb.get_radius() - board.half_size(),
+						center_extent + orb.get_current_radius() - board.half_size(),
 						0.0
 					)
 					maximum_penetration = maxf(maximum_penetration, penetration)

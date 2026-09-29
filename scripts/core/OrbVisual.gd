@@ -7,8 +7,16 @@ var _radius: float = 0.0
 
 func setup(display_color: Color, radius: float) -> void:
 	_display_color = display_color
+	set_radius(radius)
+
+
+func set_radius(radius: float) -> void:
 	_radius = radius
 	queue_redraw()
+
+
+func get_radius() -> float:
+	return _radius
 
 
 func _draw() -> void:
