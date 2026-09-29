@@ -4,6 +4,14 @@ const TEST_DIRECTORIES: Array[String] = ["res://tests", "res://tests/scenarios"]
 const TEST_FILE_PREFIX: String = "test_"
 const TEST_FILE_SUFFIX: String = ".gd"
 const TEST_METHOD_PREFIX: String = "test_"
+const GROWTH_DURATION_PREFIX: String = "--growth-duration="
+const GROWTH_RATIO_PREFIX: String = "--growth-ratio="
+const GROWTH_SUITE_PREFIX: String = "--growth-suite="
+const GROWTH_FIXED_TESTS: Array[String] = [
+	"res://tests/scenarios/test_board_physics.gd",
+	"res://tests/scenarios/test_spawn_flow.gd",
+	"res://tests/scenarios/test_turn_time.gd",
+]
 
 var _passed: int = 0
 var _failed: int = 0
@@ -14,12 +22,43 @@ func _init() -> void:
 
 
 func _run_all_tests() -> void:
-	for directory: String in TEST_DIRECTORIES:
-		await _run_directory(directory)
+	var growth_suite: String = _apply_growth_arguments()
+	if growth_suite == "fixed":
+		for path: String in GROWTH_FIXED_TESTS:
+			await _run_test_file(path)
+	elif growth_suite == "realtime":
+		await _run_test_file("res://tests/scenarios/test_turn_time.gd")
+	else:
+		for directory: String in TEST_DIRECTORIES:
+			await _run_directory(directory)
 
 	var total: int = _passed + _failed
 	print("Tests: %d passed, %d failed, %d total" % [_passed, _failed, total])
 	quit(1 if _failed > 0 else 0)
+
+
+func _apply_growth_arguments() -> String:
+	var growth_suite: String = ""
+	var config_node: Node = root.get_node("Config")
+	var config_data: GameConfig = config_node.get("data") as GameConfig
+	for argument: String in OS.get_cmdline_user_args():
+		if argument.begins_with(GROWTH_DURATION_PREFIX):
+			config_data.grow_duration = argument.trim_prefix(GROWTH_DURATION_PREFIX).to_float()
+		elif argument.begins_with(GROWTH_RATIO_PREFIX):
+			config_data.grow_start_ratio = argument.trim_prefix(GROWTH_RATIO_PREFIX).to_float()
+		elif argument.begins_with(GROWTH_SUITE_PREFIX):
+			growth_suite = argument.trim_prefix(GROWTH_SUITE_PREFIX)
+	if not growth_suite.is_empty():
+		print(
+			"Growth candidate duration=%.3f ratio=%.3f suite=%s" % [
+				config_data.grow_duration,
+				config_data.grow_start_ratio,
+				growth_suite,
+			]
+		)
+	return growth_suite
+
+
 func _run_directory(directory: String) -> void:
 	var files: PackedStringArray = DirAccess.get_files_at(directory)
 	files.sort()

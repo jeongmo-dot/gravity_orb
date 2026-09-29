@@ -3,6 +3,7 @@ extends RefCounted
 
 var tree: SceneTree
 var failures: Array[String] = []
+var _motion_bounds_reported: Dictionary = {}
 
 
 func assert_eq(actual: Variant, expected: Variant, message: String = "") -> void:
@@ -30,6 +31,45 @@ func assert_near(actual: float, expected: float, epsilon: float, message: String
 
 func get_failure_count() -> int:
 	return failures.size()
+
+
+func assert_board_motion_bounds(board: Node, context: String = "") -> void:
+	var maximum_extent: float = float(board.call("half_size")) * 2.0
+	var orbs: Array = board.call("get_orbs") as Array
+	var board_id: int = board.get_instance_id()
+	var already_reported: bool = _motion_bounds_reported.has(board_id)
+	var violated: bool = false
+	for orb_value: Variant in orbs:
+		var orb: RigidBody2D = orb_value as RigidBody2D
+		var center_extent: float = maxf(absf(orb.position.x), absf(orb.position.y))
+		var speed: float = orb.linear_velocity.length()
+		if center_extent > maximum_extent:
+			violated = true
+			if not already_reported:
+				assert_true(
+					false,
+					"%s orb %d center extent %.3f must be at most %.3f" % [
+						context,
+						orb.get_instance_id(),
+						center_extent,
+						maximum_extent,
+					]
+				)
+				already_reported = true
+		if speed > 10000.0:
+			violated = true
+			if not already_reported:
+				assert_true(
+					false,
+					"%s orb %d speed %.3f must be at most 10000.000" % [
+						context,
+						orb.get_instance_id(),
+						speed,
+					]
+				)
+				already_reported = true
+	if violated:
+		_motion_bounds_reported[board_id] = true
 
 
 func _record_failure(message: String) -> void:

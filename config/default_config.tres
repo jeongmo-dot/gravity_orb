@@ -37,3 +37,5 @@ rest_speed = 0.0
 rest_damp = 0.0
 floor_contact_tolerance = 2.0
 escape_guard_depth = 25.0
+grow_duration = 0.06
+grow_start_ratio = 0.3

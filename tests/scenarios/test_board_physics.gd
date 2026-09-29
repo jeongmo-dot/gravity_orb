@@ -28,6 +28,7 @@ func test_floor_resistance_is_zero_for_airborne_orb_contact() -> void:
 	var left: Orb = board.spawn_orb(0, 1, Vector2(-radius, 0.0), Vector2(100.0, 0.0))
 	var right: Orb = board.spawn_orb(1, 1, Vector2(radius, 0.0), Vector2(-100.0, 0.0))
 	await tree.physics_frame
+	assert_board_motion_bounds(board, "airborne contact")
 	assert_true(
 		left._last_rolling_resistance_force.is_zero_approx(),
 		"airborne left orb rolling force"
@@ -46,8 +47,13 @@ func test_guard_restores_orb_after_forty_pixel_penetration() -> void:
 	var board: Board = BOARD_SCENE.instantiate() as Board
 	tree.root.add_child(board)
 	await tree.process_frame
-	var radius: float = Config.data.radius_for_level(1)
-	var boundary: float = board.half_size() - radius
+	var final_radius: float = Config.data.radius_for_level(1)
+	var current_radius: float = (
+		final_radius
+		if Config.data.grow_duration <= 0.0
+		else final_radius * Config.data.grow_start_ratio
+	)
+	var boundary: float = board.half_size() - current_radius
 	var orb: Orb = board.spawn_orb(
 		0,
 		1,
@@ -55,7 +61,7 @@ func test_guard_restores_orb_after_forty_pixel_penetration() -> void:
 		Vector2(100.0, 0.0)
 	)
 	orb.set_physics_process(false)
-	orb._physics_process(1.0 / float(Engine.physics_ticks_per_second))
+	orb._physics_process(0.0)
 	var body_transform: Transform2D = PhysicsServer2D.body_get_state(
 		orb.get_rid(),
 		PhysicsServer2D.BODY_STATE_TRANSFORM
@@ -145,13 +151,17 @@ func _run_scenario(seed: int, scenario_name: String, levels: Array[int]) -> Dict
 			board.set_gravity(direction)
 			for _frame: int in range(frames_per_direction):
 				await tree.physics_frame
+				assert_board_motion_bounds(
+					board,
+					"physics seed %d frame %d" % [seed, scenario_frame + 1]
+				)
 				scenario_frame += 1
 				var orbs: Array[Orb] = board.get_orbs()
 				for orb_index: int in range(orbs.size()):
 					var orb: Orb = orbs[orb_index]
 					var center_extent: float = maxf(absf(orb.position.x), absf(orb.position.y))
 					var penetration: float = maxf(
-						center_extent + orb.get_radius() - board.half_size(),
+						center_extent + orb.get_current_radius() - board.half_size(),
 						0.0
 					)
 					maximum_penetration = maxf(maximum_penetration, penetration)

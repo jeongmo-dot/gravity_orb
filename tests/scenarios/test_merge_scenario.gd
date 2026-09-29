@@ -29,7 +29,7 @@ func test_matching_pair_merges_once_at_clamped_midpoint() -> void:
 		clampf(raw_midpoint.y, -board.half_size() + result_radius, board.half_size() - result_radius)
 	)
 
-	var applied: int = await _advance_and_flush(resolver, OBSERVE_SECONDS)
+	var applied: int = await _advance_and_flush(board, resolver, OBSERVE_SECONDS)
 	var orbs: Array[Orb] = board.get_orbs()
 	assert_eq(applied, 1, "matching pair reaction count")
 	assert_eq(_reactions.size(), 1, "matching pair signal count")
@@ -55,7 +55,7 @@ func test_three_simultaneous_contacts_apply_exactly_one_merge() -> void:
 	board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(49.0, 0.0))
 	board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(0.0, 84.0))
 
-	var applied: int = await _advance_and_flush(resolver, OBSERVE_SECONDS)
+	var applied: int = await _advance_and_flush(board, resolver, OBSERVE_SECONDS)
 	var orbs: Array[Orb] = board.get_orbs()
 	assert_eq(applied, 1, "three-orb reaction count")
 	assert_eq(_reactions.size(), 1, "three-orb signal count")
@@ -71,7 +71,11 @@ func test_nonmatching_pairs_do_not_merge() -> void:
 	var color_resolver: CollisionResolver = color_fixture["resolver"] as CollisionResolver
 	color_board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(-49.5, 0.0))
 	color_board.spawn_orb(OrbTypes.OrbColor.BLUE, 1, Vector2(49.5, 0.0))
-	var color_applied: int = await _advance_and_flush(color_resolver, OBSERVE_SECONDS)
+	var color_applied: int = await _advance_and_flush(
+		color_board,
+		color_resolver,
+		OBSERVE_SECONDS
+	)
 	assert_eq(color_applied, 0, "different-color reaction count")
 	assert_eq(color_board.get_orbs().size(), 2, "different-color orb count")
 	await _cleanup_fixture(color_fixture)
@@ -81,7 +85,11 @@ func test_nonmatching_pairs_do_not_merge() -> void:
 	var level_resolver: CollisionResolver = level_fixture["resolver"] as CollisionResolver
 	level_board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(-55.0, 0.0))
 	level_board.spawn_orb(OrbTypes.OrbColor.RED, 2, Vector2(55.0, 0.0))
-	var level_applied: int = await _advance_and_flush(level_resolver, OBSERVE_SECONDS)
+	var level_applied: int = await _advance_and_flush(
+		level_board,
+		level_resolver,
+		OBSERVE_SECONDS
+	)
 	assert_eq(level_applied, 0, "different-level reaction count")
 	assert_eq(level_board.get_orbs().size(), 2, "different-level orb count")
 	await _cleanup_fixture(level_fixture)
@@ -96,7 +104,7 @@ func test_merge_result_reacts_again_as_chain_two() -> void:
 	board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(49.5, 0.0))
 	board.spawn_orb(OrbTypes.OrbColor.RED, 2, Vector2(0.0, 110.0))
 
-	var applied: int = await _advance_and_flush(resolver, OBSERVE_SECONDS)
+	var applied: int = await _advance_and_flush(board, resolver, OBSERVE_SECONDS)
 	var orbs: Array[Orb] = board.get_orbs()
 	assert_eq(applied, 2, "chain reaction count")
 	assert_eq(_reaction_chains(), [1, 2], "chain reaction order")
@@ -120,7 +128,7 @@ func test_independent_simultaneous_merges_are_both_chain_one() -> void:
 	board.spawn_orb(OrbTypes.OrbColor.BLUE, 1, Vector2(151.0, 0.0))
 	board.spawn_orb(OrbTypes.OrbColor.BLUE, 1, Vector2(250.0, 0.0))
 
-	var applied: int = await _advance_and_flush(resolver, OBSERVE_SECONDS)
+	var applied: int = await _advance_and_flush(board, resolver, OBSERVE_SECONDS)
 	assert_eq(applied, 2, "independent reaction count")
 	assert_eq(_reaction_chains(), [1, 1], "independent chain values")
 	assert_eq(manager.turn_max_chain, 1, "independent maximum chain")
@@ -135,7 +143,7 @@ func test_max_level_pair_clears_without_result() -> void:
 	board.spawn_orb(OrbTypes.OrbColor.RED, Config.data.orb_max_level, Vector2(-180.0, 0.0))
 	board.spawn_orb(OrbTypes.OrbColor.RED, Config.data.orb_max_level, Vector2(180.0, 0.0))
 
-	var applied: int = await _advance_and_flush(resolver, OBSERVE_SECONDS)
+	var applied: int = await _advance_and_flush(board, resolver, OBSERVE_SECONDS)
 	assert_eq(applied, 1, "maximum clear reaction count")
 	assert_eq(board.get_orbs().size(), 0, "maximum clear orb count")
 	if _reactions.size() == 1:
@@ -152,7 +160,7 @@ func test_wall_merge_result_is_clamped_inside_board() -> void:
 	board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(426.0, -49.5))
 	board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(426.0, 49.5))
 
-	var applied: int = await _advance_and_flush(resolver, OBSERVE_SECONDS)
+	var applied: int = await _advance_and_flush(board, resolver, OBSERVE_SECONDS)
 	var orbs: Array[Orb] = board.get_orbs()
 	assert_eq(applied, 1, "wall reaction count")
 	assert_eq(orbs.size(), 1, "wall result count")
@@ -269,6 +277,7 @@ func test_waiting_input_flush_continues_previous_turn_chain() -> void:
 		if _reactions.size() > reaction_count_before:
 			break
 		await tree.physics_frame
+		assert_board_motion_bounds(board, "waiting-input merge")
 	assert_true(
 		_reactions.size() > reaction_count_before,
 		"waiting input emits reaction_applied"
@@ -330,11 +339,16 @@ func _create_fixture() -> Dictionary:
 	}
 
 
-func _advance_and_flush(_resolver: CollisionResolver, seconds: float) -> int:
+func _advance_and_flush(
+	board: Board,
+	_resolver: CollisionResolver,
+	seconds: float
+) -> int:
 	var reaction_count_before: int = _reactions.size()
 	var frame_count: int = ceili(float(Engine.physics_ticks_per_second) * seconds)
 	for _frame: int in range(frame_count):
 		await tree.physics_frame
+		assert_board_motion_bounds(board, "merge observation")
 	return _reactions.size() - reaction_count_before
 
 
@@ -344,6 +358,8 @@ func _wait_for_state(manager: TurnManager, target: TurnManager.State) -> void:
 		if manager.state == target:
 			return
 		await tree.physics_frame
+		var board: Board = manager.get_parent().get_node("Board") as Board
+		assert_board_motion_bounds(board, "merge state wait")
 	assert_eq(manager.state, target, "state wait timeout")
 
 
