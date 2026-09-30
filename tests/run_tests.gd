@@ -7,7 +7,9 @@ const TEST_METHOD_PREFIX: String = "test_"
 const GROWTH_DURATION_PREFIX: String = "--growth-duration="
 const GROWTH_RATIO_PREFIX: String = "--growth-ratio="
 const GROWTH_SUITE_PREFIX: String = "--growth-suite="
-const GROWTH_FIXED_TESTS: Array[String] = [
+const MASS_EXPONENT_PREFIX: String = "--mass-exponent="
+const MASS_SUITE_PREFIX: String = "--mass-suite="
+const MEASUREMENT_FIXED_TESTS: Array[String] = [
 	"res://tests/scenarios/test_board_physics.gd",
 	"res://tests/scenarios/test_spawn_flow.gd",
 	"res://tests/scenarios/test_turn_time.gd",
@@ -22,11 +24,11 @@ func _init() -> void:
 
 
 func _run_all_tests() -> void:
-	var growth_suite: String = _apply_growth_arguments()
-	if growth_suite == "fixed":
-		for path: String in GROWTH_FIXED_TESTS:
+	var measurement_suite: String = _apply_measurement_arguments()
+	if measurement_suite == "fixed":
+		for path: String in MEASUREMENT_FIXED_TESTS:
 			await _run_test_file(path)
-	elif growth_suite == "realtime":
+	elif measurement_suite == "realtime":
 		await _run_test_file("res://tests/scenarios/test_turn_time.gd")
 	else:
 		for directory: String in TEST_DIRECTORIES:
@@ -37,8 +39,9 @@ func _run_all_tests() -> void:
 	quit(1 if _failed > 0 else 0)
 
 
-func _apply_growth_arguments() -> String:
-	var growth_suite: String = ""
+func _apply_measurement_arguments() -> String:
+	var measurement_suite: String = ""
+	var is_mass_measurement: bool = false
 	var config_node: Node = root.get_node("Config")
 	var config_data: GameConfig = config_node.get("data") as GameConfig
 	for argument: String in OS.get_cmdline_user_args():
@@ -47,16 +50,29 @@ func _apply_growth_arguments() -> String:
 		elif argument.begins_with(GROWTH_RATIO_PREFIX):
 			config_data.grow_start_ratio = argument.trim_prefix(GROWTH_RATIO_PREFIX).to_float()
 		elif argument.begins_with(GROWTH_SUITE_PREFIX):
-			growth_suite = argument.trim_prefix(GROWTH_SUITE_PREFIX)
-	if not growth_suite.is_empty():
+			measurement_suite = argument.trim_prefix(GROWTH_SUITE_PREFIX)
+		elif argument.begins_with(MASS_EXPONENT_PREFIX):
+			config_data.mass_exponent = argument.trim_prefix(MASS_EXPONENT_PREFIX).to_float()
+			is_mass_measurement = true
+		elif argument.begins_with(MASS_SUITE_PREFIX):
+			measurement_suite = argument.trim_prefix(MASS_SUITE_PREFIX)
+			is_mass_measurement = true
+	if is_mass_measurement:
+		print(
+			"Mass candidate exponent=%.3f suite=%s" % [
+				config_data.mass_exponent,
+				measurement_suite,
+			]
+		)
+	elif not measurement_suite.is_empty():
 		print(
 			"Growth candidate duration=%.3f ratio=%.3f suite=%s" % [
 				config_data.grow_duration,
 				config_data.grow_start_ratio,
-				growth_suite,
+				measurement_suite,
 			]
 		)
-	return growth_suite
+	return measurement_suite
 
 
 func _run_directory(directory: String) -> void:

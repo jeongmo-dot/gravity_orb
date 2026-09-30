@@ -2,13 +2,13 @@ extends TestCase
 
 const CONFIG_RESOURCE: GameConfig = preload("res://config/default_config.tres")
 const EXPECTED_RADII: Array[float] = [
-	50.0,
-	62.5,
-	78.125,
-	97.65625,
-	122.0703125,
-	152.587890625,
-	190.73486328125,
+	25.0,
+	40.0,
+	60.0,
+	85.0,
+	115.0,
+	150.0,
+	190.0,
 ]
 const TOLERANCE: float = 1.0e-3
 
@@ -16,6 +16,7 @@ const TOLERANCE: float = 1.0e-3
 func test_radius_for_levels_one_through_seven() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	assert_eq(config.orb_max_level, EXPECTED_RADII.size(), "expected radius count")
+	assert_eq(config.level_radii.size(), EXPECTED_RADII.size(), "configured radius count")
 	for index: int in range(EXPECTED_RADII.size()):
 		var level: int = index + 1
 		assert_near(
@@ -26,9 +27,23 @@ func test_radius_for_levels_one_through_seven() -> void:
 		)
 
 
-func test_mass_for_level_two() -> void:
+func test_mass_for_candidate_exponents() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
-	assert_near(config.mass_for_level(2), 1.5625, TOLERANCE, "mass for level 2")
+	var radius_ratio: float = EXPECTED_RADII[1] / EXPECTED_RADII[0]
+	for exponent: float in [2.0, 1.5, 1.0]:
+		config.mass_exponent = exponent
+		assert_near(
+			config.mass_for_level(2),
+			config.orb_base_mass * pow(radius_ratio, exponent),
+			TOLERANCE,
+			"mass for level 2 at exponent %.1f" % exponent
+		)
+	assert_near(
+		CONFIG_RESOURCE.mass_exponent,
+		2.0,
+		TOLERANCE,
+		"default mass exponent"
+	)
 
 
 func test_m2_swipe_defaults() -> void:

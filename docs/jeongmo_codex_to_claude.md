@@ -38,6 +38,54 @@
 
 ## 미확인
 
+### [2026-10-01] 대상 #14 — 레벨별 반지름 표 + 질량 지수 + 안전 기준 재측정
+- 상태: 질문
+- 브랜치 / PR: `m7-radius-mass-remeasure` / PR 미생성
+- 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, `scripts/core/Board.gd`, `tests/run_tests.gd`, `tests/test_config.gd`, `tests/scenarios/test_annihilation_scenario.gd`, `tests/scenarios/test_board_physics.gd`, `tests/scenarios/test_ghost_scenario.gd`, `tests/scenarios/test_merge_scenario.gd`, `tests/scenarios/test_spawn_flow.gd`, `tests/scenarios/test_turn_time.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `level_radii=[25, 40, 60, 85, 115, 150, 190]`, `mass_exponent=2.0` 기본값과 명세 공식을 적용하고 `orb_base_radius`·`orb_radius_growth` 코드/리소스 참조 제거 — config 자동 검증
+  - [x] 새 반지름에 맞춰 config 기대값 및 접촉·합체·유령 시나리오 배치를 반지름 함수 기반으로 갱신 — 관련 회귀 자동 검증
+  - [x] 물리 22시드의 레벨 1~4 순환과 최악 구성 `L4×4 + L1×4` 유지 — 자동 검증
+  - [x] 지수 2/1.5/1 각각 fixed 묶음과 realtime 120턴을 별도 프로세스로 실행하고 요구 지표 출력 — 아래 표
+  - [x] 모든 사전 복구 경고·측정 표에 마지막 유령 타임아웃 이후 physics frame 수 추가. 선행 타임아웃이 없으면 `-1` — 자동 검증
+  - [ ] 전체 92개 테스트 중 91개 통과. `test_cycle_seeded_orbs_remain_inside_board_during_gravity_cycles`는 기본 지수 2에서 현행 12px/사전 복구 0회 기준 초과 — Claude의 지수·안전 기준 결정 필요
+  - [ ] NEXT 미리보기와 HUD 새 크기 육안 확인 — 수동 확인 필요(아래 절차)
+- QA 관측값: 아래 fixed 열은 지수마다 `--fixed-fps 240 --mass-suite=fixed` 독립 프로세스, realtime 열은 `--mass-suite=realtime` 독립 프로세스다. `최대 비율`은 관측 프레임의 관통을 해당 구체의 **최종 설정 반지름**으로 나눈 별도 최댓값이다. `이탈`·`발산`은 orb-frame 횟수이며 발산 기준은 속도 `>5000px/s` 또는 중심이 `half+100px` 밖이다.
+
+| 질량 지수 | 시나리오 | 안전장치 | 사전 복구 (마지막 timeout 후 frame) | 유령 timeout | 이탈 | 발산 | 최대 관통(px) | 최대 비율 (레벨) | 120턴 잔여 구 평균 |
+|---:|---|---:|---|---:|---:|---:|---:|---:|---:|
+| 2.0 | fixed 물리 22시드 | 0 | 0 (`[]`) | 0 | 0 | 0 | 14.823 | 59.290% (L1) | — |
+| 2.0 | fixed 겹침 | 0 | 0 (`[]`) | 0 | 0 | 0 | 0.000 | 0% (—) | — |
+| 2.0 | fixed 20턴 | 0 | 0 (`[]`) | 1 | 0 | 0 | 6.631 | 26.524% (L1) | — |
+| 2.0 | fixed 120턴 | 0 | 0 (`[]`) | 6 | 0 | 0 | 13.135 | 52.538% (L1) | 5.667 |
+| 2.0 | realtime 120턴 | 0 | 1 (`[757]`) | 6 | 0 | 0 | 14.091 | 56.365% (L1) | 4.833 |
+| 1.5 | fixed 물리 22시드 | 0 | 0 (`[]`) | 0 | 0 | 0 | 12.036 | 48.143% (L1) | — |
+| 1.5 | fixed 겹침 | 0 | 0 (`[]`) | 0 | 0 | 0 | 0.000 | 0% (—) | — |
+| 1.5 | fixed 20턴 | 0 | 0 (`[]`) | 1 | 0 | 0 | 8.594 | 34.377% (L1) | — |
+| 1.5 | fixed 120턴 | 0 | 0 (`[]`) | 4 | 0 | 0 | 10.811 | 43.243% (L1) | 5.333 |
+| 1.5 | realtime 120턴 | 0 | 0 (`[]`) | 4 | 0 | 0 | 13.542 | 54.168% (L1) | 5.333 |
+| 1.0 | fixed 물리 22시드 | 0 | 0 (`[]`) | 0 | 0 | 0 | 8.182 | 32.729% (L1) | — |
+| 1.0 | fixed 겹침 | 0 | 0 (`[]`) | 0 | 0 | 0 | 0.000 | 0% (—) | — |
+| 1.0 | fixed 20턴 | 0 | 0 (`[]`) | 1 | 0 | 0 | 6.853 | 27.143% (L1) | — |
+| 1.0 | fixed 120턴 | 0 | 0 (`[]`) | 9 | 0 | 0 | 10.292 | 41.166% (L1) | 4.833 |
+| 1.0 | realtime 120턴 | 0 | 0 (`[]`) | 6 | 0 | 0 | 11.574 | 46.295% (L1) | 4.667 |
+
+  - 지수별 프로세스 결과 → `2.0 fixed 10/11(종료 1), realtime 1/1(종료 0)`; `1.5 fixed 10/11(종료 1), realtime 1/1(종료 0)`; `1.0 fixed 11/11(종료 0), realtime 1/1(종료 0)`. fixed 실패는 각각 22시드 12px 기준 초과(`2.0: 14.823px`, `1.5: 12.036px`)뿐이다.
+  - 지수 2 realtime 사전 복구 1회 → `L1 / x / depth 22.551px / since_last_spawn 177 / since_last_ghost_timeout 757 / on_ghost_timeout_frame=false`. #12의 timeout+1 frame 가설과 다른 사례다.
+  - 필수 전체 실시간 실행의 22시드 → 안전장치 0, 사전 복구 1, 유령 timeout 0, 이탈 0, 발산 0, 최대 관통 14.144px, 최대 비율 56.5763%(L1). 복구는 시드 1013의 `depth 16.157px / since_last_spawn 2558 / since_last_ghost_timeout -1`이며 선행 timeout이 없었다. 12px 초과 시드는 1002/1003/1009/1012/1013/1018/1047/2000이다.
+  - 필수 전체 실시간 실행의 120턴 → 안전장치 0, 사전 복구 0, 유령 timeout 7, 이탈 0, 발산 0, 최대 관통 12.562px, 최대 비율 50.2463%(L1), 최종 구 평균 5.833.
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --import` → 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . -s res://tests/run_tests.gd` → 91/92 통과, 종료 코드 1. 위 22시드 안전 기준 테스트 1개만 실패
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --quit-after 300` → 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - 환경 진단 → 사용자 로그/Windows 루트 인증서/에디터 설정 접근 오류가 출력됐으나 프로젝트 스크립트 로드·실행 결과에는 영향 없음
+  - 정적 검사 → `Input`/`InputEvent` 참조는 `InputRouter.gd`만, 난수 API는 `Spawner.gd`만; `git diff --check` 이상 없음
+- 수동 확인 절차:
+  1. 프로젝트를 실행하고 NEXT의 L1/L2 미리보기와 실제 생성 구체를 번갈아 본다 → 미리보기와 생성 구체 크기가 일치하고 L1 25px·L2 40px 차이가 분명히 보이는지 확인한다.
+  2. 같은 색·레벨 구체를 차례로 합체해 L1→L2→L3 이상을 만든다 → 25/40/60/85px 표에 따라 단계별 크기 차이가 보이고 HUD의 NEXT·SCORE·BEST·MAX CHAIN이 겹치거나 잘리지 않는지 확인한다.
+  3. 네 방향으로 여러 턴 플레이한다 → 큰 구체가 벽에서 튀거나 순간 이동하는 복구가 눈에 띄는지, 중심 이탈이나 수치 발산이 보이는지 확인한다.
+- 결정 사항: 지수 비교용 `--mass-exponent`/`--mass-suite` 러너 인자를 추가했으며 기본 리소스의 `mass_exponent=2.0`은 유지했다. 최대 비율 분모는 성장 중 현재 반지름이 아니라 레벨별 최종 반지름으로 정의했다. 안전 기준(`escape_guard_depth=25`, `wall_penetration_limit=16`, 테스트 12/16px), 물리 tick/contact, 성장·유령, 턴·반응 규칙은 변경하지 않았다.
+- 남은 것 · 질문: 표를 근거로 최종 `mass_exponent`와 새 안전 기준을 지정해 달라. 현행 기준에서는 지수 2 fixed 22시드와 realtime 120턴, 지수 1.5 fixed 22시드와 realtime 120턴이 12px를 넘고, 지수 1만 독립 fixed/realtime 측정의 12px 이내였다. 결정 전까지 기본값은 지시대로 2.0이며 안전 수치는 그대로다.
+
 ### [2026-09-30] 대상 #13 — M7 점수·최고 점수·재시작 (게임오버 보류)
 - 상태: 완료
 - 브랜치 / PR: `m7-score-restart` / PR 미생성

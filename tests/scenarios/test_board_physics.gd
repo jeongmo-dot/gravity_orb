@@ -14,6 +14,8 @@ const STANDARD_SEED_END_EXCLUSIVE: int = 1020
 const KNOWN_REGRESSION_SEED: int = 1047
 const WORST_CASE_SEED: int = 2000
 const MAX_ALLOWED_PENETRATION: float = 12.0
+const DIVERGENCE_SPEED: float = 5000.0
+const DIVERGENCE_MARGIN: float = 100.0
 const STANDARD_ORB_COUNT: int = 5
 const POSITION_TOLERANCE: float = 0.1
 
@@ -98,31 +100,50 @@ func test_cycle_seeded_orbs_remain_inside_board_during_gravity_cycles() -> void:
 	var total_escape_guards: int = 0
 	var total_wall_recoveries: int = 0
 	var total_timeout_corrections: int = 0
+	var total_ghost_timeouts: int = 0
+	var total_divergences: int = 0
 	var overall_maximum_penetration: float = 0.0
+	var overall_maximum_penetration_ratio: float = 0.0
+	var overall_maximum_penetration_level: int = 0
 	var overall_maximum_speed: float = 0.0
+	var recovery_timeout_lags: Array[int] = []
 	for result: Dictionary in results:
 		total_departures += int(result["departures"])
 		total_escape_guards += int(result["escape_guards"])
 		total_wall_recoveries += int(result["wall_recoveries"])
 		total_timeout_corrections += int(result["timeout_corrections"])
+		total_ghost_timeouts += int(result["ghost_timeouts"])
+		total_divergences += int(result["divergences"])
 		overall_maximum_penetration = maxf(
 			overall_maximum_penetration,
 			float(result["max_penetration"])
 		)
 		overall_maximum_speed = maxf(overall_maximum_speed, float(result["max_speed"]))
+		if float(result["max_penetration_ratio"]) > overall_maximum_penetration_ratio:
+			overall_maximum_penetration_ratio = float(result["max_penetration_ratio"])
+			overall_maximum_penetration_level = int(result["max_penetration_level"])
+		recovery_timeout_lags.append_array(
+			result["wall_recovery_timeout_lags"] as Array[int]
+		)
 
 	print(
-		"Scenario summary: seeds=%d departures=%d max_penetration=%.3f max_speed=%.3f escape_guards=%d wall_recoveries=%d timeout_corrections=%d" % [
+		"Scenario summary: seeds=%d departures=%d divergences=%d max_penetration=%.3f max_penetration_ratio=%.6f ratio_level=%d max_speed=%.3f escape_guards=%d wall_recoveries=%d recovery_timeout_lags=%s timeout_corrections=%d ghost_timeouts=%d" % [
 			results.size(),
 			total_departures,
+			total_divergences,
 			overall_maximum_penetration,
+			overall_maximum_penetration_ratio,
+			overall_maximum_penetration_level,
 			overall_maximum_speed,
 			total_escape_guards,
 			total_wall_recoveries,
+			str(recovery_timeout_lags),
 			total_timeout_corrections,
+			total_ghost_timeouts,
 		]
 	)
 	assert_eq(total_departures, 0, "total orb center departures")
+	assert_eq(total_divergences, 0, "total divergent orb frames")
 	assert_eq(total_escape_guards, 0, "total escape guard activations")
 	assert_eq(total_wall_recoveries, 0, "total wall recovery activations")
 	assert_true(
@@ -144,7 +165,10 @@ func _run_scenario(seed: int, scenario_name: String, levels: Array[int]) -> Dict
 
 	var initial_overlap_count: int = _count_initial_overlaps(board)
 	var departure_count: int = 0
+	var divergence_count: int = 0
 	var maximum_penetration: float = 0.0
+	var maximum_penetration_ratio: float = 0.0
+	var maximum_penetration_level: int = 0
 	var maximum_speed: float = 0.0
 	var first_departure_recorded: bool = false
 	var scenario_frame: int = 0
@@ -172,7 +196,17 @@ func _run_scenario(seed: int, scenario_name: String, levels: Array[int]) -> Dict
 						0.0
 					)
 					maximum_penetration = maxf(maximum_penetration, penetration)
-					maximum_speed = maxf(maximum_speed, orb.linear_velocity.length())
+					var penetration_ratio: float = penetration / orb.get_radius()
+					if penetration_ratio > maximum_penetration_ratio:
+						maximum_penetration_ratio = penetration_ratio
+						maximum_penetration_level = orb.level
+					var speed: float = orb.linear_velocity.length()
+					maximum_speed = maxf(maximum_speed, speed)
+					if (
+						speed > DIVERGENCE_SPEED
+						or center_extent > board.half_size() + DIVERGENCE_MARGIN
+					):
+						divergence_count += 1
 					if center_extent <= board.half_size():
 						continue
 
@@ -194,19 +228,25 @@ func _run_scenario(seed: int, scenario_name: String, levels: Array[int]) -> Dict
 					)
 
 	print(
-		"Scenario seed=%d kind=%s initial_overlaps=%d departures=%d max_penetration=%.3f max_speed=%.3f escape_guards=%d wall_recoveries=%d timeout_corrections=%d" % [
+		"Scenario seed=%d kind=%s initial_overlaps=%d departures=%d divergences=%d max_penetration=%.3f max_penetration_ratio=%.6f ratio_level=%d max_speed=%.3f escape_guards=%d wall_recoveries=%d recovery_timeout_lags=%s timeout_corrections=%d ghost_timeouts=%d" % [
 			seed,
 			scenario_name,
 			initial_overlap_count,
 			departure_count,
+			divergence_count,
 			maximum_penetration,
+			maximum_penetration_ratio,
+			maximum_penetration_level,
 			maximum_speed,
 			board.escape_guard_count,
 			board.wall_recovery_count,
+			str(board.wall_recovery_since_last_ghost_timeout_frames),
 			board.timeout_correction_count,
+			board.ghost_timeout_count,
 		]
 	)
 	assert_eq(departure_count, 0, "seed %d orb center departures" % seed)
+	assert_eq(divergence_count, 0, "seed %d divergent orb frames" % seed)
 	assert_eq(board.escape_guard_count, 0, "seed %d escape guard activations" % seed)
 	assert_eq(board.wall_recovery_count, 0, "seed %d wall recovery activations" % seed)
 	assert_true(
@@ -221,17 +261,26 @@ func _run_scenario(seed: int, scenario_name: String, levels: Array[int]) -> Dict
 	var escape_guard_count: int = board.escape_guard_count
 	var wall_recovery_count: int = board.wall_recovery_count
 	var timeout_correction_count: int = board.timeout_correction_count
+	var ghost_timeout_count: int = board.ghost_timeout_count
+	var wall_recovery_timeout_lags: Array[int] = (
+		board.wall_recovery_since_last_ghost_timeout_frames.duplicate()
+	)
 	board.queue_free()
 	await tree.process_frame
 	return {
 		"seed": seed,
 		"kind": scenario_name,
 		"departures": departure_count,
+		"divergences": divergence_count,
 		"max_penetration": maximum_penetration,
+		"max_penetration_ratio": maximum_penetration_ratio,
+		"max_penetration_level": maximum_penetration_level,
 		"max_speed": maximum_speed,
 		"escape_guards": escape_guard_count,
 		"wall_recoveries": wall_recovery_count,
+		"wall_recovery_timeout_lags": wall_recovery_timeout_lags,
 		"timeout_corrections": timeout_correction_count,
+		"ghost_timeouts": ghost_timeout_count,
 	}
 
 

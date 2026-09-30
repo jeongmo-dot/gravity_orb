@@ -104,16 +104,17 @@ func test_two_ghosts_pass_through_each_other_and_both_exit() -> void:
 		Vector2.ZERO
 	)
 	var blocker_position: Vector2 = blocker.position
+	var pair_offset: float = Config.data.radius_for_level(1) * 0.6
 	var ghost_a: Orb = board.spawn_orb(
 		OrbTypes.OrbColor.RED,
 		1,
-		Vector2(-30.0, 0.0),
+		Vector2(-pair_offset, 0.0),
 		Vector2(600.0, 0.0)
 	)
 	var ghost_b: Orb = board.spawn_orb(
 		OrbTypes.OrbColor.BLUE,
 		1,
-		Vector2(30.0, 0.0),
+		Vector2(pair_offset, 0.0),
 		Vector2(-600.0, 0.0)
 	)
 	_assert_ghost_state(ghost_a, "ghost pair a")
@@ -187,12 +188,13 @@ func test_packed_floor_times_out_once_without_divergence() -> void:
 	)
 	var dummies: Array[Orb] = []
 	var dummy_starts: Array[Vector2] = []
-	for x: float in [-250.0, -150.0, -50.0, 50.0, 150.0, 250.0]:
+	var radius: float = Config.data.radius_for_level(1)
+	for multiplier: float in [-5.0, -3.0, -1.0, 1.0, 3.0, 5.0]:
 		var dummy: Orb = _spawn_normal(
 			board,
 			OrbTypes.OrbColor.GREEN,
 			1,
-			Vector2(x, bottom_y)
+			Vector2(multiplier * radius, bottom_y)
 		)
 		dummy.freeze = true
 		dummies.append(dummy)
@@ -284,6 +286,11 @@ func test_proactive_wall_recovery_precedes_escape_guard() -> void:
 
 	assert_eq(board.wall_recovery_count, 1, "proactive recovery axis count")
 	assert_eq(board.escape_guard_count, 0, "proactive recovery escape guards")
+	assert_eq(
+		board.wall_recovery_since_last_ghost_timeout_frames,
+		[-1] as Array[int],
+		"proactive recovery has no preceding ghost timeout"
+	)
 	await _cleanup_fixture(fixture)
 
 

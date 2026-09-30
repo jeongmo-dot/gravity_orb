@@ -112,8 +112,20 @@ func test_sweep_rechecks_resting_pair_after_rule_change() -> void:
 	var fixture: Dictionary = await _create_fixture()
 	var board: Board = fixture["board"] as Board
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
-	var red: Orb = board.spawn_orb(OrbTypes.OrbColor.RED, 2, Vector2(-50.0, 0.0))
-	var blue: Orb = board.spawn_orb(OrbTypes.OrbColor.BLUE, 1, Vector2(50.0, 0.0))
+	var contact_half_distance: float = (
+		(Config.data.radius_for_level(2) + Config.data.radius_for_level(1)) * 0.5
+		- 0.5
+	)
+	var red: Orb = board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		2,
+		Vector2(-contact_half_distance, 0.0)
+	)
+	var blue: Orb = board.spawn_orb(
+		OrbTypes.OrbColor.BLUE,
+		1,
+		Vector2(contact_half_distance, 0.0)
+	)
 	var found_contact: bool = await _wait_for_contact(board, resolver, red, blue)
 	assert_true(found_contact, "resting pair becomes a reported contact")
 

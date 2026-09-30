@@ -20,6 +20,7 @@ var _pending_wall_recovery_warnings: Array[Dictionary] = []
 var _wall_recovery_warning_flush_scheduled: bool = false
 var escape_guard_count: int = 0
 var wall_recovery_count: int = 0
+var wall_recovery_since_last_ghost_timeout_frames: Array[int] = []
 var timeout_correction_count: int = 0
 var ghost_timeout_count: int = 0
 var ghost_completed_count: int = 0
@@ -354,6 +355,10 @@ func _on_orb_wall_recovery_triggered(
 	physics_frame: int
 ) -> void:
 	wall_recovery_count += 1
+	var since_last_ghost_timeout_frames: int = -1
+	if _last_ghost_timeout_physics_frame >= 0:
+		since_last_ghost_timeout_frames = physics_frame - _last_ghost_timeout_physics_frame
+	wall_recovery_since_last_ghost_timeout_frames.append(since_last_ghost_timeout_frames)
 	_pending_wall_recovery_warnings.append(
 		{
 			"level": level,
@@ -362,6 +367,7 @@ func _on_orb_wall_recovery_triggered(
 			"ghost": ghost,
 			"age_frames": age_frames,
 			"since_last_spawn_frames": since_last_spawn_frames,
+			"since_last_ghost_timeout_frames": since_last_ghost_timeout_frames,
 			"physics_frame": physics_frame,
 		}
 	)
@@ -375,13 +381,14 @@ func _flush_wall_recovery_warnings() -> void:
 	for event: Dictionary in _pending_wall_recovery_warnings:
 		var recovery_frame: int = int(event["physics_frame"])
 		push_warning(
-			"[WALL_RECOVERY] level=%d axis=%s depth=%.3f ghost=%s age_frames=%d since_last_spawn_frames=%d on_ghost_timeout_frame=%s" % [
+			"[WALL_RECOVERY] level=%d axis=%s depth=%.3f ghost=%s age_frames=%d since_last_spawn_frames=%d since_last_ghost_timeout_frames=%d on_ghost_timeout_frame=%s" % [
 				int(event["level"]),
 				str(event["axis"]),
 				float(event["depth"]),
 				str(bool(event["ghost"])),
 				int(event["age_frames"]),
 				int(event["since_last_spawn_frames"]),
+				int(event["since_last_ghost_timeout_frames"]),
 				str(recovery_frame == _last_ghost_timeout_physics_frame),
 			]
 		)
