@@ -31,7 +31,7 @@
 ## 대기 중
 
 ### [2026-09-30 #14] 레벨별 반지름 표 + 질량 지수 + 안전 기준 재측정
-- 상태: 대기
+- 상태: 진행중 — **추가 요구 있음** (아래 「추가 요구 1」)
 - 근거: 기획서 **0.4.2** 3.4 (사용자 결정: L1~L3 크기 차이가 안 보임), [technical_design.md](technical_design.md) §4 (`level_radii`, `mass_exponent`)
 - 요구:
   1. `GameConfig`: `level_radii = [25, 40, 60, 85, 115, 150, 190]`, `mass_exponent`. `orb_base_radius`·`orb_radius_growth` **제거**하고 참조를 모두 `radius_for_level()`로 바꾼다. `radius_for_level(level) = level_radii[level - 1]`, `mass_for_level(level) = orb_base_mass × (r / r_L1)^mass_exponent`
@@ -46,6 +46,22 @@
   - [ ] 3개 지수 × 측정 표
 - QA: 위 표, NEXT 미리보기·HUD가 새 크기로 보이는지 스모크
 - 커밋: 항목 단위 브랜치, push까지
+
+**추가 요구 1 (2026-10-01) — Claude 지정값**
+
+1단계 표 검수: 측정 정확. 질량비가 클수록 L1 관통이 커진다 (지수 2: 22시드 14.8px → 지수 1: 8.2px). #12의 "유령 타임아웃 +1프레임" 가설은 `since_last_ghost_timeout 757` 사례로 **기각**한다.
+
+1. `mass_exponent = 1.0` (기본값·선언 모두)
+2. 테스트 관통 한도: 물리 22시드 **10px**, 연속 턴(20턴·120턴) **14px**, 겹침 생성 12px 유지
+3. `wall_penetration_limit` 16, `escape_guard_depth` 25 유지. 사전 복구 assert: 22시드·겹침·20턴 0, 120턴 ≤ 2 유지
+4. **보고 지표 추가 (assert 없음)**: 120턴 각 턴 종료 시점의 **보드 점유율** = Σ(π r²) ÷ 960² 의 평균·최대, 턴 종료 시 구체 수 평균·최대
+5. 1단계 스윕용 `--mass-suite` 모드는 유지해도 된다
+
+- Done-when (추가 요구 1):
+  - [ ] 지수 1.0 기본값으로 전체 테스트 통과 (fixed·실시간 120턴 포함)
+  - [ ] §10.1 명령 3종 에러 0
+- QA: 기본값 기준 22시드·20턴·120턴(fixed·실시간) 관통·사전 복구·안전장치, 120턴 보드 점유율·구체 수, 시드별 점수·최대 연쇄·최고 레벨
+- 커밋: 같은 브랜치, push까지
 
 ---
 
