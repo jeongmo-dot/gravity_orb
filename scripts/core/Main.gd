@@ -45,4 +45,4 @@ func _cycle_annihilation_rule() -> void:
 func _cycle_spawn_count() -> void:
 	# TEMP(M7): M9 디버그 패널이 생성 수 선택을 대체할 때 제거한다.
 	Config.data.spawn_count_per_turn = Config.data.spawn_count_per_turn % 3 + 1
-	_spawner.sync_next_batch_size()
+	_spawner.sync_next_batch_size(_turn_manager.turn_index + 1)

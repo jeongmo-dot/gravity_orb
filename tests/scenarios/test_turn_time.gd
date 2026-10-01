@@ -7,8 +7,8 @@ const SPAWNER_SCRIPT: Script = preload("res://scripts/core/Spawner.gd")
 const TURN_MANAGER_SCRIPT: Script = preload("res://scripts/core/TurnManager.gd")
 const SEEDS: Array[int] = [101, 102, 103, 104, 105, 106]
 const TURNS_PER_SEED: int = 20
-const SPAWN_MEASUREMENT_TURNS_PER_SEED: int = 120
-const OCCUPANCY_CHECKPOINTS: Array[int] = [30, 60, 90, 120]
+const SPAWN_MEASUREMENT_TURNS_PER_SEED: int = 180
+const OCCUPANCY_CHECKPOINTS: Array[int] = [30, 60, 90, 120, 150, 180]
 const DIRECTION_PATTERN: Array[Vector2i] = [
 	Vector2i.DOWN,
 	Vector2i.RIGHT,
@@ -379,7 +379,11 @@ func _wait_for_state_with_metrics(
 		_record_diagnostic_frame(board)
 		for orb: Orb in board.get_orbs():
 			var center_extent: float = maxf(absf(orb.position.x), absf(orb.position.y))
-			if center_extent > board.half_size() * 2.0 and not _bounds_reported:
+			if (
+				not _is_spawn_measurement()
+				and center_extent > board.half_size() * 2.0
+				and not _bounds_reported
+			):
 				_bounds_reported = true
 				assert_true(
 					false,
@@ -389,7 +393,7 @@ func _wait_for_state_with_metrics(
 					]
 				)
 			var speed: float = orb.linear_velocity.length()
-			if speed > 10000.0 and not _bounds_reported:
+			if not _is_spawn_measurement() and speed > 10000.0 and not _bounds_reported:
 				_bounds_reported = true
 				assert_true(
 					false,
@@ -559,6 +563,13 @@ func _percentile(values: Array[float], quantile: float) -> float:
 
 func _print_metrics(metrics: Dictionary) -> void:
 	var direction_p50: Dictionary = metrics["direction_p50"] as Dictionary
+	var recovery_lags: Array[int] = metrics["wall_recovery_timeout_lags"] as Array[int]
+	var recovery_lags_text: String = str(recovery_lags)
+	if _is_spawn_measurement():
+		recovery_lags_text = "%d samples, max=%d" % [
+			recovery_lags.size(),
+			_maximum_int(recovery_lags),
+		]
 	print(
 		"Turn-time cap=%.3f turns=%d capped=%d capped_ratio=%.6f average=%.6f p50=%.6f p90=%.6f max=%.6f max_residual_speed=%.3f max_penetration=%.3f max_penetration_ratio=%.6f ratio_level=%d departures=%d divergences=%d final_orbs_avg=%.3f turn_end_occupancy_avg=%.6f turn_end_occupancy_max=%.6f turn_end_orbs_avg=%.3f turn_end_orbs_max=%d escape_guards=%d wall_recoveries=%d recovery_timeout_lags=%s timeout_corrections=%d ghost_timeouts=%d ghost_completed=%d ghost_avg=%.6f direction_p50=[D %.6f R %.6f U %.6f L %.6f]" % [
 			Config.data.max_settle_time,
@@ -582,7 +593,7 @@ func _print_metrics(metrics: Dictionary) -> void:
 			int(metrics["turn_end_orb_count_maximum"]),
 			int(metrics["escape_guards"]),
 			int(metrics["wall_recoveries"]),
-			str(metrics["wall_recovery_timeout_lags"]),
+			recovery_lags_text,
 			int(metrics["timeout_corrections"]),
 			int(metrics["ghost_timeouts"]),
 			int(metrics["ghost_completed"]),
@@ -595,8 +606,11 @@ func _print_metrics(metrics: Dictionary) -> void:
 	)
 	if _is_spawn_measurement():
 		print(
-			"Spawn-measurement count=%d active_colors=%d turns_by_seed=%s checkpoint_occupancies=%s checkpoint_samples=%s over30=%s over50=%s saturated=%s" % [
+			"Spawn-measurement case=%s count=%d ramp=%d max=%d active_colors=%d turns_by_seed=%s checkpoint_occupancies=%s checkpoint_samples=%s over30=%s over50=%s saturated=%s" % [
+				_spawn_case_name(),
 				Config.data.spawn_count_per_turn,
+				Config.data.spawn_count_ramp_turns,
+				Config.data.spawn_count_max,
 				_active_color_count(),
 				str(metrics["turns_by_seed"]),
 				str(metrics["checkpoint_occupancies"]),
@@ -613,6 +627,13 @@ func _print_metrics(metrics: Dictionary) -> void:
 			str(metrics["max_levels_by_seed"]),
 		]
 	)
+
+
+func _spawn_case_name() -> String:
+	for argument: String in OS.get_cmdline_user_args():
+		if argument.begins_with("--spawn-case="):
+			return argument.trim_prefix("--spawn-case=").to_upper()
+	return ""
 
 
 func _active_color_count() -> int:

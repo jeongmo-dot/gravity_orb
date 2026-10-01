@@ -70,7 +70,7 @@ func _update_label() -> void:
 		_turn_index,
 		_turn_max_chain,
 		ANNIHILATION_RULE_NAMES[Config.data.annihilation_rule],
-		Config.data.spawn_count_per_turn,
+		Config.data.spawn_count_for_turn(_turn_manager.turn_index + 1),
 		_turn_manager._settle_elapsed,
 		_spawner.seed_used,
 	]

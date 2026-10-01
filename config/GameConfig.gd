@@ -32,6 +32,8 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 @export var spawn_level_weights: PackedFloat32Array = PackedFloat32Array([0.9, 0.1])
 @export var spawn_color_weights: PackedFloat32Array = PackedFloat32Array([1.0, 1.0, 1.0, 1.0])
 @export var spawn_count_per_turn: int = 1
+@export var spawn_count_ramp_turns: int = 0
+@export var spawn_count_max: int = 3
 @export var spawn_position_mode: SpawnPositionMode = SpawnPositionMode.RANDOM
 @export var spawn_margin: float = 4.0
 @export var rng_seed: int = 0
@@ -69,6 +71,15 @@ func mass_for_level(level: int) -> float:
 
 func score_for_level(level: int) -> int:
 	return level_scores[level - 1]
+
+
+func spawn_count_for_turn(turn_index: int) -> int:
+	if spawn_count_ramp_turns <= 0:
+		return spawn_count_per_turn
+	var completed_ramps: int = floori(
+		float(maxi(turn_index, 1) - 1) / float(spawn_count_ramp_turns)
+	)
+	return mini(spawn_count_per_turn + completed_ramps, spawn_count_max)
 
 
 func is_opposite(c1: int, c2: int) -> bool:

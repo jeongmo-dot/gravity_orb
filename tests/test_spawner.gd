@@ -116,8 +116,28 @@ func test_count_two_batch_sequence_matches_continuous_count_one_sequence() -> vo
 	_restore_spawn_config(snapshot)
 
 
+func test_ramp_draws_next_turn_batch_sizes_at_boundaries() -> void:
+	var snapshot: Dictionary = _snapshot_spawn_config()
+	Config.data.spawn_count_per_turn = 1
+	Config.data.spawn_count_ramp_turns = 40
+	Config.data.spawn_count_max = 3
+	var spawner: Spawner = Spawner.new()
+	spawner.init_rng(8642)
+	var expected: Dictionary = {1: 1, 40: 1, 41: 2, 81: 3, 121: 3}
+	for turn_value: Variant in expected:
+		var turn_index: int = int(turn_value)
+		assert_eq(
+			spawner._draw_batch(turn_index).size(),
+			int(expected[turn_index]),
+			"batch size at turn %d" % turn_index
+		)
+	spawner.free()
+	_restore_spawn_config(snapshot)
+
+
 func _draw_batched_sequence(seed: int, batch_size: int, batch_count: int) -> Array[Dictionary]:
 	Config.data.spawn_count_per_turn = batch_size
+	Config.data.spawn_count_ramp_turns = 0
 	var spawner: Spawner = Spawner.new()
 	spawner.init_rng(seed)
 	var sequence: Array[Dictionary] = []
@@ -144,6 +164,8 @@ func _snapshot_spawn_config() -> Dictionary:
 		"spawn_color_weights": Config.data.spawn_color_weights.duplicate(),
 		"spawn_position_mode": Config.data.spawn_position_mode,
 		"spawn_count_per_turn": Config.data.spawn_count_per_turn,
+		"spawn_count_ramp_turns": Config.data.spawn_count_ramp_turns,
+		"spawn_count_max": Config.data.spawn_count_max,
 	}
 
 
@@ -152,3 +174,5 @@ func _restore_spawn_config(snapshot: Dictionary) -> void:
 	Config.data.spawn_color_weights = snapshot["spawn_color_weights"] as PackedFloat32Array
 	Config.data.spawn_position_mode = int(snapshot["spawn_position_mode"]) as GameConfig.SpawnPositionMode
 	Config.data.spawn_count_per_turn = int(snapshot["spawn_count_per_turn"])
+	Config.data.spawn_count_ramp_turns = int(snapshot["spawn_count_ramp_turns"])
+	Config.data.spawn_count_max = int(snapshot["spawn_count_max"])

@@ -72,10 +72,27 @@ func test_m4_spawn_defaults() -> void:
 		"color weights"
 	)
 	assert_eq(config.spawn_count_per_turn, 1, "spawn count per turn")
+	assert_eq(config.spawn_count_ramp_turns, 0, "spawn count ramp disabled")
+	assert_eq(config.spawn_count_max, 3, "spawn count maximum")
 	assert_eq(config.spawn_position_mode, GameConfig.SpawnPositionMode.RANDOM, "position mode")
 	assert_near(config.spawn_margin, 4.0, TOLERANCE, "spawn margin")
 	assert_eq(config.rng_seed, 0, "random seed default")
 	assert_eq(config.initial_orb_count, 2, "initial orb count")
+
+
+func test_spawn_count_ramp_turn_boundaries() -> void:
+	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
+	config.spawn_count_per_turn = 1
+	config.spawn_count_ramp_turns = 40
+	config.spawn_count_max = 3
+	var expected: Dictionary = {1: 1, 40: 1, 41: 2, 81: 3, 121: 3}
+	for turn_value: Variant in expected:
+		var turn_index: int = int(turn_value)
+		assert_eq(
+			config.spawn_count_for_turn(turn_index),
+			int(expected[turn_index]),
+			"spawn count at turn %d" % turn_index
+		)
 
 
 func test_m5_contact_defaults() -> void:

@@ -12,6 +12,7 @@ const MASS_SUITE_PREFIX: String = "--mass-suite="
 const SPAWN_COUNT_PREFIX: String = "--spawn-count="
 const ACTIVE_COLORS_PREFIX: String = "--active-colors="
 const SPAWN_SUITE_PREFIX: String = "--spawn-suite="
+const SPAWN_CASE_PREFIX: String = "--spawn-case="
 const MEASUREMENT_FIXED_TESTS: Array[String] = [
 	"res://tests/scenarios/test_board_physics.gd",
 	"res://tests/scenarios/test_spawn_flow.gd",
@@ -51,6 +52,7 @@ func _apply_measurement_arguments() -> String:
 	var config_node: Node = root.get_node("Config")
 	var config_data: GameConfig = config_node.get("data") as GameConfig
 	var active_colors: int = config_data.spawn_color_weights.size()
+	var spawn_case: String = ""
 	for argument: String in OS.get_cmdline_user_args():
 		if argument.begins_with(GROWTH_DURATION_PREFIX):
 			config_data.grow_duration = argument.trim_prefix(GROWTH_DURATION_PREFIX).to_float()
@@ -73,15 +75,25 @@ func _apply_measurement_arguments() -> String:
 		elif argument.begins_with(SPAWN_SUITE_PREFIX):
 			measurement_suite = "spawn"
 			is_spawn_measurement = true
+		elif argument.begins_with(SPAWN_CASE_PREFIX):
+			spawn_case = argument.trim_prefix(SPAWN_CASE_PREFIX).to_upper()
+			measurement_suite = "spawn"
+			is_spawn_measurement = true
 	if is_spawn_measurement:
-		if active_colors == 3:
+		if not spawn_case.is_empty():
+			active_colors = _apply_spawn_case(config_data, spawn_case)
+		elif active_colors == 3:
 			config_data.spawn_color_weights = PackedFloat32Array([1.0, 1.0, 1.0, 0.0])
 		else:
 			config_data.spawn_color_weights = PackedFloat32Array([1.0, 1.0, 1.0, 1.0])
 		print(
-			"Spawn candidate count=%d active_colors=%d suite=%s" % [
+			"Spawn candidate case=%s count=%d ramp=%d max=%d active_colors=%d opposite_pairs=%s suite=%s" % [
+				spawn_case,
 				config_data.spawn_count_per_turn,
+				config_data.spawn_count_ramp_turns,
+				config_data.spawn_count_max,
 				active_colors,
+				str(config_data.opposite_pairs),
 				measurement_suite,
 			]
 		)
@@ -101,6 +113,41 @@ func _apply_measurement_arguments() -> String:
 			]
 		)
 	return measurement_suite
+
+
+func _apply_spawn_case(config_data: GameConfig, spawn_case: String) -> int:
+	var active_colors: int = 4
+	config_data.spawn_count_ramp_turns = 0
+	config_data.spawn_count_max = 3
+	match spawn_case:
+		"A3":
+			config_data.spawn_count_per_turn = 3
+			active_colors = 3
+		"B1":
+			config_data.spawn_count_per_turn = 1
+		"B2":
+			config_data.spawn_count_per_turn = 2
+		"B3":
+			config_data.spawn_count_per_turn = 3
+		"CA":
+			config_data.spawn_count_per_turn = 1
+			config_data.spawn_count_ramp_turns = 40
+			active_colors = 3
+		"CB":
+			config_data.spawn_count_per_turn = 1
+			config_data.spawn_count_ramp_turns = 40
+		_:
+			push_error("Unknown spawn measurement case: %s" % spawn_case)
+	config_data.spawn_color_weights = (
+		PackedFloat32Array([1.0, 1.0, 1.0, 0.0])
+		if active_colors == 3
+		else PackedFloat32Array([1.0, 1.0, 1.0, 1.0])
+	)
+	var red_blue_only: Array[Vector2i] = [
+		Vector2i(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE),
+	]
+	config_data.opposite_pairs = red_blue_only
+	return active_colors
 
 
 func _run_directory(directory: String) -> void:

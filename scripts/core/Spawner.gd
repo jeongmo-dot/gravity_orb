@@ -38,12 +38,12 @@ func spawn_initial(board: Board, gravity: Vector2i) -> void:
 		var orb: Orb = board.spawn_orb(int(candidate["color"]), level, position)
 		orb.exit_ghost_state()
 		orb_spawned.emit(level)
-	_draw_and_publish_next_batch()
+	_draw_and_publish_next_batch(1)
 
 
-func try_spawn(board: Board, gravity: Vector2i) -> Array[Orb]:
+func try_spawn(board: Board, gravity: Vector2i, turn_index: int = 1) -> Array[Orb]:
 	if _next_batch.is_empty():
-		_draw_and_publish_next_batch()
+		_draw_and_publish_next_batch(turn_index)
 
 	var spawned: Array[Orb] = []
 	for candidate: Dictionary in _next_batch:
@@ -64,7 +64,7 @@ func try_spawn(board: Board, gravity: Vector2i) -> Array[Orb]:
 		var orb: Orb = board.spawn_orb(int(candidate["color"]), level, position)
 		spawned.append(orb)
 		orb_spawned.emit(level)
-	_draw_and_publish_next_batch()
+	_draw_and_publish_next_batch(turn_index + 1)
 	return spawned
 
 
@@ -72,8 +72,8 @@ func peek_next() -> Array[Dictionary]:
 	return _public_batch(_next_batch)
 
 
-func sync_next_batch_size() -> void:
-	var target_size: int = maxi(Config.data.spawn_count_per_turn, 1)
+func sync_next_batch_size(next_turn_index: int = 1) -> void:
+	var target_size: int = maxi(Config.data.spawn_count_for_turn(next_turn_index), 1)
 	while _next_batch.size() < target_size:
 		_next_batch.append(_draw_candidate())
 	if _next_batch.size() > target_size:
@@ -88,15 +88,16 @@ func _draw_candidate() -> Dictionary:
 	return {"level": level, "color": color, "t": position_t}
 
 
-func _draw_batch() -> Array[Dictionary]:
+func _draw_batch(turn_index: int = 1) -> Array[Dictionary]:
 	var batch: Array[Dictionary] = []
-	for _index: int in range(maxi(Config.data.spawn_count_per_turn, 1)):
+	var count: int = maxi(Config.data.spawn_count_for_turn(turn_index), 1)
+	for _index: int in range(count):
 		batch.append(_draw_candidate())
 	return batch
 
 
-func _draw_and_publish_next_batch() -> void:
-	_next_batch = _draw_batch()
+func _draw_and_publish_next_batch(turn_index: int) -> void:
+	_next_batch = _draw_batch(turn_index)
 	next_batch_changed.emit(peek_next())
 
 
