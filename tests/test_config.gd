@@ -71,7 +71,7 @@ func test_m4_spawn_defaults() -> void:
 		PackedFloat32Array([1.0, 1.0, 1.0, 1.0]),
 		"color weights"
 	)
-	assert_eq(config.spawn_count_per_turn, 1, "spawn count per turn")
+	assert_eq(config.spawn_count_per_turn, 2, "spawn count per turn")
 	assert_eq(config.spawn_count_ramp_turns, 0, "spawn count ramp disabled")
 	assert_eq(config.spawn_count_max, 3, "spawn count maximum")
 	assert_eq(config.spawn_position_mode, GameConfig.SpawnPositionMode.RANDOM, "position mode")
@@ -122,17 +122,12 @@ func test_m5_plus_tuning_defaults() -> void:
 
 func test_m6_annihilation_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
-	assert_eq(config.opposite_pairs.size(), 2, "opposite pair count")
-	if config.opposite_pairs.size() == 2:
+	assert_eq(config.opposite_pairs.size(), 1, "opposite pair count")
+	if config.opposite_pairs.size() == 1:
 		assert_eq(
 			config.opposite_pairs[0],
 			Vector2i(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE),
 			"red-blue opposite pair"
-		)
-		assert_eq(
-			config.opposite_pairs[1],
-			Vector2i(OrbTypes.OrbColor.GREEN, OrbTypes.OrbColor.YELLOW),
-			"green-yellow opposite pair"
 		)
 	assert_eq(
 		config.annihilation_rule,
@@ -148,12 +143,12 @@ func test_m6_annihilation_defaults() -> void:
 		"opposite pair reverse"
 	)
 	assert_true(
-		config.is_opposite(OrbTypes.OrbColor.GREEN, OrbTypes.OrbColor.YELLOW),
-		"green-yellow opposite pair forward"
+		not config.is_opposite(OrbTypes.OrbColor.GREEN, OrbTypes.OrbColor.YELLOW),
+		"green-yellow is not an opposite pair"
 	)
 	assert_true(
-		config.is_opposite(OrbTypes.OrbColor.YELLOW, OrbTypes.OrbColor.GREEN),
-		"green-yellow opposite pair reverse"
+		not config.is_opposite(OrbTypes.OrbColor.YELLOW, OrbTypes.OrbColor.GREEN),
+		"yellow-green is not an opposite pair"
 	)
 
 

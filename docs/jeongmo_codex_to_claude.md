@@ -38,6 +38,35 @@
 
 ## 미확인
 
+### [2026-10-01] 대상 #15 추가 요구 2 — B2 기본값 채택
+- 상태: 완료
+- 브랜치 / PR: `m7-four-color-multi-spawn` / PR 미생성
+- 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, `tests/test_config.gd`, `tests/test_rules.gd`, `tests/scenarios/test_spawn_flow.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 코드 선언·기본 리소스를 B2(`spawn_count_per_turn=2`, 4색 동일 가중치, `opposite_pairs=[R↔B]`, `spawn_count_ramp_turns=0`)로 변경 — config·규칙 자동 검증
+  - [x] 측정 모드 `--spawn-suite`·`--spawn-case`와 램프 구현 유지
+  - [x] 단일 생성을 검증하는 미리보기·중앙 겹침 시나리오는 `spawn_count_per_turn=1`을 명시하고, 턴 흐름·20턴 회귀는 새 기본값 2를 사용하도록 기대값 갱신
+  - [x] 전체 98/98 및 §10.1 명령 3종 통과
+  - [x] 회귀 기준: 22시드·겹침·20턴·120턴에서 이탈·발산·안전장치·사전 복구 0, 관통 한도 이내
+- QA 관측값:
+  - 22시드 → 이탈 0, 발산 0, 최대 관통 `7.925px`, 안전장치 0, 사전 복구 0, 유령 timeout 0
+  - 중앙 겹침 0.5초 → 이탈 0, 발산 0, 최대 관통 `0.000px`, 안전장치 0, 사전 복구 0
+  - 시드 4242 × 20턴(턴당 2개, 최종 구체 42개) → 이탈 0, 발산 0, 최대 관통 `7.397px`, 안전장치 0, 사전 복구 0, 유령 timeout 5, timeout 보정 44
+  - 120턴(시드 101~106 × 20턴) → 점유율 평균/최대 `4.8536% / 10.5504%`, 턴 종료 구체 수 평균/최대 `7.525 / 13`, 최종 구체 평균 `10.167`, 최대 레벨 `[4,4,4,4,4,5]`
+  - 120턴 물리 → 이탈 0, 발산 0, 최대 관통 `9.973px`, 안전장치 0, 사전 복구 0, 유령 timeout 13, timeout 보정 65
+  - 120턴 시간 → p50/p90/max `1.504167 / 1.504167 / 1.504167s`, 상한 도달 `119/120` (`99.1667%`)
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --import` → 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . -s res://tests/run_tests.gd` → 98/98 통과, 종료 코드 0
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --quit-after 300` → 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - 정적 검사 → `Input`/`InputEvent` 참조는 `InputRouter.gd`만, 난수 API는 `Spawner.gd`만; `git diff --check` 이상 없음
+  - 환경 진단 → 사용자 로그·Windows 루트 인증서·에디터 설정 접근 오류가 출력됐으나 프로젝트 스크립트 로드 및 검증 종료 코드에는 영향 없음
+- 수동 확인 절차:
+  1. 게임을 시작하고 NEXT를 본다 → 4색 중 두 구체가 나란히 표시된다.
+  2. 스와이프한다 → 미리 본 두 구체가 같은 물리 프레임에 생성되고 NEXT가 다시 두 개로 갱신된다.
+  3. 같은 레벨의 초록·노랑을 충돌시킨다 → 소멸하지 않는다. 같은 레벨의 빨강·파랑은 규칙 B에 따라 소멸한다.
+- 결정 사항: 없음. 기획서 0.6 및 추가 요구 2의 지정값을 그대로 반영했다. 램프·측정 경로는 삭제하지 않았다.
+- 남은 것 · 질문: 없음
+
 ### [2026-10-01] 대상 #15 추가 요구 1 — 노랑 상극 없음·점진 생성 180턴 측정
 - 상태: 질문
 - 브랜치 / PR: `m7-four-color-multi-spawn` / PR 미생성

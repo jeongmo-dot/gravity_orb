@@ -31,7 +31,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 @export var allow_same_direction_swipe: bool = true
 @export var spawn_level_weights: PackedFloat32Array = PackedFloat32Array([0.9, 0.1])
 @export var spawn_color_weights: PackedFloat32Array = PackedFloat32Array([1.0, 1.0, 1.0, 1.0])
-@export var spawn_count_per_turn: int = 1
+@export var spawn_count_per_turn: int = 2
 @export var spawn_count_ramp_turns: int = 0
 @export var spawn_count_max: int = 3
 @export var spawn_position_mode: SpawnPositionMode = SpawnPositionMode.RANDOM
@@ -52,7 +52,6 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 @export var wall_penetration_limit: float = 16.0
 @export var opposite_pairs: Array[Vector2i] = [
 	Vector2i(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE),
-	Vector2i(OrbTypes.OrbColor.GREEN, OrbTypes.OrbColor.YELLOW),
 ]
 @export var annihilation_rule: AnnihilationRule = AnnihilationRule.B_SAME_LEVEL
 @export var level_scores: PackedInt32Array = PackedInt32Array([2, 4, 8, 16, 32, 64, 128])

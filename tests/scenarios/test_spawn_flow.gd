@@ -109,6 +109,7 @@ func test_initial_two_orbs_use_even_bottom_positions_without_overlap() -> void:
 
 func test_preview_matches_spawned_orb_and_spawn_line() -> void:
 	var snapshot: Dictionary = _snapshot_config()
+	Config.data.spawn_count_per_turn = 1
 	_set_fast_settle()
 	var fixture: Dictionary = await _create_ready_fixture(4003)
 	var board: Board = fixture["board"] as Board
@@ -197,6 +198,7 @@ func test_seed_777_reproduces_five_turn_sequence() -> void:
 func test_three_turns_spawn_before_one_settle_each() -> void:
 	var snapshot: Dictionary = _snapshot_config()
 	_set_fast_settle()
+	var spawn_count: int = Config.data.spawn_count_per_turn
 	var fixture: Dictionary = await _create_ready_fixture(4005)
 	var board: Board = fixture["board"] as Board
 	var manager: TurnManager = fixture["manager"] as TurnManager
@@ -209,10 +211,18 @@ func test_three_turns_spawn_before_one_settle_each() -> void:
 		manager.on_swipe(direction)
 		assert_eq(manager.state, TurnManager.State.SPAWNING, "swipe enters SPAWNING")
 		await _wait_for_state(manager, TurnManager.State.SIMULATING)
-		assert_eq(board.get_orbs().size(), orb_count_before + 1, "spawn precedes settling")
+		assert_eq(
+			board.get_orbs().size(),
+			orb_count_before + spawn_count,
+			"spawn precedes settling"
+		)
 		await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
 
-	assert_eq(board.get_orbs().size(), 5, "initial two plus three turn spawns")
+	assert_eq(
+		board.get_orbs().size(),
+		Config.data.initial_orb_count + directions.size() * spawn_count,
+		"initial orbs plus three turn batches"
+	)
 	var expected_states: Array[TurnManager.State] = []
 	for _turn: int in range(3):
 		expected_states.append_array(
@@ -231,6 +241,7 @@ func test_three_turns_spawn_before_one_settle_each() -> void:
 
 func test_center_spawn_overlap_remains_inside_board_for_half_second() -> void:
 	var snapshot: Dictionary = _snapshot_config()
+	Config.data.spawn_count_per_turn = 1
 	Config.data.spawn_position_mode = GameConfig.SpawnPositionMode.CENTER
 	var fixture: Dictionary = await _create_fixture(4006, false)
 	var board: Board = fixture["board"] as Board
@@ -379,7 +390,7 @@ func test_seed_4242_completes_twenty_turns_without_departures() -> void:
 		]
 	)
 	assert_eq(manager.turn_index, 20, "twenty turns completed")
-	assert_eq(board.get_orbs().size(), 22, "initial two plus twenty turn spawns")
+	assert_eq(board.get_orbs().size(), 42, "initial two plus forty turn spawns")
 	assert_eq(total_departures, 0, "twenty-turn orb center departures")
 	assert_eq(total_divergences, 0, "twenty-turn divergent orb frames")
 	assert_eq(board.escape_guard_count, 0, "twenty-turn escape guard activations")

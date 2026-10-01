@@ -103,7 +103,7 @@ func test_rule_c_uses_larger_orb_color_level_difference_and_input_side() -> void
 	_assert_annihilation(equal, 0, 0, "rule C equal")
 
 
-func test_green_yellow_level_one_annihilates_under_rule_b() -> void:
+func test_green_yellow_level_one_has_no_reaction_under_rule_b() -> void:
 	var cfg: GameConfig = GameConfig.new()
 	cfg.annihilation_rule = GameConfig.AnnihilationRule.B_SAME_LEVEL
 	var result: Dictionary = ReactionRules.classify(
@@ -113,7 +113,7 @@ func test_green_yellow_level_one_annihilates_under_rule_b() -> void:
 		1,
 		cfg
 	)
-	_assert_annihilation(result, 0, 0, "green-yellow rule B")
+	assert_eq(result["type"], ReactionRules.Type.NONE, "green-yellow rule B")
 
 
 func test_yellow_same_level_merges() -> void:
