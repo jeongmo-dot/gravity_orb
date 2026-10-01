@@ -30,8 +30,15 @@
 
 ## 대기 중
 
-### [2026-09-30 #14] 레벨별 반지름 표 + 질량 지수 + 안전 기준 재측정
-- 상태: 진행중 — **추가 요구 있음** (아래 「추가 요구 1」)
+_(없음)_
+
+---
+
+## 처리 완료
+
+### [2026-09-30 #14] 레벨별 반지름 표 + 질량 지수 + 안전 기준 재측정 — 완료
+- 상태: 완료 (2026-10-01 Claude 검수 통과 · [PR #14](https://github.com/jeongmo-dot/gravity_orb/pull/14) 병합 `453b28f`)
+- 검수: 92/92, 22시드 7.925px, 120턴 8.733px·복구 0·안전장치 0 Claude 재실행 일치. 기획 관찰: 120턴 보드 점유율 평균 약 2% → 사용자와 생성량·보드 크기 논의. 수동 확인 보류
 - 근거: 기획서 **0.4.2** 3.4 (사용자 결정: L1~L3 크기 차이가 안 보임), [technical_design.md](technical_design.md) §4 (`level_radii`, `mass_exponent`)
 - 요구:
   1. `GameConfig`: `level_radii = [25, 40, 60, 85, 115, 150, 190]`, `mass_exponent`. `orb_base_radius`·`orb_radius_growth` **제거**하고 참조를 모두 `radius_for_level()`로 바꾼다. `radius_for_level(level) = level_radii[level - 1]`, `mass_for_level(level) = orb_base_mass × (r / r_L1)^mass_exponent`
@@ -62,10 +69,6 @@
   - [ ] §10.1 명령 3종 에러 0
 - QA: 기본값 기준 22시드·20턴·120턴(fixed·실시간) 관통·사전 복구·안전장치, 120턴 보드 점유율·구체 수, 시드별 점수·최대 연쇄·최고 레벨
 - 커밋: 같은 브랜치, push까지
-
----
-
-## 처리 완료
 
 ### [2026-09-30 #13] M7 점수·최고 점수·재시작 (게임오버 보류) — 완료
 - 상태: 완료 (2026-09-30 Claude 검수 통과 · [PR #13](https://github.com/jeongmo-dot/gravity_orb/pull/13) 병합 `76be3b6`)
