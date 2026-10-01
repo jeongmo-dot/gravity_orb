@@ -20,8 +20,17 @@ func test_matching_pair_merges_once_at_clamped_midpoint() -> void:
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
 	var radius: float = Config.data.radius_for_level(1)
 	var bottom_y: float = board.half_size() - radius - Config.data.spawn_margin
-	var a: Orb = board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(-49.5, bottom_y))
-	var b: Orb = board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(49.5, bottom_y))
+	var half_distance: float = radius - 0.5
+	var a: Orb = board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		1,
+		Vector2(-half_distance, bottom_y)
+	)
+	var b: Orb = board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		1,
+		Vector2(half_distance, bottom_y)
+	)
 	var raw_midpoint: Vector2 = (a.position + b.position) * 0.5
 	var result_radius: float = Config.data.radius_for_level(2)
 	var expected_position: Vector2 = Vector2(
@@ -51,9 +60,11 @@ func test_three_simultaneous_contacts_apply_exactly_one_merge() -> void:
 	var fixture: Dictionary = await _create_fixture()
 	var board: Board = fixture["board"] as Board
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
-	board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(-49.0, 0.0))
-	board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(49.0, 0.0))
-	board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(0.0, 84.0))
+	var radius: float = Config.data.radius_for_level(1)
+	var half_distance: float = radius - 1.0
+	board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(-half_distance, 0.0))
+	board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(half_distance, 0.0))
+	board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(0.0, radius * 1.68))
 
 	var applied: int = await _advance_and_flush(board, resolver, OBSERVE_SECONDS)
 	var orbs: Array[Orb] = board.get_orbs()
@@ -69,8 +80,17 @@ func test_nonmatching_pairs_do_not_react() -> void:
 	var color_fixture: Dictionary = await _create_fixture()
 	var color_board: Board = color_fixture["board"] as Board
 	var color_resolver: CollisionResolver = color_fixture["resolver"] as CollisionResolver
-	color_board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(-49.5, 0.0))
-	color_board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(49.5, 0.0))
+	var level_one_half_distance: float = Config.data.radius_for_level(1) - 0.5
+	color_board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		1,
+		Vector2(-level_one_half_distance, 0.0)
+	)
+	color_board.spawn_orb(
+		OrbTypes.OrbColor.GREEN,
+		1,
+		Vector2(level_one_half_distance, 0.0)
+	)
 	var color_applied: int = await _advance_and_flush(
 		color_board,
 		color_resolver,
@@ -83,8 +103,20 @@ func test_nonmatching_pairs_do_not_react() -> void:
 	var level_fixture: Dictionary = await _create_fixture()
 	var level_board: Board = level_fixture["board"] as Board
 	var level_resolver: CollisionResolver = level_fixture["resolver"] as CollisionResolver
-	level_board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(-55.0, 0.0))
-	level_board.spawn_orb(OrbTypes.OrbColor.RED, 2, Vector2(55.0, 0.0))
+	var mixed_half_distance: float = (
+		(Config.data.radius_for_level(1) + Config.data.radius_for_level(2)) * 0.5
+		- 0.5
+	)
+	level_board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		1,
+		Vector2(-mixed_half_distance, 0.0)
+	)
+	level_board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		2,
+		Vector2(mixed_half_distance, 0.0)
+	)
 	var level_applied: int = await _advance_and_flush(
 		level_board,
 		level_resolver,
@@ -100,9 +132,13 @@ func test_merge_result_reacts_again_as_chain_two() -> void:
 	var board: Board = fixture["board"] as Board
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
 	var manager: TurnManager = fixture["manager"] as TurnManager
-	board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(-49.5, 0.0))
-	board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(49.5, 0.0))
-	board.spawn_orb(OrbTypes.OrbColor.RED, 2, Vector2(0.0, 110.0))
+	var level_one_radius: float = Config.data.radius_for_level(1)
+	var level_two_radius: float = Config.data.radius_for_level(2)
+	var half_distance: float = level_one_radius - 0.5
+	var chain_y: float = (level_one_radius + 3.0 * level_two_radius) * 0.5
+	board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(-half_distance, 0.0))
+	board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(half_distance, 0.0))
+	board.spawn_orb(OrbTypes.OrbColor.RED, 2, Vector2(0.0, chain_y))
 
 	var applied: int = await _advance_and_flush(board, resolver, OBSERVE_SECONDS)
 	var orbs: Array[Orb] = board.get_orbs()
@@ -123,10 +159,28 @@ func test_independent_simultaneous_merges_are_both_chain_one() -> void:
 	var board: Board = fixture["board"] as Board
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
 	var manager: TurnManager = fixture["manager"] as TurnManager
-	board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(-250.0, 0.0))
-	board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(-151.0, 0.0))
-	board.spawn_orb(OrbTypes.OrbColor.BLUE, 1, Vector2(151.0, 0.0))
-	board.spawn_orb(OrbTypes.OrbColor.BLUE, 1, Vector2(250.0, 0.0))
+	var half_distance: float = Config.data.radius_for_level(1) - 0.5
+	var pair_offset: float = 200.0
+	board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		1,
+		Vector2(-pair_offset - half_distance, 0.0)
+	)
+	board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		1,
+		Vector2(-pair_offset + half_distance, 0.0)
+	)
+	board.spawn_orb(
+		OrbTypes.OrbColor.BLUE,
+		1,
+		Vector2(pair_offset - half_distance, 0.0)
+	)
+	board.spawn_orb(
+		OrbTypes.OrbColor.BLUE,
+		1,
+		Vector2(pair_offset + half_distance, 0.0)
+	)
 
 	var applied: int = await _advance_and_flush(board, resolver, OBSERVE_SECONDS)
 	assert_eq(applied, 2, "independent reaction count")
@@ -157,8 +211,11 @@ func test_wall_merge_result_is_clamped_inside_board() -> void:
 	var fixture: Dictionary = await _create_fixture()
 	var board: Board = fixture["board"] as Board
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
-	board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(426.0, -49.5))
-	board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(426.0, 49.5))
+	var radius: float = Config.data.radius_for_level(1)
+	var wall_x: float = board.half_size() - radius - Config.data.spawn_margin
+	var half_distance: float = radius - 0.5
+	board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(wall_x, -half_distance))
+	board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(wall_x, half_distance))
 
 	var applied: int = await _advance_and_flush(board, resolver, OBSERVE_SECONDS)
 	var orbs: Array[Orb] = board.get_orbs()
@@ -166,9 +223,15 @@ func test_wall_merge_result_is_clamped_inside_board() -> void:
 	assert_eq(orbs.size(), 1, "wall result count")
 	if _reactions.size() == 1:
 		var position: Vector2 = _reactions[0]["position"] as Vector2
-		var radius: float = Config.data.radius_for_level(2)
-		assert_true(absf(position.x) <= board.half_size() - radius, "wall result x inside")
-		assert_true(absf(position.y) <= board.half_size() - radius, "wall result y inside")
+		var result_radius: float = Config.data.radius_for_level(2)
+		assert_true(
+			absf(position.x) <= board.half_size() - result_radius,
+			"wall result x inside"
+		)
+		assert_true(
+			absf(position.y) <= board.half_size() - result_radius,
+			"wall result y inside"
+		)
 	await _cleanup_fixture(fixture)
 
 

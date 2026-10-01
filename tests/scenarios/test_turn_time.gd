@@ -18,7 +18,7 @@ const DIRECTION_PATTERN: Array[Vector2i] = [
 	Vector2i.RIGHT,
 ]
 const WAIT_TIMEOUT_SECONDS: float = 3.0
-const CONTINUOUS_PENETRATION_LIMIT: float = 16.0
+const CONTINUOUS_PENETRATION_LIMIT: float = 14.0
 const DIVERGENCE_SPEED: float = 5000.0
 const DIVERGENCE_MARGIN: float = 100.0
 const DIAGNOSTIC_HISTORY_FRAMES: int = 10
@@ -42,13 +42,14 @@ func test_all_turns_return_to_input_within_time_cap() -> void:
 		"all turns return within cap plus one physics tick"
 	)
 	assert_eq(int(metrics["escape_guards"]), 0, "120-turn escape guard activations")
+	assert_eq(int(metrics["divergences"]), 0, "120-turn divergent orb frames")
 	assert_true(
 		int(metrics["wall_recoveries"]) <= 2,
 		"120-turn wall recovery activations must be at most 2, got %d" % int(
 			metrics["wall_recoveries"]
 		)
 	)
-	if _is_independent_growth_measurement():
+	if _is_independent_measurement():
 		assert_true(
 			float(metrics["maximum_penetration"]) <= CONTINUOUS_PENETRATION_LIMIT,
 			"120-turn wall penetration must be at most %.3fpx, got %.3fpx" % [
@@ -60,6 +61,8 @@ func test_all_turns_return_to_input_within_time_cap() -> void:
 
 func _measure_current_config() -> Dictionary:
 	var turn_times: Array[float] = []
+	var turn_end_occupancies: Array[float] = []
+	var turn_end_orb_counts: Array[int] = []
 	var direction_times: Dictionary = {
 		"DOWN": [] as Array[float],
 		"RIGHT": [] as Array[float],
@@ -76,7 +79,11 @@ func _measure_current_config() -> Dictionary:
 	var ghost_duration_total: float = 0.0
 	var maximum_residual_speed: float = 0.0
 	var maximum_penetration: float = 0.0
+	var maximum_penetration_ratio: float = 0.0
+	var maximum_penetration_level: int = 0
 	var center_departures: int = 0
+	var divergence_count: int = 0
+	var wall_recovery_timeout_lags: Array[int] = []
 	var scores_by_seed: Array[int] = []
 	var max_chains_by_seed: Array[int] = []
 	var max_levels_by_seed: Array[int] = []
@@ -98,7 +105,11 @@ func _measure_current_config() -> Dictionary:
 				maximum_penetration,
 				float(turn_metrics["max_penetration"])
 			)
+			if float(turn_metrics["max_penetration_ratio"]) > maximum_penetration_ratio:
+				maximum_penetration_ratio = float(turn_metrics["max_penetration_ratio"])
+				maximum_penetration_level = int(turn_metrics["max_penetration_level"])
 			center_departures += int(turn_metrics["departures"])
+			divergence_count += int(turn_metrics["divergences"])
 			var turn_time: float = manager._settle_elapsed
 			turn_times.append(turn_time)
 			var direction_name: String = OrbTypes.dir_name(direction)
@@ -108,6 +119,8 @@ func _measure_current_config() -> Dictionary:
 				maximum_residual_speed,
 				_maximum_linear_speed(board)
 			)
+			turn_end_occupancies.append(_board_occupancy(board))
+			turn_end_orb_counts.append(board.get_orbs().size())
 		capped_turns += manager.capped_turn_count
 		final_orb_total += board.get_orbs().size()
 		escape_guard_total += board.escape_guard_count
@@ -116,6 +129,9 @@ func _measure_current_config() -> Dictionary:
 		ghost_timeout_total += board.ghost_timeout_count
 		ghost_completed_total += board.ghost_completed_count
 		ghost_duration_total += board.ghost_total_duration
+		wall_recovery_timeout_lags.append_array(
+			board.wall_recovery_since_last_ghost_timeout_frames
+		)
 		scores_by_seed.append(score_manager.score)
 		max_chains_by_seed.append(score_manager.max_chain)
 		max_levels_by_seed.append(score_manager.max_level_reached)
@@ -139,10 +155,18 @@ func _measure_current_config() -> Dictionary:
 		"maximum": _percentile(turn_times, 1.0),
 		"maximum_residual_speed": maximum_residual_speed,
 		"maximum_penetration": maximum_penetration,
+		"maximum_penetration_ratio": maximum_penetration_ratio,
+		"maximum_penetration_level": maximum_penetration_level,
 		"departures": center_departures,
+		"divergences": divergence_count,
 		"final_orb_average": float(final_orb_total) / float(SEEDS.size()),
+		"turn_end_occupancy_average": _average(turn_end_occupancies),
+		"turn_end_occupancy_maximum": _percentile(turn_end_occupancies, 1.0),
+		"turn_end_orb_count_average": _average_int(turn_end_orb_counts),
+		"turn_end_orb_count_maximum": _maximum_int(turn_end_orb_counts),
 		"escape_guards": escape_guard_total,
 		"wall_recoveries": wall_recovery_total,
+		"wall_recovery_timeout_lags": wall_recovery_timeout_lags,
 		"timeout_corrections": timeout_correction_total,
 		"ghost_timeouts": ghost_timeout_total,
 		"ghost_completed": ghost_completed_total,
@@ -170,9 +194,20 @@ func _maximum_linear_speed(board: Board) -> float:
 	return maximum
 
 
-func _is_independent_growth_measurement() -> bool:
+func _board_occupancy(board: Board) -> float:
+	var occupied_area: float = 0.0
+	for orb: Orb in board.get_orbs():
+		var radius: float = orb.get_radius()
+		occupied_area += PI * radius * radius
+	return occupied_area / (Config.data.board_size * Config.data.board_size)
+
+
+func _is_independent_measurement() -> bool:
 	for argument: String in OS.get_cmdline_user_args():
-		if argument.begins_with("--growth-suite="):
+		if (
+			argument.begins_with("--growth-suite=")
+			or argument.begins_with("--mass-suite=")
+		):
 			return true
 	return false
 
@@ -255,7 +290,10 @@ func _wait_for_state_with_metrics(
 ) -> Dictionary:
 	var metrics: Dictionary = {
 		"max_penetration": 0.0,
+		"max_penetration_ratio": 0.0,
+		"max_penetration_level": 0,
 		"departures": 0,
+		"divergences": 0,
 	}
 	var max_frames: int = ceili(float(Engine.physics_ticks_per_second) * WAIT_TIMEOUT_SECONDS)
 	for _frame: int in range(max_frames):
@@ -287,8 +325,17 @@ func _wait_for_state_with_metrics(
 				float(metrics["max_penetration"]),
 				penetration
 			)
+			var penetration_ratio: float = penetration / orb.get_radius()
+			if penetration_ratio > float(metrics["max_penetration_ratio"]):
+				metrics["max_penetration_ratio"] = penetration_ratio
+				metrics["max_penetration_level"] = orb.level
 			if center_extent > board.half_size():
 				metrics["departures"] = int(metrics["departures"]) + 1
+			if (
+				speed > DIVERGENCE_SPEED
+				or center_extent > board.half_size() + DIVERGENCE_MARGIN
+			):
+				metrics["divergences"] = int(metrics["divergences"]) + 1
 		if manager.state == target:
 			return metrics
 	assert_eq(manager.state, target, "state wait timeout")
@@ -411,6 +458,20 @@ func _average(values: Array[float]) -> float:
 	return total / float(values.size())
 
 
+func _average_int(values: Array[int]) -> float:
+	var total: int = 0
+	for value: int in values:
+		total += value
+	return float(total) / float(values.size())
+
+
+func _maximum_int(values: Array[int]) -> int:
+	var maximum: int = 0
+	for value: int in values:
+		maximum = maxi(maximum, value)
+	return maximum
+
+
 func _percentile(values: Array[float], quantile: float) -> float:
 	var sorted_values: Array[float] = values.duplicate()
 	sorted_values.sort()
@@ -421,7 +482,7 @@ func _percentile(values: Array[float], quantile: float) -> float:
 func _print_metrics(metrics: Dictionary) -> void:
 	var direction_p50: Dictionary = metrics["direction_p50"] as Dictionary
 	print(
-		"Turn-time cap=%.3f turns=%d capped=%d capped_ratio=%.6f average=%.6f p50=%.6f p90=%.6f max=%.6f max_residual_speed=%.3f max_penetration=%.3f departures=%d final_orbs_avg=%.3f escape_guards=%d wall_recoveries=%d timeout_corrections=%d ghost_timeouts=%d ghost_completed=%d ghost_avg=%.6f direction_p50=[D %.6f R %.6f U %.6f L %.6f]" % [
+		"Turn-time cap=%.3f turns=%d capped=%d capped_ratio=%.6f average=%.6f p50=%.6f p90=%.6f max=%.6f max_residual_speed=%.3f max_penetration=%.3f max_penetration_ratio=%.6f ratio_level=%d departures=%d divergences=%d final_orbs_avg=%.3f turn_end_occupancy_avg=%.6f turn_end_occupancy_max=%.6f turn_end_orbs_avg=%.3f turn_end_orbs_max=%d escape_guards=%d wall_recoveries=%d recovery_timeout_lags=%s timeout_corrections=%d ghost_timeouts=%d ghost_completed=%d ghost_avg=%.6f direction_p50=[D %.6f R %.6f U %.6f L %.6f]" % [
 			Config.data.max_settle_time,
 			int(metrics["turns"]),
 			int(metrics["capped_turns"]),
@@ -432,10 +493,18 @@ func _print_metrics(metrics: Dictionary) -> void:
 			float(metrics["maximum"]),
 			float(metrics["maximum_residual_speed"]),
 			float(metrics["maximum_penetration"]),
+			float(metrics["maximum_penetration_ratio"]),
+			int(metrics["maximum_penetration_level"]),
 			int(metrics["departures"]),
+			int(metrics["divergences"]),
 			float(metrics["final_orb_average"]),
+			float(metrics["turn_end_occupancy_average"]),
+			float(metrics["turn_end_occupancy_maximum"]),
+			float(metrics["turn_end_orb_count_average"]),
+			int(metrics["turn_end_orb_count_maximum"]),
 			int(metrics["escape_guards"]),
 			int(metrics["wall_recoveries"]),
+			str(metrics["wall_recovery_timeout_lags"]),
 			int(metrics["timeout_corrections"]),
 			int(metrics["ghost_timeouts"]),
 			int(metrics["ghost_completed"]),

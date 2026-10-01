@@ -11,7 +11,9 @@ const WAIT_TIMEOUT_SECONDS: float = 8.0
 const POSITION_TOLERANCE: float = 0.001
 const OVERLAP_OBSERVE_SECONDS: float = 0.5
 const OVERLAP_PENETRATION_LIMIT: float = 12.0
-const CONTINUOUS_PENETRATION_LIMIT: float = 16.0
+const CONTINUOUS_PENETRATION_LIMIT: float = 14.0
+const DIVERGENCE_SPEED: float = 5000.0
+const DIVERGENCE_MARGIN: float = 100.0
 const REPRO_DIRECTIONS: Array[Vector2i] = [
 	Vector2i.DOWN,
 	Vector2i.LEFT,
@@ -249,19 +251,24 @@ func test_center_spawn_overlap_remains_inside_board_for_half_second() -> void:
 
 	var metrics: Dictionary = await _observe_board(board, OVERLAP_OBSERVE_SECONDS)
 	print(
-		"Spawn overlap seed=4006 duration=%.2f departures=%d max_penetration=%.3f max_speed=%.3f escape_guards=%d wall_recoveries=%d timeout_corrections=%d ghost_timeouts=%d ghost_avg=%.6f" % [
+		"Spawn overlap seed=4006 duration=%.2f departures=%d divergences=%d max_penetration=%.3f max_penetration_ratio=%.6f ratio_level=%d max_speed=%.3f escape_guards=%d wall_recoveries=%d recovery_timeout_lags=%s timeout_corrections=%d ghost_timeouts=%d ghost_avg=%.6f" % [
 			OVERLAP_OBSERVE_SECONDS,
 			int(metrics["departures"]),
+			int(metrics["divergences"]),
 			float(metrics["max_penetration"]),
+			float(metrics["max_penetration_ratio"]),
+			int(metrics["max_penetration_level"]),
 			float(metrics["max_speed"]),
 			int(metrics["escape_guards"]),
 			board.wall_recovery_count,
+			str(board.wall_recovery_since_last_ghost_timeout_frames),
 			board.timeout_correction_count,
 			board.ghost_timeout_count,
 			board.average_ghost_duration(),
 		]
 	)
 	assert_eq(int(metrics["departures"]), 0, "overlap case orb center departures")
+	assert_eq(int(metrics["divergences"]), 0, "overlap case divergent orb frames")
 	assert_eq(int(metrics["escape_guards"]), 0, "overlap case escape guard activations")
 	assert_eq(board.wall_recovery_count, 0, "overlap case wall recovery activations")
 	assert_true(
@@ -288,7 +295,10 @@ func test_seed_4242_completes_twenty_turns_without_departures() -> void:
 		Vector2i.LEFT,
 	]
 	var total_departures: int = 0
+	var total_divergences: int = 0
 	var maximum_penetration: float = 0.0
+	var maximum_penetration_ratio: float = 0.0
+	var maximum_penetration_level: int = 0
 	var capped_turn_count: int = 0
 
 	for turn_offset: int in range(20):
@@ -301,7 +311,11 @@ func test_seed_4242_completes_twenty_turns_without_departures() -> void:
 		if capped:
 			capped_turn_count += 1
 		total_departures += int(metrics["departures"])
+		total_divergences += int(metrics["divergences"])
 		maximum_penetration = maxf(maximum_penetration, float(metrics["max_penetration"]))
+		if float(metrics["max_penetration_ratio"]) > maximum_penetration_ratio:
+			maximum_penetration_ratio = float(metrics["max_penetration_ratio"])
+			maximum_penetration_level = int(metrics["max_penetration_level"])
 		print(
 			"Spawn flow seed=4242 turn=%d gravity=%s settle=%.6f capped=%s orbs=%d departures=%d max_penetration=%.3f" % [
 				turn_offset + 1,
@@ -316,13 +330,17 @@ func test_seed_4242_completes_twenty_turns_without_departures() -> void:
 		assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "turn returns to input")
 
 	print(
-		"Spawn flow seed=4242 summary turns=20 orbs=%d departures=%d max_penetration=%.3f capped_turns=%d escape_guards=%d wall_recoveries=%d timeout_corrections=%d ghost_timeouts=%d ghost_avg=%.6f" % [
+		"Spawn flow seed=4242 summary turns=20 orbs=%d departures=%d divergences=%d max_penetration=%.3f max_penetration_ratio=%.6f ratio_level=%d capped_turns=%d escape_guards=%d wall_recoveries=%d recovery_timeout_lags=%s timeout_corrections=%d ghost_timeouts=%d ghost_avg=%.6f" % [
 			board.get_orbs().size(),
 			total_departures,
+			total_divergences,
 			maximum_penetration,
+			maximum_penetration_ratio,
+			maximum_penetration_level,
 			capped_turn_count,
 			board.escape_guard_count,
 			board.wall_recovery_count,
+			str(board.wall_recovery_since_last_ghost_timeout_frames),
 			board.timeout_correction_count,
 			board.ghost_timeout_count,
 			board.average_ghost_duration(),
@@ -331,6 +349,7 @@ func test_seed_4242_completes_twenty_turns_without_departures() -> void:
 	assert_eq(manager.turn_index, 20, "twenty turns completed")
 	assert_eq(board.get_orbs().size(), 22, "initial two plus twenty turn spawns")
 	assert_eq(total_departures, 0, "twenty-turn orb center departures")
+	assert_eq(total_divergences, 0, "twenty-turn divergent orb frames")
 	assert_eq(board.escape_guard_count, 0, "twenty-turn escape guard activations")
 	assert_eq(board.wall_recovery_count, 0, "twenty-turn wall recovery activations")
 	assert_true(
@@ -482,8 +501,11 @@ func _empty_physics_metrics() -> Dictionary:
 	return {
 		"departures": 0,
 		"max_penetration": 0.0,
+		"max_penetration_ratio": 0.0,
+		"max_penetration_level": 0,
 		"max_speed": 0.0,
 		"escape_guards": 0,
+		"divergences": 0,
 	}
 
 
@@ -502,10 +524,20 @@ func _accumulate_board_metrics(board: Board, metrics: Dictionary) -> void:
 			float(metrics["max_penetration"]),
 			penetration
 		)
+		var penetration_ratio: float = penetration / orb.get_radius()
+		if penetration_ratio > float(metrics["max_penetration_ratio"]):
+			metrics["max_penetration_ratio"] = penetration_ratio
+			metrics["max_penetration_level"] = orb.level
+		var speed: float = orb.linear_velocity.length()
 		metrics["max_speed"] = maxf(
 			float(metrics["max_speed"]),
-			orb.linear_velocity.length()
+			speed
 		)
+		if (
+			speed > DIVERGENCE_SPEED
+			or center_extent > board.half_size() + DIVERGENCE_MARGIN
+		):
+			metrics["divergences"] = int(metrics["divergences"]) + 1
 		if center_extent > board.half_size():
 			metrics["departures"] = int(metrics["departures"]) + 1
 

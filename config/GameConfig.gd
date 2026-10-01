@@ -6,10 +6,12 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 
 @export var board_size: float = 960.0
 @export var wall_thickness: float = 256.0
-@export var orb_base_radius: float = 50.0
-@export var orb_radius_growth: float = 1.25
+@export var level_radii: PackedFloat32Array = PackedFloat32Array(
+	[25.0, 40.0, 60.0, 85.0, 115.0, 150.0, 190.0]
+)
 @export var orb_max_level: int = 7
 @export var orb_base_mass: float = 1.0
+@export var mass_exponent: float = 1.0
 @export var gravity_strength: float = 2400.0
 @export var orb_friction: float = 0.3
 @export var orb_bounce: float = 0.15
@@ -55,12 +57,12 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 
 
 func radius_for_level(level: int) -> float:
-	return orb_base_radius * pow(orb_radius_growth, level - 1)
+	return level_radii[level - 1]
 
 
 func mass_for_level(level: int) -> float:
-	var radius_ratio: float = radius_for_level(level) / orb_base_radius
-	return orb_base_mass * radius_ratio * radius_ratio
+	var radius_ratio: float = radius_for_level(level) / radius_for_level(1)
+	return orb_base_mass * pow(radius_ratio, mass_exponent)
 
 
 func score_for_level(level: int) -> int:
