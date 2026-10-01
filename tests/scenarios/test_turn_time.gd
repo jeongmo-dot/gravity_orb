@@ -40,10 +40,10 @@ func test_all_turns_return_to_input_within_time_cap() -> void:
 			"measured spawn sweep turns do not exceed the planned total"
 		)
 	else:
-		assert_eq(
-			int(metrics["turns"]),
-			SEEDS.size() * TURNS_PER_SEED,
-			"measured turns"
+		assert_true(
+			int(metrics["turns"]) >= SEEDS.size()
+			and int(metrics["turns"]) <= SEEDS.size() * TURNS_PER_SEED,
+			"each seed measures until game over or twenty turns"
 		)
 	assert_true(
 		float(metrics["maximum"]) <= Config.data.max_settle_time + tick_seconds,
@@ -161,6 +161,8 @@ func _measure_current_config() -> Dictionary:
 				if occupancy > 0.70:
 					saturated_at = completed_turns
 					break
+			if manager.state == TurnManager.State.GAME_OVER:
+				break
 		capped_turns += manager.capped_turn_count
 		final_orb_total += board.get_orbs().size()
 		escape_guard_total += board.escape_guard_count
@@ -418,9 +420,12 @@ func _wait_for_state_with_metrics(
 				or center_extent > board.half_size() + DIVERGENCE_MARGIN
 			):
 				metrics["divergences"] = int(metrics["divergences"]) + 1
-		if manager.state == target:
+		if manager.state == target or manager.state == TurnManager.State.GAME_OVER:
 			return metrics
-	assert_eq(manager.state, target, "state wait timeout")
+	assert_true(
+		manager.state == target or manager.state == TurnManager.State.GAME_OVER,
+		"state wait timeout"
+	)
 	return metrics
 
 

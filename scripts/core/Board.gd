@@ -5,6 +5,8 @@ signal orb_contact(a: Orb, b: Orb)
 
 const ORB_SCENE: PackedScene = preload("res://scenes/Orb.tscn")
 const FRAME_WIDTH: float = 4.0
+const WARNING_FRAME_WIDTH: float = 12.0
+const WARNING_FRAME_COLOR: Color = Color("#FF3B30")
 
 @onready var _wall_top: StaticBody2D = %WallTop
 @onready var _wall_bottom: StaticBody2D = %WallBottom
@@ -25,6 +27,7 @@ var timeout_correction_count: int = 0
 var ghost_timeout_count: int = 0
 var ghost_completed_count: int = 0
 var ghost_total_duration: float = 0.0
+var _warning_directions: Array[Vector2i] = []
 
 
 func _ready() -> void:
@@ -33,6 +36,7 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_update_entrance_waiters()
 	_update_ghost_orbs(delta)
 
 
@@ -108,31 +112,59 @@ func spawn_line(gravity: Vector2i, radius: float) -> Dictionary:
 	}
 
 
-func average_ghost_duration() -> float:
-	if ghost_completed_count == 0:
-		return 0.0
-	return ghost_total_duration / float(ghost_completed_count)
+func find_free_spawn_slot(
+	gravity: Vector2i,
+	radius: float,
+	placed: Array[Dictionary],
+	preferred_position: Vector2 = Vector2.ZERO
+) -> Dictionary:
+	var line: Dictionary = spawn_line(gravity, radius)
+	var origin: Vector2 = line["origin"] as Vector2
+	var axis: Vector2 = line["axis"] as Vector2
+	var extent: float = float(line["extent"])
+	var preferred_offset: float = clampf(
+		(preferred_position - origin).dot(axis),
+		-extent,
+		extent
+	)
+	var offsets: Array[float] = [preferred_offset]
+	var step: float = maxf(Config.data.spawn_probe_step, 0.001)
+	var sample_count: int = ceili(extent * 2.0 / step)
+	for sample_index: int in range(sample_count + 1):
+		var offset: float = minf(-extent + float(sample_index) * step, extent)
+		if not _contains_approx(offsets, offset):
+			offsets.append(offset)
 
-
-func _update_ghost_orbs(delta: float) -> void:
-	for orb: Orb in get_orbs():
-		if not orb.is_ghost:
+	var found: bool = false
+	var best_position: Vector2 = preferred_position
+	var best_distance: float = INF
+	var best_offset: float = INF
+	for offset: float in offsets:
+		var position: Vector2 = origin + axis * offset
+		if not _spawn_probe_is_clear(position, radius, placed):
 			continue
-		orb.advance_ghost(delta)
-		var maximum_overlap: float = _maximum_normal_overlap(orb)
-		if maximum_overlap <= Config.data.ghost_exit_overlap:
-			_complete_ghost(orb, false, maximum_overlap)
-		elif (
-			orb.ghost_elapsed >= Config.data.ghost_max_time
-			or is_equal_approx(
-				orb.ghost_elapsed,
-				Config.data.ghost_max_time
-			)
+		var distance: float = absf(offset - preferred_offset)
+		if (
+			not found
+			or distance < best_distance
+			or (is_equal_approx(distance, best_distance) and offset < best_offset)
 		):
-			_complete_ghost(orb, true, maximum_overlap)
+			found = true
+			best_position = position
+			best_distance = distance
+			best_offset = offset
+	return {"found": found, "position": best_position}
 
 
-func _maximum_normal_overlap(ghost: Orb) -> float:
+func entrance_waiting_orbs() -> Array[Orb]:
+	var waiting: Array[Orb] = []
+	for orb: Orb in get_orbs():
+		if orb.is_waiting_at_entrance:
+			waiting.append(orb)
+	return waiting
+
+
+func maximum_normal_overlap(ghost: Orb) -> float:
 	var maximum_overlap: float = 0.0
 	for other: Orb in _orbs:
 		if (
@@ -149,6 +181,138 @@ func _maximum_normal_overlap(ghost: Orb) -> float:
 		)
 		maximum_overlap = maxf(maximum_overlap, overlap)
 	return maximum_overlap
+
+
+func normal_overlap_count(ghost: Orb) -> int:
+	var count: int = 0
+	for other: Orb in _orbs:
+		if (
+			other == ghost
+			or not is_instance_valid(other)
+			or other.consumed
+			or other.is_ghost
+		):
+			continue
+		var overlap: float = (
+			ghost.get_current_radius()
+			+ other.get_current_radius()
+			- ghost.position.distance_to(other.position)
+		)
+		if overlap > Config.data.ghost_exit_overlap:
+			count += 1
+	return count
+
+
+func blocked_spawn_directions(batch: Array[Dictionary]) -> Array[Vector2i]:
+	var blocked: Array[Vector2i] = []
+	for direction: Vector2i in OrbTypes.DIRECTIONS:
+		if not _batch_fits_spawn_line(direction, batch):
+			blocked.append(direction)
+	return blocked
+
+
+func set_warning_directions(directions: Array[Vector2i]) -> void:
+	_warning_directions.clear()
+	_warning_directions.append_array(directions)
+	queue_redraw()
+
+
+func _batch_fits_spawn_line(
+	gravity: Vector2i,
+	batch: Array[Dictionary]
+) -> bool:
+	var radii: Array[float] = []
+	for candidate: Dictionary in batch:
+		radii.append(Config.data.radius_for_level(int(candidate["level"])))
+	radii.sort()
+	radii.reverse()
+
+	var placed: Array[Dictionary] = []
+	for radius: float in radii:
+		var slot: Dictionary = find_free_spawn_slot(gravity, radius, placed)
+		if not bool(slot["found"]):
+			return false
+		placed.append({"position": slot["position"], "radius": radius})
+	return true
+
+
+func _spawn_probe_is_clear(
+	position: Vector2,
+	radius: float,
+	placed: Array[Dictionary]
+) -> bool:
+	for orb: Orb in _orbs:
+		if not is_instance_valid(orb) or orb.consumed or orb.is_ghost:
+			continue
+		var overlap: float = (
+			radius
+			+ orb.get_current_radius()
+			- position.distance_to(orb.position)
+		)
+		if overlap > Config.data.ghost_exit_overlap:
+			return false
+	for item: Dictionary in placed:
+		var overlap: float = (
+			radius
+			+ float(item["radius"])
+			- position.distance_to(item["position"] as Vector2)
+		)
+		if overlap > Config.data.ghost_exit_overlap:
+			return false
+	return true
+
+
+func _contains_approx(values: Array[float], target: float) -> bool:
+	for value: float in values:
+		if is_equal_approx(value, target):
+			return true
+	return false
+
+
+func _update_entrance_waiters() -> void:
+	var placed: Array[Dictionary] = []
+	for orb: Orb in get_orbs():
+		if orb.is_ghost and not orb.is_waiting_at_entrance:
+			placed.append(
+				{"position": orb.position, "radius": orb.get_radius()}
+			)
+	for orb: Orb in entrance_waiting_orbs():
+		var slot: Dictionary = find_free_spawn_slot(
+			orb.entrance_gravity,
+			orb.get_radius(),
+			placed,
+			orb.entrance_preferred_position
+		)
+		if not bool(slot["found"]):
+			continue
+		var position: Vector2 = slot["position"] as Vector2
+		orb.release_entrance_wait(
+			position,
+			orb.entrance_gravity,
+			Config.data.gravity_strength
+		)
+		placed.append({"position": position, "radius": orb.get_radius()})
+
+
+func average_ghost_duration() -> float:
+	if ghost_completed_count == 0:
+		return 0.0
+	return ghost_total_duration / float(ghost_completed_count)
+
+
+func _update_ghost_orbs(delta: float) -> void:
+	for orb: Orb in get_orbs():
+		if not orb.is_ghost or orb.is_waiting_at_entrance:
+			continue
+		orb.advance_ghost(delta)
+		var maximum_overlap: float = maximum_normal_overlap(orb)
+		if maximum_overlap <= Config.data.ghost_exit_overlap:
+			_complete_ghost(orb, false, maximum_overlap)
+		elif (
+			orb.ghost_elapsed >= Config.data.ghost_max_time
+			or is_equal_approx(orb.ghost_elapsed, Config.data.ghost_max_time)
+		):
+			_complete_ghost(orb, true, maximum_overlap)
 
 
 func _complete_ghost(orb: Orb, timed_out: bool, maximum_overlap: float) -> void:
@@ -494,3 +658,16 @@ func _configure_frame() -> void:
 	_frame_border.width = FRAME_WIDTH
 	_frame_border.default_color = Color.WHITE
 	_frame_border.closed = true
+
+
+func _draw() -> void:
+	var half: float = half_size()
+	for direction: Vector2i in _warning_directions:
+		var wall_center: Vector2 = -Vector2(direction) * half
+		var wall_axis: Vector2 = Vector2(OrbTypes.perpendicular(direction))
+		draw_line(
+			wall_center - wall_axis * half,
+			wall_center + wall_axis * half,
+			WARNING_FRAME_COLOR,
+			WARNING_FRAME_WIDTH
+		)
