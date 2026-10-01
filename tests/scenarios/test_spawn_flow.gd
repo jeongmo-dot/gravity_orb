@@ -109,12 +109,14 @@ func test_initial_two_orbs_use_even_bottom_positions_without_overlap() -> void:
 
 func test_preview_matches_spawned_orb_and_spawn_line() -> void:
 	var snapshot: Dictionary = _snapshot_config()
+	Config.data.spawn_count_per_turn = 1
 	_set_fast_settle()
 	var fixture: Dictionary = await _create_ready_fixture(4003)
 	var board: Board = fixture["board"] as Board
 	var spawner: Spawner = fixture["spawner"] as Spawner
 	var manager: TurnManager = fixture["manager"] as TurnManager
-	var preview: Dictionary = spawner.peek_next()
+	var preview_batch: Array[Dictionary] = spawner.peek_next()
+	var preview: Dictionary = preview_batch[0]
 	_arm_spawn_capture(manager, board)
 
 	var frame_before_swipe: int = Engine.get_physics_frames()
@@ -154,6 +156,36 @@ func test_preview_matches_spawned_orb_and_spawn_line() -> void:
 	_restore_config(snapshot)
 
 
+func test_count_two_spawns_whole_preview_batch_in_one_physics_frame() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.spawn_count_per_turn = 2
+	_set_fast_settle()
+	var fixture: Dictionary = await _create_ready_fixture(4015)
+	var board: Board = fixture["board"] as Board
+	var spawner: Spawner = fixture["spawner"] as Spawner
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	var preview: Array[Dictionary] = spawner.peek_next()
+	assert_eq(preview.size(), 2, "two-item preview batch")
+
+	manager.on_swipe(Vector2i.RIGHT)
+	await tree.physics_frame
+	var orbs: Array[Orb] = board.get_orbs()
+	assert_eq(orbs.size(), 4, "two orbs created in spawn frame")
+	for index: int in range(2):
+		var spawned: Orb = orbs[orbs.size() - 2 + index]
+		assert_eq(spawned.color, int(preview[index]["color"]), "batch color %d" % index)
+		assert_eq(spawned.level, int(preview[index]["level"]), "batch level %d" % index)
+		assert_eq(
+			spawned._spawn_physics_frame,
+			orbs[orbs.size() - 2]._spawn_physics_frame,
+			"batch physics frame %d" % index
+		)
+	assert_eq(spawner.peek_next().size(), 2, "next batch renewed")
+
+	await _cleanup_fixture(fixture)
+	_restore_config(snapshot)
+
+
 func test_seed_777_reproduces_five_turn_sequence() -> void:
 	var snapshot: Dictionary = _snapshot_config()
 	_set_fast_settle()
@@ -166,6 +198,7 @@ func test_seed_777_reproduces_five_turn_sequence() -> void:
 func test_three_turns_spawn_before_one_settle_each() -> void:
 	var snapshot: Dictionary = _snapshot_config()
 	_set_fast_settle()
+	var spawn_count: int = Config.data.spawn_count_per_turn
 	var fixture: Dictionary = await _create_ready_fixture(4005)
 	var board: Board = fixture["board"] as Board
 	var manager: TurnManager = fixture["manager"] as TurnManager
@@ -178,10 +211,18 @@ func test_three_turns_spawn_before_one_settle_each() -> void:
 		manager.on_swipe(direction)
 		assert_eq(manager.state, TurnManager.State.SPAWNING, "swipe enters SPAWNING")
 		await _wait_for_state(manager, TurnManager.State.SIMULATING)
-		assert_eq(board.get_orbs().size(), orb_count_before + 1, "spawn precedes settling")
+		assert_eq(
+			board.get_orbs().size(),
+			orb_count_before + spawn_count,
+			"spawn precedes settling"
+		)
 		await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
 
-	assert_eq(board.get_orbs().size(), 5, "initial two plus three turn spawns")
+	assert_eq(
+		board.get_orbs().size(),
+		Config.data.initial_orb_count + directions.size() * spawn_count,
+		"initial orbs plus three turn batches"
+	)
 	var expected_states: Array[TurnManager.State] = []
 	for _turn: int in range(3):
 		expected_states.append_array(
@@ -200,6 +241,7 @@ func test_three_turns_spawn_before_one_settle_each() -> void:
 
 func test_center_spawn_overlap_remains_inside_board_for_half_second() -> void:
 	var snapshot: Dictionary = _snapshot_config()
+	Config.data.spawn_count_per_turn = 1
 	Config.data.spawn_position_mode = GameConfig.SpawnPositionMode.CENTER
 	var fixture: Dictionary = await _create_fixture(4006, false)
 	var board: Board = fixture["board"] as Board
@@ -229,7 +271,8 @@ func test_center_spawn_overlap_remains_inside_board_for_half_second() -> void:
 	await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
 	assert_eq(board.get_orbs().size(), 8, "eight level-1 orbs stabilized at bottom")
 
-	var preview: Dictionary = spawner.peek_next()
+	var preview_batch: Array[Dictionary] = spawner.peek_next()
+	var preview: Dictionary = preview_batch[0]
 	var spawned_final_radius: float = Config.data.radius_for_level(int(preview["level"]))
 	var spawn_line: Dictionary = board.spawn_line(Vector2i.UP, spawned_final_radius)
 	var overlap_position: Vector2 = spawn_line["origin"] as Vector2
@@ -347,7 +390,7 @@ func test_seed_4242_completes_twenty_turns_without_departures() -> void:
 		]
 	)
 	assert_eq(manager.turn_index, 20, "twenty turns completed")
-	assert_eq(board.get_orbs().size(), 22, "initial two plus twenty turn spawns")
+	assert_eq(board.get_orbs().size(), 42, "initial two plus forty turn spawns")
 	assert_eq(total_departures, 0, "twenty-turn orb center departures")
 	assert_eq(total_divergences, 0, "twenty-turn divergent orb frames")
 	assert_eq(board.escape_guard_count, 0, "twenty-turn escape guard activations")
@@ -572,6 +615,7 @@ func _snapshot_config() -> Dictionary:
 		"stable_angular_speed": Config.data.stable_angular_speed,
 		"spawn_position_mode": Config.data.spawn_position_mode,
 		"initial_orb_count": Config.data.initial_orb_count,
+		"spawn_count_per_turn": Config.data.spawn_count_per_turn,
 	}
 
 
@@ -580,6 +624,7 @@ func _restore_config(snapshot: Dictionary) -> void:
 	Config.data.stable_angular_speed = float(snapshot["stable_angular_speed"])
 	Config.data.spawn_position_mode = int(snapshot["spawn_position_mode"]) as GameConfig.SpawnPositionMode
 	Config.data.initial_orb_count = int(snapshot["initial_orb_count"])
+	Config.data.spawn_count_per_turn = int(snapshot["spawn_count_per_turn"])
 
 
 func _cleanup_fixture(fixture: Dictionary) -> void:

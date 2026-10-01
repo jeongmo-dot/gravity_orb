@@ -103,33 +103,31 @@ func test_rule_c_uses_larger_orb_color_level_difference_and_input_side() -> void
 	_assert_annihilation(equal, 0, 0, "rule C equal")
 
 
-func test_green_is_not_opposite_under_any_rule() -> void:
+func test_green_yellow_level_one_has_no_reaction_under_rule_b() -> void:
 	var cfg: GameConfig = GameConfig.new()
-	var rules: Array[GameConfig.AnnihilationRule] = [
-		GameConfig.AnnihilationRule.A_BOTH,
-		GameConfig.AnnihilationRule.B_SAME_LEVEL,
-		GameConfig.AnnihilationRule.C_REMAINDER,
-	]
-	for rule: GameConfig.AnnihilationRule in rules:
-		cfg.annihilation_rule = rule
-		for other_color: int in range(cfg.color_display.size()):
-			var result: Dictionary = ReactionRules.classify(
-				OrbTypes.OrbColor.GREEN,
-				1,
-				other_color,
-				2,
-				cfg
-			)
-			assert_eq(result["type"], ReactionRules.Type.NONE, "green nonreaction")
+	cfg.annihilation_rule = GameConfig.AnnihilationRule.B_SAME_LEVEL
+	var result: Dictionary = ReactionRules.classify(
+		OrbTypes.OrbColor.GREEN,
+		1,
+		OrbTypes.OrbColor.YELLOW,
+		1,
+		cfg
+	)
+	assert_eq(result["type"], ReactionRules.Type.NONE, "green-yellow rule B")
 
-		var green_merge: Dictionary = ReactionRules.classify(
-			OrbTypes.OrbColor.GREEN,
-			2,
-			OrbTypes.OrbColor.GREEN,
-			2,
-			cfg
-		)
-		assert_eq(green_merge["type"], ReactionRules.Type.MERGE, "green merge")
+
+func test_yellow_same_level_merges() -> void:
+	var cfg: GameConfig = GameConfig.new()
+	var result: Dictionary = ReactionRules.classify(
+		OrbTypes.OrbColor.YELLOW,
+		1,
+		OrbTypes.OrbColor.YELLOW,
+		1,
+		cfg
+	)
+	assert_eq(result["type"], ReactionRules.Type.MERGE, "yellow merge type")
+	assert_eq(result["result_level"], 2, "yellow merge result level")
+	assert_eq(result["result_color"], OrbTypes.OrbColor.YELLOW, "yellow merge color")
 
 
 func test_same_color_merge_has_precedence_over_configured_opposite_pair() -> void:

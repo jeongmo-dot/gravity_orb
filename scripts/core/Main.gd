@@ -21,6 +21,8 @@ func _ready() -> void:
 		InputRouter.debug_cycle_annihilation_rule.connect(
 			_cycle_annihilation_rule
 		)
+		# TEMP(M7): M9 디버그 패널이 생성 수 선택을 대체할 때 제거한다.
+		InputRouter.debug_cycle_spawn_count.connect(_cycle_spawn_count)
 	_spawner.init_rng(Config.data.rng_seed)
 	_spawner.spawn_initial(_board, Vector2i.DOWN)
 	_turn_manager.start_game()
@@ -38,3 +40,9 @@ func _cycle_annihilation_rule() -> void:
 			Config.data.annihilation_rule = GameConfig.AnnihilationRule.C_REMAINDER
 		_:
 			Config.data.annihilation_rule = GameConfig.AnnihilationRule.A_BOTH
+
+
+func _cycle_spawn_count() -> void:
+	# TEMP(M7): M9 디버그 패널이 생성 수 선택을 대체할 때 제거한다.
+	Config.data.spawn_count_per_turn = Config.data.spawn_count_per_turn % 3 + 1
+	_spawner.sync_next_batch_size(_turn_manager.turn_index + 1)

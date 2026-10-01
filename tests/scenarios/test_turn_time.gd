@@ -7,6 +7,8 @@ const SPAWNER_SCRIPT: Script = preload("res://scripts/core/Spawner.gd")
 const TURN_MANAGER_SCRIPT: Script = preload("res://scripts/core/TurnManager.gd")
 const SEEDS: Array[int] = [101, 102, 103, 104, 105, 106]
 const TURNS_PER_SEED: int = 20
+const SPAWN_MEASUREMENT_TURNS_PER_SEED: int = 180
+const OCCUPANCY_CHECKPOINTS: Array[int] = [30, 60, 90, 120, 150, 180]
 const DIRECTION_PATTERN: Array[Vector2i] = [
 	Vector2i.DOWN,
 	Vector2i.RIGHT,
@@ -32,24 +34,31 @@ func test_all_turns_return_to_input_within_time_cap() -> void:
 	var metrics: Dictionary = await _measure_current_config()
 	_print_metrics(metrics)
 	var tick_seconds: float = 1.0 / float(Engine.physics_ticks_per_second)
-	assert_eq(
-		int(metrics["turns"]),
-		SEEDS.size() * TURNS_PER_SEED,
-		"measured turns"
-	)
+	if _is_spawn_measurement():
+		assert_true(
+			int(metrics["turns"]) <= SEEDS.size() * SPAWN_MEASUREMENT_TURNS_PER_SEED,
+			"measured spawn sweep turns do not exceed the planned total"
+		)
+	else:
+		assert_eq(
+			int(metrics["turns"]),
+			SEEDS.size() * TURNS_PER_SEED,
+			"measured turns"
+		)
 	assert_true(
 		float(metrics["maximum"]) <= Config.data.max_settle_time + tick_seconds,
 		"all turns return within cap plus one physics tick"
 	)
-	assert_eq(int(metrics["escape_guards"]), 0, "120-turn escape guard activations")
-	assert_eq(int(metrics["divergences"]), 0, "120-turn divergent orb frames")
-	assert_true(
-		int(metrics["wall_recoveries"]) <= 2,
-		"120-turn wall recovery activations must be at most 2, got %d" % int(
-			metrics["wall_recoveries"]
+	if not _is_spawn_measurement():
+		assert_eq(int(metrics["escape_guards"]), 0, "120-turn escape guard activations")
+		assert_eq(int(metrics["divergences"]), 0, "120-turn divergent orb frames")
+		assert_true(
+			int(metrics["wall_recoveries"]) <= 2,
+			"120-turn wall recovery activations must be at most 2, got %d" % int(
+				metrics["wall_recoveries"]
+			)
 		)
-	)
-	if _is_independent_measurement():
+	if _is_independent_measurement() and not _is_spawn_measurement():
 		assert_true(
 			float(metrics["maximum_penetration"]) <= CONTINUOUS_PENETRATION_LIMIT,
 			"120-turn wall penetration must be at most %.3fpx, got %.3fpx" % [
@@ -87,13 +96,29 @@ func _measure_current_config() -> Dictionary:
 	var scores_by_seed: Array[int] = []
 	var max_chains_by_seed: Array[int] = []
 	var max_levels_by_seed: Array[int] = []
+	var turns_by_seed: Array[int] = []
+	var first_over_30_by_seed: Array[int] = []
+	var first_over_50_by_seed: Array[int] = []
+	var saturated_at_by_seed: Array[int] = []
+	var checkpoint_samples: Dictionary = {}
+	for checkpoint: int in OCCUPANCY_CHECKPOINTS:
+		checkpoint_samples[checkpoint] = [] as Array[float]
+	var turns_per_seed: int = (
+		SPAWN_MEASUREMENT_TURNS_PER_SEED
+		if _is_spawn_measurement()
+		else TURNS_PER_SEED
+	)
 
 	for seed: int in SEEDS:
 		var fixture: Dictionary = await _create_ready_fixture(seed)
 		var board: Board = fixture["board"] as Board
 		var manager: TurnManager = fixture["manager"] as TurnManager
 		var score_manager: ScoreManager = fixture["score_manager"] as ScoreManager
-		for turn_offset: int in range(TURNS_PER_SEED):
+		var first_over_30: int = -1
+		var first_over_50: int = -1
+		var saturated_at: int = -1
+		var completed_turns: int = 0
+		for turn_offset: int in range(turns_per_seed):
 			var direction: Vector2i = DIRECTION_PATTERN[turn_offset % DIRECTION_PATTERN.size()]
 			manager.on_swipe(direction)
 			var turn_metrics: Dictionary = await _wait_for_state_with_metrics(
@@ -119,8 +144,23 @@ func _measure_current_config() -> Dictionary:
 				maximum_residual_speed,
 				_maximum_linear_speed(board)
 			)
-			turn_end_occupancies.append(_board_occupancy(board))
+			var occupancy: float = _board_occupancy(board)
+			turn_end_occupancies.append(occupancy)
 			turn_end_orb_counts.append(board.get_orbs().size())
+			completed_turns = turn_offset + 1
+			if _is_spawn_measurement():
+				if first_over_30 < 0 and occupancy > 0.30:
+					first_over_30 = completed_turns
+				if first_over_50 < 0 and occupancy > 0.50:
+					first_over_50 = completed_turns
+				if OCCUPANCY_CHECKPOINTS.has(completed_turns):
+					var checkpoint_values: Array[float] = (
+						checkpoint_samples[completed_turns] as Array[float]
+					)
+					checkpoint_values.append(occupancy)
+				if occupancy > 0.70:
+					saturated_at = completed_turns
+					break
 		capped_turns += manager.capped_turn_count
 		final_orb_total += board.get_orbs().size()
 		escape_guard_total += board.escape_guard_count
@@ -135,12 +175,20 @@ func _measure_current_config() -> Dictionary:
 		scores_by_seed.append(score_manager.score)
 		max_chains_by_seed.append(score_manager.max_chain)
 		max_levels_by_seed.append(score_manager.max_level_reached)
+		turns_by_seed.append(completed_turns)
+		first_over_30_by_seed.append(first_over_30)
+		first_over_50_by_seed.append(first_over_50)
+		saturated_at_by_seed.append(saturated_at)
 		print(
-			"Turn-time seed=%d score=%d max_chain=%d max_level=%d" % [
+			"Turn-time seed=%d turns=%d score=%d max_chain=%d max_level=%d over30=%d over50=%d saturated=%d" % [
 				seed,
+				completed_turns,
 				score_manager.score,
 				score_manager.max_chain,
 				score_manager.max_level_reached,
+				first_over_30,
+				first_over_50,
+				saturated_at,
 			]
 		)
 		await _cleanup_fixture(fixture)
@@ -178,6 +226,12 @@ func _measure_current_config() -> Dictionary:
 		"scores_by_seed": scores_by_seed,
 		"max_chains_by_seed": max_chains_by_seed,
 		"max_levels_by_seed": max_levels_by_seed,
+		"turns_by_seed": turns_by_seed,
+		"first_over_30_by_seed": first_over_30_by_seed,
+		"first_over_50_by_seed": first_over_50_by_seed,
+		"saturated_at_by_seed": saturated_at_by_seed,
+		"checkpoint_occupancies": _checkpoint_averages(checkpoint_samples),
+		"checkpoint_sample_counts": _checkpoint_sample_counts(checkpoint_samples),
 		"direction_p50": {
 			"DOWN": _percentile(direction_times["DOWN"] as Array[float], 0.50),
 			"RIGHT": _percentile(direction_times["RIGHT"] as Array[float], 0.50),
@@ -207,9 +261,33 @@ func _is_independent_measurement() -> bool:
 		if (
 			argument.begins_with("--growth-suite=")
 			or argument.begins_with("--mass-suite=")
+			or argument.begins_with("--spawn-suite=")
 		):
 			return true
 	return false
+
+
+func _is_spawn_measurement() -> bool:
+	for argument: String in OS.get_cmdline_user_args():
+		if argument.begins_with("--spawn-suite="):
+			return true
+	return false
+
+
+func _checkpoint_averages(samples_by_turn: Dictionary) -> Dictionary:
+	var result: Dictionary = {}
+	for checkpoint: int in OCCUPANCY_CHECKPOINTS:
+		var samples: Array[float] = samples_by_turn[checkpoint] as Array[float]
+		result[checkpoint] = _average(samples) if not samples.is_empty() else -1.0
+	return result
+
+
+func _checkpoint_sample_counts(samples_by_turn: Dictionary) -> Dictionary:
+	var result: Dictionary = {}
+	for checkpoint: int in OCCUPANCY_CHECKPOINTS:
+		var samples: Array[float] = samples_by_turn[checkpoint] as Array[float]
+		result[checkpoint] = samples.size()
+	return result
 
 
 func _create_ready_fixture(seed: int) -> Dictionary:
@@ -301,7 +379,11 @@ func _wait_for_state_with_metrics(
 		_record_diagnostic_frame(board)
 		for orb: Orb in board.get_orbs():
 			var center_extent: float = maxf(absf(orb.position.x), absf(orb.position.y))
-			if center_extent > board.half_size() * 2.0 and not _bounds_reported:
+			if (
+				not _is_spawn_measurement()
+				and center_extent > board.half_size() * 2.0
+				and not _bounds_reported
+			):
 				_bounds_reported = true
 				assert_true(
 					false,
@@ -311,7 +393,7 @@ func _wait_for_state_with_metrics(
 					]
 				)
 			var speed: float = orb.linear_velocity.length()
-			if speed > 10000.0 and not _bounds_reported:
+			if not _is_spawn_measurement() and speed > 10000.0 and not _bounds_reported:
 				_bounds_reported = true
 				assert_true(
 					false,
@@ -481,6 +563,13 @@ func _percentile(values: Array[float], quantile: float) -> float:
 
 func _print_metrics(metrics: Dictionary) -> void:
 	var direction_p50: Dictionary = metrics["direction_p50"] as Dictionary
+	var recovery_lags: Array[int] = metrics["wall_recovery_timeout_lags"] as Array[int]
+	var recovery_lags_text: String = str(recovery_lags)
+	if _is_spawn_measurement():
+		recovery_lags_text = "%d samples, max=%d" % [
+			recovery_lags.size(),
+			_maximum_int(recovery_lags),
+		]
 	print(
 		"Turn-time cap=%.3f turns=%d capped=%d capped_ratio=%.6f average=%.6f p50=%.6f p90=%.6f max=%.6f max_residual_speed=%.3f max_penetration=%.3f max_penetration_ratio=%.6f ratio_level=%d departures=%d divergences=%d final_orbs_avg=%.3f turn_end_occupancy_avg=%.6f turn_end_occupancy_max=%.6f turn_end_orbs_avg=%.3f turn_end_orbs_max=%d escape_guards=%d wall_recoveries=%d recovery_timeout_lags=%s timeout_corrections=%d ghost_timeouts=%d ghost_completed=%d ghost_avg=%.6f direction_p50=[D %.6f R %.6f U %.6f L %.6f]" % [
 			Config.data.max_settle_time,
@@ -504,7 +593,7 @@ func _print_metrics(metrics: Dictionary) -> void:
 			int(metrics["turn_end_orb_count_maximum"]),
 			int(metrics["escape_guards"]),
 			int(metrics["wall_recoveries"]),
-			str(metrics["wall_recovery_timeout_lags"]),
+			recovery_lags_text,
 			int(metrics["timeout_corrections"]),
 			int(metrics["ghost_timeouts"]),
 			int(metrics["ghost_completed"]),
@@ -515,6 +604,22 @@ func _print_metrics(metrics: Dictionary) -> void:
 			float(direction_p50["LEFT"]),
 		]
 	)
+	if _is_spawn_measurement():
+		print(
+			"Spawn-measurement case=%s count=%d ramp=%d max=%d active_colors=%d turns_by_seed=%s checkpoint_occupancies=%s checkpoint_samples=%s over30=%s over50=%s saturated=%s" % [
+				_spawn_case_name(),
+				Config.data.spawn_count_per_turn,
+				Config.data.spawn_count_ramp_turns,
+				Config.data.spawn_count_max,
+				_active_color_count(),
+				str(metrics["turns_by_seed"]),
+				str(metrics["checkpoint_occupancies"]),
+				str(metrics["checkpoint_sample_counts"]),
+				str(metrics["first_over_30_by_seed"]),
+				str(metrics["first_over_50_by_seed"]),
+				str(metrics["saturated_at_by_seed"]),
+			]
+		)
 	print(
 		"Turn-time scores_by_seed=%s max_chains_by_seed=%s max_levels_by_seed=%s" % [
 			str(metrics["scores_by_seed"]),
@@ -522,3 +627,18 @@ func _print_metrics(metrics: Dictionary) -> void:
 			str(metrics["max_levels_by_seed"]),
 		]
 	)
+
+
+func _spawn_case_name() -> String:
+	for argument: String in OS.get_cmdline_user_args():
+		if argument.begins_with("--spawn-case="):
+			return argument.trim_prefix("--spawn-case=").to_upper()
+	return ""
+
+
+func _active_color_count() -> int:
+	var count: int = 0
+	for weight: float in Config.data.spawn_color_weights:
+		if weight > 0.0:
+			count += 1
+	return count

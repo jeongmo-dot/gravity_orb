@@ -245,7 +245,8 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M3 | `allow_same_direction_swipe` | bool | true | 11.1 참조 |
 | M4 | `spawn_level_weights` | PackedFloat32Array | [0.9, 0.1] | 인덱스 0 = 레벨1 |
 | M4 | `spawn_color_weights` | PackedFloat32Array | [1, 1, 1] → **[1, 1, 1, 1]** (#15) | 인덱스 = 색. 가중치 0인 색은 생성되지 않는다 |
-| #15 | `spawn_count_per_turn` | int | #15 측정 후 결정 (후보 1 / 2 / 3) | 턴당 생성 구체 수. 미리보기도 이 수만큼 |
+| #15 | `spawn_count_per_turn` | int | **2** (기획서 0.6, 180턴 측정 B2) | 턴당 생성 구체 수. 미리보기도 이 수만큼 |
+| #15 | `spawn_count_ramp_turns` / `spawn_count_max` | int | 0 (비활성) / 3 | 점진 증가 (측정용, 기본 비활성) |
 | M4 | `spawn_position_mode` | SpawnPositionMode | RANDOM | |
 | M4 | `spawn_margin` | float | 4.0 | 생성 벽 안쪽 면과 구체 사이 여백 |
 | M4 | `rng_seed` | int | 0 | 0이면 시작 시 무작위 시드를 뽑아 기록 |
@@ -260,7 +261,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M5+ | `ghost_alpha` | float | 0.55 | 유령 상태 표시 불투명도 |
 | M5+ | `wall_penetration_limit` | float | 16.0 | 사전 벽 복구: 관통이 이 값을 넘으면 25px 안전장치 전에 경계로 복구 (#11, 사용자 승인). 회귀 테스트는 발동 0 요구 (#12) |
 | M5+ | `escape_guard_depth` | float | 25.0 | 벽 관통이 이 깊이를 넘으면 경계로 되돌리는 안전장치 (회귀 테스트는 발동 0 요구) |
-| M6 | `opposite_pairs` | Array[Vector2i] | [(RED, BLUE)] → **[(RED, BLUE), (GREEN, YELLOW)]** (#15) | 상극 쌍 (순서 무관) |
+| M6 | `opposite_pairs` | Array[Vector2i] | **[(RED, BLUE)]** — 0.5의 (GREEN, YELLOW)는 0.6에서 철회 (판이 덜 참) | 상극 쌍 (순서 무관). 초록·노랑은 상극 없음 |
 | M6 | `annihilation_rule` | AnnihilationRule | A_BOTH → **B_SAME_LEVEL** (2026-09-30 플레이테스트, 기획서 0.4.1) | |
 | M7 | `level_scores` | PackedInt32Array | [2,4,8,16,32,64,128] | 인덱스 0 = 레벨1 |
 | M7 | `annihilation_score_factor` | float | 0.5 | |
@@ -697,17 +698,23 @@ godot --headless --path . --quit-after 300
 ### 11.1 같은 방향 스와이프
 기획서 3.2 표는 "유효 입력", 7장은 미정. **기본 허용(true)**, 토글 제공. 비허용이면 입력을 잠그지 않고 무시만 한다.
 
-### 11.2 게임오버 조건 — 보류
-기획서 0.2에서 생성이 빈자리와 무관해져 0.1의 "생성 영역이 겹치면 게임오버"는 폐기됐다. 새 조건은 사용자 결정 전까지 **보류**하며, 그동안 구체는 계속 쌓이고 게임은 끝나지 않는다. `GAME_OVER` 상태·`game_over` 신호는 정의만 두고 진입 경로를 만들지 않는다.
-후보 (기획서 7장): ① 턴 종료 시 이번 턴 생성 구체가 생성 벽 근처(지름 이내)에 남아 있으면 ② 어떤 구체든 생성 벽 근처에 걸쳐 있으면.
+### 11.2 게임오버 조건 — 방향 막힘 (기획서 0.6)
+- **판정**: `CHECK_GAMEOVER`에서, 이번 턴 `Spawner`가 생성한 구체 중 하나라도 **아직 유령 상태이고 일반 구체와의 최대 겹침 > `ghost_exit_overlap`** 이면 `GAME_OVER`. "그 방향으로 더 들어오지 못했다"
+- **유령 타임아웃 예외**: `Spawner` 생성 구체는 턴이 끝날 때까지 `ghost_max_time`으로 강제 해제하지 않는다 (판정 대상이므로). 합체·규칙 C 잔존 구체는 기존 0.6초 타임아웃을 유지하고 판정에서 제외
+- 스와이프 순간이 아니라 턴 끝에 판정하는 이유: 생성 벽에 쌓여 있던 더미가 새 중력으로 떠날 시간을 준다
+- `GAME_OVER` 진입: 입력 잠금 유지, `game_over` 신호, 게임오버 패널. R키·버튼으로 재시작
 
 ### 11.3 생성 위치 결정
 - 스와이프 순간(SPAWNING 1프레임) 새 중력의 반대편 벽 `spawn_line` 위에 생성한다.
 - 위치: RANDOM이면 `s = lerpf(-extent, extent, t)`(`t`는 미리 뽑아 둔 값), CENTER면 `s = 0`.
 - **겹침 검사·빈자리 탐색을 하지 않는다.** 기존 구체와 겹치면 물리 엔진이 밀어낸다. 과도한 튕김 여부는 시나리오 테스트로 측정한다 (M4 교체 항목 #6).
 
-### 11.4 경고 신호 — 보류
-게임오버 조건과 함께 재설계한다.
+### 11.4 방향 경고 (기획서 0.6)
+턴이 끝날 때(`WAITING_INPUT` 진입 직전) 네 방향 `g` 각각에 대해, 다음 묶음(`peek_next()`)의 구체들이 `spawn_line(g, r)` 위에 들어갈 **빈자리**가 있는지 계산한다.
+- 빈자리 = 선분 위 후보점(간격 `spawn_probe_step`, 기본 5px)에서 모든 일반 구체와의 겹침이 `ghost_exit_overlap` 이하
+- 묶음의 구체마다 서로 다른 빈자리가 필요하다 (앞 구체를 놓은 자리도 막힌 것으로 계산, 큰 구체부터)
+- 자리가 부족한 방향 목록을 `warning_changed(dirs: Array[Vector2i])`로 발신 (변했을 때만). 표기 방향 = 그 방향으로 스와이프하면 막힘
+- 경고는 **예측**이다. 실제 게임오버는 11.2 판정으로만
 
 ### 11.5 연쇄 정의
 8.1의 세대 방식. 기획서 4장 "합체·소멸 후 다시 4번으로"와 동치이며 독립적인 동시 반응을 연쇄로 세지 않는다.

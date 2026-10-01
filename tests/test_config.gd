@@ -63,12 +63,36 @@ func test_m3_turn_defaults() -> void:
 
 func test_m4_spawn_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
+	assert_eq(config.color_display.size(), 4, "display color count")
+	assert_eq(config.color_display[OrbTypes.OrbColor.YELLOW], Color("#F5C542"), "yellow display")
 	assert_eq(config.spawn_level_weights, PackedFloat32Array([0.9, 0.1]), "level weights")
-	assert_eq(config.spawn_color_weights, PackedFloat32Array([1.0, 1.0, 1.0]), "color weights")
+	assert_eq(
+		config.spawn_color_weights,
+		PackedFloat32Array([1.0, 1.0, 1.0, 1.0]),
+		"color weights"
+	)
+	assert_eq(config.spawn_count_per_turn, 2, "spawn count per turn")
+	assert_eq(config.spawn_count_ramp_turns, 0, "spawn count ramp disabled")
+	assert_eq(config.spawn_count_max, 3, "spawn count maximum")
 	assert_eq(config.spawn_position_mode, GameConfig.SpawnPositionMode.RANDOM, "position mode")
 	assert_near(config.spawn_margin, 4.0, TOLERANCE, "spawn margin")
 	assert_eq(config.rng_seed, 0, "random seed default")
 	assert_eq(config.initial_orb_count, 2, "initial orb count")
+
+
+func test_spawn_count_ramp_turn_boundaries() -> void:
+	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
+	config.spawn_count_per_turn = 1
+	config.spawn_count_ramp_turns = 40
+	config.spawn_count_max = 3
+	var expected: Dictionary = {1: 1, 40: 1, 41: 2, 81: 3, 121: 3}
+	for turn_value: Variant in expected:
+		var turn_index: int = int(turn_value)
+		assert_eq(
+			config.spawn_count_for_turn(turn_index),
+			int(expected[turn_index]),
+			"spawn count at turn %d" % turn_index
+		)
 
 
 func test_m5_contact_defaults() -> void:
@@ -103,7 +127,7 @@ func test_m6_annihilation_defaults() -> void:
 		assert_eq(
 			config.opposite_pairs[0],
 			Vector2i(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE),
-			"default opposite pair"
+			"red-blue opposite pair"
 		)
 	assert_eq(
 		config.annihilation_rule,
@@ -119,8 +143,12 @@ func test_m6_annihilation_defaults() -> void:
 		"opposite pair reverse"
 	)
 	assert_true(
-		not config.is_opposite(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.GREEN),
-		"green is not opposite"
+		not config.is_opposite(OrbTypes.OrbColor.GREEN, OrbTypes.OrbColor.YELLOW),
+		"green-yellow is not an opposite pair"
+	)
+	assert_true(
+		not config.is_opposite(OrbTypes.OrbColor.YELLOW, OrbTypes.OrbColor.GREEN),
+		"yellow-green is not an opposite pair"
 	)
 
 

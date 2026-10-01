@@ -63,7 +63,7 @@ func _physics_process(delta: float) -> void:
 	var applied_reactions: int = _collision_resolver.flush()
 
 	if state == State.SPAWNING:
-		_spawner.try_spawn(_board, gravity)
+		_spawner.try_spawn(_board, gravity, turn_index)
 		_begin_settle()
 		_set_state(State.SIMULATING)
 		return
