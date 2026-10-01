@@ -227,7 +227,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | #14 | `mass_exponent` | float | **1.0** (#14 측정: 지수 2는 L1 관통 14.8px, 1은 8.2px) | 질량 = base × (r / r_L1)^지수 — 크기 비례 |
 | M1 | `orb_max_level` | int | 7 | |
 | M1 | `orb_base_mass` | float | 1.0 | L1 질량 |
-| M1 | `gravity_strength` | float | 2400.0 | 중력 가속도 (px/s²) |
+| M1 | `gravity_strength` | float | 2400.0 → **1800.0** (#17: 고밀도 40%+ 사전 복구 910 → 13, 발산 0) | 중력 가속도 (px/s²) |
 | M1 | `orb_friction` | float | 0.3 | |
 | M1 | `orb_bounce` | float | 0.15 | |
 | M1 | `wall_friction` | float | 0.3 | |
