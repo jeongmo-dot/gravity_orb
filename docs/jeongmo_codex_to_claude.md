@@ -38,6 +38,35 @@
 
 ## 미확인
 
+### [2026-10-02] 대상 #17 추가 요구 1 — 중력 1800 기본값 적용과 물리 회귀 기준 충돌
+- 상태: 질문
+- 브랜치 / PR: `m7-high-density-physics` / [PR #17](https://github.com/jeongmo-dot/gravity_orb/pull/17)
+- 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, `tests/test_config.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `GameConfig.gravity_strength` 선언 기본값과 `default_config.tres`를 `1800.0`으로 변경하고 config 테스트에 명시적 검증 추가. 마찰 `0.3`, 반발 `0.15`는 유지
+  - [x] 기본 리소스 경로에서 시드 101~112 게임오버 측정 완료. 12/12 완주, 안전장치·이탈·발산 `0/0/0`
+  - [x] #17 측정 도구·진단 필드는 그대로 유지
+  - [ ] 전체 자동 테스트 통과 — `103/104`, seed 1016의 22시드 물리 회귀 최대 관통 `10.595px`가 승인 기준 `10.000px`를 초과
+  - [ ] 필수 명령 3종 무오류 통과 — import와 프로젝트 실행은 종료 코드 0, 전체 테스트는 위 1건으로 종료 코드 1
+- 기본값 재측정 (`default_G1800`, `--fixed-fps 240`):
+  - 게임오버 턴 `[217, 221, 219, 245, 276, 233, 214, 215, 259, 249, 242, 264]`, p50 `242턴`, 평균 종료 점유율 `80.678867%`, 중단 `0/12`
+  - 구간별 `안전장치/사전 복구/이탈/발산; 최대 관통`: 0~20% `0/61/0/0; 14.367px`, 20~40% `0/1/0/0; 14.354px`, 40~60% `0/2/0/0; 15.645px`, 60%+ `0/11/0/0; 12.623px`
+  - 기존 `1800/0.3/0.15` 행과 게임오버 턴·점유율·구간별 전 지표·고밀도 이벤트 총 `13건`이 동일해 기본 경로 적용에 따른 물리 결과 차이는 `0`이었다.
+  - 원본 JSON 직접 비교에서 `case` 이름 외 차이는 `high_density_top_causes` 표현뿐이다. 기존 스윕 파일은 원인별 합산(`timeout_correction` 11, `ghost_release` 2), 현재 최종 측정기는 원인+레벨별 상위 3개(`timeout L1` 6, `L2` 3, `L3` 1)로 출력한다. 이벤트 총계·복구 총계와 안전 지표는 동일하다.
+- QA 관측값:
+  - 기본값 측정 → `1/1` 통과, 종료 코드 0, 보고서 `.godot/game_over_measurement_default_G1800.json` 생성
+  - 22시드 물리 회귀 → 이탈 0, 발산 0, 안전장치 0, 사전 복구 0, 최대 관통 `10.595px`(seed 1016, L1, 반지름 대비 `0.423817`)
+  - 120턴 회귀 → 이탈 0, 발산 0, 안전장치 0, 사전 복구 0, 최대 관통 `8.930px`
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . -s res://tests/run_tests.gd` → `103/104` 통과, 종료 코드 1. 유일한 실패: `test_cycle_seeded_orbs_remain_inside_board_during_gravity_cycles`
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --quit-after 300` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 정적 검사 → `Input`/`InputEvent`는 `InputRouter.gd`만, 난수 API는 `Spawner.gd`만, `git diff --check` 이상 없음
+- 수동 확인 절차:
+  1. 기본값으로 게임을 시작해 방향을 여러 번 바꾸며 고밀도까지 진행한다 → 전환 가속감이 낮아졌는지와 벽 이탈·비정상 발산이 없는지 확인한다.
+  2. 큰 구체가 벽 근처에 쐐기를 만든 상태에서 수직 방향을 번갈아 입력한다 → 잼 체감은 이번 값 변경으로 해결 대상으로 삼지 않았으므로 별도 #18 기준으로 판정한다.
+- 결정 사항: 승인된 세 물리 기본값 외 수치는 변경하지 않았다. 기존 `10px` 회귀 기준을 임의 완화하거나 테스트에서 중력만 과거값으로 덮어쓰지 않았다.
+- 남은 것 · 질문: `gravity_strength=1800` 기본값과 기존 22시드 관통 기준 `10px`가 현재 seed 1016에서 양립하지 않는다. 10px를 유지할 물리 보정 명세, 해당 회귀의 별도 중력 전제, 또는 기준 변경 중 어느 방향으로 갈지 지정이 필요하다. 지정 전에는 실패를 숨기는 테스트 변경을 하지 않는다.
+
 ### [2026-10-02] 대상 #17 — 고밀도 물리 안정성 + 움직임(잼) 측정
 - 상태: 질문
 - 브랜치 / PR: `m7-high-density-physics` / [PR #17](https://github.com/jeongmo-dot/gravity_orb/pull/17)

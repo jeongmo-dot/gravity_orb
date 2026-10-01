@@ -54,6 +54,7 @@ func test_m2_swipe_defaults() -> void:
 
 func test_m3_turn_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
+	assert_near(config.gravity_strength, 1800.0, TOLERANCE, "gravity strength")
 	assert_near(config.stable_linear_speed, 30.0, TOLERANCE, "stable linear speed")
 	assert_near(config.stable_angular_speed, 3.0, TOLERANCE, "stable angular speed")
 	assert_near(config.stable_duration, 0.33, TOLERANCE, "stable duration")
