@@ -9,6 +9,9 @@ const GROWTH_RATIO_PREFIX: String = "--growth-ratio="
 const GROWTH_SUITE_PREFIX: String = "--growth-suite="
 const MASS_EXPONENT_PREFIX: String = "--mass-exponent="
 const MASS_SUITE_PREFIX: String = "--mass-suite="
+const SPAWN_COUNT_PREFIX: String = "--spawn-count="
+const ACTIVE_COLORS_PREFIX: String = "--active-colors="
+const SPAWN_SUITE_PREFIX: String = "--spawn-suite="
 const MEASUREMENT_FIXED_TESTS: Array[String] = [
 	"res://tests/scenarios/test_board_physics.gd",
 	"res://tests/scenarios/test_spawn_flow.gd",
@@ -30,6 +33,8 @@ func _run_all_tests() -> void:
 			await _run_test_file(path)
 	elif measurement_suite == "realtime":
 		await _run_test_file("res://tests/scenarios/test_turn_time.gd")
+	elif measurement_suite == "spawn":
+		await _run_test_file("res://tests/scenarios/test_turn_time.gd")
 	else:
 		for directory: String in TEST_DIRECTORIES:
 			await _run_directory(directory)
@@ -42,8 +47,10 @@ func _run_all_tests() -> void:
 func _apply_measurement_arguments() -> String:
 	var measurement_suite: String = ""
 	var is_mass_measurement: bool = false
+	var is_spawn_measurement: bool = false
 	var config_node: Node = root.get_node("Config")
 	var config_data: GameConfig = config_node.get("data") as GameConfig
+	var active_colors: int = config_data.spawn_color_weights.size()
 	for argument: String in OS.get_cmdline_user_args():
 		if argument.begins_with(GROWTH_DURATION_PREFIX):
 			config_data.grow_duration = argument.trim_prefix(GROWTH_DURATION_PREFIX).to_float()
@@ -57,7 +64,28 @@ func _apply_measurement_arguments() -> String:
 		elif argument.begins_with(MASS_SUITE_PREFIX):
 			measurement_suite = argument.trim_prefix(MASS_SUITE_PREFIX)
 			is_mass_measurement = true
-	if is_mass_measurement:
+		elif argument.begins_with(SPAWN_COUNT_PREFIX):
+			config_data.spawn_count_per_turn = argument.trim_prefix(SPAWN_COUNT_PREFIX).to_int()
+			is_spawn_measurement = true
+		elif argument.begins_with(ACTIVE_COLORS_PREFIX):
+			active_colors = argument.trim_prefix(ACTIVE_COLORS_PREFIX).to_int()
+			is_spawn_measurement = true
+		elif argument.begins_with(SPAWN_SUITE_PREFIX):
+			measurement_suite = "spawn"
+			is_spawn_measurement = true
+	if is_spawn_measurement:
+		if active_colors == 3:
+			config_data.spawn_color_weights = PackedFloat32Array([1.0, 1.0, 1.0, 0.0])
+		else:
+			config_data.spawn_color_weights = PackedFloat32Array([1.0, 1.0, 1.0, 1.0])
+		print(
+			"Spawn candidate count=%d active_colors=%d suite=%s" % [
+				config_data.spawn_count_per_turn,
+				active_colors,
+				measurement_suite,
+			]
+		)
+	elif is_mass_measurement:
 		print(
 			"Mass candidate exponent=%.3f suite=%s" % [
 				config_data.mass_exponent,

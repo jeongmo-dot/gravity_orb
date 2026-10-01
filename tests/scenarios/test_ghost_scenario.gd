@@ -78,7 +78,8 @@ func test_initial_orbs_are_normal_and_empty_turn_spawn_exits_quickly() -> void:
 		_assert_normal_state(orb, "initial orb")
 
 	board.set_gravity(Vector2i.RIGHT)
-	var turn_spawn: Orb = spawner.try_spawn(board, Vector2i.RIGHT)
+	var turn_spawns: Array[Orb] = spawner.try_spawn(board, Vector2i.RIGHT)
+	var turn_spawn: Orb = turn_spawns[0]
 	_assert_ghost_state(turn_spawn, "turn spawn")
 	var max_frames: int = ceili(0.1 * float(Engine.physics_ticks_per_second))
 	for _frame: int in range(max_frames):

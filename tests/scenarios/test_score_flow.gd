@@ -103,6 +103,8 @@ func test_restart_request_resets_score_and_preserves_best_and_rule() -> void:
 
 
 func test_main_scene_binds_score_hud_and_restart() -> void:
+	var original_spawn_count: int = Config.data.spawn_count_per_turn
+	Config.data.spawn_count_per_turn = 3
 	var main: Main = MAIN_SCENE.instantiate() as Main
 	var score_manager: ScoreManager = main.get_node("ScoreManager") as ScoreManager
 	score_manager.save_path = ""
@@ -116,15 +118,29 @@ func test_main_scene_binds_score_hud_and_restart() -> void:
 	var score_label: Label = main.get_node("UI/Hud/ScoreLabel") as Label
 	var best_label: Label = main.get_node("UI/Hud/BestLabel") as Label
 	var max_chain_label: Label = main.get_node("UI/Hud/MaxChainLabel") as Label
+	var spawner: Spawner = main.get_node("Spawner") as Spawner
+	var next_preview: Node2D = main.get_node("UI/Hud/NextPreview") as Node2D
 	assert_eq(score_label.text, "SCORE\n32", "score HUD text")
 	assert_eq(best_label.text, "BEST\n32", "best HUD text")
 	assert_eq(max_chain_label.text, "MAX CHAIN  2", "chain HUD text")
 	assert_eq(score_label.mouse_filter, Control.MOUSE_FILTER_IGNORE, "score ignores pointer")
 	assert_eq(best_label.mouse_filter, Control.MOUSE_FILTER_IGNORE, "best ignores pointer")
 	assert_eq(max_chain_label.mouse_filter, Control.MOUSE_FILTER_IGNORE, "chain ignores pointer")
+	var next_batch: Array[Dictionary] = spawner.peek_next()
+	assert_eq(next_batch.size(), 3, "three-item next batch")
+	assert_eq(next_preview.get_child_count(), 3, "three preview visuals")
+	for index: int in range(mini(next_batch.size(), next_preview.get_child_count())):
+		var visual: OrbVisual = next_preview.get_child(index) as OrbVisual
+		assert_near(
+			visual.get_radius(),
+			Config.data.radius_for_level(int(next_batch[index]["level"])),
+			0.001,
+			"preview radius %d" % index
+		)
 	main.queue_free()
 	await tree.process_frame
 	InputRouter.set_locked(false)
+	Config.data.spawn_count_per_turn = original_spawn_count
 
 
 func _create_reaction_fixture() -> Dictionary:

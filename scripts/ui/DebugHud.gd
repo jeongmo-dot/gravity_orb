@@ -64,12 +64,13 @@ func _on_chain_changed(chain: int) -> void:
 
 
 func _update_label() -> void:
-	_label.text = "State: %s\nGravity: %s\nTurn: %d\nChain: %d\nRule: %s\nSettle: %.2f s\nSeed: %d" % [
+	_label.text = "State: %s\nGravity: %s\nTurn: %d\nChain: %d\nRule: %s\nSpawn: %d\nSettle: %.2f s\nSeed: %d" % [
 		STATE_NAMES[_state],
 		OrbTypes.dir_name(_gravity),
 		_turn_index,
 		_turn_max_chain,
 		ANNIHILATION_RULE_NAMES[Config.data.annihilation_rule],
+		Config.data.spawn_count_per_turn,
 		_turn_manager._settle_elapsed,
 		_spawner.seed_used,
 	]

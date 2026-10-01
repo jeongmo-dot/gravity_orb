@@ -20,7 +20,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 @export var orb_linear_damp: float = 0.1
 @export var orb_angular_damp: float = 1.0
 @export var color_display: PackedColorArray = PackedColorArray(
-	[Color("#E5484D"), Color("#3E7BFA"), Color("#30A46C")]
+	[Color("#E5484D"), Color("#3E7BFA"), Color("#30A46C"), Color("#F5C542")]
 )
 @export var swipe_min_distance: float = 80.0
 @export var swipe_dominance_ratio: float = 1.5
@@ -30,7 +30,8 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 @export var max_settle_time: float = 3.0
 @export var allow_same_direction_swipe: bool = true
 @export var spawn_level_weights: PackedFloat32Array = PackedFloat32Array([0.9, 0.1])
-@export var spawn_color_weights: PackedFloat32Array = PackedFloat32Array([1.0, 1.0, 1.0])
+@export var spawn_color_weights: PackedFloat32Array = PackedFloat32Array([1.0, 1.0, 1.0, 1.0])
+@export var spawn_count_per_turn: int = 1
 @export var spawn_position_mode: SpawnPositionMode = SpawnPositionMode.RANDOM
 @export var spawn_margin: float = 4.0
 @export var rng_seed: int = 0
@@ -49,6 +50,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 @export var wall_penetration_limit: float = 16.0
 @export var opposite_pairs: Array[Vector2i] = [
 	Vector2i(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE),
+	Vector2i(OrbTypes.OrbColor.GREEN, OrbTypes.OrbColor.YELLOW),
 ]
 @export var annihilation_rule: AnnihilationRule = AnnihilationRule.B_SAME_LEVEL
 @export var level_scores: PackedInt32Array = PackedInt32Array([2, 4, 8, 16, 32, 64, 128])

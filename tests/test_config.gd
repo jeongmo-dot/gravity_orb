@@ -63,8 +63,15 @@ func test_m3_turn_defaults() -> void:
 
 func test_m4_spawn_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
+	assert_eq(config.color_display.size(), 4, "display color count")
+	assert_eq(config.color_display[OrbTypes.OrbColor.YELLOW], Color("#F5C542"), "yellow display")
 	assert_eq(config.spawn_level_weights, PackedFloat32Array([0.9, 0.1]), "level weights")
-	assert_eq(config.spawn_color_weights, PackedFloat32Array([1.0, 1.0, 1.0]), "color weights")
+	assert_eq(
+		config.spawn_color_weights,
+		PackedFloat32Array([1.0, 1.0, 1.0, 1.0]),
+		"color weights"
+	)
+	assert_eq(config.spawn_count_per_turn, 1, "spawn count per turn")
 	assert_eq(config.spawn_position_mode, GameConfig.SpawnPositionMode.RANDOM, "position mode")
 	assert_near(config.spawn_margin, 4.0, TOLERANCE, "spawn margin")
 	assert_eq(config.rng_seed, 0, "random seed default")
@@ -98,12 +105,17 @@ func test_m5_plus_tuning_defaults() -> void:
 
 func test_m6_annihilation_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
-	assert_eq(config.opposite_pairs.size(), 1, "opposite pair count")
-	if config.opposite_pairs.size() == 1:
+	assert_eq(config.opposite_pairs.size(), 2, "opposite pair count")
+	if config.opposite_pairs.size() == 2:
 		assert_eq(
 			config.opposite_pairs[0],
 			Vector2i(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE),
-			"default opposite pair"
+			"red-blue opposite pair"
+		)
+		assert_eq(
+			config.opposite_pairs[1],
+			Vector2i(OrbTypes.OrbColor.GREEN, OrbTypes.OrbColor.YELLOW),
+			"green-yellow opposite pair"
 		)
 	assert_eq(
 		config.annihilation_rule,
@@ -119,8 +131,12 @@ func test_m6_annihilation_defaults() -> void:
 		"opposite pair reverse"
 	)
 	assert_true(
-		not config.is_opposite(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.GREEN),
-		"green is not opposite"
+		config.is_opposite(OrbTypes.OrbColor.GREEN, OrbTypes.OrbColor.YELLOW),
+		"green-yellow opposite pair forward"
+	)
+	assert_true(
+		config.is_opposite(OrbTypes.OrbColor.YELLOW, OrbTypes.OrbColor.GREEN),
+		"green-yellow opposite pair reverse"
 	)
 
 

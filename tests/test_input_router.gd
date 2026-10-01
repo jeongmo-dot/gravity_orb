@@ -4,6 +4,7 @@ const INPUT_ROUTER_SCRIPT: Script = preload("res://scripts/autoload/InputRouter.
 
 var _received: Array[Vector2i] = []
 var _debug_cycles: int = 0
+var _spawn_count_cycles: int = 0
 var _restart_requests: int = 0
 
 
@@ -131,6 +132,14 @@ func test_f2_debug_action_emits_even_while_locked() -> void:
 	router.free()
 
 
+func test_f3_spawn_count_action_emits_even_while_locked() -> void:
+	var router: Variant = _new_router()
+	router.set_locked(true)
+	router._handle_event(_logical_key(KEY_F3))
+	assert_eq(_spawn_count_cycles, 1, "spawn count cycle signal count")
+	router.free()
+
+
 func test_restart_action_emits_even_while_locked() -> void:
 	var router: Variant = _new_router()
 	router.set_locked(true)
@@ -142,11 +151,13 @@ func test_restart_action_emits_even_while_locked() -> void:
 func _new_router() -> Variant:
 	_received.clear()
 	_debug_cycles = 0
+	_spawn_count_cycles = 0
 	_restart_requests = 0
 	var router: Variant = INPUT_ROUTER_SCRIPT.new()
 	router.swipe.connect(_record_swipe)
 	router.restart_requested.connect(_record_restart_request)
 	router.debug_cycle_annihilation_rule.connect(_record_debug_cycle)
+	router.debug_cycle_spawn_count.connect(_record_spawn_count_cycle)
 	return router
 
 
@@ -156,6 +167,10 @@ func _record_swipe(direction: Vector2i) -> void:
 
 func _record_debug_cycle() -> void:
 	_debug_cycles += 1
+
+
+func _record_spawn_count_cycle() -> void:
+	_spawn_count_cycles += 1
 
 
 func _record_restart_request() -> void:
