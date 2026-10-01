@@ -24,6 +24,9 @@ var ghost_elapsed: float = 0.0
 var is_waiting_at_entrance: bool = false
 var entrance_preferred_position: Vector2 = Vector2.ZERO
 var entrance_gravity: Vector2i = Vector2i.DOWN
+var diagnostic_last_event: String = "spawn"
+var diagnostic_last_event_physics_frame: int = 0
+var diagnostic_warnings_enabled: bool = true
 var _radius: float = 0.0
 var _current_radius: float = 0.0
 var _growth_start_radius: float = 0.0
@@ -52,6 +55,8 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	_growth_elapsed = 0.0
 	_spawn_physics_frame = Engine.get_physics_frames()
 	_last_board_spawn_physics_frame = _spawn_physics_frame
+	diagnostic_last_event = "spawn"
+	diagnostic_last_event_physics_frame = _spawn_physics_frame
 
 	gravity_scale = 0.0
 	can_sleep = false
@@ -125,6 +130,7 @@ func release_entrance_wait(
 	queue_timeout_correction(spawn_position, Vector2.ZERO)
 	angular_velocity = 0.0
 	set_gravity(gravity, gravity_strength)
+	note_diagnostic_event("entrance_release")
 
 
 func queue_timeout_correction(
@@ -140,6 +146,13 @@ func queue_timeout_correction(
 
 func note_board_spawn(physics_frame: int) -> void:
 	_last_board_spawn_physics_frame = physics_frame
+
+
+func note_diagnostic_event(event_name: String, physics_frame: int = -1) -> void:
+	diagnostic_last_event = event_name
+	diagnostic_last_event_physics_frame = (
+		Engine.get_physics_frames() if physics_frame < 0 else physics_frame
+	)
 
 
 func set_gravity(direction: Vector2i, strength: float) -> void:
@@ -307,15 +320,16 @@ func _apply_escape_guard() -> bool:
 			physics_frame - _last_board_spawn_physics_frame,
 			0
 		)
-		push_warning(
-			"[ESCAPE_GUARD] level=%d axis=%s depth=%.3f age_frames=%d since_last_spawn_frames=%d" % [
-				level,
-				axis_name,
-				depth,
-				age_frames,
-				since_last_spawn_frames,
-			]
-		)
+		if diagnostic_warnings_enabled:
+			push_warning(
+				"[ESCAPE_GUARD] level=%d axis=%s depth=%.3f age_frames=%d since_last_spawn_frames=%d" % [
+					level,
+					axis_name,
+					depth,
+					age_frames,
+					since_last_spawn_frames,
+				]
+			)
 		triggered = true
 	if not triggered:
 		return false
