@@ -234,7 +234,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M1 | `wall_bounce` | float | 0.1 | |
 | M1 | `orb_linear_damp` | float | 0.1 | |
 | M1 | `orb_angular_damp` | float | 1.0 | |
-| M1 | `color_display` | PackedColorArray | 빨 `#E5484D`, 파 `#3E7BFA`, 초 `#30A46C` | 인덱스 = `OrbTypes.OrbColor` |
+| M1 | `color_display` | PackedColorArray | 빨 `#E5484D`, 파 `#3E7BFA`, 초 `#30A46C`, **노 `#F5C542`** (#15) | 인덱스 = `OrbTypes.OrbColor` |
 | M1 | `debug_test_orb_count` | int | 5 | M1 전용. M4에서 삭제 |
 | M2 | `swipe_min_distance` | float | 80.0 | 스와이프 최소 이동 거리 (기준 해상도 px) |
 | M2 | `swipe_dominance_ratio` | float | 1.5 | 주 방향 성분 ≥ 보조 성분 × 이 값 |
@@ -244,7 +244,8 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M3 | `max_settle_time` | float | 3.0 → **1.5** (기획서 0.3) | 턴 최대 길이 (초, 스케일된 시간). 도달하면 움직임이 남아도 턴 종료 — 정상 동작 |
 | M3 | `allow_same_direction_swipe` | bool | true | 11.1 참조 |
 | M4 | `spawn_level_weights` | PackedFloat32Array | [0.9, 0.1] | 인덱스 0 = 레벨1 |
-| M4 | `spawn_color_weights` | PackedFloat32Array | [1, 1, 1] | 인덱스 = 색 |
+| M4 | `spawn_color_weights` | PackedFloat32Array | [1, 1, 1] → **[1, 1, 1, 1]** (#15) | 인덱스 = 색. 가중치 0인 색은 생성되지 않는다 |
+| #15 | `spawn_count_per_turn` | int | #15 측정 후 결정 (후보 1 / 2 / 3) | 턴당 생성 구체 수. 미리보기도 이 수만큼 |
 | M4 | `spawn_position_mode` | SpawnPositionMode | RANDOM | |
 | M4 | `spawn_margin` | float | 4.0 | 생성 벽 안쪽 면과 구체 사이 여백 |
 | M4 | `rng_seed` | int | 0 | 0이면 시작 시 무작위 시드를 뽑아 기록 |
@@ -259,7 +260,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M5+ | `ghost_alpha` | float | 0.55 | 유령 상태 표시 불투명도 |
 | M5+ | `wall_penetration_limit` | float | 16.0 | 사전 벽 복구: 관통이 이 값을 넘으면 25px 안전장치 전에 경계로 복구 (#11, 사용자 승인). 회귀 테스트는 발동 0 요구 (#12) |
 | M5+ | `escape_guard_depth` | float | 25.0 | 벽 관통이 이 깊이를 넘으면 경계로 되돌리는 안전장치 (회귀 테스트는 발동 0 요구) |
-| M6 | `opposite_pairs` | Array[Vector2i] | [(RED, BLUE)] | 상극 쌍 (순서 무관) |
+| M6 | `opposite_pairs` | Array[Vector2i] | [(RED, BLUE)] → **[(RED, BLUE), (GREEN, YELLOW)]** (#15) | 상극 쌍 (순서 무관) |
 | M6 | `annihilation_rule` | AnnihilationRule | A_BOTH → **B_SAME_LEVEL** (2026-09-30 플레이테스트, 기획서 0.4.1) | |
 | M7 | `level_scores` | PackedInt32Array | [2,4,8,16,32,64,128] | 인덱스 0 = 레벨1 |
 | M7 | `annihilation_score_factor` | float | 0.5 | |
@@ -304,7 +305,7 @@ func is_opposite(c1: int, c2: int) -> bool:     # M6
 
 ```gdscript
 class_name OrbTypes
-enum OrbColor { RED, BLUE, GREEN }
+enum OrbColor { RED, BLUE, GREEN, YELLOW }   # YELLOW는 #15 (기획서 0.5)
 const DIRECTIONS: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
 static func dir_name(d: Vector2i) -> String          # "UP" 등, 디버그 표시용
 static func perpendicular(d: Vector2i) -> Vector2i   # 벽을 따라가는 축
@@ -823,7 +824,7 @@ M4 검수(2026-09-28)에서 발견. 합체가 없는 M4 상태에서 **이동·�
   - 연쇄(chain ≥ 2): "n연쇄" 라벨 팝업, 히트스톱(11.8), 효과음 `pitch_scale = 1 + (chain − 1) × chain_pitch_step`
   - 중력 전환: 카메라 기울기(11.9), 중력 방향 벽 강조(Frame), 하단 화살표 회전
   - 경고: 해당 벽 붉게 점멸 (Frame)
-- `OrbVisual` 문양: 빨강 ▲, 파랑 ●(안쪽 작은 원), 초록 ■. 흰색 반투명, `draw_colored_polygon`/`draw_circle`로 그린다 (폰트 의존 없음).
+- `OrbVisual` 문양: 빨강 ▲, 파랑 ●(안쪽 작은 원), 초록 ■, 노랑 ◆. 흰색 반투명, `draw_colored_polygon`/`draw_circle`로 그린다 (폰트 의존 없음).
 - 임시 효과음: `assets/sfx/`의 짧은 `.wav` (합체음과 소멸음은 달라야 함). 직접 생성 가능하면 `AudioStreamWAV` 코드 생성도 허용.
 - 연출은 **물리 상태를 바꾸지 않는다** (Visual·카메라·파티클·UI만).
 
