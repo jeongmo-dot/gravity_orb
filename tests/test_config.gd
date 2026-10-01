@@ -40,7 +40,7 @@ func test_mass_for_candidate_exponents() -> void:
 		)
 	assert_near(
 		CONFIG_RESOURCE.mass_exponent,
-		2.0,
+		1.0,
 		TOLERANCE,
 		"default mass exponent"
 	)

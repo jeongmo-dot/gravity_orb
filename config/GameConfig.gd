@@ -11,7 +11,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 )
 @export var orb_max_level: int = 7
 @export var orb_base_mass: float = 1.0
-@export var mass_exponent: float = 2.0
+@export var mass_exponent: float = 1.0
 @export var gravity_strength: float = 2400.0
 @export var orb_friction: float = 0.3
 @export var orb_bounce: float = 0.15

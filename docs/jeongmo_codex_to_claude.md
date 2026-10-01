@@ -38,6 +38,47 @@
 
 ## 미확인
 
+### [2026-10-01] 대상 #14 추가 요구 1 — 질량 지수 1.0 채택 및 안전 기준 갱신
+- 상태: 완료
+- 브랜치 / PR: `m7-radius-mass-remeasure` / PR 미생성
+- 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, `tests/test_config.gd`, `tests/scenarios/test_board_physics.gd`, `tests/scenarios/test_spawn_flow.gd`, `tests/scenarios/test_turn_time.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `mass_exponent` 선언·기본 리소스를 1.0으로 변경하고 config 기본값 자동 검증 갱신
+  - [x] 관통 한도를 물리 22시드 10px, 20턴·120턴 14px, 겹침 12px로 적용 — fixed·실시간 측정 통과
+  - [x] `wall_penetration_limit=16`, `escape_guard_depth=25`와 사전 복구 assert(22시드·겹침·20턴 0, 120턴 ≤2) 유지
+  - [x] 120턴 매 턴 종료 시 `Σ(πr²) / board_size²` 점유율과 구체 수를 수집해 각각 평균·최대를 출력 — 보고 전용, assert 없음
+  - [x] 기본값 전체 92/92, fixed 측정 11/11, realtime 120턴 1/1 통과
+  - [x] §10.1 명령 3종 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - [ ] NEXT 미리보기·HUD 새 크기 육안 확인 — #14의 기존 수동 확인 절차 유지
+- QA 관측값:
+
+| 실행 | 최대 관통 | 안전장치 | 사전 복구 | 유령 timeout | 이탈/발산 | 최종 구 평균 | 턴 종료 점유율 평균/최대 | 턴 종료 구체 수 평균/최대 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| fixed 22시드 | 8.182px | 0 | 0 | 0 | 0 / 0 | — | — | — |
+| fixed 겹침 | 0.000px | 0 | 0 | 0 | 0 / 0 | — | — | — |
+| fixed 20턴 | 6.853px | 0 | 0 | 1 | 0 / 0 | 22.000 | — | — |
+| fixed 120턴 | 10.292px | 0 | 0 | 9 | 0 / 0 | 4.833 | 2.0775% / 4.9940% | 3.858 / 8 |
+| realtime 120턴 | 11.574px | 0 | 0 | 6 | 0 / 0 | 4.667 | 2.1376% / 5.2070% | 3.942 / 7 |
+| 전체 실시간 22시드 | 7.925px | 0 | 0 | 0 | 0 / 0 | — | — | — |
+| 전체 실시간 20턴 | 8.444px | 0 | 0 | 1 | 0 / 0 | 22.000 | — | — |
+| 전체 실시간 120턴 | 10.086px | 0 | 0 | 7 | 0 / 0 | 5.167 | 2.1696% / 4.9940% | 3.858 / 7 |
+
+  - fixed 120턴 시드 101~106 → 점수 `[60, 70, 60, 62, 68, 54]`, 최대 연쇄 `[2, 1, 2, 2, 2, 1]`, 최고 레벨 `[3, 4, 3, 3, 4, 3]`
+  - realtime 120턴 시드 101~106 → 점수 `[56, 86, 46, 62, 76, 74]`, 최대 연쇄 `[2, 2, 1, 2, 2, 2]`, 최고 레벨 `[3, 4, 3, 3, 4, 3]`
+  - 전체 실시간 120턴 시드 101~106 → 점수 `[60, 86, 46, 54, 86, 46]`, 최대 연쇄 `[2, 2, 2, 1, 2, 1]`, 최고 레벨 `[3, 4, 3, 3, 4, 3]`
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --fixed-fps 240 --path . -s res://tests/run_tests.gd -- --mass-suite=fixed` → 11/11 통과, 종료 코드 0
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . -s res://tests/run_tests.gd -- --mass-suite=realtime` → 1/1 통과, 종료 코드 0
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --import` → 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . -s res://tests/run_tests.gd` → 92/92 통과, 종료 코드 0
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --quit-after 300` → 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - 환경 진단 → 사용자 로그/Windows 루트 인증서/에디터 설정 접근 오류가 출력됐으나 프로젝트 스크립트 로드·검증 종료 코드에는 영향 없음
+  - 정적 검사 → `Input`/`InputEvent` 참조는 `InputRouter.gd`만, 난수 API는 `Spawner.gd`만; `git diff --check` 이상 없음
+- 수동 확인 절차:
+  1. 프로젝트를 실행해 NEXT의 L1/L2 미리보기와 실제 생성 구체를 비교한다 → 미리보기와 실제 크기가 일치하고 25px/40px 차이가 분명한지 확인한다.
+  2. 합체로 L1→L2→L3 이상을 만든다 → 레벨별 크기 차이가 보이고 NEXT·SCORE·BEST·MAX CHAIN HUD가 겹치거나 잘리지 않는지 확인한다.
+- 결정 사항: 점유율의 `r`은 성장 중 현재 반지름이 아닌 레벨별 최종 반지름으로 계산했고, 분모는 현재 `Config.data.board_size²`를 사용했다(기본 960²와 동일). 점유율·구체 수는 각 턴이 `WAITING_INPUT`으로 돌아온 직후 120개 표본에서 집계한다. 1단계 `--mass-suite` 모드는 유지했다.
+- 남은 것 · 질문: 코드·자동 검증 기준 남은 항목 없음. 실제 NEXT/HUD 크기는 위 수동 절차로 확인 필요.
+
 ### [2026-10-01] 대상 #14 — 레벨별 반지름 표 + 질량 지수 + 안전 기준 재측정
 - 상태: 질문
 - 브랜치 / PR: `m7-radius-mass-remeasure` / PR 미생성

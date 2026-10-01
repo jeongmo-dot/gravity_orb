@@ -18,7 +18,7 @@ const DIRECTION_PATTERN: Array[Vector2i] = [
 	Vector2i.RIGHT,
 ]
 const WAIT_TIMEOUT_SECONDS: float = 3.0
-const CONTINUOUS_PENETRATION_LIMIT: float = 16.0
+const CONTINUOUS_PENETRATION_LIMIT: float = 14.0
 const DIVERGENCE_SPEED: float = 5000.0
 const DIVERGENCE_MARGIN: float = 100.0
 const DIAGNOSTIC_HISTORY_FRAMES: int = 10
@@ -61,6 +61,8 @@ func test_all_turns_return_to_input_within_time_cap() -> void:
 
 func _measure_current_config() -> Dictionary:
 	var turn_times: Array[float] = []
+	var turn_end_occupancies: Array[float] = []
+	var turn_end_orb_counts: Array[int] = []
 	var direction_times: Dictionary = {
 		"DOWN": [] as Array[float],
 		"RIGHT": [] as Array[float],
@@ -117,6 +119,8 @@ func _measure_current_config() -> Dictionary:
 				maximum_residual_speed,
 				_maximum_linear_speed(board)
 			)
+			turn_end_occupancies.append(_board_occupancy(board))
+			turn_end_orb_counts.append(board.get_orbs().size())
 		capped_turns += manager.capped_turn_count
 		final_orb_total += board.get_orbs().size()
 		escape_guard_total += board.escape_guard_count
@@ -156,6 +160,10 @@ func _measure_current_config() -> Dictionary:
 		"departures": center_departures,
 		"divergences": divergence_count,
 		"final_orb_average": float(final_orb_total) / float(SEEDS.size()),
+		"turn_end_occupancy_average": _average(turn_end_occupancies),
+		"turn_end_occupancy_maximum": _percentile(turn_end_occupancies, 1.0),
+		"turn_end_orb_count_average": _average_int(turn_end_orb_counts),
+		"turn_end_orb_count_maximum": _maximum_int(turn_end_orb_counts),
 		"escape_guards": escape_guard_total,
 		"wall_recoveries": wall_recovery_total,
 		"wall_recovery_timeout_lags": wall_recovery_timeout_lags,
@@ -184,6 +192,14 @@ func _maximum_linear_speed(board: Board) -> float:
 	for orb: Orb in board.get_orbs():
 		maximum = maxf(maximum, orb.linear_velocity.length())
 	return maximum
+
+
+func _board_occupancy(board: Board) -> float:
+	var occupied_area: float = 0.0
+	for orb: Orb in board.get_orbs():
+		var radius: float = orb.get_radius()
+		occupied_area += PI * radius * radius
+	return occupied_area / (Config.data.board_size * Config.data.board_size)
 
 
 func _is_independent_measurement() -> bool:
@@ -442,6 +458,20 @@ func _average(values: Array[float]) -> float:
 	return total / float(values.size())
 
 
+func _average_int(values: Array[int]) -> float:
+	var total: int = 0
+	for value: int in values:
+		total += value
+	return float(total) / float(values.size())
+
+
+func _maximum_int(values: Array[int]) -> int:
+	var maximum: int = 0
+	for value: int in values:
+		maximum = maxi(maximum, value)
+	return maximum
+
+
 func _percentile(values: Array[float], quantile: float) -> float:
 	var sorted_values: Array[float] = values.duplicate()
 	sorted_values.sort()
@@ -452,7 +482,7 @@ func _percentile(values: Array[float], quantile: float) -> float:
 func _print_metrics(metrics: Dictionary) -> void:
 	var direction_p50: Dictionary = metrics["direction_p50"] as Dictionary
 	print(
-		"Turn-time cap=%.3f turns=%d capped=%d capped_ratio=%.6f average=%.6f p50=%.6f p90=%.6f max=%.6f max_residual_speed=%.3f max_penetration=%.3f max_penetration_ratio=%.6f ratio_level=%d departures=%d divergences=%d final_orbs_avg=%.3f escape_guards=%d wall_recoveries=%d recovery_timeout_lags=%s timeout_corrections=%d ghost_timeouts=%d ghost_completed=%d ghost_avg=%.6f direction_p50=[D %.6f R %.6f U %.6f L %.6f]" % [
+		"Turn-time cap=%.3f turns=%d capped=%d capped_ratio=%.6f average=%.6f p50=%.6f p90=%.6f max=%.6f max_residual_speed=%.3f max_penetration=%.3f max_penetration_ratio=%.6f ratio_level=%d departures=%d divergences=%d final_orbs_avg=%.3f turn_end_occupancy_avg=%.6f turn_end_occupancy_max=%.6f turn_end_orbs_avg=%.3f turn_end_orbs_max=%d escape_guards=%d wall_recoveries=%d recovery_timeout_lags=%s timeout_corrections=%d ghost_timeouts=%d ghost_completed=%d ghost_avg=%.6f direction_p50=[D %.6f R %.6f U %.6f L %.6f]" % [
 			Config.data.max_settle_time,
 			int(metrics["turns"]),
 			int(metrics["capped_turns"]),
@@ -468,6 +498,10 @@ func _print_metrics(metrics: Dictionary) -> void:
 			int(metrics["departures"]),
 			int(metrics["divergences"]),
 			float(metrics["final_orb_average"]),
+			float(metrics["turn_end_occupancy_average"]),
+			float(metrics["turn_end_occupancy_maximum"]),
+			float(metrics["turn_end_orb_count_average"]),
+			int(metrics["turn_end_orb_count_maximum"]),
 			int(metrics["escape_guards"]),
 			int(metrics["wall_recoveries"]),
 			str(metrics["wall_recovery_timeout_lags"]),
