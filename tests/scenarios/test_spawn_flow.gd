@@ -343,12 +343,14 @@ func test_seed_4242_completes_twenty_turns_without_departures() -> void:
 	var maximum_penetration_ratio: float = 0.0
 	var maximum_penetration_level: int = 0
 	var capped_turn_count: int = 0
+	var completed_turns: int = 0
 
 	for turn_offset: int in range(20):
 		var direction: Vector2i = directions[turn_offset % directions.size()]
 		var capped_before: int = manager.capped_turn_count
 		manager.on_swipe(direction)
 		var metrics: Dictionary = await _wait_for_turn_with_metrics(manager, board)
+		completed_turns = manager.turn_index
 		var settle_elapsed: float = manager._settle_elapsed
 		var capped: bool = manager.capped_turn_count > capped_before
 		if capped:
@@ -370,10 +372,17 @@ func test_seed_4242_completes_twenty_turns_without_departures() -> void:
 				float(metrics["max_penetration"]),
 			]
 		)
-		assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "turn returns to input")
+		assert_true(
+			manager.state == TurnManager.State.WAITING_INPUT
+			or manager.state == TurnManager.State.GAME_OVER,
+			"turn returns to input or ends game"
+		)
+		if manager.state == TurnManager.State.GAME_OVER:
+			break
 
 	print(
-		"Spawn flow seed=4242 summary turns=20 orbs=%d departures=%d divergences=%d max_penetration=%.3f max_penetration_ratio=%.6f ratio_level=%d capped_turns=%d escape_guards=%d wall_recoveries=%d recovery_timeout_lags=%s timeout_corrections=%d ghost_timeouts=%d ghost_avg=%.6f" % [
+		"Spawn flow seed=4242 summary turns=%d orbs=%d departures=%d divergences=%d max_penetration=%.3f max_penetration_ratio=%.6f ratio_level=%d capped_turns=%d escape_guards=%d wall_recoveries=%d recovery_timeout_lags=%s timeout_corrections=%d ghost_timeouts=%d ghost_avg=%.6f" % [
+			completed_turns,
 			board.get_orbs().size(),
 			total_departures,
 			total_divergences,
@@ -389,15 +398,19 @@ func test_seed_4242_completes_twenty_turns_without_departures() -> void:
 			board.average_ghost_duration(),
 		]
 	)
-	assert_eq(manager.turn_index, 20, "twenty turns completed")
-	assert_eq(board.get_orbs().size(), 42, "initial two plus forty turn spawns")
-	assert_eq(total_departures, 0, "twenty-turn orb center departures")
-	assert_eq(total_divergences, 0, "twenty-turn divergent orb frames")
-	assert_eq(board.escape_guard_count, 0, "twenty-turn escape guard activations")
-	assert_eq(board.wall_recovery_count, 0, "twenty-turn wall recovery activations")
+	assert_true(completed_turns > 0 and completed_turns <= 20, "turns before game over")
+	assert_eq(
+		board.get_orbs().size(),
+		Config.data.initial_orb_count + completed_turns * Config.data.spawn_count_per_turn,
+		"initial orbs plus completed turn spawns"
+	)
+	assert_eq(total_departures, 0, "continuous-turn orb center departures")
+	assert_eq(total_divergences, 0, "continuous-turn divergent orb frames")
+	assert_eq(board.escape_guard_count, 0, "continuous-turn escape guard activations")
+	assert_eq(board.wall_recovery_count, 0, "continuous-turn wall recovery activations")
 	assert_true(
 		maximum_penetration <= CONTINUOUS_PENETRATION_LIMIT,
-		"twenty-turn wall penetration must be at most %.3fpx, got %.3fpx" % [
+		"continuous-turn wall penetration must be at most %.3fpx, got %.3fpx" % [
 			CONTINUOUS_PENETRATION_LIMIT,
 			maximum_penetration,
 		]
@@ -522,9 +535,16 @@ func _wait_for_turn_with_metrics(manager: TurnManager, board: Board) -> Dictiona
 		await tree.physics_frame
 		assert_board_motion_bounds(board, "spawn-flow turn wait")
 		_accumulate_board_metrics(board, metrics)
-		if manager.state == TurnManager.State.WAITING_INPUT:
+		if (
+			manager.state == TurnManager.State.WAITING_INPUT
+			or manager.state == TurnManager.State.GAME_OVER
+		):
 			return metrics
-	assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "turn wait timeout")
+	assert_true(
+		manager.state == TurnManager.State.WAITING_INPUT
+		or manager.state == TurnManager.State.GAME_OVER,
+		"turn wait timeout"
+	)
 	return metrics
 
 

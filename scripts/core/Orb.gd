@@ -21,6 +21,7 @@ var generation: int = 0
 var consumed: bool = false
 var is_ghost: bool = false
 var ghost_elapsed: float = 0.0
+var spawned_turn_index: int = -1
 var _radius: float = 0.0
 var _current_radius: float = 0.0
 var _growth_start_radius: float = 0.0

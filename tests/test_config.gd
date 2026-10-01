@@ -76,6 +76,7 @@ func test_m4_spawn_defaults() -> void:
 	assert_eq(config.spawn_count_max, 3, "spawn count maximum")
 	assert_eq(config.spawn_position_mode, GameConfig.SpawnPositionMode.RANDOM, "position mode")
 	assert_near(config.spawn_margin, 4.0, TOLERANCE, "spawn margin")
+	assert_near(config.spawn_probe_step, 5.0, TOLERANCE, "spawn probe step")
 	assert_eq(config.rng_seed, 0, "random seed default")
 	assert_eq(config.initial_orb_count, 2, "initial orb count")
 

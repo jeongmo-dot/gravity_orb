@@ -9,6 +9,8 @@ const PREVIEW_GAP: float = 16.0
 @onready var _score_label: Label = %ScoreLabel
 @onready var _best_label: Label = %BestLabel
 @onready var _max_chain_label: Label = %MaxChainLabel
+@onready var _blocked_label: Label = %BlockedLabel
+@onready var _game_over_panel: GameOverPanel = %GameOverPanel
 
 var _spawner: Spawner
 var _score_manager: ScoreManager
@@ -26,6 +28,17 @@ func bind_score_manager(score_manager: ScoreManager) -> void:
 	_score_manager.max_chain_changed.connect(_on_max_chain_changed)
 	_on_score_changed(_score_manager.score, _score_manager.best_score)
 	_on_max_chain_changed(_score_manager.max_chain)
+
+
+func bind_game_state(
+	turn_manager: TurnManager,
+	board: Board,
+	score_manager: ScoreManager
+) -> void:
+	turn_manager.warning_changed.connect(_on_warning_changed)
+	_game_over_panel.bind(turn_manager, score_manager)
+	_on_warning_changed(turn_manager.blocked_directions)
+	board.set_warning_directions(turn_manager.blocked_directions)
 
 
 func _on_next_batch_changed(batch: Array[Dictionary]) -> void:
@@ -81,3 +94,14 @@ func _on_score_changed(score: int, best: int) -> void:
 
 func _on_max_chain_changed(max_chain: int) -> void:
 	_max_chain_label.text = "MAX CHAIN  %d" % max_chain
+
+
+func _on_warning_changed(directions: Array[Vector2i]) -> void:
+	var names: Array[String] = []
+	for direction: Vector2i in directions:
+		names.append(OrbTypes.dir_name(direction))
+	_blocked_label.text = (
+		"BLOCKED: NONE"
+		if names.is_empty()
+		else "BLOCKED: %s" % ", ".join(names)
+	)

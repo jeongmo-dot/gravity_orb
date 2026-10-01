@@ -38,6 +38,57 @@
 
 ## 미확인
 
+### [2026-10-01] 대상 #16 — 게임오버·방향 경고·게임오버 패널
+- 상태: 질문
+- 브랜치 / PR: `m7-direction-game-over` / PR 미생성
+- 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, `scenes/UI.tscn`, `scripts/core/Board.gd`, `scripts/core/Orb.gd`, `scripts/core/Spawner.gd`, `scripts/core/TurnManager.gd`, `scripts/ui/DebugHud.gd`, `scripts/ui/Hud.gd`, `scripts/ui/GameOverPanel.gd`, `tests/run_tests.gd`, `tests/test_config.gd`, `tests/scenarios/test_game_over.gd`, `tests/scenarios/test_game_over_measurement.gd`, `tests/scenarios/test_score_flow.gd`, `tests/scenarios/test_spawn_flow.gd`, `tests/scenarios/test_turn_time.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 턴 생성 구체에 `spawned_turn_index`를 기록하고 해당 유령만 `ghost_max_time` 강제 해제에서 제외. 합체·규칙 C 결과는 `-1`로 기존 timeout 유지
+  - [x] `CHECK_GAMEOVER`에서 이번 턴 생성 유령의 일반 구체 겹침이 `ghost_exit_overlap`을 넘으면 `GAME_OVER`·`game_over` 발신, 입력 잠금 유지 및 이후 스와이프 무시
+  - [x] `spawn_probe_step=5.0` 선언·리소스·config 테스트. NEXT 묶음을 큰 반지름부터 서로 다른 빈자리에 가상 배치해 네 방향을 계산하고, 변경 시에만 `warning_changed`
+  - [x] 경고 방향의 생성 벽을 붉은 테두리로 표시하고 HUD에 `BLOCKED: ...` 표시
+  - [x] `GameOverPanel`에 SCORE·BEST·MAX CHAIN·막힌 방향·RESTART 버튼 구현. 패널/라벨은 포인터 무시, 버튼만 `MOUSE_FILTER_STOP`; R키는 입력 잠금 중에도 restart 발신
+  - [x] 생성 벽 막힘 → 턴 끝 GAME_OVER, 바닥 더미가 위로 떠남 → 생존, 반응 결과 유령 제외, 한 벽 경고, GAME_OVER 후 스와이프 무시·R키 동작 자동 시나리오
+  - [x] 시드 101~112 × 최대 400턴, `--fixed-fps 240` 측정 및 전체 103/103·§10.1 명령 3종 통과
+  - [ ] 현재 판정은 12/12 시드가 점유율 25% 미만에서 조기 종료되고 경고가 실제 게임오버를 한 번도 예고하지 못함 — 아래 질문의 규칙 결정 필요
+- 측정 관측값 (`--game-over-suite=measurement`, 기본 B2, 규칙 B):
+
+| 시드 | 게임오버 턴 | 점유율 | 구체 수 | 막힌 방향 | 판정 생성 레벨 | 일반 구체 겹침 수 | 직전 경고 |
+|---:|---:|---:|---:|---|---|---|---|
+| 101 | 4 | 2.1987% | 4 | LEFT | `[1]` | `[1]` | 없음 |
+| 102 | 5 | 3.6475% | 5 | DOWN | `[1]` | `[1]` | 없음 |
+| 103 | 23 | 8.8971% | 8 | UP | `[2]` | `[1]` | 없음 |
+| 104 | 31 | 14.4535% | 14 | UP | `[1]` | `[1]` | 없음 |
+| 105 | 17 | 6.7410% | 10 | DOWN | `[1]` | `[1]` | 없음 |
+| 106 | 3 | 1.9430% | 6 | UP | `[1]` | `[1]` | 없음 |
+| 107 | 4 | 2.3691% | 8 | LEFT | `[1]` | `[1]` | 없음 |
+| 108 | 2 | 1.5169% | 4 | RIGHT | `[2]` | `[2]` | 없음 |
+| 109 | 19 | 7.6273% | 10 | UP | `[1]` | `[2]` | 없음 |
+| 110 | 17 | 8.0449% | 13 | DOWN | `[1]` | `[1]` | 없음 |
+| 111 | 20 | 8.2153% | 8 | LEFT | `[2]` | `[2]` | 없음 |
+| 112 | 16 | 6.9540% | 11 | RIGHT | `[1]` | `[2]` | 없음 |
+
+  - 게임오버 턴 평균/최소/최대 `13.417 / 2 / 31`, 게임오버 점유율 평균/최소/최대 `6.0507% / 1.5169% / 14.4535%`, 구체 수 평균/최소/최대 `8.417 / 4 / 14`
+  - 이른 게임오버(<25%) `12/12`. 전부 생성 L1 또는 L2 하나가 일반 구체 1~2개와 기준 이상 겹친 사례
+  - 경고 정확도: 경고 방향 스와이프 `0회`라 실제 게임오버 비율은 표본 없음. 경고 없는 방향 스와이프 `161회` 중 게임오버 `12회` (`7.4534%`)
+  - 물리 안전: 관측 161턴이 전부 점유율 0~20% 구간. 안전장치 0, 사전 복구 0, 이탈 0, 발산 0. 20~40%·40%+ 표본 없음
+  - 반응: 0~20% 구간 합체(최대 합체 포함) `153회 / 0.9503회·턴`, 상극 소멸 `46회 / 0.2857회·턴`. 상위 점유율 구간은 조기 종료로 측정 불가
+- QA 관측값:
+  - 전체 회귀 22시드 → 이탈 0, 발산 0, 최대 관통 `7.925px`, 안전장치 0, 사전 복구 0
+  - 기본 6시드 게임오버/20턴 회귀 → 합계 94턴, 최대 관통 `8.564px`, 이탈·발산·안전장치·사전 복구 0
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --import` → 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . -s res://tests/run_tests.gd` → 103/103 통과, 종료 코드 0
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --quit-after 300` → 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - 정적 검사 → `Input`/`InputEvent` 참조는 `InputRouter.gd`만, 난수 API는 `Spawner.gd`만; `git diff --check` 이상 없음
+  - 환경 진단 → 사용자 로그·Windows 루트 인증서·에디터 설정 접근 오류가 출력됐으나 프로젝트 스크립트 로드 및 검증 종료 코드에는 영향 없음
+- 수동 확인 절차:
+  1. 한 생성 벽을 구체로 채운다 → 그 벽에서 생성되는 스와이프 방향이 HUD `BLOCKED`에 표시되고 해당 생성 벽이 붉어진다.
+  2. 경고 방향으로 스와이프해 새 구체가 턴 끝까지 일반 구체와 기준 이상 겹치게 둔다 → GAME OVER 패널에 현재 SCORE·BEST·MAX CHAIN·방향이 표시되고 추가 스와이프가 무시된다.
+  3. 패널의 RESTART를 누른다 → 새 게임으로 재시작한다. 다시 게임오버 후 R키도 같은 동작인지 확인한다.
+  4. 바닥 더미가 있는 상태에서 위로 스와이프해 더미가 떠나 자리가 생기게 한다 → 새 구체가 유령을 벗어나면 게임오버가 나지 않는다.
+- 결정 사항: 측정 전용 파일은 일반 전체 테스트 탐색에서 제외하고 `--game-over-suite=measurement`에서만 실행한다. 기존 장시간 회귀는 #16 이후 게임오버 또는 지정 최대 턴 중 먼저 도달한 시점까지 물리 안전을 검증한다.
+- 남은 것 · 질문: 명세 그대로면 실제 생성 위치가 무작위라 생성선 다른 곳에 빈자리가 있어도 뽑힌 위치 하나가 겹치면 게임오버가 되어, 방향 경고(“빈자리 하나라도 있으면 안전”)와 실제 판정이 불일치한다. 측정상 모든 판이 매우 일찍 끝났다. (A) 실제 게임오버도 해당 방향에 묶음 빈자리가 전혀 없을 때로 변경, (B) 생성 위치를 탐색된 빈자리로 보정, (C) 무작위 위치 재시도/허용 턴 수를 추가, (D) 현재 규칙 유지 중 하나를 지정해 달라. 수치·규칙은 임의로 바꾸지 않았다.
+
 ### [2026-10-01] 대상 #15 추가 요구 2 — B2 기본값 채택
 - 상태: 완료
 - 브랜치 / PR: `m7-four-color-multi-spawn` / PR 미생성

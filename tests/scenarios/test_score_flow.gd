@@ -143,6 +143,37 @@ func test_main_scene_binds_score_hud_and_restart() -> void:
 	Config.data.spawn_count_per_turn = original_spawn_count
 
 
+func test_game_over_panel_shows_scores_direction_and_restart_button() -> void:
+	var main: Main = MAIN_SCENE.instantiate() as Main
+	var score_manager: ScoreManager = main.get_node("ScoreManager") as ScoreManager
+	score_manager.save_path = ""
+	tree.root.add_child(main)
+	await tree.process_frame
+	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
+	score_manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 2, [3, 3], 4))
+	manager.gravity = Vector2i.LEFT
+	manager._set_state(TurnManager.State.GAME_OVER)
+	manager.game_over.emit()
+
+	var panel: GameOverPanel = main.get_node("UI/Hud/GameOverPanel") as GameOverPanel
+	var score_label: Label = panel.get_node("Margin/Content/GameOverScore") as Label
+	var best_label: Label = panel.get_node("Margin/Content/GameOverBest") as Label
+	var chain_label: Label = panel.get_node("Margin/Content/GameOverMaxChain") as Label
+	var blocked_label: Label = panel.get_node("Margin/Content/GameOverBlocked") as Label
+	var restart_button: Button = panel.get_node("Margin/Content/RestartButton") as Button
+	assert_true(panel.visible, "game-over panel visible")
+	assert_eq(score_label.text, "SCORE  32", "game-over score")
+	assert_eq(best_label.text, "BEST  32", "game-over best")
+	assert_eq(chain_label.text, "MAX CHAIN  2", "game-over max chain")
+	assert_eq(blocked_label.text, "BLOCKED: LEFT", "game-over blocked direction")
+	assert_eq(panel.mouse_filter, Control.MOUSE_FILTER_IGNORE, "panel ignores pointer")
+	assert_eq(restart_button.mouse_filter, Control.MOUSE_FILTER_STOP, "restart consumes pointer")
+
+	main.queue_free()
+	await tree.process_frame
+	InputRouter.set_locked(false)
+
+
 func _create_reaction_fixture() -> Dictionary:
 	var fixture_root: Node = Node.new()
 	fixture_root.name = "ScoreFlowFixture"

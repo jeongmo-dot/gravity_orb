@@ -36,6 +36,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 @export var spawn_count_max: int = 3
 @export var spawn_position_mode: SpawnPositionMode = SpawnPositionMode.RANDOM
 @export var spawn_margin: float = 4.0
+@export var spawn_probe_step: float = 5.0
 @export var rng_seed: int = 0
 @export var initial_orb_count: int = 2
 @export var contact_max_reported: int = 6

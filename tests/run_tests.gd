@@ -13,6 +13,7 @@ const SPAWN_COUNT_PREFIX: String = "--spawn-count="
 const ACTIVE_COLORS_PREFIX: String = "--active-colors="
 const SPAWN_SUITE_PREFIX: String = "--spawn-suite="
 const SPAWN_CASE_PREFIX: String = "--spawn-case="
+const GAME_OVER_SUITE_PREFIX: String = "--game-over-suite="
 const MEASUREMENT_FIXED_TESTS: Array[String] = [
 	"res://tests/scenarios/test_board_physics.gd",
 	"res://tests/scenarios/test_spawn_flow.gd",
@@ -36,6 +37,14 @@ func _run_all_tests() -> void:
 		await _run_test_file("res://tests/scenarios/test_turn_time.gd")
 	elif measurement_suite == "spawn":
 		await _run_test_file("res://tests/scenarios/test_turn_time.gd")
+	elif measurement_suite == "game_over_unit":
+		await _run_test_file("res://tests/scenarios/test_game_over.gd")
+		await _run_test_file("res://tests/scenarios/test_score_flow.gd")
+		await _run_test_file("res://tests/scenarios/test_spawn_flow.gd")
+		await _run_test_file("res://tests/scenarios/test_turn_manager.gd")
+		await _run_test_file("res://tests/scenarios/test_turn_time.gd")
+	elif measurement_suite == "game_over_measurement":
+		await _run_test_file("res://tests/scenarios/test_game_over_measurement.gd")
 	else:
 		for directory: String in TEST_DIRECTORIES:
 			await _run_directory(directory)
@@ -79,6 +88,10 @@ func _apply_measurement_arguments() -> String:
 			spawn_case = argument.trim_prefix(SPAWN_CASE_PREFIX).to_upper()
 			measurement_suite = "spawn"
 			is_spawn_measurement = true
+		elif argument.begins_with(GAME_OVER_SUITE_PREFIX):
+			measurement_suite = "game_over_%s" % argument.trim_prefix(
+				GAME_OVER_SUITE_PREFIX
+			)
 	if is_spawn_measurement:
 		if not spawn_case.is_empty():
 			active_colors = _apply_spawn_case(config_data, spawn_case)
@@ -104,6 +117,8 @@ func _apply_measurement_arguments() -> String:
 				measurement_suite,
 			]
 		)
+	elif measurement_suite.begins_with("game_over_"):
+		print("Game-over suite=%s" % measurement_suite)
 	elif not measurement_suite.is_empty():
 		print(
 			"Growth candidate duration=%.3f ratio=%.3f suite=%s" % [
@@ -155,6 +170,8 @@ func _run_directory(directory: String) -> void:
 	files.sort()
 	for file_name: String in files:
 		if not file_name.begins_with(TEST_FILE_PREFIX) or not file_name.ends_with(TEST_FILE_SUFFIX):
+			continue
+		if file_name == "test_game_over_measurement.gd":
 			continue
 		await _run_test_file(directory.path_join(file_name))
 

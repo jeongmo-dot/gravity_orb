@@ -8,6 +8,8 @@ signal gravity_changed(dir: Vector2i)
 signal turn_started(turn_index: int, dir: Vector2i)
 signal turn_finished(turn_index: int, max_chain: int)
 signal chain_changed(chain: int)
+signal warning_changed(walls: Array[Vector2i])
+signal game_over
 
 @onready var _board: Board = %Board
 @onready var _spawner: Spawner = %Spawner
@@ -18,6 +20,8 @@ var gravity: Vector2i = Vector2i.DOWN
 var turn_index: int = 0
 var turn_max_chain: int = 0
 var capped_turn_count: int = 0
+var blocked_directions: Array[Vector2i] = []
+var game_over_details: Dictionary = {}
 
 var _stable_time: float = 0.0
 var _settle_elapsed: float = 0.0
@@ -32,10 +36,13 @@ func start_game() -> void:
 	turn_index = 0
 	turn_max_chain = 0
 	capped_turn_count = 0
+	blocked_directions.clear()
+	game_over_details.clear()
 	gravity = Vector2i.DOWN
 	_is_initial_settle = true
 	InputRouter.set_locked(true)
 	_board.set_gravity(gravity)
+	_board.set_warning_directions(blocked_directions)
 	gravity_changed.emit(gravity)
 	_begin_settle()
 	_set_state(State.SIMULATING)
@@ -118,14 +125,60 @@ func _begin_settle() -> void:
 func _on_settled() -> void:
 	if _is_initial_settle:
 		_is_initial_settle = false
+		_update_warnings()
 		InputRouter.set_locked(false)
 		_set_state(State.WAITING_INPUT)
 		return
 
 	_set_state(State.CHECK_GAMEOVER)
 	turn_finished.emit(turn_index, turn_max_chain)
+	var blocked_spawns: Array[Orb] = _blocked_turn_spawns()
+	if not blocked_spawns.is_empty():
+		game_over_details = _build_game_over_details(blocked_spawns)
+		_set_state(State.GAME_OVER)
+		game_over.emit()
+		return
+	_update_warnings()
 	InputRouter.set_locked(false)
 	_set_state(State.WAITING_INPUT)
+
+
+func _blocked_turn_spawns() -> Array[Orb]:
+	var blocked: Array[Orb] = []
+	for orb: Orb in _board.get_orbs():
+		if (
+			orb.spawned_turn_index == turn_index
+			and orb.is_ghost
+			and _board.maximum_normal_overlap(orb) > Config.data.ghost_exit_overlap
+		):
+			blocked.append(orb)
+	return blocked
+
+
+func _build_game_over_details(blocked_spawns: Array[Orb]) -> Dictionary:
+	var levels: Array[int] = []
+	var overlap_counts: Array[int] = []
+	for orb: Orb in blocked_spawns:
+		levels.append(orb.level)
+		overlap_counts.append(_board.normal_overlap_count(orb))
+	return {
+		"direction": gravity,
+		"spawned_levels": levels,
+		"overlap_counts": overlap_counts,
+	}
+
+
+func _update_warnings() -> void:
+	var next_blocked: Array[Vector2i] = _board.blocked_spawn_directions(
+		_spawner.peek_next()
+	)
+	_board.set_warning_directions(next_blocked)
+	if next_blocked == blocked_directions:
+		return
+	blocked_directions = next_blocked
+	var published: Array[Vector2i] = []
+	published.append_array(blocked_directions)
+	warning_changed.emit(published)
 
 
 func _set_state(next_state: State) -> void:

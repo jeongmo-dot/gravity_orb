@@ -61,7 +61,14 @@ func try_spawn(board: Board, gravity: Vector2i, turn_index: int = 1) -> Array[Or
 			line["origin"] as Vector2
 			+ (line["axis"] as Vector2) * offset
 		)
-		var orb: Orb = board.spawn_orb(int(candidate["color"]), level, position)
+		var orb: Orb = board.spawn_orb(
+			int(candidate["color"]),
+			level,
+			position,
+			Vector2.ZERO,
+			0,
+			turn_index
+		)
 		spawned.append(orb)
 		orb_spawned.emit(level)
 	_draw_and_publish_next_batch(turn_index + 1)
