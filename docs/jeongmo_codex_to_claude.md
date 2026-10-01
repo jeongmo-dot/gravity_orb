@@ -40,7 +40,7 @@
 
 ### [2026-10-02] 대상 #17 — 고밀도 물리 안정성 + 움직임(잼) 측정
 - 상태: 질문
-- 브랜치 / PR: `m7-high-density-physics` / PR 미생성
+- 브랜치 / PR: `m7-high-density-physics` / [PR #17](https://github.com/jeongmo-dot/gravity_orb/pull/17)
 - 변경 파일: `scripts/core/Board.gd`, `scripts/core/CollisionResolver.gd`, `scripts/core/Orb.gd`, `tests/run_tests.gd`, `tests/run_physics_sweep.ps1`, `tests/scenarios/test_game_over_measurement.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 시드 101~112 × 최대 400턴 × `--fixed-fps 240`, 게임오버까지 0~20 / 20~40 / 40~60 / 60%+ 네 구간의 안전장치·복구·이탈·발산·최대 관통 측정
