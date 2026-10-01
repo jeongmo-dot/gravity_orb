@@ -21,7 +21,9 @@ var generation: int = 0
 var consumed: bool = false
 var is_ghost: bool = false
 var ghost_elapsed: float = 0.0
-var spawned_turn_index: int = -1
+var is_waiting_at_entrance: bool = false
+var entrance_preferred_position: Vector2 = Vector2.ZERO
+var entrance_gravity: Vector2i = Vector2i.DOWN
 var _radius: float = 0.0
 var _current_radius: float = 0.0
 var _growth_start_radius: float = 0.0
@@ -91,14 +93,38 @@ func enter_ghost_state(alpha: float) -> void:
 
 func exit_ghost_state() -> void:
 	is_ghost = false
+	is_waiting_at_entrance = false
 	collision_layer = 2
 	collision_mask = 3
 	_visual.set_alpha(1.0)
+	_visual.set_waiting_at_entrance(false)
 
 
 func advance_ghost(delta: float) -> void:
 	if is_ghost:
 		ghost_elapsed += delta
+
+
+func enter_entrance_wait(preferred_position: Vector2, gravity: Vector2i) -> void:
+	is_waiting_at_entrance = true
+	entrance_preferred_position = preferred_position
+	entrance_gravity = gravity
+	constant_force = Vector2.ZERO
+	linear_velocity = Vector2.ZERO
+	angular_velocity = 0.0
+	_visual.set_waiting_at_entrance(true)
+
+
+func release_entrance_wait(
+	spawn_position: Vector2,
+	gravity: Vector2i,
+	gravity_strength: float
+) -> void:
+	is_waiting_at_entrance = false
+	_visual.set_waiting_at_entrance(false)
+	queue_timeout_correction(spawn_position, Vector2.ZERO)
+	angular_velocity = 0.0
+	set_gravity(gravity, gravity_strength)
 
 
 func queue_timeout_correction(
@@ -118,10 +144,26 @@ func note_board_spawn(physics_frame: int) -> void:
 
 func set_gravity(direction: Vector2i, strength: float) -> void:
 	_gravity_direction = Vector2(direction)
-	constant_force = _gravity_direction * strength * mass
+	constant_force = (
+		Vector2.ZERO
+		if is_waiting_at_entrance
+		else _gravity_direction * strength * mass
+	)
 
 
 func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
+	if is_waiting_at_entrance:
+		var waiting_transform: Transform2D = state.transform
+		var waiting_parent: Node2D = get_parent() as Node2D
+		waiting_transform.origin = (
+			entrance_preferred_position
+			if waiting_parent == null
+			else waiting_parent.to_global(entrance_preferred_position)
+		)
+		state.transform = waiting_transform
+		state.linear_velocity = Vector2.ZERO
+		state.angular_velocity = 0.0
+		return
 	if _timeout_correction_pending:
 		_timeout_correction_pending = false
 		var timeout_transform: Transform2D = state.transform

@@ -46,6 +46,7 @@ func try_spawn(board: Board, gravity: Vector2i, turn_index: int = 1) -> Array[Or
 		_draw_and_publish_next_batch(turn_index)
 
 	var spawned: Array[Orb] = []
+	var placed: Array[Dictionary] = []
 	for candidate: Dictionary in _next_batch:
 		var level: int = int(candidate["level"])
 		var radius: float = Config.data.radius_for_level(level)
@@ -57,18 +58,33 @@ func try_spawn(board: Board, gravity: Vector2i, turn_index: int = 1) -> Array[Or
 				float(line["extent"]),
 				float(candidate["t"])
 			)
-		var position: Vector2 = (
+		var preferred_position: Vector2 = (
 			line["origin"] as Vector2
 			+ (line["axis"] as Vector2) * offset
+		)
+		var slot: Dictionary = board.find_free_spawn_slot(
+			gravity,
+			radius,
+			placed,
+			preferred_position
+		)
+		var has_free_slot: bool = bool(slot["found"])
+		var position: Vector2 = (
+			slot["position"] as Vector2
+			if has_free_slot
+			else preferred_position
 		)
 		var orb: Orb = board.spawn_orb(
 			int(candidate["color"]),
 			level,
 			position,
 			Vector2.ZERO,
-			0,
-			turn_index
+			0
 		)
+		if has_free_slot:
+			placed.append({"position": position, "radius": radius})
+		else:
+			orb.enter_entrance_wait(preferred_position, gravity)
 		spawned.append(orb)
 		orb_spawned.emit(level)
 	_draw_and_publish_next_batch(turn_index + 1)

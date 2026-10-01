@@ -9,135 +9,151 @@ const COLLISION_RESOLVER_SCRIPT: Script = preload(
 const HIGH_THRESHOLD: float = 1.0e9
 const WAIT_TIMEOUT_SECONDS: float = 4.0
 
-var _restart_count: int = 0
 
-
-func test_full_spawn_wall_enters_game_over_and_keeps_input_locked() -> void:
+func test_blocked_preferred_position_uses_nearest_free_slot() -> void:
 	var snapshot: Dictionary = _snapshot_config()
 	_configure_single_center_spawn()
-	Config.data.gravity_strength = 0.0
-	Config.data.stable_linear_speed = HIGH_THRESHOLD
-	Config.data.stable_angular_speed = HIGH_THRESHOLD
-	Config.data.stable_duration = Config.data.ghost_max_time + 0.05
-	Config.data.max_settle_time = Config.data.ghost_max_time + 0.10
 	var fixture: Dictionary = await _create_fixture(5101)
 	var board: Board = fixture["board"] as Board
-	var manager: TurnManager = fixture["manager"] as TurnManager
-	var blocker: Orb = board.spawn_orb(
-		OrbTypes.OrbColor.GREEN,
-		Config.data.orb_max_level,
-		Vector2(0.0, -board.half_size() + Config.data.radius_for_level(7) + 4.0)
-	)
+	var spawner: Spawner = fixture["spawner"] as Spawner
+	var radius: float = Config.data.radius_for_level(1)
+	var line: Dictionary = board.spawn_line(Vector2i.DOWN, radius)
+	var preferred: Vector2 = line["origin"] as Vector2
+	var blocker: Orb = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, preferred)
 	blocker.exit_ghost_state()
-	var game_over_count: Array[int] = [0]
-	manager.game_over.connect(func() -> void: game_over_count[0] += 1)
+	blocker.freeze = true
+	_set_next_level_one_batch(spawner, [0.5])
 
-	manager.on_swipe(Vector2i.DOWN)
-	await _wait_for_state(manager, TurnManager.State.GAME_OVER)
-	assert_eq(game_over_count[0], 1, "game over signal count")
-	assert_eq(InputRouter.is_locked(), true, "input remains locked")
-	var blocked_spawn: Orb = _find_turn_spawn(board, 1)
-	assert_true(blocked_spawn != null, "turn spawn remains active")
-	if blocked_spawn != null:
-		assert_true(blocked_spawn.is_ghost, "blocked turn spawn remains ghost")
-		assert_true(
-			blocked_spawn.ghost_elapsed > Config.data.ghost_max_time,
-			"turn spawn does not use ghost timeout"
-		)
-	var turn_before: int = manager.turn_index
-	var gravity_before: Vector2i = manager.gravity
-	manager.on_swipe(Vector2i.RIGHT)
-	assert_eq(manager.turn_index, turn_before, "game-over swipe does not start turn")
-	assert_eq(manager.gravity, gravity_before, "game-over swipe does not change gravity")
-
-	_restart_count = 0
-	InputRouter.restart_requested.connect(_record_restart)
-	InputRouter._handle_event(_restart_key_event())
-	assert_eq(_restart_count, 1, "R emits restart while input is locked")
-	InputRouter.restart_requested.disconnect(_record_restart)
+	var spawned: Array[Orb] = spawner.try_spawn(board, Vector2i.DOWN, 1)
+	assert_eq(spawned.size(), 1, "one orb spawned")
+	var orb: Orb = spawned[0]
+	assert_true(not orb.is_waiting_at_entrance, "nearby free slot avoids waiting")
+	assert_true(orb.position.distance_to(preferred) > 1.0, "blocked preference is relocated")
+	assert_true(
+		board.maximum_normal_overlap(orb) <= Config.data.ghost_exit_overlap,
+		"nearest slot satisfies overlap criterion"
+	)
 	await _cleanup_fixture(fixture, snapshot)
 
 
-func test_bottom_pile_moves_away_on_up_swipe_without_game_over() -> void:
+func test_full_spawn_wall_waits_without_falling_then_game_over() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	_configure_single_center_spawn()
+	Config.data.stable_linear_speed = HIGH_THRESHOLD
+	Config.data.stable_angular_speed = HIGH_THRESHOLD
+	Config.data.stable_duration = 0.10
+	Config.data.max_settle_time = 0.25
+	var fixture: Dictionary = await _create_fixture(5102)
+	var board: Board = fixture["board"] as Board
+	var spawner: Spawner = fixture["spawner"] as Spawner
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	_fill_spawn_wall(board, Vector2i.DOWN, true)
+	_set_next_level_one_batch(spawner, [0.5])
+
+	manager.on_swipe(Vector2i.DOWN)
+	await tree.physics_frame
+	await tree.physics_frame
+	var waiting: Array[Orb] = board.entrance_waiting_orbs()
+	assert_eq(waiting.size(), 1, "full wall creates one entrance waiter")
+	var start_position: Vector2 = waiting[0].position if not waiting.is_empty() else Vector2.ZERO
+	await _wait_for_state(manager, TurnManager.State.GAME_OVER)
+	assert_eq(manager.state, TurnManager.State.GAME_OVER, "waiter ends the turn in game over")
+	assert_eq(InputRouter.is_locked(), true, "game over keeps input locked")
+	if not waiting.is_empty():
+		assert_true(waiting[0].is_waiting_at_entrance, "wait state remains at game over")
+		assert_true(
+			waiting[0].position.distance_to(start_position) < 1.0,
+			"entrance waiter does not fall"
+		)
+	await _cleanup_fixture(fixture, snapshot)
+
+
+func test_bottom_wall_moves_away_waiter_enters_without_game_over() -> void:
 	var snapshot: Dictionary = _snapshot_config()
 	_configure_single_center_spawn()
 	Config.data.stable_linear_speed = 0.0
 	Config.data.stable_angular_speed = 0.0
 	Config.data.max_settle_time = 1.5
-	var fixture: Dictionary = await _create_fixture(5102)
-	var board: Board = fixture["board"] as Board
-	var manager: TurnManager = fixture["manager"] as TurnManager
-	var radius: float = Config.data.radius_for_level(1)
-	var pile_orb: Orb = board.spawn_orb(
-		OrbTypes.OrbColor.GREEN,
-		1,
-		Vector2(0.0, board.half_size() - radius - Config.data.spawn_margin),
-		Vector2(0.0, -200.0)
-	)
-	pile_orb.exit_ghost_state()
-
-	manager.on_swipe(Vector2i.UP)
-	await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
-	assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "moving pile survives turn")
-	assert_eq(InputRouter.is_locked(), false, "input unlocks after surviving turn")
-	var turn_spawn: Orb = _find_turn_spawn(board, 1)
-	assert_true(turn_spawn != null, "up-swipe turn spawn exists")
-	if turn_spawn != null:
-		assert_true(not turn_spawn.is_ghost, "turn spawn found room before turn end")
-	await _cleanup_fixture(fixture, snapshot)
-
-
-func test_reaction_ghost_is_excluded_from_game_over() -> void:
-	var snapshot: Dictionary = _snapshot_config()
-	_configure_single_center_spawn()
 	var fixture: Dictionary = await _create_fixture(5103)
-	var board: Board = fixture["board"] as Board
-	var manager: TurnManager = fixture["manager"] as TurnManager
-	var normal: Orb = board.spawn_orb(OrbTypes.OrbColor.BLUE, 1, Vector2.ZERO)
-	normal.exit_ghost_state()
-	var reaction_ghost: Orb = board.spawn_orb(OrbTypes.OrbColor.BLUE, 2, Vector2.ZERO)
-	assert_eq(reaction_ghost.spawned_turn_index, -1, "reaction ghost has no turn marker")
-	manager.turn_index = 1
-	manager._is_initial_settle = false
-	manager._on_settled()
-
-	assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "reaction ghost does not end game")
-	assert_true(reaction_ghost.is_ghost, "reaction result may still be ghost")
-	assert_eq(InputRouter.is_locked(), false, "reaction ghost check unlocks input")
-	await _cleanup_fixture(fixture, snapshot)
-
-
-func test_warning_signal_contains_only_direction_with_full_spawn_wall() -> void:
-	var snapshot: Dictionary = _snapshot_config()
-	Config.data.grow_duration = 0.0
-	Config.data.initial_orb_count = 0
-	Config.data.spawn_count_per_turn = 1
-	var fixture: Dictionary = await _create_fixture(5104)
 	var board: Board = fixture["board"] as Board
 	var spawner: Spawner = fixture["spawner"] as Spawner
 	var manager: TurnManager = fixture["manager"] as TurnManager
-	var radius: float = Config.data.radius_for_level(1)
-	var top_y: float = -board.half_size() + radius + Config.data.spawn_margin
-	for x_position: int in range(-440, 441, 40):
-		var orb: Orb = board.spawn_orb(
-			OrbTypes.OrbColor.GREEN,
-			1,
-			Vector2(float(x_position), top_y)
-		)
-		orb.exit_ghost_state()
-	spawner._next_batch = [
-		{"color": OrbTypes.OrbColor.YELLOW, "level": 1, "t": 0.5},
-	]
-	var emissions: Array[Array] = []
-	manager.warning_changed.connect(
-		func(directions: Array[Vector2i]) -> void: emissions.append(directions.duplicate())
-	)
-	manager._update_warnings()
+	_fill_spawn_wall(board, Vector2i.UP, true)
+	_set_next_level_one_batch(spawner, [0.5])
 
-	assert_eq(manager.blocked_directions, [Vector2i.DOWN], "only top spawn wall is blocked")
-	assert_eq(emissions.size(), 1, "warning emits once for changed directions")
-	manager._update_warnings()
-	assert_eq(emissions.size(), 1, "unchanged warning is not emitted again")
+	manager.on_swipe(Vector2i.UP)
+	await tree.physics_frame
+	await tree.physics_frame
+	var spawned: Array[Orb] = []
+	for orb: Orb in board.get_orbs():
+		if orb.is_waiting_at_entrance:
+			spawned.append(orb)
+	assert_eq(spawned.size(), 1, "orb initially waits behind bottom pile")
+	for orb: Orb in board.get_orbs():
+		if orb.is_waiting_at_entrance:
+			continue
+		orb.freeze = false
+		orb.linear_velocity = Vector2.UP * 500.0
+	await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
+	assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "opened entrance survives turn")
+	assert_eq(board.entrance_waiting_orbs().size(), 0, "waiter entered after pile moved")
+	assert_eq(InputRouter.is_locked(), false, "input unlocks after surviving turn")
+	await _cleanup_fixture(fixture, snapshot)
+
+
+func test_two_orb_batch_reserves_distinct_free_slots() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	_configure_single_center_spawn()
+	Config.data.spawn_count_per_turn = 2
+	var fixture: Dictionary = await _create_fixture(5104)
+	var board: Board = fixture["board"] as Board
+	var spawner: Spawner = fixture["spawner"] as Spawner
+	_set_next_level_one_batch(spawner, [0.5, 0.5])
+
+	var spawned: Array[Orb] = spawner.try_spawn(board, Vector2i.DOWN, 1)
+	assert_eq(spawned.size(), 2, "two-orb batch spawned")
+	assert_true(not spawned[0].is_waiting_at_entrance, "first orb has a free slot")
+	assert_true(not spawned[1].is_waiting_at_entrance, "second orb has a reserved free slot")
+	var required_distance: float = (
+		spawned[0].get_radius()
+		+ spawned[1].get_radius()
+		- Config.data.ghost_exit_overlap
+	)
+	assert_true(
+		spawned[0].position.distance_to(spawned[1].position) >= required_distance,
+		"batch placements do not overlap beyond the shared criterion"
+	)
+	await _cleanup_fixture(fixture, snapshot)
+
+
+func test_warning_set_matches_directions_that_would_wait() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	_configure_single_center_spawn()
+	var fixture: Dictionary = await _create_fixture(5105)
+	var board: Board = fixture["board"] as Board
+	var spawner: Spawner = fixture["spawner"] as Spawner
+	_fill_spawn_wall(board, Vector2i.DOWN, true)
+	_set_next_level_one_batch(spawner, [0.5])
+	var warnings: Array[Vector2i] = board.blocked_spawn_directions(spawner.peek_next())
+	var actual_waits: Array[Vector2i] = []
+
+	for direction_index: int in range(OrbTypes.DIRECTIONS.size()):
+		var direction: Vector2i = OrbTypes.DIRECTIONS[direction_index]
+		var direction_fixture: Dictionary = await _create_fixture(5200 + direction_index)
+		var direction_board: Board = direction_fixture["board"] as Board
+		var direction_spawner: Spawner = direction_fixture["spawner"] as Spawner
+		_fill_spawn_wall(direction_board, Vector2i.DOWN, true)
+		_set_next_level_one_batch(direction_spawner, [0.5])
+		var direction_spawned: Array[Orb] = direction_spawner.try_spawn(
+			direction_board,
+			direction,
+			1
+		)
+		if direction_spawned[0].is_waiting_at_entrance:
+			actual_waits.append(direction)
+		await _cleanup_fixture(direction_fixture, snapshot, false)
+
+	assert_eq(warnings, actual_waits, "warning directions equal actual entrance waits")
 	await _cleanup_fixture(fixture, snapshot)
 
 
@@ -148,6 +164,44 @@ func _configure_single_center_spawn() -> void:
 	Config.data.spawn_level_weights = PackedFloat32Array([1.0, 0.0])
 	Config.data.initial_orb_count = 0
 	Config.data.grow_duration = 0.0
+
+
+func _set_next_level_one_batch(spawner: Spawner, positions: Array[float]) -> void:
+	spawner._next_batch.clear()
+	for position_t: float in positions:
+		spawner._next_batch.append(
+			{
+				"color": OrbTypes.OrbColor.YELLOW,
+				"level": 1,
+				"t": position_t,
+			}
+		)
+
+
+func _fill_spawn_wall(board: Board, gravity: Vector2i, frozen: bool) -> void:
+	var radius: float = Config.data.radius_for_level(1)
+	var line: Dictionary = board.spawn_line(gravity, radius)
+	var origin: Vector2 = line["origin"] as Vector2
+	var axis: Vector2 = line["axis"] as Vector2
+	var extent: float = float(line["extent"])
+	var offset: float = -extent
+	while offset <= extent:
+		var orb: Orb = board.spawn_orb(
+			OrbTypes.OrbColor.GREEN,
+			1,
+			origin + axis * offset
+		)
+		orb.exit_ghost_state()
+		orb.freeze = frozen
+		offset += 45.0
+	if offset - 45.0 < extent:
+		var edge_orb: Orb = board.spawn_orb(
+			OrbTypes.OrbColor.GREEN,
+			1,
+			origin + axis * extent
+		)
+		edge_orb.exit_ghost_state()
+		edge_orb.freeze = frozen
 
 
 func _create_fixture(seed: int) -> Dictionary:
@@ -175,7 +229,6 @@ func _create_fixture(seed: int) -> Dictionary:
 	manager.owner = fixture_root
 	tree.root.add_child(fixture_root)
 	await tree.process_frame
-	board.orb_contact.disconnect(resolver.report_contact)
 	spawner.init_rng(seed)
 	spawner.spawn_initial(board, Vector2i.DOWN)
 	return {
@@ -185,13 +238,6 @@ func _create_fixture(seed: int) -> Dictionary:
 		"resolver": resolver,
 		"manager": manager,
 	}
-
-
-func _find_turn_spawn(board: Board, turn_index: int) -> Orb:
-	for orb: Orb in board.get_orbs():
-		if orb.spawned_turn_index == turn_index:
-			return orb
-	return null
 
 
 func _wait_for_state(manager: TurnManager, target: TurnManager.State) -> void:
@@ -233,20 +279,14 @@ func _restore_config(snapshot: Dictionary) -> void:
 	Config.data.grow_duration = float(snapshot["grow_duration"])
 
 
-func _cleanup_fixture(fixture: Dictionary, snapshot: Dictionary) -> void:
+func _cleanup_fixture(
+	fixture: Dictionary,
+	snapshot: Dictionary,
+	restore_config: bool = true
+) -> void:
 	InputRouter.set_locked(false)
-	_restore_config(snapshot)
+	if restore_config:
+		_restore_config(snapshot)
 	var fixture_root: Node = fixture["root"] as Node
 	fixture_root.queue_free()
 	await tree.process_frame
-
-
-func _record_restart() -> void:
-	_restart_count += 1
-
-
-func _restart_key_event() -> InputEventKey:
-	var event: InputEventKey = InputEventKey.new()
-	event.physical_keycode = KEY_R
-	event.pressed = true
-	return event

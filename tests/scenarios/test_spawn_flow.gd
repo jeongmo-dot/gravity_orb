@@ -239,7 +239,7 @@ func test_three_turns_spawn_before_one_settle_each() -> void:
 	_restore_config(snapshot)
 
 
-func test_center_spawn_overlap_remains_inside_board_for_half_second() -> void:
+func test_center_spawn_relocates_from_overlap_and_remains_inside_board() -> void:
 	var snapshot: Dictionary = _snapshot_config()
 	Config.data.spawn_count_per_turn = 1
 	Config.data.spawn_position_mode = GameConfig.SpawnPositionMode.CENTER
@@ -288,8 +288,13 @@ func test_center_spawn_overlap_remains_inside_board_for_half_second() -> void:
 		_captured_spawn["position"] as Vector2
 	)
 	assert_true(
-		spawn_distance < overlap_dummy.get_current_radius() + float(_captured_spawn["current_radius"]),
-		"CENTER spawn overlaps the prepared dummy at creation"
+		spawn_distance
+		>= (
+			overlap_dummy.get_current_radius()
+			+ spawned_final_radius
+			- Config.data.ghost_exit_overlap
+		),
+		"CENTER spawn relocates to a free entrance slot"
 	)
 
 	var metrics: Dictionary = await _observe_board(board, OVERLAP_OBSERVE_SECONDS)

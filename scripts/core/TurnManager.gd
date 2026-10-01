@@ -132,7 +132,7 @@ func _on_settled() -> void:
 
 	_set_state(State.CHECK_GAMEOVER)
 	turn_finished.emit(turn_index, turn_max_chain)
-	var blocked_spawns: Array[Orb] = _blocked_turn_spawns()
+	var blocked_spawns: Array[Orb] = _board.entrance_waiting_orbs()
 	if not blocked_spawns.is_empty():
 		game_over_details = _build_game_over_details(blocked_spawns)
 		_set_state(State.GAME_OVER)
@@ -141,18 +141,6 @@ func _on_settled() -> void:
 	_update_warnings()
 	InputRouter.set_locked(false)
 	_set_state(State.WAITING_INPUT)
-
-
-func _blocked_turn_spawns() -> Array[Orb]:
-	var blocked: Array[Orb] = []
-	for orb: Orb in _board.get_orbs():
-		if (
-			orb.spawned_turn_index == turn_index
-			and orb.is_ghost
-			and _board.maximum_normal_overlap(orb) > Config.data.ghost_exit_overlap
-		):
-			blocked.append(orb)
-	return blocked
 
 
 func _build_game_over_details(blocked_spawns: Array[Orb]) -> Dictionary:

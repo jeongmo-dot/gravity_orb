@@ -36,6 +36,7 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_update_entrance_waiters()
 	_update_ghost_orbs(delta)
 
 
@@ -54,8 +55,7 @@ func spawn_orb(
 	p_level: int,
 	p_position: Vector2,
 	p_velocity: Vector2 = Vector2.ZERO,
-	p_generation: int = 0,
-	p_spawned_turn_index: int = -1
+	p_generation: int = 0
 ) -> Orb:
 	var spawn_physics_frame: int = Engine.get_physics_frames()
 	for existing_orb: Orb in _orbs:
@@ -68,7 +68,6 @@ func spawn_orb(
 	orb.position = p_position
 	orb.linear_velocity = p_velocity
 	orb.generation = p_generation
-	orb.spawned_turn_index = p_spawned_turn_index
 	orb.set_gravity(_gravity_direction, Config.data.gravity_strength)
 	orb.enter_ghost_state(Config.data.ghost_alpha)
 	orb.body_entered.connect(_on_orb_body_entered.bind(orb))
@@ -111,6 +110,58 @@ func spawn_line(gravity: Vector2i, radius: float) -> Dictionary:
 		"axis": Vector2(OrbTypes.perpendicular(gravity)),
 		"extent": half - radius,
 	}
+
+
+func find_free_spawn_slot(
+	gravity: Vector2i,
+	radius: float,
+	placed: Array[Dictionary],
+	preferred_position: Vector2 = Vector2.ZERO
+) -> Dictionary:
+	var line: Dictionary = spawn_line(gravity, radius)
+	var origin: Vector2 = line["origin"] as Vector2
+	var axis: Vector2 = line["axis"] as Vector2
+	var extent: float = float(line["extent"])
+	var preferred_offset: float = clampf(
+		(preferred_position - origin).dot(axis),
+		-extent,
+		extent
+	)
+	var offsets: Array[float] = [preferred_offset]
+	var step: float = maxf(Config.data.spawn_probe_step, 0.001)
+	var sample_count: int = ceili(extent * 2.0 / step)
+	for sample_index: int in range(sample_count + 1):
+		var offset: float = minf(-extent + float(sample_index) * step, extent)
+		if not _contains_approx(offsets, offset):
+			offsets.append(offset)
+
+	var found: bool = false
+	var best_position: Vector2 = preferred_position
+	var best_distance: float = INF
+	var best_offset: float = INF
+	for offset: float in offsets:
+		var position: Vector2 = origin + axis * offset
+		if not _spawn_probe_is_clear(position, radius, placed):
+			continue
+		var distance: float = absf(offset - preferred_offset)
+		if (
+			not found
+			or distance < best_distance
+			or (is_equal_approx(distance, best_distance) and offset < best_offset)
+		):
+			found = true
+			best_position = position
+			best_distance = distance
+			best_offset = offset
+	return {"found": found, "position": best_position}
+
+
+func entrance_waiting_orbs() -> Array[Orb]:
+	var waiting: Array[Orb] = []
+	for orb: Orb in get_orbs():
+		if orb.is_waiting_at_entrance:
+			waiting.append(orb)
+	return waiting
 
 
 func maximum_normal_overlap(ghost: Orb) -> float:
@@ -176,39 +227,19 @@ func _batch_fits_spawn_line(
 	radii.sort()
 	radii.reverse()
 
-	var reserved_positions: Array[Vector2] = []
-	var reserved_radii: Array[float] = []
+	var placed: Array[Dictionary] = []
 	for radius: float in radii:
-		var line: Dictionary = spawn_line(gravity, radius)
-		var origin: Vector2 = line["origin"] as Vector2
-		var axis: Vector2 = line["axis"] as Vector2
-		var extent: float = float(line["extent"])
-		var step: float = maxf(Config.data.spawn_probe_step, 0.001)
-		var sample_count: int = ceili(extent * 2.0 / step)
-		var found_position: bool = false
-		for sample_index: int in range(sample_count + 1):
-			var offset: float = minf(-extent + float(sample_index) * step, extent)
-			var position: Vector2 = origin + axis * offset
-			if _spawn_probe_is_clear(
-				position,
-				radius,
-				reserved_positions,
-				reserved_radii
-			):
-				reserved_positions.append(position)
-				reserved_radii.append(radius)
-				found_position = true
-				break
-		if not found_position:
+		var slot: Dictionary = find_free_spawn_slot(gravity, radius, placed)
+		if not bool(slot["found"]):
 			return false
+		placed.append({"position": slot["position"], "radius": radius})
 	return true
 
 
 func _spawn_probe_is_clear(
 	position: Vector2,
 	radius: float,
-	reserved_positions: Array[Vector2],
-	reserved_radii: Array[float]
+	placed: Array[Dictionary]
 ) -> bool:
 	for orb: Orb in _orbs:
 		if not is_instance_valid(orb) or orb.consumed or orb.is_ghost:
@@ -220,15 +251,47 @@ func _spawn_probe_is_clear(
 		)
 		if overlap > Config.data.ghost_exit_overlap:
 			return false
-	for index: int in range(reserved_positions.size()):
+	for item: Dictionary in placed:
 		var overlap: float = (
 			radius
-			+ reserved_radii[index]
-			- position.distance_to(reserved_positions[index])
+			+ float(item["radius"])
+			- position.distance_to(item["position"] as Vector2)
 		)
 		if overlap > Config.data.ghost_exit_overlap:
 			return false
 	return true
+
+
+func _contains_approx(values: Array[float], target: float) -> bool:
+	for value: float in values:
+		if is_equal_approx(value, target):
+			return true
+	return false
+
+
+func _update_entrance_waiters() -> void:
+	var placed: Array[Dictionary] = []
+	for orb: Orb in get_orbs():
+		if orb.is_ghost and not orb.is_waiting_at_entrance:
+			placed.append(
+				{"position": orb.position, "radius": orb.get_radius()}
+			)
+	for orb: Orb in entrance_waiting_orbs():
+		var slot: Dictionary = find_free_spawn_slot(
+			orb.entrance_gravity,
+			orb.get_radius(),
+			placed,
+			orb.entrance_preferred_position
+		)
+		if not bool(slot["found"]):
+			continue
+		var position: Vector2 = slot["position"] as Vector2
+		orb.release_entrance_wait(
+			position,
+			orb.entrance_gravity,
+			Config.data.gravity_strength
+		)
+		placed.append({"position": position, "radius": orb.get_radius()})
 
 
 func average_ghost_duration() -> float:
@@ -239,13 +302,13 @@ func average_ghost_duration() -> float:
 
 func _update_ghost_orbs(delta: float) -> void:
 	for orb: Orb in get_orbs():
-		if not orb.is_ghost:
+		if not orb.is_ghost or orb.is_waiting_at_entrance:
 			continue
 		orb.advance_ghost(delta)
 		var maximum_overlap: float = maximum_normal_overlap(orb)
 		if maximum_overlap <= Config.data.ghost_exit_overlap:
 			_complete_ghost(orb, false, maximum_overlap)
-		elif orb.spawned_turn_index < 0 and (
+		elif (
 			orb.ghost_elapsed >= Config.data.ghost_max_time
 			or is_equal_approx(orb.ghost_elapsed, Config.data.ghost_max_time)
 		):
