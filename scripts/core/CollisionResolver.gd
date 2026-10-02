@@ -75,6 +75,7 @@ func flush() -> int:
 				(velocity_a + velocity_b) * 0.5,
 				chain
 			)
+			result_orb.note_diagnostic_event("merge")
 		elif reaction_type == ReactionRules.Type.ANNIHILATE and survivor != 0:
 			reaction_position = position_a if survivor == 1 else position_b
 			var survivor_velocity: Vector2 = velocity_a if survivor == 1 else velocity_b
@@ -85,6 +86,7 @@ func flush() -> int:
 				survivor_velocity,
 				chain
 			)
+			result_orb.note_diagnostic_event("annihilation_remainder")
 
 		var reaction: Dictionary = {
 			"type": reaction_type,

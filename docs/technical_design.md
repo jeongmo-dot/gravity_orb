@@ -223,11 +223,11 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M1 | `board_size` | float | 960.0 | 보드 한 변 (px) |
 | M1 | `wall_thickness` | float | 256.0 | 터널링 방지용으로 두껍게 |
 | ~~M1~~ | ~~`orb_base_radius`, `orb_radius_growth`~~ | | | **#14에서 제거** → `level_radii` |
-| #14 | `level_radii` | PackedFloat32Array | [25, 40, 60, 85, 115, 150, 190] | 레벨별 반지름 (기획서 0.4.2) |
+| #14 | `level_radii` | PackedFloat32Array | [25, 40, 60, 85, 115, 150, 190] → **[25, 40, 60, 85, 100, 120, 140]** (#18, 기획서 0.6.2) | 레벨별 반지름 |
 | #14 | `mass_exponent` | float | **1.0** (#14 측정: 지수 2는 L1 관통 14.8px, 1은 8.2px) | 질량 = base × (r / r_L1)^지수 — 크기 비례 |
 | M1 | `orb_max_level` | int | 7 | |
 | M1 | `orb_base_mass` | float | 1.0 | L1 질량 |
-| M1 | `gravity_strength` | float | 2400.0 | 중력 가속도 (px/s²) |
+| M1 | `gravity_strength` | float | 2400.0 → **1800.0** (#17: 고밀도 40%+ 사전 복구 910 → 13, 발산 0) | 중력 가속도 (px/s²) |
 | M1 | `orb_friction` | float | 0.3 | |
 | M1 | `orb_bounce` | float | 0.15 | |
 | M1 | `wall_friction` | float | 0.3 | |

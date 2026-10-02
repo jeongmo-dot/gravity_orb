@@ -23,10 +23,12 @@ var _wall_recovery_warning_flush_scheduled: bool = false
 var escape_guard_count: int = 0
 var wall_recovery_count: int = 0
 var wall_recovery_since_last_ghost_timeout_frames: Array[int] = []
+var wall_recovery_events: Array[Dictionary] = []
 var timeout_correction_count: int = 0
 var ghost_timeout_count: int = 0
 var ghost_completed_count: int = 0
 var ghost_total_duration: float = 0.0
+var diagnostic_warnings_enabled: bool = true
 var _warning_directions: Array[Vector2i] = []
 
 
@@ -64,6 +66,7 @@ func spawn_orb(
 	var orb: Orb = ORB_SCENE.instantiate() as Orb
 	_orbs_node.add_child(orb)
 	orb.setup(p_color, p_level, Config.data)
+	orb.diagnostic_warnings_enabled = diagnostic_warnings_enabled
 	orb.note_board_spawn(spawn_physics_frame)
 	orb.position = p_position
 	orb.linear_velocity = p_velocity
@@ -72,7 +75,7 @@ func spawn_orb(
 	orb.enter_ghost_state(Config.data.ghost_alpha)
 	orb.body_entered.connect(_on_orb_body_entered.bind(orb))
 	orb.escape_guard_triggered.connect(_on_orb_escape_guard_triggered)
-	orb.wall_recovery_triggered.connect(_on_orb_wall_recovery_triggered)
+	orb.wall_recovery_triggered.connect(_on_orb_wall_recovery_triggered.bind(orb))
 	_orbs.append(orb)
 	_print_growth_spawn_diagnostic(orb, spawn_physics_frame)
 	return orb
@@ -322,19 +325,21 @@ func _complete_ghost(orb: Orb, timed_out: bool, maximum_overlap: float) -> void:
 		_restore_existing_orbs_inside_board(orb)
 		_relieve_timeout_overlap(orb)
 	orb.exit_ghost_state()
+	orb.note_diagnostic_event("timeout_correction" if timed_out else "ghost_release")
 	ghost_completed_count += 1
 	ghost_total_duration += duration
 	if not timed_out:
 		return
 	ghost_timeout_count += 1
-	push_warning(
-		"[GHOST_TIMEOUT] id=%d level=%d elapsed=%.3f max_overlap=%.3f" % [
-			orb.get_instance_id(),
-			orb.level,
-			duration,
-			maximum_overlap,
-		]
-	)
+	if diagnostic_warnings_enabled:
+		push_warning(
+			"[GHOST_TIMEOUT] id=%d level=%d elapsed=%.3f max_overlap=%.3f" % [
+				orb.get_instance_id(),
+				orb.level,
+				duration,
+				maximum_overlap,
+			]
+		)
 
 
 func _restore_existing_orbs_inside_board(excluded_orb: Orb) -> void:
@@ -370,6 +375,7 @@ func _restore_existing_orbs_inside_board(excluded_orb: Orb) -> void:
 			):
 				corrected_velocity[axis_index] = 0.0
 		orb.queue_timeout_correction(corrected_position, corrected_velocity)
+		orb.note_diagnostic_event("timeout_correction")
 		timeout_correction_count += 1
 
 
@@ -516,13 +522,39 @@ func _on_orb_wall_recovery_triggered(
 	ghost: bool,
 	age_frames: int,
 	since_last_spawn_frames: int,
-	physics_frame: int
+	physics_frame: int,
+	orb: Orb
 ) -> void:
 	wall_recovery_count += 1
 	var since_last_ghost_timeout_frames: int = -1
 	if _last_ghost_timeout_physics_frame >= 0:
 		since_last_ghost_timeout_frames = physics_frame - _last_ghost_timeout_physics_frame
 	wall_recovery_since_last_ghost_timeout_frames.append(since_last_ghost_timeout_frames)
+	wall_recovery_events.append(
+		{
+			"orb_id": orb.get_instance_id(),
+			"level": level,
+			"axis": axis,
+			"depth": depth,
+			"ghost": ghost,
+			"age_frames": age_frames,
+			"since_last_spawn_frames": since_last_spawn_frames,
+			"since_last_ghost_timeout_frames": since_last_ghost_timeout_frames,
+			"physics_frame": physics_frame,
+			"position": orb.position,
+			"radius": orb.get_current_radius(),
+			"pile_depth": _diagnostic_pile_depth(orb),
+			"neighbor_levels": _diagnostic_neighbor_levels(orb),
+			"wall_contact": _diagnostic_wall_contact(orb),
+			"last_event": orb.diagnostic_last_event,
+			"frames_since_last_event": maxi(
+				physics_frame - orb.diagnostic_last_event_physics_frame,
+				0
+			),
+		}
+	)
+	if not diagnostic_warnings_enabled:
+		return
 	_pending_wall_recovery_warnings.append(
 		{
 			"level": level,
@@ -538,6 +570,49 @@ func _on_orb_wall_recovery_triggered(
 	if not _wall_recovery_warning_flush_scheduled:
 		_wall_recovery_warning_flush_scheduled = true
 		call_deferred("_flush_wall_recovery_warnings")
+
+
+func _diagnostic_pile_depth(target: Orb) -> int:
+	if not target.position.is_finite():
+		return 0
+	var perpendicular: Vector2 = Vector2(OrbTypes.perpendicular(_gravity_direction))
+	var count: int = 0
+	for other: Orb in get_orbs():
+		if not other.position.is_finite():
+			continue
+		var cross_distance: float = absf((other.position - target.position).dot(perpendicular))
+		if cross_distance <= target.get_current_radius() + other.get_current_radius():
+			count += 1
+	return count
+
+
+func _diagnostic_neighbor_levels(target: Orb) -> Array[int]:
+	var levels: Array[int] = []
+	if not target.position.is_finite():
+		return levels
+	for other: Orb in get_orbs():
+		if other == target:
+			continue
+		if not other.position.is_finite():
+			continue
+		var contact_distance: float = (
+			target.get_current_radius()
+			+ other.get_current_radius()
+			+ Config.data.ghost_exit_overlap
+		)
+		if target.position.distance_squared_to(other.position) <= contact_distance * contact_distance:
+			levels.append(other.level)
+	return levels
+
+
+func _diagnostic_wall_contact(target: Orb) -> bool:
+	if not target.position.is_finite():
+		return false
+	var wall_gap: float = minf(
+		half_size() - absf(target.position.x) - target.get_current_radius(),
+		half_size() - absf(target.position.y) - target.get_current_radius()
+	)
+	return wall_gap <= Config.data.floor_contact_tolerance
 
 
 func _flush_wall_recovery_warnings() -> void:

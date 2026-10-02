@@ -14,6 +14,10 @@ const ACTIVE_COLORS_PREFIX: String = "--active-colors="
 const SPAWN_SUITE_PREFIX: String = "--spawn-suite="
 const SPAWN_CASE_PREFIX: String = "--spawn-case="
 const GAME_OVER_SUITE_PREFIX: String = "--game-over-suite="
+const PHYSICS_GRAVITY_PREFIX: String = "--physics-gravity="
+const PHYSICS_FRICTION_PREFIX: String = "--physics-friction="
+const PHYSICS_BOUNCE_PREFIX: String = "--physics-bounce="
+const PHYSICS_CASE_PREFIX: String = "--physics-case="
 const MEASUREMENT_FIXED_TESTS: Array[String] = [
 	"res://tests/scenarios/test_board_physics.gd",
 	"res://tests/scenarios/test_spawn_flow.gd",
@@ -62,6 +66,7 @@ func _apply_measurement_arguments() -> String:
 	var config_data: GameConfig = config_node.get("data") as GameConfig
 	var active_colors: int = config_data.spawn_color_weights.size()
 	var spawn_case: String = ""
+	var physics_case: String = ""
 	for argument: String in OS.get_cmdline_user_args():
 		if argument.begins_with(GROWTH_DURATION_PREFIX):
 			config_data.grow_duration = argument.trim_prefix(GROWTH_DURATION_PREFIX).to_float()
@@ -92,6 +97,18 @@ func _apply_measurement_arguments() -> String:
 			measurement_suite = "game_over_%s" % argument.trim_prefix(
 				GAME_OVER_SUITE_PREFIX
 			)
+		elif argument.begins_with(PHYSICS_GRAVITY_PREFIX):
+			config_data.gravity_strength = argument.trim_prefix(
+				PHYSICS_GRAVITY_PREFIX
+			).to_float()
+		elif argument.begins_with(PHYSICS_FRICTION_PREFIX):
+			var friction: float = argument.trim_prefix(PHYSICS_FRICTION_PREFIX).to_float()
+			config_data.orb_friction = friction
+			config_data.wall_friction = friction
+		elif argument.begins_with(PHYSICS_BOUNCE_PREFIX):
+			config_data.orb_bounce = argument.trim_prefix(PHYSICS_BOUNCE_PREFIX).to_float()
+		elif argument.begins_with(PHYSICS_CASE_PREFIX):
+			physics_case = argument.trim_prefix(PHYSICS_CASE_PREFIX)
 	if is_spawn_measurement:
 		if not spawn_case.is_empty():
 			active_colors = _apply_spawn_case(config_data, spawn_case)
@@ -118,7 +135,15 @@ func _apply_measurement_arguments() -> String:
 			]
 		)
 	elif measurement_suite.begins_with("game_over_"):
-		print("Game-over suite=%s" % measurement_suite)
+		print(
+			"Game-over suite=%s case=%s gravity=%.1f friction=%.3f bounce=%.3f" % [
+				measurement_suite,
+				physics_case,
+				config_data.gravity_strength,
+				config_data.orb_friction,
+				config_data.orb_bounce,
+			]
+		)
 	elif not measurement_suite.is_empty():
 		print(
 			"Growth candidate duration=%.3f ratio=%.3f suite=%s" % [
