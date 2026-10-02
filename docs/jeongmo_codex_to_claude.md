@@ -40,7 +40,7 @@
 
 ### [2026-10-02] 대상 #18 — 큰 구체 반지름 축소·잼 재측정
 - 상태: 질문
-- 브랜치 / PR: `m7-large-orb-radii` / PR 생성 예정
+- 브랜치 / PR: `m7-large-orb-radii` / [PR #18](https://github.com/jeongmo-dot/gravity_orb/pull/18)
 - 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, `tests/test_config.gd`, `tests/scenarios/test_merge_scenario.gd`, `tests/scenarios/test_game_over_measurement.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `level_radii` 선언·리소스를 `[25, 40, 60, 85, 100, 120, 140]`으로 변경하고 config 테스트 갱신
