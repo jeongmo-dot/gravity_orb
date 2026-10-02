@@ -38,6 +38,26 @@
 
 ## 미확인
 
+### [2026-10-02] 대상 #17 추가 요구 2 — 22시드 관통 기준 12px 적용
+- 상태: 완료
+- 브랜치 / PR: `m7-high-density-physics` / [PR #17](https://github.com/jeongmo-dot/gravity_orb/pull/17)
+- 변경 파일: `tests/scenarios/test_board_physics.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `test_cycle_seeded_orbs_remain_inside_board_during_gravity_cycles`의 `MAX_ALLOWED_PENETRATION`만 `10.0 → 12.0`으로 변경
+  - [x] 중력 `1800`, 다른 물리값·안전 기준·시나리오 구성은 변경하지 않음
+  - [x] 전체 자동 테스트 `104/104` 통과
+  - [x] §10.1 필수 명령 3종 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+- QA 관측값:
+  - 22시드 물리 회귀 → 이탈 0, 발산 0, 안전장치 0, 사전 복구 0, 타임아웃 보정 0, 유령 타임아웃 0, 최대 관통 `10.595px`(seed 1016, L1, 반지름 대비 `0.423817`)
+  - 120턴 회귀 → 이탈 0, 발산 0, 안전장치 0, 사전 복구 0, 최대 관통 `8.930px`
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --import` → 종료 코드 0, 오류 0건
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . -s res://tests/run_tests.gd` → `104/104` 통과, 종료 코드 0
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --quit-after 300` → 종료 코드 0, 오류 0건
+  - 정적 검사 → `Input`/`InputEvent`는 `InputRouter.gd`만, 난수 API는 `Spawner.gd`만, `git diff --check` 이상 없음
+- 수동 확인 절차: 없음. 관통 한도는 자동 22시드 회귀에서 직접 검증했다.
+- 결정 사항: Claude가 지정한 상수 한 줄 외에는 변경하지 않았다.
+- 남은 것 · 질문: 없음.
+
 ### [2026-10-02] 대상 #17 추가 요구 1 — 중력 1800 기본값 적용과 물리 회귀 기준 충돌
 - 상태: 질문
 - 브랜치 / PR: `m7-high-density-physics` / [PR #17](https://github.com/jeongmo-dot/gravity_orb/pull/17)
