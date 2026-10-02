@@ -7,7 +7,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 @export var board_size: float = 960.0
 @export var wall_thickness: float = 256.0
 @export var level_radii: PackedFloat32Array = PackedFloat32Array(
-	[25.0, 40.0, 60.0, 85.0, 115.0, 150.0, 190.0]
+	[25.0, 40.0, 60.0, 85.0, 100.0, 120.0, 140.0]
 )
 @export var orb_max_level: int = 7
 @export var orb_base_mass: float = 1.0

@@ -6,9 +6,9 @@ const EXPECTED_RADII: Array[float] = [
 	40.0,
 	60.0,
 	85.0,
-	115.0,
-	150.0,
-	190.0,
+	100.0,
+	120.0,
+	140.0,
 ]
 const TOLERANCE: float = 1.0e-3
 

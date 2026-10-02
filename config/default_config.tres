@@ -6,7 +6,7 @@
 script = ExtResource("1_game_config")
 board_size = 960.0
 wall_thickness = 256.0
-level_radii = PackedFloat32Array(25, 40, 60, 85, 115, 150, 190)
+level_radii = PackedFloat32Array(25, 40, 60, 85, 100, 120, 140)
 orb_max_level = 7
 orb_base_mass = 1.0
 mass_exponent = 1.0

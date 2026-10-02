@@ -39,6 +39,9 @@ func test_game_over_distribution_warning_accuracy_and_density_metrics() -> void:
 	var high_density_events: Array[Dictionary] = []
 	var jam_diagnostics: Dictionary = _empty_jam_diagnostics()
 	var all_turn_seconds: Array[float] = []
+	var max_levels_reached: Array[int] = []
+	var max_clears_by_seed: Array[int] = []
+	var max_clear_count: int = 0
 
 	for seed: int in SEEDS:
 		var fixture: Dictionary = await _create_ready_fixture(seed)
@@ -178,6 +181,11 @@ func test_game_over_distribution_warning_accuracy_and_density_metrics() -> void:
 		)
 		game_over_occupancies.append(game_over_occupancy)
 		game_over_orb_counts.append(game_over_orbs)
+		var seed_max_level: int = score_manager.max_level_reached
+		var seed_max_clears: int = int(reaction_counts["max_clears"])
+		max_levels_reached.append(seed_max_level)
+		max_clears_by_seed.append(seed_max_clears)
+		max_clear_count += seed_max_clears
 		seed_rows.append(
 			{
 				"seed": seed,
@@ -196,10 +204,12 @@ func test_game_over_distribution_warning_accuracy_and_density_metrics() -> void:
 				"turn_p50_seconds": _percentile(seed_turn_seconds, 0.50),
 				"score": score_manager.score,
 				"max_chain": score_manager.max_chain,
+				"max_level": seed_max_level,
+				"max_clears": seed_max_clears,
 			}
 		)
 		print(
-			"Game-over seed=%d turn=%d occupancy=%.6f orbs=%d direction=%s warned=%s aborted=%s completed_turns=%d turn_avg=%.6f score=%d max_chain=%d" % [
+			"Game-over seed=%d turn=%d occupancy=%.6f orbs=%d direction=%s warned=%s aborted=%s completed_turns=%d turn_avg=%.6f score=%d max_chain=%d max_level=%d max_clears=%d" % [
 				seed,
 				game_over_turns.back(),
 				game_over_occupancy,
@@ -215,6 +225,8 @@ func test_game_over_distribution_warning_accuracy_and_density_metrics() -> void:
 				_average(seed_turn_seconds),
 				score_manager.score,
 				score_manager.max_chain,
+				seed_max_level,
+				seed_max_clears,
 			]
 		)
 		await _cleanup_fixture(fixture)
@@ -223,6 +235,7 @@ func test_game_over_distribution_warning_accuracy_and_density_metrics() -> void:
 	var report: Dictionary = {
 		"case": _physics_case_name(),
 		"config": {
+			"level_radii": Config.data.level_radii,
 			"gravity_strength": Config.data.gravity_strength,
 			"orb_friction": Config.data.orb_friction,
 			"wall_friction": Config.data.wall_friction,
@@ -249,9 +262,13 @@ func test_game_over_distribution_warning_accuracy_and_density_metrics() -> void:
 		"high_density_event_count": high_density_events.size(),
 		"high_density_top_causes": _cause_summary(high_density_events),
 		"jam_diagnostics": _finalize_jam_diagnostics(jam_diagnostics),
+		"max_levels_reached": max_levels_reached,
+		"max_level_distribution": _level_distribution(max_levels_reached),
+		"max_clears_by_seed": max_clears_by_seed,
+		"max_clear_count": max_clear_count,
 	}
 	print(
-		"Game-over summary case=%s turns=%s occupancies=%s aborted=%d turn_p50=%.6f bins=%s top_causes=%s jam=%s" % [
+		"Game-over summary case=%s turns=%s occupancies=%s aborted=%d turn_p50=%.6f bins=%s top_causes=%s jam=%s max_levels=%s max_clears=%d" % [
 			report["case"],
 			str(game_over_turns),
 			str(game_over_occupancies),
@@ -260,6 +277,8 @@ func test_game_over_distribution_warning_accuracy_and_density_metrics() -> void:
 			str(finalized_bins),
 			str(report["high_density_top_causes"]),
 			str(report["jam_diagnostics"]),
+			str(report["max_level_distribution"]),
+			max_clear_count,
 		]
 	)
 	_write_report(report)
@@ -297,12 +316,14 @@ func _create_ready_fixture(seed: int) -> Dictionary:
 	score_manager.owner = fixture_root
 	tree.root.add_child(fixture_root)
 	await tree.process_frame
-	var reaction_counts: Dictionary = {"merges": 0, "annihilations": 0}
+	var reaction_counts: Dictionary = {"merges": 0, "annihilations": 0, "max_clears": 0}
 	resolver.reaction_applied.connect(
 		func(reaction: Dictionary) -> void:
 			var type: ReactionRules.Type = reaction["type"] as ReactionRules.Type
 			if type == ReactionRules.Type.MERGE or type == ReactionRules.Type.MAX_CLEAR:
 				reaction_counts["merges"] = int(reaction_counts["merges"]) + 1
+				if type == ReactionRules.Type.MAX_CLEAR:
+					reaction_counts["max_clears"] = int(reaction_counts["max_clears"]) + 1
 			elif type == ReactionRules.Type.ANNIHILATE:
 				reaction_counts["annihilations"] = int(reaction_counts["annihilations"]) + 1
 	)
@@ -770,6 +791,13 @@ func _cause_summary(events: Array[Dictionary]) -> Array[Dictionary]:
 
 func _increment(counts: Dictionary, key: String) -> void:
 	counts[key] = int(counts.get(key, 0)) + 1
+
+
+func _level_distribution(levels: Array[int]) -> Dictionary:
+	var result: Dictionary = {}
+	for level: int in levels:
+		_increment(result, "L%d" % level)
+	return result
 
 
 func _average(values: Array[float]) -> float:
