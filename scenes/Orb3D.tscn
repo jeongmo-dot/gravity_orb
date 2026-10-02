@@ -1,0 +1,16 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/spike/Orb3D.gd" id="1_orb_3d"]
+
+[node name="Orb3D" type="Node"]
+script = ExtResource("1_orb_3d")
+
+[node name="Body" type="RigidBody3D" parent="."]
+unique_name_in_owner = true
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Body"]
+unique_name_in_owner = true
+
+[node name="Mesh" type="MeshInstance3D" parent="Body"]
+unique_name_in_owner = true
+cast_shadow = 1

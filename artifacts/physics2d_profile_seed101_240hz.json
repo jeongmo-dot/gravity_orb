@@ -1,0 +1,14 @@
+{
+	"completed_turns": 120,
+	"departures": 0,
+	"divergences": 0,
+	"final_orb_count": 25,
+	"game_over": false,
+	"max_wall_penetration_px": 25.3196716308594,
+	"physics_step_wall_ms_mean": 0.218963950276239,
+	"physics_step_wall_ms_p50": 0.18,
+	"physics_step_wall_ms_p95": 0.264,
+	"physics_ticks_per_second": 240,
+	"requested_turns": 120,
+	"seed": 101
+}
