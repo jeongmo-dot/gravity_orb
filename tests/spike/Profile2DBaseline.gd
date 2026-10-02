@@ -94,6 +94,7 @@ func _run() -> void:
 		"physics_step_wall_ms_mean": _mean(step_ms),
 		"physics_step_wall_ms_p50": _percentile(step_ms, 0.5),
 		"physics_step_wall_ms_p95": _percentile(step_ms, 0.95),
+		"physics_frames_sampled": step_ms.size(),
 		"max_wall_penetration_px": max_penetration,
 		"departures": departures,
 		"divergences": divergences,

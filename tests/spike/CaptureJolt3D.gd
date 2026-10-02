@@ -16,6 +16,7 @@ const DIRECTION_PATTERN: Array[Vector2i] = [
 const WAIT_TIMEOUT_SECONDS: float = 3.5
 
 var _failed: bool = false
+var _max_capture_turn: int = CAPTURE_TURNS[-1]
 
 
 func _ready() -> void:
@@ -23,6 +24,7 @@ func _ready() -> void:
 
 
 func _capture_sequence() -> void:
+	_apply_arguments()
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUTPUT_DIRECTORY))
 	var main: Main3D = MAIN_SCENE.instantiate() as Main3D
 	get_tree().root.add_child(main)
@@ -34,12 +36,13 @@ func _capture_sequence() -> void:
 		get_tree().quit(1)
 		return
 
-	for turn_number: int in range(1, CAPTURE_TURNS[-1] + 1):
+	for turn_number: int in range(1, _max_capture_turn + 1):
 		var direction: Vector2i = DIRECTION_PATTERN[(turn_number - 1) % DIRECTION_PATTERN.size()]
 		manager.on_swipe(direction)
 		if turn_number == 60:
 			await get_tree().create_timer(0.08).timeout
 			await get_tree().process_frame
+			await RenderingServer.frame_post_draw
 			_capture("jolt3d_seed101_tilt_turn060.png")
 		if not await _wait_until_ready(manager):
 			push_error("Jolt capture turn %d did not settle" % turn_number)
@@ -48,6 +51,7 @@ func _capture_sequence() -> void:
 		if CAPTURE_TURNS.has(turn_number):
 			await get_tree().process_frame
 			await get_tree().process_frame
+			await RenderingServer.frame_post_draw
 			_capture("jolt3d_seed101_turn_%03d.png" % turn_number)
 		if manager.state == TurnManager3D.State.GAME_OVER and turn_number < CAPTURE_TURNS[-1]:
 			push_error("Jolt capture game over at turn %d before turn 180" % turn_number)
@@ -80,3 +84,13 @@ func _capture(file_name: String) -> void:
 		push_error("Could not save capture %s: %s" % [path, error_string(error)])
 		return
 	print("JOLT3D_CAPTURE %s %dx%d" % [path, image.get_width(), image.get_height()])
+
+
+func _apply_arguments() -> void:
+	for argument: String in OS.get_cmdline_user_args():
+		if argument.begins_with("--jolt-capture-until="):
+			_max_capture_turn = clampi(
+				argument.trim_prefix("--jolt-capture-until=").to_int(),
+				1,
+				CAPTURE_TURNS[-1]
+			)

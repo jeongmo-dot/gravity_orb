@@ -32,6 +32,12 @@ var _seeds: Array[int] = []
 var _max_turns: int = MAX_TURNS
 var _determinism_turns: int = DETERMINISM_TURNS
 var _report_path: String = REPORT_PATH
+var _continuous_cd_enabled: bool = true
+var _allow_sleep: bool = false
+var _contact_reporting_enabled: bool = true
+var _progressive_growth_enabled: bool = false
+var _record_seed_hashes: bool = false
+var _scan_pairs_each_frame: bool = false
 
 
 func _ready() -> void:
@@ -51,11 +57,16 @@ func _run() -> void:
 		"level_radii_px": Array(Config.data.level_radii),
 		"corrections": {
 			"ghost": false,
-			"growth": false,
+			"growth": _progressive_growth_enabled,
 			"timeout_correction": false,
 			"proactive_wall_recovery": false,
 			"escape_guard": false,
 			"entrance_waiting_rule": true,
+		},
+		"physics_profile": {
+			"contact_reporting": _contact_reporting_enabled,
+			"continuous_cd": _continuous_cd_enabled,
+			"allow_sleep": _allow_sleep,
 		},
 		"ticks": [],
 	}
@@ -81,7 +92,13 @@ func _run_tick_suite(ticks: int) -> Dictionary:
 	var game_over_count: int = 0
 	var aborted_count: int = 0
 	for seed: int in _seeds:
-		var result: Dictionary = await _run_seed(seed, _max_turns, bins, physics_ms, false)
+		var result: Dictionary = await _run_seed(
+			seed,
+			_max_turns,
+			bins,
+			physics_ms,
+			_record_seed_hashes
+		)
 		seed_rows.append(result)
 		if bool(result["aborted"]):
 			aborted_count += 1
@@ -131,6 +148,11 @@ func _run_seed(
 	var aborted: bool = false
 	var abort_reason: String = ""
 	var hashes: Array[String] = []
+	var engine_count_samples: Array[Dictionary] = []
+	var turn_performance_samples: Array[Dictionary] = []
+	var seed_max_pair_end: Dictionary = {"penetration_px": 0.0, "category": "none"}
+	var seed_max_pair_end_turn: int = 0
+	var seed_max_wall: float = 0.0
 	for turn_offset: int in range(max_turns):
 		var direction: Vector2i = DIRECTION_PATTERN[turn_offset % DIRECTION_PATTERN.size()]
 		var same_direction: bool = direction == manager.gravity
@@ -138,6 +160,16 @@ func _run_seed(
 		manager.on_swipe(direction)
 		var frame_metrics: Dictionary = await _wait_for_turn_end(manager, board, physics_ms)
 		completed_turns = turn_offset + 1
+		turn_performance_samples.append({
+			"turn": completed_turns,
+			"active_orbs": board.get_orbs().size(),
+			"physics_frames": int(frame_metrics["physics_ms_samples"]),
+			"physics_ms_mean": _safe_ratio(
+				float(frame_metrics["physics_ms_sum"]),
+				int(frame_metrics["physics_ms_samples"])
+			),
+			"physics_ms_max": float(frame_metrics["physics_ms_max"]),
+		})
 		var occupancy: float = _board_occupancy(board)
 		var bin_name: String = _occupancy_bin(occupancy)
 		var bin_values: Dictionary = bins[bin_name] as Dictionary
@@ -148,14 +180,47 @@ func _run_seed(
 			float(bin_values["max_wall_penetration_px"]),
 			float(frame_metrics["max_wall_penetration_px"])
 		)
-		bin_values["max_pair_penetration_px"] = maxf(
-			float(bin_values["max_pair_penetration_px"]),
-			_maximum_pair_penetration(board)
+		var turn_end_pair: Dictionary = _maximum_pair_penetration_details(board)
+		if (
+			float(turn_end_pair["penetration_px"])
+			> float(bin_values["max_pair_penetration_px"])
+		):
+			bin_values["max_pair_penetration_px"] = turn_end_pair["penetration_px"]
+			bin_values["max_pair_penetration_details"] = turn_end_pair
+			bin_values["max_pair_penetration_seed"] = seed
+			bin_values["max_pair_penetration_turn"] = completed_turns
+		if float(turn_end_pair["penetration_px"]) > float(seed_max_pair_end["penetration_px"]):
+			seed_max_pair_end = turn_end_pair
+			seed_max_pair_end_turn = completed_turns
+		seed_max_wall = maxf(seed_max_wall, float(frame_metrics["max_wall_penetration_px"]))
+		bin_values["physics_ms_sum"] = (
+			float(bin_values["physics_ms_sum"])
+			+ float(frame_metrics["physics_ms_sum"])
 		)
+		bin_values["physics_ms_samples"] = (
+			int(bin_values["physics_ms_samples"])
+			+ int(frame_metrics["physics_ms_samples"])
+		)
+		bin_values["physics_ms_max"] = maxf(
+			float(bin_values["physics_ms_max"]),
+			float(frame_metrics["physics_ms_max"])
+		)
+		if (
+			float(frame_metrics["max_pair_penetration_any_frame_px"])
+			> float(bin_values["max_pair_penetration_any_frame_px"])
+		):
+			bin_values["max_pair_penetration_any_frame_px"] = frame_metrics[
+				"max_pair_penetration_any_frame_px"
+			]
+			bin_values["max_pair_penetration_any_frame_details"] = frame_metrics[
+				"max_pair_penetration_any_frame_details"
+			]
 		if not same_direction:
 			_record_movement(bin_values, before, board, direction)
 		if record_hashes:
 			hashes.append(_state_hash(board))
+		if completed_turns % 10 == 0:
+			engine_count_samples.append(_engine_counts(completed_turns, board))
 		if bool(frame_metrics["aborted"]):
 			aborted = true
 			abort_reason = str(frame_metrics["abort_reason"])
@@ -171,6 +236,13 @@ func _run_seed(
 		"aborted": aborted,
 		"abort_reason": abort_reason,
 		"hashes": hashes,
+		"final_state": _state_rows(board),
+		"engine_count_samples": engine_count_samples,
+		"final_engine_counts": _engine_counts(completed_turns, board),
+		"turn_performance_samples": turn_performance_samples,
+		"max_turn_end_pair": seed_max_pair_end,
+		"max_turn_end_pair_turn": seed_max_pair_end_turn,
+		"max_wall_penetration_px": seed_max_wall,
 	}
 	fixture_root.queue_free()
 	await get_tree().process_frame
@@ -186,6 +258,10 @@ func _create_fixture(seed: int) -> Dictionary:
 	var board: Board3D = BOARD_SCENE.instantiate() as Board3D
 	board.name = "Board"
 	board.unique_name_in_owner = true
+	board.orb_contact_reporting_enabled = _contact_reporting_enabled
+	board.orb_continuous_cd_enabled = _continuous_cd_enabled
+	board.orb_allow_sleep = _allow_sleep
+	board.orb_progressive_growth_enabled = _progressive_growth_enabled
 	fixture_root.add_child(board)
 	board.owner = fixture_root
 	var resolver: CollisionResolver3D = RESOLVER_SCRIPT.new() as CollisionResolver3D
@@ -243,6 +319,11 @@ func _wait_for_turn_end(
 		"departures": 0,
 		"divergences": 0,
 		"max_wall_penetration_px": 0.0,
+		"max_pair_penetration_any_frame_px": 0.0,
+		"max_pair_penetration_any_frame_details": {},
+		"physics_ms_sum": 0.0,
+		"physics_ms_samples": 0,
+		"physics_ms_max": 0.0,
 		"aborted": false,
 		"abort_reason": "",
 	}
@@ -257,6 +338,10 @@ func _wait_for_turn_end(
 			float(Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)) * 1000.0
 		)
 		physics_ms.append(maxf(step_wall_ms, monitor_ms))
+		var measured_ms: float = maxf(step_wall_ms, monitor_ms)
+		metrics["physics_ms_sum"] = float(metrics["physics_ms_sum"]) + measured_ms
+		metrics["physics_ms_samples"] = int(metrics["physics_ms_samples"]) + 1
+		metrics["physics_ms_max"] = maxf(float(metrics["physics_ms_max"]), measured_ms)
 		for orb: Orb3D in board.get_orbs():
 			var finite: bool = orb.position.is_finite() and orb.linear_velocity.is_finite()
 			var center_extent: float = maxf(absf(orb.position.x), absf(orb.position.y)) if finite else INF
@@ -277,6 +362,14 @@ func _wait_for_turn_end(
 				divergence_ids[orb_id] = true
 		metrics["departures"] = departure_ids.size()
 		metrics["divergences"] = divergence_ids.size()
+		if _scan_pairs_each_frame:
+			var pair_details: Dictionary = _maximum_pair_penetration_details(board)
+			if (
+				float(pair_details["penetration_px"])
+				> float(metrics["max_pair_penetration_any_frame_px"])
+			):
+				metrics["max_pair_penetration_any_frame_px"] = pair_details["penetration_px"]
+				metrics["max_pair_penetration_any_frame_details"] = pair_details
 		if not divergence_ids.is_empty():
 			metrics["aborted"] = true
 			metrics["abort_reason"] = "divergence"
@@ -339,8 +432,10 @@ func _record_movement(
 			per_level["below_radius"] = int(per_level["below_radius"]) + 1
 
 
-func _maximum_pair_penetration(board: Board3D) -> float:
+func _maximum_pair_penetration_details(board: Board3D) -> Dictionary:
 	var maximum: float = 0.0
+	var maximum_first: Orb3D = null
+	var maximum_second: Orb3D = null
 	var orbs: Array[Orb3D] = board.get_orbs()
 	for first_index: int in range(orbs.size()):
 		var first: Orb3D = orbs[first_index]
@@ -350,13 +445,49 @@ func _maximum_pair_penetration(board: Board3D) -> float:
 			var second: Orb3D = orbs[second_index]
 			if second.is_waiting_at_entrance:
 				continue
-			maximum = maxf(
-				maximum,
-				first.get_radius()
-				+ second.get_radius()
+			var penetration: float = (
+				first.get_current_radius()
+				+ second.get_current_radius()
 				- first.position.distance_to(second.position)
 			)
-	return maxf(maximum, 0.0)
+			if penetration > maximum:
+				maximum = penetration
+				maximum_first = first
+				maximum_second = second
+	var details: Dictionary = {
+		"penetration_px": maxf(maximum, 0.0),
+		"category": "none",
+	}
+	if maximum_first == null or maximum_second == null:
+		return details
+	var current_frame: int = Engine.get_physics_frames()
+	var immediate_frames: int = maxi(ceili(float(Engine.physics_ticks_per_second) * 0.1), 2)
+	var first_age: int = maxi(
+		current_frame - maximum_first.diagnostic_last_event_physics_frame,
+		0
+	)
+	var second_age: int = maxi(
+		current_frame - maximum_second.diagnostic_last_event_physics_frame,
+		0
+	)
+	var category: String = "normal_pile"
+	for orb: Orb3D in [maximum_first, maximum_second]:
+		var age: int = maxi(current_frame - orb.diagnostic_last_event_physics_frame, 0)
+		if age > immediate_frames:
+			continue
+		if orb.diagnostic_last_event == "merge_result":
+			category = "merge_immediate"
+			break
+		if orb.diagnostic_last_event == "spawn":
+			category = "spawn_immediate"
+	details["category"] = category
+	details["first_event"] = maximum_first.diagnostic_last_event
+	details["second_event"] = maximum_second.diagnostic_last_event
+	details["first_event_age_frames"] = first_age
+	details["second_event_age_frames"] = second_age
+	details["first_level"] = maximum_first.level
+	details["second_level"] = maximum_second.level
+	return details
 
 
 func _board_occupancy(board: Board3D) -> float:
@@ -386,6 +517,14 @@ func _empty_bins() -> Dictionary:
 			"divergences": 0,
 			"max_wall_penetration_px": 0.0,
 			"max_pair_penetration_px": 0.0,
+			"max_pair_penetration_details": {},
+			"max_pair_penetration_seed": 0,
+			"max_pair_penetration_turn": 0,
+			"max_pair_penetration_any_frame_px": 0.0,
+			"max_pair_penetration_any_frame_details": {},
+			"physics_ms_sum": 0.0,
+			"physics_ms_samples": 0,
+			"physics_ms_max": 0.0,
 			"movement_sum_px": 0.0,
 			"movement_samples": 0,
 			"below_radius_samples": 0,
@@ -414,6 +553,19 @@ func _finalize_bins(bins: Dictionary) -> Dictionary:
 			"divergences": values["divergences"],
 			"max_wall_penetration_px": values["max_wall_penetration_px"],
 			"max_pair_penetration_px": values["max_pair_penetration_px"],
+			"max_pair_penetration_details": values["max_pair_penetration_details"],
+			"max_pair_penetration_seed": values["max_pair_penetration_seed"],
+			"max_pair_penetration_turn": values["max_pair_penetration_turn"],
+			"max_pair_penetration_any_frame_px": values["max_pair_penetration_any_frame_px"],
+			"max_pair_penetration_any_frame_details": values[
+				"max_pair_penetration_any_frame_details"
+			],
+			"physics_ms_mean": _safe_ratio(
+				float(values["physics_ms_sum"]),
+				int(values["physics_ms_samples"])
+			),
+			"physics_ms_max": values["physics_ms_max"],
+			"physics_ms_samples": values["physics_ms_samples"],
 			"mean_movement_px": _safe_ratio(float(values["movement_sum_px"]), samples),
 			"below_radius_percent": _safe_ratio(float(values["below_radius_samples"]) * 100.0, samples),
 			"movement_samples": samples,
@@ -479,6 +631,37 @@ func _state_hash(board: Board3D) -> String:
 	return "|".join(states).sha256_text()
 
 
+func _state_rows(board: Board3D) -> Array[Dictionary]:
+	var rows: Array[Dictionary] = []
+	for orb: Orb3D in board.get_orbs():
+		rows.append({
+			"color": orb.color,
+			"level": orb.level,
+			"position_x": orb.position.x,
+			"position_y": orb.position.y,
+			"velocity_x": orb.linear_velocity.x,
+			"velocity_y": orb.linear_velocity.y,
+			"angular_velocity": orb.angular_velocity,
+			"waiting": orb.is_waiting_at_entrance,
+		})
+	return rows
+
+
+func _engine_counts(turn: int, board: Board3D) -> Dictionary:
+	var orbs_node: Node = board.get_node("Orbs")
+	return {
+		"turn": turn,
+		"active_orbs": board.get_orbs().size(),
+		"orb_child_nodes": orbs_node.get_child_count(),
+		"object_count": int(Performance.get_monitor(Performance.OBJECT_COUNT)),
+		"node_count": int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)),
+		"orphan_node_count": int(
+			Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT)
+		),
+		"resource_count": int(Performance.get_monitor(Performance.OBJECT_RESOURCE_COUNT)),
+	}
+
+
 func _safe_ratio(numerator: float, denominator: int) -> float:
 	return 0.0 if denominator == 0 else numerator / float(denominator)
 
@@ -533,6 +716,18 @@ func _apply_arguments() -> void:
 			)
 		elif argument.begins_with("--jolt-output="):
 			_report_path = argument.trim_prefix("--jolt-output=")
+		elif argument == "--jolt-no-ccd":
+			_continuous_cd_enabled = false
+		elif argument == "--jolt-allow-sleep":
+			_allow_sleep = true
+		elif argument == "--jolt-no-contact-reporting":
+			_contact_reporting_enabled = false
+		elif argument == "--jolt-growth":
+			_progressive_growth_enabled = true
+		elif argument == "--jolt-record-hashes":
+			_record_seed_hashes = true
+		elif argument == "--jolt-frame-pair-scan":
+			_scan_pairs_each_frame = true
 
 
 func _parse_int_list(csv: String) -> Array[int]:

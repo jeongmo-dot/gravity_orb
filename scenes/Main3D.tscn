@@ -23,9 +23,9 @@ script = ExtResource("1_main")
 environment = SubResource("Environment_main")
 
 [node name="Camera3D" type="Camera3D" parent="."]
-position = Vector3(0, 0, 13.7)
+position = Vector3(0, 0, 42)
 current = true
-fov = 46.0
+fov = 25.0
 
 [node name="KeyLight" type="DirectionalLight3D" parent="."]
 rotation_degrees = Vector3(-24, -22, 0)

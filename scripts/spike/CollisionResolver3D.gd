@@ -13,7 +13,10 @@ func _ready() -> void:
 
 
 func report_contact(a: Orb3D, b: Orb3D) -> void:
-	_pending.append([a, b])
+	if a.stable_spawn_id <= b.stable_spawn_id:
+		_pending.append([a, b])
+	else:
+		_pending.append([b, a])
 
 
 func sweep_resting_contacts() -> int:
@@ -21,7 +24,7 @@ func sweep_resting_contacts() -> int:
 		for b: Orb3D in a.get_colliding_orbs():
 			if b.consumed:
 				continue
-			if a.get_instance_id() < b.get_instance_id():
+			if a.stable_spawn_id < b.stable_spawn_id:
 				report_contact(a, b)
 	return flush()
 
@@ -29,7 +32,9 @@ func sweep_resting_contacts() -> int:
 func flush() -> int:
 	var pending: Array[Array] = _pending
 	_pending = []
+	pending.sort_custom(_pair_less)
 	var applied: int = 0
+	var visited_pairs: Dictionary = {}
 	for pair: Array in pending:
 		var a: Orb3D = pair[0] as Orb3D
 		var b: Orb3D = pair[1] as Orb3D
@@ -37,6 +42,10 @@ func flush() -> int:
 			continue
 		if a.consumed or b.consumed:
 			continue
+		var pair_key: String = "%d:%d" % [a.stable_spawn_id, b.stable_spawn_id]
+		if visited_pairs.has(pair_key):
+			continue
+		visited_pairs[pair_key] = true
 
 		var classified: Dictionary = ReactionRules.classify(
 			a.color,
@@ -74,6 +83,7 @@ func flush() -> int:
 				(velocity_a + velocity_b) * 0.5,
 				chain
 			)
+			result_orb.note_diagnostic_event("merge_result")
 		elif reaction_type == ReactionRules.Type.ANNIHILATE and survivor != 0:
 			reaction_position = position_a if survivor == 1 else position_b
 			var survivor_velocity: Vector2 = velocity_a if survivor == 1 else velocity_b
@@ -84,6 +94,7 @@ func flush() -> int:
 				survivor_velocity,
 				chain
 			)
+			result_orb.note_diagnostic_event("annihilate_survivor")
 
 		var reaction: Dictionary = {
 			"type": reaction_type,
@@ -98,6 +109,16 @@ func flush() -> int:
 		reaction_applied.emit(reaction)
 		applied += 1
 	return applied
+
+
+func _pair_less(first: Array, second: Array) -> bool:
+	var first_a: Orb3D = first[0] as Orb3D
+	var first_b: Orb3D = first[1] as Orb3D
+	var second_a: Orb3D = second[0] as Orb3D
+	var second_b: Orb3D = second[1] as Orb3D
+	if first_a.stable_spawn_id != second_a.stable_spawn_id:
+		return first_a.stable_spawn_id < second_a.stable_spawn_id
+	return first_b.stable_spawn_id < second_b.stable_spawn_id
 
 
 func _clamp_inside(plane_position: Vector2, radius: float) -> Vector2:

@@ -14,9 +14,14 @@ const VISUAL_TILT_DURATION: float = 0.25
 @onready var _visual_tilt: Node3D = %VisualTilt
 
 var _orbs: Array[Orb3D] = []
+var _next_orb_spawn_id: int = 1
 var _gravity_direction: Vector2i = Vector2i.DOWN
 var _warning_directions: Array[Vector2i] = []
 var _tilt_tween: Tween
+var orb_contact_reporting_enabled: bool = true
+var orb_continuous_cd_enabled: bool = true
+var orb_allow_sleep: bool = false
+var orb_progressive_growth_enabled: bool = false
 
 
 func _ready() -> void:
@@ -73,7 +78,15 @@ func spawn_orb(
 ) -> Orb3D:
 	var orb: Orb3D = ORB_SCENE.instantiate() as Orb3D
 	_orbs_node.add_child(orb)
+	orb.configure_physics_profile(
+		orb_contact_reporting_enabled,
+		orb_continuous_cd_enabled,
+		orb_allow_sleep,
+		orb_progressive_growth_enabled
+	)
 	orb.setup(p_color, p_level, Config.data)
+	orb.stable_spawn_id = _next_orb_spawn_id
+	_next_orb_spawn_id += 1
 	orb.position = p_position
 	orb.linear_velocity = p_velocity
 	orb.generation = p_generation
@@ -270,7 +283,7 @@ func _on_orb_body_entered(other_body: Node, orb: Orb3D) -> void:
 	var other: Orb3D = other_body.get_parent() as Orb3D
 	if other == null or orb.consumed or other.consumed:
 		return
-	if orb.get_instance_id() < other.get_instance_id():
+	if orb.stable_spawn_id < other.stable_spawn_id:
 		orb_contact.emit(orb, other)
 
 

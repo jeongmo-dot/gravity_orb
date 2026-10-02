@@ -16,6 +16,28 @@ func test_project_uses_jolt_without_changing_2d_main_scene() -> void:
 		"res://scenes/Main.tscn",
 		"2D main scene remains default"
 	)
+	assert_eq(
+		int(ProjectSettings.get_setting(
+			"physics/jolt_physics_3d/simulation/position_steps",
+			2
+		)),
+		4,
+		"second-round position solver steps"
+	)
+	assert_eq(
+		int(ProjectSettings.get_setting("threading/worker_pool/max_threads", -1)),
+		1,
+		"single worker avoids Jolt job queue warning"
+	)
+
+
+func test_main_3d_camera_fits_vertical_board_mockup() -> void:
+	var main_scene: PackedScene = load("res://scenes/Main3D.tscn") as PackedScene
+	var main: Main3D = main_scene.instantiate() as Main3D
+	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
+	assert_near(camera.fov, 25.0, 0.001, "reduced perspective FOV")
+	assert_near(camera.position.z, 42.0, 0.001, "board and tilt margin distance")
+	main.free()
 
 
 func test_orb_3d_exposes_pixel_plane_api_and_locks_depth() -> void:
