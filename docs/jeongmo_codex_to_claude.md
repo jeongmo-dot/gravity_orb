@@ -40,7 +40,7 @@
 
 ### [2026-10-03] 대상 #19 — Jolt 3D + 평면 고정 스파이크
 - 상태: 질문
-- 브랜치 / PR: `spike-jolt-3d` / Draft PR 생성 전
+- 브랜치 / PR: `spike-jolt-3d` / [Draft PR #19](https://github.com/jeongmo-dot/gravity_orb/pull/19)
 - 변경 파일: `project.godot`, `scenes/Board3D.tscn`, `scenes/Orb3D.tscn`, `scenes/Main3D.tscn`, `scripts/spike/Orb3D.gd`, `scripts/spike/Board3D.gd`, `scripts/spike/Spawner3D.gd`, `scripts/spike/CollisionResolver3D.gd`, `scripts/spike/TurnManager3D.gd`, `scripts/spike/Main3D.gd`, `scripts/spike/Hud3D.gd`, `tests/test_jolt_3d.gd`, `tests/spike/`, `artifacts/jolt3d_*`, `artifacts/physics2d_profile_seed101_240hz.json`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] Jolt 3D·XY 평면·`1m=100px`·Z 이동/X/Y 회전 잠금, 4면 `StaticBody3D`, 원근 카메라와 조명, 색 구체·하이라이트·그림자, 시각 보드만 `4°/0.25초` 기울기 구현
