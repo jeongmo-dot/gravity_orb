@@ -41,7 +41,7 @@
 ### [2026-10-03] 대상 #20 추가 요구 1 — 3D 화면 Y축 반전 수정과 확정 기준 적용
 - 상태: 완료
 - 브랜치 / PR: `m8-jolt-integration` / [PR #20](https://github.com/jeongmo-dot/gravity_orb/pull/20)
-- 변경 파일: `project.godot`, `scripts/spike/{Orb3D,Board3D}.gd`, `tests/{test_jolt_3d.gd,scenarios/test_jolt_integration.gd,spike/CaptureJolt3D.gd,spike/run_jolt_3d_measurement.gd}`, `artifacts/jolt3d_integration_summary.json`, `artifacts/jolt3d_seed101_{down_before,down_after,turn_001,turn_060,tilt_turn060}.png`, `docs/jeongmo_codex_to_claude.md`
+- 변경 파일: `project.godot`, `scripts/spike/{Orb3D,Board3D}.gd`, `tests/{test_jolt_3d.gd,scenarios/test_jolt_integration.gd,spike/CaptureJolt3D.gd,spike/run_jolt_3d_measurement.gd}`, `artifacts/jolt3d_integration_summary.json`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 2D 화면 평면(px, Y 아래) ↔ 3D 월드(m, Y 위) 변환을 `Orb3D` 정적 helper로 모으고 위치·선속도·중력에 Y 반전을 적용. handedness 반전에 맞춰 Z 각속도 부호도 양방향 반전
   - [x] `Board3D` 물리 벽·시각 프레임·DOWN 기울기가 같은 변환 helper를 사용. 생성선·빈 슬롯·입구 대기는 기존 2D 평면 좌표를 유지하고 `Orb3D.position` 경계에서만 변환
@@ -50,7 +50,7 @@
   - [x] 자동 기준 적용: 22시드 순환 wall `<=14px`, pair `<=16px`; 20/120턴 wall `<=20px`, 턴 종료 pair `<=60px`; 모든 경로 이탈·발산 0
   - [x] 22시드 순환 관측 `wall 11.6444px / pair 12.2092px / 이탈 0 / 발산 0`. 전체 테스트에서 기준 assertion 통과
   - [x] ghost OFF 120Hz seed 101~112 재측정: 게임오버 `12/12`, 중단·이탈·발산 `0/0/0`, 턴 p50 `247`, 종료 점유율 평균 `80.9850%`, 최대 wall/pair `20.5398 / 31.1279px`. 게임오버 수치는 지시대로 보고만 하고 판정에는 사용하지 않음
-  - [x] seed 101 턴 1·60·턴 60 기울기와 DOWN 입력 전/후 PNG를 GPU `OpenGL 3.3 / RTX 4070 Ti SUPER`로 `540×960` 재캡처. 직접 확인 시 입력 전 기존 구체는 화면 하단, 입력 0.35초 후 새 구체는 화면 상단에서 아래로 이동, 턴 1 정착 시 하단 도달
+  - [x] seed 101 턴 1·60·턴 60 기울기와 DOWN 입력 전/후 PNG를 GPU `OpenGL 3.3 / RTX 4070 Ti SUPER`로 `540×960` 로컬 재캡처하고 방향을 확인. 사용자 추가 지시에 따라 PNG 바이너리는 커밋·PR에서 제외
   - [x] §10.1 필수 명령 3종 종료 코드 0, 전체 테스트 `121/121`
 - QA 관측값:
   - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --import` → 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
@@ -64,7 +64,7 @@
   1. Godot 4.8에서 프로젝트를 실행하고 DOWN을 입력한다 → 새 구체는 화면 위쪽 생성선에서 나타나 아래쪽으로 이동하며, 보드 프레임도 화면 아래 방향으로 기울었다가 복귀한다.
   2. UP/RIGHT/LEFT를 차례로 입력한다 → 구체가 각각 화면 위/오른쪽/왼쪽으로 이동한다.
   3. 해당 생성 변이 막힌 상태를 만든다 → DOWN 차단은 화면 상단, UP 차단은 화면 하단 프레임이 빨갛게 표시된다.
-  4. `artifacts/jolt3d_seed101_down_before.png`와 `jolt3d_seed101_down_after.png`를 나란히 연다 → 후 장면의 새 구체가 상단 생성 지점에서 화면 아래로 이동한 것을 확인한다.
+  4. `tests/spike/JoltCapture.tscn`을 `--jolt-seed=101 --jolt-capture-until=1`로 실행한다 → 로컬 생성된 DOWN 전/후 화면에서 새 구체가 상단 생성 지점부터 화면 아래로 이동하는지 확인한다. PNG는 PR에 포함하지 않는다.
 - 결정 사항: 새 밸런스 수치와 기존 공개 신호·메서드는 변경하지 않았다. 좌표 반전은 3D 경계 helper에만 두어 2D 규칙 좌표·생성 알고리즘·측정식을 유지했다. 20/120턴 pair는 기존 장기 측정 정의와 동일하게 턴 종료 시점, wall·이탈·발산은 매 물리 프레임에서 측정한다. Godot 에디터가 기본값과 같은 `velocity_steps=10`, `run_on_separate_thread=false` 항목을 직렬화에서 생략하고 physics 항목을 재정렬한 기존 `project.godot` 변경은 사용자 지시에 따라 함께 포함했다.
 - 남은 것 · 질문: 없음.
 

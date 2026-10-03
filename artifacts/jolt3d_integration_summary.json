@@ -39,14 +39,7 @@
         "DOWN warning at screen top",
         "DOWN tilt toward screen bottom"
       ]
-    },
-    "updated_captures": [
-      "artifacts/jolt3d_seed101_down_before.png",
-      "artifacts/jolt3d_seed101_down_after.png",
-      "artifacts/jolt3d_seed101_turn_001.png",
-      "artifacts/jolt3d_seed101_turn_060.png",
-      "artifacts/jolt3d_seed101_tilt_turn060.png"
-    ]
+    }
   },
   "regression_side_by_side": {
     "2d_240hz_22_seeds": {
