@@ -18,6 +18,7 @@ signal wall_recovery_triggered(
 var color: int
 var level: int
 var generation: int = 0
+var stable_spawn_id: int = 0
 var consumed: bool = false
 var is_ghost: bool = false
 var ghost_elapsed: float = 0.0
@@ -86,6 +87,15 @@ func get_radius() -> float:
 
 func get_current_radius() -> float:
 	return _current_radius
+
+
+func get_colliding_orbs() -> Array:
+	var result: Array = []
+	for body: Node2D in get_colliding_bodies():
+		var candidate: Orb = body as Orb
+		if candidate != null:
+			result.append(candidate)
+	return result
 
 
 func enter_ghost_state(alpha: float) -> void:

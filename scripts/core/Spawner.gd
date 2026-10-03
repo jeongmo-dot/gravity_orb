@@ -22,7 +22,7 @@ func init_rng(seed: int) -> int:
 	return seed_used
 
 
-func spawn_initial(board: Board, gravity: Vector2i) -> void:
+func spawn_initial(board: Variant, gravity: Vector2i) -> void:
 	board.set_gravity(gravity)
 	var count: int = Config.data.initial_orb_count
 	var half: float = board.half_size()
@@ -35,17 +35,17 @@ func spawn_initial(board: Board, gravity: Vector2i) -> void:
 			lerpf(-half, half, fraction),
 			half - radius - Config.data.spawn_margin
 		)
-		var orb: Orb = board.spawn_orb(int(candidate["color"]), level, position)
+		var orb: Variant = board.spawn_orb(int(candidate["color"]), level, position)
 		orb.exit_ghost_state()
 		orb_spawned.emit(level)
 	_draw_and_publish_next_batch(1)
 
 
-func try_spawn(board: Board, gravity: Vector2i, turn_index: int = 1) -> Array[Orb]:
+func try_spawn(board: Variant, gravity: Vector2i, turn_index: int = 1) -> Array:
 	if _next_batch.is_empty():
 		_draw_and_publish_next_batch(turn_index)
 
-	var spawned: Array[Orb] = []
+	var spawned: Array = []
 	var placed: Array[Dictionary] = []
 	for candidate: Dictionary in _next_batch:
 		var level: int = int(candidate["level"])
@@ -74,7 +74,7 @@ func try_spawn(board: Board, gravity: Vector2i, turn_index: int = 1) -> Array[Or
 			if has_free_slot
 			else preferred_position
 		)
-		var orb: Orb = board.spawn_orb(
+		var orb: Variant = board.spawn_orb(
 			int(candidate["color"]),
 			level,
 			position,

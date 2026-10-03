@@ -1,0 +1,169 @@
+{
+	"corrections": {
+		"entrance_waiting_rule": true,
+		"escape_guard": false,
+		"ghost": false,
+		"growth": false,
+		"proactive_wall_recovery": false,
+		"timeout_correction": false
+	},
+	"determinism": {
+		"compared_turns": 120,
+		"first_mismatch_turn": 2,
+		"identical": false,
+		"requested_turns": 120,
+		"run_a_game_over": false,
+		"run_b_game_over": false,
+		"seed": 101
+	},
+	"engine": {
+		"build": "official",
+		"hash": "51105ccbe58381774ecd7a7486d564b202a5192e",
+		"hex": 264192,
+		"major": 4,
+		"minor": 8,
+		"patch": 0,
+		"status": "dev3",
+		"string": "4.8-dev3 (official)",
+		"timestamp": 0
+	},
+	"gravity_px_s2": 1800.0,
+	"level_radii_px": [
+		25.0,
+		40.0,
+		60.0,
+		85.0,
+		115.0,
+		150.0,
+		190.0
+	],
+	"physics_engine": "Jolt Physics",
+	"pixels_per_meter": 100.0,
+	"ticks": [
+		{
+			"aborted_count": 0,
+			"bins": {
+				"0-20": {
+					"below_radius_percent": 9.52380952380952,
+					"departures": 0,
+					"divergences": 0,
+					"levels": {
+						"1": {
+							"below_radius_percent": 9.75609756097561,
+							"mean_movement_px": 470.100426371505,
+							"samples": 164
+						},
+						"2": {
+							"below_radius_percent": 11.2244897959184,
+							"mean_movement_px": 484.738543763453,
+							"samples": 98
+						},
+						"3": {
+							"below_radius_percent": 8.33333333333333,
+							"mean_movement_px": 409.923611958822,
+							"samples": 96
+						},
+						"4": {
+							"below_radius_percent": 6.84931506849315,
+							"mean_movement_px": 375.797023616425,
+							"samples": 73
+						},
+						"5": {
+							"below_radius_percent": 20.0,
+							"mean_movement_px": 290.928039550781,
+							"samples": 10
+						}
+					},
+					"max_pair_penetration_px": 11.118968963623,
+					"max_wall_penetration_px": 13.7628784179688,
+					"mean_movement_px": 440.580446896369,
+					"movement_samples": 441,
+					"turns": 46
+				},
+				"20-40": {
+					"below_radius_percent": 17.9352580927384,
+					"departures": 0,
+					"divergences": 0,
+					"levels": {
+						"1": {
+							"below_radius_percent": 15.3266331658291,
+							"mean_movement_px": 351.956785070237,
+							"samples": 398
+						},
+						"2": {
+							"below_radius_percent": 9.72762645914397,
+							"mean_movement_px": 380.210722125458,
+							"samples": 257
+						},
+						"3": {
+							"below_radius_percent": 13.9344262295082,
+							"mean_movement_px": 354.640129464572,
+							"samples": 122
+						},
+						"4": {
+							"below_radius_percent": 16.7701863354037,
+							"mean_movement_px": 286.182235409754,
+							"samples": 161
+						},
+						"5": {
+							"below_radius_percent": 31.8681318681319,
+							"mean_movement_px": 252.302361037705,
+							"samples": 91
+						},
+						"6": {
+							"below_radius_percent": 40.3508771929825,
+							"mean_movement_px": 212.297420618827,
+							"samples": 114
+						}
+					},
+					"max_pair_penetration_px": 17.2184295654297,
+					"max_wall_penetration_px": 18.6987915039063,
+					"mean_movement_px": 327.467902488909,
+					"movement_samples": 1143,
+					"turns": 74
+				},
+				"40-60": {
+					"below_radius_percent": 0.0,
+					"departures": 0,
+					"divergences": 0,
+					"levels": {},
+					"max_pair_penetration_px": 0.0,
+					"max_wall_penetration_px": 0.0,
+					"mean_movement_px": 0.0,
+					"movement_samples": 0,
+					"turns": 0
+				},
+				"60+": {
+					"below_radius_percent": 0.0,
+					"departures": 0,
+					"divergences": 0,
+					"levels": {},
+					"max_pair_penetration_px": 0.0,
+					"max_wall_penetration_px": 0.0,
+					"mean_movement_px": 0.0,
+					"movement_samples": 0,
+					"turns": 0
+				}
+			},
+			"game_over_count": 0,
+			"game_over_occupancy_mean_percent": 0.0,
+			"game_over_turn_p50": 0.0,
+			"physics_ms_mean": 18.9457720303845,
+			"physics_ms_p50": 21.065,
+			"physics_ms_p95": 24.148,
+			"physics_ticks_per_second": 240,
+			"seeds": [
+				{
+					"abort_reason": "",
+					"aborted": false,
+					"completed_turns": 120,
+					"final_occupancy_percent": 39.3636514402432,
+					"final_orb_count": 19,
+					"game_over": false,
+					"hashes": [],
+					"seed": 101
+				}
+			]
+		}
+	]
+}

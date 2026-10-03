@@ -224,7 +224,10 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M1 | `wall_thickness` | float | 256.0 | 터널링 방지용으로 두껍게 |
 | ~~M1~~ | ~~`orb_base_radius`, `orb_radius_growth`~~ | | | **#14에서 제거** → `level_radii` |
 | #14 | `level_radii` | PackedFloat32Array | [25, 40, 60, 85, 115, 150, 190] → **[25, 40, 60, 85, 100, 120, 140]** (#18, 기획서 0.6.2) | 레벨별 반지름 |
-| #14 | `mass_exponent` | float | **1.0** (#14 측정: 지수 2는 L1 관통 14.8px, 1은 8.2px) | 질량 = base × (r / r_L1)^지수 — 크기 비례 |
+| #21 | `combo_multiplier_base` | float | 2.0 | 콤보 배수 밑 (§8.2) |
+| #21 | `danger_start` / `danger_doubling` | float | 0.30 / 0.20 | 위험 배수 시작 점유율 / 2배가 되는 점유율 간격 (§8.2) |
+| #21 | `gravity_level_scale` | float | #21 측정 후 결정 (후보 0 / 0.05 / 0.1) | 레벨별 중력 배율 = 1 + 값 × (레벨 − 1). 큰 구체가 더 빨리 떨어진다 (기획서 0.8) |
+| #14 | `mass_exponent` | float | **1.0** (#14 측정: 지수 2는 L1 관통 14.8px, 1은 8.2px) | 질량 = base × (r / r_L1)^지수 — 크기 비례. #21에서 2 / 3 재측정 (Jolt는 질량비에 더 강하다) |
 | M1 | `orb_max_level` | int | 7 | |
 | M1 | `orb_base_mass` | float | 1.0 | L1 질량 |
 | M1 | `gravity_strength` | float | 2400.0 → **1800.0** (#17: 고밀도 40%+ 사전 복구 910 → 13, 발산 0) | 중력 가속도 (px/s²) |
@@ -610,27 +613,28 @@ return applied
 
 ## 8. 점수·연쇄
 
-### 8.1 연쇄 세대 (M5)
+### 8.1 콤보 (기획서 0.8 — #21에서 교체)
+- **턴 콤보**: `on_swipe`에서 `turn_combo = 0`. 이후 다음 스와이프 전까지 적용되는 반응(MERGE·MAX_CLEAR·ANNIHILATE, 입력 대기 중 반응 포함)마다 `turn_combo += 1`, 그 반응의 `combo = turn_combo`
+- 반응 점수 = 기본 점수 × `combo` (§8.2)
+- 표시: 턴 중 현재 콤보, 판 전체 최대 콤보(`max_combo`). 신호 `combo_changed(combo)`
+- 0.7까지의 **연쇄 세대**(`generation`, chain = max(gen)+1)는 콤보 계산에서 제외한다. 필드는 디버그 표시용으로 남겨도 된다
 
-- 턴 시작 시 모든 구체의 `generation = 0`. 새로 생성되는 구체(`Spawner`)도 0.
-- 반응 1건의 연쇄 번호: `chain = max(a.generation, b.generation) + 1`.
-- 반응으로 생긴 구체(합체 결과, 규칙 C 잔존)는 `generation = chain`.
-- 턴 내 연쇄 수 = 이번 턴 반응들의 `chain` 최댓값. 1이면 연쇄 없음, 2 이상이면 "n연쇄".
-- 스와이프 후 settle과 생성 후 settle 모두 같은 턴이다.
+### 8.2 점수 (기획서 0.8 — #21에서 교체)
 
-독립적으로 동시에 일어난 두 합체는 둘 다 chain 1이므로 연쇄로 세지 않는다. "반응으로 생긴 구체가 다시 반응"한 경우만 연쇄다.
-
-### 8.2 점수 (기획서 5.2, M7)
+**반응 점수 = floor(기본 점수 × 콤보 배수 × 위험 배수)**
 
 | 반응 | 기본 점수 |
 |---|---|
 | MERGE | `score_for_level(result_level)` |
-| ANNIHILATE | `floor((score_for_level(La) + score_for_level(Lb)) × annihilation_score_factor)` — 규칙 C도 원래 두 레벨 기준 |
-| MAX_CLEAR | `score_for_level(orb_max_level) × max_merge_bonus_factor` (기본 128 × 5 = 640) |
+| ANNIHILATE | `floor((score_for_level(La) + score_for_level(Lb)) × annihilation_score_factor)` |
+| MAX_CLEAR (L7 잭팟) | `score_for_level(orb_max_level) × max_merge_bonus_factor` (128 × 5 = 640) |
 
-최종 = `int(기본 점수) × chain`.
+- **콤보 배수** = `combo_multiplier_base ^ (combo − 1)` (기본 2.0). `combo`는 §8.1 턴 콤보
+- **위험 배수** = 점유율 p(반응 직전, 최종 반지름 기준 Σπr² ÷ 보드²)가 `danger_start`(0.30) 미만이면 1, 이상이면 `2 ^ ((p − danger_start) ÷ danger_doubling)` (`danger_doubling` 0.20)
+- 점수·최고 점수는 **int64**. 배수는 float으로 계산 후 마지막에 버림
+- 반응 딕셔너리에 `base_points`, `combo_multiplier`, `danger_multiplier`, `points`를 담아 HUD·연출(M8)이 그대로 보여줄 수 있게 한다
 
-예: 레벨2 빨강 둘 합체(chain 1) → 레벨3 생성 = 8점. 그 레벨3이 곧바로 다른 레벨3 빨강과 합체(chain 2) → 레벨4 = 16 × 2 = 32점.
+예: 같은 턴 1번째 L2 합체(4점, 점유율 20%) = 4 / 2번째 L3 합체(8점) = 16 / 3번째 L7 청소(640점, 점유율 70% → ×4) = 640 × 4 × 4 = 10,240
 
 ---
 
@@ -870,6 +874,32 @@ M4 검수(2026-09-28)에서 발견. 합체가 없는 M4 상태에서 **이동·�
 - **보정 장치는 기본 끔**: 유령·점진 성장·타임아웃 보정·사전 벽 복구·안전장치 없이 먼저 측정한다. 게임 규칙인 빈자리 생성·입구 대기는 유지 (규칙이므로)
 
 **비교 지표** (#17·#18과 같은 측정 경로, 시드 101~112, 게임오버 또는 400턴): 점유율 구간별 관통·이탈·발산, 레벨별 반경 미만 이동(잼), 게임오버 턴·점유율, 프레임당 물리 시간(ms), **결정성**(같은 시드 2회 실행 시 턴별 구체 상태 일치 여부), 물리 틱 60/120/240 비교
+
+## 12-J. Jolt 3D 채택 (2026-10-03, 사용자 결정)
+
+스파이크 #19 결과로 **물리 엔진을 Jolt 3D(평면 고정)로, 표현을 3D로** 바꾼다. 게임 규칙·평면 좌표(px)·설정값은 그대로다.
+
+**채택 근거 (#19 2차, 120Hz, 12시드 게임오버까지)**: 보정 장치 없이 이탈·발산 0, 같은 기기 독립 프로세스 2회 120턴 상태 해시 일치(worker 1 + 접촉 쌍 ID 정렬), 프레임당 물리 0.40ms(2D 0.20ms — 1차의 19ms는 `--fixed-fps` 장시간 실행의 타이머 측정 오류), 카메라 FOV 25°로 세로 화면에 보드 전체. 남은 과제: 벽 침투 최대 19.1px, 턴 끝 쌍 겹침 최대 57.6px(주로 합체 직후 1~3프레임).
+
+**확정 설정** (스파이크 값)
+| 키 | 값 |
+|---|---|
+| `physics/3d/physics_engine` | Jolt Physics |
+| `physics/jolt_physics_3d/simulation/position_steps` | 4 (기본 2) |
+| `physics/jolt_physics_3d/simulation/velocity_steps` | 10 |
+| `physics/jolt_physics_3d/simulation/baumgarte_stabilization_factor` | 0.2 |
+| `physics/jolt_physics_3d/simulation/penetration_slop` | 0.02 |
+| `physics/3d/run_on_separate_thread` | false |
+| `threading/worker_pool/max_threads` | 1 (결정성. **전역 설정**이라 리소스 로딩 등 다른 스레드 작업에도 영향 — M10에서 재평가) |
+| 물리 틱 | 120 (60Hz는 #20에서 재측정) |
+| 단위 | 1m = 100px. 평면 XY, `axis_lock_linear_z`, `axis_lock_angular_x/y` |
+| 카메라 | 원근 FOV 25°, z = 42m |
+
+**통합 구조 (#20)**
+- 코어(`TurnManager`·`CollisionResolver`·`ScoreManager`·`Spawner`·`Hud`)가 특정 노드 타입(`Orb`/`Orb3D`)에 묶이지 않게 한다. 코어가 쓰는 구체 API: `color`, `level`, `generation`, `consumed`, 평면 `position: Vector2`(px), `linear_velocity: Vector2`(px/s), `angular_velocity: float`, `get_radius()`, 유령·입구 대기 상태. 보드 API: §5.3 + 빈자리·입구 대기. **하나의 코어 경로**로 2D·3D 보드를 모두 돌릴 수 있게 하고(덕 타이핑 또는 공통 베이스), 스파이크의 `TurnManager3D`·`Hud3D` 등 복사본은 제거
+- 메인 씬은 3D. 2D 씬은 회귀 비교가 끝날 때까지 유지 (`scenes/Main2D.tscn`으로 이름 변경 가능)
+- 보정 장치: 3D 기본은 **합체·규칙 C 잔존 결과에만 유령**(겹침 풀릴 때까지 통과) 적용을 시험. 점진 성장·타임아웃 보정·사전 벽 복구·안전장치는 3D에서 기본 끔, 측정 후 필요한 것만 켠다
+- 2D 물리·보정 장치 코드 정리는 3D 회귀가 안정된 뒤 별도 항목
 
 ## 13. 알려진 함정 (Godot 4)
 

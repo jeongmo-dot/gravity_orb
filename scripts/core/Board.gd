@@ -16,6 +16,7 @@ const WARNING_FRAME_COLOR: Color = Color("#FF3B30")
 @onready var _orbs_node: Node2D = %Orbs
 
 var _orbs: Array[Orb] = []
+var _next_orb_spawn_id: int = 1
 var _gravity_direction: Vector2i = Vector2i.DOWN
 var _last_ghost_timeout_physics_frame: int = -1
 var _pending_wall_recovery_warnings: Array[Dictionary] = []
@@ -66,6 +67,8 @@ func spawn_orb(
 	var orb: Orb = ORB_SCENE.instantiate() as Orb
 	_orbs_node.add_child(orb)
 	orb.setup(p_color, p_level, Config.data)
+	orb.stable_spawn_id = _next_orb_spawn_id
+	_next_orb_spawn_id += 1
 	orb.diagnostic_warnings_enabled = diagnostic_warnings_enabled
 	orb.note_board_spawn(spawn_physics_frame)
 	orb.position = p_position
@@ -104,6 +107,10 @@ func clear() -> void:
 	var orbs_to_remove: Array[Orb] = _orbs.duplicate()
 	for orb: Orb in orbs_to_remove:
 		remove_orb(orb)
+
+
+func should_ghost_reaction_results() -> bool:
+	return true
 
 
 func spawn_line(gravity: Vector2i, radius: float) -> Dictionary:
@@ -507,7 +514,7 @@ func _on_orb_body_entered(other_body: Node, orb: Orb) -> void:
 	var other: Orb = other_body as Orb
 	if other == null or orb.consumed or other.consumed:
 		return
-	if orb.get_instance_id() < other.get_instance_id():
+	if orb.stable_spawn_id < other.stable_spawn_id:
 		orb_contact.emit(orb, other)
 
 

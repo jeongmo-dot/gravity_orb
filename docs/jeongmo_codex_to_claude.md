@@ -38,6 +38,248 @@
 
 ## 미확인
 
+### [2026-10-03] 대상 #20 추가 요구 1 — 3D 화면 Y축 반전 수정과 확정 기준 적용
+- 상태: 완료
+- 브랜치 / PR: `m8-jolt-integration` / [PR #20](https://github.com/jeongmo-dot/gravity_orb/pull/20)
+- 변경 파일: `project.godot`, `scripts/spike/{Orb3D,Board3D}.gd`, `tests/{test_jolt_3d.gd,scenarios/test_jolt_integration.gd,spike/CaptureJolt3D.gd,spike/run_jolt_3d_measurement.gd}`, `artifacts/jolt3d_integration_summary.json`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 2D 화면 평면(px, Y 아래) ↔ 3D 월드(m, Y 위) 변환을 `Orb3D` 정적 helper로 모으고 위치·선속도·중력에 Y 반전을 적용. handedness 반전에 맞춰 Z 각속도 부호도 양방향 반전
+  - [x] `Board3D` 물리 벽·시각 프레임·DOWN 기울기가 같은 변환 helper를 사용. 생성선·빈 슬롯·입구 대기는 기존 2D 평면 좌표를 유지하고 `Orb3D.position` 경계에서만 변환
+  - [x] 화면 좌표 자동 테스트 4개 추가: 네 중력 방향의 실제 이동, DOWN 생성 위치=화면 상단, DOWN 붉은 경고=화면 상단, DOWN 기울기=화면 아래. 3D는 `Camera3D.unproject_position()`, 2D는 캔버스 변환으로 같은 방향을 검증
+  - [x] 120Hz 유지, 3D 합체 결과 유령 기본 OFF. 유령 ON/OFF 코드는 유지하고 측정 도구는 기본 OFF + `--jolt-reaction-ghost` 선택 인자로 전환
+  - [x] 자동 기준 적용: 22시드 순환 wall `<=14px`, pair `<=16px`; 20/120턴 wall `<=20px`, 턴 종료 pair `<=60px`; 모든 경로 이탈·발산 0
+  - [x] 22시드 순환 관측 `wall 11.6444px / pair 12.2092px / 이탈 0 / 발산 0`. 전체 테스트에서 기준 assertion 통과
+  - [x] ghost OFF 120Hz seed 101~112 재측정: 게임오버 `12/12`, 중단·이탈·발산 `0/0/0`, 턴 p50 `247`, 종료 점유율 평균 `80.9850%`, 최대 wall/pair `20.5398 / 31.1279px`. 게임오버 수치는 지시대로 보고만 하고 판정에는 사용하지 않음
+  - [x] seed 101 턴 1·60·턴 60 기울기와 DOWN 입력 전/후 PNG를 GPU `OpenGL 3.3 / RTX 4070 Ti SUPER`로 `540×960` 로컬 재캡처하고 방향을 확인. 사용자 추가 지시에 따라 PNG 바이너리는 커밋·PR에서 제외
+  - [x] §10.1 필수 명령 3종 종료 코드 0, 전체 테스트 `121/121`
+- QA 관측값:
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --import` → 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . -s res://tests/run_tests.gd` → `121/121` 통과, 종료 코드 0
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --quit-after 300` → 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - `InspectJoltSettings.gd` → 직렬화에서 생략된 기본 설정의 런타임 값 `velocity_steps=10`, `run_on_separate_thread=false` 확인. position steps `4`, Baumgarte `0.2`, slop `0.02`, worker `1`, 120Hz 유지
+  - 화면 회귀 4개와 3D 좌표/속도/중력 단위 테스트 통과. 각속도 `plane +2.5 → world -2.5`, `world +1.75 → plane -1.75` 자동 확인
+  - 정적 규칙 → `Input`/`InputEvent`는 `scripts/autoload/InputRouter.gd`만, 난수 호출은 `scripts/core/Spawner.gd`만, `git diff --check` 이상 없음
+  - Windows 사용자 로그·루트 인증서·에디터 설정 저장 오류는 기존 실행 환경 오류이며 명령 종료 코드와 프로젝트 스크립트 로드에는 영향 없음
+- 수동 확인 절차:
+  1. Godot 4.8에서 프로젝트를 실행하고 DOWN을 입력한다 → 새 구체는 화면 위쪽 생성선에서 나타나 아래쪽으로 이동하며, 보드 프레임도 화면 아래 방향으로 기울었다가 복귀한다.
+  2. UP/RIGHT/LEFT를 차례로 입력한다 → 구체가 각각 화면 위/오른쪽/왼쪽으로 이동한다.
+  3. 해당 생성 변이 막힌 상태를 만든다 → DOWN 차단은 화면 상단, UP 차단은 화면 하단 프레임이 빨갛게 표시된다.
+  4. `tests/spike/JoltCapture.tscn`을 `--jolt-seed=101 --jolt-capture-until=1`로 실행한다 → 로컬 생성된 DOWN 전/후 화면에서 새 구체가 상단 생성 지점부터 화면 아래로 이동하는지 확인한다. PNG는 PR에 포함하지 않는다.
+- 결정 사항: 새 밸런스 수치와 기존 공개 신호·메서드는 변경하지 않았다. 좌표 반전은 3D 경계 helper에만 두어 2D 규칙 좌표·생성 알고리즘·측정식을 유지했다. 20/120턴 pair는 기존 장기 측정 정의와 동일하게 턴 종료 시점, wall·이탈·발산은 매 물리 프레임에서 측정한다. Godot 에디터가 기본값과 같은 `velocity_steps=10`, `run_on_separate_thread=false` 항목을 직렬화에서 생략하고 physics 항목을 재정렬한 기존 `project.godot` 변경은 사용자 지시에 따라 함께 포함했다.
+- 남은 것 · 질문: 없음.
+
+### [2026-10-03] 대상 #20 — Jolt 3D 정식 통합
+- 상태: 질문
+- 브랜치 / PR: `m8-jolt-integration` / [PR #20](https://github.com/jeongmo-dot/gravity_orb/pull/20)
+- 변경 파일: `project.godot`, `scenes/Main3D.tscn`, `scripts/core/{Main,TurnManager,CollisionResolver,Spawner,Board,Orb}.gd`, `scripts/ui/{Hud,DebugHud}.gd`, `scripts/spike/{Board3D,Orb3D}.gd`, 스파이크 복사본 5종 삭제, `tests/test_jolt_3d.gd`, `tests/scenarios/test_jolt_integration.gd`, `tests/spike/`, `artifacts/jolt3d_integration_summary.json`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 프로젝트 메인 씬을 `Main3D.tscn`으로 전환하고 Jolt 확정 설정(position 4 / velocity 10 / Baumgarte 0.2 / slop 0.02 / separate thread false / worker 1 / 120Hz / FOV 25° / z 42m)을 적용. 기존 2D `Main.tscn`·`Board.tscn`은 유지
+  - [x] `TurnManager`·`CollisionResolver`·`Spawner`·`Main`·`Hud`를 2D/3D 공통 덕 타이핑 경로로 일반화하고 `TurnManager3D`·`CollisionResolver3D`·`Spawner3D`·`Main3D.gd`·`Hud3D` 복사본 삭제. 3D 전용 코드는 `Board3D`·`Orb3D`·씬/카메라/시각 연출만 유지
+  - [x] 3D 합체·규칙 C 결과만 유령 처리: 구체 충돌 통과, 최대 일반 구체 겹침 `<= ghost_exit_overlap` 해제, `ghost_max_time=0.6s` 타임아웃. 점진 성장·타임아웃 위치 보정·사전 벽 복구·escape guard는 끈 상태로 ON/OFF 측정
+  - [x] 3D 자동 시나리오: 공통 코어/UI, 합체 유령 ON/OFF, 겹침 유령 타임아웃, 규칙 C+점수, 20턴, seed 101 120턴, 입구 대기+게임오버+붉은 3D 변, 22시드 중력 사이클 — `8/8` 통과
+  - [x] 2D 회귀와 3D 회귀를 나란히 실행: 2D 240Hz 22시드 `이탈/발산 0/0, wall 10.595px`; 3D 120Hz 22시드 `0/0, wall 11.6444px, pair 13.1703px`. 3D pair 반복 관측 범위 `11.6094~13.8115px`이며 기준 미정이라 실패 한도로 고정하지 않음
+  - [x] 120/60Hz × 결과 유령 ON/OFF, seed 101~112, 게임오버 또는 400턴 측정. 네 조건 모두 12/12 게임오버, 중단·이탈·발산 0
+  - [x] 독립 Godot 프로세스 2회에서 seed 101 120턴 해시 `120/120` 일치. 최종 해시 `1136f5e40244d411100a273c94b0b2622d719d7a63f3910ee8788b5c878c4cb9`
+  - [x] 공통 전체 HUD·F2·F3·R 신호·게임오버 패널·붉은 3D 경고 변 경로 유지. 입력 테스트와 3D 게임오버/경고 테스트 통과
+  - [x] seed 101 턴 1·60·180·기울기 PNG 4장을 GPU 렌더링으로 로컬 재캡처하고 HUD/보드/구체/seed 101 표기를 직접 확인. 사용자 지시에 따라 PNG 바이너리는 PR에서 제외
+  - [ ] 짧은 영상 — 선택 산출물이라 미생성. 자동 캡처 재현 스크립트와 자동 화면 좌표 검증을 유지함
+  - [x] §10.1 필수 명령 3종 종료 코드 0, 전체 테스트 `117/117`
+- 12시드 전체 측정 요약 (`wall/pair`는 네 점유율 구간 중 최대, 외부 ms/frame은 프로세스 wall time ÷ 기록 physics frame):
+
+| 틱 | 결과 유령 | 게임오버 | 턴 p50 | 종료 점유율 평균 | 최대 wall / pair | 이탈 / 발산 | 유령 완료 / timeout / 평균 | 외부 ms/frame |
+|---:|:---:|---:|---:|---:|---:|---:|---:|---:|
+| 120 | ON | 12/12 | 245 | 81.2307% | 27.6306 / 253.2566px | 0 / 0 | 3447 / 2171 / 0.402166s | 0.400763 |
+| 120 | OFF | 12/12 | 245 | 81.5361% | 19.1093 / 57.6111px | 0 / 0 | 0 / 0 / — | 0.400474 |
+| 60 | ON | 12/12 | 256 | 82.5253% | 29.8354 / 244.6228px | 0 / 0 | 3453 / 2307 / 0.427512s | 0.635621 |
+| 60 | OFF | 12/12 | 259 | 82.8655% | 23.8172 / 68.7923px | 0 / 0 | 0 / 0 / — | 0.593263 |
+
+- 점유율 구간별 관측 (`wall / pair px`, `평균 이동 px / 반지름 미만 이동 %`):
+
+| 틱·유령 | 0~20% | 20~40% | 40~60% | 60%+ |
+|---|---:|---:|---:|---:|
+| 120 ON | 23.7145 / 153.5435; 452.99 / 8.94% | 18.6375 / 207.8105; 325.81 / 18.27% | 27.6306 / 253.2566; 214.00 / 26.01% | 27.0826 / 230.1969; 66.77 / 56.14% |
+| 120 OFF | 14.6367 / 55.4102; 445.76 / 9.31% | 19.1093 / 57.6111; 320.75 / 18.13% | 17.1480 / 20.3328; 203.07 / 26.44% | 16.6010 / 12.3192; 63.70 / 56.35% |
+| 60 ON | 23.6865 / 149.9337; 454.48 / 8.81% | 25.7665 / 204.8451; 330.74 / 18.05% | 29.8354 / 225.6754; 205.61 / 27.59% | 26.4857 / 244.6228; 74.51 / 53.71% |
+| 60 OFF | 22.4490 / 29.4529; 441.60 / 9.52% | 23.8172 / 32.3593; 322.11 / 18.26% | 21.3567 / 68.7923; 206.21 / 26.72% | 16.2689 / 34.1755; 72.66 / 53.01% |
+
+- 겹침 원인·유령 효과 관측:
+  - 120 ON 최대 pair `253.2566px`: 40~60%, L6 `ghost_timeout` 이력 구체와 L6 `merge_result`; 60 ON 최대 `244.6228px`: 60%+, L7 `ghost_timeout` 이력 구체와 L3 `merge_result`
+  - OFF 최대는 120Hz `57.6111px`(합체 직후 3 frame)와 60Hz `68.7923px`(오래된 정상 더미 분류). ON은 0.6초 뒤 깊게 겹친 상태에서 보정 없이 solid로 돌아온 timeout이 각각 2171/2307회 누적되어 pair와 wall 모두 OFF보다 커짐
+  - 고밀도 60%+에서 반지름 미만 이동 비율은 모든 조건에서 레벨과 함께 단조 증가. 예: 120 OFF `L1 37.12% → L7 97.87%`, 60 OFF `L1 35.71% → L7 96.41%`. 큰 구체 잼 양상은 3D에서도 유지
+  - 같은 프로세스에서 fixture를 연속 생성하는 보조 결정성 검사는 Jolt body ID 지속으로 2턴부터 다르지만, 명세 기준인 독립 프로세스 2회는 120턴 전부 일치
+- 상세 산출물:
+  - `artifacts/jolt3d_integration_summary.json`: 네 조건의 구간별/레벨별 잼, 게임오버, 성능, 결정성, 2D/3D 회귀 요약
+  - `tests/spike/CaptureJolt3D.gd`: seed 101 턴 화면을 로컬에서 재현하는 캡처 도구. PNG 출력은 PR에 포함하지 않음
+- QA 관측값:
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --import` → 종료 코드 0, 프로젝트 오류 0
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . -s res://tests/run_tests.gd` → `117/117` 통과, 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --quit-after 300` → 종료 코드 0, 프로젝트 오류 0
+  - 정적 규칙 → `Input`/`InputEvent`는 `scripts/autoload/InputRouter.gd`만, 난수 호출은 `scripts/core/Spawner.gd`만, `git diff --check` 이상 없음
+- 수동 확인 절차:
+  1. Godot 4.8에서 프로젝트를 실행한다 → `Main3D.tscn`이 열리고 상단에 디버그·SCORE/BEST/MAX CHAIN/NEXT, 하단에 BLOCKED, 중앙에 3D 보드가 보이는지 확인한다.
+  2. WASD/방향키 또는 스와이프로 네 방향을 입력한다 → 구체가 새 방향으로 이동하고 3D 프레임만 약 4° 기울었다가 0.25초 안에 돌아오는지 확인한다.
+  3. F2로 소멸 규칙, F3로 생성 수를 바꾸고 플레이한다 → HUD Rule/Spawn 값과 다음 생성이 바뀌는지 확인한다.
+  4. 한쪽 생성 변이 막힐 때까지 플레이한다 → 그 3D 프레임 변과 BLOCKED가 빨갛게 표시되고, 해당 방향 생성 실패 시 GAME OVER 패널이 SCORE/BEST/MAX CHAIN/막힌 방향을 표시하는지 확인한다.
+  5. GAME OVER에서 R 또는 RESTART를 누른다 → 새 판이 시작되고 최고 점수는 유지되는지 확인한다.
+- 결정 사항: 공개 신호·메서드 이름과 밸런스값은 바꾸지 않았다. 공통 코어는 `Variant` 덕 타이핑으로 2D/3D 보드 API를 공유했고, 물리 접촉 순서는 런타임 instance ID 대신 보드별 `stable_spawn_id` 정렬·중복 제거로 고정했다. 프로젝트 기본 120Hz와 별개로 기존 2D 물리 회귀 파일은 과거 비교 기준인 240Hz로, `jolt` 테스트 파일은 120Hz로 실행하도록 테스트 러너에서 파일별 틱을 명시했다.
+- 남은 것 · 질문:
+  1. 3D wall/pair 자동 기준값을 어떤 값으로 확정할지 지정 필요. 현재 22시드 회귀는 `11.6444 / 13.1703px`, 실제 12판 게임오버 측정의 최댓값은 유령 OFF에서 120Hz `19.1093 / 57.6111px`, 60Hz `23.8172 / 68.7923px`.
+  2. 기본 물리 틱을 120Hz로 유지할지 60Hz로 내릴지 결정 필요. 60Hz도 이탈·발산 0이나 wall/pair와 외부 ms/frame이 120Hz보다 높게 관측됨.
+  3. 결과 유령을 기본 ON으로 유지할지 OFF로 바꿀지 결정 필요. 위치 보정 금지 조건의 ON은 timeout 누적으로 pair `244~253px`를 만들어 OFF보다 악화됐으며, 수치 변경은 하지 않고 질문으로 멈춤.
+
+### [2026-10-03] 대상 #19 추가 요구 1 — Jolt 2차 성능·겹침·결정성·카메라 시험
+- 상태: 질문
+- 브랜치 / PR: `spike-jolt-3d` / [Draft PR #19](https://github.com/jeongmo-dot/gravity_orb/pull/19)
+- 변경 파일: `project.godot`, `scenes/Main3D.tscn`, `scripts/spike/Orb3D.gd`, `scripts/spike/Board3D.gd`, `scripts/spike/CollisionResolver3D.gd`, `tests/test_jolt_3d.gd`, `tests/spike/CaptureJolt3D.gd`, `tests/spike/Profile2DBaseline.gd`, `tests/spike/run_jolt_3d_measurement.gd`, `tests/spike/InspectJoltSettings.gd`, `tests/spike/JoltDecomposition.gd`, `tests/spike/JoltDecomposition.tscn`, `artifacts/jolt3d_seed101_*.png`, `artifacts/physics2d_profile_seed101_240hz.json`, `artifacts/jolt3d_second_round_summary.json`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] seed 101 턴 120 실제 상태 스냅샷으로 (a) 잠금 물체부터 (f) 전체까지 6단계 성능 분해. 오브젝트·노드 수도 10턴마다 기록해 누적 누수 여부를 함께 확인
+  - [x] Godot 4.8 런타임에서 실제 Jolt 설정 이름·현재값을 열거하고 position steps / Baumgarte / penetration slop 중심 스윕, velocity steps 20 문제 시드 보조 비교
+  - [x] CCD 끔·sleep 허용과 3D 점진 성장만 켠 경우를 각각 분리 측정. 유령·복구 등 나머지 보정은 계속 끔
+  - [x] worker pool 1개로 독립 프로세스 2회를 실행해 seed 101의 120턴 해시 `120/120` 일치 확인
+  - [x] 카메라를 `FOV 25° / z=42m`로 조정하고 턴 1·60·180·기울기 PNG 4장을 540×960에서 재캡처·육안 확인
+  - [x] 최종 후보를 120Hz, seed 101~112, 게임오버까지 재측정하고 2D 기본 행과 비교
+  - [x] 기존 2D 포함 전체 자동 테스트 `109/109` 및 필수 명령 3종 종료 코드 0
+  - [ ] 60Hz 재측정과 짧은 영상 — 명세상 선택 항목이라 120Hz의 12시드 전체 계측·분류를 우선했고 이번 2차에는 미실행
+- 1차 성능 수치 교정:
+  - `--fixed-fps` 장시간 실행 중 `Time.get_ticks_usec()`가 turn 20부터 실제 경과가 아니라 매 물리 프레임 정확히 `13.836ms`씩 증가하는 값으로 전환됐다. 이 때문에 1차의 Jolt `18.946~28.113ms/step` 및 “2D의 약 90배” 비교는 실제 wall time이 아니었다.
+  - 같은 5,460 physics frame을 프로세스 외부에서 재면 시작·QA 포함 `1,871.896ms / 5,460 = 0.3428ms/frame`, 최종 12시드 전체는 `217,378.747ms / 540,110 = 0.4025ms/frame`이었다. headless의 `Performance.TIME_PHYSICS_PROCESS`는 계속 0이라 외부 프로세스 경과 시간을 최종 성능 기준으로 사용했다.
+  - 2D seed 101·120턴은 같은 외부 방식으로 시작·QA 포함 `8,689.9ms / 43,440 = 0.2000ms/frame`이었다. Jolt 최종 후보는 참고 목표 `≤2ms` 안이며, 2D 대비 외부 wall 기준 약 `2.01배`다.
+- 성능 원인 분해 (`seed101 turn120`, 실제 27개 구체 스냅샷, 120Hz, ms/frame):
+
+| 구성 | 평균 | p50 | p95 |
+|---|---:|---:|---:|
+| a. 잠금 물체 | 0.0392 | 0.037 | 0.057 |
+| b. + contact 보고 | 0.0478 | 0.044 | 0.071 |
+| c. + `Orb3D` 래퍼 | 0.0558 | 0.052 | 0.086 |
+| d. + `Board3D` | 0.0892 | 0.086 | 0.126 |
+| e. + resolver / turn manager | 0.0882 | 0.079 | 0.130 |
+| f. 전체 | 0.2162 | 0.096 | 0.234 |
+
+  - 특정 구성 하나에서 19ms급 비용이 생기지 않았다. 전체 구성의 단일 최대 `22.798ms` 한 건은 상태 전환 프레임이고 p95에는 영향을 주지 않았다.
+  - Jolt 작업 큐 경고와 관련된 런타임 설정은 `physics/3d/run_on_separate_thread=false`, `threading/worker_pool/max_threads`였다. 장시간 fixture에서 object/node 수의 단조 누적은 없었다. 엔진 내부 원인을 더 좁히지는 못했지만 worker pool을 1개로 고정한 최종 전 실행에서 `maximum number of jobs` 경고는 0회였다. 이는 Jolt 전용 설정이 아니라 프로젝트 전역 worker pool 설정이다.
+- Godot 4.8에서 확인한 설정 이름·값:
+  - `physics/jolt_physics_3d/simulation/position_steps`: 기본 `2`, 최종 `4`
+  - `physics/jolt_physics_3d/simulation/velocity_steps`: 기본·최종 `10`
+  - `physics/jolt_physics_3d/simulation/baumgarte_stabilization_factor`: 기본·최종 `0.2`
+  - `physics/jolt_physics_3d/simulation/penetration_slop`: 기본·최종 `0.02m`
+  - `physics/jolt_physics_3d/simulation/speculative_contact_distance`: `0.02m` 유지
+  - `physics/jolt_physics_3d/simulation/body_pair_contact_cache_enabled`: `true` 유지
+  - `physics/jolt_physics_3d/simulation/allow_sleep`: `true`이나, 최종 시험의 각 `RigidBody3D.can_sleep=false`
+  - `physics/3d/run_on_separate_thread=false`, `threading/worker_pool/max_threads=1`
+- 설정 스윕 (`seed101`, 120턴, 120Hz):
+
+| position / velocity / Baumgarte / slop | 외부 ms/frame | 최대 wall | 턴 끝 pair |
+|---|---:|---:|---:|
+| 2 / 10 / 0.2 / 0.02 | 0.5804 | 14.858px | 9.735px |
+| **4 / 10 / 0.2 / 0.02** | **0.4027** | **14.636px** | **5.786px** |
+| 2 / 10 / 0.4 / 0.02 | 0.4242 | 18.550px | 5.670px |
+| 2 / 10 / 0.2 / 0.01 | 0.4847 | 16.220px | 25.660px |
+| 8 / 10 / 0.2 / 0.02 | 0.2827 | 20.997px | 5.915px |
+
+  - velocity steps 20은 문제 시드 103/104/109/110에서 wall·pair가 서로 엇갈려 10보다 일관되게 낫지 않았다. CCD 끔과 sleep 허용도 장시간 성능을 개선하지 않았고 sleep은 결과 상태까지 바꿨다.
+  - 점진 성장만 켠 seed 101 결과는 외부 `0.4290ms/frame`, wall `25.060px`, 턴 끝 pair `7.250px`, 모든 프레임 pair `26.080px`였다. 성장 끔의 모든 프레임 pair `76.390px`보다 생성 직후 겹침은 줄였지만 wall이 나빠져 최종 후보에는 적용하지 않았다.
+- 최종 비교 (`Jolt 2차`는 position 4 / velocity 10 / Baumgarte 0.2 / slop 0.02 / worker 1 / 성장 끔):
+
+| 경로 | 틱 | 게임오버 | 중단/이탈/발산 | 게임오버 p50 | 종료 점유율 평균 | 최대 wall / 턴 끝 pair | 외부 ms/frame |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Jolt 2차 최종 | 120 | 12/12 | 0 / 0 / 0 | 245 | 81.5361% | 19.1093 / 57.6111px | 0.4025 |
+| Jolt 1차 보정 끔 | 120 | 12/12 | 0 / 0 / 0 | 242 | 81.3500% | 18.617 / 78.977px | 1차 값 무효 |
+| 2D 현재 기본 (#17) | 240 | 12/12 | 0 / 0 / 0 | 242 | 80.6789% | 구간 최대 15.645 / 미측정 | 0.2000¹ |
+
+  - ¹ 2D 성능만 seed 101·120턴 외부 프로세스 측정이고, 나머지 2D 열은 기존 12시드 게임오버 측정이다.
+  - Jolt 2차 seed별 `wall / pair`: 101 `14.64/12.50`, 102 `15.12/39.60`, 103 `16.50/57.61`, 104 `17.15/55.41`, 105 `15.52/9.54`, 106 `13.55/14.27`, 107 `16.60/8.37`, 108 `14.13/9.42`, 109 `19.11/20.33`, 110 `13.91/53.02`, 111 `12.35/16.10`, 112 `12.91/9.76`px.
+- 겹침 분류:
+  - 0~20% 최대 pair `55.41px`: seed 104 turn 23, 합체 결과 직후(`merge_immediate`), 결과 구체 age 1 frame
+  - 20~40% 최대 pair `57.61px`: seed 103 turn 83, 합체 결과 직후(`merge_immediate`), 결과 구체 age 3 frames
+  - 40~60% 최대 pair `20.33px`: seed 109 turn 152, 오래된 정상 더미(`normal_pile`)
+  - 60%+ 최대 pair `12.32px`: 정상 더미. 전체 모든 프레임 최대 `134.6156px`도 합체 직후였다.
+  - 따라서 큰 최대치는 주로 생성·합체 직후이나 정상 더미에서도 턴 끝 `20.33px`가 관측됐다. 참고 목표 wall `≤15px`, 턴 끝 pair `≤15px`는 각각 `19.1093px`, `57.6111px`로 충족 여부를 Claude가 판정해야 한다.
+- 결정성:
+  - 안정적인 spawn ID를 부여하고 contact pair를 ID 순으로 정렬·중복 제거했다. worker 1에서 seed 101을 독립 프로세스 2회 실행한 턴별 상태 해시는 `120/120` 동일, 최초 불일치 `-1`이었다(각 프로세스 wall `6,094.814 / 6,167.297ms`).
+  - 같은 프로세스 안에서 fixture만 재생성하면 Jolt body ID가 초기화되지 않아 2턴부터 달라지는 한계는 남는다. 실제 “2회 실행” 조건인 독립 프로세스 간에는 일치했다.
+- 화면 산출물:
+  - `artifacts/jolt3d_seed101_turn_001.png`, `artifacts/jolt3d_seed101_turn_060.png`, `artifacts/jolt3d_seed101_turn_180.png`, `artifacts/jolt3d_seed101_tilt_turn060.png`
+  - 모두 `540×960`. `FOV 25° / z=42m`에서 보드 전체와 상·하단 HUD가 화면 안에 있고, 기울기 순간에도 화면 경계에 잘린 보드·구체는 없음을 직접 확인했다. 렌더 완료 신호 뒤 캡처하도록 스크립트도 수정했다.
+- QA 관측값:
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --import` → 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . -s res://tests/run_tests.gd` → `109/109` 통과, 종료 코드 0
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --quit-after 300` → 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - 정적 검사 → `Input`/`InputEvent`는 `InputRouter.gd`만, 난수 API는 `Spawner.gd`만, `git diff --check` 이상 없음
+  - Windows 사용자 로그·루트 인증서 접근 오류는 기존 실행 환경 오류이며 프로젝트 스크립트 로드와 종료 코드에는 영향 없음
+- 수동 확인 절차:
+  1. Godot 4.8에서 `scenes/Main3D.tscn`을 실행한다 → 540×960 세로 화면에서 보드 외곽 네 면과 HUD가 모두 여백 안에 표시되는지 확인한다.
+  2. WASD/화살표 또는 스와이프로 중력을 바꾼다 → 4° 기울기 중에도 보드·구체가 화면 밖으로 잘리지 않고, 입력 종료 후 프레임만 0.25초 안에 복귀하는지 확인한다.
+  3. `artifacts/jolt3d_seed101_*.png` 4장을 연다 → 턴 1/60/180과 턴 60 기울기 장면의 HUD·보드·구체가 완전히 렌더됐는지 확인한다.
+- 결정 사항: 1차의 성능 결론을 그대로 사용하지 않고 외부 프로세스 wall time으로 다시 측정했다. 스윕에서 성능·wall·pair가 모두 단조 개선되지 않아 wall 악화가 큰 position 8 대신 position 4를 최종 후보로 두었다. 전역 worker 1은 실험 브랜치에만 적용했다. 기존 2D 씬·수치·코어는 변경하지 않았다.
+- 남은 것 · 질문: 성능 `0.4025ms/frame`, 독립 실행 결정성 `120/120`, 이탈·발산 `0/0`은 참고 목표 안이나 wall `19.1093px`와 턴 끝 pair `57.6111px`는 참고 목표를 넘는다. 허용된 점진 성장은 pair를 줄이는 대신 wall을 `25.060px`로 악화했다. 이 상태로 Jolt를 채택/기각할지, 또는 합체 직후 충돌 형상 처리나 추가 보정 명세를 허용할지 결정이 필요하다.
+
+### [2026-10-03] 대상 #19 — Jolt 3D + 평면 고정 스파이크
+- 상태: 질문
+- 브랜치 / PR: `spike-jolt-3d` / [Draft PR #19](https://github.com/jeongmo-dot/gravity_orb/pull/19)
+- 변경 파일: `project.godot`, `scenes/Board3D.tscn`, `scenes/Orb3D.tscn`, `scenes/Main3D.tscn`, `scripts/spike/Orb3D.gd`, `scripts/spike/Board3D.gd`, `scripts/spike/Spawner3D.gd`, `scripts/spike/CollisionResolver3D.gd`, `scripts/spike/TurnManager3D.gd`, `scripts/spike/Main3D.gd`, `scripts/spike/Hud3D.gd`, `tests/test_jolt_3d.gd`, `tests/spike/`, `artifacts/jolt3d_*`, `artifacts/physics2d_profile_seed101_240hz.json`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] Jolt 3D·XY 평면·`1m=100px`·Z 이동/X/Y 회전 잠금, 4면 `StaticBody3D`, 원근 카메라와 조명, 색 구체·하이라이트·그림자, 시각 보드만 `4°/0.25초` 기울기 구현
+  - [x] 기존 2D 기본 씬·코어·수치·규칙은 변경하지 않고 `Main3D.tscn`을 나란히 실행 가능하게 추가. 프로젝트 기본 씬은 계속 `Main.tscn`
+  - [x] 120/240Hz에서 시드 101~112 모두 게임오버까지 완주, 60Hz는 11/12 게임오버·seed 109만 400턴 도달. 세 틱 모두 측정 중단·완전 이탈·발산 0
+  - [x] 기존 2D 전체 자동 테스트 `108/108` 통과(기존 104 + 3D 단위 테스트 4)
+  - [x] 보정 장치 끔 상태의 틱별 안정성·움직임·게임오버·물리 스텝 wall time, 2D 현재 기본값 비교, 동일 시드 2회 120턴 해시 비교
+  - [x] 시드 101 턴 1·60·180 및 턴 60 기울기 순간 PNG 4장 생성·육안 확인
+  - [ ] 보정 장치 켬 추가 측정 — 세 틱 모두 이탈·발산 0이고 관통/겹침의 합격 기준이 명세에 없어 임의 보정을 켜지 않음. 아래 관측값을 기준으로 허용 한도 또는 켤 장치 지정 필요
+- 최소 어댑터 목록:
+  - `Orb3D`: `Node` 래퍼가 자식 `RigidBody3D`를 소유해 코어 의미와 같은 px 단위 `Vector2 position/linear_velocity`, Z `angular_velocity`를 노출한다. 구체 자체는 Jolt `RigidBody3D + SphereShape3D`
+  - `Board3D`: 2D `Board`의 생성선·빈자리·입구 대기 API를 3D 물리 노드에 맞춰 구현한다. 유령·성장·타임아웃 보정·사전 벽 복구·안전장치는 포함하지 않았다
+  - `Spawner3D`: 난수를 새로 만들지 않고 기존 `Spawner._draw_candidate()`를 호출해 RNG·가중치·소비 순서를 그대로 사용하며, 3D 보드 생성만 어댑트한다
+  - `CollisionResolver3D`: 물리 콜백에서는 쌍만 적재하고 `flush()`에서 처리한다. 판정은 기존 `ReactionRules.classify()`를 직접 사용하고 점수는 기존 `ScoreManager`를 직접 사용한다
+  - `TurnManager3D`: 기존 구체 타입이 `Orb`로 고정돼 있어 같은 상태 전이·정착·게임오버 흐름을 `Orb3D` 타입으로 옮겼다. 입력은 기존 `InputRouter`를 직접 사용한다
+  - `Hud3D`: 기존 HUD도 2D 구체 타입에 고정돼 있어 시안용 `CanvasLayer` 어댑터를 추가했다. 원본 코어/API를 일반화하면 2D 회귀 범위가 커지므로 스파이크에서는 수정하지 않았다
+- 틱별 보정 끔 측정 (`--fixed-fps 240`, 시드 101~112, 게임오버 또는 400턴): `wall`은 벽 안쪽 경계 기준 최대 침투, `pair`는 턴 끝 구체쌍 최대 겹침, `ms`는 연속 `physics_frame` 콜백 사이 wall time이다.
+
+| 경로 | 틱 | 게임오버 | 중단/이탈/발산 | 게임오버 턴 p50 | 종료 점유율 평균 | 최대 wall / pair | 물리 step 평균 / p95 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Jolt 3D 보정 끔 | 60 | 11/12 | 0 / 0 / 0 | 246 | 81.9789% | 24.664 / 71.455px | 28.113 / 42.791ms |
+| Jolt 3D 보정 끔 | 120 | 12/12 | 0 / 0 / 0 | 242 | 81.3500% | 18.617 / 78.977px | 26.802 / 41.735ms |
+| Jolt 3D 보정 끔 | 240 | 12/12 | 0 / 0 / 0 | 254 | 81.4622% | 19.325 / 48.406px | 25.766 / 39.734ms |
+| Jolt 3D 보정 켬 | — | 미실행 | — | — | — | — | — |
+| 2D 현재 기본 (#17, 보정 켬) | 240 | 12/12 | 0 / 0 / 0 | 242 | 80.6789% | 구간 최대 15.645px / 미측정 | 아래 동일 표본 참조 |
+
+  - 동일 표본 성능 보조 측정(240Hz, seed 101, 120턴): Jolt 3D `18.946ms` 평균 / `24.148ms` p95, 2D `0.219ms` 평균 / `0.264ms` p95. 둘 다 headless·`--fixed-fps 240`에서 같은 방향 패턴과 wall-time 방식으로 측정했다. 이는 순수 solver profiler가 아니라 스크립트 콜백 사이의 전체 물리 스텝 비용이다.
+  - Jolt 측정의 `Performance.TIME_PHYSICS_PROCESS`는 headless에서 0을 반환해 wall time을 사용했다. 전체 12시드 수치는 고밀도까지 포함하므로 동일 seed 120턴 보조 측정보다 느리다.
+- 점유율 구간별 비교: `D/V; wall; move; <r`는 완전 이탈/발산, 최대 벽 침투(px), 새 중력 방향 평균 이동(px), 자기 반지름 미만 이동 비율이다.
+
+| 경로·틱 | 0~20% | 20~40% | 40~60% | 60%+ |
+|---|---|---|---|---|
+| Jolt 60 | 0/0; 21.20; 447.8; 9.23% | 0/0; 24.66; 326.7; 17.49% | 0/0; 22.60; 201.7; 27.14% | 0/0; 18.84; 77.2; 50.82% |
+| Jolt 120 | 0/0; 15.52; 446.3; 8.82% | 0/0; 18.62; 320.3; 17.63% | 0/0; 17.95; 198.4; 26.81% | 0/0; 13.79; 67.8; 54.22% |
+| Jolt 240 | 0/0; 15.80; 442.1; 9.48% | 0/0; 19.04; 318.5; 17.86% | 0/0; 19.32; 193.5; 27.87% | 0/0; 19.05; 65.3; 56.22% |
+| 2D 현재 240 (#17) | 0/0; 14.37; 446.4; 8.6% | 0/0; 14.35; 322.0; 17.5% | 0/0; 15.64; 193.6; 27.0% | 0/0; 12.62; 68.3; 53.1% |
+
+  - 2D 현재 행에는 사전 벽 복구가 구간별 `61/1/2/11회` 있었다. Jolt 행은 해당 장치 자체가 없고 0회다.
+  - Jolt 60Hz의 고밀도 움직임은 2D보다 좋았지만(반경 미만 `50.82%` vs `53.1%`), 120/240Hz는 `54.22/56.22%`로 나빴다. 틱 증가가 움직임을 개선하지 않았다.
+  - Jolt는 완전 이탈·발산 없이 완주했지만 벽 침투가 2D 기준보다 크고, 턴 끝 구체쌍 겹침이 최대 `78.977px`였다. 합격 기준이 없어 판정하지 않고 관측값으로 남긴다.
+- 결정성: seed 101을 새 fixture로 2회 실행해 120턴 모두 비교했다. 색·레벨·위치·선/각속도·입구 대기 상태를 소수점 3자리로 정렬 해시했으며 **2턴부터 불일치**, `120/120`턴 비교는 완료했지만 완전 일치는 아니었다.
+- 화면 시안 산출물:
+  - `artifacts/jolt3d_seed101_turn_001.png` (`540×960`)
+  - `artifacts/jolt3d_seed101_tilt_turn060.png` (`540×960`, 프레임 기울기 순간)
+  - `artifacts/jolt3d_seed101_turn_060.png` (`540×960`)
+  - `artifacts/jolt3d_seed101_turn_180.png` (`540×960`)
+  - 짧은 영상은 미생성. 필수 PNG 4장과 자동 캡처 재현 스크립트는 포함했다.
+- QA 관측값:
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --import` → 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . -s res://tests/run_tests.gd` → `108/108` 통과, 종료 코드 0
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --quit-after 300` → 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - 3D 전체 측정 → 종료 코드 0, 60/120/240Hz 총 35/36판 게임오버·중단 0. 60Hz seed 109만 400턴 미종료
+  - 시각 캡처 → 종료 코드 0, PNG 4장 저장 후 직접 확인
+  - Jolt 엔진 `maximum number of jobs` 경고가 전체 측정 1회, 화면 캡처 1회 발생했다. 측정 중단·이탈·발산으로 이어지지는 않았다
+  - Windows 사용자 로그·루트 인증서·에디터 설정 접근 오류는 기존 환경 오류이며 프로젝트 스크립트/종료 코드에는 영향 없음
+  - 정적 검사 → `Input`/`InputEvent`는 `InputRouter.gd`만, 난수 API는 `Spawner.gd`만, `git diff --check` 이상 없음
+- 수동 확인 절차:
+  1. Godot에서 `scenes/Main3D.tscn`을 현재 씬으로 실행한다 → 원근 카메라·색 구체·하이라이트·그림자·보드 프레임과 CanvasLayer HUD가 표시된다.
+  2. WASD/화살표 또는 스와이프로 중력 방향을 바꾼다 → 물리 구체는 XY 평면에서 새 중력으로 이동하고, 시각 프레임만 해당 방향으로 약 4° 기울었다가 0.25초 안에 복귀한다.
+  3. 게임오버까지 반복한다 → NEXT 묶음·합체·상극 소멸·점수·입구 대기 후 게임오버가 2D와 같은 규칙으로 동작한다.
+  4. `artifacts/jolt3d_seed101_*.png` 4장을 연다 → 턴 1/60/180과 턴 60 기울기 순간이 서로 다른 실제 프레임으로 보인다.
+- 결정 사항: 원본 코어 타입을 약화하거나 2D API를 바꾸지 않기 위해 스파이크 전용 어댑터를 격리했다. 프레임 기울기는 명세 범위 중앙인 `4°`, 전체 시간은 지정값 `0.25초`를 사용했다. 별도 수치는 만들지 않았다. #18 축소 반지름 1회는 선택 요구라 현재 반지름의 3틱×12시드·결정성·시각 캡처를 우선해 미실행했다.
+- 남은 것 · 질문: Jolt는 보정 없이 이탈·발산 0이지만, ① 2턴부터 비결정적, ② 최대 벽 침투 `24.664px`·턴 끝 쌍 겹침 `78.977px`, ③ 동일 표본 물리 step wall time이 2D보다 크게 느림, ④ 작업 큐 경고 2회가 관측됐다. 채택/기각 또는 허용 관통·결정성·성능 기준과 추가 측정할 보정 장치를 지정해 달라.
+
 ### [2026-10-02] 대상 #17 추가 요구 2 — 22시드 관통 기준 12px 적용
 - 상태: 완료
 - 브랜치 / PR: `m7-high-density-physics` / [PR #17](https://github.com/jeongmo-dot/gravity_orb/pull/17)

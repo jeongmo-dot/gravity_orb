@@ -1,0 +1,199 @@
+{
+  "task": "#20 Jolt 3D formal integration",
+  "engine": "Godot 4.8.dev3.mono.official.51105ccbe",
+  "seeds": [101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112],
+  "stop_condition": "game_over_or_400_turns",
+  "additional_requirement_1": {
+    "coordinate_fix": "2D screen-space y-down is converted to 3D world-space y-up at the Orb3D boundary; angular velocity sign is flipped with handedness",
+    "physics_ticks_per_second": 120,
+    "reaction_ghost_default": false,
+    "automatic_thresholds": {
+      "22_seed_cycle": {"wall_px": 14.0, "pair_px": 16.0},
+      "20_and_120_turns": {"wall_px": 20.0, "pair_px": 60.0},
+      "departures": 0,
+      "divergences": 0
+    },
+    "observed_22_seed_cycle": {
+      "wall_px": 11.6444,
+      "pair_px": 12.2092,
+      "departures": 0,
+      "divergences": 0
+    },
+    "observed_12_game_120hz_ghost_off": {
+      "game_over_count": 12,
+      "aborted_count": 0,
+      "game_over_turn_p50": 247,
+      "game_over_occupancy_mean_percent": 80.9850,
+      "max_wall_px": 20.5398,
+      "max_pair_px": 31.1279,
+      "departures": 0,
+      "divergences": 0,
+      "game_over_is_report_only": true
+    },
+    "screen_coordinate_tests": {
+      "count": 4,
+      "covers_3d_and_2d": true,
+      "checks": [
+        "cardinal gravity movement",
+        "DOWN spawn at screen top",
+        "DOWN warning at screen top",
+        "DOWN tilt toward screen bottom"
+      ]
+    }
+  },
+  "regression_side_by_side": {
+    "2d_240hz_22_seeds": {
+      "departures": 0,
+      "divergences": 0,
+      "max_wall_penetration_px": 10.595,
+      "escape_guards": 0,
+      "wall_recoveries": 0
+    },
+    "3d_120hz_22_seeds": {
+      "departures": 0,
+      "divergences": 0,
+      "max_wall_penetration_px": 11.6444,
+      "max_pair_overlap_px": 13.1703,
+      "repeated_max_pair_overlap_range_px": [11.6094, 13.8115]
+    }
+  },
+  "corrections": {
+    "progressive_growth": false,
+    "timeout_position_correction": false,
+    "proactive_wall_recovery": false,
+    "escape_guard": false
+  },
+  "conditions": [
+    {
+      "ticks_per_second": 120,
+      "reaction_ghost": true,
+      "game_over_count": 12,
+      "game_over_turn_p50": 245,
+      "game_over_occupancy_mean_percent": 81.2307,
+      "physics_frames": 548953,
+      "external_wall_seconds": 220.0,
+      "external_ms_per_frame": 0.400763,
+      "ghost_completed": 3447,
+      "ghost_timeouts": 2171,
+      "ghost_average_duration_seconds": 0.402166,
+      "bins": {
+        "0-20": {"wall_px": 23.7145, "pair_px": 153.5435, "pair_category": "normal_pile", "departures": 0, "divergences": 0, "mean_movement_px": 452.9874, "below_radius_percent": 8.9410},
+        "20-40": {"wall_px": 18.6375, "pair_px": 207.8105, "pair_category": "normal_pile", "departures": 0, "divergences": 0, "mean_movement_px": 325.8147, "below_radius_percent": 18.2693},
+        "40-60": {"wall_px": 27.6306, "pair_px": 253.2566, "pair_category": "normal_pile", "departures": 0, "divergences": 0, "mean_movement_px": 213.9981, "below_radius_percent": 26.0109},
+        "60+": {"wall_px": 27.0826, "pair_px": 230.1969, "pair_category": "normal_pile", "departures": 0, "divergences": 0, "mean_movement_px": 66.7737, "below_radius_percent": 56.1431}
+      },
+      "jam_60_plus_by_level": {
+        "1": {"mean_movement_px": 79.5595, "below_radius_percent": 37.2924},
+        "2": {"mean_movement_px": 68.0441, "below_radius_percent": 52.0742},
+        "3": {"mean_movement_px": 60.8946, "below_radius_percent": 65.5495},
+        "4": {"mean_movement_px": 57.9642, "below_radius_percent": 74.5917},
+        "5": {"mean_movement_px": 50.0734, "below_radius_percent": 86.2004},
+        "6": {"mean_movement_px": 36.5850, "below_radius_percent": 94.6269},
+        "7": {"mean_movement_px": 32.7631, "below_radius_percent": 98.3421}
+      }
+    },
+    {
+      "ticks_per_second": 120,
+      "reaction_ghost": false,
+      "game_over_count": 12,
+      "game_over_turn_p50": 245,
+      "game_over_occupancy_mean_percent": 81.5361,
+      "physics_frames": 540110,
+      "external_wall_seconds": 216.3,
+      "external_ms_per_frame": 0.400474,
+      "ghost_completed": 0,
+      "ghost_timeouts": 0,
+      "bins": {
+        "0-20": {"wall_px": 14.6367, "pair_px": 55.4102, "pair_category": "merge_immediate", "departures": 0, "divergences": 0, "mean_movement_px": 445.7565, "below_radius_percent": 9.3055},
+        "20-40": {"wall_px": 19.1093, "pair_px": 57.6111, "pair_category": "merge_immediate", "departures": 0, "divergences": 0, "mean_movement_px": 320.7488, "below_radius_percent": 18.1323},
+        "40-60": {"wall_px": 17.1480, "pair_px": 20.3328, "pair_category": "normal_pile", "departures": 0, "divergences": 0, "mean_movement_px": 203.0687, "below_radius_percent": 26.4441},
+        "60+": {"wall_px": 16.6010, "pair_px": 12.3192, "pair_category": "normal_pile", "departures": 0, "divergences": 0, "mean_movement_px": 63.6970, "below_radius_percent": 56.3455}
+      },
+      "jam_60_plus_by_level": {
+        "1": {"mean_movement_px": 73.0568, "below_radius_percent": 37.1157},
+        "2": {"mean_movement_px": 66.5796, "below_radius_percent": 52.3678},
+        "3": {"mean_movement_px": 57.7000, "below_radius_percent": 66.6439},
+        "4": {"mean_movement_px": 55.1505, "below_radius_percent": 77.1820},
+        "5": {"mean_movement_px": 51.3199, "below_radius_percent": 85.8999},
+        "6": {"mean_movement_px": 43.1661, "below_radius_percent": 94.0355},
+        "7": {"mean_movement_px": 35.5789, "below_radius_percent": 97.8701}
+      }
+    },
+    {
+      "ticks_per_second": 60,
+      "reaction_ghost": true,
+      "game_over_count": 12,
+      "game_over_turn_p50": 256,
+      "game_over_occupancy_mean_percent": 82.5253,
+      "physics_frames": 280513,
+      "external_wall_seconds": 178.3,
+      "external_ms_per_frame": 0.635621,
+      "ghost_completed": 3453,
+      "ghost_timeouts": 2307,
+      "ghost_average_duration_seconds": 0.427512,
+      "bins": {
+        "0-20": {"wall_px": 23.6865, "pair_px": 149.9337, "pair_category": "normal_pile", "departures": 0, "divergences": 0, "mean_movement_px": 454.4765, "below_radius_percent": 8.8084},
+        "20-40": {"wall_px": 25.7665, "pair_px": 204.8451, "pair_category": "normal_pile", "departures": 0, "divergences": 0, "mean_movement_px": 330.7420, "below_radius_percent": 18.0485},
+        "40-60": {"wall_px": 29.8354, "pair_px": 225.6754, "pair_category": "normal_pile", "departures": 0, "divergences": 0, "mean_movement_px": 205.6074, "below_radius_percent": 27.5914},
+        "60+": {"wall_px": 26.4857, "pair_px": 244.6228, "pair_category": "normal_pile", "departures": 0, "divergences": 0, "mean_movement_px": 74.5126, "below_radius_percent": 53.7112}
+      },
+      "jam_60_plus_by_level": {
+        "1": {"mean_movement_px": 84.6263, "below_radius_percent": 37.1638},
+        "2": {"mean_movement_px": 74.3680, "below_radius_percent": 50.9195},
+        "3": {"mean_movement_px": 73.8781, "below_radius_percent": 59.8314},
+        "4": {"mean_movement_px": 63.5384, "below_radius_percent": 73.3030},
+        "5": {"mean_movement_px": 61.7354, "below_radius_percent": 80.3894},
+        "6": {"mean_movement_px": 51.4205, "below_radius_percent": 91.4037},
+        "7": {"mean_movement_px": 40.9174, "below_radius_percent": 97.2395}
+      }
+    },
+    {
+      "ticks_per_second": 60,
+      "reaction_ghost": false,
+      "game_over_count": 12,
+      "game_over_turn_p50": 259,
+      "game_over_occupancy_mean_percent": 82.8655,
+      "physics_frames": 279134,
+      "external_wall_seconds": 165.6,
+      "external_ms_per_frame": 0.593263,
+      "ghost_completed": 0,
+      "ghost_timeouts": 0,
+      "bins": {
+        "0-20": {"wall_px": 22.4490, "pair_px": 29.4529, "pair_category": "merge_immediate", "departures": 0, "divergences": 0, "mean_movement_px": 441.5995, "below_radius_percent": 9.5157},
+        "20-40": {"wall_px": 23.8172, "pair_px": 32.3593, "pair_category": "merge_immediate", "departures": 0, "divergences": 0, "mean_movement_px": 322.1067, "below_radius_percent": 18.2621},
+        "40-60": {"wall_px": 21.3567, "pair_px": 68.7923, "pair_category": "normal_pile", "departures": 0, "divergences": 0, "mean_movement_px": 206.2077, "below_radius_percent": 26.7191},
+        "60+": {"wall_px": 16.2689, "pair_px": 34.1755, "pair_category": "normal_pile", "departures": 0, "divergences": 0, "mean_movement_px": 72.6562, "below_radius_percent": 53.0142}
+      },
+      "jam_60_plus_by_level": {
+        "1": {"mean_movement_px": 81.8882, "below_radius_percent": 35.7130},
+        "2": {"mean_movement_px": 75.7042, "below_radius_percent": 47.1902},
+        "3": {"mean_movement_px": 66.7748, "below_radius_percent": 61.9077},
+        "4": {"mean_movement_px": 62.8420, "below_radius_percent": 73.9693},
+        "5": {"mean_movement_px": 60.3583, "below_radius_percent": 82.7907},
+        "6": {"mean_movement_px": 52.3097, "below_radius_percent": 91.0695},
+        "7": {"mean_movement_px": 45.3095, "below_radius_percent": 96.4108}
+      }
+    }
+  ],
+  "determinism": {
+    "criterion": "independent_processes_seed_101_120_turn_hashes",
+    "identical": true,
+    "compared_turns": 120,
+    "final_hash": "1136f5e40244d411100a273c94b0b2622d719d7a63f3910ee8788b5c878c4cb9",
+    "same_process_fixture_diagnostic_identical": false,
+    "same_process_first_mismatch_turn": 2
+  },
+  "verification": {
+    "import_exit_code": 0,
+    "tests": {"passed": 121, "failed": 0, "exit_code": 0},
+    "main_300_frames_exit_code": 0,
+    "script_errors": 0,
+    "parse_errors": 0
+  },
+  "observations": [
+    "All four conditions recorded zero departures and zero divergences.",
+    "Reaction ghost ON produced 2171 timeouts at 120 Hz and 2307 at 60 Hz.",
+    "With timeout position correction disabled, ghost ON raised maximum pair overlap to 149.9337-253.2566 px versus 12.3192-68.7923 px with ghost OFF.",
+    "High-density below-radius movement increases monotonically with orb level in every condition."
+  ]
+}
