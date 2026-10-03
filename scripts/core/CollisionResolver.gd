@@ -6,6 +6,7 @@ signal reaction_applied(reaction: Dictionary)
 @onready var _board: Variant = %Board
 
 var _pending: Array[Array] = []
+var _reaction_locks: Dictionary = {}
 
 
 func _ready() -> void:
@@ -29,7 +30,9 @@ func sweep_resting_contacts() -> int:
 	return flush()
 
 
-func flush() -> int:
+func flush(delta: float = 0.0) -> int:
+	_advance_reaction_locks(delta)
+	_queue_released_reaction_contacts()
 	var pending: Array[Array] = _pending
 	_pending = []
 	pending.sort_custom(_pair_less)
@@ -41,6 +44,8 @@ func flush() -> int:
 		if not is_instance_valid(a) or not is_instance_valid(b):
 			continue
 		if a.consumed or b.consumed:
+			continue
+		if _is_reaction_locked(a) or _is_reaction_locked(b):
 			continue
 		var pair_key: String = "%d:%d" % [a.stable_spawn_id, b.stable_spawn_id]
 		if visited_pairs.has(pair_key):
@@ -101,6 +106,9 @@ func flush() -> int:
 			if _board.should_ghost_reaction_results():
 				result_orb.enter_ghost_state(Config.data.ghost_alpha)
 
+		if result_orb != null:
+			_lock_reaction_result(result_orb)
+
 		var shock_level: int = (
 			Config.data.orb_max_level
 			if reaction_type == ReactionRules.Type.MAX_CLEAR
@@ -134,6 +142,115 @@ func flush() -> int:
 		reaction_applied.emit(reaction)
 		applied += 1
 	return applied
+
+
+func has_pending_reactions() -> bool:
+	for lock_id_value: Variant in _reaction_locks.keys():
+		var lock_id: int = int(lock_id_value)
+		var entry: Dictionary = _reaction_locks[lock_id] as Dictionary
+		var orb: Variant = entry.get("orb")
+		if not _is_valid_reaction_orb(orb):
+			continue
+		if not _current_reaction_partners(orb).is_empty():
+			return true
+	return false
+
+
+func _is_reaction_locked(orb: Variant) -> bool:
+	if not is_instance_valid(orb):
+		return false
+	var lock_id: int = orb.get_instance_id()
+	if not _reaction_locks.has(lock_id):
+		return false
+	var entry: Dictionary = _reaction_locks[lock_id] as Dictionary
+	return float(entry.get("remaining", 0.0)) > 0.0
+func _lock_reaction_result(orb: Variant) -> void:
+	var delay: float = maxf(Config.data.chain_reaction_delay, 0.0)
+	if delay <= 0.0:
+		return
+	_reaction_locks[orb.get_instance_id()] = {
+		"orb": orb,
+		"remaining": delay,
+	}
+
+
+func _advance_reaction_locks(delta: float) -> void:
+	if delta <= 0.0:
+		return
+	for lock_id_value: Variant in _reaction_locks.keys():
+		var lock_id: int = int(lock_id_value)
+		var entry: Dictionary = _reaction_locks[lock_id] as Dictionary
+		var orb: Variant = entry.get("orb")
+		if not _is_valid_reaction_orb(orb):
+			_reaction_locks.erase(lock_id)
+			continue
+		var remaining: float = float(entry["remaining"]) - delta
+		entry["remaining"] = 0.0 if remaining <= 0.000001 else remaining
+		_reaction_locks[lock_id] = entry
+
+
+func _queue_released_reaction_contacts() -> void:
+	var released_ids: Array[int] = []
+	for lock_id_value: Variant in _reaction_locks.keys():
+		var lock_id: int = int(lock_id_value)
+		var entry: Dictionary = _reaction_locks[lock_id] as Dictionary
+		var orb: Variant = entry.get("orb")
+		if not _is_valid_reaction_orb(orb):
+			released_ids.append(lock_id)
+			continue
+		if float(entry.get("remaining", 0.0)) > 0.0:
+			continue
+		for partner: Variant in _current_reaction_partners(orb):
+			report_contact(orb, partner)
+		released_ids.append(lock_id)
+	for lock_id: int in released_ids:
+		_reaction_locks.erase(lock_id)
+
+
+func _current_reaction_partners(orb: Variant) -> Array:
+	var partners: Array = []
+	if not _is_valid_reaction_orb(orb):
+		return partners
+	if orb.is_waiting_at_entrance:
+		return partners
+	var orb_radius: float = _orb_contact_radius(orb)
+	for candidate: Variant in _board.get_orbs():
+		if candidate == orb or not _is_valid_reaction_orb(candidate):
+			continue
+		if candidate.is_ghost or candidate.is_waiting_at_entrance:
+			continue
+		var contact_distance: float = (
+			orb_radius
+			+ _orb_contact_radius(candidate)
+			+ Config.data.ghost_exit_overlap
+		)
+		if orb.position.distance_to(candidate.position) > contact_distance:
+			continue
+		if not _pair_can_react(orb, candidate):
+			continue
+		partners.append(candidate)
+	return partners
+
+
+func _pair_can_react(a: Variant, b: Variant) -> bool:
+	var classified: Dictionary = ReactionRules.classify(
+		a.color,
+		a.level,
+		b.color,
+		b.level,
+		Config.data
+	)
+	return int(classified["type"]) != ReactionRules.Type.NONE
+
+
+func _orb_contact_radius(orb: Variant) -> float:
+	if orb.has_method("get_current_radius"):
+		return float(orb.get_current_radius())
+	return float(orb.get_radius())
+
+
+func _is_valid_reaction_orb(orb: Variant) -> bool:
+	return is_instance_valid(orb) and not orb.consumed
 
 
 func _board_occupancy() -> float:

@@ -38,6 +38,36 @@
 
 ## 미확인
 
+### [2026-10-04] 대상 #23 — 순차 연쇄 반응 잠금
+- 상태: 완료
+- 브랜치 / PR: `m9-chain-reaction-lock` / [PR #22](https://github.com/jeongmo-dot/gravity_orb/pull/22)
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/{CollisionResolver,TurnManager}.gd`, `tests/{test_config,test_jolt_3d}.gd`, `tests/scenarios/{test_merge_scenario,test_annihilation_scenario,test_score_flow}.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `chain_reaction_delay=0.2` 추가. MERGE 결과와 규칙 C 잔존 구체를 공통 `CollisionResolver`에서 스케일된 시간 동안 잠그고, 잠금 해제 프레임에 현재 거리 접촉을 다시 분류
+  - [x] 잠금 중 접촉 쌍은 처리하지 않고, 이탈한 접촉은 재생하지 않으며 새로 닿은 반응 가능 쌍은 해제 프레임에 처리 — `test_locked_contact_that_separates_is_not_replayed`, `test_new_contact_during_lock_reacts_on_unlock`
+  - [x] L2+L2→L3→L4 두 반응이 120Hz 기준 24틱 간격, MERGE 충격파 경로 2회, combo `[1,2]`, 최종 L4 1개 — `test_merge_result_reacts_again_as_chain_two`
+  - [x] 3단 연쇄 3회가 각각 24틱 간격이고 combo `[1,2,3]` — `test_three_stage_chain_waits_between_every_reaction`
+  - [x] `chain_reaction_delay=0` 즉시 동작, 규칙 A 소멸 연쇄와 점수 20 회귀, Jolt 3D 공통 잠금 경로 자동 검증
+  - [x] 반응 가능한 잠금 접촉은 안정 판정을 막고, 1.5초 상한과 입력 대기 중 `flush(delta)` 지속은 기존 TurnManager 회귀와 전체 테스트로 확인
+  - [x] 12시드 게임오버 1회와 기존 2D/3D 장기 회귀, §10.1 필수 명령 3종 실행
+  - [ ] 잠금 중 임시 발광/맥동 표시 — 인박스 선택 항목이라 M8 정식 연출 전에는 추가하지 않음
+- 12시드 게임오버 측정 (`101~112`, Jolt 3D 120Hz, 최대 400턴, 독립 1회):
+  - 게임오버 `12/12`, 중단 `0`; 게임 길이 p50 `258턴`, 범위 `216~273턴`
+  - 점수 평균 `14,503.83`, p50 `15,707`, 범위 `7,914~19,990`; 최대 콤보 p50/최대 `6/7`
+  - #21 최종값 대비: 게임 길이 p50 `246→258`(+12), 점수 평균 `15,557.33→14,503.83`(-1,053.50), 점수 p50 `15,154→15,707`(+553), 최대 콤보 p50/최대 `6/8→6/7`
+- QA 관측값:
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . -s res://tests/run_tests.gd` → `132/132`, 종료 코드 0
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --quit-after 300` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 최종 2D 22시드: 최대 침투 `10.595px`, 이탈·발산·벽 복구 `0/0/0`; 최종 3D 22시드: wall/pair `12.9515/14.2993px`, 이탈·발산 `0/0`
+  - 턴 시간 120턴: 상한 p50/max `1.504167/1.504167초`, 이탈·발산·벽 복구 `0/0/0`
+  - Windows 사용자 로그·루트 인증서·에디터 설정 저장 오류는 제한 실행 환경 메시지이며 프로젝트 스크립트 오류는 없음
+- 수동 확인 절차:
+  1. 같은 색 L2 두 개 바로 옆에 같은 색 L3을 놓고 L2끼리 합체시킨다 → 첫 합체와 두 번째 합체/충격파가 한 프레임에 겹치지 않고 약 0.2초 간격으로 두 번 보이며 HUD 콤보가 1→2로 오른다.
+  2. 같은 방식으로 L2·L3 상대를 이어 둔 3단 연쇄를 만든다 → 각 반응이 약 0.2초 간격으로 차례대로 발생하고 입력 가능 상태로 먼저 끝나지 않는다.
+- 결정 사항: 잠금 해제 접촉 판정은 설계서가 허용한 반지름 합 + `ghost_exit_overlap` 방식으로 구현했고, 성장 중인 2D 구체는 현재 충돌 반지름을 사용했다. 공개 신호·점수·콤보·물리 설정은 변경하지 않았다.
+- 남은 것 · 질문: 없음. 임시 잠금 시각 표시는 선택 요구라 생략했다.
+
 ### [2026-10-03] 대상 #21 · 추가 요구 3 — 연속 턴 벽 기준 28px 확정
 - 상태: 완료
 - 브랜치 / PR: `m9-turn-combo-weight` / [PR #21](https://github.com/jeongmo-dot/gravity_orb/pull/21)

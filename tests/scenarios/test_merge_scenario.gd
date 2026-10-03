@@ -132,26 +132,222 @@ func test_merge_result_reacts_again_as_chain_two() -> void:
 	var board: Board = fixture["board"] as Board
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
 	var manager: TurnManager = fixture["manager"] as TurnManager
-	var level_one_radius: float = Config.data.radius_for_level(1)
 	var level_two_radius: float = Config.data.radius_for_level(2)
-	var half_distance: float = level_one_radius - 0.5
-	var chain_y: float = (level_one_radius + 3.0 * level_two_radius) * 0.5
-	board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(-half_distance, 0.0))
-	board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(half_distance, 0.0))
-	board.spawn_orb(OrbTypes.OrbColor.RED, 2, Vector2(0.0, chain_y))
+	var half_distance: float = level_two_radius - 0.5
+	var first: Orb = board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		2,
+		Vector2(-half_distance, 0.0)
+	)
+	var second: Orb = board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		2,
+		Vector2(half_distance, 0.0)
+	)
+	var adjacent: Orb = board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		3,
+		Vector2.ZERO
+	)
+	adjacent.position = Vector2(0.0, adjacent.get_current_radius() * 2.0 - 1.0)
+	adjacent.exit_ghost_state()
+	resolver.report_contact(first, second)
+	assert_eq(resolver.flush(), 1, "chain first reaction")
 
-	var applied: int = await _advance_and_flush(board, resolver, OBSERVE_SECONDS)
+	var tick: float = 1.0 / float(Engine.physics_ticks_per_second)
+	var delay_frames: int = roundi(Config.data.chain_reaction_delay / tick)
+	var applied: int = 1
+	for frame_index: int in range(delay_frames):
+		var frame_applied: int = resolver.flush(tick)
+		applied += frame_applied
+		if frame_index < delay_frames - 1:
+			assert_eq(frame_applied, 0, "chain result remains locked")
+		else:
+			assert_eq(frame_applied, 1, "chain result unlocks on configured tick")
 	var orbs: Array[Orb] = board.get_orbs()
 	assert_eq(applied, 2, "chain reaction count")
 	assert_eq(_reaction_chains(), [1, 2], "chain reaction order")
 	assert_eq(_combos, [1, 2], "combo_changed sequence")
 	assert_eq(manager.turn_combo, 2, "turn combo")
 	assert_eq(orbs.size(), 1, "chain result count")
+	if _reactions.size() == 2:
+		assert_eq(
+			int(_reactions[0]["type"]),
+			ReactionRules.Type.MERGE,
+			"first reaction invokes the merge shockwave path"
+		)
+		assert_eq(
+			int(_reactions[1]["type"]),
+			ReactionRules.Type.MERGE,
+			"second reaction invokes the same merge shockwave path"
+		)
 	if orbs.size() == 1:
-		assert_eq(orbs[0].level, 3, "chain result level")
+		assert_eq(orbs[0].level, 4, "chain result level")
 		assert_eq(orbs[0].generation, 2, "chain result generation")
 	print("Merge chain sequence: %s" % str(_reaction_chains()))
 	await _cleanup_fixture(fixture)
+
+
+func test_three_stage_chain_waits_between_every_reaction() -> void:
+	var fixture: Dictionary = await _create_fixture()
+	var board: Board = fixture["board"] as Board
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var tick: float = 1.0 / float(Engine.physics_ticks_per_second)
+	var delay_frames: int = roundi(Config.data.chain_reaction_delay / tick)
+	var radius_one: float = Config.data.radius_for_level(1)
+	var first: Orb = board.spawn_orb(
+		OrbTypes.OrbColor.GREEN,
+		1,
+		Vector2(-radius_one + 0.5, 0.0)
+	)
+	var second: Orb = board.spawn_orb(
+		OrbTypes.OrbColor.GREEN,
+		1,
+		Vector2(radius_one - 0.5, 0.0)
+	)
+	resolver.report_contact(first, second)
+	assert_eq(resolver.flush(), 1, "three-stage first reaction")
+
+	var elapsed_frames: Array[int] = [0]
+	for target_level: int in [2, 3]:
+		var current_result: Orb = _reactions[_reactions.size() - 1]["result_orb"] as Orb
+		var partner: Orb = board.spawn_orb(
+			OrbTypes.OrbColor.GREEN,
+			target_level,
+			current_result.position
+		)
+		partner.exit_ghost_state()
+		resolver.report_contact(current_result, partner)
+		var reaction_count_before: int = _reactions.size()
+		for frame_index: int in range(delay_frames):
+			var applied: int = resolver.flush(tick)
+			if frame_index < delay_frames - 1:
+				assert_eq(applied, 0, "three-stage reaction remains locked")
+			else:
+				assert_eq(applied, 1, "three-stage reaction unlocks on delay")
+		assert_eq(
+			_reactions.size(),
+			reaction_count_before + 1,
+			"three-stage reaction count advances once"
+		)
+		elapsed_frames.append(elapsed_frames[-1] + delay_frames)
+
+	assert_eq(_reaction_chains(), [1, 2, 3], "three-stage chain generations")
+	assert_eq(_reaction_combos(), [1, 2, 3], "three-stage turn combos")
+	assert_eq(elapsed_frames, [0, delay_frames, delay_frames * 2], "three-stage timing")
+	var orbs: Array[Orb] = board.get_orbs()
+	assert_eq(orbs.size(), 1, "three-stage final orb count")
+	if orbs.size() == 1:
+		assert_eq(orbs[0].level, 4, "three-stage final level")
+	await _cleanup_fixture(fixture)
+
+
+func test_locked_contact_that_separates_is_not_replayed() -> void:
+	var fixture: Dictionary = await _create_fixture()
+	var board: Board = fixture["board"] as Board
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var radius: float = Config.data.radius_for_level(1)
+	var first: Orb = board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		1,
+		Vector2(-radius + 0.5, 0.0)
+	)
+	var second: Orb = board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		1,
+		Vector2(radius - 0.5, 0.0)
+	)
+	resolver.report_contact(first, second)
+	assert_eq(resolver.flush(), 1, "separation fixture first merge")
+	var locked_result: Orb = _reactions[0]["result_orb"] as Orb
+	var opposite: Orb = board.spawn_orb(
+		OrbTypes.OrbColor.BLUE,
+		locked_result.level,
+		locked_result.position
+	)
+	opposite.exit_ghost_state()
+	resolver.report_contact(locked_result, opposite)
+	assert_eq(resolver.flush(), 0, "locked opposite pair is deferred")
+	assert_true(resolver.has_pending_reactions(), "locked touching pair blocks stability")
+	opposite.position = Vector2(board.half_size() - opposite.get_radius(), 0.0)
+	var tick: float = 1.0 / float(Engine.physics_ticks_per_second)
+	var delay_frames: int = roundi(Config.data.chain_reaction_delay / tick)
+	for _frame: int in range(delay_frames + 1):
+		resolver.flush(tick)
+	assert_eq(_reactions.size(), 1, "separated locked contact is not replayed")
+	assert_true(not resolver.has_pending_reactions(), "separated pair no longer blocks stability")
+	await _cleanup_fixture(fixture)
+
+
+func test_new_contact_during_lock_reacts_on_unlock() -> void:
+	var fixture: Dictionary = await _create_fixture()
+	var board: Board = fixture["board"] as Board
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var radius: float = Config.data.radius_for_level(1)
+	var first: Orb = board.spawn_orb(
+		OrbTypes.OrbColor.YELLOW,
+		1,
+		Vector2(-radius + 0.5, 0.0)
+	)
+	var second: Orb = board.spawn_orb(
+		OrbTypes.OrbColor.YELLOW,
+		1,
+		Vector2(radius - 0.5, 0.0)
+	)
+	resolver.report_contact(first, second)
+	assert_eq(resolver.flush(), 1, "new-contact fixture first merge")
+	var locked_result: Orb = _reactions[0]["result_orb"] as Orb
+	var partner: Orb = board.spawn_orb(
+		OrbTypes.OrbColor.YELLOW,
+		locked_result.level,
+		locked_result.position
+	)
+	partner.exit_ghost_state()
+	resolver.report_contact(locked_result, partner)
+	assert_eq(resolver.flush(), 0, "new contact is deferred while locked")
+	var tick: float = 1.0 / float(Engine.physics_ticks_per_second)
+	var delay_frames: int = roundi(Config.data.chain_reaction_delay / tick)
+	for frame_index: int in range(delay_frames):
+		var applied: int = resolver.flush(tick)
+		if frame_index < delay_frames - 1:
+			assert_eq(applied, 0, "new contact waits until unlock frame")
+		else:
+			assert_eq(applied, 1, "new contact reacts on unlock frame")
+	assert_eq(_reaction_chains(), [1, 2], "new contact chain generations")
+	assert_eq(_reaction_combos(), [1, 2], "new contact combo sequence")
+	await _cleanup_fixture(fixture)
+
+
+func test_zero_chain_reaction_delay_keeps_immediate_behavior() -> void:
+	var original_delay: float = Config.data.chain_reaction_delay
+	Config.data.chain_reaction_delay = 0.0
+	var fixture: Dictionary = await _create_fixture()
+	var board: Board = fixture["board"] as Board
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var radius: float = Config.data.radius_for_level(1)
+	var first: Orb = board.spawn_orb(
+		OrbTypes.OrbColor.GREEN,
+		1,
+		Vector2(-radius + 0.5, 0.0)
+	)
+	var second: Orb = board.spawn_orb(
+		OrbTypes.OrbColor.GREEN,
+		1,
+		Vector2(radius - 0.5, 0.0)
+	)
+	resolver.report_contact(first, second)
+	assert_eq(resolver.flush(), 1, "zero-delay first merge")
+	var result: Orb = _reactions[0]["result_orb"] as Orb
+	var partner: Orb = board.spawn_orb(
+		OrbTypes.OrbColor.GREEN,
+		result.level,
+		result.position + Vector2(result.get_radius() * 2.0 - 1.0, 0.0)
+	)
+	resolver.report_contact(result, partner)
+	assert_eq(resolver.flush(), 1, "zero-delay follow-up is immediate")
+	assert_eq(_reaction_combos(), [1, 2], "zero-delay combo sequence")
+	await _cleanup_fixture(fixture)
+	Config.data.chain_reaction_delay = original_delay
 
 
 func test_independent_simultaneous_merges_advance_combo() -> void:

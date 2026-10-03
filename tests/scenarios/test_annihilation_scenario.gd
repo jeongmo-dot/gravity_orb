@@ -95,10 +95,19 @@ func test_merge_then_annihilation_reports_chain_one_two() -> void:
 		var blue: Orb = board.spawn_orb(
 			OrbTypes.OrbColor.BLUE,
 			2,
-			merge_result.position + Vector2(124.0, 0.0)
+			merge_result.position
 		)
+		blue.exit_ghost_state()
 		resolver.report_contact(merge_result, blue)
-		assert_eq(resolver.flush(), 1, "chain annihilation count")
+		assert_eq(resolver.flush(), 0, "chain annihilation waits for result lock")
+		var tick: float = 1.0 / float(Engine.physics_ticks_per_second)
+		var delay_frames: int = roundi(Config.data.chain_reaction_delay / tick)
+		for frame_index: int in range(delay_frames):
+			var applied: int = resolver.flush(tick)
+			if frame_index < delay_frames - 1:
+				assert_eq(applied, 0, "chain annihilation remains locked")
+			else:
+				assert_eq(applied, 1, "chain annihilation count")
 	assert_eq(_reaction_chains(), [1, 2], "annihilation chain order")
 	assert_eq(board.get_orbs().size(), 0, "annihilation chain final count")
 	print("Annihilation chain sequence: %s" % str(_reaction_chains()))

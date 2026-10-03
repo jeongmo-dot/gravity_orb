@@ -117,6 +117,26 @@ func test_jolt_reaction_uses_shared_rules_and_spawns_3d_result() -> void:
 	assert_eq(active.size(), 1, "two inputs replaced by one result")
 	assert_eq(active[0].level, 2, "shared ReactionRules level")
 	assert_eq(active[0].color, OrbTypes.OrbColor.GREEN, "shared ReactionRules color")
+	var result: Orb3D = active[0]
+	var partner: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.GREEN,
+		2,
+		result.position
+	)
+	resolver.report_contact(result, partner)
+	assert_eq(resolver.flush(), 0, "shared 3D result lock defers the next reaction")
+	var tick: float = 1.0 / float(Engine.physics_ticks_per_second)
+	var delay_frames: int = roundi(Config.data.chain_reaction_delay / tick)
+	for frame_index: int in range(delay_frames):
+		var applied: int = resolver.flush(tick)
+		if frame_index < delay_frames - 1:
+			assert_eq(applied, 0, "shared 3D lock remains active")
+		else:
+			assert_eq(applied, 1, "shared 3D lock releases on the configured tick")
+	active = board.get_orbs()
+	assert_eq(active.size(), 1, "shared 3D chain leaves one result")
+	if active.size() == 1:
+		assert_eq(active[0].level, 3, "shared 3D delayed result level")
 	_cleanup(fixture_root)
 
 

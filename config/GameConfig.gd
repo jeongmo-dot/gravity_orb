@@ -66,6 +66,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 @export var shock_radius_factor: float = 2.5
 @export var shock_level_scale: float = 0.3
 @export var shock_jackpot_scale: float = 3.0
+@export var chain_reaction_delay: float = 0.2
 
 
 func radius_for_level(level: int) -> float:

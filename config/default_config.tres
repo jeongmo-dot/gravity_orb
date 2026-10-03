@@ -60,3 +60,4 @@ shock_impulse = 600.0
 shock_radius_factor = 2.5
 shock_level_scale = 0.3
 shock_jackpot_scale = 3.0
+chain_reaction_delay = 0.2
