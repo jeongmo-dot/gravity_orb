@@ -71,7 +71,7 @@
 ### [2026-10-03] 대상 #20 — Jolt 3D 정식 통합
 - 상태: 질문
 - 브랜치 / PR: `m8-jolt-integration` / [PR #20](https://github.com/jeongmo-dot/gravity_orb/pull/20)
-- 변경 파일: `project.godot`, `scenes/Main3D.tscn`, `scripts/core/{Main,TurnManager,CollisionResolver,Spawner,Board,Orb}.gd`, `scripts/ui/{Hud,DebugHud}.gd`, `scripts/spike/{Board3D,Orb3D}.gd`, 스파이크 복사본 5종 삭제, `tests/test_jolt_3d.gd`, `tests/scenarios/test_jolt_integration.gd`, `tests/spike/`, `artifacts/jolt3d_integration_summary.json`, `artifacts/jolt3d_seed101_*.png`, `docs/jeongmo_codex_to_claude.md`
+- 변경 파일: `project.godot`, `scenes/Main3D.tscn`, `scripts/core/{Main,TurnManager,CollisionResolver,Spawner,Board,Orb}.gd`, `scripts/ui/{Hud,DebugHud}.gd`, `scripts/spike/{Board3D,Orb3D}.gd`, 스파이크 복사본 5종 삭제, `tests/test_jolt_3d.gd`, `tests/scenarios/test_jolt_integration.gd`, `tests/spike/`, `artifacts/jolt3d_integration_summary.json`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 프로젝트 메인 씬을 `Main3D.tscn`으로 전환하고 Jolt 확정 설정(position 4 / velocity 10 / Baumgarte 0.2 / slop 0.02 / separate thread false / worker 1 / 120Hz / FOV 25° / z 42m)을 적용. 기존 2D `Main.tscn`·`Board.tscn`은 유지
   - [x] `TurnManager`·`CollisionResolver`·`Spawner`·`Main`·`Hud`를 2D/3D 공통 덕 타이핑 경로로 일반화하고 `TurnManager3D`·`CollisionResolver3D`·`Spawner3D`·`Main3D.gd`·`Hud3D` 복사본 삭제. 3D 전용 코드는 `Board3D`·`Orb3D`·씬/카메라/시각 연출만 유지
@@ -81,8 +81,8 @@
   - [x] 120/60Hz × 결과 유령 ON/OFF, seed 101~112, 게임오버 또는 400턴 측정. 네 조건 모두 12/12 게임오버, 중단·이탈·발산 0
   - [x] 독립 Godot 프로세스 2회에서 seed 101 120턴 해시 `120/120` 일치. 최종 해시 `1136f5e40244d411100a273c94b0b2622d719d7a63f3910ee8788b5c878c4cb9`
   - [x] 공통 전체 HUD·F2·F3·R 신호·게임오버 패널·붉은 3D 경고 변 경로 유지. 입력 테스트와 3D 게임오버/경고 테스트 통과
-  - [x] seed 101 턴 1·60·180·기울기 PNG 4장을 GPU 렌더링으로 재캡처하고 HUD/보드/구체/seed 101 표기를 직접 확인
-  - [ ] 짧은 영상 — 선택 산출물이라 미생성. 정지 화면 4장과 실제 180턴 자동 플레이 캡처를 우선함
+  - [x] seed 101 턴 1·60·180·기울기 PNG 4장을 GPU 렌더링으로 로컬 재캡처하고 HUD/보드/구체/seed 101 표기를 직접 확인. 사용자 지시에 따라 PNG 바이너리는 PR에서 제외
+  - [ ] 짧은 영상 — 선택 산출물이라 미생성. 자동 캡처 재현 스크립트와 자동 화면 좌표 검증을 유지함
   - [x] §10.1 필수 명령 3종 종료 코드 0, 전체 테스트 `117/117`
 - 12시드 전체 측정 요약 (`wall/pair`는 네 점유율 구간 중 최대, 외부 ms/frame은 프로세스 wall time ÷ 기록 physics frame):
 
@@ -109,7 +109,7 @@
   - 같은 프로세스에서 fixture를 연속 생성하는 보조 결정성 검사는 Jolt body ID 지속으로 2턴부터 다르지만, 명세 기준인 독립 프로세스 2회는 120턴 전부 일치
 - 상세 산출물:
   - `artifacts/jolt3d_integration_summary.json`: 네 조건의 구간별/레벨별 잼, 게임오버, 성능, 결정성, 2D/3D 회귀 요약
-  - `artifacts/jolt3d_seed101_turn_001.png`, `jolt3d_seed101_turn_060.png`, `jolt3d_seed101_turn_180.png`, `jolt3d_seed101_tilt_turn060.png`: 실제 seed 101, 공통 HUD가 연결된 정식 3D 장면, `799×1421`
+  - `tests/spike/CaptureJolt3D.gd`: seed 101 턴 화면을 로컬에서 재현하는 캡처 도구. PNG 출력은 PR에 포함하지 않음
 - QA 관측값:
   - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --import` → 종료 코드 0, 프로젝트 오류 0
   - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . -s res://tests/run_tests.gd` → `117/117` 통과, 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0
