@@ -40,7 +40,7 @@
 
 ### [2026-10-03] 대상 #20 — Jolt 3D 정식 통합
 - 상태: 질문
-- 브랜치 / PR: `m8-jolt-integration` / `main` 대상 PR 생성 후 링크 갱신
+- 브랜치 / PR: `m8-jolt-integration` / [PR #20](https://github.com/jeongmo-dot/gravity_orb/pull/20)
 - 변경 파일: `project.godot`, `scenes/Main3D.tscn`, `scripts/core/{Main,TurnManager,CollisionResolver,Spawner,Board,Orb}.gd`, `scripts/ui/{Hud,DebugHud}.gd`, `scripts/spike/{Board3D,Orb3D}.gd`, 스파이크 복사본 5종 삭제, `tests/test_jolt_3d.gd`, `tests/scenarios/test_jolt_integration.gd`, `tests/spike/`, `artifacts/jolt3d_integration_summary.json`, `artifacts/jolt3d_seed101_*.png`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 프로젝트 메인 씬을 `Main3D.tscn`으로 전환하고 Jolt 확정 설정(position 4 / velocity 10 / Baumgarte 0.2 / slop 0.02 / separate thread false / worker 1 / 120Hz / FOV 25° / z 42m)을 적용. 기존 2D `Main.tscn`·`Board.tscn`은 유지
