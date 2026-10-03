@@ -40,7 +40,7 @@
 
 ### [2026-10-04] 대상 #24 — 콤보 표시 단일 출처와 MAX COMBO 동기화
 - 상태: 완료
-- 브랜치 / PR: `m9-combo-display-sync` / 생성 후 링크 갱신 (#23 PR #22 기반)
+- 브랜치 / PR: `m9-combo-display-sync` / [PR #23](https://github.com/jeongmo-dot/gravity_orb/pull/23) ([#23 PR #22](https://github.com/jeongmo-dot/gravity_orb/pull/22) 기반)
 - 변경 파일: `scenes/UI.tscn`, `scripts/core/{Main,ScoreManager,TurnManager}.gd`, `scripts/ui/{DebugHud,GameOverPanel,Hud}.gd`, `tests/scenarios/{test_game_over_measurement,test_jolt_integration,test_merge_scenario,test_score_flow,test_turn_manager,test_turn_time}.gd`, `tests/spike/run_jolt_3d_measurement.gd`, `docs/jeongmo_codex_to_claude.md`
 - 재현·원인:
   - 수정 전 `ScoreManager`를 `TurnManager`보다 먼저 `CollisionResolver.reaction_applied`에 연결한 뒤 같은 턴 3회 반응을 발생시켰다. `TurnManager.turn_combo=3`인데 `ScoreManager.max_combo=1`, 점수 `12`(기대 `28`)로 재현됐다.
