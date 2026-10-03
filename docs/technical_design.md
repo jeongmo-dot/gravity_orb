@@ -609,6 +609,15 @@ return applied
 
 `body_entered`는 "접촉 시작"에만 발생하므로, 규칙이 런타임에 바뀌었거나 접촉 보고가 누락된 경우 반응 대상 쌍이 붙은 채 남을 수 있다. 안정 판정 직전에 모든 Orb의 `get_colliding_bodies()`를 훑어 쌍을 `_pending`에 넣고 `flush()`한 결과를 반환한다.
 
+
+### 7.4 합체 충격파 (기획서 0.9 — #21 추가 요구 1)
+MERGE·MAX_CLEAR 반응 직후 반응 지점 `p`에서 충격파를 낸다.
+- 대상: 일반 상태(유령·입구 대기 제외)이고 중심 거리 `d < R`인 구체. `R = shock_radius_factor × r_result` (MAX_CLEAR는 `r_L7` 기준)
+- 충격량(속도 아님): `J = shock_impulse × (1 + shock_level_scale × (L_result − 1)) × (1 − d / R)`, 방향 `(q − p).normalized()` (평면). 속도 변화 = `J / mass` → **가벼운 구체가 더 크게 움직인다** (무게감)
+- MAX_CLEAR(L7 잭팟)는 `J × shock_jackpot_scale`
+- 결과 구체 자신은 제외. 물리 콜백 밖(`flush`)에서 적용
+- 새 필드: `shock_impulse`, `shock_radius_factor`, `shock_level_scale`, `shock_jackpot_scale` — 값은 #21 측정으로 결정
+
 ---
 
 ## 8. 점수·연쇄
