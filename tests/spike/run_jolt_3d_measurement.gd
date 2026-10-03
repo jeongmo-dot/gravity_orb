@@ -1,9 +1,9 @@
 extends Node
 
 const BOARD_SCENE: PackedScene = preload("res://scenes/Board3D.tscn")
-const RESOLVER_SCRIPT: Script = preload("res://scripts/spike/CollisionResolver3D.gd")
-const SPAWNER_SCRIPT: Script = preload("res://scripts/spike/Spawner3D.gd")
-const TURN_MANAGER_SCRIPT: Script = preload("res://scripts/spike/TurnManager3D.gd")
+const RESOLVER_SCRIPT: Script = preload("res://scripts/core/CollisionResolver.gd")
+const SPAWNER_SCRIPT: Script = preload("res://scripts/core/Spawner.gd")
+const TURN_MANAGER_SCRIPT: Script = preload("res://scripts/core/TurnManager.gd")
 const SCORE_MANAGER_SCRIPT: Script = preload("res://scripts/core/ScoreManager.gd")
 const TICKS: Array[int] = [60, 120, 240]
 const SEEDS: Array[int] = [101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112]
@@ -36,6 +36,7 @@ var _continuous_cd_enabled: bool = true
 var _allow_sleep: bool = false
 var _contact_reporting_enabled: bool = true
 var _progressive_growth_enabled: bool = false
+var _reaction_ghost_enabled: bool = true
 var _record_seed_hashes: bool = false
 var _scan_pairs_each_frame: bool = false
 
@@ -56,7 +57,7 @@ func _run() -> void:
 		"gravity_px_s2": Config.data.gravity_strength,
 		"level_radii_px": Array(Config.data.level_radii),
 		"corrections": {
-			"ghost": false,
+			"reaction_ghost": _reaction_ghost_enabled,
 			"growth": _progressive_growth_enabled,
 			"timeout_correction": false,
 			"proactive_wall_recovery": false,
@@ -75,11 +76,11 @@ func _run() -> void:
 		var tick_report: Dictionary = await _run_tick_suite(ticks)
 		report["ticks"].append(tick_report)
 
-	Engine.physics_ticks_per_second = 240
+	Engine.physics_ticks_per_second = 120
 	report["determinism"] = await _run_determinism_check(101)
 	Engine.physics_ticks_per_second = _original_ticks
 	_write_report(report)
-	print("JOLT3D_REPORT %s" % JSON.stringify(report))
+	print("JOLT3D_REPORT_PATH %s" % _report_path)
 	get_tree().quit(1 if _had_runner_error else 0)
 
 
@@ -91,6 +92,9 @@ func _run_tick_suite(ticks: int) -> Dictionary:
 	var game_over_occupancies: Array[float] = []
 	var game_over_count: int = 0
 	var aborted_count: int = 0
+	var ghost_completed_count: int = 0
+	var ghost_timeout_count: int = 0
+	var ghost_duration_sum: float = 0.0
 	for seed: int in _seeds:
 		var result: Dictionary = await _run_seed(
 			seed,
@@ -100,6 +104,9 @@ func _run_tick_suite(ticks: int) -> Dictionary:
 			_record_seed_hashes
 		)
 		seed_rows.append(result)
+		ghost_completed_count += int(result["ghost_completed_count"])
+		ghost_timeout_count += int(result["ghost_timeout_count"])
+		ghost_duration_sum += float(result["ghost_duration_sum"])
 		if bool(result["aborted"]):
 			aborted_count += 1
 		if bool(result["game_over"]):
@@ -111,6 +118,9 @@ func _run_tick_suite(ticks: int) -> Dictionary:
 		"seeds": seed_rows,
 		"game_over_count": game_over_count,
 		"aborted_count": aborted_count,
+		"ghost_completed_count": ghost_completed_count,
+		"ghost_timeout_count": ghost_timeout_count,
+		"ghost_average_duration": _safe_ratio(ghost_duration_sum, ghost_completed_count),
 		"game_over_turn_p50": _percentile(game_over_turns, 0.5),
 		"game_over_occupancy_mean_percent": _mean(game_over_occupancies),
 		"physics_ms_mean": _mean(physics_ms),
@@ -143,7 +153,7 @@ func _run_seed(
 	var fixture: Dictionary = await _create_fixture(seed)
 	var fixture_root: Node = fixture["root"] as Node
 	var board: Board3D = fixture["board"] as Board3D
-	var manager: TurnManager3D = fixture["manager"] as TurnManager3D
+	var manager: TurnManager = fixture["manager"] as TurnManager
 	var completed_turns: int = 0
 	var aborted: bool = false
 	var abort_reason: String = ""
@@ -225,12 +235,12 @@ func _run_seed(
 			aborted = true
 			abort_reason = str(frame_metrics["abort_reason"])
 			break
-		if manager.state == TurnManager3D.State.GAME_OVER:
+		if manager.state == TurnManager.State.GAME_OVER:
 			break
 	var result: Dictionary = {
 		"seed": seed,
 		"completed_turns": completed_turns,
-		"game_over": manager.state == TurnManager3D.State.GAME_OVER,
+		"game_over": manager.state == TurnManager.State.GAME_OVER,
 		"final_occupancy_percent": _board_occupancy(board) * 100.0,
 		"final_orb_count": board.get_orbs().size(),
 		"aborted": aborted,
@@ -243,6 +253,9 @@ func _run_seed(
 		"max_turn_end_pair": seed_max_pair_end,
 		"max_turn_end_pair_turn": seed_max_pair_end_turn,
 		"max_wall_penetration_px": seed_max_wall,
+		"ghost_completed_count": board.ghost_completed_count,
+		"ghost_timeout_count": board.ghost_timeout_count,
+		"ghost_duration_sum": board.ghost_total_duration,
 	}
 	fixture_root.queue_free()
 	await get_tree().process_frame
@@ -262,19 +275,20 @@ func _create_fixture(seed: int) -> Dictionary:
 	board.orb_continuous_cd_enabled = _continuous_cd_enabled
 	board.orb_allow_sleep = _allow_sleep
 	board.orb_progressive_growth_enabled = _progressive_growth_enabled
+	board.reaction_ghost_enabled = _reaction_ghost_enabled
 	fixture_root.add_child(board)
 	board.owner = fixture_root
-	var resolver: CollisionResolver3D = RESOLVER_SCRIPT.new() as CollisionResolver3D
+	var resolver: CollisionResolver = RESOLVER_SCRIPT.new() as CollisionResolver
 	resolver.name = "CollisionResolver"
 	resolver.unique_name_in_owner = true
 	fixture_root.add_child(resolver)
 	resolver.owner = fixture_root
-	var spawner: Spawner3D = SPAWNER_SCRIPT.new() as Spawner3D
+	var spawner: Spawner = SPAWNER_SCRIPT.new() as Spawner
 	spawner.name = "Spawner"
 	spawner.unique_name_in_owner = true
 	fixture_root.add_child(spawner)
 	spawner.owner = fixture_root
-	var manager: TurnManager3D = TURN_MANAGER_SCRIPT.new() as TurnManager3D
+	var manager: TurnManager = TURN_MANAGER_SCRIPT.new() as TurnManager
 	manager.name = "TurnManager"
 	fixture_root.add_child(manager)
 	manager.owner = fixture_root
@@ -290,7 +304,7 @@ func _create_fixture(seed: int) -> Dictionary:
 	spawner.init_rng(seed)
 	spawner.spawn_initial(board, Vector2i.DOWN)
 	manager.start_game()
-	var ready: bool = await _wait_for_state(manager, TurnManager3D.State.WAITING_INPUT)
+	var ready: bool = await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
 	if not ready:
 		_had_runner_error = true
 		push_error("Jolt fixture failed to reach WAITING_INPUT for seed %d" % seed)
@@ -301,7 +315,7 @@ func _create_fixture(seed: int) -> Dictionary:
 	}
 
 
-func _wait_for_state(manager: TurnManager3D, target: TurnManager3D.State) -> bool:
+func _wait_for_state(manager: TurnManager, target: TurnManager.State) -> bool:
 	var max_frames: int = ceili(float(Engine.physics_ticks_per_second) * WAIT_TIMEOUT_SECONDS)
 	for _frame: int in range(max_frames):
 		if manager.state == target:
@@ -311,7 +325,7 @@ func _wait_for_state(manager: TurnManager3D, target: TurnManager3D.State) -> boo
 
 
 func _wait_for_turn_end(
-	manager: TurnManager3D,
+	manager: TurnManager,
 	board: Board3D,
 	physics_ms: Array[float]
 ) -> Dictionary:
@@ -376,8 +390,8 @@ func _wait_for_turn_end(
 			_freeze_orbs(board)
 			return metrics
 		if (
-			manager.state == TurnManager3D.State.WAITING_INPUT
-			or manager.state == TurnManager3D.State.GAME_OVER
+			manager.state == TurnManager.State.WAITING_INPUT
+			or manager.state == TurnManager.State.GAME_OVER
 		):
 			return metrics
 	metrics["aborted"] = true
@@ -724,6 +738,8 @@ func _apply_arguments() -> void:
 			_contact_reporting_enabled = false
 		elif argument == "--jolt-growth":
 			_progressive_growth_enabled = true
+		elif argument == "--jolt-no-reaction-ghost":
+			_reaction_ghost_enabled = false
 		elif argument == "--jolt-record-hashes":
 			_record_seed_hashes = true
 		elif argument == "--jolt-frame-pair-scan":

@@ -1,9 +1,10 @@
 class_name Main
-extends Node2D
+extends Node
 
 const BACKGROUND_COLOR: Color = Color.BLACK
+const SEED_PREFIX: String = "--jolt-seed="
 
-@onready var _board: Board = $Board
+@onready var _board: Variant = $Board
 @onready var _turn_manager: TurnManager = %TurnManager
 @onready var _spawner: Spawner = %Spawner
 @onready var _collision_resolver: CollisionResolver = %CollisionResolver
@@ -23,7 +24,7 @@ func _ready() -> void:
 		)
 		# TEMP(M7): M9 디버그 패널이 생성 수 선택을 대체할 때 제거한다.
 		InputRouter.debug_cycle_spawn_count.connect(_cycle_spawn_count)
-	_spawner.init_rng(Config.data.rng_seed)
+	_spawner.init_rng(_seed_from_arguments(Config.data.rng_seed))
 	_spawner.spawn_initial(_board, Vector2i.DOWN)
 	_turn_manager.start_game()
 
@@ -46,3 +47,10 @@ func _cycle_spawn_count() -> void:
 	# TEMP(M7): M9 디버그 패널이 생성 수 선택을 대체할 때 제거한다.
 	Config.data.spawn_count_per_turn = Config.data.spawn_count_per_turn % 3 + 1
 	_spawner.sync_next_batch_size(_turn_manager.turn_index + 1)
+
+
+func _seed_from_arguments(fallback_seed: int) -> int:
+	for argument: String in OS.get_cmdline_user_args():
+		if argument.begins_with(SEED_PREFIX):
+			return argument.trim_prefix(SEED_PREFIX).to_int()
+	return fallback_seed

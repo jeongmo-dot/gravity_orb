@@ -13,7 +13,7 @@ const ANNIHILATION_RULE_NAMES: Array[String] = ["A", "B", "C"]
 @onready var _turn_manager: TurnManager = %TurnManager
 @onready var _spawner: Spawner = %Spawner
 @onready var _score_manager: ScoreManager = %ScoreManager
-@onready var _board: Board = %Board
+@onready var _board: Variant = %Board
 @onready var _label: Label = %DebugLabel
 @onready var _hud: Hud = %Hud
 
@@ -73,6 +73,6 @@ func _update_label() -> void:
 		_turn_max_chain,
 		ANNIHILATION_RULE_NAMES[Config.data.annihilation_rule],
 		Config.data.spawn_count_for_turn(_turn_manager.turn_index + 1),
-		_turn_manager._settle_elapsed,
+		_turn_manager.settle_elapsed,
 		_spawner.seed_used,
 	]

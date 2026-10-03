@@ -1,11 +1,11 @@
 extends TestCase
 
 const BOARD_SCENE: PackedScene = preload("res://scenes/Board3D.tscn")
-const RESOLVER_SCRIPT: Script = preload("res://scripts/spike/CollisionResolver3D.gd")
-const SPAWNER_SCRIPT: Script = preload("res://scripts/spike/Spawner3D.gd")
+const RESOLVER_SCRIPT: Script = preload("res://scripts/core/CollisionResolver.gd")
+const SPAWNER_SCRIPT: Script = preload("res://scripts/core/Spawner.gd")
 
 
-func test_project_uses_jolt_without_changing_2d_main_scene() -> void:
+func test_project_uses_jolt_with_3d_main_and_keeps_2d_scene() -> void:
 	assert_eq(
 		str(ProjectSettings.get_setting("physics/3d/physics_engine", "")),
 		"Jolt Physics",
@@ -13,8 +13,14 @@ func test_project_uses_jolt_without_changing_2d_main_scene() -> void:
 	)
 	assert_eq(
 		str(ProjectSettings.get_setting("application/run/main_scene", "")),
-		"res://scenes/Main.tscn",
-		"2D main scene remains default"
+		"res://scenes/Main3D.tscn",
+		"3D scene is the project entry point"
+	)
+	assert_true(ResourceLoader.exists("res://scenes/Main.tscn"), "2D scene remains available")
+	assert_eq(
+		int(ProjectSettings.get_setting("physics/common/physics_ticks_per_second", 0)),
+		120,
+		"adopted Jolt tick rate"
 	)
 	assert_eq(
 		int(ProjectSettings.get_setting(
@@ -33,7 +39,7 @@ func test_project_uses_jolt_without_changing_2d_main_scene() -> void:
 
 func test_main_3d_camera_fits_vertical_board_mockup() -> void:
 	var main_scene: PackedScene = load("res://scenes/Main3D.tscn") as PackedScene
-	var main: Main3D = main_scene.instantiate() as Main3D
+	var main: Main = main_scene.instantiate() as Main
 	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
 	assert_near(camera.fov, 25.0, 0.001, "reduced perspective FOV")
 	assert_near(camera.position.z, 42.0, 0.001, "board and tilt margin distance")
@@ -72,7 +78,7 @@ func test_jolt_reaction_uses_shared_rules_and_spawns_3d_result() -> void:
 	board.unique_name_in_owner = true
 	fixture_root.add_child(board)
 	board.owner = fixture_root
-	var resolver: CollisionResolver3D = RESOLVER_SCRIPT.new() as CollisionResolver3D
+	var resolver: CollisionResolver = RESOLVER_SCRIPT.new() as CollisionResolver
 	resolver.name = "CollisionResolver"
 	resolver.unique_name_in_owner = true
 	fixture_root.add_child(resolver)
@@ -91,8 +97,8 @@ func test_jolt_reaction_uses_shared_rules_and_spawns_3d_result() -> void:
 
 
 func test_spawner_3d_reuses_spawner_rng_sequence() -> void:
-	var first: Spawner3D = SPAWNER_SCRIPT.new() as Spawner3D
-	var second: Spawner3D = SPAWNER_SCRIPT.new() as Spawner3D
+	var first: Spawner = SPAWNER_SCRIPT.new() as Spawner
+	var second: Spawner = SPAWNER_SCRIPT.new() as Spawner
 	tree.root.add_child(first)
 	tree.root.add_child(second)
 	await tree.process_frame

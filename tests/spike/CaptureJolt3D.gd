@@ -26,11 +26,11 @@ func _ready() -> void:
 func _capture_sequence() -> void:
 	_apply_arguments()
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUTPUT_DIRECTORY))
-	var main: Main3D = MAIN_SCENE.instantiate() as Main3D
+	var main: Main = MAIN_SCENE.instantiate() as Main
 	get_tree().root.add_child(main)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	var manager: TurnManager3D = main.get_node("TurnManager") as TurnManager3D
+	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
 	if not await _wait_until_ready(manager):
 		push_error("Jolt capture failed to reach initial WAITING_INPUT")
 		get_tree().quit(1)
@@ -53,7 +53,7 @@ func _capture_sequence() -> void:
 			await get_tree().process_frame
 			await RenderingServer.frame_post_draw
 			_capture("jolt3d_seed101_turn_%03d.png" % turn_number)
-		if manager.state == TurnManager3D.State.GAME_OVER and turn_number < CAPTURE_TURNS[-1]:
+		if manager.state == TurnManager.State.GAME_OVER and turn_number < CAPTURE_TURNS[-1]:
 			push_error("Jolt capture game over at turn %d before turn 180" % turn_number)
 			_failed = true
 			break
@@ -63,12 +63,12 @@ func _capture_sequence() -> void:
 	get_tree().quit(1 if _failed else 0)
 
 
-func _wait_until_ready(manager: TurnManager3D) -> bool:
+func _wait_until_ready(manager: TurnManager) -> bool:
 	var max_frames: int = ceili(float(Engine.physics_ticks_per_second) * WAIT_TIMEOUT_SECONDS)
 	for _frame: int in range(max_frames):
 		if (
-			manager.state == TurnManager3D.State.WAITING_INPUT
-			or manager.state == TurnManager3D.State.GAME_OVER
+			manager.state == TurnManager.State.WAITING_INPUT
+			or manager.state == TurnManager.State.GAME_OVER
 		):
 			return true
 		await get_tree().physics_frame

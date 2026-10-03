@@ -24,7 +24,7 @@ func test_blocked_preferred_position_uses_nearest_free_slot() -> void:
 	blocker.freeze = true
 	_set_next_level_one_batch(spawner, [0.5])
 
-	var spawned: Array[Orb] = spawner.try_spawn(board, Vector2i.DOWN, 1)
+	var spawned: Array = spawner.try_spawn(board, Vector2i.DOWN, 1)
 	assert_eq(spawned.size(), 1, "one orb spawned")
 	var orb: Orb = spawned[0]
 	assert_true(not orb.is_waiting_at_entrance, "nearby free slot avoids waiting")
@@ -110,7 +110,7 @@ func test_two_orb_batch_reserves_distinct_free_slots() -> void:
 	var spawner: Spawner = fixture["spawner"] as Spawner
 	_set_next_level_one_batch(spawner, [0.5, 0.5])
 
-	var spawned: Array[Orb] = spawner.try_spawn(board, Vector2i.DOWN, 1)
+	var spawned: Array = spawner.try_spawn(board, Vector2i.DOWN, 1)
 	assert_eq(spawned.size(), 2, "two-orb batch spawned")
 	assert_true(not spawned[0].is_waiting_at_entrance, "first orb has a free slot")
 	assert_true(not spawned[1].is_waiting_at_entrance, "second orb has a reserved free slot")
@@ -144,7 +144,7 @@ func test_warning_set_matches_directions_that_would_wait() -> void:
 		var direction_spawner: Spawner = direction_fixture["spawner"] as Spawner
 		_fill_spawn_wall(direction_board, Vector2i.DOWN, true)
 		_set_next_level_one_batch(direction_spawner, [0.5])
-		var direction_spawned: Array[Orb] = direction_spawner.try_spawn(
+		var direction_spawned: Array = direction_spawner.try_spawn(
 			direction_board,
 			direction,
 			1

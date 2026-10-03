@@ -38,6 +38,65 @@
 
 ## 미확인
 
+### [2026-10-03] 대상 #20 — Jolt 3D 정식 통합
+- 상태: 질문
+- 브랜치 / PR: `m8-jolt-integration` / `main` 대상 PR 생성 후 링크 갱신
+- 변경 파일: `project.godot`, `scenes/Main3D.tscn`, `scripts/core/{Main,TurnManager,CollisionResolver,Spawner,Board,Orb}.gd`, `scripts/ui/{Hud,DebugHud}.gd`, `scripts/spike/{Board3D,Orb3D}.gd`, 스파이크 복사본 5종 삭제, `tests/test_jolt_3d.gd`, `tests/scenarios/test_jolt_integration.gd`, `tests/spike/`, `artifacts/jolt3d_integration_summary.json`, `artifacts/jolt3d_seed101_*.png`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 프로젝트 메인 씬을 `Main3D.tscn`으로 전환하고 Jolt 확정 설정(position 4 / velocity 10 / Baumgarte 0.2 / slop 0.02 / separate thread false / worker 1 / 120Hz / FOV 25° / z 42m)을 적용. 기존 2D `Main.tscn`·`Board.tscn`은 유지
+  - [x] `TurnManager`·`CollisionResolver`·`Spawner`·`Main`·`Hud`를 2D/3D 공통 덕 타이핑 경로로 일반화하고 `TurnManager3D`·`CollisionResolver3D`·`Spawner3D`·`Main3D.gd`·`Hud3D` 복사본 삭제. 3D 전용 코드는 `Board3D`·`Orb3D`·씬/카메라/시각 연출만 유지
+  - [x] 3D 합체·규칙 C 결과만 유령 처리: 구체 충돌 통과, 최대 일반 구체 겹침 `<= ghost_exit_overlap` 해제, `ghost_max_time=0.6s` 타임아웃. 점진 성장·타임아웃 위치 보정·사전 벽 복구·escape guard는 끈 상태로 ON/OFF 측정
+  - [x] 3D 자동 시나리오: 공통 코어/UI, 합체 유령 ON/OFF, 겹침 유령 타임아웃, 규칙 C+점수, 20턴, seed 101 120턴, 입구 대기+게임오버+붉은 3D 변, 22시드 중력 사이클 — `8/8` 통과
+  - [x] 2D 회귀와 3D 회귀를 나란히 실행: 2D 240Hz 22시드 `이탈/발산 0/0, wall 10.595px`; 3D 120Hz 22시드 `0/0, wall 11.6444px, pair 13.1703px`. 3D pair 반복 관측 범위 `11.6094~13.8115px`이며 기준 미정이라 실패 한도로 고정하지 않음
+  - [x] 120/60Hz × 결과 유령 ON/OFF, seed 101~112, 게임오버 또는 400턴 측정. 네 조건 모두 12/12 게임오버, 중단·이탈·발산 0
+  - [x] 독립 Godot 프로세스 2회에서 seed 101 120턴 해시 `120/120` 일치. 최종 해시 `1136f5e40244d411100a273c94b0b2622d719d7a63f3910ee8788b5c878c4cb9`
+  - [x] 공통 전체 HUD·F2·F3·R 신호·게임오버 패널·붉은 3D 경고 변 경로 유지. 입력 테스트와 3D 게임오버/경고 테스트 통과
+  - [x] seed 101 턴 1·60·180·기울기 PNG 4장을 GPU 렌더링으로 재캡처하고 HUD/보드/구체/seed 101 표기를 직접 확인
+  - [ ] 짧은 영상 — 선택 산출물이라 미생성. 정지 화면 4장과 실제 180턴 자동 플레이 캡처를 우선함
+  - [x] §10.1 필수 명령 3종 종료 코드 0, 전체 테스트 `117/117`
+- 12시드 전체 측정 요약 (`wall/pair`는 네 점유율 구간 중 최대, 외부 ms/frame은 프로세스 wall time ÷ 기록 physics frame):
+
+| 틱 | 결과 유령 | 게임오버 | 턴 p50 | 종료 점유율 평균 | 최대 wall / pair | 이탈 / 발산 | 유령 완료 / timeout / 평균 | 외부 ms/frame |
+|---:|:---:|---:|---:|---:|---:|---:|---:|---:|
+| 120 | ON | 12/12 | 245 | 81.2307% | 27.6306 / 253.2566px | 0 / 0 | 3447 / 2171 / 0.402166s | 0.400763 |
+| 120 | OFF | 12/12 | 245 | 81.5361% | 19.1093 / 57.6111px | 0 / 0 | 0 / 0 / — | 0.400474 |
+| 60 | ON | 12/12 | 256 | 82.5253% | 29.8354 / 244.6228px | 0 / 0 | 3453 / 2307 / 0.427512s | 0.635621 |
+| 60 | OFF | 12/12 | 259 | 82.8655% | 23.8172 / 68.7923px | 0 / 0 | 0 / 0 / — | 0.593263 |
+
+- 점유율 구간별 관측 (`wall / pair px`, `평균 이동 px / 반지름 미만 이동 %`):
+
+| 틱·유령 | 0~20% | 20~40% | 40~60% | 60%+ |
+|---|---:|---:|---:|---:|
+| 120 ON | 23.7145 / 153.5435; 452.99 / 8.94% | 18.6375 / 207.8105; 325.81 / 18.27% | 27.6306 / 253.2566; 214.00 / 26.01% | 27.0826 / 230.1969; 66.77 / 56.14% |
+| 120 OFF | 14.6367 / 55.4102; 445.76 / 9.31% | 19.1093 / 57.6111; 320.75 / 18.13% | 17.1480 / 20.3328; 203.07 / 26.44% | 16.6010 / 12.3192; 63.70 / 56.35% |
+| 60 ON | 23.6865 / 149.9337; 454.48 / 8.81% | 25.7665 / 204.8451; 330.74 / 18.05% | 29.8354 / 225.6754; 205.61 / 27.59% | 26.4857 / 244.6228; 74.51 / 53.71% |
+| 60 OFF | 22.4490 / 29.4529; 441.60 / 9.52% | 23.8172 / 32.3593; 322.11 / 18.26% | 21.3567 / 68.7923; 206.21 / 26.72% | 16.2689 / 34.1755; 72.66 / 53.01% |
+
+- 겹침 원인·유령 효과 관측:
+  - 120 ON 최대 pair `253.2566px`: 40~60%, L6 `ghost_timeout` 이력 구체와 L6 `merge_result`; 60 ON 최대 `244.6228px`: 60%+, L7 `ghost_timeout` 이력 구체와 L3 `merge_result`
+  - OFF 최대는 120Hz `57.6111px`(합체 직후 3 frame)와 60Hz `68.7923px`(오래된 정상 더미 분류). ON은 0.6초 뒤 깊게 겹친 상태에서 보정 없이 solid로 돌아온 timeout이 각각 2171/2307회 누적되어 pair와 wall 모두 OFF보다 커짐
+  - 고밀도 60%+에서 반지름 미만 이동 비율은 모든 조건에서 레벨과 함께 단조 증가. 예: 120 OFF `L1 37.12% → L7 97.87%`, 60 OFF `L1 35.71% → L7 96.41%`. 큰 구체 잼 양상은 3D에서도 유지
+  - 같은 프로세스에서 fixture를 연속 생성하는 보조 결정성 검사는 Jolt body ID 지속으로 2턴부터 다르지만, 명세 기준인 독립 프로세스 2회는 120턴 전부 일치
+- 상세 산출물:
+  - `artifacts/jolt3d_integration_summary.json`: 네 조건의 구간별/레벨별 잼, 게임오버, 성능, 결정성, 2D/3D 회귀 요약
+  - `artifacts/jolt3d_seed101_turn_001.png`, `jolt3d_seed101_turn_060.png`, `jolt3d_seed101_turn_180.png`, `jolt3d_seed101_tilt_turn060.png`: 실제 seed 101, 공통 HUD가 연결된 정식 3D 장면, `799×1421`
+- QA 관측값:
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --import` → 종료 코드 0, 프로젝트 오류 0
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . -s res://tests/run_tests.gd` → `117/117` 통과, 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --quit-after 300` → 종료 코드 0, 프로젝트 오류 0
+  - 정적 규칙 → `Input`/`InputEvent`는 `scripts/autoload/InputRouter.gd`만, 난수 호출은 `scripts/core/Spawner.gd`만, `git diff --check` 이상 없음
+- 수동 확인 절차:
+  1. Godot 4.8에서 프로젝트를 실행한다 → `Main3D.tscn`이 열리고 상단에 디버그·SCORE/BEST/MAX CHAIN/NEXT, 하단에 BLOCKED, 중앙에 3D 보드가 보이는지 확인한다.
+  2. WASD/방향키 또는 스와이프로 네 방향을 입력한다 → 구체가 새 방향으로 이동하고 3D 프레임만 약 4° 기울었다가 0.25초 안에 돌아오는지 확인한다.
+  3. F2로 소멸 규칙, F3로 생성 수를 바꾸고 플레이한다 → HUD Rule/Spawn 값과 다음 생성이 바뀌는지 확인한다.
+  4. 한쪽 생성 변이 막힐 때까지 플레이한다 → 그 3D 프레임 변과 BLOCKED가 빨갛게 표시되고, 해당 방향 생성 실패 시 GAME OVER 패널이 SCORE/BEST/MAX CHAIN/막힌 방향을 표시하는지 확인한다.
+  5. GAME OVER에서 R 또는 RESTART를 누른다 → 새 판이 시작되고 최고 점수는 유지되는지 확인한다.
+- 결정 사항: 공개 신호·메서드 이름과 밸런스값은 바꾸지 않았다. 공통 코어는 `Variant` 덕 타이핑으로 2D/3D 보드 API를 공유했고, 물리 접촉 순서는 런타임 instance ID 대신 보드별 `stable_spawn_id` 정렬·중복 제거로 고정했다. 프로젝트 기본 120Hz와 별개로 기존 2D 물리 회귀 파일은 과거 비교 기준인 240Hz로, `jolt` 테스트 파일은 120Hz로 실행하도록 테스트 러너에서 파일별 틱을 명시했다.
+- 남은 것 · 질문:
+  1. 3D wall/pair 자동 기준값을 어떤 값으로 확정할지 지정 필요. 현재 22시드 회귀는 `11.6444 / 13.1703px`, 실제 12판 게임오버 측정의 최댓값은 유령 OFF에서 120Hz `19.1093 / 57.6111px`, 60Hz `23.8172 / 68.7923px`.
+  2. 기본 물리 틱을 120Hz로 유지할지 60Hz로 내릴지 결정 필요. 60Hz도 이탈·발산 0이나 wall/pair와 외부 ms/frame이 120Hz보다 높게 관측됨.
+  3. 결과 유령을 기본 ON으로 유지할지 OFF로 바꿀지 결정 필요. 위치 보정 금지 조건의 ON은 timeout 누적으로 pair `244~253px`를 만들어 OFF보다 악화됐으며, 수치 변경은 하지 않고 질문으로 멈춤.
+
 ### [2026-10-03] 대상 #19 추가 요구 1 — Jolt 2차 성능·겹침·결정성·카메라 시험
 - 상태: 질문
 - 브랜치 / PR: `spike-jolt-3d` / [Draft PR #19](https://github.com/jeongmo-dot/gravity_orb/pull/19)

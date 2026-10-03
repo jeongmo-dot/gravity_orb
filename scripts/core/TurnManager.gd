@@ -11,7 +11,7 @@ signal chain_changed(chain: int)
 signal warning_changed(walls: Array[Vector2i])
 signal game_over
 
-@onready var _board: Board = %Board
+@onready var _board: Variant = %Board
 @onready var _spawner: Spawner = %Spawner
 @onready var _collision_resolver: CollisionResolver = %CollisionResolver
 
@@ -22,9 +22,14 @@ var turn_max_chain: int = 0
 var capped_turn_count: int = 0
 var blocked_directions: Array[Vector2i] = []
 var game_over_details: Dictionary = {}
+var settle_elapsed: float = 0.0
+var _settle_elapsed: float:
+	get:
+		return settle_elapsed
+	set(value):
+		settle_elapsed = value
 
 var _stable_time: float = 0.0
-var _settle_elapsed: float = 0.0
 var _is_initial_settle: bool = false
 
 
@@ -56,11 +61,13 @@ func on_swipe(dir: Vector2i) -> void:
 
 	turn_index += 1
 	turn_max_chain = 0
-	for orb: Orb in _board.get_orbs():
+	for orb: Variant in _board.get_orbs():
 		orb.generation = 0
 	InputRouter.set_locked(true)
 	gravity = dir
 	_board.set_gravity(gravity)
+	if _board.has_method("play_visual_tilt"):
+		_board.play_visual_tilt(gravity)
 	gravity_changed.emit(gravity)
 	turn_started.emit(turn_index, gravity)
 	_set_state(State.SPAWNING)
@@ -81,13 +88,13 @@ func _physics_process(delta: float) -> void:
 	if applied_reactions > 0:
 		_stable_time = 0.0
 
-	_settle_elapsed += delta
+	settle_elapsed += delta
 	if _all_below_threshold():
 		_stable_time += delta
 	else:
 		_stable_time = 0.0
 
-	if _settle_elapsed >= Config.data.max_settle_time:
+	if settle_elapsed >= Config.data.max_settle_time:
 		_collision_resolver.sweep_resting_contacts()
 		if not _is_initial_settle:
 			capped_turn_count += 1
@@ -100,7 +107,9 @@ func _physics_process(delta: float) -> void:
 
 
 func _all_below_threshold() -> bool:
-	for orb: Orb in _board.get_orbs():
+	for orb: Variant in _board.get_orbs():
+		if orb.is_waiting_at_entrance:
+			continue
 		if orb.linear_velocity.length() > Config.data.stable_linear_speed:
 			return false
 		if absf(orb.angular_velocity) > Config.data.stable_angular_speed:
@@ -119,7 +128,7 @@ func on_reaction(reaction: Dictionary) -> void:
 
 func _begin_settle() -> void:
 	_stable_time = 0.0
-	_settle_elapsed = 0.0
+	settle_elapsed = 0.0
 
 
 func _on_settled() -> void:
@@ -132,7 +141,7 @@ func _on_settled() -> void:
 
 	_set_state(State.CHECK_GAMEOVER)
 	turn_finished.emit(turn_index, turn_max_chain)
-	var blocked_spawns: Array[Orb] = _board.entrance_waiting_orbs()
+	var blocked_spawns: Array = _board.entrance_waiting_orbs()
 	if not blocked_spawns.is_empty():
 		game_over_details = _build_game_over_details(blocked_spawns)
 		_set_state(State.GAME_OVER)
@@ -143,10 +152,10 @@ func _on_settled() -> void:
 	_set_state(State.WAITING_INPUT)
 
 
-func _build_game_over_details(blocked_spawns: Array[Orb]) -> Dictionary:
+func _build_game_over_details(blocked_spawns: Array) -> Dictionary:
 	var levels: Array[int] = []
 	var overlap_counts: Array[int] = []
-	for orb: Orb in blocked_spawns:
+	for orb: Variant in blocked_spawns:
 		levels.append(orb.level)
 		overlap_counts.append(_board.normal_overlap_count(orb))
 	return {

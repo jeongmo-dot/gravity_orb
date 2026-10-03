@@ -13,6 +13,7 @@ var generation: int = 0
 var stable_spawn_id: int = 0
 var consumed: bool = false
 var is_ghost: bool = false
+var ghost_elapsed: float = 0.0
 var is_waiting_at_entrance: bool = false
 var entrance_preferred_position: Vector2 = Vector2.ZERO
 var entrance_gravity: Vector2i = Vector2i.DOWN
@@ -129,6 +130,28 @@ func get_current_radius() -> float:
 	return _current_radius
 
 
+func enter_ghost_state(alpha: float) -> void:
+	is_ghost = true
+	ghost_elapsed = 0.0
+	_body.collision_layer = 4
+	_body.collision_mask = 1
+	_set_visual_alpha(alpha)
+
+
+func exit_ghost_state() -> void:
+	is_ghost = false
+	is_waiting_at_entrance = false
+	_body.collision_layer = 2
+	_body.collision_mask = 3
+	_body.sleeping = false
+	_set_visual_alpha(1.0)
+
+
+func advance_ghost(delta: float) -> void:
+	if is_ghost:
+		ghost_elapsed += delta
+
+
 func note_diagnostic_event(event_name: String, physics_frame: int = -1) -> void:
 	diagnostic_last_event = event_name
 	diagnostic_last_event_physics_frame = (
@@ -203,12 +226,20 @@ func get_colliding_orbs() -> Array[Orb3D]:
 
 
 func _set_waiting_visual(waiting: bool) -> void:
+	_set_visual_alpha(0.45 if waiting else 1.0)
+
+
+func _set_visual_alpha(alpha: float) -> void:
 	var material: StandardMaterial3D = _mesh.material_override as StandardMaterial3D
 	if material == null:
 		return
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA if waiting else BaseMaterial3D.TRANSPARENCY_DISABLED
+	material.transparency = (
+		BaseMaterial3D.TRANSPARENCY_ALPHA
+		if alpha < 1.0
+		else BaseMaterial3D.TRANSPARENCY_DISABLED
+	)
 	var display_color: Color = Config.data.color_display[color]
-	display_color.a = 0.45 if waiting else 1.0
+	display_color.a = alpha
 	material.albedo_color = display_color
 
 

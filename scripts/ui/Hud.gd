@@ -32,7 +32,7 @@ func bind_score_manager(score_manager: ScoreManager) -> void:
 
 func bind_game_state(
 	turn_manager: TurnManager,
-	board: Board,
+	board: Variant,
 	score_manager: ScoreManager
 ) -> void:
 	turn_manager.warning_changed.connect(_on_warning_changed)

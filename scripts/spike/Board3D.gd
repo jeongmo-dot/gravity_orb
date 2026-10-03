@@ -8,6 +8,8 @@ const PIXELS_PER_METER: float = 100.0
 const VISUAL_WALL_WIDTH_M: float = 0.12
 const VISUAL_TILT_DEGREES: float = 4.0
 const VISUAL_TILT_DURATION: float = 0.25
+const WARNING_FRAME_COLOR: Color = Color("#FF3B30")
+const NORMAL_FRAME_COLOR: Color = Color("#8ec5ff")
 
 @onready var _orbs_node: Node3D = %Orbs
 @onready var _physics_geometry: Node3D = %PhysicsGeometry
@@ -17,11 +19,16 @@ var _orbs: Array[Orb3D] = []
 var _next_orb_spawn_id: int = 1
 var _gravity_direction: Vector2i = Vector2i.DOWN
 var _warning_directions: Array[Vector2i] = []
+var _visual_walls: Dictionary = {}
 var _tilt_tween: Tween
 var orb_contact_reporting_enabled: bool = true
 var orb_continuous_cd_enabled: bool = true
 var orb_allow_sleep: bool = false
 var orb_progressive_growth_enabled: bool = false
+var reaction_ghost_enabled: bool = true
+var ghost_timeout_count: int = 0
+var ghost_completed_count: int = 0
+var ghost_total_duration: float = 0.0
 
 
 func _ready() -> void:
@@ -31,6 +38,7 @@ func _ready() -> void:
 
 func _physics_process(_delta: float) -> void:
 	_update_entrance_waiters()
+	_update_ghost_orbs(_delta)
 
 
 func half_size() -> float:
@@ -119,6 +127,10 @@ func clear() -> void:
 		remove_orb(orb)
 
 
+func should_ghost_reaction_results() -> bool:
+	return reaction_ghost_enabled
+
+
 func spawn_line(gravity: Vector2i, radius: float) -> Dictionary:
 	var half: float = half_size()
 	return {
@@ -183,7 +195,7 @@ func entrance_waiting_orbs() -> Array[Orb3D]:
 func normal_overlap_count(target: Orb3D) -> int:
 	var count: int = 0
 	for other: Orb3D in get_orbs():
-		if other == target or other.is_waiting_at_entrance:
+		if other == target or other.is_waiting_at_entrance or other.is_ghost:
 			continue
 		var overlap: float = (
 			target.get_radius()
@@ -206,6 +218,7 @@ func blocked_spawn_directions(batch: Array[Dictionary]) -> Array[Vector2i]:
 func set_warning_directions(directions: Array[Vector2i]) -> void:
 	_warning_directions.clear()
 	_warning_directions.append_array(directions)
+	_update_warning_visuals()
 
 
 func _batch_fits_spawn_line(gravity: Vector2i, batch: Array[Dictionary]) -> bool:
@@ -229,7 +242,7 @@ func _spawn_probe_is_clear(
 	placed: Array[Dictionary]
 ) -> bool:
 	for orb: Orb3D in get_orbs():
-		if orb.is_waiting_at_entrance:
+		if orb.is_waiting_at_entrance or orb.is_ghost:
 			continue
 		var overlap: float = (
 			radius
@@ -259,7 +272,7 @@ func _contains_approx(values: Array[float], target: float) -> bool:
 func _update_entrance_waiters() -> void:
 	var placed: Array[Dictionary] = []
 	for orb: Orb3D in get_orbs():
-		if not orb.is_waiting_at_entrance:
+		if not orb.is_waiting_at_entrance and not orb.is_ghost:
 			placed.append({"position": orb.position, "radius": orb.get_radius()})
 	for orb: Orb3D in entrance_waiting_orbs():
 		var slot: Dictionary = find_free_spawn_slot(
@@ -277,6 +290,48 @@ func _update_entrance_waiters() -> void:
 			Config.data.gravity_strength
 		)
 		placed.append({"position": spawn_position, "radius": orb.get_radius()})
+
+
+func maximum_normal_overlap(ghost: Orb3D) -> float:
+	var maximum_overlap: float = 0.0
+	for other: Orb3D in get_orbs():
+		if other == ghost or other.is_ghost:
+			continue
+		var overlap: float = (
+			ghost.get_current_radius()
+			+ other.get_current_radius()
+			- ghost.position.distance_to(other.position)
+		)
+		maximum_overlap = maxf(maximum_overlap, overlap)
+	return maximum_overlap
+
+
+func average_ghost_duration() -> float:
+	if ghost_completed_count == 0:
+		return 0.0
+	return ghost_total_duration / float(ghost_completed_count)
+
+
+func _update_ghost_orbs(delta: float) -> void:
+	for orb: Orb3D in get_orbs():
+		if not orb.is_ghost or orb.is_waiting_at_entrance:
+			continue
+		orb.advance_ghost(delta)
+		var maximum_overlap: float = maximum_normal_overlap(orb)
+		if maximum_overlap <= Config.data.ghost_exit_overlap:
+			_complete_ghost(orb, false)
+		elif orb.ghost_elapsed >= Config.data.ghost_max_time:
+			_complete_ghost(orb, true)
+
+
+func _complete_ghost(orb: Orb3D, timed_out: bool) -> void:
+	var duration: float = orb.ghost_elapsed
+	orb.exit_ghost_state()
+	orb.note_diagnostic_event("ghost_timeout" if timed_out else "ghost_release")
+	ghost_completed_count += 1
+	ghost_total_duration += duration
+	if timed_out:
+		ghost_timeout_count += 1
 
 
 func _on_orb_body_entered(other_body: Node, orb: Orb3D) -> void:
@@ -365,8 +420,29 @@ func _add_visual_wall(wall_name: String, wall_position: Vector3, size: Vector3) 
 	var wall_mesh: BoxMesh = BoxMesh.new()
 	wall_mesh.size = size
 	wall_mesh_instance.mesh = wall_mesh
-	wall_mesh_instance.material_override = _visual_material(Color("#8ec5ff"), 0.22, 0.18)
+	wall_mesh_instance.material_override = _visual_material(NORMAL_FRAME_COLOR, 0.22, 0.18)
 	_visual_tilt.add_child(wall_mesh_instance)
+	_visual_walls[wall_name] = wall_mesh_instance
+
+
+func _update_warning_visuals() -> void:
+	var direction_by_name: Dictionary = {
+		"VisualTop": Vector2i.DOWN,
+		"VisualBottom": Vector2i.UP,
+		"VisualLeft": Vector2i.RIGHT,
+		"VisualRight": Vector2i.LEFT,
+	}
+	for wall_name: String in direction_by_name:
+		var wall: MeshInstance3D = _visual_walls.get(wall_name) as MeshInstance3D
+		if wall == null:
+			continue
+		var direction: Vector2i = Vector2i(direction_by_name[wall_name])
+		var warning: bool = _warning_directions.has(direction)
+		wall.material_override = _visual_material(
+			WARNING_FRAME_COLOR if warning else NORMAL_FRAME_COLOR,
+			0.22,
+			0.35 if warning else 0.18
+		)
 
 
 func _visual_material(color_value: Color, roughness: float, emission_energy: float) -> StandardMaterial3D:

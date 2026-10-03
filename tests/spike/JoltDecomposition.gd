@@ -3,9 +3,9 @@ extends Node
 const BOARD_SCENE: PackedScene = preload("res://scenes/Board3D.tscn")
 const ORB_SCENE: PackedScene = preload("res://scenes/Orb3D.tscn")
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
-const RESOLVER_SCRIPT: Script = preload("res://scripts/spike/CollisionResolver3D.gd")
-const SPAWNER_SCRIPT: Script = preload("res://scripts/spike/Spawner3D.gd")
-const TURN_MANAGER_SCRIPT: Script = preload("res://scripts/spike/TurnManager3D.gd")
+const RESOLVER_SCRIPT: Script = preload("res://scripts/core/CollisionResolver.gd")
+const SPAWNER_SCRIPT: Script = preload("res://scripts/core/Spawner.gd")
+const TURN_MANAGER_SCRIPT: Script = preload("res://scripts/core/TurnManager.gd")
 const BODY_COUNT: int = 70
 const WARMUP_FRAMES: int = 120
 const SAMPLE_FRAMES: int = 240
@@ -132,17 +132,17 @@ func _create_manager_fixture() -> void:
 	_configure_board_profile(_board)
 	root.add_child(_board)
 	_board.owner = root
-	var resolver: CollisionResolver3D = RESOLVER_SCRIPT.new() as CollisionResolver3D
+	var resolver: CollisionResolver = RESOLVER_SCRIPT.new() as CollisionResolver
 	resolver.name = "CollisionResolver"
 	resolver.unique_name_in_owner = true
 	root.add_child(resolver)
 	resolver.owner = root
-	var spawner: Spawner3D = SPAWNER_SCRIPT.new() as Spawner3D
+	var spawner: Spawner = SPAWNER_SCRIPT.new() as Spawner
 	spawner.name = "Spawner"
 	spawner.unique_name_in_owner = true
 	root.add_child(spawner)
 	spawner.owner = root
-	var manager: TurnManager3D = TURN_MANAGER_SCRIPT.new() as TurnManager3D
+	var manager: TurnManager = TURN_MANAGER_SCRIPT.new() as TurnManager
 	manager.name = "TurnManager"
 	root.add_child(manager)
 	manager.owner = root
@@ -152,7 +152,7 @@ func _create_manager_fixture() -> void:
 
 
 func _create_full_fixture() -> void:
-	var main: Main3D = MAIN_SCENE.instantiate() as Main3D
+	var main: Main = MAIN_SCENE.instantiate() as Main
 	_fixture_root = main
 	_board = main.get_node("Board") as Board3D
 	_configure_board_profile(_board)

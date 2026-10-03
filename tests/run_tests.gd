@@ -18,6 +18,7 @@ const PHYSICS_GRAVITY_PREFIX: String = "--physics-gravity="
 const PHYSICS_FRICTION_PREFIX: String = "--physics-friction="
 const PHYSICS_BOUNCE_PREFIX: String = "--physics-bounce="
 const PHYSICS_CASE_PREFIX: String = "--physics-case="
+const TEST_FILE_ARGUMENT_PREFIX: String = "--test-file="
 const MEASUREMENT_FIXED_TESTS: Array[String] = [
 	"res://tests/scenarios/test_board_physics.gd",
 	"res://tests/scenarios/test_spawn_flow.gd",
@@ -34,6 +35,19 @@ func _init() -> void:
 
 func _run_all_tests() -> void:
 	var measurement_suite: String = _apply_measurement_arguments()
+	var requested_test_file: String = _requested_test_file()
+	if not requested_test_file.is_empty():
+		await _run_test_file(requested_test_file)
+		var requested_total: int = _passed + _failed
+		print(
+			"Tests: %d passed, %d failed, %d total" % [
+				_passed,
+				_failed,
+				requested_total,
+			]
+		)
+		quit(1 if _failed > 0 else 0)
+		return
 	if measurement_suite == "fixed":
 		for path: String in MEASUREMENT_FIXED_TESTS:
 			await _run_test_file(path)
@@ -155,6 +169,13 @@ func _apply_measurement_arguments() -> String:
 	return measurement_suite
 
 
+func _requested_test_file() -> String:
+	for argument: String in OS.get_cmdline_user_args():
+		if argument.begins_with(TEST_FILE_ARGUMENT_PREFIX):
+			return argument.trim_prefix(TEST_FILE_ARGUMENT_PREFIX)
+	return ""
+
+
 func _apply_spawn_case(config_data: GameConfig, spawn_case: String) -> int:
 	var active_colors: int = 4
 	config_data.spawn_count_ramp_turns = 0
@@ -202,6 +223,7 @@ func _run_directory(directory: String) -> void:
 
 
 func _run_test_file(path: String) -> void:
+	Engine.physics_ticks_per_second = 120 if path.contains("jolt") else 240
 	var test_script: Script = load(path) as Script
 	if test_script == null:
 		_record_runner_failure(path, "could not load script")
