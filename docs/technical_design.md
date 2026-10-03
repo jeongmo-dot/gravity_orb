@@ -224,7 +224,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M1 | `wall_thickness` | float | 256.0 | 터널링 방지용으로 두껍게 |
 | ~~M1~~ | ~~`orb_base_radius`, `orb_radius_growth`~~ | | | **#14에서 제거** → `level_radii` |
 | #14 | `level_radii` | PackedFloat32Array | [25, 40, 60, 85, 115, 150, 190] → **[25, 40, 60, 85, 100, 120, 140]** (#18, 기획서 0.6.2) | 레벨별 반지름 |
-| #25 | `color_effects_enabled` 외 6개 | | §7.6 표 | 색별 합체 효과·소멸 붕괴 (§7.6) |
+| #25 | `color_effects_enabled` 외 5개 | | §7.6 표 | 색별 합체 효과 (§7.6) |
 | #23 | `chain_reaction_delay` | float | 0.2 (가안, 플레이 체감으로 조정) | 합체 결과의 반응 잠금 시간 (초, §7.5) |
 | #21 | `combo_multiplier_base` | float | 2.0 | 콤보 배수 밑 (§8.2) |
 | #21 | `danger_start` / `danger_doubling` | float | 0.30 / 0.20 | 위험 배수 시작 점유율 / 2배가 되는 점유율 간격 (§8.2) |
@@ -266,7 +266,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M5+ | `ghost_alpha` | float | 0.55 | 유령 상태 표시 불투명도 |
 | M5+ | `wall_penetration_limit` | float | 16.0 | 사전 벽 복구: 관통이 이 값을 넘으면 25px 안전장치 전에 경계로 복구 (#11, 사용자 승인). 회귀 테스트는 발동 0 요구 (#12) |
 | M5+ | `escape_guard_depth` | float | 25.0 | 벽 관통이 이 깊이를 넘으면 경계로 되돌리는 안전장치 (회귀 테스트는 발동 0 요구) |
-| M6 | `opposite_pairs` | Array[Vector2i] | **[(RED, BLUE)]** — 0.5의 (GREEN, YELLOW)는 0.6에서 철회 (판이 덜 참) | 상극 쌍 (순서 무관). 초록·노랑은 상극 없음 |
+| M6 | `opposite_pairs` | Array[Vector2i] | [(RED, BLUE)] → **[] (#25, 기획서 0.9.3: 상극 소멸 폐지)**. 0.5의 (GREEN, YELLOW)는 0.6에서 철회 | 상극 쌍 (순서 무관). 비어 있으면 소멸 없음. ANNIHILATE 코드·규칙 A/B/C·점수는 지우지 않고 남긴다 (되살릴 때 값만 넣는다) |
 | M6 | `annihilation_rule` | AnnihilationRule | A_BOTH → **B_SAME_LEVEL** (2026-09-30 플레이테스트, 기획서 0.4.1) | |
 | M7 | `level_scores` | PackedInt32Array | [2,4,8,16,32,64,128] | 인덱스 0 = 레벨1 |
 | M7 | `annihilation_score_factor` | float | 0.5 | |
@@ -630,8 +630,8 @@ MERGE·MAX_CLEAR 반응 직후 반응 지점 `p`에서 충격파를 낸다.
 - 새 필드 `chain_reaction_delay`
 
 
-### 7.6 색별 반응 효과 (기획서 0.9.2 — #25)
-§7.4 충격파를 **결과 구체의 색에 따라 다른 효과**로 바꾸고, 소멸에도 효과를 준다. 공통 기호는 §7.4와 같다 (`p` 반응 지점, `q` 대상 중심, `d = |q − p|`, `Lf = 1 + shock_level_scale × (L − 1)`, `mass`는 대상 질량, 대상은 일반 상태 구체이며 결과 구체 자신은 제외).
+### 7.6 색별 반응 효과 (기획서 0.9.2·0.9.3 — #25)
+§7.4 충격파를 **결과 구체의 색에 따라 다른 효과**로 바꾼다. 0.9.3에서 상극 소멸을 폐지해(`opposite_pairs = []`) 소멸 효과(IMPLODE 붕괴)는 넣지 않는다. 공통 기호는 §7.4와 같다 (`p` 반응 지점, `q` 대상 중심, `d = |q − p|`, `Lf = 1 + shock_level_scale × (L − 1)`, `mass`는 대상 질량, 대상은 일반 상태 구체이며 결과 구체 자신은 제외).
 
 | 반응 | 모드 | 대상 | 효과 |
 |---|---|---|---|
@@ -639,15 +639,14 @@ MERGE·MAX_CLEAR 반응 직후 반응 지점 `p`에서 충격파를 낸다.
 | 파랑 합체 | **PULL 흡인** | `d < R` (파랑 계수) | 같은 식, 방향 `(p − q)` (안쪽). 끌려온 구체가 결과 구체와 닿아 다음 반응(§7.5 잠금 해제 후)을 만든다 |
 | 초록 합체 | **SHAKE 진동** | 판 위 **모든** 일반 구체 | **속도 변화(질량 무관)** `Δv = min(green_shake_speed × Lf, green_shake_max_speed)`, 방향은 무작위 단위벡터. 큰 구체도 같이 흔들려 굳은 더미를 푼다 |
 | 노랑 합체 | **LIFT 역중력** | `d < R` (노랑 계수) | 충격량은 PUSH와 같은 식, 방향 = **현재 중력의 반대** (`-gravity`) |
-| 빨강↔파랑 소멸 | **IMPLODE 붕괴** | `d < R`, `R = annihilate_implode_radius_factor × max(r_a, r_b)` | `J = shock_impulse × annihilate_implode_scale × Lf(max(La, Lb)) × (1 − d/R)`, 방향 `(p − q)` (사라진 자리로) |
 
-- `p`: 합체는 결과 생성 위치, 소멸은 두 구체 중심의 중점. 규칙 C 잔존 구체가 있으면 그 구체도 대상에서 제외한다
+- `p`: 결과 생성 위치 (MAX_CLEAR는 두 구체 중심의 중점). ANNIHILATE는 효과 없음 (소멸을 다시 켜도 그대로)
 - **MAX_CLEAR(L7 잭팟)**: 그 색의 모드를 쓰고 세기(Δv 포함)에 `shock_jackpot_scale`을 곱한다. 기준 반지름은 `r_L7`. SHAKE 잭팟도 `green_shake_max_speed × shock_jackpot_scale`로 상한
 - **무작위 방향(SHAKE)**: 전용 `RandomNumberGenerator`를 게임 시드에서 파생해 쓴다 (`Spawner` RNG와 분리 — 생성 순서가 바뀌지 않게). 같은 시드면 같은 결과 (결정론)
 - 효과는 §7.5와 같이 **반응마다** 적용한다 (순차 연쇄의 두 번째 합체는 두 번째 효과)
 - 모드 배정은 `shock_color_modes` 배열(색 순서 RED, BLUE, GREEN, YELLOW)로 한다. 측정·플레이 비교를 위해 모드를 바꿔 끼울 수 있게 한다
-- `color_effects_enabled = false`면 §7.4 기존 동작(모든 색 PUSH, 계수 1.0·2.5, 소멸 효과 없음)과 같다 — 회귀 비교용
-- 시각 표시(임시): 반응 지점에 모드별 색 고리 1회 (PUSH 바깥으로 퍼짐, PULL 안으로 수축, SHAKE 보드 프레임 짧은 떨림, LIFT 중력 반대 방향 화살, IMPLODE 수축 후 소멸). 정식 연출은 M8
+- `color_effects_enabled = false`면 §7.4 기존 동작(모든 색 PUSH, 계수 1.0·2.5)과 같다 — 회귀 비교용
+- 시각 표시(임시): 반응 지점에 모드별 색 고리 1회 (PUSH 바깥으로 퍼짐, PULL 안으로 수축, SHAKE 보드 프레임 짧은 떨림, LIFT 중력 반대 방향 화살). 정식 연출은 M8
 - 새 필드 (가안, #25 측정 후 확정):
 
 | 필드 | 타입 | 가안 |
@@ -657,9 +656,8 @@ MERGE·MAX_CLEAR 반응 직후 반응 지점 `p`에서 충격파를 낸다.
 | `shock_color_impulse_scale` | PackedFloat32Array | [1.5, 0.8, 0.0, 1.0] (SHAKE는 미사용) |
 | `shock_color_radius_factor` | PackedFloat32Array | [3.0, 3.0, 0.0, 3.0] (SHAKE는 판 전체) |
 | `green_shake_speed` / `green_shake_max_speed` | float | 150 / 600 (px/s) |
-| `annihilate_implode_scale` / `annihilate_implode_radius_factor` | float | 0.8 / 2.5 |
 
-- 위험: PULL·IMPLODE는 구체를 서로·벽 쪽으로 몰아 **겹침·벽 관통**을 늘릴 수 있다. §10 3D 임계값(22시드 벽 ≤14 / 쌍 ≤16px, 연속 턴 벽 ≤28 / 쌍 ≤60px, 이탈·발산 0)을 그대로 지켜야 하며, 넘으면 계수를 낮추는 쪽으로 보고한다
+- 위험: PULL은 구체를 서로·벽 쪽으로 몰아 **겹침·벽 관통**을 늘릴 수 있다. §10 3D 임계값(22시드 벽 ≤14 / 쌍 ≤16px, 연속 턴 벽 ≤28 / 쌍 ≤60px, 이탈·발산 0)을 그대로 지켜야 하며, 넘으면 계수를 낮추는 쪽으로 보고한다
 
 ---
 
