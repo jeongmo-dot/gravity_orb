@@ -10,8 +10,8 @@ const WAIT_TIMEOUT_SECONDS: float = 8.0
 const HIGH_THRESHOLD: float = 1.0e9
 
 var _reactions: Array[Dictionary] = []
-var _chains: Array[int] = []
-var _finished_max_chains: Array[int] = []
+var _combos: Array[int] = []
+var _finished_combos: Array[int] = []
 
 
 func test_matching_pair_merges_once_at_clamped_midpoint() -> void:
@@ -144,8 +144,8 @@ func test_merge_result_reacts_again_as_chain_two() -> void:
 	var orbs: Array[Orb] = board.get_orbs()
 	assert_eq(applied, 2, "chain reaction count")
 	assert_eq(_reaction_chains(), [1, 2], "chain reaction order")
-	assert_eq(_chains, [1, 2], "chain_changed sequence")
-	assert_eq(manager.turn_max_chain, 2, "turn maximum chain")
+	assert_eq(_combos, [1, 2], "combo_changed sequence")
+	assert_eq(manager.turn_combo, 2, "turn combo")
 	assert_eq(orbs.size(), 1, "chain result count")
 	if orbs.size() == 1:
 		assert_eq(orbs[0].level, 3, "chain result level")
@@ -154,7 +154,7 @@ func test_merge_result_reacts_again_as_chain_two() -> void:
 	await _cleanup_fixture(fixture)
 
 
-func test_independent_simultaneous_merges_are_both_chain_one() -> void:
+func test_independent_simultaneous_merges_advance_combo() -> void:
 	var fixture: Dictionary = await _create_fixture()
 	var board: Board = fixture["board"] as Board
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
@@ -185,8 +185,26 @@ func test_independent_simultaneous_merges_are_both_chain_one() -> void:
 	var applied: int = await _advance_and_flush(board, resolver, OBSERVE_SECONDS)
 	assert_eq(applied, 2, "independent reaction count")
 	assert_eq(_reaction_chains(), [1, 1], "independent chain values")
-	assert_eq(manager.turn_max_chain, 1, "independent maximum chain")
+	assert_eq(_reaction_combos(), [1, 2], "independent combo values")
+	assert_eq(manager.turn_combo, 2, "independent turn combo")
 	assert_eq(board.get_orbs().size(), 2, "independent result count")
+	await _cleanup_fixture(fixture)
+
+
+func test_annihilation_advances_combo() -> void:
+	var fixture: Dictionary = await _create_fixture()
+	var board: Board = fixture["board"] as Board
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	var first: Orb = board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(-20.0, 0.0))
+	var second: Orb = board.spawn_orb(OrbTypes.OrbColor.BLUE, 1, Vector2(20.0, 0.0))
+
+	resolver.report_contact(first, second)
+	assert_eq(resolver.flush(), 1, "annihilation reaction count")
+	assert_eq(manager.turn_combo, 1, "annihilation turn combo")
+	if _reactions.size() == 1:
+		assert_eq(_reactions[0]["type"], ReactionRules.Type.ANNIHILATE, "annihilation type")
+		assert_eq(_reactions[0]["combo"], 1, "annihilation combo")
 	await _cleanup_fixture(fixture)
 
 
@@ -268,16 +286,16 @@ func test_turn_manager_finishes_turn_after_merge() -> void:
 	await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
 
 	assert_eq(manager.turn_index, 1, "merge turn index")
-	assert_true(manager.turn_max_chain >= 1, "merge turn maximum chain")
-	assert_eq(_finished_max_chains.size(), 1, "turn_finished signal count")
-	if _finished_max_chains.size() == 1:
-		assert_true(_finished_max_chains[0] >= 1, "turn_finished maximum chain")
+	assert_true(manager.turn_combo >= 1, "merge turn combo")
+	assert_eq(_finished_combos.size(), 1, "turn_finished signal count")
+	if _finished_combos.size() == 1:
+		assert_true(_finished_combos[0] >= 1, "turn_finished combo")
 	assert_true(_reactions.size() >= 1, "merge reaction during turn")
 	await _cleanup_fixture(fixture)
 	_restore_turn_config(snapshot)
 
 
-func test_waiting_input_flush_continues_previous_turn_chain() -> void:
+func test_waiting_input_flush_continues_previous_turn_combo() -> void:
 	var snapshot: Dictionary = _snapshot_turn_config()
 	Config.data.stable_linear_speed = HIGH_THRESHOLD
 	Config.data.stable_angular_speed = HIGH_THRESHOLD
@@ -322,8 +340,9 @@ func test_waiting_input_flush_continues_previous_turn_chain() -> void:
 		_restore_turn_config(snapshot)
 		return
 
-	var finished_chain: int = manager.turn_max_chain
+	var finished_combo: int = manager.turn_combo
 	var expected_chain: int = chain_result.generation + 1
+	var expected_combo: int = finished_combo + 1
 	var result_radius: float = chain_result.get_radius()
 	chain_result.position = Vector2(-result_radius + 0.5, 0.0)
 	chain_result.linear_velocity = Vector2.ZERO
@@ -346,11 +365,11 @@ func test_waiting_input_flush_continues_previous_turn_chain() -> void:
 		"waiting input emits reaction_applied"
 	)
 	assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "reaction keeps waiting state")
-	assert_true(expected_chain > finished_chain, "waiting reaction continues finished chain")
-	assert_eq(manager.turn_max_chain, expected_chain, "waiting reaction updates turn maximum")
+	assert_eq(manager.turn_combo, expected_combo, "waiting reaction continues turn combo")
 	if _reactions.size() > reaction_count_before:
 		var waiting_reaction: Dictionary = _reactions[_reactions.size() - 1]
 		assert_eq(int(waiting_reaction["chain"]), expected_chain, "waiting reaction chain")
+		assert_eq(int(waiting_reaction["combo"]), expected_combo, "waiting reaction combo")
 		var waiting_result: Orb = waiting_reaction["result_orb"] as Orb
 		assert_true(waiting_result != null, "waiting reaction result orb")
 		if waiting_result != null:
@@ -392,7 +411,7 @@ func _create_fixture() -> Dictionary:
 	tree.root.add_child(fixture_root)
 	await tree.process_frame
 	resolver.reaction_applied.connect(_record_reaction)
-	manager.chain_changed.connect(_record_chain)
+	manager.combo_changed.connect(_record_combo)
 	return {
 		"root": fixture_root,
 		"board": board,
@@ -448,16 +467,27 @@ func _reaction_chains() -> Array[int]:
 	return chains
 
 
+func _reaction_combos() -> Array[int]:
+	var combos: Array[int] = []
+	for reaction: Dictionary in _reactions:
+		combos.append(int(reaction["combo"]))
+	return combos
+
+
 func _assert_reaction_dictionary(reaction: Dictionary) -> void:
 	var keys: Array[String] = [
 		"type",
 		"chain",
+		"combo",
+		"occupancy",
 		"levels",
 		"colors",
 		"position",
 		"result_level",
 		"result_color",
 		"result_orb",
+		"shock_level",
+		"shock_targets",
 	]
 	for key: String in keys:
 		assert_true(reaction.has(key), "reaction key %s" % key)
@@ -479,17 +509,17 @@ func _restore_turn_config(snapshot: Dictionary) -> void:
 
 func _reset_records() -> void:
 	_reactions.clear()
-	_chains.clear()
-	_finished_max_chains.clear()
+	_combos.clear()
+	_finished_combos.clear()
 
 
 func _record_reaction(reaction: Dictionary) -> void:
 	_reactions.append(reaction)
 
 
-func _record_chain(chain: int) -> void:
-	_chains.append(chain)
+func _record_combo(combo: int) -> void:
+	_combos.append(combo)
 
 
-func _record_turn_finished(_turn_index: int, max_chain: int) -> void:
-	_finished_max_chains.append(max_chain)
+func _record_turn_finished(_turn_index: int, combo: int) -> void:
+	_finished_combos.append(combo)

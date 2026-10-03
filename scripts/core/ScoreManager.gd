@@ -2,13 +2,14 @@ class_name ScoreManager
 extends Node
 
 signal score_changed(score: int, best: int)
-signal max_chain_changed(max_chain: int)
+signal max_combo_changed(max_combo: int)
+signal reaction_scored(reaction: Dictionary)
 
 @export var save_path: String = "user://save.cfg"
 
 var score: int = 0
 var best_score: int = 0
-var max_chain: int = 0
+var max_combo: int = 0
 var max_level_reached: int = 0
 
 
@@ -19,25 +20,26 @@ func _ready() -> void:
 
 func reset() -> void:
 	score = 0
-	max_chain = 0
+	max_combo = 0
 	max_level_reached = 0
 	score_changed.emit(score, best_score)
-	max_chain_changed.emit(max_chain)
+	max_combo_changed.emit(max_combo)
 
 
 func on_reaction(reaction: Dictionary) -> void:
 	var points: int = points_for(reaction, Config.data)
 	score += points
-	var chain: int = int(reaction["chain"])
-	if chain > max_chain:
-		max_chain = chain
-		max_chain_changed.emit(max_chain)
+	var combo: int = int(reaction.get("combo", 1))
+	if combo > max_combo:
+		max_combo = combo
+		max_combo_changed.emit(max_combo)
 	if int(reaction["type"]) == ReactionRules.Type.MERGE:
 		max_level_reached = maxi(max_level_reached, int(reaction["result_level"]))
 	if score > best_score:
 		best_score = score
 		_save_best_score()
 	score_changed.emit(score, best_score)
+	reaction_scored.emit(reaction)
 
 
 func on_orb_spawned(level: int) -> void:
@@ -67,7 +69,29 @@ static func points_for(reaction: Dictionary, cfg: GameConfig) -> int:
 			)
 		_:
 			return 0
-	return base_points * int(reaction["chain"])
+	var combo: int = maxi(int(reaction.get("combo", 1)), 1)
+	var occupancy: float = float(reaction.get("occupancy", 0.0))
+	var combo_multiplier: float = pow(cfg.combo_multiplier_base, float(combo - 1))
+	var danger_multiplier: float = danger_multiplier_for(occupancy, cfg)
+	var raw_points: float = float(base_points) * combo_multiplier * danger_multiplier
+	var nearest_integer: float = round(raw_points)
+	if is_equal_approx(raw_points, nearest_integer):
+		raw_points = nearest_integer
+	var points: int = floori(raw_points)
+	reaction["base_points"] = base_points
+	reaction["combo_multiplier"] = combo_multiplier
+	reaction["danger_multiplier"] = danger_multiplier
+	reaction["points"] = points
+	return points
+
+
+static func danger_multiplier_for(occupancy: float, cfg: GameConfig) -> float:
+	if occupancy < cfg.danger_start:
+		return 1.0
+	return pow(
+		2.0,
+		(occupancy - cfg.danger_start) / cfg.danger_doubling
+	)
 
 
 func _load_best_score() -> void:

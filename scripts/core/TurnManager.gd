@@ -6,8 +6,8 @@ enum State { WAITING_INPUT, SIMULATING, SPAWNING, CHECK_GAMEOVER, GAME_OVER }
 signal state_changed(state: State)
 signal gravity_changed(dir: Vector2i)
 signal turn_started(turn_index: int, dir: Vector2i)
-signal turn_finished(turn_index: int, max_chain: int)
-signal chain_changed(chain: int)
+signal turn_finished(turn_index: int, combo: int)
+signal combo_changed(combo: int)
 signal warning_changed(walls: Array[Vector2i])
 signal game_over
 
@@ -18,7 +18,7 @@ signal game_over
 var state: State = State.WAITING_INPUT
 var gravity: Vector2i = Vector2i.DOWN
 var turn_index: int = 0
-var turn_max_chain: int = 0
+var turn_combo: int = 0
 var capped_turn_count: int = 0
 var blocked_directions: Array[Vector2i] = []
 var game_over_details: Dictionary = {}
@@ -39,7 +39,7 @@ func _ready() -> void:
 
 func start_game() -> void:
 	turn_index = 0
-	turn_max_chain = 0
+	turn_combo = 0
 	capped_turn_count = 0
 	blocked_directions.clear()
 	game_over_details.clear()
@@ -49,6 +49,7 @@ func start_game() -> void:
 	_board.set_gravity(gravity)
 	_board.set_warning_directions(blocked_directions)
 	gravity_changed.emit(gravity)
+	combo_changed.emit(turn_combo)
 	_begin_settle()
 	_set_state(State.SIMULATING)
 
@@ -60,7 +61,8 @@ func on_swipe(dir: Vector2i) -> void:
 		return
 
 	turn_index += 1
-	turn_max_chain = 0
+	turn_combo = 0
+	combo_changed.emit(turn_combo)
 	for orb: Variant in _board.get_orbs():
 		orb.generation = 0
 	InputRouter.set_locked(true)
@@ -119,11 +121,9 @@ func _all_below_threshold() -> bool:
 
 func on_reaction(reaction: Dictionary) -> void:
 	_stable_time = 0.0
-	var chain: int = int(reaction["chain"])
-	if chain <= turn_max_chain:
-		return
-	turn_max_chain = chain
-	chain_changed.emit(turn_max_chain)
+	turn_combo += 1
+	reaction["combo"] = turn_combo
+	combo_changed.emit(turn_combo)
 
 
 func _begin_settle() -> void:
@@ -140,7 +140,7 @@ func _on_settled() -> void:
 		return
 
 	_set_state(State.CHECK_GAMEOVER)
-	turn_finished.emit(turn_index, turn_max_chain)
+	turn_finished.emit(turn_index, turn_combo)
 	var blocked_spawns: Array = _board.entrance_waiting_orbs()
 	if not blocked_spawns.is_empty():
 		game_over_details = _build_game_over_details(blocked_spawns)

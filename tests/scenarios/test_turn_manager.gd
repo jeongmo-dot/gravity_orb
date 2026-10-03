@@ -58,7 +58,7 @@ func test_t2_swipe_emits_full_state_and_turn_signal_sequence() -> void:
 	assert_eq(_turn_finishes.size(), 1, "turn_finished count")
 	if _turn_finishes.size() == 1:
 		assert_eq(_turn_finishes[0]["turn_index"], 1, "finished turn index")
-		assert_eq(_turn_finishes[0]["max_chain"], 0, "M3 max chain")
+		assert_eq(_turn_finishes[0]["combo"], 0, "turn combo")
 	assert_eq(manager.gravity, Vector2i.RIGHT, "gravity after turn")
 	await _cleanup_fixture(fixture, snapshot)
 
@@ -174,6 +174,21 @@ func test_t7_allowed_same_direction_swipe_starts_turn() -> void:
 	await _cleanup_fixture(fixture, snapshot)
 
 
+func test_t8_next_swipe_resets_combo_to_zero() -> void:
+	var snapshot: Dictionary = _snapshot_m3_config()
+	var fixture: Dictionary = await _create_ready_fixture(FIXTURE_SEED + 8)
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	var combo_values: Array[int] = []
+	manager.combo_changed.connect(func(combo: int) -> void: combo_values.append(combo))
+	manager.on_reaction({"chain": 1})
+	assert_eq(manager.turn_combo, 1, "reaction increments combo")
+	manager.on_swipe(Vector2i.RIGHT)
+	assert_eq(manager.turn_combo, 0, "accepted swipe resets combo")
+	assert_eq(combo_values, [1, 0], "combo signal includes reset")
+	await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
+	await _cleanup_fixture(fixture, snapshot)
+
+
 func _create_ready_fixture(seed: int) -> Dictionary:
 	var fixture: Dictionary = await _create_fixture(seed)
 	var manager: TurnManager = fixture["manager"] as TurnManager
@@ -278,5 +293,5 @@ func _record_turn_started(next_turn_index: int, direction: Vector2i) -> void:
 	_turn_starts.append({"turn_index": next_turn_index, "direction": direction})
 
 
-func _record_turn_finished(finished_turn_index: int, max_chain: int) -> void:
-	_turn_finishes.append({"turn_index": finished_turn_index, "max_chain": max_chain})
+func _record_turn_finished(finished_turn_index: int, combo: int) -> void:
+	_turn_finishes.append({"turn_index": finished_turn_index, "combo": combo})

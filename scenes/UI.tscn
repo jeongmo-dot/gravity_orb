@@ -16,7 +16,7 @@ offset_bottom = 300.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 28
-text = "State: WAITING_INPUT\nGravity: DOWN\nTurn: 0\nChain: 0\nSettle: 0.00 s"
+text = "State: WAITING_INPUT\nGravity: DOWN\nTurn: 0\nCombo: 0\nSettle: 0.00 s"
 
 [node name="Hud" type="Control" parent="."]
 unique_name_in_owner = true
@@ -55,7 +55,7 @@ theme_override_font_sizes/font_size = 28
 text = "BEST\n0"
 horizontal_alignment = 1
 
-[node name="MaxChainLabel" type="Label" parent="Hud"]
+[node name="MaxComboLabel" type="Label" parent="Hud"]
 unique_name_in_owner = true
 layout_mode = 0
 offset_left = 430.0
@@ -65,7 +65,35 @@ offset_bottom = 210.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 26
-text = "MAX CHAIN  0"
+text = "MAX COMBO  0"
+horizontal_alignment = 1
+
+[node name="ComboLabel" type="Label" parent="Hud"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 0
+offset_left = 350.0
+offset_top = 225.0
+offset_right = 730.0
+offset_bottom = 285.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.772549, 0.258824, 1)
+theme_override_font_sizes/font_size = 36
+text = "COMBO x1"
+horizontal_alignment = 1
+
+[node name="DangerLabel" type="Label" parent="Hud"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 0
+offset_left = 350.0
+offset_top = 290.0
+offset_right = 730.0
+offset_bottom = 350.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.231373, 0.188235, 1)
+theme_override_font_sizes/font_size = 32
+text = "DANGER x1.0"
 horizontal_alignment = 1
 
 [node name="NextLabel" type="Label" parent="Hud"]
@@ -146,12 +174,12 @@ theme_override_font_sizes/font_size = 32
 text = "BEST  0"
 horizontal_alignment = 1
 
-[node name="GameOverMaxChain" type="Label" parent="Hud/GameOverPanel/Margin/Content"]
+[node name="GameOverMaxCombo" type="Label" parent="Hud/GameOverPanel/Margin/Content"]
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
 theme_override_font_sizes/font_size = 32
-text = "MAX CHAIN  0"
+text = "MAX COMBO  0"
 horizontal_alignment = 1
 
 [node name="GameOverBlocked" type="Label" parent="Hud/GameOverPanel/Margin/Content"]

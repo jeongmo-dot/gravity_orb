@@ -70,6 +70,7 @@ func flush() -> int:
 		var result_color: int = int(classified["result_color"])
 		var survivor: int = int(classified["survivor"])
 		var result_orb: Variant = null
+		var occupancy: float = _board_occupancy()
 
 		_board.remove_orb(a)
 		_board.remove_orb(b)
@@ -100,19 +101,47 @@ func flush() -> int:
 			if _board.should_ghost_reaction_results():
 				result_orb.enter_ghost_state(Config.data.ghost_alpha)
 
+		var shock_level: int = (
+			Config.data.orb_max_level
+			if reaction_type == ReactionRules.Type.MAX_CLEAR
+			else result_level
+		)
+		var shock_targets: Array[Dictionary] = []
+		if (
+			reaction_type == ReactionRules.Type.MERGE
+			or reaction_type == ReactionRules.Type.MAX_CLEAR
+		):
+			shock_targets = _board.apply_shockwave(
+				reaction_position,
+				shock_level,
+				result_orb,
+				reaction_type == ReactionRules.Type.MAX_CLEAR
+			)
+
 		var reaction: Dictionary = {
 			"type": reaction_type,
 			"chain": chain,
+			"occupancy": occupancy,
 			"levels": levels,
 			"colors": colors,
 			"position": reaction_position,
 			"result_level": result_level,
 			"result_color": result_color,
 			"result_orb": result_orb,
+			"shock_level": shock_level,
+			"shock_targets": shock_targets,
 		}
 		reaction_applied.emit(reaction)
 		applied += 1
 	return applied
+
+
+func _board_occupancy() -> float:
+	var occupied_area: float = 0.0
+	for orb: Variant in _board.get_orbs():
+		var radius: float = Config.data.radius_for_level(orb.level)
+		occupied_area += PI * radius * radius
+	return occupied_area / (Config.data.board_size * Config.data.board_size)
 
 
 func _pair_less(first: Array, second: Array) -> bool:

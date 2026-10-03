@@ -11,8 +11,9 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 )
 @export var orb_max_level: int = 7
 @export var orb_base_mass: float = 1.0
-@export var mass_exponent: float = 1.0
+@export var mass_exponent: float = 2.0
 @export var gravity_strength: float = 1800.0
+@export var gravity_level_scale: float = 0.1
 @export var orb_friction: float = 0.3
 @export var orb_bounce: float = 0.15
 @export var wall_friction: float = 0.3
@@ -58,6 +59,13 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 @export var level_scores: PackedInt32Array = PackedInt32Array([2, 4, 8, 16, 32, 64, 128])
 @export var annihilation_score_factor: float = 0.5
 @export var max_merge_bonus_factor: float = 5.0
+@export var combo_multiplier_base: float = 2.0
+@export var danger_start: float = 0.30
+@export var danger_doubling: float = 0.20
+@export var shock_impulse: float = 600.0
+@export var shock_radius_factor: float = 2.5
+@export var shock_level_scale: float = 0.3
+@export var shock_jackpot_scale: float = 3.0
 
 
 func radius_for_level(level: int) -> float:
@@ -67,6 +75,10 @@ func radius_for_level(level: int) -> float:
 func mass_for_level(level: int) -> float:
 	var radius_ratio: float = radius_for_level(level) / radius_for_level(1)
 	return orb_base_mass * pow(radius_ratio, mass_exponent)
+
+
+func gravity_for_level(level: int) -> float:
+	return gravity_strength * (1.0 + gravity_level_scale * float(level - 1))
 
 
 func score_for_level(level: int) -> int:

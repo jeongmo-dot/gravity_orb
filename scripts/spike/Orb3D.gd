@@ -195,8 +195,16 @@ func set_gravity(direction: Vector2i, strength: float) -> void:
 	if is_waiting_at_entrance:
 		_body.constant_force = Vector3.ZERO
 		return
-	var acceleration_px: Vector2 = Vector2(direction) * strength
+	var level_strength: float = strength * (
+		1.0 + Config.data.gravity_level_scale * float(level - 1)
+	)
+	var acceleration_px: Vector2 = Vector2(direction) * level_strength
 	_body.constant_force = plane_vector_to_world(acceleration_px) * _body.mass
+	_body.sleeping = false
+
+
+func apply_plane_impulse(impulse: Vector2) -> void:
+	_body.apply_central_impulse(plane_vector_to_world(impulse))
 	_body.sleeping = false
 
 

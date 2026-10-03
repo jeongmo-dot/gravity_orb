@@ -195,11 +195,11 @@ func test_game_over_distribution_warning_accuracy_and_density_metrics() -> void:
 				"average_turn_seconds": _average(seed_turn_seconds),
 				"turn_p50_seconds": _percentile(seed_turn_seconds, 0.50),
 				"score": score_manager.score,
-				"max_chain": score_manager.max_chain,
+				"max_combo": score_manager.max_combo,
 			}
 		)
 		print(
-			"Game-over seed=%d turn=%d occupancy=%.6f orbs=%d direction=%s warned=%s aborted=%s completed_turns=%d turn_avg=%.6f score=%d max_chain=%d" % [
+			"Game-over seed=%d turn=%d occupancy=%.6f orbs=%d direction=%s warned=%s aborted=%s completed_turns=%d turn_avg=%.6f score=%d max_combo=%d" % [
 				seed,
 				game_over_turns.back(),
 				game_over_occupancy,
@@ -214,7 +214,7 @@ func test_game_over_distribution_warning_accuracy_and_density_metrics() -> void:
 				completed_turns,
 				_average(seed_turn_seconds),
 				score_manager.score,
-				score_manager.max_chain,
+				score_manager.max_combo,
 			]
 		)
 		await _cleanup_fixture(fixture)

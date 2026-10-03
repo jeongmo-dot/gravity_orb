@@ -1,0 +1,146 @@
+{
+  "engine": "Godot 4.8-dev3 mono",
+  "physics_engine": "Jolt Physics",
+  "physics_ticks_per_second": 120,
+  "position_steps": 4,
+  "seeds": [
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109,
+    110,
+    111,
+    112
+  ],
+  "config": {
+    "mass_exponent": 2.0,
+    "gravity_level_scale": 0.1,
+    "shock_impulse": 600.0,
+    "shock_radius_factor": 2.5,
+    "shock_level_scale": 0.3,
+    "shock_jackpot_scale": 3.0
+  },
+  "game_over_count": 12,
+  "seed_count": 12,
+  "aborted_count": 0,
+  "completed_turn_p50": 246.0,
+  "completed_turn_min": 211,
+  "completed_turn_max": 272,
+  "occupancy_mean_percent": 81.51119393998266,
+  "occupancy_min_percent": 77.7472595993373,
+  "occupancy_max_percent": 83.482643322932,
+  "score_mean": 15557.333333333334,
+  "score_p50": 15154.0,
+  "score_min": 8824,
+  "score_max": 23447,
+  "max_combo_p50": 6.0,
+  "max_combo_max": 8,
+  "max_level_p50": 7.0,
+  "max_level_max": 7,
+  "departures": 0,
+  "divergences": 0,
+  "max_wall_penetration_px": 24.71630859375,
+  "max_pair_penetration_px": 60.0587463378906,
+  "rearrangement_60_plus_mean": 0.056342487394151,
+  "rearrangement_60_plus_samples": 622,
+  "bins": {
+    "0-20": {
+      "max_wall_penetration_px": 19.6659240722656,
+      "max_pair_penetration_px": 13.592658996582,
+      "departures": 0,
+      "divergences": 0,
+      "mean_movement_px": 438.585008910773,
+      "below_radius_percent": 10.2780117944398,
+      "movement_samples": 5935
+    },
+    "20-40": {
+      "max_wall_penetration_px": 24.71630859375,
+      "max_pair_penetration_px": 36.158088684082,
+      "departures": 0,
+      "divergences": 0,
+      "mean_movement_px": 312.860799162263,
+      "below_radius_percent": 20.0856801741695,
+      "movement_samples": 14239
+    },
+    "40-60": {
+      "max_wall_penetration_px": 21.4377136230469,
+      "max_pair_penetration_px": 60.0587463378906,
+      "departures": 0,
+      "divergences": 0,
+      "mean_movement_px": 192.284263533439,
+      "below_radius_percent": 27.9231416301412,
+      "movement_samples": 22587
+    },
+    "60+": {
+      "max_wall_penetration_px": 21.0841674804688,
+      "max_pair_penetration_px": 13.2953491210938,
+      "departures": 0,
+      "divergences": 0,
+      "mean_movement_px": 69.5488038053219,
+      "below_radius_percent": 50.7915479896668,
+      "movement_samples": 30194
+    }
+  },
+  "jam_occupancy_40_plus_by_level": {
+    "L1": {
+      "samples": 19190,
+      "mean_movement_px": 124.94589789088593,
+      "below_radius_percent": 29.510161542470048
+    },
+    "L2": {
+      "samples": 13389,
+      "mean_movement_px": 125.08262118604351,
+      "below_radius_percent": 35.85032489356936
+    },
+    "L3": {
+      "samples": 8286,
+      "mean_movement_px": 121.65934047107962,
+      "below_radius_percent": 44.726043929519655
+    },
+    "L4": {
+      "samples": 4834,
+      "mean_movement_px": 118.90467469269052,
+      "below_radius_percent": 53.64087712039722
+    },
+    "L5": {
+      "samples": 3637,
+      "mean_movement_px": 114.10956459901547,
+      "below_radius_percent": 63.37640912840248
+    },
+    "L6": {
+      "samples": 1736,
+      "mean_movement_px": 118.5487606702588,
+      "below_radius_percent": 67.79953917050693
+    },
+    "L7": {
+      "samples": 1709,
+      "mean_movement_px": 97.69843145910225,
+      "below_radius_percent": 81.86073727325922
+    }
+  },
+  "shock_displacement_by_target_level": {
+    "L1": {
+      "mean_surrounding_displacement_per_reaction_px": 166.495994071547,
+      "mean_target_displacement_px": 155.404967111213,
+      "reaction_samples": 2070,
+      "target_samples": 3835
+    },
+    "L4": {
+      "mean_surrounding_displacement_per_reaction_px": 124.879913352191,
+      "mean_target_displacement_px": 124.459245215189,
+      "reaction_samples": 474,
+      "target_samples": 547
+    },
+    "L7": {
+      "mean_surrounding_displacement_per_reaction_px": 74.7861713320017,
+      "mean_target_displacement_px": 74.7861713320017,
+      "reaction_samples": 20,
+      "target_samples": 20
+    }
+  }
+}

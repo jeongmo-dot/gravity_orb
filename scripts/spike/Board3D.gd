@@ -122,6 +122,45 @@ func get_orbs() -> Array[Orb3D]:
 	return active
 
 
+func apply_shockwave(
+	origin: Vector2,
+	result_level: int,
+	excluded_orb: Variant,
+	is_jackpot: bool
+) -> Array[Dictionary]:
+	var result_radius: float = Config.data.radius_for_level(result_level)
+	var shock_radius: float = Config.data.shock_radius_factor * result_radius
+	var level_multiplier: float = (
+		1.0 + Config.data.shock_level_scale * float(result_level - 1)
+	)
+	var jackpot_multiplier: float = Config.data.shock_jackpot_scale if is_jackpot else 1.0
+	var targets: Array[Dictionary] = []
+	for orb: Orb3D in get_orbs():
+		if orb == excluded_orb or orb.is_ghost or orb.is_waiting_at_entrance:
+			continue
+		var offset: Vector2 = orb.position - origin
+		var distance: float = offset.length()
+		if is_zero_approx(distance) or distance >= shock_radius:
+			continue
+		var impulse_strength: float = (
+			Config.data.shock_impulse
+			* level_multiplier
+			* (1.0 - distance / shock_radius)
+			* jackpot_multiplier
+		)
+		var impulse: Vector2 = offset / distance * impulse_strength
+		targets.append({
+			"orb": orb,
+			"stable_spawn_id": orb.stable_spawn_id,
+			"level": orb.level,
+			"position": orb.position,
+			"impulse": impulse,
+		})
+		if not impulse.is_zero_approx():
+			orb.apply_plane_impulse(impulse)
+	return targets
+
+
 func clear() -> void:
 	var to_remove: Array[Orb3D] = _orbs.duplicate()
 	for orb: Orb3D in to_remove:
