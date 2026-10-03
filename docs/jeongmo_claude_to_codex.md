@@ -50,8 +50,26 @@
 - Done-when: 테스트 통과, 측정 보고, §10.1 명령 3종 에러 0
 - 커밋: 항목 단위 브랜치, push까지
 
+### [2026-10-03 #24] 🐛 콤보 표시 3곳 불일치 + MAX COMBO 미갱신
+- 상태: 대기 (**#23 다음, #22보다 먼저**)
+- 근거: 사용자 플레이 소감 — "콤보 숫자가 세 곳에서 나오는데 각각 따로 논다. 싱크가 안 맞는다. MAX COMBO 숫자 갱신도 안 된다"
+- Claude 코드 확인 (main `5002544` 기준):
+  - 디버그 라벨 `Combo:` = `TurnManager.turn_combo` (**횟수**, `combo_changed`)
+  - HUD `COMBO x…` = `combo_multiplier_base^(combo−1)` (**배수**, `ScoreManager.reaction_scored` 경유 + `combo_changed` 둘 다 구독)
+  - `MAX COMBO` = `ScoreManager.max_combo` (**횟수**, `max_combo_changed`)
+  - 횟수와 배수가 섞여 같은 순간에도 다른 숫자가 보이고, 갱신 경로가 셋이다. MAX COMBO 미갱신 원인은 코드만으로 확정 못 함 — `reaction_applied`의 두 구독자(`TurnManager.on_reaction`이 `reaction["combo"]`를 채우고 `ScoreManager.on_reaction`이 읽음)의 **호출 순서 의존**, 재시작(`reload_current_scene`) 후 재연결, 입력 대기 중 반응 경로를 의심
+- 요구:
+  1. **단일 출처**: 콤보 상태(현재 턴 콤보, 판 최대 콤보)는 한 곳에서 계산하고 하나의 신호(예: `combo_changed(combo, multiplier, max_combo)`)로만 내보낸다. `ScoreManager`가 `reaction["combo"]`를 읽는 구조라면 호출 순서에 의존하지 않게 바꾼다 (예: `TurnManager`가 콤보를 매긴 뒤 점수 계산을 직접 호출하거나, `CollisionResolver` → `TurnManager` → `ScoreManager` 순서를 명시적으로 고정)
+  2. **표시 통일**: HUD 현재 콤보 `COMBO 3 (x4)` 형식, `MAX COMBO 6`, 디버그 라벨도 같은 값. 게임오버 패널 MAX COMBO도 같은 출처
+  3. **재현 테스트 먼저**: MAX COMBO가 안 오르는 상황을 자동 테스트로 재현해 원인을 회신에 적고 고친다
+  4. **동기 테스트**: 같은 턴 3연속 반응, 입력 대기 중 반응, 다음 스와이프 리셋, R키 재시작 후 새 판, 게임오버 패널 — 각 시점에 디버그 라벨·HUD 콤보·MAX COMBO·게임오버 패널의 값이 단일 출처와 일치 (라벨 텍스트까지 검사)
+  5. #23 순차 연쇄(0.2초 간격)에서도 콤보 표시가 반응마다 한 단계씩 오르는지 확인
+- 건드리지 말 것: 점수 공식, 콤보 규칙, `docs/` (회신 파일 제외)
+- Done-when: 재현→수정, 동기 테스트 통과, 전체 테스트 통과, §10.1 명령 3종 에러 0
+- 커밋: 항목 단위 브랜치, push까지
+
 ### [2026-10-03 #22] 큰 구체 반지름 재측정 — Jolt 3D 기준
-- 상태: 대기 (#23 다음)
+- 상태: 대기 (#23·#24 다음)
 - 근거: #18(닫음, 2D 측정), #20 측정 — Jolt 3D에서도 판 60%+ 반경 미만 이동이 L1 37% → **L7 98%**로 큰 구체 잼이 남아 있다. #21 무게감 결정값 위에서 다시 판단한다
 - 요구:
   1. #21에서 확정된 무게감 기본값(질량 지수·레벨별 중력 배율)을 쓴다
