@@ -76,7 +76,7 @@ func on_swipe(dir: Vector2i) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	var applied_reactions: int = _collision_resolver.flush()
+	var applied_reactions: int = _collision_resolver.flush(delta)
 
 	if state == State.SPAWNING:
 		_spawner.try_spawn(_board, gravity, turn_index)
@@ -109,6 +109,8 @@ func _physics_process(delta: float) -> void:
 
 
 func _all_below_threshold() -> bool:
+	if _collision_resolver.has_pending_reactions():
+		return false
 	for orb: Variant in _board.get_orbs():
 		if orb.is_waiting_at_entrance:
 			continue

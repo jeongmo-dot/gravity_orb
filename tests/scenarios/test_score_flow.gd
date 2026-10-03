@@ -25,8 +25,18 @@ func test_same_turn_merges_score_twenty_and_track_combo_two() -> void:
 	var merge_result: Orb = _find_active_level(board, 2, next)
 	assert_true(merge_result != null, "first merge result")
 	if merge_result != null:
+		next.position = merge_result.position
+		next.exit_ghost_state()
 		resolver.report_contact(merge_result, next)
-		assert_eq(resolver.flush(), 1, "second merge count")
+		assert_eq(resolver.flush(), 0, "second merge waits for result lock")
+		var tick: float = 1.0 / float(Engine.physics_ticks_per_second)
+		var delay_frames: int = roundi(Config.data.chain_reaction_delay / tick)
+		for frame_index: int in range(delay_frames):
+			var applied: int = resolver.flush(tick)
+			if frame_index < delay_frames - 1:
+				assert_eq(applied, 0, "score chain remains locked")
+			else:
+				assert_eq(applied, 1, "second merge count")
 
 	assert_eq(score_manager.score, 20, "merge chain score")
 	assert_eq(score_manager.best_score, 20, "merge chain best score")

@@ -184,6 +184,7 @@ func test_m7_score_defaults() -> void:
 	assert_near(config.shock_radius_factor, 2.5, TOLERANCE, "shock radius factor")
 	assert_near(config.shock_level_scale, 0.3, TOLERANCE, "shock level scale")
 	assert_near(config.shock_jackpot_scale, 3.0, TOLERANCE, "shock jackpot scale")
+	assert_near(config.chain_reaction_delay, 0.2, TOLERANCE, "chain reaction delay")
 	for level: int in range(1, config.orb_max_level + 1):
 		assert_eq(
 			config.score_for_level(level),
