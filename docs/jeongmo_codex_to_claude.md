@@ -38,6 +38,45 @@
 
 ## 미확인
 
+### [2026-10-03] 대상 #21 · 추가 요구 2 — 최종 무게감 기본값 적용과 3D 회귀 재측정
+- 상태: 질문
+- 브랜치 / PR: `m9-turn-combo-weight` / [PR #21](https://github.com/jeongmo-dot/gravity_orb/pull/21)
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `tests/{test_config.gd,run_final_defaults_measurement.ps1}`, `tests/scenarios/test_board_physics.gd`, `artifacts/final_defaults_summary.json`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 선언·기본 리소스·config 테스트에 최종값 `mass_exponent=2.0`, `gravity_level_scale=0.1`, `shock_impulse=600.0`, `shock_radius_factor=2.5`, `shock_level_scale=0.3`, `shock_jackpot_scale=3.0` 적용
+  - [x] 새 기본값으로 3D 22시드와 20/120턴 회귀를 실행하고, 기준 초과에 따라 `position_steps` 4 → 6 → 8 순서로 측정
+  - [ ] 기준을 만족하는 `position_steps` 적용 — 8의 단독 실행은 통과했으나 전체 테스트 순서에서는 22시드 pair `17.9573px`, 120턴 wall `24.8075px`로 다시 초과. 지시대로 최종값은 4로 복원하고 질문 상태로 멈춤
+  - [x] 최종 기본값·`position_steps=4`에서 12시드 게임오버 1회 측정. 게임오버 `12/12`, 중단 `0`, 이탈·발산 `0/0`
+  - [ ] 전체 테스트 통과 — 최종 상태에서 `127/128`; 120턴 wall `24.6361px > 20px` 한 건 실패
+  - [ ] §10.1 명령 3종 에러 0 — import·300프레임 스모크는 종료 코드 0, 전체 테스트는 위 기준 실패로 종료 코드 1
+- `position_steps` 회귀 관측 (`wall/pair` 단위 px):
+
+| steps | 실행 범위 | 22시드 wall / pair | 20턴 | 120턴 | 이탈 / 발산 | 관측 |
+|---:|---|---:|---|---|---:|---|
+| 4 | 전체 128개, 고정 120Hz | 13.4939 / 14.3286 | 통과 | wall 24.6361 > 20 | 0 / 0 | `127/128`; 120턴 1건 실패 |
+| 6 | 3D 회귀 단독 | 13.3051 / 12.3462 | 통과 | wall 20.3097 > 20 | 0 / 0 | `11/12`; 120턴 1건 실패 |
+| 8 | 3D 회귀 단독 | 13.5292 / 15.6254 | 통과 | 통과 | 0 / 0 | `12/12` 통과 |
+| 8 | 전체 128개 순서 | 13.5292 / 17.9573 | 통과 | wall 24.8075 > 20 | 0 / 0 | 물리 기준 2건 재실패. 별도로 기존 steps=4 설정 검증 1건 실패 |
+
+- 최종 기본값 12시드 게임오버 관측 (`position_steps=4`, 게임오버 wall/pair는 #20 결정대로 보고 전용):
+  - 게임 길이: p50 `246턴`, 범위 `211~272턴`; 종료 점유율 평균 `81.5112%` (`77.7473~83.4826%`)
+  - 점수: 평균 `15,557.33`, p50 `15,154`, 범위 `8,824~23,447`; 최대 콤보 p50/최대 `6/8`, 최고 레벨 p50/최대 `7/7`
+  - 최대 wall/pair `24.7163 / 60.0587px`, 이탈·발산 `0/0`
+  - 점유율 40%+ 반지름 미만 이동 비율: L1 `29.51%`, L2 `35.85%`, L3 `44.73%`, L4 `53.64%`, L5 `63.38%`, L6 `67.80%`, L7 `81.86%`
+  - 상세 점유율 구간·표본 수·충격 주변 변위는 `artifacts/final_defaults_summary.json`에 기록
+- QA 관측값:
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . -s res://tests/run_tests.gd` → `127/128` 통과, 종료 코드 1; 유일한 실패 `120-turn wall penetration 24.6361 <= 20.0`
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --quit-after 300` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 비교용 고정 120Hz 전체 테스트도 `127/128`, 같은 120턴 wall 수치로 실패. 최종 2D 22시드는 이탈·발산 `0/0`, 최대 침투 `10.595px`; 최종 3D 22시드는 이탈·발산 `0/0`, wall/pair `13.4939/14.3286px`
+  - Windows 사용자 로그·루트 인증서·에디터 설정 저장 오류는 기존 제한 실행 환경 메시지이며 프로젝트 `SCRIPT ERROR`·`Parse Error`는 없음
+- 수동 확인 절차:
+  1. Godot 4.8에서 새 게임을 시작해 L1과 큰 구체가 충돌하는 장면을 만든다 → 큰 구체가 작은 구체보다 충격에 덜 밀리고 L7의 낙하 가속이 L1보다 큰지 확인한다.
+  2. 합체와 L7 최대 청소를 각각 만든다 → 주변 정상 구체가 중심 바깥쪽으로 흔들리고 최대 청소 충격이 더 강한지 확인한다.
+  3. 게임오버까지 플레이한다 → 고밀도에서 이탈·발산 없이 종료되는지와 합체 충격의 체감이 과하지 않은지 확인한다.
+- 결정 사항: §12-J에서 2D 씬은 회귀 비교가 끝날 때까지 유지하므로, 2D 전용 22시드 비교 테스트는 해당 테스트 안에서 과거 비교 기준 `mass_exponent=1.0`, `gravity_level_scale=0.0`을 설정하고 종료 전에 복원한다. 새 기본값의 합격 기준은 인박스 지시대로 3D 회귀에서 측정했다. 공개 API와 밸런스 수치는 지시값 외에 바꾸지 않았다.
+- 남은 것 · 질문: `position_steps=8`도 전체 테스트 순서에서는 22시드 pair와 120턴 wall 기준을 모두 넘어서 명세대로 적용하지 않고 4로 복원했다. 최종 기본값은 적용돼 있으나 전체 테스트가 `127/128`이므로, 후속 물리 튜닝 축 또는 회귀 기준 처리 지시가 필요하다.
+
 ### [2026-10-03] 대상 #21 · 추가 요구 1 — 턴 콤보·위험 점수, 무게감·합체 충격파 측정
 - 상태: 질문
 - 브랜치 / PR: `m9-turn-combo-weight` / [PR #21](https://github.com/jeongmo-dot/gravity_orb/pull/21)

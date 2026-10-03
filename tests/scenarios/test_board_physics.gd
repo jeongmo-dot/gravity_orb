@@ -18,6 +18,8 @@ const DIVERGENCE_SPEED: float = 5000.0
 const DIVERGENCE_MARGIN: float = 100.0
 const STANDARD_ORB_COUNT: int = 5
 const POSITION_TOLERANCE: float = 0.1
+const LEGACY_2D_MASS_EXPONENT: float = 1.0
+const LEGACY_2D_GRAVITY_LEVEL_SCALE: float = 0.0
 
 
 func test_floor_resistance_is_zero_for_airborne_orb_contact() -> void:
@@ -85,6 +87,10 @@ func test_guard_restores_orb_after_forty_pixel_penetration() -> void:
 
 
 func test_cycle_seeded_orbs_remain_inside_board_during_gravity_cycles() -> void:
+	var original_mass_exponent: float = Config.data.mass_exponent
+	var original_gravity_level_scale: float = Config.data.gravity_level_scale
+	Config.data.mass_exponent = LEGACY_2D_MASS_EXPONENT
+	Config.data.gravity_level_scale = LEGACY_2D_GRAVITY_LEVEL_SCALE
 	var results: Array[Dictionary] = []
 	for seed: int in range(STANDARD_SEED_START, STANDARD_SEED_END_EXCLUSIVE):
 		var standard_levels: Array[int] = _standard_levels(STANDARD_ORB_COUNT)
@@ -95,6 +101,8 @@ func test_cycle_seeded_orbs_remain_inside_board_during_gravity_cycles() -> void:
 
 	var worst_case_levels: Array[int] = [4, 4, 4, 4, 1, 1, 1, 1]
 	results.append(await _run_scenario(WORST_CASE_SEED, "worst", worst_case_levels))
+	Config.data.mass_exponent = original_mass_exponent
+	Config.data.gravity_level_scale = original_gravity_level_scale
 
 	var total_departures: int = 0
 	var total_escape_guards: int = 0

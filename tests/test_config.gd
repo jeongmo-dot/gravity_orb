@@ -40,7 +40,7 @@ func test_mass_for_candidate_exponents() -> void:
 		)
 	assert_near(
 		CONFIG_RESOURCE.mass_exponent,
-		1.0,
+		2.0,
 		TOLERANCE,
 		"default mass exponent"
 	)
@@ -55,7 +55,7 @@ func test_m2_swipe_defaults() -> void:
 func test_m3_turn_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	assert_near(config.gravity_strength, 1800.0, TOLERANCE, "gravity strength")
-	assert_near(config.gravity_level_scale, 0.0, TOLERANCE, "gravity level scale")
+	assert_near(config.gravity_level_scale, 0.1, TOLERANCE, "gravity level scale")
 	assert_near(config.gravity_for_level(1), 1800.0, TOLERANCE, "level one gravity")
 	config.gravity_level_scale = 0.1
 	assert_near(config.gravity_for_level(7), 2880.0, TOLERANCE, "level seven gravity")
@@ -180,7 +180,7 @@ func test_m7_score_defaults() -> void:
 	assert_near(config.combo_multiplier_base, 2.0, TOLERANCE, "combo multiplier base")
 	assert_near(config.danger_start, 0.30, TOLERANCE, "danger start")
 	assert_near(config.danger_doubling, 0.20, TOLERANCE, "danger doubling")
-	assert_near(config.shock_impulse, 0.0, TOLERANCE, "shock impulse disabled")
+	assert_near(config.shock_impulse, 600.0, TOLERANCE, "shock impulse")
 	assert_near(config.shock_radius_factor, 2.5, TOLERANCE, "shock radius factor")
 	assert_near(config.shock_level_scale, 0.3, TOLERANCE, "shock level scale")
 	assert_near(config.shock_jackpot_scale, 3.0, TOLERANCE, "shock jackpot scale")
