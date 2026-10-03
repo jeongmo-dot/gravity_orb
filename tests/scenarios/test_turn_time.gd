@@ -94,7 +94,7 @@ func _measure_current_config() -> Dictionary:
 	var divergence_count: int = 0
 	var wall_recovery_timeout_lags: Array[int] = []
 	var scores_by_seed: Array[int] = []
-	var max_chains_by_seed: Array[int] = []
+	var max_combos_by_seed: Array[int] = []
 	var max_levels_by_seed: Array[int] = []
 	var turns_by_seed: Array[int] = []
 	var first_over_30_by_seed: Array[int] = []
@@ -175,18 +175,18 @@ func _measure_current_config() -> Dictionary:
 			board.wall_recovery_since_last_ghost_timeout_frames
 		)
 		scores_by_seed.append(score_manager.score)
-		max_chains_by_seed.append(score_manager.max_chain)
+		max_combos_by_seed.append(score_manager.max_combo)
 		max_levels_by_seed.append(score_manager.max_level_reached)
 		turns_by_seed.append(completed_turns)
 		first_over_30_by_seed.append(first_over_30)
 		first_over_50_by_seed.append(first_over_50)
 		saturated_at_by_seed.append(saturated_at)
 		print(
-			"Turn-time seed=%d turns=%d score=%d max_chain=%d max_level=%d over30=%d over50=%d saturated=%d" % [
+			"Turn-time seed=%d turns=%d score=%d max_combo=%d max_level=%d over30=%d over50=%d saturated=%d" % [
 				seed,
 				completed_turns,
 				score_manager.score,
-				score_manager.max_chain,
+				score_manager.max_combo,
 				score_manager.max_level_reached,
 				first_over_30,
 				first_over_50,
@@ -226,7 +226,7 @@ func _measure_current_config() -> Dictionary:
 			else 0.0
 		),
 		"scores_by_seed": scores_by_seed,
-		"max_chains_by_seed": max_chains_by_seed,
+		"max_combos_by_seed": max_combos_by_seed,
 		"max_levels_by_seed": max_levels_by_seed,
 		"turns_by_seed": turns_by_seed,
 		"first_over_30_by_seed": first_over_30_by_seed,
@@ -626,9 +626,9 @@ func _print_metrics(metrics: Dictionary) -> void:
 			]
 		)
 	print(
-		"Turn-time scores_by_seed=%s max_chains_by_seed=%s max_levels_by_seed=%s" % [
+		"Turn-time scores_by_seed=%s max_combos_by_seed=%s max_levels_by_seed=%s" % [
 			str(metrics["scores_by_seed"]),
-			str(metrics["max_chains_by_seed"]),
+			str(metrics["max_combos_by_seed"]),
 			str(metrics["max_levels_by_seed"]),
 		]
 	)

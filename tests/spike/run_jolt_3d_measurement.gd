@@ -39,6 +39,7 @@ var _progressive_growth_enabled: bool = false
 var _reaction_ghost_enabled: bool = false
 var _record_seed_hashes: bool = false
 var _scan_pairs_each_frame: bool = false
+var _skip_determinism: bool = false
 
 
 func _ready() -> void:
@@ -55,6 +56,8 @@ func _run() -> void:
 		"physics_engine": str(ProjectSettings.get_setting("physics/3d/physics_engine")),
 		"pixels_per_meter": Orb3D.PIXELS_PER_METER,
 		"gravity_px_s2": Config.data.gravity_strength,
+		"gravity_level_scale": Config.data.gravity_level_scale,
+		"mass_exponent": Config.data.mass_exponent,
 		"level_radii_px": Array(Config.data.level_radii),
 		"corrections": {
 			"reaction_ghost": _reaction_ghost_enabled,
@@ -77,7 +80,12 @@ func _run() -> void:
 		report["ticks"].append(tick_report)
 
 	Engine.physics_ticks_per_second = 120
-	report["determinism"] = await _run_determinism_check(101)
+	report["feel_metrics"] = await _measure_feel_metrics()
+	report["determinism"] = (
+		{"skipped": true}
+		if _skip_determinism
+		else await _run_determinism_check(101)
+	)
 	Engine.physics_ticks_per_second = _original_ticks
 	_write_report(report)
 	print("JOLT3D_REPORT_PATH %s" % _report_path)
@@ -154,6 +162,7 @@ func _run_seed(
 	var fixture_root: Node = fixture["root"] as Node
 	var board: Board3D = fixture["board"] as Board3D
 	var manager: TurnManager = fixture["manager"] as TurnManager
+	var score_manager: ScoreManager = fixture["score_manager"] as ScoreManager
 	var completed_turns: int = 0
 	var aborted: bool = false
 	var abort_reason: String = ""
@@ -243,6 +252,9 @@ func _run_seed(
 		"game_over": manager.state == TurnManager.State.GAME_OVER,
 		"final_occupancy_percent": _board_occupancy(board) * 100.0,
 		"final_orb_count": board.get_orbs().size(),
+		"score": score_manager.score,
+		"max_combo": score_manager.max_combo,
+		"max_level_reached": score_manager.max_level_reached,
 		"aborted": aborted,
 		"abort_reason": abort_reason,
 		"hashes": hashes,
@@ -312,6 +324,7 @@ func _create_fixture(seed: int) -> Dictionary:
 		"root": fixture_root,
 		"board": board,
 		"manager": manager,
+		"score_manager": score_manager,
 	}
 
 
@@ -322,6 +335,96 @@ func _wait_for_state(manager: TurnManager, target: TurnManager.State) -> bool:
 			return true
 		await get_tree().physics_frame
 	return manager.state == target
+
+
+func _measure_feel_metrics() -> Dictionary:
+	return {
+		"fall_time_seconds": {
+			"L1": await _measure_fall_time(1),
+			"L7": await _measure_fall_time(7),
+		},
+		"rolling_impact": {
+			"L7_into_L1": await _measure_rolling_impact(7, 1),
+			"L1_into_L7": await _measure_rolling_impact(1, 7),
+		},
+	}
+
+
+func _measure_fall_time(level: int) -> float:
+	var board: Board3D = await _create_feel_board()
+	var radius: float = Config.data.radius_for_level(level)
+	var start_y: float = -board.half_size() + radius + Config.data.spawn_margin
+	var floor_y: float = board.half_size() - radius
+	var orb: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.GREEN,
+		level,
+		Vector2(0.0, start_y)
+	)
+	var elapsed_frames: int = 0
+	var max_frames: int = ceili(float(Engine.physics_ticks_per_second) * 3.0)
+	for _frame: int in range(max_frames):
+		await get_tree().physics_frame
+		elapsed_frames += 1
+		if orb.position.y >= floor_y - Config.data.floor_contact_tolerance:
+			break
+	board.queue_free()
+	await get_tree().process_frame
+	return float(elapsed_frames) / float(Engine.physics_ticks_per_second)
+
+
+func _measure_rolling_impact(incoming_level: int, target_level: int) -> Dictionary:
+	var board: Board3D = await _create_feel_board()
+	var target_radius: float = Config.data.radius_for_level(target_level)
+	var incoming_radius: float = Config.data.radius_for_level(incoming_level)
+	var target_start: Vector2 = Vector2(
+		160.0,
+		board.half_size() - target_radius - Config.data.spawn_margin
+	)
+	var target: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.GREEN,
+		target_level,
+		target_start
+	)
+	var settle_frames: int = ceili(float(Engine.physics_ticks_per_second) * 0.5)
+	for _frame: int in range(settle_frames):
+		await get_tree().physics_frame
+	target_start = target.position
+	board.spawn_orb(
+		OrbTypes.OrbColor.YELLOW,
+		incoming_level,
+		Vector2(
+			-320.0,
+			board.half_size() - incoming_radius - Config.data.spawn_margin
+		),
+		Vector2(900.0, 0.0)
+	)
+	var maximum_displacement: float = 0.0
+	var observe_frames: int = ceili(float(Engine.physics_ticks_per_second) * 1.5)
+	for _frame: int in range(observe_frames):
+		await get_tree().physics_frame
+		maximum_displacement = maxf(
+			maximum_displacement,
+			absf(target.position.x - target_start.x)
+		)
+	var result: Dictionary = {
+		"target_displacement_px": absf(target.position.x - target_start.x),
+		"target_max_displacement_px": maximum_displacement,
+	}
+	board.queue_free()
+	await get_tree().process_frame
+	return result
+
+
+func _create_feel_board() -> Board3D:
+	var board: Board3D = BOARD_SCENE.instantiate() as Board3D
+	board.orb_contact_reporting_enabled = false
+	board.orb_continuous_cd_enabled = _continuous_cd_enabled
+	board.orb_allow_sleep = _allow_sleep
+	board.orb_progressive_growth_enabled = false
+	get_tree().root.add_child(board)
+	await get_tree().process_frame
+	board.set_gravity(Vector2i.DOWN)
+	return board
 
 
 func _wait_for_turn_end(
@@ -730,6 +833,12 @@ func _apply_arguments() -> void:
 			)
 		elif argument.begins_with("--jolt-output="):
 			_report_path = argument.trim_prefix("--jolt-output=")
+		elif argument.begins_with("--mass-exponent="):
+			Config.data.mass_exponent = argument.trim_prefix("--mass-exponent=").to_float()
+		elif argument.begins_with("--gravity-level-scale="):
+			Config.data.gravity_level_scale = argument.trim_prefix(
+				"--gravity-level-scale="
+			).to_float()
 		elif argument == "--jolt-no-ccd":
 			_continuous_cd_enabled = false
 		elif argument == "--jolt-allow-sleep":
@@ -746,6 +855,8 @@ func _apply_arguments() -> void:
 			_record_seed_hashes = true
 		elif argument == "--jolt-frame-pair-scan":
 			_scan_pairs_each_frame = true
+		elif argument == "--jolt-no-determinism":
+			_skip_determinism = true
 
 
 func _parse_int_list(csv: String) -> Array[int]:

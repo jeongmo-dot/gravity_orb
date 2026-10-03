@@ -222,6 +222,7 @@ func _assert_reaction_dictionary(reaction: Dictionary) -> void:
 	var keys: Array[String] = [
 		"type",
 		"chain",
+		"occupancy",
 		"levels",
 		"colors",
 		"position",

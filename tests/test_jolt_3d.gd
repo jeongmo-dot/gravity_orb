@@ -74,6 +74,26 @@ func test_orb_3d_exposes_pixel_plane_api_and_locks_depth() -> void:
 	_cleanup(board)
 
 
+func test_level_gravity_scale_accelerates_large_orbs() -> void:
+	var original_scale: float = Config.data.gravity_level_scale
+	Config.data.gravity_level_scale = 0.1
+	var board: Board3D = await _create_board()
+	var orb: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		7,
+		Vector2.ZERO
+	)
+	var body: RigidBody3D = orb.get_physics_body()
+	assert_near(
+		(body.constant_force / body.mass).y,
+		-Config.data.gravity_strength * 1.6 / Orb3D.PIXELS_PER_METER,
+		0.001,
+		"level seven scaled gravity"
+	)
+	_cleanup(board)
+	Config.data.gravity_level_scale = original_scale
+
+
 func test_jolt_reaction_uses_shared_rules_and_spawns_3d_result() -> void:
 	var fixture_root: Node = Node.new()
 	fixture_root.name = "JoltReactionFixture"

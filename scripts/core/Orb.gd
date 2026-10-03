@@ -167,10 +167,13 @@ func note_diagnostic_event(event_name: String, physics_frame: int = -1) -> void:
 
 func set_gravity(direction: Vector2i, strength: float) -> void:
 	_gravity_direction = Vector2(direction)
+	var level_strength: float = strength * (
+		1.0 + Config.data.gravity_level_scale * float(level - 1)
+	)
 	constant_force = (
 		Vector2.ZERO
 		if is_waiting_at_entrance
-		else _gravity_direction * strength * mass
+		else _gravity_direction * level_strength * mass
 	)
 
 

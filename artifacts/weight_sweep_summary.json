@@ -1,0 +1,644 @@
+{
+  "engine": "Godot 4.8-dev3 mono",
+  "physics_engine": "Jolt Physics",
+  "physics_ticks_per_second": 120,
+  "seeds": [
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109,
+    110,
+    111,
+    112
+  ],
+  "max_turns": 400,
+  "defaults_unchanged": true,
+  "rows": [
+    {
+      "mass_exponent": 1.0,
+      "gravity_level_scale": 0.0,
+      "game_over_count": 12,
+      "seed_count": 12,
+      "game_over_turn_p50": 247.0,
+      "completed_turn_min": 208,
+      "completed_turn_max": 281,
+      "occupancy_mean_percent": 80.984953308583,
+      "score_mean": 16255.416666666666,
+      "aborted_count": 0,
+      "departures": 0,
+      "divergences": 0,
+      "max_wall_penetration_px": 20.539794921875,
+      "max_pair_penetration_px": 31.1278915405273,
+      "jam_occupancy_40_plus_by_level": {
+        "L1": {
+          "samples": 17664,
+          "mean_movement_px": 139.0559448020035,
+          "below_radius_percent": 28.17028985507249
+        },
+        "L2": {
+          "samples": 11761,
+          "mean_movement_px": 124.6277041025418,
+          "below_radius_percent": 38.508630218518846
+        },
+        "L3": {
+          "samples": 7116,
+          "mean_movement_px": 119.76947750366442,
+          "below_radius_percent": 47.25969645868467
+        },
+        "L4": {
+          "samples": 5221,
+          "mean_movement_px": 116.62279057857815,
+          "below_radius_percent": 54.75962459298987
+        },
+        "L5": {
+          "samples": 2779,
+          "mean_movement_px": 116.48860786046077,
+          "below_radius_percent": 62.720403022670034
+        },
+        "L6": {
+          "samples": 2518,
+          "mean_movement_px": 98.79724889496552,
+          "below_radius_percent": 73.62986497220015
+        },
+        "L7": {
+          "samples": 1573,
+          "mean_movement_px": 80.90833826362129,
+          "below_radius_percent": 87.22186904005086
+        }
+      },
+      "feel_metrics": {
+        "fall_time_seconds": {
+          "L1": 1.04166666666667,
+          "L7": 0.825
+        },
+        "rolling_impact": {
+          "L1_into_L7": {
+            "target_displacement_px": 47.4591369628906,
+            "target_max_displacement_px": 47.4591369628906
+          },
+          "L7_into_L1": {
+            "target_displacement_px": 203.627410888672,
+            "target_max_displacement_px": 203.627410888672
+          }
+        }
+      }
+    },
+    {
+      "mass_exponent": 1.0,
+      "gravity_level_scale": 0.05,
+      "game_over_count": 12,
+      "seed_count": 12,
+      "game_over_turn_p50": 246.0,
+      "completed_turn_min": 212,
+      "completed_turn_max": 266,
+      "occupancy_mean_percent": 81.8094679820716,
+      "score_mean": 14574.833333333334,
+      "aborted_count": 0,
+      "departures": 0,
+      "divergences": 0,
+      "max_wall_penetration_px": 18.1357116699219,
+      "max_pair_penetration_px": 77.7021331787109,
+      "jam_occupancy_40_plus_by_level": {
+        "L1": {
+          "samples": 17342,
+          "mean_movement_px": 130.93153958998545,
+          "below_radius_percent": 30.849959635566844
+        },
+        "L2": {
+          "samples": 11937,
+          "mean_movement_px": 118.36866443857444,
+          "below_radius_percent": 41.29178185473741
+        },
+        "L3": {
+          "samples": 6953,
+          "mean_movement_px": 118.31723581947357,
+          "below_radius_percent": 48.35322882209119
+        },
+        "L4": {
+          "samples": 4347,
+          "mean_movement_px": 115.37884822838167,
+          "below_radius_percent": 56.52173913043476
+        },
+        "L5": {
+          "samples": 3636,
+          "mean_movement_px": 105.64409385319905,
+          "below_radius_percent": 66.44664466446645
+        },
+        "L6": {
+          "samples": 1925,
+          "mean_movement_px": 105.24971383156723,
+          "below_radius_percent": 71.94805194805198
+        },
+        "L7": {
+          "samples": 1670,
+          "mean_movement_px": 82.92387218132714,
+          "below_radius_percent": 84.13173652694614
+        }
+      },
+      "feel_metrics": {
+        "fall_time_seconds": {
+          "L1": 1.04166666666667,
+          "L7": 0.725
+        },
+        "rolling_impact": {
+          "L1_into_L7": {
+            "target_displacement_px": 47.2664947509766,
+            "target_max_displacement_px": 47.2664947509766
+          },
+          "L7_into_L1": {
+            "target_displacement_px": 233.792083740234,
+            "target_max_displacement_px": 233.792083740234
+          }
+        }
+      }
+    },
+    {
+      "mass_exponent": 1.0,
+      "gravity_level_scale": 0.1,
+      "game_over_count": 12,
+      "seed_count": 12,
+      "game_over_turn_p50": 254.0,
+      "completed_turn_min": 216,
+      "completed_turn_max": 288,
+      "occupancy_mean_percent": 80.848599460771,
+      "score_mean": 20545.0,
+      "aborted_count": 0,
+      "departures": 0,
+      "divergences": 0,
+      "max_wall_penetration_px": 20.8590698242188,
+      "max_pair_penetration_px": 67.3989028930664,
+      "jam_occupancy_40_plus_by_level": {
+        "L1": {
+          "samples": 18018,
+          "mean_movement_px": 135.0418794355159,
+          "below_radius_percent": 27.583527583527555
+        },
+        "L2": {
+          "samples": 12262,
+          "mean_movement_px": 131.541548871815,
+          "below_radius_percent": 35.53253955309087
+        },
+        "L3": {
+          "samples": 7589,
+          "mean_movement_px": 119.11949378992658,
+          "below_radius_percent": 46.620108051126664
+        },
+        "L4": {
+          "samples": 4249,
+          "mean_movement_px": 121.86042802371432,
+          "below_radius_percent": 52.8830313014827
+        },
+        "L5": {
+          "samples": 3590,
+          "mean_movement_px": 113.93334719703051,
+          "below_radius_percent": 62.95264623955433
+        },
+        "L6": {
+          "samples": 2091,
+          "mean_movement_px": 113.50147516370549,
+          "below_radius_percent": 68.96221903395505
+        },
+        "L7": {
+          "samples": 1859,
+          "mean_movement_px": 86.53247931607629,
+          "below_radius_percent": 84.07746100053791
+        }
+      },
+      "feel_metrics": {
+        "fall_time_seconds": {
+          "L1": 1.04166666666667,
+          "L7": 0.65
+        },
+        "rolling_impact": {
+          "L1_into_L7": {
+            "target_displacement_px": 47.5865936279297,
+            "target_max_displacement_px": 47.5865936279297
+          },
+          "L7_into_L1": {
+            "target_displacement_px": 288.257507324219,
+            "target_max_displacement_px": 295.140075683594
+          }
+        }
+      }
+    },
+    {
+      "mass_exponent": 2.0,
+      "gravity_level_scale": 0.0,
+      "game_over_count": 12,
+      "seed_count": 12,
+      "game_over_turn_p50": 253.0,
+      "completed_turn_min": 219,
+      "completed_turn_max": 270,
+      "occupancy_mean_percent": 81.8094679820715,
+      "score_mean": 18888.416666666668,
+      "aborted_count": 0,
+      "departures": 0,
+      "divergences": 0,
+      "max_wall_penetration_px": 23.1161193847656,
+      "max_pair_penetration_px": 48.0786209106445,
+      "jam_occupancy_40_plus_by_level": {
+        "L1": {
+          "samples": 18575,
+          "mean_movement_px": 127.84788214756209,
+          "below_radius_percent": 30.411843876177652
+        },
+        "L2": {
+          "samples": 13161,
+          "mean_movement_px": 124.10847865298786,
+          "below_radius_percent": 38.34814983663854
+        },
+        "L3": {
+          "samples": 8338,
+          "mean_movement_px": 118.71122672140916,
+          "below_radius_percent": 46.497961141760605
+        },
+        "L4": {
+          "samples": 4596,
+          "mean_movement_px": 106.85155953426708,
+          "below_radius_percent": 57.55004351610097
+        },
+        "L5": {
+          "samples": 2944,
+          "mean_movement_px": 114.1029240232283,
+          "below_radius_percent": 62.296195652173886
+        },
+        "L6": {
+          "samples": 2402,
+          "mean_movement_px": 103.95285048016278,
+          "below_radius_percent": 72.39800166527888
+        },
+        "L7": {
+          "samples": 1551,
+          "mean_movement_px": 87.33825297266483,
+          "below_radius_percent": 84.52611218568663
+        }
+      },
+      "feel_metrics": {
+        "fall_time_seconds": {
+          "L1": 1.04166666666667,
+          "L7": 0.825
+        },
+        "rolling_impact": {
+          "L1_into_L7": {
+            "target_displacement_px": 12.0386962890625,
+            "target_max_displacement_px": 12.0386962890625
+          },
+          "L7_into_L1": {
+            "target_displacement_px": 273.757598876953,
+            "target_max_displacement_px": 295.595031738281
+          }
+        }
+      }
+    },
+    {
+      "mass_exponent": 2.0,
+      "gravity_level_scale": 0.05,
+      "game_over_count": 12,
+      "seed_count": 12,
+      "game_over_turn_p50": 252.0,
+      "completed_turn_min": 220,
+      "completed_turn_max": 269,
+      "occupancy_mean_percent": 81.98346117329,
+      "score_mean": 17115.833333333332,
+      "aborted_count": 0,
+      "departures": 0,
+      "divergences": 0,
+      "max_wall_penetration_px": 27.0020751953125,
+      "max_pair_penetration_px": 61.0453033447266,
+      "jam_occupancy_40_plus_by_level": {
+        "L1": {
+          "samples": 20469,
+          "mean_movement_px": 128.1526358961225,
+          "below_radius_percent": 30.353217059944317
+        },
+        "L2": {
+          "samples": 14198,
+          "mean_movement_px": 123.80677089314676,
+          "below_radius_percent": 37.61797436258625
+        },
+        "L3": {
+          "samples": 8494,
+          "mean_movement_px": 121.57734775181116,
+          "below_radius_percent": 46.00894749234754
+        },
+        "L4": {
+          "samples": 5532,
+          "mean_movement_px": 114.14407464295142,
+          "below_radius_percent": 55.169920462762114
+        },
+        "L5": {
+          "samples": 3832,
+          "mean_movement_px": 117.17554167784074,
+          "below_radius_percent": 60.88204592901879
+        },
+        "L6": {
+          "samples": 1741,
+          "mean_movement_px": 127.23405855787959,
+          "below_radius_percent": 63.06720275703621
+        },
+        "L7": {
+          "samples": 1793,
+          "mean_movement_px": 80.57163283064341,
+          "below_radius_percent": 86.83770217512547
+        }
+      },
+      "feel_metrics": {
+        "fall_time_seconds": {
+          "L1": 1.04166666666667,
+          "L7": 0.725
+        },
+        "rolling_impact": {
+          "L1_into_L7": {
+            "target_displacement_px": 12.0502319335938,
+            "target_max_displacement_px": 12.0502319335938
+          },
+          "L7_into_L1": {
+            "target_displacement_px": 276.757232666016,
+            "target_max_displacement_px": 295.436553955078
+          }
+        }
+      }
+    },
+    {
+      "mass_exponent": 2.0,
+      "gravity_level_scale": 0.1,
+      "game_over_count": 12,
+      "seed_count": 12,
+      "game_over_turn_p50": 242.0,
+      "completed_turn_min": 205,
+      "completed_turn_max": 282,
+      "occupancy_mean_percent": 81.387623265403,
+      "score_mean": 15268.333333333334,
+      "aborted_count": 0,
+      "departures": 0,
+      "divergences": 0,
+      "max_wall_penetration_px": 32.4871215820313,
+      "max_pair_penetration_px": 43.7046661376953,
+      "jam_occupancy_40_plus_by_level": {
+        "L1": {
+          "samples": 17762,
+          "mean_movement_px": 123.38920348156674,
+          "below_radius_percent": 31.252111248733236
+        },
+        "L2": {
+          "samples": 12368,
+          "mean_movement_px": 123.76632840979488,
+          "below_radius_percent": 38.260025873221224
+        },
+        "L3": {
+          "samples": 7680,
+          "mean_movement_px": 116.62034069679208,
+          "below_radius_percent": 47.78645833333329
+        },
+        "L4": {
+          "samples": 4946,
+          "mean_movement_px": 115.80600070095346,
+          "below_radius_percent": 54.04367165386169
+        },
+        "L5": {
+          "samples": 3710,
+          "mean_movement_px": 109.63801040804438,
+          "below_radius_percent": 64.1509433962264
+        },
+        "L6": {
+          "samples": 1811,
+          "mean_movement_px": 121.2079573628129,
+          "below_radius_percent": 66.97956929872997
+        },
+        "L7": {
+          "samples": 1488,
+          "mean_movement_px": 97.08583179532862,
+          "below_radius_percent": 80.84677419354837
+        }
+      },
+      "feel_metrics": {
+        "fall_time_seconds": {
+          "L1": 1.04166666666667,
+          "L7": 0.65
+        },
+        "rolling_impact": {
+          "L1_into_L7": {
+            "target_displacement_px": 11.9763641357422,
+            "target_max_displacement_px": 11.9763641357422
+          },
+          "L7_into_L1": {
+            "target_displacement_px": 275.223052978516,
+            "target_max_displacement_px": 293.745758056641
+          }
+        }
+      }
+    },
+    {
+      "mass_exponent": 3.0,
+      "gravity_level_scale": 0.0,
+      "game_over_count": 12,
+      "seed_count": 12,
+      "game_over_turn_p50": 246.0,
+      "completed_turn_min": 201,
+      "completed_turn_max": 276,
+      "occupancy_mean_percent": 82.5160933913059,
+      "score_mean": 15105.416666666666,
+      "aborted_count": 0,
+      "departures": 0,
+      "divergences": 0,
+      "max_wall_penetration_px": 36.5455627441406,
+      "max_pair_penetration_px": 47.2928428649902,
+      "jam_occupancy_40_plus_by_level": {
+        "L1": {
+          "samples": 19976,
+          "mean_movement_px": 136.05587185990888,
+          "below_radius_percent": 30.176211453744482
+        },
+        "L2": {
+          "samples": 14763,
+          "mean_movement_px": 127.76245016835459,
+          "below_radius_percent": 38.08169071326968
+        },
+        "L3": {
+          "samples": 8668,
+          "mean_movement_px": 124.75061603515543,
+          "below_radius_percent": 46.089063221042935
+        },
+        "L4": {
+          "samples": 5284,
+          "mean_movement_px": 120.99129836499296,
+          "below_radius_percent": 54.57986373959123
+        },
+        "L5": {
+          "samples": 4055,
+          "mean_movement_px": 120.64289602710028,
+          "below_radius_percent": 60.96177558569666
+        },
+        "L6": {
+          "samples": 1990,
+          "mean_movement_px": 127.21235638719085,
+          "below_radius_percent": 65.72864321608043
+        },
+        "L7": {
+          "samples": 1520,
+          "mean_movement_px": 96.18944603581198,
+          "below_radius_percent": 84.40789473684211
+        }
+      },
+      "feel_metrics": {
+        "fall_time_seconds": {
+          "L1": 1.04166666666667,
+          "L7": 0.825
+        },
+        "rolling_impact": {
+          "L1_into_L7": {
+            "target_displacement_px": 1.78562927246094,
+            "target_max_displacement_px": 1.78562927246094
+          },
+          "L7_into_L1": {
+            "target_displacement_px": 271.619964599609,
+            "target_max_displacement_px": 295.821655273438
+          }
+        }
+      }
+    },
+    {
+      "mass_exponent": 3.0,
+      "gravity_level_scale": 0.05,
+      "game_over_count": 12,
+      "seed_count": 12,
+      "game_over_turn_p50": 244.0,
+      "completed_turn_min": 217,
+      "completed_turn_max": 266,
+      "occupancy_mean_percent": 83.8718199302289,
+      "score_mean": 14267.0,
+      "aborted_count": 0,
+      "departures": 0,
+      "divergences": 0,
+      "max_wall_penetration_px": 34.5882568359375,
+      "max_pair_penetration_px": 49.2510089874268,
+      "jam_occupancy_40_plus_by_level": {
+        "L1": {
+          "samples": 20714,
+          "mean_movement_px": 121.3041249686104,
+          "below_radius_percent": 31.42319204402821
+        },
+        "L2": {
+          "samples": 14608,
+          "mean_movement_px": 114.92524407343757,
+          "below_radius_percent": 40.25191675794082
+        },
+        "L3": {
+          "samples": 9601,
+          "mean_movement_px": 114.28224370346967,
+          "below_radius_percent": 48.03666284762008
+        },
+        "L4": {
+          "samples": 6156,
+          "mean_movement_px": 110.77971965117148,
+          "below_radius_percent": 56.02664067576347
+        },
+        "L5": {
+          "samples": 3671,
+          "mean_movement_px": 114.78931874691119,
+          "below_radius_percent": 61.78153091800599
+        },
+        "L6": {
+          "samples": 2277,
+          "mean_movement_px": 120.96845918294362,
+          "below_radius_percent": 67.28151075977162
+        },
+        "L7": {
+          "samples": 1201,
+          "mean_movement_px": 92.51636585168912,
+          "below_radius_percent": 83.76353039134054
+        }
+      },
+      "feel_metrics": {
+        "fall_time_seconds": {
+          "L1": 1.04166666666667,
+          "L7": 0.725
+        },
+        "rolling_impact": {
+          "L1_into_L7": {
+            "target_displacement_px": 1.83697509765625,
+            "target_max_displacement_px": 1.83697509765625
+          },
+          "L7_into_L1": {
+            "target_displacement_px": 270.098785400391,
+            "target_max_displacement_px": 294.606689453125
+          }
+        }
+      }
+    },
+    {
+      "mass_exponent": 3.0,
+      "gravity_level_scale": 0.1,
+      "game_over_count": 12,
+      "seed_count": 12,
+      "game_over_turn_p50": 256.0,
+      "completed_turn_min": 224,
+      "completed_turn_max": 281,
+      "occupancy_mean_percent": 83.9279238571932,
+      "score_mean": 20455.583333333332,
+      "aborted_count": 0,
+      "departures": 0,
+      "divergences": 0,
+      "max_wall_penetration_px": 40.7879333496094,
+      "max_pair_penetration_px": 60.5294876098633,
+      "jam_occupancy_40_plus_by_level": {
+        "L1": {
+          "samples": 21078,
+          "mean_movement_px": 122.27494729101355,
+          "below_radius_percent": 33.162539140335916
+        },
+        "L2": {
+          "samples": 14748,
+          "mean_movement_px": 118.98208860883236,
+          "below_radius_percent": 39.178193653376724
+        },
+        "L3": {
+          "samples": 9216,
+          "mean_movement_px": 120.57516033756048,
+          "below_radius_percent": 47.005208333333364
+        },
+        "L4": {
+          "samples": 5998,
+          "mean_movement_px": 121.17707174954806,
+          "below_radius_percent": 53.16772257419144
+        },
+        "L5": {
+          "samples": 4019,
+          "mean_movement_px": 114.77504424379676,
+          "below_radius_percent": 62.851455585966676
+        },
+        "L6": {
+          "samples": 1949,
+          "mean_movement_px": 126.9108832896582,
+          "below_radius_percent": 65.00769625448946
+        },
+        "L7": {
+          "samples": 1613,
+          "mean_movement_px": 103.76627967169904,
+          "below_radius_percent": 81.71109733415999
+        }
+      },
+      "feel_metrics": {
+        "fall_time_seconds": {
+          "L1": 1.04166666666667,
+          "L7": 0.65
+        },
+        "rolling_impact": {
+          "L1_into_L7": {
+            "target_displacement_px": 1.87191772460938,
+            "target_max_displacement_px": 1.87191772460938
+          },
+          "L7_into_L1": {
+            "target_displacement_px": 272.203155517578,
+            "target_max_displacement_px": 294.589172363281
+          }
+        }
+      }
+    }
+  ]
+}

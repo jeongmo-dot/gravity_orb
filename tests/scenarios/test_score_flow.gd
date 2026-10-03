@@ -5,11 +5,13 @@ const COLLISION_RESOLVER_SCRIPT: Script = preload("res://scripts/core/CollisionR
 const INPUT_ROUTER_SCRIPT: Script = preload("res://scripts/autoload/InputRouter.gd")
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
 const SCORE_MANAGER_SCRIPT: Script = preload("res://scripts/core/ScoreManager.gd")
+const SPAWNER_SCRIPT: Script = preload("res://scripts/core/Spawner.gd")
+const TURN_MANAGER_SCRIPT: Script = preload("res://scripts/core/TurnManager.gd")
 const BEST_SAVE_PATH: String = "res://tests/test_score_flow_best.tmp.cfg"
 const CORRUPT_SAVE_PATH: String = "res://tests/test_score_flow_corrupt.tmp.cfg"
 
 
-func test_merge_chain_scores_twenty_and_tracks_chain_two() -> void:
+func test_same_turn_merges_score_twenty_and_track_combo_two() -> void:
 	var fixture: Dictionary = await _create_reaction_fixture()
 	var board: Board = fixture["board"] as Board
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
@@ -28,7 +30,7 @@ func test_merge_chain_scores_twenty_and_tracks_chain_two() -> void:
 
 	assert_eq(score_manager.score, 20, "merge chain score")
 	assert_eq(score_manager.best_score, 20, "merge chain best score")
-	assert_eq(score_manager.max_chain, 2, "merge chain maximum")
+	assert_eq(score_manager.max_combo, 2, "merge combo maximum")
 	assert_eq(score_manager.max_level_reached, 3, "merge chain maximum level")
 	await _cleanup_fixture(fixture)
 
@@ -59,6 +61,24 @@ func test_best_score_is_saved_immediately_and_loaded_by_new_manager() -> void:
 	var second: ScoreManager = await _create_score_manager(BEST_SAVE_PATH)
 	assert_eq(second.score, 0, "new manager score starts at zero")
 	assert_eq(second.best_score, 8, "new manager loads best")
+	second.queue_free()
+	await tree.process_frame
+	_remove_test_file(BEST_SAVE_PATH)
+
+
+func test_large_int64_score_is_saved_and_loaded() -> void:
+	_remove_test_file(BEST_SAVE_PATH)
+	var first: ScoreManager = await _create_score_manager(BEST_SAVE_PATH)
+	var levels: Array[int] = [Config.data.orb_max_level, Config.data.orb_max_level]
+	first.on_reaction(_reaction(ReactionRules.Type.MAX_CLEAR, 31, levels, 0))
+	var expected: int = 687194767360
+	assert_eq(first.score, expected, "large score")
+	assert_eq(first.best_score, expected, "large best score")
+	first.queue_free()
+	await tree.process_frame
+
+	var second: ScoreManager = await _create_score_manager(BEST_SAVE_PATH)
+	assert_eq(second.best_score, expected, "large best restored")
 	second.queue_free()
 	await tree.process_frame
 	_remove_test_file(BEST_SAVE_PATH)
@@ -117,15 +137,26 @@ func test_main_scene_binds_score_hud_and_restart() -> void:
 	score_manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 2, [3, 3], 4))
 	var score_label: Label = main.get_node("UI/Hud/ScoreLabel") as Label
 	var best_label: Label = main.get_node("UI/Hud/BestLabel") as Label
-	var max_chain_label: Label = main.get_node("UI/Hud/MaxChainLabel") as Label
+	var max_combo_label: Label = main.get_node("UI/Hud/MaxComboLabel") as Label
+	var combo_label: Label = main.get_node("UI/Hud/ComboLabel") as Label
+	var danger_label: Label = main.get_node("UI/Hud/DangerLabel") as Label
 	var spawner: Spawner = main.get_node("Spawner") as Spawner
 	var next_preview: Node2D = main.get_node("UI/Hud/NextPreview") as Node2D
 	assert_eq(score_label.text, "SCORE\n32", "score HUD text")
 	assert_eq(best_label.text, "BEST\n32", "best HUD text")
-	assert_eq(max_chain_label.text, "MAX CHAIN  2", "chain HUD text")
+	assert_eq(max_combo_label.text, "MAX COMBO  2", "combo HUD text")
+	assert_eq(combo_label.text, "COMBO x2", "current combo multiplier")
+	assert_true(combo_label.visible, "current combo visible")
+	assert_eq(danger_label.visible, false, "danger hidden below threshold")
+	score_manager.on_reaction(
+		_reaction(ReactionRules.Type.MERGE, 3, [1, 1], 2, 0.50)
+	)
+	assert_eq(combo_label.text, "COMBO x4", "updated combo multiplier")
+	assert_eq(danger_label.text, "DANGER x2.0", "danger multiplier text")
+	assert_true(danger_label.visible, "danger visible at threshold")
 	assert_eq(score_label.mouse_filter, Control.MOUSE_FILTER_IGNORE, "score ignores pointer")
 	assert_eq(best_label.mouse_filter, Control.MOUSE_FILTER_IGNORE, "best ignores pointer")
-	assert_eq(max_chain_label.mouse_filter, Control.MOUSE_FILTER_IGNORE, "chain ignores pointer")
+	assert_eq(max_combo_label.mouse_filter, Control.MOUSE_FILTER_IGNORE, "combo ignores pointer")
 	var next_batch: Array[Dictionary] = spawner.peek_next()
 	assert_eq(next_batch.size(), 3, "three-item next batch")
 	assert_eq(next_preview.get_child_count(), 3, "three preview visuals")
@@ -158,13 +189,13 @@ func test_game_over_panel_shows_scores_direction_and_restart_button() -> void:
 	var panel: GameOverPanel = main.get_node("UI/Hud/GameOverPanel") as GameOverPanel
 	var score_label: Label = panel.get_node("Margin/Content/GameOverScore") as Label
 	var best_label: Label = panel.get_node("Margin/Content/GameOverBest") as Label
-	var chain_label: Label = panel.get_node("Margin/Content/GameOverMaxChain") as Label
+	var combo_label: Label = panel.get_node("Margin/Content/GameOverMaxCombo") as Label
 	var blocked_label: Label = panel.get_node("Margin/Content/GameOverBlocked") as Label
 	var restart_button: Button = panel.get_node("Margin/Content/RestartButton") as Button
 	assert_true(panel.visible, "game-over panel visible")
 	assert_eq(score_label.text, "SCORE  32", "game-over score")
 	assert_eq(best_label.text, "BEST  32", "game-over best")
-	assert_eq(chain_label.text, "MAX CHAIN  2", "game-over max chain")
+	assert_eq(combo_label.text, "MAX COMBO  2", "game-over max combo")
 	assert_eq(blocked_label.text, "BLOCKED: LEFT", "game-over blocked direction")
 	assert_eq(panel.mouse_filter, Control.MOUSE_FILTER_IGNORE, "panel ignores pointer")
 	assert_eq(restart_button.mouse_filter, Control.MOUSE_FILTER_STOP, "restart consumes pointer")
@@ -192,6 +223,15 @@ func _create_reaction_fixture() -> Dictionary:
 	score_manager.save_path = ""
 	fixture_root.add_child(score_manager)
 	score_manager.owner = fixture_root
+	var spawner: Spawner = SPAWNER_SCRIPT.new() as Spawner
+	spawner.name = "Spawner"
+	spawner.unique_name_in_owner = true
+	fixture_root.add_child(spawner)
+	spawner.owner = fixture_root
+	var manager: TurnManager = TURN_MANAGER_SCRIPT.new() as TurnManager
+	manager.name = "TurnManager"
+	fixture_root.add_child(manager)
+	manager.owner = fixture_root
 	tree.root.add_child(fixture_root)
 	await tree.process_frame
 	board.set_gravity(Vector2i.ZERO)
@@ -201,6 +241,7 @@ func _create_reaction_fixture() -> Dictionary:
 		"board": board,
 		"resolver": resolver,
 		"score_manager": score_manager,
+		"manager": manager,
 	}
 
 
@@ -227,15 +268,17 @@ func _find_active_level(board: Board, level: int, excluded: Orb) -> Orb:
 
 func _reaction(
 	type: ReactionRules.Type,
-	chain: int,
+	combo: int,
 	levels: Array[int],
-	result_level: int = 0
+	result_level: int = 0,
+	occupancy: float = 0.20
 ) -> Dictionary:
 	return {
 		"type": type,
-		"chain": chain,
+		"combo": combo,
 		"levels": levels,
 		"result_level": result_level,
+		"occupancy": occupancy,
 	}
 
 

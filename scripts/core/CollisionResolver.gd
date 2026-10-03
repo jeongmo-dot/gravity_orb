@@ -70,6 +70,7 @@ func flush() -> int:
 		var result_color: int = int(classified["result_color"])
 		var survivor: int = int(classified["survivor"])
 		var result_orb: Variant = null
+		var occupancy: float = _board_occupancy()
 
 		_board.remove_orb(a)
 		_board.remove_orb(b)
@@ -103,6 +104,7 @@ func flush() -> int:
 		var reaction: Dictionary = {
 			"type": reaction_type,
 			"chain": chain,
+			"occupancy": occupancy,
 			"levels": levels,
 			"colors": colors,
 			"position": reaction_position,
@@ -113,6 +115,14 @@ func flush() -> int:
 		reaction_applied.emit(reaction)
 		applied += 1
 	return applied
+
+
+func _board_occupancy() -> float:
+	var occupied_area: float = 0.0
+	for orb: Variant in _board.get_orbs():
+		var radius: float = Config.data.radius_for_level(orb.level)
+		occupied_area += PI * radius * radius
+	return occupied_area / (Config.data.board_size * Config.data.board_size)
 
 
 func _pair_less(first: Array, second: Array) -> bool:

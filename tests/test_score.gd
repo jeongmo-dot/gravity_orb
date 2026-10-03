@@ -1,71 +1,92 @@
 extends TestCase
 
 const CONFIG_RESOURCE: GameConfig = preload("res://config/default_config.tres")
+const TOLERANCE: float = 1.0e-6
 
 
-func test_merge_level_two_to_three_chain_one_scores_eight() -> void:
-	assert_eq(
-		ScoreManager.points_for(
-			_reaction(ReactionRules.Type.MERGE, 1, [2, 2], 3),
-			_config()
-		),
-		8,
-		"merge L2 to L3 chain one"
+func test_same_turn_merge_example_scores_twenty() -> void:
+	var cfg: GameConfig = _config()
+	var first: Dictionary = _reaction(
+		ReactionRules.Type.MERGE,
+		1,
+		[1, 1],
+		2,
+		0.20
 	)
-
-
-func test_merge_level_three_to_four_chain_two_scores_thirty_two() -> void:
-	assert_eq(
-		ScoreManager.points_for(
-			_reaction(ReactionRules.Type.MERGE, 2, [3, 3], 4),
-			_config()
-		),
-		32,
-		"merge L3 to L4 chain two"
-	)
-
-
-func test_annihilation_level_two_and_one_chain_one_scores_three() -> void:
-	assert_eq(
-		ScoreManager.points_for(
-			_reaction(ReactionRules.Type.ANNIHILATE, 1, [2, 1]),
-			_config()
-		),
+	var second: Dictionary = _reaction(
+		ReactionRules.Type.MERGE,
+		2,
+		[2, 2],
 		3,
-		"annihilation L2 and L1 chain one"
+		0.20
 	)
+	assert_eq(ScoreManager.points_for(first, cfg), 4, "first L2 merge")
+	assert_eq(ScoreManager.points_for(second, cfg), 16, "second L3 merge")
+	assert_eq(int(first["points"]) + int(second["points"]), 20, "same-turn total")
 
 
-func test_rule_c_annihilation_uses_original_levels_before_chain() -> void:
-	assert_eq(
-		ScoreManager.points_for(
-			_reaction(ReactionRules.Type.ANNIHILATE, 3, [4, 1], 3),
-			_config()
-		),
-		27,
-		"rule C annihilation L4 and L1 chain three"
-	)
-
-
-func test_maximum_clear_applies_bonus_then_chain() -> void:
+func test_third_max_clear_at_seventy_percent_scores_10240() -> void:
 	var cfg: GameConfig = _config()
 	var levels: Array[int] = [cfg.orb_max_level, cfg.orb_max_level]
-	assert_eq(
-		ScoreManager.points_for(
-			_reaction(ReactionRules.Type.MAX_CLEAR, 1, levels),
-			cfg
-		),
-		640,
-		"maximum clear chain one"
+	var reaction: Dictionary = _reaction(
+		ReactionRules.Type.MAX_CLEAR,
+		3,
+		levels,
+		0,
+		0.70
 	)
-	assert_eq(
-		ScoreManager.points_for(
-			_reaction(ReactionRules.Type.MAX_CLEAR, 2, levels),
-			cfg
-		),
-		1280,
-		"maximum clear chain two"
+	assert_eq(ScoreManager.points_for(reaction, cfg), 10240, "third L7 clear")
+	assert_eq(reaction["base_points"], 640, "maximum clear base")
+	assert_near(float(reaction["combo_multiplier"]), 4.0, TOLERANCE, "combo multiplier")
+	assert_near(float(reaction["danger_multiplier"]), 4.0, TOLERANCE, "danger multiplier")
+
+
+func test_danger_multiplier_boundaries() -> void:
+	var cfg: GameConfig = _config()
+	var expected: Dictionary = {
+		0.299: 1.0,
+		0.30: 1.0,
+		0.50: 2.0,
+		0.70: 4.0,
+	}
+	for occupancy_value: Variant in expected:
+		var occupancy: float = float(occupancy_value)
+		assert_near(
+			ScoreManager.danger_multiplier_for(occupancy, cfg),
+			float(expected[occupancy_value]),
+			TOLERANCE,
+			"danger multiplier at %.1f%%" % (occupancy * 100.0)
+		)
+
+
+func test_annihilation_uses_original_levels_and_combo() -> void:
+	var reaction: Dictionary = _reaction(
+		ReactionRules.Type.ANNIHILATE,
+		2,
+		[2, 1],
+		0,
+		0.20
 	)
+	assert_eq(ScoreManager.points_for(reaction, _config()), 6, "annihilation combo two")
+	assert_eq(reaction["base_points"], 3, "annihilation base")
+
+
+func test_scoring_populates_reaction_dictionary() -> void:
+	var reaction: Dictionary = _reaction(
+		ReactionRules.Type.MERGE,
+		2,
+		[2, 2],
+		3,
+		0.50
+	)
+	assert_eq(ScoreManager.points_for(reaction, _config()), 32, "scored points")
+	for key: String in [
+		"base_points",
+		"combo_multiplier",
+		"danger_multiplier",
+		"points",
+	]:
+		assert_true(reaction.has(key), "scored reaction key %s" % key)
 
 
 func _config() -> GameConfig:
@@ -74,13 +95,15 @@ func _config() -> GameConfig:
 
 func _reaction(
 	type: ReactionRules.Type,
-	chain: int,
+	combo: int,
 	levels: Array[int],
-	result_level: int = 0
+	result_level: int,
+	occupancy: float
 ) -> Dictionary:
 	return {
 		"type": type,
-		"chain": chain,
+		"combo": combo,
 		"levels": levels,
 		"result_level": result_level,
+		"occupancy": occupancy,
 	}
