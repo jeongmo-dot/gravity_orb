@@ -40,7 +40,7 @@
 
 ### [2026-10-03] 대상 #21 — 턴 콤보·위험 점수 적용과 무게감 9조합 측정
 - 상태: 질문
-- 브랜치 / PR: `m9-turn-combo-weight` / push 후 PR 생성 예정
+- 브랜치 / PR: `m9-turn-combo-weight` / [PR #21](https://github.com/jeongmo-dot/gravity_orb/pull/21)
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scenes/UI.tscn`, `scripts/core/{CollisionResolver,Orb,ScoreManager,TurnManager}.gd`, `scripts/spike/Orb3D.gd`, `scripts/ui/{DebugHud,GameOverPanel,Hud}.gd`, `tests/{test_config,test_jolt_3d,test_score}.gd`, `tests/scenarios/`, `tests/spike/run_jolt_3d_measurement.gd`, `tests/run_weight_sweep.ps1`, `artifacts/weight_sweep_summary.json`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 스와이프에서 `turn_combo=0`, 이후 원인·색과 무관하게 모든 MERGE·MAX_CLEAR·ANNIHILATE 반응마다 +1. 서로 떨어진 동시 합체 `combo=[1,2]`, 소멸 증가, 다음 스와이프 0, 입력 대기 중 반응 연속을 자동 검증. 기존 `chain`은 물리 세대 디버그 값으로 유지
