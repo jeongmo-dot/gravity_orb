@@ -224,6 +224,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M1 | `wall_thickness` | float | 256.0 | 터널링 방지용으로 두껍게 |
 | ~~M1~~ | ~~`orb_base_radius`, `orb_radius_growth`~~ | | | **#14에서 제거** → `level_radii` |
 | #14 | `level_radii` | PackedFloat32Array | [25, 40, 60, 85, 115, 150, 190] → **[25, 40, 60, 85, 100, 120, 140]** (#18, 기획서 0.6.2) | 레벨별 반지름 |
+| #23 | `chain_reaction_delay` | float | 0.2 (가안, 플레이 체감으로 조정) | 합체 결과의 반응 잠금 시간 (초, §7.5) |
 | #21 | `combo_multiplier_base` | float | 2.0 | 콤보 배수 밑 (§8.2) |
 | #21 | `danger_start` / `danger_doubling` | float | 0.30 / 0.20 | 위험 배수 시작 점유율 / 2배가 되는 점유율 간격 (§8.2) |
 | #21 | `gravity_level_scale` | float | **0.1** (#21: L7 낙하 0.65초 vs L1 1.04초) | 레벨별 중력 배율 = 1 + 값 × (레벨 − 1). 큰 구체가 더 빨리 떨어진다 (기획서 0.8) |
@@ -618,6 +619,14 @@ MERGE·MAX_CLEAR 반응 직후 반응 지점 `p`에서 충격파를 낸다.
 - 결과 구체 자신은 제외. 물리 콜백 밖(`flush`)에서 적용
 - 새 필드와 확정값 (#21): `shock_impulse` **600** (L1 기준 Δv 600px/s), `shock_radius_factor` 2.5, `shock_level_scale` 0.3, `shock_jackpot_scale` 3.0
 - #21 측정: 충격파는 고밀도 재배열(켄달 불일치 약 6%)·L7 잼(81~87%)을 거의 바꾸지 못했다. 잼 해소가 아니라 **합체 손맛·무게 차이 표현**용으로 채택
+
+
+### 7.5 순차 연쇄 (기획서 0.9.1 — #23)
+- MERGE 결과·규칙 C 잔존 구체는 생성 후 `chain_reaction_delay`(가안 0.2초, 스케일된 시간) 동안 **반응 잠금**: `CollisionResolver.flush`는 잠긴 구체가 낀 쌍을 처리하지 않고 **보류 목록**에 남긴다
+- 잠금이 풀리는 프레임에 그 구체의 현재 접촉(`get_colliding_bodies` 또는 반지름 합 + `ghost_exit_overlap` 이내 거리)을 다시 모아 반응 판정한다 — 잠금 중 생긴 접촉도 놓치지 않는다
+- 보류 중인 반응이 있거나 잠긴 구체가 반응 가능한 상대와 닿아 있으면 **안정으로 보지 않는다** (턴이 연쇄 도중에 끝나지 않게). 1.5초 상한에 걸려 턴이 끝나도 연쇄는 입력 대기 중 계속된다 (기존 규칙)
+- 충격파·콤보·점수는 반응마다 그대로 (두 번째 합체는 두 번째 충격파·×2)
+- 새 필드 `chain_reaction_delay`
 
 ---
 
