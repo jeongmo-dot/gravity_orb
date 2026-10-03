@@ -62,6 +62,10 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 @export var combo_multiplier_base: float = 2.0
 @export var danger_start: float = 0.30
 @export var danger_doubling: float = 0.20
+@export var shock_impulse: float = 0.0
+@export var shock_radius_factor: float = 2.5
+@export var shock_level_scale: float = 0.3
+@export var shock_jackpot_scale: float = 3.0
 
 
 func radius_for_level(level: int) -> float:

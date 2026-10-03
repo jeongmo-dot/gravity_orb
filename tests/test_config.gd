@@ -180,6 +180,10 @@ func test_m7_score_defaults() -> void:
 	assert_near(config.combo_multiplier_base, 2.0, TOLERANCE, "combo multiplier base")
 	assert_near(config.danger_start, 0.30, TOLERANCE, "danger start")
 	assert_near(config.danger_doubling, 0.20, TOLERANCE, "danger doubling")
+	assert_near(config.shock_impulse, 0.0, TOLERANCE, "shock impulse disabled")
+	assert_near(config.shock_radius_factor, 2.5, TOLERANCE, "shock radius factor")
+	assert_near(config.shock_level_scale, 0.3, TOLERANCE, "shock level scale")
+	assert_near(config.shock_jackpot_scale, 3.0, TOLERANCE, "shock jackpot scale")
 	for level: int in range(1, config.orb_max_level + 1):
 		assert_eq(
 			config.score_for_level(level),

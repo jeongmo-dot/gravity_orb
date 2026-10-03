@@ -56,3 +56,7 @@ max_merge_bonus_factor = 5.0
 combo_multiplier_base = 2.0
 danger_start = 0.3
 danger_doubling = 0.2
+shock_impulse = 0.0
+shock_radius_factor = 2.5
+shock_level_scale = 0.3
+shock_jackpot_scale = 3.0

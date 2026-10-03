@@ -177,6 +177,10 @@ func set_gravity(direction: Vector2i, strength: float) -> void:
 	)
 
 
+func apply_plane_impulse(impulse: Vector2) -> void:
+	apply_central_impulse(impulse)
+
+
 func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 	if is_waiting_at_entrance:
 		var waiting_transform: Transform2D = state.transform

@@ -40,6 +40,7 @@ var _reaction_ghost_enabled: bool = false
 var _record_seed_hashes: bool = false
 var _scan_pairs_each_frame: bool = false
 var _skip_determinism: bool = false
+var _turn_shock_events: Array[Dictionary] = []
 
 
 func _ready() -> void:
@@ -58,6 +59,10 @@ func _run() -> void:
 		"gravity_px_s2": Config.data.gravity_strength,
 		"gravity_level_scale": Config.data.gravity_level_scale,
 		"mass_exponent": Config.data.mass_exponent,
+		"shock_impulse": Config.data.shock_impulse,
+		"shock_radius_factor": Config.data.shock_radius_factor,
+		"shock_level_scale": Config.data.shock_level_scale,
+		"shock_jackpot_scale": Config.data.shock_jackpot_scale,
 		"level_radii_px": Array(Config.data.level_radii),
 		"corrections": {
 			"reaction_ghost": _reaction_ghost_enabled,
@@ -103,13 +108,17 @@ func _run_tick_suite(ticks: int) -> Dictionary:
 	var ghost_completed_count: int = 0
 	var ghost_timeout_count: int = 0
 	var ghost_duration_sum: float = 0.0
+	var rearrangement_values: Array[float] = []
+	var shock_displacements: Dictionary = _empty_shock_displacements()
 	for seed: int in _seeds:
 		var result: Dictionary = await _run_seed(
 			seed,
 			_max_turns,
 			bins,
 			physics_ms,
-			_record_seed_hashes
+			_record_seed_hashes,
+			rearrangement_values,
+			shock_displacements
 		)
 		seed_rows.append(result)
 		ghost_completed_count += int(result["ghost_completed_count"])
@@ -135,6 +144,11 @@ func _run_tick_suite(ticks: int) -> Dictionary:
 		"physics_ms_p50": _percentile(physics_ms, 0.5),
 		"physics_ms_p95": _percentile(physics_ms, 0.95),
 		"bins": _finalize_bins(bins),
+		"rearrangement_60_plus_mean": _mean(rearrangement_values),
+		"rearrangement_60_plus_samples": rearrangement_values.size(),
+		"shock_displacement_by_target_level": _finalize_shock_displacements(
+			shock_displacements
+		),
 	}
 	print(
 		"JOLT3D_TICK ticks=%d game_over=%d/%d aborted=%d turn_p50=%.1f occupancy_mean=%.4f physics_ms_mean=%.5f p95=%.5f" % [
@@ -156,7 +170,9 @@ func _run_seed(
 	max_turns: int,
 	bins: Dictionary,
 	physics_ms: Array[float],
-	record_hashes: bool
+	record_hashes: bool,
+	rearrangement_values: Array[float],
+	shock_displacements: Dictionary
 ) -> Dictionary:
 	var fixture: Dictionary = await _create_fixture(seed)
 	var fixture_root: Node = fixture["root"] as Node
@@ -173,11 +189,18 @@ func _run_seed(
 	var seed_max_pair_end_turn: int = 0
 	var seed_max_wall: float = 0.0
 	for turn_offset: int in range(max_turns):
+		_turn_shock_events.clear()
 		var direction: Vector2i = DIRECTION_PATTERN[turn_offset % DIRECTION_PATTERN.size()]
 		var same_direction: bool = direction == manager.gravity
 		var before: Dictionary = _snapshot_orbs(board)
+		var start_occupancy: float = _snapshot_occupancy(before)
 		manager.on_swipe(direction)
 		var frame_metrics: Dictionary = await _wait_for_turn_end(manager, board, physics_ms)
+		if start_occupancy >= 0.60:
+			var rearrangement: float = _kendall_rearrangement(before, board, direction)
+			if rearrangement >= 0.0:
+				rearrangement_values.append(rearrangement)
+		_record_shock_displacements(shock_displacements, _turn_shock_events)
 		completed_turns = turn_offset + 1
 		turn_performance_samples.append({
 			"turn": completed_turns,
@@ -312,6 +335,7 @@ func _create_fixture(seed: int) -> Dictionary:
 	get_tree().root.add_child(fixture_root)
 	await get_tree().process_frame
 	resolver.reaction_applied.connect(score_manager.on_reaction)
+	resolver.reaction_applied.connect(_record_shock_event)
 	spawner.orb_spawned.connect(score_manager.on_orb_spawned)
 	spawner.init_rng(seed)
 	spawner.spawn_initial(board, Vector2i.DOWN)
@@ -519,6 +543,145 @@ func _snapshot_orbs(board: Board3D) -> Dictionary:
 	return snapshot
 
 
+func _snapshot_occupancy(snapshot: Dictionary) -> float:
+	var occupied_area: float = 0.0
+	for item_value: Variant in snapshot.values():
+		var item: Dictionary = item_value as Dictionary
+		var radius: float = float(item["radius"])
+		occupied_area += PI * radius * radius
+	return occupied_area / (Config.data.board_size * Config.data.board_size)
+
+
+func _kendall_rearrangement(
+	before: Dictionary,
+	board: Board3D,
+	direction: Vector2i
+) -> float:
+	var end_positions: Dictionary = {}
+	for orb: Orb3D in board.get_orbs():
+		end_positions[orb.get_instance_id()] = orb.position
+	var start_items: Array[Dictionary] = []
+	var end_items: Array[Dictionary] = []
+	var axis: Vector2 = Vector2(direction)
+	for id_value: Variant in before:
+		var orb_id: int = int(id_value)
+		if not end_positions.has(orb_id):
+			continue
+		var start_item: Dictionary = before[orb_id] as Dictionary
+		var start_position: Vector2 = start_item["position"] as Vector2
+		var end_position: Vector2 = end_positions[orb_id] as Vector2
+		start_items.append({
+			"id": orb_id,
+			"projection": start_position.dot(axis),
+		})
+		end_items.append({
+			"id": orb_id,
+			"projection": end_position.dot(axis),
+		})
+	if start_items.size() < 2:
+		return -1.0
+	start_items.sort_custom(_projection_item_less)
+	end_items.sort_custom(_projection_item_less)
+	var end_ranks: Dictionary = {}
+	for index: int in range(end_items.size()):
+		end_ranks[int(end_items[index]["id"])] = index
+	var inversions: int = 0
+	for first_index: int in range(start_items.size()):
+		var first_rank: int = int(end_ranks[int(start_items[first_index]["id"])])
+		for second_index: int in range(first_index + 1, start_items.size()):
+			var second_rank: int = int(end_ranks[int(start_items[second_index]["id"])])
+			if first_rank > second_rank:
+				inversions += 1
+	var pair_count: int = start_items.size() * (start_items.size() - 1) / 2
+	return float(inversions) / float(pair_count)
+
+
+func _projection_item_less(first: Dictionary, second: Dictionary) -> bool:
+	var first_projection: float = float(first["projection"])
+	var second_projection: float = float(second["projection"])
+	if not is_equal_approx(first_projection, second_projection):
+		return first_projection < second_projection
+	return int(first["id"]) < int(second["id"])
+
+
+func _record_shock_event(reaction: Dictionary) -> void:
+	var reaction_type: ReactionRules.Type = reaction["type"] as ReactionRules.Type
+	if (
+		reaction_type != ReactionRules.Type.MERGE
+		and reaction_type != ReactionRules.Type.MAX_CLEAR
+	):
+		return
+	var targets: Array[Dictionary] = reaction["shock_targets"] as Array[Dictionary]
+	_turn_shock_events.append({"targets": targets})
+
+
+func _empty_shock_displacements() -> Dictionary:
+	var result: Dictionary = {}
+	for level_key: String in ["L1", "L4", "L7"]:
+		result[level_key] = {
+			"target_displacement_sum_px": 0.0,
+			"target_samples": 0,
+			"reaction_mean_sum_px": 0.0,
+			"reaction_samples": 0,
+		}
+	return result
+
+
+func _record_shock_displacements(
+	totals: Dictionary,
+	events: Array[Dictionary]
+) -> void:
+	for event: Dictionary in events:
+		var event_sums: Dictionary = {"L1": 0.0, "L4": 0.0, "L7": 0.0}
+		var event_counts: Dictionary = {"L1": 0, "L4": 0, "L7": 0}
+		var targets: Array[Dictionary] = event["targets"] as Array[Dictionary]
+		for target_info: Dictionary in targets:
+			var level_key: String = "L%d" % int(target_info["level"])
+			if not event_sums.has(level_key):
+				continue
+			var orb: Variant = target_info["orb"]
+			if not is_instance_valid(orb) or orb.consumed:
+				continue
+			var start_position: Vector2 = target_info["position"] as Vector2
+			var displacement: float = orb.position.distance_to(start_position)
+			event_sums[level_key] = float(event_sums[level_key]) + displacement
+			event_counts[level_key] = int(event_counts[level_key]) + 1
+		for level_key: String in event_sums:
+			var count: int = int(event_counts[level_key])
+			if count == 0:
+				continue
+			var values: Dictionary = totals[level_key] as Dictionary
+			values["target_displacement_sum_px"] = (
+				float(values["target_displacement_sum_px"])
+				+ float(event_sums[level_key])
+			)
+			values["target_samples"] = int(values["target_samples"]) + count
+			values["reaction_mean_sum_px"] = (
+				float(values["reaction_mean_sum_px"])
+				+ float(event_sums[level_key]) / float(count)
+			)
+			values["reaction_samples"] = int(values["reaction_samples"]) + 1
+
+
+func _finalize_shock_displacements(source: Dictionary) -> Dictionary:
+	var result: Dictionary = {}
+	for level_key: String in source:
+		var values: Dictionary = source[level_key] as Dictionary
+		result[level_key] = {
+			"mean_target_displacement_px": _safe_ratio(
+				float(values["target_displacement_sum_px"]),
+				int(values["target_samples"])
+			),
+			"mean_surrounding_displacement_per_reaction_px": _safe_ratio(
+				float(values["reaction_mean_sum_px"]),
+				int(values["reaction_samples"])
+			),
+			"target_samples": values["target_samples"],
+			"reaction_samples": values["reaction_samples"],
+		}
+	return result
+
+
 func _record_movement(
 	values: Dictionary,
 	before: Dictionary,
@@ -696,19 +859,25 @@ func _run_determinism_check(seed: int) -> Dictionary:
 	var unused_bins_b: Dictionary = _empty_bins()
 	var unused_physics_a: Array[float] = []
 	var unused_physics_b: Array[float] = []
+	var unused_rearrangement_a: Array[float] = []
+	var unused_rearrangement_b: Array[float] = []
 	var first: Dictionary = await _run_seed(
 		seed,
 		_determinism_turns,
 		unused_bins_a,
 		unused_physics_a,
-		true
+		true,
+		unused_rearrangement_a,
+		_empty_shock_displacements()
 	)
 	var second: Dictionary = await _run_seed(
 		seed,
 		_determinism_turns,
 		unused_bins_b,
 		unused_physics_b,
-		true
+		true,
+		unused_rearrangement_b,
+		_empty_shock_displacements()
 	)
 	var first_hashes: Array[String] = first["hashes"] as Array[String]
 	var second_hashes: Array[String] = second["hashes"] as Array[String]
@@ -838,6 +1007,20 @@ func _apply_arguments() -> void:
 		elif argument.begins_with("--gravity-level-scale="):
 			Config.data.gravity_level_scale = argument.trim_prefix(
 				"--gravity-level-scale="
+			).to_float()
+		elif argument.begins_with("--shock-impulse="):
+			Config.data.shock_impulse = argument.trim_prefix("--shock-impulse=").to_float()
+		elif argument.begins_with("--shock-radius-factor="):
+			Config.data.shock_radius_factor = argument.trim_prefix(
+				"--shock-radius-factor="
+			).to_float()
+		elif argument.begins_with("--shock-level-scale="):
+			Config.data.shock_level_scale = argument.trim_prefix(
+				"--shock-level-scale="
+			).to_float()
+		elif argument.begins_with("--shock-jackpot-scale="):
+			Config.data.shock_jackpot_scale = argument.trim_prefix(
+				"--shock-jackpot-scale="
 			).to_float()
 		elif argument == "--jolt-no-ccd":
 			_continuous_cd_enabled = false

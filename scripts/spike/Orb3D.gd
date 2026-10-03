@@ -203,6 +203,11 @@ func set_gravity(direction: Vector2i, strength: float) -> void:
 	_body.sleeping = false
 
 
+func apply_plane_impulse(impulse: Vector2) -> void:
+	_body.apply_central_impulse(plane_vector_to_world(impulse))
+	_body.sleeping = false
+
+
 func enter_entrance_wait(preferred_position: Vector2, gravity: Vector2i) -> void:
 	is_waiting_at_entrance = true
 	entrance_preferred_position = preferred_position

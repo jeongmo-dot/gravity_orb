@@ -101,6 +101,23 @@ func flush() -> int:
 			if _board.should_ghost_reaction_results():
 				result_orb.enter_ghost_state(Config.data.ghost_alpha)
 
+		var shock_level: int = (
+			Config.data.orb_max_level
+			if reaction_type == ReactionRules.Type.MAX_CLEAR
+			else result_level
+		)
+		var shock_targets: Array[Dictionary] = []
+		if (
+			reaction_type == ReactionRules.Type.MERGE
+			or reaction_type == ReactionRules.Type.MAX_CLEAR
+		):
+			shock_targets = _board.apply_shockwave(
+				reaction_position,
+				shock_level,
+				result_orb,
+				reaction_type == ReactionRules.Type.MAX_CLEAR
+			)
+
 		var reaction: Dictionary = {
 			"type": reaction_type,
 			"chain": chain,
@@ -111,6 +128,8 @@ func flush() -> int:
 			"result_level": result_level,
 			"result_color": result_color,
 			"result_orb": result_orb,
+			"shock_level": shock_level,
+			"shock_targets": shock_targets,
 		}
 		reaction_applied.emit(reaction)
 		applied += 1

@@ -486,6 +486,8 @@ func _assert_reaction_dictionary(reaction: Dictionary) -> void:
 		"result_level",
 		"result_color",
 		"result_orb",
+		"shock_level",
+		"shock_targets",
 	]
 	for key: String in keys:
 		assert_true(reaction.has(key), "reaction key %s" % key)
