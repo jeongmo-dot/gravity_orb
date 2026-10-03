@@ -90,8 +90,9 @@
 - 사용자 플레이 소감: ① 큰 공과 작은 공의 무게 차이가 안 느껴진다 ② 콤보가 너무 안 쌓인다 → 같은 턴의 반응이면 색·인과 무관하게 콤보
 - 요구 A — **턴 콤보** (§8.1):
   1. `TurnManager`: `turn_combo`(스와이프마다 0), 반응마다 +1, 반응 딕셔너리에 `combo` 추가. 입력 대기 중 반응도 직전 턴 콤보에 이어 센다. `combo_changed` 신호
-  2. `ScoreManager`: 점수 배수를 `chain` → `combo`. `max_combo` 저장·표시 (HUD `MAX CHAIN` → `MAX COMBO`, 게임오버 패널 동일). 턴 중 현재 콤보를 HUD에 표시 (예: `COMBO x3`)
-  3. 테스트 갱신: 서로 떨어진 두 합체 = 콤보 1, 2 / 소멸도 콤보 증가 / 다음 스와이프에 0으로 / 입력 대기 중 반응 이어짐 / 점수 표 갱신 (예: 같은 턴 L2 합체 + 별개 L3 합체 = 8 + 16×2 = 40)
+  2. `ScoreManager`: **§8.2 새 공식** — 반응 점수 = floor(기본 × `combo_multiplier_base`^(combo−1) × 위험 배수). 위험 배수는 반응 직전 점유율로 계산 (`danger_start` 0.30, `danger_doubling` 0.20). 새 필드 `combo_multiplier_base`(2.0)·`danger_start`·`danger_doubling`. 점수·최고 점수 int64. 반응 딕셔너리에 `base_points`·`combo_multiplier`·`danger_multiplier`·`points`
+  3. HUD: `MAX CHAIN` → `MAX COMBO`, 턴 중 `COMBO x{배수}`(예: `x8`)와 위험 배수(`DANGER x2.0`, 점유율 30% 이상일 때만) 임시 표시. 게임오버 패널도 MAX COMBO
+  4. 테스트 갱신·추가: 서로 떨어진 두 합체 = 콤보 1, 2 / 소멸도 콤보 증가 / 다음 스와이프에 0 / 입력 대기 중 반응 이어짐 / 점수: 같은 턴 L2 합체(4, 점유율 20%) + L3 합체(8) = 4 + 16 = 20, 3번째 L7 청소 점유율 70% → 640×4×4 = 10,240 / 위험 배수 경계 29.9%=1, 30%=1, 50%=2, 70%=4 / int64 오버플로 없이 큰 점수 저장·복원
 - 요구 B — **무게감 측정** (3D 기본):
   1. `GameConfig.gravity_level_scale` 추가 (기본 0). 구체 중력 = `gravity_strength × (1 + gravity_level_scale × (level − 1))`
   2. 스윕: `mass_exponent` **1 / 2 / 3** × `gravity_level_scale` **0 / 0.05 / 0.1** = 9조합, 3D 120Hz, 12시드 게임오버 측정 (#20 경로). 안정성(벽·쌍 겹침·이탈·발산), 레벨별 잼, 게임 길이

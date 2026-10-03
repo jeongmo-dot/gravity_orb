@@ -224,6 +224,8 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M1 | `wall_thickness` | float | 256.0 | 터널링 방지용으로 두껍게 |
 | ~~M1~~ | ~~`orb_base_radius`, `orb_radius_growth`~~ | | | **#14에서 제거** → `level_radii` |
 | #14 | `level_radii` | PackedFloat32Array | [25, 40, 60, 85, 115, 150, 190] → **[25, 40, 60, 85, 100, 120, 140]** (#18, 기획서 0.6.2) | 레벨별 반지름 |
+| #21 | `combo_multiplier_base` | float | 2.0 | 콤보 배수 밑 (§8.2) |
+| #21 | `danger_start` / `danger_doubling` | float | 0.30 / 0.20 | 위험 배수 시작 점유율 / 2배가 되는 점유율 간격 (§8.2) |
 | #21 | `gravity_level_scale` | float | #21 측정 후 결정 (후보 0 / 0.05 / 0.1) | 레벨별 중력 배율 = 1 + 값 × (레벨 − 1). 큰 구체가 더 빨리 떨어진다 (기획서 0.8) |
 | #14 | `mass_exponent` | float | **1.0** (#14 측정: 지수 2는 L1 관통 14.8px, 1은 8.2px) | 질량 = base × (r / r_L1)^지수 — 크기 비례. #21에서 2 / 3 재측정 (Jolt는 질량비에 더 강하다) |
 | M1 | `orb_max_level` | int | 7 | |
@@ -617,17 +619,22 @@ return applied
 - 표시: 턴 중 현재 콤보, 판 전체 최대 콤보(`max_combo`). 신호 `combo_changed(combo)`
 - 0.7까지의 **연쇄 세대**(`generation`, chain = max(gen)+1)는 콤보 계산에서 제외한다. 필드는 디버그 표시용으로 남겨도 된다
 
-### 8.2 점수 (기획서 5.2, M7)
+### 8.2 점수 (기획서 0.8 — #21에서 교체)
+
+**반응 점수 = floor(기본 점수 × 콤보 배수 × 위험 배수)**
 
 | 반응 | 기본 점수 |
 |---|---|
 | MERGE | `score_for_level(result_level)` |
-| ANNIHILATE | `floor((score_for_level(La) + score_for_level(Lb)) × annihilation_score_factor)` — 규칙 C도 원래 두 레벨 기준 |
-| MAX_CLEAR | `score_for_level(orb_max_level) × max_merge_bonus_factor` (기본 128 × 5 = 640) |
+| ANNIHILATE | `floor((score_for_level(La) + score_for_level(Lb)) × annihilation_score_factor)` |
+| MAX_CLEAR (L7 잭팟) | `score_for_level(orb_max_level) × max_merge_bonus_factor` (128 × 5 = 640) |
 
-최종 = `int(기본 점수) × combo` (0.8, §8.1).
+- **콤보 배수** = `combo_multiplier_base ^ (combo − 1)` (기본 2.0). `combo`는 §8.1 턴 콤보
+- **위험 배수** = 점유율 p(반응 직전, 최종 반지름 기준 Σπr² ÷ 보드²)가 `danger_start`(0.30) 미만이면 1, 이상이면 `2 ^ ((p − danger_start) ÷ danger_doubling)` (`danger_doubling` 0.20)
+- 점수·최고 점수는 **int64**. 배수는 float으로 계산 후 마지막에 버림
+- 반응 딕셔너리에 `base_points`, `combo_multiplier`, `danger_multiplier`, `points`를 담아 HUD·연출(M8)이 그대로 보여줄 수 있게 한다
 
-예: 레벨2 빨강 둘 합체(chain 1) → 레벨3 생성 = 8점. 그 레벨3이 곧바로 다른 레벨3 빨강과 합체(chain 2) → 레벨4 = 16 × 2 = 32점.
+예: 같은 턴 1번째 L2 합체(4점, 점유율 20%) = 4 / 2번째 L3 합체(8점) = 16 / 3번째 L7 청소(640점, 점유율 70% → ×4) = 640 × 4 × 4 = 10,240
 
 ---
 
