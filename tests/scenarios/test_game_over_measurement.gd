@@ -195,7 +195,7 @@ func test_game_over_distribution_warning_accuracy_and_density_metrics() -> void:
 				"average_turn_seconds": _average(seed_turn_seconds),
 				"turn_p50_seconds": _percentile(seed_turn_seconds, 0.50),
 				"score": score_manager.score,
-				"max_combo": score_manager.max_combo,
+				"max_combo": manager.max_combo,
 			}
 		)
 		print(
@@ -214,7 +214,7 @@ func test_game_over_distribution_warning_accuracy_and_density_metrics() -> void:
 				completed_turns,
 				_average(seed_turn_seconds),
 				score_manager.score,
-				score_manager.max_combo,
+				manager.max_combo,
 			]
 		)
 		await _cleanup_fixture(fixture)
@@ -306,7 +306,7 @@ func _create_ready_fixture(seed: int) -> Dictionary:
 			elif type == ReactionRules.Type.ANNIHILATE:
 				reaction_counts["annihilations"] = int(reaction_counts["annihilations"]) + 1
 	)
-	resolver.reaction_applied.connect(score_manager.on_reaction)
+	manager.reaction_ready.connect(score_manager.on_reaction)
 	spawner.orb_spawned.connect(score_manager.on_orb_spawned)
 	spawner.init_rng(seed)
 	spawner.spawn_initial(board, Vector2i.DOWN)

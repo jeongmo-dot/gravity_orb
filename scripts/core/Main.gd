@@ -15,7 +15,7 @@ func _ready() -> void:
 	RenderingServer.set_default_clear_color(BACKGROUND_COLOR)
 	InputRouter.swipe.connect(_turn_manager.on_swipe)
 	InputRouter.restart_requested.connect(restart)
-	_collision_resolver.reaction_applied.connect(_score_manager.on_reaction)
+	_turn_manager.reaction_ready.connect(_score_manager.on_reaction)
 	_spawner.orb_spawned.connect(_score_manager.on_orb_spawned)
 	# TEMP(M6): M9 디버그 패널이 규칙 선택을 대체할 때 제거한다.
 	if OS.is_debug_build():

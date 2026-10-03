@@ -11,6 +11,8 @@ const HIGH_THRESHOLD: float = 1.0e9
 
 var _reactions: Array[Dictionary] = []
 var _combos: Array[int] = []
+var _combo_multipliers: Array[float] = []
+var _max_combos: Array[int] = []
 var _finished_combos: Array[int] = []
 
 
@@ -168,6 +170,8 @@ func test_merge_result_reacts_again_as_chain_two() -> void:
 	assert_eq(applied, 2, "chain reaction count")
 	assert_eq(_reaction_chains(), [1, 2], "chain reaction order")
 	assert_eq(_combos, [1, 2], "combo_changed sequence")
+	assert_eq(_combo_multipliers, [1.0, 2.0], "chain multiplier display sequence")
+	assert_eq(_max_combos, [1, 2], "chain maximum display sequence")
 	assert_eq(manager.turn_combo, 2, "turn combo")
 	assert_eq(orbs.size(), 1, "chain result count")
 	if _reactions.size() == 2:
@@ -234,6 +238,8 @@ func test_three_stage_chain_waits_between_every_reaction() -> void:
 
 	assert_eq(_reaction_chains(), [1, 2, 3], "three-stage chain generations")
 	assert_eq(_reaction_combos(), [1, 2, 3], "three-stage turn combos")
+	assert_eq(_combo_multipliers, [1.0, 2.0, 4.0], "three-stage multipliers")
+	assert_eq(_max_combos, [1, 2, 3], "three-stage maximums")
 	assert_eq(elapsed_frames, [0, delay_frames, delay_frames * 2], "three-stage timing")
 	var orbs: Array[Orb] = board.get_orbs()
 	assert_eq(orbs.size(), 1, "three-stage final orb count")
@@ -706,6 +712,8 @@ func _restore_turn_config(snapshot: Dictionary) -> void:
 func _reset_records() -> void:
 	_reactions.clear()
 	_combos.clear()
+	_combo_multipliers.clear()
+	_max_combos.clear()
 	_finished_combos.clear()
 
 
@@ -713,8 +721,10 @@ func _record_reaction(reaction: Dictionary) -> void:
 	_reactions.append(reaction)
 
 
-func _record_combo(combo: int) -> void:
+func _record_combo(combo: int, multiplier: float, max_combo: int) -> void:
 	_combos.append(combo)
+	_combo_multipliers.append(multiplier)
+	_max_combos.append(max_combo)
 
 
 func _record_turn_finished(_turn_index: int, combo: int) -> void:

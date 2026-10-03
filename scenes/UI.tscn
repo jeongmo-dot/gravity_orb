@@ -16,7 +16,7 @@ offset_bottom = 300.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 28
-text = "State: WAITING_INPUT\nGravity: DOWN\nTurn: 0\nCombo: 0\nSettle: 0.00 s"
+text = "State: WAITING_INPUT\nGravity: DOWN\nTurn: 0\nCombo: 0 (x1)\nMax Combo: 0\nSettle: 0.00 s"
 
 [node name="Hud" type="Control" parent="."]
 unique_name_in_owner = true
@@ -65,7 +65,7 @@ offset_bottom = 210.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 26
-text = "MAX COMBO  0"
+text = "MAX COMBO 0"
 horizontal_alignment = 1
 
 [node name="ComboLabel" type="Label" parent="Hud"]
@@ -79,7 +79,7 @@ offset_bottom = 285.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 0.772549, 0.258824, 1)
 theme_override_font_sizes/font_size = 36
-text = "COMBO x1"
+text = "COMBO 1 (x1)"
 horizontal_alignment = 1
 
 [node name="DangerLabel" type="Label" parent="Hud"]
@@ -179,7 +179,7 @@ unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
 theme_override_font_sizes/font_size = 32
-text = "MAX COMBO  0"
+text = "MAX COMBO 0"
 horizontal_alignment = 1
 
 [node name="GameOverBlocked" type="Label" parent="Hud/GameOverPanel/Margin/Content"]
