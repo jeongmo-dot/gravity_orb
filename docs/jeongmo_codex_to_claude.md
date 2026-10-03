@@ -40,7 +40,7 @@
 
 ### [2026-10-04] 대상 #23 — 순차 연쇄 반응 잠금
 - 상태: 완료
-- 브랜치 / PR: `m9-chain-reaction-lock` / 생성 후 링크 갱신
+- 브랜치 / PR: `m9-chain-reaction-lock` / [PR #22](https://github.com/jeongmo-dot/gravity_orb/pull/22)
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/{CollisionResolver,TurnManager}.gd`, `tests/{test_config,test_jolt_3d}.gd`, `tests/scenarios/{test_merge_scenario,test_annihilation_scenario,test_score_flow}.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `chain_reaction_delay=0.2` 추가. MERGE 결과와 규칙 C 잔존 구체를 공통 `CollisionResolver`에서 스케일된 시간 동안 잠그고, 잠금 해제 프레임에 현재 거리 접촉을 다시 분류
