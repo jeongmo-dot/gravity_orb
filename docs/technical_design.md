@@ -224,7 +224,8 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M1 | `wall_thickness` | float | 256.0 | 터널링 방지용으로 두껍게 |
 | ~~M1~~ | ~~`orb_base_radius`, `orb_radius_growth`~~ | | | **#14에서 제거** → `level_radii` |
 | #14 | `level_radii` | PackedFloat32Array | [25, 40, 60, 85, 115, 150, 190] → **[25, 40, 60, 85, 100, 120, 140]** (#18, 기획서 0.6.2) | 레벨별 반지름 |
-| #14 | `mass_exponent` | float | **1.0** (#14 측정: 지수 2는 L1 관통 14.8px, 1은 8.2px) | 질량 = base × (r / r_L1)^지수 — 크기 비례 |
+| #21 | `gravity_level_scale` | float | #21 측정 후 결정 (후보 0 / 0.05 / 0.1) | 레벨별 중력 배율 = 1 + 값 × (레벨 − 1). 큰 구체가 더 빨리 떨어진다 (기획서 0.8) |
+| #14 | `mass_exponent` | float | **1.0** (#14 측정: 지수 2는 L1 관통 14.8px, 1은 8.2px) | 질량 = base × (r / r_L1)^지수 — 크기 비례. #21에서 2 / 3 재측정 (Jolt는 질량비에 더 강하다) |
 | M1 | `orb_max_level` | int | 7 | |
 | M1 | `orb_base_mass` | float | 1.0 | L1 질량 |
 | M1 | `gravity_strength` | float | 2400.0 → **1800.0** (#17: 고밀도 40%+ 사전 복구 910 → 13, 발산 0) | 중력 가속도 (px/s²) |
@@ -610,15 +611,11 @@ return applied
 
 ## 8. 점수·연쇄
 
-### 8.1 연쇄 세대 (M5)
-
-- 턴 시작 시 모든 구체의 `generation = 0`. 새로 생성되는 구체(`Spawner`)도 0.
-- 반응 1건의 연쇄 번호: `chain = max(a.generation, b.generation) + 1`.
-- 반응으로 생긴 구체(합체 결과, 규칙 C 잔존)는 `generation = chain`.
-- 턴 내 연쇄 수 = 이번 턴 반응들의 `chain` 최댓값. 1이면 연쇄 없음, 2 이상이면 "n연쇄".
-- 스와이프 후 settle과 생성 후 settle 모두 같은 턴이다.
-
-독립적으로 동시에 일어난 두 합체는 둘 다 chain 1이므로 연쇄로 세지 않는다. "반응으로 생긴 구체가 다시 반응"한 경우만 연쇄다.
+### 8.1 콤보 (기획서 0.8 — #21에서 교체)
+- **턴 콤보**: `on_swipe`에서 `turn_combo = 0`. 이후 다음 스와이프 전까지 적용되는 반응(MERGE·MAX_CLEAR·ANNIHILATE, 입력 대기 중 반응 포함)마다 `turn_combo += 1`, 그 반응의 `combo = turn_combo`
+- 반응 점수 = 기본 점수 × `combo` (§8.2)
+- 표시: 턴 중 현재 콤보, 판 전체 최대 콤보(`max_combo`). 신호 `combo_changed(combo)`
+- 0.7까지의 **연쇄 세대**(`generation`, chain = max(gen)+1)는 콤보 계산에서 제외한다. 필드는 디버그 표시용으로 남겨도 된다
 
 ### 8.2 점수 (기획서 5.2, M7)
 
@@ -628,7 +625,7 @@ return applied
 | ANNIHILATE | `floor((score_for_level(La) + score_for_level(Lb)) × annihilation_score_factor)` — 규칙 C도 원래 두 레벨 기준 |
 | MAX_CLEAR | `score_for_level(orb_max_level) × max_merge_bonus_factor` (기본 128 × 5 = 640) |
 
-최종 = `int(기본 점수) × chain`.
+최종 = `int(기본 점수) × combo` (0.8, §8.1).
 
 예: 레벨2 빨강 둘 합체(chain 1) → 레벨3 생성 = 8점. 그 레벨3이 곧바로 다른 레벨3 빨강과 합체(chain 2) → 레벨4 = 16 × 2 = 32점.
 
