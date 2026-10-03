@@ -257,13 +257,11 @@ gravity_right={
 [physics]
 
 common/physics_ticks_per_second=120
-2d/solver/contact_max_allowed_penetration=0.1
 3d/physics_engine="Jolt Physics"
-3d/run_on_separate_thread=false
 jolt_physics_3d/simulation/position_steps=4
-jolt_physics_3d/simulation/velocity_steps=10
-jolt_physics_3d/simulation/baumgarte_stabilization_factor=0.2
 jolt_physics_3d/simulation/penetration_slop=0.02
+jolt_physics_3d/simulation/baumgarte_stabilization_factor=0.2
+2d/solver/contact_max_allowed_penetration=0.1
 
 [rendering]
 

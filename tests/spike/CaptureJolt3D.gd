@@ -14,6 +14,7 @@ const DIRECTION_PATTERN: Array[Vector2i] = [
 	Vector2i.RIGHT,
 ]
 const WAIT_TIMEOUT_SECONDS: float = 3.5
+const DOWN_AFTER_CAPTURE_DELAY: float = 0.35
 
 var _failed: bool = false
 var _max_capture_turn: int = CAPTURE_TURNS[-1]
@@ -38,7 +39,16 @@ func _capture_sequence() -> void:
 
 	for turn_number: int in range(1, _max_capture_turn + 1):
 		var direction: Vector2i = DIRECTION_PATTERN[(turn_number - 1) % DIRECTION_PATTERN.size()]
+		if turn_number == 1:
+			await get_tree().process_frame
+			await RenderingServer.frame_post_draw
+			_capture("jolt3d_seed101_down_before.png")
 		manager.on_swipe(direction)
+		if turn_number == 1:
+			await get_tree().create_timer(DOWN_AFTER_CAPTURE_DELAY).timeout
+			await get_tree().process_frame
+			await RenderingServer.frame_post_draw
+			_capture("jolt3d_seed101_down_after.png")
 		if turn_number == 60:
 			await get_tree().create_timer(0.08).timeout
 			await get_tree().process_frame

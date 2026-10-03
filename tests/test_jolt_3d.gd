@@ -58,14 +58,18 @@ func test_orb_3d_exposes_pixel_plane_api_and_locks_depth() -> void:
 	assert_near(orb.position.y, -75.0, 0.001, "plane y remains in pixels")
 	assert_near(orb.get_radius(), 25.0, 0.001, "radius remains in pixels")
 	var body: RigidBody3D = orb.get_physics_body()
+	assert_near(body.position.x, 1.25, 0.001, "plane x converts to world x")
+	assert_near(body.position.y, 0.75, 0.001, "screen-up converts to world positive y")
+	assert_near(body.linear_velocity.x, 0.4, 0.001, "plane velocity x converts to m/s")
+	assert_near(body.linear_velocity.y, -0.2, 0.001, "screen-down velocity flips world y")
 	assert_true(body.axis_lock_linear_z, "depth axis is locked")
 	assert_true(body.axis_lock_angular_x, "x rotation is locked")
 	assert_true(body.axis_lock_angular_y, "y rotation is locked")
 	assert_near(
 		(body.constant_force / body.mass).y,
-		Config.data.gravity_strength / Orb3D.PIXELS_PER_METER,
+		-Config.data.gravity_strength / Orb3D.PIXELS_PER_METER,
 		0.001,
-		"gravity converts px/s^2 to m/s^2"
+		"screen-down gravity converts to negative world y"
 	)
 	_cleanup(board)
 

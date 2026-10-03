@@ -31,29 +31,61 @@ var _progressive_growth_enabled: bool = false
 
 var position: Vector2:
 	get:
-		return Vector2(_body.position.x, _body.position.y) * PIXELS_PER_METER
+		return world_position_to_plane(_body.position)
 	set(value):
-		_body.position = Vector3(
-			value.x / PIXELS_PER_METER,
-			value.y / PIXELS_PER_METER,
-			0.0
-		)
+		_body.position = plane_position_to_world(value)
 
 var linear_velocity: Vector2:
 	get:
-		return Vector2(_body.linear_velocity.x, _body.linear_velocity.y) * PIXELS_PER_METER
+		return world_vector_to_plane(_body.linear_velocity)
 	set(value):
-		_body.linear_velocity = Vector3(
-			value.x / PIXELS_PER_METER,
-			value.y / PIXELS_PER_METER,
-			0.0
-		)
+		_body.linear_velocity = plane_vector_to_world(value)
 
 var angular_velocity: float:
 	get:
-		return _body.angular_velocity.z
+		return world_angular_velocity_to_plane(_body.angular_velocity.z)
 	set(value):
-		_body.angular_velocity = Vector3(0.0, 0.0, value)
+		_body.angular_velocity = Vector3(
+			0.0,
+			0.0,
+			plane_angular_velocity_to_world(value)
+		)
+
+
+static func plane_position_to_world(value: Vector2, z: float = 0.0) -> Vector3:
+	return Vector3(
+		value.x / PIXELS_PER_METER,
+		-value.y / PIXELS_PER_METER,
+		z
+	)
+
+
+static func world_position_to_plane(value: Vector3) -> Vector2:
+	return Vector2(value.x, -value.y) * PIXELS_PER_METER
+
+
+static func plane_vector_to_world(value: Vector2) -> Vector3:
+	return Vector3(
+		value.x / PIXELS_PER_METER,
+		-value.y / PIXELS_PER_METER,
+		0.0
+	)
+
+
+static func world_vector_to_plane(value: Vector3) -> Vector2:
+	return Vector2(value.x, -value.y) * PIXELS_PER_METER
+
+
+static func plane_direction_to_world(value: Vector2i) -> Vector3:
+	return Vector3(float(value.x), -float(value.y), 0.0)
+
+
+static func plane_angular_velocity_to_world(value: float) -> float:
+	return -value
+
+
+static func world_angular_velocity_to_plane(value: float) -> float:
+	return -value
 
 
 func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
@@ -163,12 +195,8 @@ func set_gravity(direction: Vector2i, strength: float) -> void:
 	if is_waiting_at_entrance:
 		_body.constant_force = Vector3.ZERO
 		return
-	var acceleration_m: Vector2 = Vector2(direction) * strength / PIXELS_PER_METER
-	_body.constant_force = Vector3(
-		acceleration_m.x,
-		acceleration_m.y,
-		0.0
-	) * _body.mass
+	var acceleration_px: Vector2 = Vector2(direction) * strength
+	_body.constant_force = plane_vector_to_world(acceleration_px) * _body.mass
 	_body.sleeping = false
 
 

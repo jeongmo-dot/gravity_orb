@@ -36,7 +36,7 @@ var _continuous_cd_enabled: bool = true
 var _allow_sleep: bool = false
 var _contact_reporting_enabled: bool = true
 var _progressive_growth_enabled: bool = false
-var _reaction_ghost_enabled: bool = true
+var _reaction_ghost_enabled: bool = false
 var _record_seed_hashes: bool = false
 var _scan_pairs_each_frame: bool = false
 
@@ -740,6 +740,8 @@ func _apply_arguments() -> void:
 			_progressive_growth_enabled = true
 		elif argument == "--jolt-no-reaction-ghost":
 			_reaction_ghost_enabled = false
+		elif argument == "--jolt-reaction-ghost":
+			_reaction_ghost_enabled = true
 		elif argument == "--jolt-record-hashes":
 			_record_seed_hashes = true
 		elif argument == "--jolt-frame-pair-scan":

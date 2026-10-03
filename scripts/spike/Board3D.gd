@@ -25,7 +25,7 @@ var orb_contact_reporting_enabled: bool = true
 var orb_continuous_cd_enabled: bool = true
 var orb_allow_sleep: bool = false
 var orb_progressive_growth_enabled: bool = false
-var reaction_ghost_enabled: bool = true
+var reaction_ghost_enabled: bool = false
 var ghost_timeout_count: int = 0
 var ghost_completed_count: int = 0
 var ghost_total_duration: float = 0.0
@@ -54,9 +54,10 @@ func set_gravity(direction: Vector2i) -> void:
 func play_visual_tilt(direction: Vector2i) -> void:
 	if _tilt_tween != null and _tilt_tween.is_valid():
 		_tilt_tween.kill()
+	var world_direction: Vector3 = Orb3D.plane_direction_to_world(direction)
 	var target: Vector3 = Vector3(
-		-float(direction.y) * VISUAL_TILT_DEGREES,
-		float(direction.x) * VISUAL_TILT_DEGREES,
+		world_direction.y * VISUAL_TILT_DEGREES,
+		world_direction.x * VISUAL_TILT_DEGREES,
 		0.0
 	)
 	_tilt_tween = create_tween()
@@ -343,8 +344,10 @@ func _on_orb_body_entered(other_body: Node, orb: Orb3D) -> void:
 
 
 func _configure_walls() -> void:
-	var half_m: float = half_size() / PIXELS_PER_METER
-	var thickness_m: float = Config.data.wall_thickness / PIXELS_PER_METER
+	var half: float = half_size()
+	var thickness: float = Config.data.wall_thickness
+	var half_m: float = half / PIXELS_PER_METER
+	var thickness_m: float = thickness / PIXELS_PER_METER
 	var depth_m: float = 0.8
 	var span_m: float = half_m * 2.0 + thickness_m * 2.0
 	var wall_material: PhysicsMaterial = PhysicsMaterial.new()
@@ -352,25 +355,25 @@ func _configure_walls() -> void:
 	wall_material.bounce = Config.data.wall_bounce
 	_configure_wall(
 		"WallTop",
-		Vector3(0.0, -half_m - thickness_m * 0.5, 0.0),
+		Orb3D.plane_position_to_world(Vector2(0.0, -half - thickness * 0.5)),
 		Vector3(span_m, thickness_m, depth_m),
 		wall_material
 	)
 	_configure_wall(
 		"WallBottom",
-		Vector3(0.0, half_m + thickness_m * 0.5, 0.0),
+		Orb3D.plane_position_to_world(Vector2(0.0, half + thickness * 0.5)),
 		Vector3(span_m, thickness_m, depth_m),
 		wall_material
 	)
 	_configure_wall(
 		"WallLeft",
-		Vector3(-half_m - thickness_m * 0.5, 0.0, 0.0),
+		Orb3D.plane_position_to_world(Vector2(-half - thickness * 0.5, 0.0)),
 		Vector3(thickness_m, span_m, depth_m),
 		wall_material
 	)
 	_configure_wall(
 		"WallRight",
-		Vector3(half_m + thickness_m * 0.5, 0.0, 0.0),
+		Orb3D.plane_position_to_world(Vector2(half + thickness * 0.5, 0.0)),
 		Vector3(thickness_m, span_m, depth_m),
 		wall_material
 	)
@@ -398,7 +401,7 @@ func _configure_wall(
 
 func _configure_visuals() -> void:
 	var board_size_m: float = Config.data.board_size / PIXELS_PER_METER
-	var half_m: float = board_size_m * 0.5
+	var half: float = half_size()
 	var backing: MeshInstance3D = MeshInstance3D.new()
 	backing.name = "Backing"
 	backing.position = Vector3(0.0, 0.0, -0.34)
@@ -407,10 +410,26 @@ func _configure_visuals() -> void:
 	backing.mesh = backing_mesh
 	backing.material_override = _visual_material(Color("#10192e"), 0.74, 0.0)
 	_visual_tilt.add_child(backing)
-	_add_visual_wall("VisualTop", Vector3(0.0, -half_m, 0.0), Vector3(board_size_m, VISUAL_WALL_WIDTH_M, 0.28))
-	_add_visual_wall("VisualBottom", Vector3(0.0, half_m, 0.0), Vector3(board_size_m, VISUAL_WALL_WIDTH_M, 0.28))
-	_add_visual_wall("VisualLeft", Vector3(-half_m, 0.0, 0.0), Vector3(VISUAL_WALL_WIDTH_M, board_size_m, 0.28))
-	_add_visual_wall("VisualRight", Vector3(half_m, 0.0, 0.0), Vector3(VISUAL_WALL_WIDTH_M, board_size_m, 0.28))
+	_add_visual_wall(
+		"VisualTop",
+		Orb3D.plane_position_to_world(Vector2(0.0, -half)),
+		Vector3(board_size_m, VISUAL_WALL_WIDTH_M, 0.28)
+	)
+	_add_visual_wall(
+		"VisualBottom",
+		Orb3D.plane_position_to_world(Vector2(0.0, half)),
+		Vector3(board_size_m, VISUAL_WALL_WIDTH_M, 0.28)
+	)
+	_add_visual_wall(
+		"VisualLeft",
+		Orb3D.plane_position_to_world(Vector2(-half, 0.0)),
+		Vector3(VISUAL_WALL_WIDTH_M, board_size_m, 0.28)
+	)
+	_add_visual_wall(
+		"VisualRight",
+		Orb3D.plane_position_to_world(Vector2(half, 0.0)),
+		Vector3(VISUAL_WALL_WIDTH_M, board_size_m, 0.28)
+	)
 
 
 func _add_visual_wall(wall_name: String, wall_position: Vector3, size: Vector3) -> void:
