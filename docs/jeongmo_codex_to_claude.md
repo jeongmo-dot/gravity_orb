@@ -38,6 +38,28 @@
 
 ## 미확인
 
+### [2026-10-03] 대상 #21 · 추가 요구 3 — 연속 턴 벽 기준 28px 확정
+- 상태: 완료
+- 브랜치 / PR: `m9-turn-combo-weight` / [PR #21](https://github.com/jeongmo-dot/gravity_orb/pull/21)
+- 변경 파일: `tests/scenarios/test_jolt_integration.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 3D 20턴·120턴 공통 벽 침투 한도 `20.0 → 28.0px` 변경
+  - [x] 연속 턴 pair `60px`, 22시드 wall/pair `14/16px`, 이탈·발산 0 기준 유지
+  - [x] `physics/jolt_physics_3d/simulation/position_steps=4` 유지 및 설정 테스트 통과
+  - [x] 독립 전체 테스트 2회 모두 `128/128`, 종료 코드 0
+  - [x] §10.1 필수 명령 3종 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+- QA 관측값:
+  - 전체 1회차 `--fixed-fps 120 -s res://tests/run_tests.gd` → `128/128`, 종료 코드 0. 3D 22시드 wall/pair `13.4939/14.3286px`, 이탈·발산 `0/0`
+  - 전체 2회차 `-s res://tests/run_tests.gd` → `128/128`, 종료 코드 0. 3D 20턴·120턴 통과, 22시드 wall/pair `13.4939/14.3286px`, 이탈·발산 `0/0`
+  - 3D 회귀 단독 사전 확인 → `12/12`, 종료 코드 0. 22시드 wall/pair `12.9515/12.2006px`, 이탈·발산 `0/0`
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --quit-after 300` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 2D 22시드 비교 회귀 → 최대 침투 `10.595px`, 이탈·발산 `0/0`
+  - Windows 사용자 로그·루트 인증서·에디터 설정 저장 오류는 기존 제한 실행 환경 메시지이며 프로젝트 스크립트 검증에는 영향 없음
+- 수동 확인 절차: 없음. 회귀 한도만 변경했고 게임 코드·물리 설정·표시를 변경하지 않았다.
+- 결정 사항: 없음. 인박스에 확정된 연속 턴 벽 한도만 반영했다.
+- 남은 것 · 질문: 없음.
+
 ### [2026-10-03] 대상 #21 · 추가 요구 2 — 최종 무게감 기본값 적용과 3D 회귀 재측정
 - 상태: 질문
 - 브랜치 / PR: `m9-turn-combo-weight` / [PR #21](https://github.com/jeongmo-dot/gravity_orb/pull/21)

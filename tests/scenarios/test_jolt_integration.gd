@@ -20,7 +20,7 @@ const DIVERGENCE_SPEED: float = 5000.0
 const DIVERGENCE_MARGIN: float = 100.0
 const CYCLE_MAX_WALL_PENETRATION: float = 14.0
 const CYCLE_MAX_PAIR_OVERLAP: float = 16.0
-const TURN_MAX_WALL_PENETRATION: float = 20.0
+const TURN_MAX_WALL_PENETRATION: float = 28.0
 const TURN_MAX_PAIR_OVERLAP: float = 60.0
 
 
