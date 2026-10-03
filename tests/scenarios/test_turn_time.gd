@@ -175,7 +175,7 @@ func _measure_current_config() -> Dictionary:
 			board.wall_recovery_since_last_ghost_timeout_frames
 		)
 		scores_by_seed.append(score_manager.score)
-		max_combos_by_seed.append(score_manager.max_combo)
+		max_combos_by_seed.append(manager.max_combo)
 		max_levels_by_seed.append(score_manager.max_level_reached)
 		turns_by_seed.append(completed_turns)
 		first_over_30_by_seed.append(first_over_30)
@@ -186,7 +186,7 @@ func _measure_current_config() -> Dictionary:
 				seed,
 				completed_turns,
 				score_manager.score,
-				score_manager.max_combo,
+			manager.max_combo,
 				score_manager.max_level_reached,
 				first_over_30,
 				first_over_50,
@@ -339,7 +339,7 @@ func _create_fixture(seed: int) -> Dictionary:
 
 	tree.root.add_child(fixture_root)
 	await tree.process_frame
-	resolver.reaction_applied.connect(score_manager.on_reaction)
+	manager.reaction_ready.connect(score_manager.on_reaction)
 	spawner.orb_spawned.connect(score_manager.on_orb_spawned)
 	spawner.init_rng(seed)
 	return {

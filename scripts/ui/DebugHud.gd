@@ -21,6 +21,8 @@ var _state: TurnManager.State = TurnManager.State.WAITING_INPUT
 var _gravity: Vector2i = Vector2i.DOWN
 var _turn_index: int = 0
 var _turn_combo: int = 0
+var _combo_multiplier: float = 1.0
+var _max_combo: int = 0
 
 
 func _ready() -> void:
@@ -31,6 +33,8 @@ func _ready() -> void:
 	_gravity = _turn_manager.gravity
 	_turn_index = _turn_manager.turn_index
 	_turn_combo = _turn_manager.turn_combo
+	_combo_multiplier = _turn_manager.current_combo_multiplier()
+	_max_combo = _turn_manager.max_combo
 	_turn_manager.state_changed.connect(_on_state_changed)
 	_turn_manager.gravity_changed.connect(_on_gravity_changed)
 	_turn_manager.turn_started.connect(_on_turn_started)
@@ -53,26 +57,34 @@ func _on_gravity_changed(direction: Vector2i) -> void:
 
 func _on_turn_started(next_turn_index: int, _direction: Vector2i) -> void:
 	_turn_index = next_turn_index
-	_turn_combo = 0
 
 
-func _on_turn_finished(finished_turn_index: int, combo: int) -> void:
+func _on_turn_finished(finished_turn_index: int, _combo: int) -> void:
 	_turn_index = finished_turn_index
-	_turn_combo = combo
 
 
-func _on_combo_changed(combo: int) -> void:
+func _on_combo_changed(combo: int, multiplier: float, max_combo: int) -> void:
 	_turn_combo = combo
+	_combo_multiplier = multiplier
+	_max_combo = max_combo
 
 
 func _update_label() -> void:
-	_label.text = "State: %s\nGravity: %s\nTurn: %d\nCombo: %d\nRule: %s\nSpawn: %d\nSettle: %.2f s\nSeed: %d" % [
+	_label.text = "State: %s\nGravity: %s\nTurn: %d\nCombo: %d (x%s)\nMax Combo: %d\nRule: %s\nSpawn: %d\nSettle: %.2f s\nSeed: %d" % [
 		STATE_NAMES[_state],
 		OrbTypes.dir_name(_gravity),
 		_turn_index,
 		_turn_combo,
+		_format_multiplier(_combo_multiplier),
+		_max_combo,
 		ANNIHILATION_RULE_NAMES[Config.data.annihilation_rule],
 		Config.data.spawn_count_for_turn(_turn_manager.turn_index + 1),
 		_turn_manager.settle_elapsed,
 		_spawner.seed_used,
 	]
+
+
+func _format_multiplier(multiplier: float) -> String:
+	if is_equal_approx(multiplier, float(roundi(multiplier))):
+		return str(roundi(multiplier))
+	return "%.2f" % multiplier

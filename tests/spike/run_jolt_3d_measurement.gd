@@ -276,7 +276,7 @@ func _run_seed(
 		"final_occupancy_percent": _board_occupancy(board) * 100.0,
 		"final_orb_count": board.get_orbs().size(),
 		"score": score_manager.score,
-		"max_combo": score_manager.max_combo,
+		"max_combo": manager.max_combo,
 		"max_level_reached": score_manager.max_level_reached,
 		"aborted": aborted,
 		"abort_reason": abort_reason,
@@ -334,7 +334,7 @@ func _create_fixture(seed: int) -> Dictionary:
 	score_manager.owner = fixture_root
 	get_tree().root.add_child(fixture_root)
 	await get_tree().process_frame
-	resolver.reaction_applied.connect(score_manager.on_reaction)
+	manager.reaction_ready.connect(score_manager.on_reaction)
 	resolver.reaction_applied.connect(_record_shock_event)
 	spawner.orb_spawned.connect(score_manager.on_orb_spawned)
 	spawner.init_rng(seed)

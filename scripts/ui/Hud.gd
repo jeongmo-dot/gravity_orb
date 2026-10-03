@@ -27,10 +27,8 @@ func bind_spawner(spawner: Spawner) -> void:
 func bind_score_manager(score_manager: ScoreManager) -> void:
 	_score_manager = score_manager
 	_score_manager.score_changed.connect(_on_score_changed)
-	_score_manager.max_combo_changed.connect(_on_max_combo_changed)
 	_score_manager.reaction_scored.connect(_on_reaction_scored)
 	_on_score_changed(_score_manager.score, _score_manager.best_score)
-	_on_max_combo_changed(_score_manager.max_combo)
 
 
 func bind_game_state(
@@ -42,7 +40,11 @@ func bind_game_state(
 	turn_manager.combo_changed.connect(_on_combo_changed)
 	_game_over_panel.bind(turn_manager, score_manager)
 	_on_warning_changed(turn_manager.blocked_directions)
-	_on_combo_changed(turn_manager.turn_combo)
+	_on_combo_changed(
+		turn_manager.turn_combo,
+		turn_manager.current_combo_multiplier(),
+		turn_manager.max_combo
+	)
 	board.set_warning_directions(turn_manager.blocked_directions)
 
 
@@ -97,24 +99,16 @@ func _on_score_changed(score: int, best: int) -> void:
 	_best_label.text = "BEST\n%d" % best
 
 
-func _on_max_combo_changed(max_combo: int) -> void:
-	_max_combo_label.text = "MAX COMBO  %d" % max_combo
-
-
-func _on_combo_changed(combo: int) -> void:
+func _on_combo_changed(combo: int, multiplier: float, max_combo: int) -> void:
+	_max_combo_label.text = "MAX COMBO %d" % max_combo
 	_combo_label.visible = combo > 0
 	if combo <= 0:
 		_danger_label.visible = false
 		return
-	var multiplier: float = pow(
-		Config.data.combo_multiplier_base,
-		float(combo - 1)
-	)
-	_combo_label.text = "COMBO x%s" % _format_multiplier(multiplier)
+	_combo_label.text = "COMBO %d (x%s)" % [combo, _format_multiplier(multiplier)]
 
 
 func _on_reaction_scored(reaction: Dictionary) -> void:
-	_on_combo_changed(int(reaction.get("combo", 1)))
 	var occupancy: float = float(reaction.get("occupancy", 0.0))
 	_danger_label.visible = occupancy >= Config.data.danger_start
 	if not _danger_label.visible:

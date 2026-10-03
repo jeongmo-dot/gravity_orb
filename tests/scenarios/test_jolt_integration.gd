@@ -544,7 +544,7 @@ func _create_fixture(start_game: bool, reaction_ghost: bool) -> Dictionary:
 	score.owner = root
 	tree.root.add_child(root)
 	await tree.process_frame
-	resolver.reaction_applied.connect(score.on_reaction)
+	manager.reaction_ready.connect(score.on_reaction)
 	spawner.orb_spawned.connect(score.on_orb_spawned)
 	spawner.init_rng(101)
 	if start_game:

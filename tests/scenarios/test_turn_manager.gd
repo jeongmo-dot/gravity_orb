@@ -179,12 +179,19 @@ func test_t8_next_swipe_resets_combo_to_zero() -> void:
 	var fixture: Dictionary = await _create_ready_fixture(FIXTURE_SEED + 8)
 	var manager: TurnManager = fixture["manager"] as TurnManager
 	var combo_values: Array[int] = []
-	manager.combo_changed.connect(func(combo: int) -> void: combo_values.append(combo))
+	var max_combo_values: Array[int] = []
+	manager.combo_changed.connect(
+		func(combo: int, _multiplier: float, max_combo: int) -> void:
+			combo_values.append(combo)
+			max_combo_values.append(max_combo)
+	)
 	manager.on_reaction({"chain": 1})
 	assert_eq(manager.turn_combo, 1, "reaction increments combo")
 	manager.on_swipe(Vector2i.RIGHT)
 	assert_eq(manager.turn_combo, 0, "accepted swipe resets combo")
 	assert_eq(combo_values, [1, 0], "combo signal includes reset")
+	assert_eq(manager.max_combo, 1, "swipe preserves board maximum")
+	assert_eq(max_combo_values, [1, 1], "maximum signal survives reset")
 	await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
 	await _cleanup_fixture(fixture, snapshot)
 

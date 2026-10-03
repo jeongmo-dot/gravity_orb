@@ -2,14 +2,12 @@ class_name ScoreManager
 extends Node
 
 signal score_changed(score: int, best: int)
-signal max_combo_changed(max_combo: int)
 signal reaction_scored(reaction: Dictionary)
 
 @export var save_path: String = "user://save.cfg"
 
 var score: int = 0
 var best_score: int = 0
-var max_combo: int = 0
 var max_level_reached: int = 0
 
 
@@ -20,19 +18,13 @@ func _ready() -> void:
 
 func reset() -> void:
 	score = 0
-	max_combo = 0
 	max_level_reached = 0
 	score_changed.emit(score, best_score)
-	max_combo_changed.emit(max_combo)
 
 
 func on_reaction(reaction: Dictionary) -> void:
 	var points: int = points_for(reaction, Config.data)
 	score += points
-	var combo: int = int(reaction.get("combo", 1))
-	if combo > max_combo:
-		max_combo = combo
-		max_combo_changed.emit(max_combo)
 	if int(reaction["type"]) == ReactionRules.Type.MERGE:
 		max_level_reached = maxi(max_level_reached, int(reaction["result_level"]))
 	if score > best_score:
