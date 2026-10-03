@@ -7,7 +7,8 @@ signal state_changed(state: State)
 signal gravity_changed(dir: Vector2i)
 signal turn_started(turn_index: int, dir: Vector2i)
 signal turn_finished(turn_index: int, combo: int)
-signal combo_changed(combo: int)
+signal combo_changed(combo: int, multiplier: float, max_combo: int)
+signal reaction_ready(reaction: Dictionary)
 signal warning_changed(walls: Array[Vector2i])
 signal game_over
 
@@ -19,6 +20,7 @@ var state: State = State.WAITING_INPUT
 var gravity: Vector2i = Vector2i.DOWN
 var turn_index: int = 0
 var turn_combo: int = 0
+var max_combo: int = 0
 var capped_turn_count: int = 0
 var blocked_directions: Array[Vector2i] = []
 var game_over_details: Dictionary = {}
@@ -40,6 +42,7 @@ func _ready() -> void:
 func start_game() -> void:
 	turn_index = 0
 	turn_combo = 0
+	max_combo = 0
 	capped_turn_count = 0
 	blocked_directions.clear()
 	game_over_details.clear()
@@ -49,7 +52,7 @@ func start_game() -> void:
 	_board.set_gravity(gravity)
 	_board.set_warning_directions(blocked_directions)
 	gravity_changed.emit(gravity)
-	combo_changed.emit(turn_combo)
+	_emit_combo_changed()
 	_begin_settle()
 	_set_state(State.SIMULATING)
 
@@ -62,7 +65,7 @@ func on_swipe(dir: Vector2i) -> void:
 
 	turn_index += 1
 	turn_combo = 0
-	combo_changed.emit(turn_combo)
+	_emit_combo_changed()
 	for orb: Variant in _board.get_orbs():
 		orb.generation = 0
 	InputRouter.set_locked(true)
@@ -124,8 +127,18 @@ func _all_below_threshold() -> bool:
 func on_reaction(reaction: Dictionary) -> void:
 	_stable_time = 0.0
 	turn_combo += 1
+	max_combo = maxi(max_combo, turn_combo)
 	reaction["combo"] = turn_combo
-	combo_changed.emit(turn_combo)
+	_emit_combo_changed()
+	reaction_ready.emit(reaction)
+
+
+func current_combo_multiplier() -> float:
+	return pow(Config.data.combo_multiplier_base, float(maxi(turn_combo, 1) - 1))
+
+
+func _emit_combo_changed() -> void:
+	combo_changed.emit(turn_combo, current_combo_multiplier(), max_combo)
 
 
 func _begin_settle() -> void:

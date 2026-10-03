@@ -15,6 +15,7 @@ func test_same_turn_merges_score_twenty_and_track_combo_two() -> void:
 	var fixture: Dictionary = await _create_reaction_fixture()
 	var board: Board = fixture["board"] as Board
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var manager: TurnManager = fixture["manager"] as TurnManager
 	var score_manager: ScoreManager = fixture["score_manager"] as ScoreManager
 	var first: Orb = board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(-120.0, 0.0))
 	var second: Orb = board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2.ZERO)
@@ -40,8 +41,38 @@ func test_same_turn_merges_score_twenty_and_track_combo_two() -> void:
 
 	assert_eq(score_manager.score, 20, "merge chain score")
 	assert_eq(score_manager.best_score, 20, "merge chain best score")
-	assert_eq(score_manager.max_combo, 2, "merge combo maximum")
+	assert_eq(manager.max_combo, 2, "merge combo maximum")
 	assert_eq(score_manager.max_level_reached, 3, "merge chain maximum level")
+	await _cleanup_fixture(fixture)
+
+
+func test_combo_pipeline_is_independent_of_resolver_subscriber_order() -> void:
+	var fixture: Dictionary = await _create_reaction_fixture(true)
+	var board: Board = fixture["board"] as Board
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	var score_manager: ScoreManager = fixture["score_manager"] as ScoreManager
+	for pair_index: int in range(3):
+		var pair_x: float = float(pair_index - 1) * 240.0
+		var first: Orb = board.spawn_orb(
+			OrbTypes.OrbColor.YELLOW,
+			1,
+			Vector2(pair_x - 24.0, 0.0)
+		)
+		var second: Orb = board.spawn_orb(
+			OrbTypes.OrbColor.YELLOW,
+			1,
+			Vector2(pair_x + 24.0, 0.0)
+		)
+		resolver.report_contact(first, second)
+		assert_eq(resolver.flush(), 1, "ordered reaction %d" % (pair_index + 1))
+	assert_eq(manager.turn_combo, 3, "turn manager observes all three reactions")
+	assert_eq(manager.max_combo, 3, "single combo source tracks the maximum")
+	assert_eq(score_manager.score, 28, "score uses combo one, two, three")
+	assert_true(
+		not resolver.reaction_applied.is_connected(score_manager.on_reaction),
+		"score manager is not a resolver subscriber"
+	)
 	await _cleanup_fixture(fixture)
 
 
@@ -140,11 +171,11 @@ func test_main_scene_binds_score_hud_and_restart() -> void:
 	score_manager.save_path = ""
 	tree.root.add_child(main)
 	await tree.process_frame
+	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
 	assert_true(
 		InputRouter.restart_requested.is_connected(Callable(main, "restart")),
 		"main restart binding"
 	)
-	score_manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 2, [3, 3], 4))
 	var score_label: Label = main.get_node("UI/Hud/ScoreLabel") as Label
 	var best_label: Label = main.get_node("UI/Hud/BestLabel") as Label
 	var max_combo_label: Label = main.get_node("UI/Hud/MaxComboLabel") as Label
@@ -152,18 +183,32 @@ func test_main_scene_binds_score_hud_and_restart() -> void:
 	var danger_label: Label = main.get_node("UI/Hud/DangerLabel") as Label
 	var spawner: Spawner = main.get_node("Spawner") as Spawner
 	var next_preview: Node2D = main.get_node("UI/Hud/NextPreview") as Node2D
-	assert_eq(score_label.text, "SCORE\n32", "score HUD text")
-	assert_eq(best_label.text, "BEST\n32", "best HUD text")
-	assert_eq(max_combo_label.text, "MAX COMBO  2", "combo HUD text")
-	assert_eq(combo_label.text, "COMBO x2", "current combo multiplier")
-	assert_true(combo_label.visible, "current combo visible")
+	_assert_combo_labels(main, 0, 0, "x1")
+
+	manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 0, [1, 1], 2))
+	_assert_combo_labels(main, 1, 1, "x1")
 	assert_eq(danger_label.visible, false, "danger hidden below threshold")
-	score_manager.on_reaction(
-		_reaction(ReactionRules.Type.MERGE, 3, [1, 1], 2, 0.50)
+	manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 0, [1, 1], 2))
+	_assert_combo_labels(main, 2, 2, "x2")
+	manager.on_reaction(
+		_reaction(ReactionRules.Type.MERGE, 0, [1, 1], 2, 0.50)
 	)
-	assert_eq(combo_label.text, "COMBO x4", "updated combo multiplier")
+	_assert_combo_labels(main, 3, 3, "x4")
+	assert_eq(score_label.text, "SCORE\n44", "score HUD text")
+	assert_eq(best_label.text, "BEST\n44", "best HUD text")
 	assert_eq(danger_label.text, "DANGER x2.0", "danger multiplier text")
 	assert_true(danger_label.visible, "danger visible at threshold")
+
+	manager._set_state(TurnManager.State.WAITING_INPUT)
+	InputRouter.set_locked(false)
+	manager.on_swipe(Vector2i.RIGHT)
+	_assert_combo_labels(main, 0, 3, "x1")
+	manager._set_state(TurnManager.State.WAITING_INPUT)
+	manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 0, [1, 1], 2))
+	_assert_combo_labels(main, 1, 3, "x1")
+	assert_eq(score_label.text, "SCORE\n48", "waiting-input reaction score")
+	assert_eq(max_combo_label.text, "MAX COMBO 3", "maximum survives swipe reset")
+	assert_eq(combo_label.text, "COMBO 1 (x1)", "waiting-input combo text")
 	assert_eq(score_label.mouse_filter, Control.MOUSE_FILTER_IGNORE, "score ignores pointer")
 	assert_eq(best_label.mouse_filter, Control.MOUSE_FILTER_IGNORE, "best ignores pointer")
 	assert_eq(max_combo_label.mouse_filter, Control.MOUSE_FILTER_IGNORE, "combo ignores pointer")
@@ -191,7 +236,8 @@ func test_game_over_panel_shows_scores_direction_and_restart_button() -> void:
 	tree.root.add_child(main)
 	await tree.process_frame
 	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
-	score_manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 2, [3, 3], 4))
+	manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 0, [3, 3], 4))
+	manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 0, [3, 3], 4))
 	manager.gravity = Vector2i.LEFT
 	manager._set_state(TurnManager.State.GAME_OVER)
 	manager.game_over.emit()
@@ -203,9 +249,9 @@ func test_game_over_panel_shows_scores_direction_and_restart_button() -> void:
 	var blocked_label: Label = panel.get_node("Margin/Content/GameOverBlocked") as Label
 	var restart_button: Button = panel.get_node("Margin/Content/RestartButton") as Button
 	assert_true(panel.visible, "game-over panel visible")
-	assert_eq(score_label.text, "SCORE  32", "game-over score")
-	assert_eq(best_label.text, "BEST  32", "game-over best")
-	assert_eq(combo_label.text, "MAX COMBO  2", "game-over max combo")
+	assert_eq(score_label.text, "SCORE  48", "game-over score")
+	assert_eq(best_label.text, "BEST  48", "game-over best")
+	assert_eq(combo_label.text, "MAX COMBO 2", "game-over max combo")
 	assert_eq(blocked_label.text, "BLOCKED: LEFT", "game-over blocked direction")
 	assert_eq(panel.mouse_filter, Control.MOUSE_FILTER_IGNORE, "panel ignores pointer")
 	assert_eq(restart_button.mouse_filter, Control.MOUSE_FILTER_STOP, "restart consumes pointer")
@@ -215,7 +261,36 @@ func test_game_over_panel_shows_scores_direction_and_restart_button() -> void:
 	InputRouter.set_locked(false)
 
 
-func _create_reaction_fixture() -> Dictionary:
+func test_new_main_resets_combo_ui_after_restart_reload() -> void:
+	var first_main: Main = MAIN_SCENE.instantiate() as Main
+	var first_score: ScoreManager = first_main.get_node("ScoreManager") as ScoreManager
+	first_score.save_path = ""
+	tree.root.add_child(first_main)
+	await tree.process_frame
+	var first_manager: TurnManager = first_main.get_node("TurnManager") as TurnManager
+	for _reaction_index: int in range(3):
+		first_manager.on_reaction(
+			_reaction(ReactionRules.Type.MERGE, 0, [1, 1], 2)
+		)
+	_assert_combo_labels(first_main, 3, 3, "x4")
+	first_main.queue_free()
+	await tree.process_frame
+
+	var restarted_main: Main = MAIN_SCENE.instantiate() as Main
+	var restarted_score: ScoreManager = restarted_main.get_node("ScoreManager") as ScoreManager
+	restarted_score.save_path = ""
+	tree.root.add_child(restarted_main)
+	await tree.process_frame
+	var restarted_manager: TurnManager = restarted_main.get_node("TurnManager") as TurnManager
+	assert_eq(restarted_manager.turn_combo, 0, "restarted current combo")
+	assert_eq(restarted_manager.max_combo, 0, "restarted maximum combo")
+	_assert_combo_labels(restarted_main, 0, 0, "x1")
+	restarted_main.queue_free()
+	await tree.process_frame
+	InputRouter.set_locked(false)
+
+
+func _create_reaction_fixture(resolver_observer_first: bool = false) -> Dictionary:
 	var fixture_root: Node = Node.new()
 	fixture_root.name = "ScoreFlowFixture"
 	var board: Board = BOARD_SCENE.instantiate() as Board
@@ -233,6 +308,11 @@ func _create_reaction_fixture() -> Dictionary:
 	score_manager.save_path = ""
 	fixture_root.add_child(score_manager)
 	score_manager.owner = fixture_root
+	if resolver_observer_first:
+		resolver.reaction_applied.connect(
+			func(_reaction: Dictionary) -> void:
+				pass
+		)
 	var spawner: Spawner = SPAWNER_SCRIPT.new() as Spawner
 	spawner.name = "Spawner"
 	spawner.unique_name_in_owner = true
@@ -245,7 +325,7 @@ func _create_reaction_fixture() -> Dictionary:
 	tree.root.add_child(fixture_root)
 	await tree.process_frame
 	board.set_gravity(Vector2i.ZERO)
-	resolver.reaction_applied.connect(score_manager.on_reaction)
+	manager.reaction_ready.connect(score_manager.on_reaction)
 	return {
 		"root": fixture_root,
 		"board": board,
@@ -274,6 +354,35 @@ func _find_active_level(board: Board, level: int, excluded: Orb) -> Orb:
 		if orb != excluded and orb.level == level:
 			return orb
 	return null
+
+
+func _assert_combo_labels(
+	main: Main,
+	combo: int,
+	max_combo: int,
+	expected_multiplier: String
+) -> void:
+	var combo_label: Label = main.get_node("UI/Hud/ComboLabel") as Label
+	var max_combo_label: Label = main.get_node("UI/Hud/MaxComboLabel") as Label
+	var debug_hud: DebugHud = main.get_node("UI") as DebugHud
+	var debug_label: Label = main.get_node("UI/DebugLabel") as Label
+	debug_hud._update_label()
+	assert_eq(combo_label.visible, combo > 0, "combo visibility")
+	if combo > 0:
+		assert_eq(
+			combo_label.text,
+			"COMBO %d (%s)" % [combo, expected_multiplier],
+			"current combo HUD text"
+		)
+	assert_eq(max_combo_label.text, "MAX COMBO %d" % max_combo, "maximum combo HUD text")
+	assert_true(
+		debug_label.text.contains("Combo: %d (%s)" % [combo, expected_multiplier]),
+		"debug current combo text"
+	)
+	assert_true(
+		debug_label.text.contains("Max Combo: %d" % max_combo),
+		"debug maximum combo text"
+	)
 
 
 func _reaction(

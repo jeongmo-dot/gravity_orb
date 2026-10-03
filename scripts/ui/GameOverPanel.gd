@@ -22,7 +22,7 @@ func bind(turn_manager: TurnManager, score_manager: ScoreManager) -> void:
 func _on_game_over() -> void:
 	_score_label.text = "SCORE  %d" % _score_manager.score
 	_best_label.text = "BEST  %d" % _score_manager.best_score
-	_max_combo_label.text = "MAX COMBO  %d" % _score_manager.max_combo
+	_max_combo_label.text = "MAX COMBO %d" % _turn_manager.max_combo
 	_blocked_label.text = "BLOCKED: %s" % OrbTypes.dir_name(_turn_manager.gravity)
 	visible = true
 

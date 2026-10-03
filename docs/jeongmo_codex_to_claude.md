@@ -38,6 +38,38 @@
 
 ## 미확인
 
+### [2026-10-04] 대상 #24 — 콤보 표시 단일 출처와 MAX COMBO 동기화
+- 상태: 완료
+- 브랜치 / PR: `m9-combo-display-sync` / [PR #23](https://github.com/jeongmo-dot/gravity_orb/pull/23) ([#23 PR #22](https://github.com/jeongmo-dot/gravity_orb/pull/22) 기반)
+- 변경 파일: `scenes/UI.tscn`, `scripts/core/{Main,ScoreManager,TurnManager}.gd`, `scripts/ui/{DebugHud,GameOverPanel,Hud}.gd`, `tests/scenarios/{test_game_over_measurement,test_jolt_integration,test_merge_scenario,test_score_flow,test_turn_manager,test_turn_time}.gd`, `tests/spike/run_jolt_3d_measurement.gd`, `docs/jeongmo_codex_to_claude.md`
+- 재현·원인:
+  - 수정 전 `ScoreManager`를 `TurnManager`보다 먼저 `CollisionResolver.reaction_applied`에 연결한 뒤 같은 턴 3회 반응을 발생시켰다. `TurnManager.turn_combo=3`인데 `ScoreManager.max_combo=1`, 점수 `12`(기대 `28`)로 재현됐다.
+  - 원인은 `TurnManager.on_reaction()`이 공유 반응 딕셔너리에 `combo`를 쓰고 `ScoreManager.on_reaction()`이 같은 신호에서 읽는 구조라, Godot 신호 구독 순서가 점수·MAX COMBO 결과를 결정한 것이다. HUD도 `combo_changed`와 `reaction_scored` 두 경로로 현재 콤보를 갱신해 표시 출처가 갈라져 있었다.
+- Done-when 대조:
+  - [x] 현재 턴 콤보·판 최대 콤보의 단일 출처를 `TurnManager`로 통합. `combo_changed(combo, multiplier, max_combo)` 하나로 HUD와 DebugHud를 갱신
+  - [x] 반응 흐름을 `CollisionResolver.reaction_applied → TurnManager.on_reaction → TurnManager.reaction_ready → ScoreManager.on_reaction`으로 고정. ScoreManager의 `max_combo`와 `max_combo_changed` 제거
+  - [x] HUD `COMBO 3 (x4)`, `MAX COMBO 3`; DebugHud `Combo: 3 (x4)`, `Max Combo: 3`; 게임오버 `MAX COMBO 2` 형식과 동일 값 자동 검증
+  - [x] 같은 턴 3회 반응, 입력 대기 중 반응, 다음 스와이프 현재 콤보 0/최대 유지, 새 Main 장면 재시작 0/0, 게임오버 패널을 라벨 문자열까지 자동 검증
+  - [x] R키가 Main 재시작에 연결되고 점수 reset을 발생시키는 기존 테스트 + 새 Main 장면의 콤보 0/최대 0 테스트로 재시작 경로 검증
+  - [x] #23 순차 연쇄에서 combo `[1,2]`, multiplier `[1,2]`, MAX `[1,2]`; 3단 연쇄에서 `[1,2,3]`, `[1,2,4]`, `[1,2,3]` 자동 검증
+  - [x] 점수 공식과 콤보 규칙을 바꾸지 않고 전체 회귀와 §10.1 필수 명령 3종 실행
+- QA 관측값:
+  - 재현 테스트 수정 전 → `8/9`, 종료 코드 1; 현재 콤보 `3`, MAX COMBO `1`, 점수 `12`(기대 `28`)
+  - 수정 후 동기 테스트 `test_score_flow.gd` → `10/10`, 순차 연쇄 `test_merge_scenario.gd` → `14/14`, TurnManager `8/8`, 종료 코드 모두 0
+  - Jolt 측정 스모크 → 종료 코드 0; 점수 단위 테스트 `5/5`, Jolt 3D 단위 `6/6`
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . -s res://tests/run_tests.gd` → `134/134`, 종료 코드 0
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --quit-after 300` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 최종 2D 22시드: 최대 침투 `10.595px`, 이탈·발산·벽 복구 `0/0/0`; 최종 3D 22시드: wall/pair `12.9515/14.2993px`, 이탈·발산 `0/0`
+  - 턴 시간 120턴: 상한 p50/max `1.504167/1.504167초`, 이탈·발산·벽 복구 `0/0/0`
+  - Windows 사용자 로그·루트 인증서·에디터 설정 저장 오류는 제한 실행 환경 메시지이며 프로젝트 스크립트 오류는 없음
+- 수동 확인 절차:
+  1. 한 턴에 반응을 3회 일으킨다 → HUD가 `COMBO 1 (x1)` → `COMBO 2 (x2)` → `COMBO 3 (x4)`로 오르고, HUD/디버그의 MAX가 동시에 1→2→3으로 오른다.
+  2. 다음 스와이프를 한다 → 현재 COMBO 표시는 사라지지만 `MAX COMBO 3`은 유지된다. 입력 대기 중 반응이 생기면 현재 COMBO가 다시 1부터 표시된다.
+  3. 게임오버 후 R키로 재시작한다 → 새 판의 현재 콤보와 MAX COMBO가 모두 0이고, 이후 첫 반응부터 세 표시가 같은 값으로 갱신된다.
+- 결정 사항: 인박스 예시 중 `TurnManager` 단일 출처와 명시적 `reaction_ready` 후속 신호 방식을 선택했다. 점수 계산은 기존 ScoreManager에 유지했고 점수 공식·밸런스 수치는 변경하지 않았다.
+- 남은 것 · 질문: 없음.
+
 ### [2026-10-04] 대상 #23 — 순차 연쇄 반응 잠금
 - 상태: 완료
 - 브랜치 / PR: `m9-chain-reaction-lock` / [PR #22](https://github.com/jeongmo-dot/gravity_orb/pull/22)
