@@ -77,7 +77,11 @@ func _update_label() -> void:
 		_turn_combo,
 		_format_multiplier(_combo_multiplier),
 		_max_combo,
-		ANNIHILATION_RULE_NAMES[Config.data.annihilation_rule],
+		(
+			"off"
+			if Config.data.opposite_pairs.is_empty()
+			else ANNIHILATION_RULE_NAMES[Config.data.annihilation_rule]
+		),
 		Config.data.spawn_count_for_turn(_turn_manager.turn_index + 1),
 		_turn_manager.settle_elapsed,
 		_spawner.seed_used,

@@ -383,6 +383,7 @@ func _assert_combo_labels(
 		debug_label.text.contains("Max Combo: %d" % max_combo),
 		"debug maximum combo text"
 	)
+	assert_true(debug_label.text.contains("Rule: off"), "debug shows disabled opposites")
 
 
 func _reaction(

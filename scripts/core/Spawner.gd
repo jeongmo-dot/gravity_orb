@@ -4,9 +4,12 @@ extends Node
 signal next_batch_changed(batch: Array[Dictionary])
 signal orb_spawned(level: int)
 
+const EFFECT_SEED_SALT: int = 0x25C01A
+
 var seed_used: int = 0
 
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var _effect_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _next_batch: Array[Dictionary] = []
 
 
@@ -19,7 +22,13 @@ func init_rng(seed: int) -> int:
 	else:
 		_rng.seed = seed
 	seed_used = _rng.seed
+	_effect_rng.seed = seed_used ^ EFFECT_SEED_SALT
 	return seed_used
+
+
+func next_shake_direction() -> Vector2:
+	var angle: float = _effect_rng.randf_range(-PI, PI)
+	return Vector2.from_angle(angle)
 
 
 func spawn_initial(board: Variant, gravity: Vector2i) -> void:

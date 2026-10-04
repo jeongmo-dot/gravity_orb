@@ -126,39 +126,95 @@ func apply_shockwave(
 	origin: Vector2,
 	result_level: int,
 	excluded_orb: Variant,
-	is_jackpot: bool
+	is_jackpot: bool,
+	result_color: int = OrbTypes.OrbColor.RED,
+	shake_direction_provider: Callable = Callable()
 ) -> Array[Dictionary]:
 	var result_radius: float = Config.data.radius_for_level(result_level)
-	var shock_radius: float = Config.data.shock_radius_factor * result_radius
 	var level_multiplier: float = (
 		1.0 + Config.data.shock_level_scale * float(result_level - 1)
 	)
 	var jackpot_multiplier: float = Config.data.shock_jackpot_scale if is_jackpot else 1.0
+	var effect_mode: GameConfig.ShockMode = GameConfig.ShockMode.PUSH
+	var impulse_scale: float = 1.0
+	var radius_factor: float = Config.data.shock_radius_factor
+	if Config.data.color_effects_enabled:
+		effect_mode = _shock_mode_for_color(result_color)
+		impulse_scale = _shock_color_value(
+			Config.data.shock_color_impulse_scale,
+			result_color,
+			1.0
+		)
+		radius_factor = _shock_color_value(
+			Config.data.shock_color_radius_factor,
+			result_color,
+			Config.data.shock_radius_factor
+		)
+	var shock_radius: float = radius_factor * result_radius
 	var targets: Array[Dictionary] = []
 	for orb: Orb3D in get_orbs():
 		if orb == excluded_orb or orb.is_ghost or orb.is_waiting_at_entrance:
 			continue
 		var offset: Vector2 = orb.position - origin
 		var distance: float = offset.length()
-		if is_zero_approx(distance) or distance >= shock_radius:
-			continue
-		var impulse_strength: float = (
-			Config.data.shock_impulse
-			* level_multiplier
-			* (1.0 - distance / shock_radius)
-			* jackpot_multiplier
-		)
-		var impulse: Vector2 = offset / distance * impulse_strength
+		var impulse: Vector2 = Vector2.ZERO
+		var velocity_change: Vector2 = Vector2.ZERO
+		if effect_mode == GameConfig.ShockMode.SHAKE:
+			var shake_speed: float = minf(
+				Config.data.green_shake_speed * level_multiplier * jackpot_multiplier,
+				Config.data.green_shake_max_speed * jackpot_multiplier
+			)
+			var shake_direction: Vector2 = _next_shake_direction(shake_direction_provider)
+			velocity_change = shake_direction * shake_speed
+			impulse = velocity_change * orb.get_physics_body().mass
+			orb.apply_plane_velocity_change(velocity_change)
+		else:
+			if is_zero_approx(distance) or shock_radius <= 0.0 or distance >= shock_radius:
+				continue
+			var impulse_strength: float = (
+				Config.data.shock_impulse
+				* impulse_scale
+				* level_multiplier
+				* (1.0 - distance / shock_radius)
+				* jackpot_multiplier
+			)
+			var direction: Vector2 = offset / distance
+			if effect_mode == GameConfig.ShockMode.PULL:
+				direction = -direction
+			elif effect_mode == GameConfig.ShockMode.LIFT:
+				direction = -Vector2(_gravity_direction).normalized()
+			impulse = direction * impulse_strength
+			if not impulse.is_zero_approx():
+				orb.apply_plane_impulse(impulse)
 		targets.append({
 			"orb": orb,
 			"stable_spawn_id": orb.stable_spawn_id,
 			"level": orb.level,
 			"position": orb.position,
+			"mode": effect_mode,
 			"impulse": impulse,
+			"velocity_change": velocity_change,
 		})
-		if not impulse.is_zero_approx():
-			orb.apply_plane_impulse(impulse)
 	return targets
+
+
+func _shock_mode_for_color(color: int) -> GameConfig.ShockMode:
+	if color < 0 or color >= Config.data.shock_color_modes.size():
+		return GameConfig.ShockMode.PUSH
+	return int(Config.data.shock_color_modes[color]) as GameConfig.ShockMode
+
+
+func _shock_color_value(values: PackedFloat32Array, color: int, fallback: float) -> float:
+	if color < 0 or color >= values.size():
+		return fallback
+	return values[color]
+
+
+func _next_shake_direction(provider: Callable) -> Vector2:
+	if not provider.is_valid():
+		return Vector2.RIGHT
+	var direction: Vector2 = provider.call() as Vector2
+	return Vector2.RIGHT if direction.is_zero_approx() else direction.normalized()
 
 
 func clear() -> void:

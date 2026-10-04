@@ -3,6 +3,7 @@ extends Resource
 
 enum SpawnPositionMode { RANDOM, CENTER }
 enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
+enum ShockMode { PUSH, PULL, SHAKE, LIFT }
 
 @export var board_size: float = 960.0
 @export var wall_thickness: float = 256.0
@@ -52,9 +53,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 @export var ghost_max_time: float = 0.6
 @export var ghost_alpha: float = 0.55
 @export var wall_penetration_limit: float = 16.0
-@export var opposite_pairs: Array[Vector2i] = [
-	Vector2i(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE),
-]
+@export var opposite_pairs: Array[Vector2i] = []
 @export var annihilation_rule: AnnihilationRule = AnnihilationRule.B_SAME_LEVEL
 @export var level_scores: PackedInt32Array = PackedInt32Array([2, 4, 8, 16, 32, 64, 128])
 @export var annihilation_score_factor: float = 0.5
@@ -66,6 +65,18 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 @export var shock_radius_factor: float = 2.5
 @export var shock_level_scale: float = 0.3
 @export var shock_jackpot_scale: float = 3.0
+@export var color_effects_enabled: bool = true
+@export var shock_color_modes: PackedInt32Array = PackedInt32Array(
+	[ShockMode.PUSH, ShockMode.PULL, ShockMode.SHAKE, ShockMode.LIFT]
+)
+@export var shock_color_impulse_scale: PackedFloat32Array = PackedFloat32Array(
+	[1.5, 0.8, 0.0, 1.0]
+)
+@export var shock_color_radius_factor: PackedFloat32Array = PackedFloat32Array(
+	[3.0, 3.0, 0.0, 3.0]
+)
+@export var green_shake_speed: float = 150.0
+@export var green_shake_max_speed: float = 600.0
 @export var chain_reaction_delay: float = 0.2
 
 

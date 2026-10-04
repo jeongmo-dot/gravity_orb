@@ -7,10 +7,12 @@ signal reaction_applied(reaction: Dictionary)
 
 var _pending: Array[Array] = []
 var _reaction_locks: Dictionary = {}
+var _spawner: Spawner = null
 
 
 func _ready() -> void:
 	_board.orb_contact.connect(report_contact)
+	_spawner = get_node_or_null("%Spawner") as Spawner
 
 
 func report_contact(a: Variant, b: Variant) -> void:
@@ -123,7 +125,13 @@ func flush(delta: float = 0.0) -> int:
 				reaction_position,
 				shock_level,
 				result_orb,
-				reaction_type == ReactionRules.Type.MAX_CLEAR
+				reaction_type == ReactionRules.Type.MAX_CLEAR,
+				result_color,
+				(
+					Callable(_spawner, "next_shake_direction")
+					if _spawner != null
+					else Callable()
+				)
 			)
 
 		var reaction: Dictionary = {

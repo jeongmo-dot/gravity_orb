@@ -181,6 +181,10 @@ func apply_plane_impulse(impulse: Vector2) -> void:
 	apply_central_impulse(impulse)
 
 
+func apply_plane_velocity_change(velocity_change: Vector2) -> void:
+	apply_central_impulse(velocity_change * mass)
+
+
 func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 	if is_waiting_at_entrance:
 		var waiting_transform: Transform2D = state.transform
