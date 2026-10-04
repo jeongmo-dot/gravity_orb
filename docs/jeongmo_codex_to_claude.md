@@ -40,7 +40,7 @@
 
 ### [2026-10-04] 대상 #26 — 턴당 1개 생성 + 미리보기 2턴치
 - 상태: 완료
-- 브랜치 / PR: `m9-one-spawn-two-turn-preview` / 생성 전
+- 브랜치 / PR: `m9-one-spawn-two-turn-preview` / https://github.com/jeongmo-dot/gravity_orb/pull/27
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scenes/UI.tscn`, `scripts/core/Spawner.gd`, `scripts/ui/Hud.gd`, `tests/{test_config,test_spawner,run_spawn_count_measurement.ps1}`, `tests/scenarios/{test_game_over,test_jolt_integration,test_score_flow,test_spawn_flow}.gd`, `tests/spike/run_jolt_3d_measurement.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `spawn_count_per_turn` 선언·기본 리소스를 `1`로 변경하고 `preview_turns=2` 새 필드와 config 테스트 추가. 2개 생성 시나리오는 값을 명시해 유지
