@@ -42,6 +42,7 @@ var _scan_pairs_each_frame: bool = false
 var _skip_determinism: bool = false
 var _turn_shock_events: Array[Dictionary] = []
 var _seed_reactions_by_color: Dictionary = {}
+var _seed_max_clear_count: int = 0
 
 
 func _ready() -> void:
@@ -185,6 +186,7 @@ func _run_seed(
 	shock_displacements: Dictionary
 ) -> Dictionary:
 	_seed_reactions_by_color = {"RED": 0, "BLUE": 0, "GREEN": 0, "YELLOW": 0}
+	_seed_max_clear_count = 0
 	var fixture: Dictionary = await _create_fixture(seed)
 	var fixture_root: Node = fixture["root"] as Node
 	var board: Board3D = fixture["board"] as Board3D
@@ -290,6 +292,7 @@ func _run_seed(
 		"max_combo": manager.max_combo,
 		"reactions_by_color": _seed_reactions_by_color.duplicate(),
 		"max_level_reached": score_manager.max_level_reached,
+		"max_clear_count": _seed_max_clear_count,
 		"aborted": aborted,
 		"abort_reason": abort_reason,
 		"hashes": hashes,
@@ -623,6 +626,8 @@ func _record_shock_event(reaction: Dictionary) -> void:
 		and reaction_type != ReactionRules.Type.MAX_CLEAR
 	):
 		return
+	if reaction_type == ReactionRules.Type.MAX_CLEAR:
+		_seed_max_clear_count += 1
 	var color: int = int(reaction["result_color"])
 	var color_names: Array[String] = ["RED", "BLUE", "GREEN", "YELLOW"]
 	if color >= 0 and color < color_names.size():
@@ -1021,6 +1026,10 @@ func _apply_arguments() -> void:
 			)
 		elif argument.begins_with("--jolt-output="):
 			_report_path = argument.trim_prefix("--jolt-output=")
+		elif argument.begins_with("--level-radii="):
+			Config.data.level_radii = _parse_float_list(
+				argument.trim_prefix("--level-radii=")
+			)
 		elif argument.begins_with("--mass-exponent="):
 			Config.data.mass_exponent = argument.trim_prefix("--mass-exponent=").to_float()
 		elif argument.begins_with("--gravity-level-scale="):
@@ -1075,4 +1084,11 @@ func _parse_int_list(csv: String) -> Array[int]:
 	var result: Array[int] = []
 	for raw_value: String in csv.split(",", false):
 		result.append(raw_value.strip_edges().to_int())
+	return result
+
+
+func _parse_float_list(csv: String) -> PackedFloat32Array:
+	var result: PackedFloat32Array = PackedFloat32Array()
+	for raw_value: String in csv.split(",", false):
+		result.append(raw_value.strip_edges().to_float())
 	return result
