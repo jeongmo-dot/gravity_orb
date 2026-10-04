@@ -167,15 +167,17 @@ func _configure_single_center_spawn() -> void:
 
 
 func _set_next_level_one_batch(spawner: Spawner, positions: Array[float]) -> void:
-	spawner._next_batch.clear()
+	spawner._preview_batches.clear()
+	var next_batch: Array[Dictionary] = []
 	for position_t: float in positions:
-		spawner._next_batch.append(
+		next_batch.append(
 			{
 				"color": OrbTypes.OrbColor.YELLOW,
 				"level": 1,
 				"t": position_t,
 			}
 		)
+	spawner._preview_batches.append(next_batch)
 
 
 func _fill_spawn_wall(board: Board, gravity: Vector2i, frozen: bool) -> void:

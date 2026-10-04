@@ -135,6 +135,60 @@ func test_ramp_draws_next_turn_batch_sizes_at_boundaries() -> void:
 	_restore_spawn_config(snapshot)
 
 
+func test_preview_turns_one_keeps_single_next_batch() -> void:
+	var snapshot: Dictionary = _snapshot_spawn_config()
+	Config.data.preview_turns = 1
+	Config.data.spawn_count_per_turn = 1
+	var spawner: Spawner = Spawner.new()
+	spawner.init_rng(9753)
+	spawner.sync_next_batch_size(1)
+	var preview: Array = spawner.peek_preview()
+	assert_eq(preview.size(), 1, "single preview batch")
+	assert_eq(preview[0], spawner.peek_next(), "single preview matches next batch")
+	spawner.free()
+	_restore_spawn_config(snapshot)
+
+
+func test_ramp_preview_batches_use_each_future_turn_number() -> void:
+	var snapshot: Dictionary = _snapshot_spawn_config()
+	Config.data.preview_turns = 2
+	Config.data.spawn_count_per_turn = 1
+	Config.data.spawn_count_ramp_turns = 40
+	Config.data.spawn_count_max = 3
+	var spawner: Spawner = Spawner.new()
+	spawner.init_rng(8642)
+	spawner.sync_next_batch_size(40)
+	var preview: Array = spawner.peek_preview()
+	assert_eq(preview.size(), 2, "two preview turns")
+	assert_eq((preview[0] as Array).size(), 1, "turn 40 preview size")
+	assert_eq((preview[1] as Array).size(), 2, "turn 41 preview size")
+	spawner.free()
+	_restore_spawn_config(snapshot)
+
+
+func test_sync_next_batch_size_updates_all_preview_batches() -> void:
+	var snapshot: Dictionary = _snapshot_spawn_config()
+	Config.data.preview_turns = 2
+	Config.data.spawn_count_per_turn = 1
+	Config.data.spawn_count_ramp_turns = 0
+	var spawner: Spawner = Spawner.new()
+	spawner.init_rng(6420)
+	spawner.sync_next_batch_size(1)
+	var before: Array = spawner.peek_preview()
+	Config.data.spawn_count_per_turn = 3
+	spawner.sync_next_batch_size(1)
+	var after: Array = spawner.peek_preview()
+	for index: int in range(after.size()):
+		assert_eq((after[index] as Array).size(), 3, "expanded batch %d" % index)
+		assert_eq(
+			(after[index] as Array)[0],
+			(before[index] as Array)[0],
+			"existing candidate preserved in batch %d" % index
+		)
+	spawner.free()
+	_restore_spawn_config(snapshot)
+
+
 func _draw_batched_sequence(seed: int, batch_size: int, batch_count: int) -> Array[Dictionary]:
 	Config.data.spawn_count_per_turn = batch_size
 	Config.data.spawn_count_ramp_turns = 0
@@ -164,6 +218,7 @@ func _snapshot_spawn_config() -> Dictionary:
 		"spawn_color_weights": Config.data.spawn_color_weights.duplicate(),
 		"spawn_position_mode": Config.data.spawn_position_mode,
 		"spawn_count_per_turn": Config.data.spawn_count_per_turn,
+		"preview_turns": Config.data.preview_turns,
 		"spawn_count_ramp_turns": Config.data.spawn_count_ramp_turns,
 		"spawn_count_max": Config.data.spawn_count_max,
 	}
@@ -174,5 +229,6 @@ func _restore_spawn_config(snapshot: Dictionary) -> void:
 	Config.data.spawn_color_weights = snapshot["spawn_color_weights"] as PackedFloat32Array
 	Config.data.spawn_position_mode = int(snapshot["spawn_position_mode"]) as GameConfig.SpawnPositionMode
 	Config.data.spawn_count_per_turn = int(snapshot["spawn_count_per_turn"])
+	Config.data.preview_turns = int(snapshot["preview_turns"])
 	Config.data.spawn_count_ramp_turns = int(snapshot["spawn_count_ramp_turns"])
 	Config.data.spawn_count_max = int(snapshot["spawn_count_max"])

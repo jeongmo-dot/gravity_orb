@@ -33,7 +33,8 @@ enum ShockMode { PUSH, PULL, SHAKE, LIFT }
 @export var allow_same_direction_swipe: bool = true
 @export var spawn_level_weights: PackedFloat32Array = PackedFloat32Array([0.9, 0.1])
 @export var spawn_color_weights: PackedFloat32Array = PackedFloat32Array([1.0, 1.0, 1.0, 1.0])
-@export var spawn_count_per_turn: int = 2
+@export var spawn_count_per_turn: int = 1
+@export var preview_turns: int = 2
 @export var spawn_count_ramp_turns: int = 0
 @export var spawn_count_max: int = 3
 @export var spawn_position_mode: SpawnPositionMode = SpawnPositionMode.RANDOM

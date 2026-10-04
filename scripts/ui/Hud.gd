@@ -6,6 +6,8 @@ const PREVIEW_REGION_SIZE: Vector2 = Vector2(280.0, 150.0)
 const PREVIEW_GAP: float = 16.0
 
 @onready var _next_preview: Node2D = %NextPreview
+@onready var _then_preview: Node2D = %ThenPreview
+@onready var _then_label: Label = %ThenLabel
 @onready var _score_label: Label = %ScoreLabel
 @onready var _best_label: Label = %BestLabel
 @onready var _max_combo_label: Label = %MaxComboLabel
@@ -20,8 +22,8 @@ var _score_manager: ScoreManager
 
 func bind_spawner(spawner: Spawner) -> void:
 	_spawner = spawner
-	_spawner.next_batch_changed.connect(_on_next_batch_changed)
-	_on_next_batch_changed(_spawner.peek_next())
+	_spawner.preview_changed.connect(_on_preview_changed)
+	_on_preview_changed(_spawner.peek_preview())
 
 
 func bind_score_manager(score_manager: ScoreManager) -> void:
@@ -48,9 +50,19 @@ func bind_game_state(
 	board.set_warning_directions(turn_manager.blocked_directions)
 
 
-func _on_next_batch_changed(batch: Array[Dictionary]) -> void:
-	for child: Node in _next_preview.get_children():
-		_next_preview.remove_child(child)
+func _on_preview_changed(batches: Array) -> void:
+	var next_batch: Array = batches[0] if not batches.is_empty() else []
+	_render_preview(_next_preview, next_batch)
+	var has_then: bool = batches.size() > 1
+	_then_label.visible = has_then
+	_then_preview.visible = has_then
+	var then_batch: Array = batches[1] if has_then else []
+	_render_preview(_then_preview, then_batch)
+
+
+func _render_preview(preview_root: Node2D, batch: Array) -> void:
+	for child: Node in preview_root.get_children():
+		preview_root.remove_child(child)
 		child.queue_free()
 
 	var preview_count: int = mini(batch.size(), MAX_PREVIEW_COUNT)
@@ -61,7 +73,8 @@ func _on_next_batch_changed(batch: Array[Dictionary]) -> void:
 	var natural_width: float = 0.0
 	var natural_height: float = 0.0
 	for index: int in range(preview_count):
-		var level: int = int(batch[index]["level"])
+		var candidate: Dictionary = batch[index] as Dictionary
+		var level: int = int(candidate["level"])
 		var radius: float = Config.data.radius_for_level(level)
 		radii.append(radius)
 		natural_width += radius * 2.0
@@ -78,10 +91,10 @@ func _on_next_batch_changed(batch: Array[Dictionary]) -> void:
 	)
 	var cursor_x: float = -natural_width * preview_scale * 0.5
 	for index: int in range(preview_count):
-		var candidate: Dictionary = batch[index]
+		var candidate: Dictionary = batch[index] as Dictionary
 		var radius: float = radii[index]
 		var visual: OrbVisual = OrbVisual.new()
-		_next_preview.add_child(visual)
+		preview_root.add_child(visual)
 		visual.setup(
 			Config.data.color_display[int(candidate["color"])],
 			radius
