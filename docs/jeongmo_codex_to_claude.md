@@ -40,7 +40,7 @@
 
 ### [2026-10-05] 대상 #22 추가 요구 1 — 턴당 1개 기준 큰 구체 반지름 재측정
 - 상태: 질문
-- 브랜치 / PR: `m9-large-orb-radius-remeasure` / 생성 전
+- 브랜치 / PR: `m9-large-orb-radius-remeasure` / https://github.com/jeongmo-dot/gravity_orb/pull/28
 - 변경 파일: `tests/run_radius_measurement.ps1`, `docs/jeongmo_codex_to_claude.md` (브랜치를 최신 `main` 위로 rebase하며 기존 `tests/spike/run_jolt_3d_measurement.gd` 계측 유지)
 - Done-when 대조:
   - [x] 기존 #22 브랜치를 #26 병합 뒤 최신 `main` 위로 rebase하고, 측정 결과에서 `spawn_count_per_turn=1`, `preview_turns=2`를 검증
