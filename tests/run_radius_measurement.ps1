@@ -24,8 +24,9 @@ if (-not $AggregateOnly) {
         & $GodotPath --headless --path $repoPath --fixed-fps 120 tests/spike/JoltMeasurement.tscn -- `
             --jolt-ticks=120 `
             --jolt-seeds=$seedCsv `
-            --jolt-max-turns=400 `
+            --jolt-max-turns=800 `
             --jolt-no-determinism `
+            --spawn-count=1 `
             --mass-exponent=2 `
             --gravity-level-scale=0.1 `
             --shock-impulse=600 `
@@ -85,6 +86,12 @@ function Get-LevelJam($Bin) {
 function Get-CaseSummary($Case) {
     $rawFile = Join-Path $artifactPath "radius_$($Case.name)_raw.json"
     $report = Get-Content -Raw -LiteralPath $rawFile | ConvertFrom-Json
+    if ([int]$report.spawn_count_per_turn -ne 1 -or [int]$report.preview_turns -ne 2) {
+        throw (
+            "Radius measurement '$($Case.name)' used unexpected spawn/preview config: " +
+            "$($report.spawn_count_per_turn)/$($report.preview_turns)"
+        )
+    }
     $tick = $report.ticks[0]
     $seedRows = @($tick.seeds)
     $turns = [double[]]@($seedRows | ForEach-Object { [double]$_.completed_turns })
@@ -142,6 +149,7 @@ function Get-CaseSummary($Case) {
         name = $Case.name
         level_radii_px = @($report.level_radii_px | ForEach-Object { [double]$_ })
         game_over_count = [int]$tick.game_over_count
+        turn_cap_count = @($seedRows | Where-Object { -not [bool]$_.game_over }).Count
         seed_count = $seedRows.Count
         aborted_count = [int]$tick.aborted_count
         game_length_turns = Get-Distribution $turns
@@ -150,6 +158,11 @@ function Get-CaseSummary($Case) {
         max_combo = Get-Distribution $maxCombos
         max_level = Get-Distribution $maxLevels
         l7_reached_seed_count = @($seedRows | Where-Object { [int]$_.max_level_reached -ge 7 }).Count
+        l7_reached_seeds = @(
+            $seedRows |
+                Where-Object { [int]$_.max_level_reached -ge 7 } |
+                ForEach-Object { [int]$_.seed }
+        )
         l7_jackpot_count = [int](($maxClearCounts | Measure-Object -Sum).Sum)
         max_clear_count = Get-Distribution $maxClearCounts
         max_wall_penetration_px = $maxWall
@@ -169,9 +182,11 @@ $summary = [ordered]@{
     physics_engine = "Jolt Physics"
     physics_ticks_per_second = 120
     seeds = @(101..112)
-    max_turns = 400
+    max_turns = 800
     independent_process_per_condition = $true
     config = [ordered]@{
+        spawn_count_per_turn = 1
+        preview_turns = 2
         mass_exponent = 2.0
         gravity_level_scale = 0.1
         shock_impulse = 600.0
