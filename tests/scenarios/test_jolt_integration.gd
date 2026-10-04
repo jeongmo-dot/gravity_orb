@@ -725,13 +725,15 @@ func _spawn_seeded_grid(
 
 
 func _set_next_level_one_batch(spawner: Spawner) -> void:
-	spawner._next_batch = [
+	spawner._preview_batches.clear()
+	var next_batch: Array[Dictionary] = [
 		{
 			"color": OrbTypes.OrbColor.YELLOW,
 			"level": 1,
 			"t": 0.5,
 		}
 	]
+	spawner._preview_batches.append(next_batch)
 
 
 func _wait_for_ready_or_game_over(manager: TurnManager) -> bool:

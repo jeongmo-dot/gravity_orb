@@ -156,6 +156,61 @@ func test_preview_matches_spawned_orb_and_spawn_line() -> void:
 	_restore_config(snapshot)
 
 
+func test_two_turn_preview_promotes_and_spawns_three_turns_in_order() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.spawn_count_per_turn = 1
+	Config.data.preview_turns = 2
+	_set_fast_settle()
+	var fixture: Dictionary = await _create_ready_fixture(4026)
+	var board: Board = fixture["board"] as Board
+	var spawner: Spawner = fixture["spawner"] as Spawner
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	var promoted_batch: Array = []
+	_arm_spawn_capture(manager, board)
+
+	for turn_offset: int in range(3):
+		var preview: Array = spawner.peek_preview()
+		assert_eq(preview.size(), 2, "preview queue turn %d" % (turn_offset + 1))
+		var next_batch: Array = preview[0] as Array
+		var then_batch: Array = preview[1] as Array
+		if not promoted_batch.is_empty():
+			assert_eq(next_batch, promoted_batch, "THEN promotes to NEXT")
+		var expected: Dictionary = next_batch[0] as Dictionary
+		promoted_batch = then_batch.duplicate(true)
+		_captured_spawn.clear()
+		manager.on_swipe(REPRO_DIRECTIONS[turn_offset])
+		await _wait_for_state(manager, TurnManager.State.SIMULATING)
+		assert_eq(_captured_spawn["color"], expected["color"], "preview color")
+		assert_eq(_captured_spawn["level"], expected["level"], "preview level")
+		await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
+
+	await _cleanup_fixture(fixture)
+	_restore_config(snapshot)
+
+
+func test_preview_turns_one_matches_single_batch_spawn() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.spawn_count_per_turn = 1
+	Config.data.preview_turns = 1
+	_set_fast_settle()
+	var fixture: Dictionary = await _create_ready_fixture(4027)
+	var board: Board = fixture["board"] as Board
+	var spawner: Spawner = fixture["spawner"] as Spawner
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	var preview: Array = spawner.peek_preview()
+	assert_eq(preview.size(), 1, "one preview turn")
+	var expected: Dictionary = (preview[0] as Array)[0] as Dictionary
+	_arm_spawn_capture(manager, board)
+	manager.on_swipe(Vector2i.RIGHT)
+	await _wait_for_state(manager, TurnManager.State.SIMULATING)
+	assert_eq(_captured_spawn["color"], expected["color"], "single preview color")
+	assert_eq(_captured_spawn["level"], expected["level"], "single preview level")
+	assert_eq(spawner.peek_preview().size(), 1, "single preview queue renewed")
+
+	await _cleanup_fixture(fixture)
+	_restore_config(snapshot)
+
+
 func test_count_two_spawns_whole_preview_batch_in_one_physics_frame() -> void:
 	var snapshot: Dictionary = _snapshot_config()
 	Config.data.spawn_count_per_turn = 2
@@ -641,6 +696,7 @@ func _snapshot_config() -> Dictionary:
 		"spawn_position_mode": Config.data.spawn_position_mode,
 		"initial_orb_count": Config.data.initial_orb_count,
 		"spawn_count_per_turn": Config.data.spawn_count_per_turn,
+		"preview_turns": Config.data.preview_turns,
 	}
 
 
@@ -650,6 +706,7 @@ func _restore_config(snapshot: Dictionary) -> void:
 	Config.data.spawn_position_mode = int(snapshot["spawn_position_mode"]) as GameConfig.SpawnPositionMode
 	Config.data.initial_orb_count = int(snapshot["initial_orb_count"])
 	Config.data.spawn_count_per_turn = int(snapshot["spawn_count_per_turn"])
+	Config.data.preview_turns = int(snapshot["preview_turns"])
 
 
 func _cleanup_fixture(fixture: Dictionary) -> void:

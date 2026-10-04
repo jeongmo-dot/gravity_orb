@@ -38,6 +38,45 @@
 
 ## 미확인
 
+### [2026-10-04] 대상 #26 — 턴당 1개 생성 + 미리보기 2턴치
+- 상태: 완료
+- 브랜치 / PR: `m9-one-spawn-two-turn-preview` / 생성 전
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scenes/UI.tscn`, `scripts/core/Spawner.gd`, `scripts/ui/Hud.gd`, `tests/{test_config,test_spawner,run_spawn_count_measurement.ps1}`, `tests/scenarios/{test_game_over,test_jolt_integration,test_score_flow,test_spawn_flow}.gd`, `tests/spike/run_jolt_3d_measurement.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `spawn_count_per_turn` 선언·기본 리소스를 `1`로 변경하고 `preview_turns=2` 새 필드와 config 테스트 추가. 2개 생성 시나리오는 값을 명시해 유지
+  - [x] `Spawner`를 앞으로 `preview_turns`개의 배치를 보관하는 큐로 전환. 생성은 큐[0]을 사용한 뒤 큐[1]을 승격하고 새 마지막 배치를 해당 미래 턴 번호로 추첨
+  - [x] 기존 `next_batch_changed`·`peek_next()` 유지, 전체 큐용 `preview_changed(batches)`·`peek_preview()` 추가
+  - [x] 실제 3턴 연속으로 THEN→NEXT 승격과 같은 색·레벨 생성을 추적. `preview_turns=1`, 같은 시드 2회, ramp 40→41턴 배치 크기 1→2, F3 변경 시 모든 큐 배치 크기 동기화 자동 검증
+  - [x] HUD에 `NEXT`와 `THEN`을 표시. THEN은 NEXT 대비 0.6배·알파 0.5이며 양쪽 색·레벨·배치 수가 큐와 일치. HUD·라벨 `mouse_filter=IGNORE` 자동 검증
+  - [x] Jolt 3D 120Hz, seeds 101~112, 게임오버 또는 800턴, 조건별 독립 프로세스로 새 기본 1개와 #25 기준 2개 측정
+  - [x] 기존 3D 22시드·20턴·120턴, 점수 흐름과 전체 회귀 및 필수 명령 3종 실행
+- 12시드 측정 (`#21` 무게감·`#25` 색 효과 ON/상극 없음, 반지름 current, 조건별 독립 프로세스):
+
+| 턴당 생성 | 게임오버 / 800턴 | 길이 p50 (범위/평균) | 종료 점유율 평균 (범위) | 점수 p50 (범위/평균) | 최대 콤보 p50/최대 | 최고 레벨 p50/최대 | L7 도달 seed / 잭팟 | wall/pair px | 이탈/발산 |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 (새 기본) | 12/12 / 0 | 281 (264~301/282.25) | 82.1092% (77.8666~85.5620) | 6,500 (4,991~16,403/7,414.42) | 5/6 | 6/7 | 1/0 | 26.2275/53.0296 | 0/0 |
+| 2 (#25 기준) | 12/12 / 0 | 136 (130~143/136.00) | 81.7534% (79.8352~83.2781) | 8,286 (4,903~15,452/9,637.92) | 7/8 | 6/6 | 0/0 | 22.0909/53.6725 | 0/0 |
+
+- 점유율 구간별 체류 턴 수 (`0~20 / 20~40 / 40~60 / 60%+`): 새 기본 1개 `743 / 829 / 889 / 926`턴 (`21.94 / 24.48 / 26.25 / 27.34%`), 2개 `370 / 401 / 401 / 460`턴 (`22.67 / 24.57 / 24.57 / 28.19%`).
+- 관측: 1개 생성은 2개 대비 게임 길이 p50이 `+145턴`(`2.066×`)이고 800턴 상한 도달은 없었다. L7은 seed 101 한 번 도달했으나 MAX_CLEAR는 없었다. 최대 콤보와 점수 p50은 각각 `7→5`, `8,286→6,500`으로 낮아졌다.
+- QA 관측값:
+  - config `10/10`, Spawner 큐 `10/10`, 실제 생성 흐름 `10/10`, HUD·점수 흐름 `10/10`, 게임오버 픽스처 `5/5`; 종료 코드 모두 0
+  - `tests/run_spawn_count_measurement.ps1` → 종료 코드 0. 양쪽 게임오버 `12/12`, 800턴 도달·중단 `0/0`; 상세 원본·집계는 로컬 `artifacts/spawn_count_*_raw.json`, `artifacts/spawn_count_measurement_summary.json`
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . -s res://tests/run_tests.gd` → `147/147`, 종료 코드 0
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --quit-after 300` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 최종 2D 22시드: 최대 침투 `10.595px`, 이탈·발산·벽 복구 `0/0/0`; 최종 3D 22시드: wall/pair `12.9515/12.8586px`, 이탈·발산 `0/0`
+  - 120턴 턴 시간: 상한 p50/max `1.504167/1.504167초`, 이탈·발산·벽 복구 `0/0/0`
+  - 규칙 점검 → `Input`/`InputEvent`는 `InputRouter.gd`만, 난수 호출은 `Spawner.gd`만 검출
+  - Windows 사용자 로그·루트 인증서·에디터 설정 저장 오류는 제한 실행 환경 메시지이며 프로젝트 스크립트 오류는 없음
+- 수동 확인 절차:
+  1. 게임을 시작해 NEXT와 THEN을 비교한다 → NEXT는 기존 크기·불투명도, THEN은 아래쪽에 0.6배·알파 0.5로 표시된다.
+  2. NEXT의 색·크기와 THEN의 색·크기를 기억하고 스와이프한다 → 기존 NEXT가 생성되고 기존 THEN이 같은 색·레벨로 NEXT 자리에 올라온다. 다시 스와이프하면 그 구체가 생성된다.
+  3. NEXT·THEN 영역에서 시작하거나 그 위를 가로질러 네 방향으로 드래그한다 → HUD가 입력을 막지 않고 스와이프가 인식된다.
+  4. 디버그 빌드에서 F3를 누른다 → NEXT와 THEN의 공 개수가 모두 같은 턴당 생성 수로 함께 바뀐다.
+- 결정 사항: `preview_turns`가 1 미만으로 런타임 변경돼도 최소 1개 큐를 유지한다. F3로 배치를 늘릴 때 이미 보인 후보는 유지하고 부족한 후보만 각 배치 뒤에 RNG로 추가한다. 기존 공개 API와 경고 계산은 큐[0] 기준으로 유지했다. 브랜치에는 Claude 작성 설계 커밋 `c81e4bd`가 먼저 포함됐으며 Codex는 해당 설계 문서를 수정하지 않았다.
+- 남은 것 · 질문: 자동 검증·측정 기준의 미완료 항목 없음. NEXT/THEN의 실제 화면 배치와 체감은 위 수동 절차로 확인 필요.
+
 ### [2026-10-04] 대상 #25 — 색별 합체 효과 4종과 기본 상극 소멸 폐지
 - 상태: 질문
 - 브랜치 / PR: `m9-color-merge-effects` / [PR #25](https://github.com/jeongmo-dot/gravity_orb/pull/25)

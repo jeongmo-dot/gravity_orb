@@ -76,7 +76,8 @@ func test_m4_spawn_defaults() -> void:
 		PackedFloat32Array([1.0, 1.0, 1.0, 1.0]),
 		"color weights"
 	)
-	assert_eq(config.spawn_count_per_turn, 2, "spawn count per turn")
+	assert_eq(config.spawn_count_per_turn, 1, "spawn count per turn")
+	assert_eq(config.preview_turns, 2, "preview turns")
 	assert_eq(config.spawn_count_ramp_turns, 0, "spawn count ramp disabled")
 	assert_eq(config.spawn_count_max, 3, "spawn count maximum")
 	assert_eq(config.spawn_position_mode, GameConfig.SpawnPositionMode.RANDOM, "position mode")

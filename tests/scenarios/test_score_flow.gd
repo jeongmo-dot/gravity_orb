@@ -165,7 +165,9 @@ func test_restart_request_resets_score_and_preserves_best_and_rule() -> void:
 
 func test_main_scene_binds_score_hud_and_restart() -> void:
 	var original_spawn_count: int = Config.data.spawn_count_per_turn
-	Config.data.spawn_count_per_turn = 3
+	var original_preview_turns: int = Config.data.preview_turns
+	Config.data.spawn_count_per_turn = 1
+	Config.data.preview_turns = 2
 	var main: Main = MAIN_SCENE.instantiate() as Main
 	var score_manager: ScoreManager = main.get_node("ScoreManager") as ScoreManager
 	score_manager.save_path = ""
@@ -182,8 +184,17 @@ func test_main_scene_binds_score_hud_and_restart() -> void:
 	var combo_label: Label = main.get_node("UI/Hud/ComboLabel") as Label
 	var danger_label: Label = main.get_node("UI/Hud/DangerLabel") as Label
 	var spawner: Spawner = main.get_node("Spawner") as Spawner
+	var hud: Control = main.get_node("UI/Hud") as Control
+	var next_label: Label = main.get_node("UI/Hud/NextLabel") as Label
 	var next_preview: Node2D = main.get_node("UI/Hud/NextPreview") as Node2D
+	var then_label: Label = main.get_node("UI/Hud/ThenLabel") as Label
+	var then_preview: Node2D = main.get_node("UI/Hud/ThenPreview") as Node2D
 	_assert_combo_labels(main, 0, 0, "x1")
+	main._cycle_spawn_count()
+	var two_item_preview: Array = spawner.peek_preview()
+	for batch_value: Variant in two_item_preview:
+		assert_eq((batch_value as Array).size(), 2, "F3 updates every batch to two")
+	main._cycle_spawn_count()
 
 	manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 0, [1, 1], 2))
 	_assert_combo_labels(main, 1, 1, "x1")
@@ -212,21 +223,30 @@ func test_main_scene_binds_score_hud_and_restart() -> void:
 	assert_eq(score_label.mouse_filter, Control.MOUSE_FILTER_IGNORE, "score ignores pointer")
 	assert_eq(best_label.mouse_filter, Control.MOUSE_FILTER_IGNORE, "best ignores pointer")
 	assert_eq(max_combo_label.mouse_filter, Control.MOUSE_FILTER_IGNORE, "combo ignores pointer")
-	var next_batch: Array[Dictionary] = spawner.peek_next()
+	var preview_batches: Array = spawner.peek_preview()
+	assert_eq(preview_batches.size(), 2, "NEXT and THEN batches")
+	var next_batch: Array = preview_batches[0] as Array
+	var then_batch: Array = preview_batches[1] as Array
 	assert_eq(next_batch.size(), 3, "three-item next batch")
+	assert_eq(then_batch.size(), 3, "three-item then batch")
 	assert_eq(next_preview.get_child_count(), 3, "three preview visuals")
-	for index: int in range(mini(next_batch.size(), next_preview.get_child_count())):
-		var visual: OrbVisual = next_preview.get_child(index) as OrbVisual
-		assert_near(
-			visual.get_radius(),
-			Config.data.radius_for_level(int(next_batch[index]["level"])),
-			0.001,
-			"preview radius %d" % index
-		)
+	assert_eq(then_preview.get_child_count(), 3, "three THEN visuals")
+	_assert_preview_visuals(next_preview, next_batch, "NEXT")
+	_assert_preview_visuals(then_preview, then_batch, "THEN")
+	assert_eq(next_label.text, "NEXT", "next label")
+	assert_eq(then_label.text, "THEN", "then label")
+	assert_near(then_preview.scale.x, 0.6, 0.001, "THEN horizontal scale")
+	assert_near(then_preview.scale.y, 0.6, 0.001, "THEN vertical scale")
+	assert_near(then_preview.modulate.a, 0.5, 0.001, "THEN preview alpha")
+	assert_near(then_label.modulate.a, 0.5, 0.001, "THEN label alpha")
+	assert_eq(hud.mouse_filter, Control.MOUSE_FILTER_IGNORE, "HUD ignores pointer")
+	assert_eq(next_label.mouse_filter, Control.MOUSE_FILTER_IGNORE, "NEXT ignores pointer")
+	assert_eq(then_label.mouse_filter, Control.MOUSE_FILTER_IGNORE, "THEN ignores pointer")
 	main.queue_free()
 	await tree.process_frame
 	InputRouter.set_locked(false)
 	Config.data.spawn_count_per_turn = original_spawn_count
+	Config.data.preview_turns = original_preview_turns
 
 
 func test_game_over_panel_shows_scores_direction_and_restart_button() -> void:
@@ -354,6 +374,28 @@ func _find_active_level(board: Board, level: int, excluded: Orb) -> Orb:
 		if orb != excluded and orb.level == level:
 			return orb
 	return null
+
+
+func _assert_preview_visuals(
+	preview_root: Node2D,
+	batch: Array,
+	label: String
+) -> void:
+	assert_eq(preview_root.get_child_count(), batch.size(), "%s visual count" % label)
+	for index: int in range(mini(batch.size(), preview_root.get_child_count())):
+		var candidate: Dictionary = batch[index] as Dictionary
+		var visual: OrbVisual = preview_root.get_child(index) as OrbVisual
+		assert_near(
+			visual.get_radius(),
+			Config.data.radius_for_level(int(candidate["level"])),
+			0.001,
+			"%s radius %d" % [label, index]
+		)
+		assert_eq(
+			visual._display_color,
+			Config.data.color_display[int(candidate["color"])],
+			"%s color %d" % [label, index]
+		)
 
 
 func _assert_combo_labels(
