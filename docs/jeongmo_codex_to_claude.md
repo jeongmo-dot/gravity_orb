@@ -40,7 +40,7 @@
 
 ### [2026-10-04] 대상 #25 — 색별 합체 효과 4종과 기본 상극 소멸 폐지
 - 상태: 질문
-- 브랜치 / PR: `m9-color-merge-effects` / 생성 예정
+- 브랜치 / PR: `m9-color-merge-effects` / [PR #25](https://github.com/jeongmo-dot/gravity_orb/pull/25)
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/{Board,CollisionResolver,Orb,Spawner}.gd`, `scripts/spike/{Board3D,Orb3D}.gd`, `scripts/ui/DebugHud.gd`, `tests/{test_config,test_rules,test_shockwave,run_color_effect_measurement.ps1}`, `tests/scenarios/{test_annihilation_scenario,test_jolt_integration,test_merge_scenario,test_score_flow}.gd`, `tests/spike/run_jolt_3d_measurement.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 2D/3D 공통 합체 효과를 결과 색 기준 `PUSH/PULL/SHAKE/LIFT`로 구현. 빨강은 바깥, 파랑은 안쪽, 초록은 판 전체 질량 독립 `Δv`, 노랑은 현재 중력 반대 방향
