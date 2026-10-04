@@ -79,7 +79,7 @@
 
 ### [2026-10-04] 대상 #22 — 큰 구체 반지름 Jolt 3D 재측정
 - 상태: 질문
-- 브랜치 / PR: `m9-large-orb-radius-remeasure` / 생성 전
+- 브랜치 / PR: `m9-large-orb-radius-remeasure` / [PR #26](https://github.com/jeongmo-dot/gravity_orb/pull/26)
 - 변경 파일: `tests/spike/run_jolt_3d_measurement.gd`, `tests/run_radius_measurement.ps1`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] #21 확정 무게감(`mass_exponent=2`, `gravity_level_scale=0.1`, 충격 `600/2.5/0.3/3`)과 #25 확정 색 효과 ON·상극 없음 위에서 current/reduced를 비교
