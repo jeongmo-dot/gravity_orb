@@ -41,6 +41,7 @@ var _record_seed_hashes: bool = false
 var _scan_pairs_each_frame: bool = false
 var _skip_determinism: bool = false
 var _turn_shock_events: Array[Dictionary] = []
+var _seed_reactions_by_color: Dictionary = {}
 
 
 func _ready() -> void:
@@ -63,6 +64,15 @@ func _run() -> void:
 		"shock_radius_factor": Config.data.shock_radius_factor,
 		"shock_level_scale": Config.data.shock_level_scale,
 		"shock_jackpot_scale": Config.data.shock_jackpot_scale,
+		"color_effects_enabled": Config.data.color_effects_enabled,
+		"opposite_pairs": Config.data.opposite_pairs.map(
+			func(pair: Vector2i) -> Array[int]: return [pair.x, pair.y]
+		),
+		"shock_color_modes": Array(Config.data.shock_color_modes),
+		"shock_color_impulse_scale": Array(Config.data.shock_color_impulse_scale),
+		"shock_color_radius_factor": Array(Config.data.shock_color_radius_factor),
+		"green_shake_speed": Config.data.green_shake_speed,
+		"green_shake_max_speed": Config.data.green_shake_max_speed,
 		"level_radii_px": Array(Config.data.level_radii),
 		"corrections": {
 			"reaction_ghost": _reaction_ghost_enabled,
@@ -174,6 +184,7 @@ func _run_seed(
 	rearrangement_values: Array[float],
 	shock_displacements: Dictionary
 ) -> Dictionary:
+	_seed_reactions_by_color = {"RED": 0, "BLUE": 0, "GREEN": 0, "YELLOW": 0}
 	var fixture: Dictionary = await _create_fixture(seed)
 	var fixture_root: Node = fixture["root"] as Node
 	var board: Board3D = fixture["board"] as Board3D
@@ -277,6 +288,7 @@ func _run_seed(
 		"final_orb_count": board.get_orbs().size(),
 		"score": score_manager.score,
 		"max_combo": manager.max_combo,
+		"reactions_by_color": _seed_reactions_by_color.duplicate(),
 		"max_level_reached": score_manager.max_level_reached,
 		"aborted": aborted,
 		"abort_reason": abort_reason,
@@ -611,6 +623,13 @@ func _record_shock_event(reaction: Dictionary) -> void:
 		and reaction_type != ReactionRules.Type.MAX_CLEAR
 	):
 		return
+	var color: int = int(reaction["result_color"])
+	var color_names: Array[String] = ["RED", "BLUE", "GREEN", "YELLOW"]
+	if color >= 0 and color < color_names.size():
+		var color_name: String = color_names[color]
+		_seed_reactions_by_color[color_name] = (
+			int(_seed_reactions_by_color.get(color_name, 0)) + 1
+		)
 	var targets: Array[Dictionary] = reaction["shock_targets"] as Array[Dictionary]
 	_turn_shock_events.append({"targets": targets})
 
@@ -1022,6 +1041,16 @@ func _apply_arguments() -> void:
 			Config.data.shock_jackpot_scale = argument.trim_prefix(
 				"--shock-jackpot-scale="
 			).to_float()
+		elif argument == "--color-effects=on":
+			Config.data.color_effects_enabled = true
+		elif argument == "--color-effects=off":
+			Config.data.color_effects_enabled = false
+		elif argument == "--opposites=none":
+			Config.data.opposite_pairs = []
+		elif argument == "--opposites=red-blue":
+			Config.data.opposite_pairs = [
+				Vector2i(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE),
+			]
 		elif argument == "--jolt-no-ccd":
 			_continuous_cd_enabled = false
 		elif argument == "--jolt-allow-sleep":

@@ -36,6 +36,7 @@ func test_same_color_max_level_clears_both() -> void:
 
 func test_rule_a_annihilates_every_red_blue_level_pair() -> void:
 	var cfg: GameConfig = GameConfig.new()
+	_enable_red_blue(cfg)
 	cfg.annihilation_rule = GameConfig.AnnihilationRule.A_BOTH
 	for red_level: int in range(1, cfg.orb_max_level + 1):
 		for blue_level: int in range(1, cfg.orb_max_level + 1):
@@ -51,6 +52,7 @@ func test_rule_a_annihilates_every_red_blue_level_pair() -> void:
 
 func test_rule_b_annihilates_only_equal_red_blue_levels() -> void:
 	var cfg: GameConfig = GameConfig.new()
+	_enable_red_blue(cfg)
 	cfg.annihilation_rule = GameConfig.AnnihilationRule.B_SAME_LEVEL
 	for red_level: int in range(1, cfg.orb_max_level + 1):
 		for blue_level: int in range(1, cfg.orb_max_level + 1):
@@ -72,6 +74,7 @@ func test_rule_b_annihilates_only_equal_red_blue_levels() -> void:
 
 func test_rule_c_uses_larger_orb_color_level_difference_and_input_side() -> void:
 	var cfg: GameConfig = GameConfig.new()
+	_enable_red_blue(cfg)
 	cfg.annihilation_rule = GameConfig.AnnihilationRule.C_REMAINDER
 	var red_larger: Dictionary = ReactionRules.classify(
 		OrbTypes.OrbColor.RED,
@@ -116,6 +119,18 @@ func test_green_yellow_level_one_has_no_reaction_under_rule_b() -> void:
 	assert_eq(result["type"], ReactionRules.Type.NONE, "green-yellow rule B")
 
 
+func test_default_red_blue_same_level_has_no_reaction() -> void:
+	var cfg: GameConfig = GameConfig.new()
+	var result: Dictionary = ReactionRules.classify(
+		OrbTypes.OrbColor.RED,
+		1,
+		OrbTypes.OrbColor.BLUE,
+		1,
+		cfg
+	)
+	assert_eq(result["type"], ReactionRules.Type.NONE, "default red-blue disabled")
+
+
 func test_yellow_same_level_merges() -> void:
 	var cfg: GameConfig = GameConfig.new()
 	var result: Dictionary = ReactionRules.classify(
@@ -146,6 +161,7 @@ func test_same_color_merge_has_precedence_over_configured_opposite_pair() -> voi
 
 func test_rule_change_is_read_on_each_classification() -> void:
 	var cfg: GameConfig = GameConfig.new()
+	_enable_red_blue(cfg)
 	cfg.annihilation_rule = GameConfig.AnnihilationRule.A_BOTH
 	var under_a: Dictionary = ReactionRules.classify(
 		OrbTypes.OrbColor.RED,
@@ -165,6 +181,12 @@ func test_rule_change_is_read_on_each_classification() -> void:
 		cfg
 	)
 	assert_eq(under_b["type"], ReactionRules.Type.NONE, "rule B after change")
+
+
+func _enable_red_blue(cfg: GameConfig) -> void:
+	cfg.opposite_pairs = [
+		Vector2i(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE),
+	]
 
 
 func _assert_annihilation(

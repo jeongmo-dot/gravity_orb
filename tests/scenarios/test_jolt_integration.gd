@@ -74,6 +74,10 @@ func test_merge_result_ghost_can_be_enabled_and_disabled() -> void:
 
 func test_rule_c_remainder_uses_shared_score_and_ghost_path() -> void:
 	var previous_rule: GameConfig.AnnihilationRule = Config.data.annihilation_rule
+	var previous_pairs: Array[Vector2i] = Config.data.opposite_pairs.duplicate()
+	Config.data.opposite_pairs = [
+		Vector2i(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE),
+	]
 	Config.data.annihilation_rule = GameConfig.AnnihilationRule.C_REMAINDER
 	var fixture: Dictionary = await _create_fixture(false, true)
 	var board: Board3D = fixture["board"] as Board3D
@@ -89,10 +93,13 @@ func test_rule_c_remainder_uses_shared_score_and_ghost_path() -> void:
 	assert_true(result.is_ghost, "rule C survivor enters ghost state")
 	assert_true(score.score > 0, "shared ScoreManager receives reaction")
 	Config.data.annihilation_rule = previous_rule
+	Config.data.opposite_pairs = previous_pairs
 	await _cleanup_fixture(fixture)
 
 
 func test_reaction_ghost_times_out_without_position_correction() -> void:
+	var effects_enabled: bool = Config.data.color_effects_enabled
+	Config.data.color_effects_enabled = false
 	var fixture: Dictionary = await _create_fixture(false, true)
 	var board: Board3D = fixture["board"] as Board3D
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
@@ -124,6 +131,7 @@ func test_reaction_ghost_times_out_without_position_correction() -> void:
 	assert_eq(board.ghost_timeout_count, 1, "reaction ghost timeout is measured")
 	assert_true(result.position.is_finite(), "timeout does not apply divergent correction")
 	await _cleanup_fixture(fixture)
+	Config.data.color_effects_enabled = effects_enabled
 
 
 func test_shared_turn_path_completes_twenty_3d_turns() -> void:

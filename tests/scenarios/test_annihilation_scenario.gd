@@ -171,6 +171,9 @@ func test_rule_change_affects_only_subsequent_flushes() -> void:
 
 func _create_fixture() -> Dictionary:
 	_reactions.clear()
+	Config.data.opposite_pairs = [
+		Vector2i(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE),
+	]
 	var fixture_root: Node = Node.new()
 	fixture_root.name = "AnnihilationFixture"
 
@@ -218,6 +221,7 @@ func _cleanup_fixture(fixture: Dictionary) -> void:
 	var fixture_root: Node = fixture["root"] as Node
 	fixture_root.queue_free()
 	await tree.process_frame
+	Config.data.opposite_pairs = []
 
 
 func _reaction_chains() -> Array[int]:

@@ -128,25 +128,15 @@ func test_m5_plus_tuning_defaults() -> void:
 
 func test_m6_annihilation_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
-	assert_eq(config.opposite_pairs.size(), 1, "opposite pair count")
-	if config.opposite_pairs.size() == 1:
-		assert_eq(
-			config.opposite_pairs[0],
-			Vector2i(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE),
-			"red-blue opposite pair"
-		)
+	assert_eq(config.opposite_pairs.size(), 0, "opposite pairs disabled by default")
 	assert_eq(
 		config.annihilation_rule,
 		GameConfig.AnnihilationRule.B_SAME_LEVEL,
 		"default annihilation rule"
 	)
 	assert_true(
-		config.is_opposite(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE),
-		"opposite pair forward"
-	)
-	assert_true(
-		config.is_opposite(OrbTypes.OrbColor.BLUE, OrbTypes.OrbColor.RED),
-		"opposite pair reverse"
+		not config.is_opposite(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE),
+		"red-blue is not opposite by default"
 	)
 	assert_true(
 		not config.is_opposite(OrbTypes.OrbColor.GREEN, OrbTypes.OrbColor.YELLOW),
@@ -184,6 +174,29 @@ func test_m7_score_defaults() -> void:
 	assert_near(config.shock_radius_factor, 2.5, TOLERANCE, "shock radius factor")
 	assert_near(config.shock_level_scale, 0.3, TOLERANCE, "shock level scale")
 	assert_near(config.shock_jackpot_scale, 3.0, TOLERANCE, "shock jackpot scale")
+	assert_true(config.color_effects_enabled, "color effects enabled")
+	assert_eq(
+		config.shock_color_modes,
+		PackedInt32Array([
+			GameConfig.ShockMode.PUSH,
+			GameConfig.ShockMode.PULL,
+			GameConfig.ShockMode.SHAKE,
+			GameConfig.ShockMode.LIFT,
+		]),
+		"color effect modes"
+	)
+	assert_eq(
+		config.shock_color_impulse_scale,
+		PackedFloat32Array([1.5, 0.8, 0.0, 1.0]),
+		"color impulse scales"
+	)
+	assert_eq(
+		config.shock_color_radius_factor,
+		PackedFloat32Array([3.0, 3.0, 0.0, 3.0]),
+		"color radius factors"
+	)
+	assert_near(config.green_shake_speed, 150.0, TOLERANCE, "green shake speed")
+	assert_near(config.green_shake_max_speed, 600.0, TOLERANCE, "green shake cap")
 	assert_near(config.chain_reaction_delay, 0.2, TOLERANCE, "chain reaction delay")
 	for level: int in range(1, config.orb_max_level + 1):
 		assert_eq(

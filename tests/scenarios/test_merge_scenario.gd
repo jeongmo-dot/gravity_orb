@@ -248,7 +248,67 @@ func test_three_stage_chain_waits_between_every_reaction() -> void:
 	await _cleanup_fixture(fixture)
 
 
+func test_each_delayed_chain_merge_applies_its_color_effect() -> void:
+	var fixture: Dictionary = await _create_fixture()
+	var board: Board = fixture["board"] as Board
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	board.set_gravity(Vector2i.DOWN)
+	var radius_one: float = Config.data.radius_for_level(1)
+	var first: Orb = board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		1,
+		Vector2(-radius_one + 0.5, 0.0)
+	)
+	var second: Orb = board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		1,
+		Vector2(radius_one - 0.5, 0.0)
+	)
+	var partner: Orb = board.spawn_orb(OrbTypes.OrbColor.RED, 2, Vector2.ZERO)
+	var observer: Orb = board.spawn_orb(
+		OrbTypes.OrbColor.BLUE,
+		1,
+		Vector2(100.0, 0.0)
+	)
+	partner.exit_ghost_state()
+	observer.exit_ghost_state()
+	resolver.report_contact(first, second)
+	assert_eq(resolver.flush(), 1, "first delayed color reaction")
+	var tick: float = 1.0 / float(Engine.physics_ticks_per_second)
+	var delay_frames: int = roundi(Config.data.chain_reaction_delay / tick)
+	for frame_index: int in range(delay_frames):
+		var applied: int = resolver.flush(tick)
+		if frame_index == delay_frames - 1:
+			assert_eq(applied, 1, "second delayed color reaction")
+	assert_eq(_reactions.size(), 2, "two delayed color reactions")
+	if _reactions.size() == 2:
+		for reaction_index: int in range(2):
+			var targets: Array[Dictionary] = (
+				_reactions[reaction_index]["shock_targets"] as Array[Dictionary]
+			)
+			var observer_effect: Dictionary = {}
+			for target_info: Dictionary in targets:
+				if int(target_info["stable_spawn_id"]) == observer.stable_spawn_id:
+					observer_effect = target_info
+					break
+			assert_true(
+				not observer_effect.is_empty(),
+				"chain reaction %d affects observer" % (reaction_index + 1)
+			)
+			if not observer_effect.is_empty():
+				assert_eq(
+					int(observer_effect["mode"]),
+					GameConfig.ShockMode.PUSH,
+					"chain reaction %d uses red PUSH" % (reaction_index + 1)
+				)
+	await _cleanup_fixture(fixture)
+
+
 func test_locked_contact_that_separates_is_not_replayed() -> void:
+	var previous_pairs: Array[Vector2i] = Config.data.opposite_pairs.duplicate()
+	Config.data.opposite_pairs = [
+		Vector2i(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE),
+	]
 	var fixture: Dictionary = await _create_fixture()
 	var board: Board = fixture["board"] as Board
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
@@ -283,6 +343,7 @@ func test_locked_contact_that_separates_is_not_replayed() -> void:
 	assert_eq(_reactions.size(), 1, "separated locked contact is not replayed")
 	assert_true(not resolver.has_pending_reactions(), "separated pair no longer blocks stability")
 	await _cleanup_fixture(fixture)
+	Config.data.opposite_pairs = previous_pairs
 
 
 func test_new_contact_during_lock_reacts_on_unlock() -> void:
@@ -394,6 +455,10 @@ func test_independent_simultaneous_merges_advance_combo() -> void:
 
 
 func test_annihilation_advances_combo() -> void:
+	var previous_pairs: Array[Vector2i] = Config.data.opposite_pairs.duplicate()
+	Config.data.opposite_pairs = [
+		Vector2i(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE),
+	]
 	var fixture: Dictionary = await _create_fixture()
 	var board: Board = fixture["board"] as Board
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
@@ -408,6 +473,7 @@ func test_annihilation_advances_combo() -> void:
 		assert_eq(_reactions[0]["type"], ReactionRules.Type.ANNIHILATE, "annihilation type")
 		assert_eq(_reactions[0]["combo"], 1, "annihilation combo")
 	await _cleanup_fixture(fixture)
+	Config.data.opposite_pairs = previous_pairs
 
 
 func test_max_level_pair_clears_without_result() -> void:

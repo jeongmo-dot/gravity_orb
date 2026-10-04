@@ -38,6 +38,53 @@
 
 ## 미확인
 
+### [2026-10-04] 대상 #25 — 색별 합체 효과 4종과 기본 상극 소멸 폐지
+- 상태: 질문
+- 브랜치 / PR: `m9-color-merge-effects` / [PR #25](https://github.com/jeongmo-dot/gravity_orb/pull/25)
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/{Board,CollisionResolver,Orb,Spawner}.gd`, `scripts/spike/{Board3D,Orb3D}.gd`, `scripts/ui/DebugHud.gd`, `tests/{test_config,test_rules,test_shockwave,run_color_effect_measurement.ps1}`, `tests/scenarios/{test_annihilation_scenario,test_jolt_integration,test_merge_scenario,test_score_flow}.gd`, `tests/spike/run_jolt_3d_measurement.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 2D/3D 공통 합체 효과를 결과 색 기준 `PUSH/PULL/SHAKE/LIFT`로 구현. 빨강은 바깥, 파랑은 안쪽, 초록은 판 전체 질량 독립 `Δv`, 노랑은 현재 중력 반대 방향
+  - [x] `MAX_CLEAR`가 같은 색 모드와 `shock_jackpot_scale`을 사용. SHAKE 상한도 잭팟 배율을 적용하고, #23 순차 연쇄의 두 반응 모두 색 효과를 적용하는 자동 테스트 추가
+  - [x] §7.6의 새 필드 6종과 가안값을 선언·기본 리소스·config 테스트에 적용. `color_effects_enabled=false`에서는 기존 §7.4 PUSH 수식과 기존 테스트 수치가 동일
+  - [x] SHAKE 전용 RNG를 게임 시드에서 파생해 Spawner 생성 RNG와 분리. 같은 시드 방향 완전 일치와 SHAKE 호출 전후 생성 후보 완전 일치 자동 검증
+  - [x] 방향(2D/3D 화면 좌표), 질량 독립성, L7·판 전체 대상, 반경 밖/유령/입구 대기/결과 자신 제외, 잭팟 3배를 자동 검증
+  - [x] `opposite_pairs=[]`를 선언·기본 리소스에 적용. 소멸 분류·규칙 A/B/C·점수 코드는 유지하고, 관련 테스트에서만 RED/BLUE 쌍을 명시. 기본 RED/BLUE 동일 레벨 무반응 및 DebugHud `Rule: off` 자동 검증
+  - [x] 120Hz, 시드 101~112, 게임오버 또는 400턴, 조건별 독립 프로세스 3종 측정. 새 기본 조건은 연속 턴 wall/pair `22.09/53.67px`, 이탈·발산 `0/0`으로 `28/60px` 이내라 계수를 낮추지 않음
+  - [x] 기존 3D 22시드·20턴·120턴, 점수 흐름과 전체 회귀 및 필수 명령 3종 실행
+  - [ ] 모드별 색 고리·프레임 떨림·화살표 — 인박스 선택 항목이라 M8 정식 연출 전에는 추가하지 않음
+- 3조건 측정 (`101~112`, Jolt 3D 120Hz, 최대 400턴, 조건별 독립 프로세스):
+
+| 조건 | 게임 길이 p50 (범위) | 점수 p50 (평균) | 최대 콤보 p50/최대 | 반응 RED/BLUE/GREEN/YELLOW | wall/pair px | 이탈/발산 |
+|---|---:|---:|---:|---:|---:|---:|
+| ① #21 기준: 상극 B + 효과 끔 | 258 (216~273) | 15,707 (14,503.83) | 6/7 | 477/446/1216/1204 | 25.62/69.21 | 0/0 |
+| ② 상극 없음 + 효과 끔 | 135 (128~144) | 6,585 (8,962.50) | 6/8 | 587/589/534/536 | 20.82/37.59 | 0/0 |
+| ③ 상극 없음 + 효과 켬 | 136 (130~143) | 8,286 (9,637.92) | 7/8 | 591/590/535/543 | 22.09/53.67 | 0/0 |
+
+- 점유율 60%+ 레벨별 잼 (`평균 이동 px / 반경 미만 이동 %`, 표본 0은 `-`):
+
+| 조건 | L1 | L2 | L3 | L4 | L5 | L6 | L7 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| ① | 71.62/37.91 | 67.24/50.15 | 61.80/63.13 | 59.36/73.75 | 59.48/82.34 | 58.95/89.73 | 49.53/97.26 |
+| ② | 68.95/36.99 | 65.22/50.01 | 62.49/62.38 | 60.15/73.94 | 60.26/81.64 | 52.77/92.88 | - |
+| ③ | 67.95/36.74 | 62.55/50.02 | 61.30/62.49 | 60.26/74.36 | 58.75/83.92 | 51.53/93.78 | - |
+
+- QA 관측값:
+  - 색 효과 단위 `test_shockwave.gd` → `9/9`; 순차 연쇄 `test_merge_scenario.gd` → `15/15`; 3D 통합 `test_jolt_integration.gd` → `12/12`, 종료 코드 모두 0
+  - `tests/run_color_effect_measurement.ps1` → 종료 코드 0, 조건별 게임오버 `12/12`, 중단 `0`; 상세 원본·집계는 로컬 `artifacts/color_effects_*_raw.json`, `artifacts/color_effects_summary.json`
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . -s res://tests/run_tests.gd` → `142/142`, 종료 코드 0
+  - `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --quit-after 300` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 최종 2D 22시드: 최대 침투 `10.595px`, 이탈·발산·벽 복구 `0/0/0`; 최종 3D 22시드: wall/pair `12.9515/15.4865px`, 이탈·발산 `0/0`
+  - 턴 시간 120턴: 상한 p50/max `1.504167/1.504167초`, 이탈·발산·벽 복구 `0/0/0`
+  - Windows 사용자 로그·루트 인증서·에디터 설정 저장 오류는 제한 실행 환경 메시지이며 프로젝트 스크립트 오류는 없음
+- 수동 확인 절차:
+  1. 각 색 L1 두 개를 합체시키고 반응 지점 오른쪽에 일반 구체를 둔다 → 빨강은 오른쪽으로 밀고, 파랑은 왼쪽으로 끌며, 노랑은 현재 중력 반대로 밀고, 초록은 반경과 무관하게 판 전체 구체를 흔든다.
+  2. 같은 색 L7 두 개를 합체시킨다 → 해당 색 모드는 유지하면서 일반 합체보다 `shock_jackpot_scale`만큼 강해진다.
+  3. 디버그 HUD를 확인한다 → 기본 설정에서 `Rule: off`가 보이고 RED/BLUE 동일 레벨 접촉은 소멸하지 않는다.
+  4. 같은 색 L2+L2 결과가 같은 색 L3에 닿게 배치한다 → 약 0.2초 간격으로 두 반응이 발생하고 각 반응마다 해당 색 효과가 다시 적용된다.
+- 결정 사항: SHAKE 전용 RNG 시드는 실제 게임 시드와 상수 `0x25C01A`의 XOR로 파생했다. 테스트처럼 Spawner가 없는 비프로덕션 보드 단독 호출은 결정적인 오른쪽 방향을 사용하고, Main의 실제 반응 경로는 항상 Spawner 전용 RNG를 전달한다. 선택 시각 효과는 생략했고 점수·콤보·기존 충격파 수치·반경은 바꾸지 않았다.
+- 남은 것 · 질문: 새 기본 조건은 물리 임계값을 만족해 §7.6 가안 계수를 그대로 적용했다. `color_effects_enabled=true`, PUSH/PULL/SHAKE/LIFT 계수와 `green_shake_speed/max=150/600`을 확정할지 확인이 필요하다. 비교 조건 ①의 턴 종료 pair `69.21px`는 기존 효과 끔 경로에서만 `60px`를 넘었고, 새 색 효과 조건 ③은 `53.67px`로 기준 안이었다.
+
 ### [2026-10-04] 대상 #24 — 콤보 표시 단일 출처와 MAX COMBO 동기화
 - 상태: 완료
 - 브랜치 / PR: `m9-combo-display-sync` / [PR #23](https://github.com/jeongmo-dot/gravity_orb/pull/23) ([#23 PR #22](https://github.com/jeongmo-dot/gravity_orb/pull/22) 기반)
