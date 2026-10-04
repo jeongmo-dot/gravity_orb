@@ -250,7 +250,8 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M3 | `allow_same_direction_swipe` | bool | true | 11.1 참조 |
 | M4 | `spawn_level_weights` | PackedFloat32Array | [0.9, 0.1] | 인덱스 0 = 레벨1 |
 | M4 | `spawn_color_weights` | PackedFloat32Array | [1, 1, 1] → **[1, 1, 1, 1]** (#15) | 인덱스 = 색. 가중치 0인 색은 생성되지 않는다 |
-| #15 | `spawn_count_per_turn` | int | **2** (기획서 0.6, 180턴 측정 B2) | 턴당 생성 구체 수. 미리보기도 이 수만큼 |
+| #15 | `spawn_count_per_turn` | int | 2 (기획서 0.6) → **1 (#26, 기획서 0.9.4: 상극 폐지 후 게임 길이 258 → 136턴)** | 턴당 생성 구체 수 |
+| #26 | `preview_turns` | int | **2** | 미리보기로 보여 줄 앞으로의 턴 수 (§11.10) |
 | #15 | `spawn_count_ramp_turns` / `spawn_count_max` | int | 0 (비활성) / 3 | 점진 증가 (측정용, 기본 비활성) |
 | M4 | `spawn_position_mode` | SpawnPositionMode | RANDOM | |
 | M4 | `spawn_margin` | float | 4.0 | 생성 벽 안쪽 면과 구체 사이 여백 |
@@ -787,6 +788,14 @@ godot --headless --path . --quit-after 300
 
 ### 11.9 보드 기울기 연출
 물리 보드를 회전하면 벽이 움직여 시뮬레이션이 깨지므로 **`Camera2D.rotation`만 트윈**한다.
+
+### 11.10 미리보기 2턴치 (기획서 0.9.4 — #26)
+- `Spawner`는 다음 묶음 하나 대신 **앞으로 `preview_turns`턴의 묶음 큐**를 가진다. 큐[0] = 다음 턴, 큐[1] = 그다음 턴. 각 묶음 크기는 `spawn_count_for_turn(그 턴 번호)` (ramp 사용 시에도 턴 번호 기준)
+- 생성(`try_spawn`)은 큐[0]을 쓰고 맨 앞을 빼낸 뒤 맨 뒤에 새 묶음을 하나 뽑아 붙인다. 묶음 내용(색·레벨)은 **뽑힌 순간 확정**되고 이후 바뀌지 않는다 — 2턴 전에 본 공이 그대로 들어온다
+- 같은 시드면 같은 순서 (결정론). 묶음을 미리 뽑으므로 이전 버전과 시드별 생성 순서가 달라지는 것은 허용
+- 신호: `next_batch_changed(batch)`는 큐[0]용으로 유지하고, `preview_changed(batches: Array)`(전체 큐)를 추가한다. `peek_next()`는 큐[0], `peek_preview()`는 전체 큐
+- F3 생성 수 변경(`sync_next_batch_size`)은 큐의 모든 묶음 크기를 맞춘다 (늘릴 때만 뒤에 새로 뽑아 붙이고, 줄일 때는 뒤에서 자른다)
+- HUD: NEXT 영역에 큐[0]을 기존 크기로, 큐[1]을 오른쪽(또는 아래)에 **작고 흐리게**(알파 0.5, 크기 0.6배) 표시. 라벨 `NEXT` / `THEN`. 스와이프 영역을 가리지 않게 `mouse_filter = IGNORE` 유지
 
 ---
 
