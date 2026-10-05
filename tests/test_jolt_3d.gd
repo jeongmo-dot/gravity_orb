@@ -98,12 +98,14 @@ func test_3d_blast_armed_orb_blinks_emission_by_level() -> void:
 	var board: Board3D = await _create_board()
 	var level_four: Orb3D = board.spawn_orb(0, 4, Vector2(-100.0, 0.0))
 	var level_five: Orb3D = board.spawn_orb(1, 5, Vector2(100.0, 0.0))
+	var level_six: Orb3D = board.spawn_orb(2, 6, Vector2(0.0, 150.0))
 	assert_true(not level_four.is_blast_armed(), "3D L4 is not armed")
-	assert_true(level_five.is_blast_armed(), "3D L5 is armed")
-	var initial_strength: float = level_five.blast_emission_strength()
-	level_five._physics_process(Config.data.blast_blink_period * 0.25)
+	assert_true(not level_five.is_blast_armed(), "3D L5 is not armed")
+	assert_true(level_six.is_blast_armed(), "3D L6 is armed")
+	var initial_strength: float = level_six.blast_emission_strength()
+	level_six._physics_process(Config.data.blast_blink_period * 0.25)
 	assert_true(
-		not is_equal_approx(level_five.blast_emission_strength(), initial_strength),
+		not is_equal_approx(level_six.blast_emission_strength(), initial_strength),
 		"3D armed emission oscillates"
 	)
 	_cleanup(board)

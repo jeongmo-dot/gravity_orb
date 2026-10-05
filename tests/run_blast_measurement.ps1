@@ -1,16 +1,23 @@
 param(
     [string]$GodotPath = "C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe",
     [double]$BlastSpeed = 900.0,
+    [int]$BlastMinimumLevel = 5,
+    [switch]$BlastOnOnly,
+    [string]$SummaryName = "blast_summary.json",
     [switch]$AggregateOnly
 )
 
 $ErrorActionPreference = "Stop"
 $repoPath = Split-Path -Parent $PSScriptRoot
 $artifactPath = Join-Path $repoPath "artifacts"
-$conditions = @(
-    [ordered]@{ name = "blast_off"; enabled = "off" },
-    [ordered]@{ name = "blast_on"; enabled = "on" }
-)
+$conditions = if ($BlastOnOnly) {
+    @([ordered]@{ name = "blast_on_min_$BlastMinimumLevel"; enabled = "on" })
+} else {
+    @(
+        [ordered]@{ name = "blast_off"; enabled = "off" },
+        [ordered]@{ name = "blast_on"; enabled = "on" }
+    )
+}
 
 New-Item -ItemType Directory -Force -Path $artifactPath | Out-Null
 
@@ -24,6 +31,7 @@ if (-not $AggregateOnly) {
             --jolt-no-determinism `
             --blast=$($condition.enabled) `
             --blast-speed=$BlastSpeed `
+            --blast-min-level=$BlastMinimumLevel `
             --jolt-output=res://artifacts/$rawName
         if ($LASTEXITCODE -ne 0) {
             throw "BLAST measurement '$($condition.name)' failed with exit code $LASTEXITCODE"
@@ -139,6 +147,7 @@ foreach ($condition in $conditions) {
     $caseSummaries += [ordered]@{
         name = $condition.name
         blast_enabled = [bool]$report.blast_enabled
+        blast_min_level = [int]$report.blast_min_level
         blast_speed = [double]$report.blast_speed
         seed_count = $seedRows.Count
         game_over_count = [int]$tick.game_over_count
@@ -190,9 +199,10 @@ $summary = [ordered]@{
     physics_ticks_per_second = 120
     seeds = @(101..112)
     max_turns = 800
+    blast_min_level = $BlastMinimumLevel
     independent_process_per_condition = $true
     cases = $caseSummaries
 }
-$summaryFile = Join-Path $artifactPath "blast_summary.json"
+$summaryFile = Join-Path $artifactPath $SummaryName
 $summary | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $summaryFile -Encoding utf8
 Write-Output "BLAST_SUMMARY $summaryFile"

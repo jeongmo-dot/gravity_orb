@@ -210,7 +210,7 @@ func test_m7_score_defaults() -> void:
 func test_m9_blast_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	assert_true(config.blast_enabled, "blast enabled")
-	assert_eq(config.blast_min_level, 5, "blast minimum level")
+	assert_eq(config.blast_min_level, 6, "blast minimum level")
 	assert_near(config.blast_speed, 900.0, TOLERANCE, "blast speed")
 	assert_near(config.blast_far_factor, 0.4, TOLERANCE, "blast far factor")
 	assert_near(config.blast_score_factor, 5.0, TOLERANCE, "blast score factor")
