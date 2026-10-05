@@ -79,6 +79,10 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	circle.radius = _current_radius
 	_collision_shape.shape = circle
 	_visual.setup(cfg.color_display[color], _current_radius)
+	_visual.set_blast_armed(
+		cfg.blast_enabled and level >= cfg.blast_min_level,
+		cfg.blast_blink_period
+	)
 
 
 func get_radius() -> float:
@@ -87,6 +91,14 @@ func get_radius() -> float:
 
 func get_current_radius() -> float:
 	return _current_radius
+
+
+func is_blast_armed() -> bool:
+	return _visual.is_blast_armed()
+
+
+func blast_brightness() -> float:
+	return _visual.blast_brightness()
 
 
 func get_colliding_orbs() -> Array:

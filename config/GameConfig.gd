@@ -79,6 +79,12 @@ enum ShockMode { PUSH, PULL, SHAKE, LIFT }
 @export var green_shake_speed: float = 150.0
 @export var green_shake_max_speed: float = 600.0
 @export var chain_reaction_delay: float = 0.2
+@export var blast_enabled: bool = true
+@export var blast_min_level: int = 5
+@export var blast_speed: float = 900.0
+@export var blast_far_factor: float = 0.4
+@export var blast_score_factor: float = 5.0
+@export var blast_blink_period: float = 0.8
 
 
 func radius_for_level(level: int) -> float:

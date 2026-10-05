@@ -385,6 +385,50 @@ func test_new_contact_during_lock_reacts_on_unlock() -> void:
 	await _cleanup_fixture(fixture)
 
 
+func test_newly_merged_level_five_blasts_after_lock_release() -> void:
+	var fixture: Dictionary = await _create_fixture()
+	var board: Board = fixture["board"] as Board
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	var radius: float = Config.data.radius_for_level(4)
+	var first: Orb = board.spawn_orb(0, 4, Vector2(-radius + 0.5, 0.0))
+	var second: Orb = board.spawn_orb(0, 4, Vector2(radius - 0.5, 0.0))
+	assert_true(not first.is_blast_armed(), "L4 is not blast armed")
+	first.exit_ghost_state()
+	second.exit_ghost_state()
+	resolver.report_contact(first, second)
+	assert_eq(resolver.flush(), 1, "L4 pair merges")
+	var merged: Orb = _reactions[0]["result_orb"] as Orb
+	assert_true(merged.is_blast_armed(), "L4 to L5 merge starts blinking")
+	var initial_brightness: float = merged.blast_brightness()
+	var merged_visual: OrbVisual = merged.get_node("Visual") as OrbVisual
+	merged_visual._process(Config.data.blast_blink_period * 0.25)
+	assert_true(
+		not is_equal_approx(merged.blast_brightness(), initial_brightness),
+		"armed L5 brightness oscillates"
+	)
+	var partner: Orb = board.spawn_orb(1, 5, merged.position)
+	partner.exit_ghost_state()
+	resolver.report_contact(merged, partner)
+	assert_eq(resolver.flush(), 0, "new L5 blast waits for merge lock")
+	var tick: float = 1.0 / float(Engine.physics_ticks_per_second)
+	var delay_frames: int = roundi(Config.data.chain_reaction_delay / tick)
+	for frame_index: int in range(delay_frames):
+		var applied: int = resolver.flush(tick)
+		if frame_index < delay_frames - 1:
+			assert_eq(applied, 0, "blast remains locked")
+		else:
+			assert_eq(applied, 1, "blast occurs on unlock")
+	assert_eq(_reactions.size(), 2, "merge and blast reactions")
+	assert_eq(_reactions[1]["type"], ReactionRules.Type.BLAST, "released reaction is blast")
+	assert_eq(_reactions[1]["result_orb"], null, "blast creates no result")
+	assert_eq(board.get_orbs().size(), 0, "blast removes both armed orbs")
+	assert_true(merged.consumed, "armed visual owner consumed on blast")
+	assert_eq(manager.turn_combo, 2, "blast increments combo")
+	assert_eq(manager.max_combo, 2, "blast updates maximum combo")
+	await _cleanup_fixture(fixture)
+
+
 func test_zero_chain_reaction_delay_keeps_immediate_behavior() -> void:
 	var original_delay: float = Config.data.chain_reaction_delay
 	Config.data.chain_reaction_delay = 0.0
@@ -767,6 +811,7 @@ func _assert_reaction_dictionary(reaction: Dictionary) -> void:
 		"result_orb",
 		"shock_level",
 		"shock_targets",
+		"blast_targets",
 	]
 	for key: String in keys:
 		assert_true(reaction.has(key), "reaction key %s" % key)

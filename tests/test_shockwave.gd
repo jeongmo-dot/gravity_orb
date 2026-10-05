@@ -347,6 +347,87 @@ func test_color_mode_jackpot_multiplies_effect_strength() -> void:
 	_restore_config(snapshot)
 
 
+func test_2d_blast_reaches_whole_board_with_mass_independent_falloff() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.blast_speed = 900.0
+	Config.data.blast_far_factor = 0.4
+	var board: Board = BOARD_2D_SCENE.instantiate() as Board
+	tree.root.add_child(board)
+	await tree.process_frame
+	board.set_gravity(Vector2i.ZERO)
+	var light: Orb = board.spawn_orb(0, 1, Vector2(100.0, 0.0))
+	var heavy: Orb = board.spawn_orb(1, 7, Vector2(0.0, 100.0))
+	var far: Orb = board.spawn_orb(2, 3, Vector2(450.0, 450.0))
+	var ghost: Orb = board.spawn_orb(3, 1, Vector2(-100.0, 0.0))
+	var waiter: Orb = board.spawn_orb(3, 1, Vector2(0.0, -100.0))
+	for orb: Orb in [light, heavy, far, waiter]:
+		orb.exit_ghost_state()
+	waiter.enter_entrance_wait(waiter.position, Vector2i.DOWN)
+	var targets: Array[Dictionary] = board.apply_blast(Vector2.ZERO)
+	assert_eq(targets.size(), 3, "2D blast excludes ghost and waiter")
+	var expected_near: float = 900.0 * lerpf(1.0, 0.4, 100.0 / 960.0)
+	assert_eq(targets[0]["orb"], light, "light target order")
+	assert_eq(targets[1]["orb"], heavy, "heavy target order")
+	assert_near(
+		(targets[0]["velocity_change"] as Vector2).x,
+		expected_near,
+		TOLERANCE,
+		"light velocity change"
+	)
+	assert_near(
+		(targets[1]["velocity_change"] as Vector2).y,
+		expected_near,
+		TOLERANCE,
+		"heavy equal delta-v"
+	)
+	var far_distance: float = far.position.length()
+	var expected_far: float = 900.0 * lerpf(1.0, 0.4, far_distance / 960.0)
+	var far_change: Vector2 = targets[2]["velocity_change"] as Vector2
+	assert_near(far_change.length(), expected_far, TOLERANCE, "far falloff")
+	assert_true(far_change.dot(far.position) > 0.0, "far target moves outward")
+	assert_true(ghost.linear_velocity.is_zero_approx(), "ghost excluded")
+	assert_true(waiter.linear_velocity.is_zero_approx(), "waiter excluded")
+	board.queue_free()
+	await tree.process_frame
+	_restore_config(snapshot)
+
+
+func test_3d_blast_uses_screen_plane_directions_and_zero_fallback() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.blast_speed = 900.0
+	Config.data.blast_far_factor = 0.4
+	var board: Board3D = BOARD_3D_SCENE.instantiate() as Board3D
+	tree.root.add_child(board)
+	await tree.process_frame
+	board.set_gravity(Vector2i.ZERO)
+	var right: Orb3D = board.spawn_orb(0, 1, Vector2(100.0, 0.0))
+	var up: Orb3D = board.spawn_orb(1, 7, Vector2(0.0, -100.0))
+	var center: Orb3D = board.spawn_orb(2, 2, Vector2.ZERO)
+	var ghost: Orb3D = board.spawn_orb(3, 1, Vector2(-100.0, 0.0))
+	ghost.enter_ghost_state(0.5)
+	var waiter: Orb3D = board.spawn_orb(3, 1, Vector2(0.0, 100.0))
+	waiter.enter_entrance_wait(waiter.position, Vector2i.DOWN)
+	var targets: Array[Dictionary] = board.apply_blast(Vector2.ZERO)
+	assert_eq(targets.size(), 3, "3D blast exclusions")
+	var right_change: Vector2 = targets[0]["velocity_change"] as Vector2
+	var up_change: Vector2 = targets[1]["velocity_change"] as Vector2
+	var center_change: Vector2 = targets[2]["velocity_change"] as Vector2
+	assert_true(right_change.x > 0.0, "3D right is screen right")
+	assert_true(up_change.y < 0.0, "3D up remains screen up")
+	assert_near(center_change.x, 900.0, TOLERANCE, "zero offset falls back right")
+	assert_near(
+		right_change.length(),
+		up_change.length(),
+		TOLERANCE,
+		"3D mass-independent delta-v"
+	)
+	assert_true(ghost.linear_velocity.is_zero_approx(), "3D ghost excluded")
+	assert_true(waiter.linear_velocity.is_zero_approx(), "3D waiter excluded")
+	board.queue_free()
+	await tree.process_frame
+	_restore_config(snapshot)
+
+
 func _configure_test_shock() -> void:
 	Config.data.color_effects_enabled = false
 	Config.data.shock_impulse = 300.0
@@ -382,6 +463,8 @@ func _snapshot_config() -> Dictionary:
 		"shock_color_radius_factor": Config.data.shock_color_radius_factor.duplicate(),
 		"green_shake_speed": Config.data.green_shake_speed,
 		"green_shake_max_speed": Config.data.green_shake_max_speed,
+		"blast_speed": Config.data.blast_speed,
+		"blast_far_factor": Config.data.blast_far_factor,
 	}
 
 
@@ -396,3 +479,5 @@ func _restore_config(snapshot: Dictionary) -> void:
 	Config.data.shock_color_radius_factor = snapshot["shock_color_radius_factor"] as PackedFloat32Array
 	Config.data.green_shake_speed = float(snapshot["green_shake_speed"])
 	Config.data.green_shake_max_speed = float(snapshot["green_shake_max_speed"])
+	Config.data.blast_speed = float(snapshot["blast_speed"])
+	Config.data.blast_far_factor = float(snapshot["blast_far_factor"])
