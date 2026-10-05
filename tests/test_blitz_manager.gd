@@ -24,6 +24,7 @@ func test_initial_fill_is_non_overlapping_and_ready_locks_input() -> void:
 	assert_true(InputRouter.is_locked(), "ready locks input")
 	manager.on_swipe(Vector2i.RIGHT)
 	assert_eq(manager.accepted_swipes, 0, "ready ignores swipe")
+	assert_eq(manager.spawn_count, 0, "ready swipe does not spawn")
 	manager._physics_process(1.5)
 	assert_eq(manager.state, BlitzManager.State.RUNNING, "ready transitions to go")
 	assert_true(not InputRouter.is_locked(), "go unlocks input")
@@ -34,23 +35,43 @@ func test_initial_fill_is_non_overlapping_and_ready_locks_input() -> void:
 func test_swipe_changes_gravity_immediately_with_cooldown_and_same_direction_ignore() -> void:
 	var fixture: Dictionary = await _create_fixture(3101)
 	var manager: BlitzManager = fixture["manager"] as BlitzManager
+	var board: Board = fixture["board"] as Board
+	var spawner: Spawner = fixture["spawner"] as Spawner
+	var initial_count: int = board.get_orbs().size()
+	var preview_before: Array = spawner.peek_preview()
+	manager._physics_process(5.0)
+	assert_eq(manager.spawn_count, 0, "time alone does not spawn in swipe mode")
 	manager.on_swipe(Vector2i.RIGHT)
 	assert_eq(manager.gravity, Vector2i.RIGHT, "first swipe applies immediately")
 	assert_eq(manager.accepted_swipes, 1, "first swipe accepted")
+	assert_eq(manager.spawn_count, 1, "accepted swipe spawns one orb")
+	assert_eq(board.get_orbs().size(), initial_count + 1, "one swipe adds one orb")
+	var spawned: Orb = board.get_orbs()[-1]
+	var expected_x: float = (
+		-board.half_size() + spawned.get_radius() + Config.data.spawn_margin
+	)
+	assert_near(spawned.position.x, expected_x, TOLERANCE, "spawn uses new gravity opposite wall")
+	var preview_after: Array = spawner.peek_preview()
+	assert_eq(preview_after[0], preview_before[1], "THEN advances to NEXT")
 	manager.on_swipe(Vector2i.UP)
 	assert_eq(manager.gravity, Vector2i.RIGHT, "cooldown ignores rapid swipe")
+	assert_eq(manager.spawn_count, 1, "cooldown rejection does not spawn")
 	manager._physics_process(Config.data.blitz_swipe_cooldown)
+	manager.on_swipe(Vector2i.RIGHT)
+	assert_eq(manager.spawn_count, 1, "same direction rejection does not spawn")
 	manager.on_swipe(Vector2i.UP)
 	assert_eq(manager.gravity, Vector2i.UP, "swipe after cooldown applies")
 	manager.on_swipe(Vector2i.UP)
 	assert_eq(manager.accepted_swipes, 2, "same direction ignored")
+	assert_eq(manager.spawn_count, 2, "only accepted swipes spawn")
 	await _cleanup_fixture(fixture)
 
 
-func test_time_spawn_uses_blitz_weights_and_skips_blocked_entrance_tick() -> void:
+func test_disabled_swipe_spawn_preserves_time_refill_and_blocked_tick() -> void:
 	var fixture: Dictionary = await _create_fixture(3102)
 	var manager: BlitzManager = fixture["manager"] as BlitzManager
 	var board: Board = fixture["board"] as Board
+	Config.data.blitz_spawn_on_swipe = false
 	Config.data.blitz_spawn_interval = 0.8
 	Config.data.blitz_refill_interval = 0.15
 	var initial_count: int = board.get_orbs().size()
@@ -80,9 +101,29 @@ func test_time_spawn_uses_blitz_weights_and_skips_blocked_entrance_tick() -> voi
 	await _cleanup_fixture(fixture)
 
 
+func test_blocked_swipe_changes_gravity_without_consuming_next() -> void:
+	var fixture: Dictionary = await _create_fixture(3105)
+	var manager: BlitzManager = fixture["manager"] as BlitzManager
+	var board: Board = fixture["board"] as Board
+	var spawner: Spawner = fixture["spawner"] as Spawner
+	manager.on_swipe(Vector2i.RIGHT)
+	var waiting: Orb = board.get_orbs()[-1]
+	waiting.enter_entrance_wait(waiting.position, manager.gravity)
+	var next_before: Array[Dictionary] = spawner.peek_next()
+	manager._physics_process(Config.data.blitz_swipe_cooldown)
+	manager.on_swipe(Vector2i.UP)
+	assert_eq(manager.gravity, Vector2i.UP, "blocked swipe still changes gravity")
+	assert_eq(manager.accepted_swipes, 2, "blocked swipe remains accepted")
+	assert_eq(manager.spawn_count, 1, "blocked entrance skips spawn")
+	assert_eq(manager.skipped_spawn_ticks, 1, "blocked spawn is counted")
+	assert_eq(spawner.peek_next(), next_before, "blocked spawn keeps NEXT")
+	await _cleanup_fixture(fixture)
+
+
 func test_speed_chain_productive_miss_idle_fever_and_time_bonus_cap() -> void:
 	var fixture: Dictionary = await _create_fixture(3103)
 	var manager: BlitzManager = fixture["manager"] as BlitzManager
+	Config.data.blitz_spawn_on_swipe = false
 	var first: Dictionary = _productive_swipe(manager, Vector2i.RIGHT)
 	assert_eq(manager.chain, 1, "productive swipe raises chain once")
 	assert_near(float(first["combo_multiplier"]), 1.25, TOLERANCE, "chain step")
@@ -133,6 +174,9 @@ func test_time_up_locks_input_and_finale_blasts_largest_first() -> void:
 	manager._physics_process(0.05)
 	assert_eq(manager.state, BlitzManager.State.FINALE, "timer enters finale")
 	assert_true(InputRouter.is_locked(), "input locks before finale")
+	var spawn_count_before_finale_swipe: int = manager.spawn_count
+	manager.on_swipe(Vector2i.RIGHT)
+	assert_eq(manager.spawn_count, spawn_count_before_finale_swipe, "finale does not spawn")
 	manager._physics_process(0.1)
 	manager._physics_process(0.1)
 	assert_eq(finale_levels, [5, 4], "finale orders large levels first")
@@ -316,6 +360,7 @@ func _snapshot_config() -> Dictionary:
 	return {
 		"game_mode": Config.data.game_mode,
 		"blitz_duration": Config.data.blitz_duration,
+		"blitz_spawn_on_swipe": Config.data.blitz_spawn_on_swipe,
 		"blitz_spawn_interval": Config.data.blitz_spawn_interval,
 		"blitz_initial_occupancy": Config.data.blitz_initial_occupancy,
 		"blitz_target_occupancy": Config.data.blitz_target_occupancy,
@@ -328,6 +373,7 @@ func _snapshot_config() -> Dictionary:
 func _restore_config(snapshot: Dictionary) -> void:
 	Config.data.game_mode = snapshot["game_mode"] as GameConfig.GameMode
 	Config.data.blitz_duration = float(snapshot["blitz_duration"])
+	Config.data.blitz_spawn_on_swipe = bool(snapshot["blitz_spawn_on_swipe"])
 	Config.data.blitz_spawn_interval = float(snapshot["blitz_spawn_interval"])
 	Config.data.blitz_initial_occupancy = float(snapshot["blitz_initial_occupancy"])
 	Config.data.blitz_target_occupancy = float(snapshot["blitz_target_occupancy"])

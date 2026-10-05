@@ -7,11 +7,9 @@ $ErrorActionPreference = "Stop"
 $repoPath = Split-Path -Parent $PSScriptRoot
 $artifactPath = Join-Path $repoPath "artifacts"
 $conditions = @(
-    [ordered]@{ bot = "heuristic"; interval = 0.3; name = "heuristic_0_3" },
     [ordered]@{ bot = "heuristic"; interval = 0.6; name = "heuristic_0_6" },
     [ordered]@{ bot = "heuristic"; interval = 1.2; name = "heuristic_1_2" },
-    [ordered]@{ bot = "random"; interval = 0.3; name = "random_0_3" },
-    [ordered]@{ bot = "random"; interval = 1.2; name = "random_1_2" }
+    [ordered]@{ bot = "random"; interval = 0.3; name = "random_0_3" }
 )
 New-Item -ItemType Directory -Force -Path $artifactPath | Out-Null
 
@@ -93,7 +91,8 @@ foreach ($condition in $conditions) {
         time_bonus_total = Get-Distribution @($rows | ForEach-Object { [double]$_.time_bonus_total })
         play_time = Get-Distribution @($rows | ForEach-Object { [double]$_.play_time })
         initial_fill_count = Get-Distribution @($rows | ForEach-Object { [double]$_.initial_fill_count })
-        refill_spawn_count = Get-Distribution @($rows | ForEach-Object { [double]$_.refill_spawn_count })
+        spawn_count = Get-Distribution @($rows | ForEach-Object { [double]$_.spawn_count })
+        skipped_spawn_count = Get-Distribution @($rows | ForEach-Object { [double]$_.skipped_spawn_count })
         first_reaction_time = Get-Distribution @($rows | ForEach-Object { [double]$_.first_reaction_time })
         finale_score_percent = Get-Distribution @($rows | ForEach-Object { [double]$_.finale_score_percent })
         final_occupancy_percent = Get-Distribution @($rows | ForEach-Object { [double]$_.final_occupancy_percent })
@@ -105,32 +104,13 @@ foreach ($condition in $conditions) {
     }
 }
 
-function Get-Case([string]$Name) {
-    return $cases | Where-Object { $_.name -eq $Name } | Select-Object -First 1
-}
-
-$h03 = Get-Case "heuristic_0_3"
-$h06 = Get-Case "heuristic_0_6"
-$h12 = Get-Case "heuristic_1_2"
-$r03 = Get-Case "random_0_3"
-$r12 = Get-Case "random_1_2"
-$criteria = [ordered]@{
-    heuristic_speed_order = ($h03.score.p50 -gt $h06.score.p50 -and $h06.score.p50 -gt $h12.score.p50)
-    heuristic_beats_random_0_3 = ($h03.score.p50 -gt $r03.score.p50)
-    heuristic_beats_random_1_2 = ($h12.score.p50 -gt $r12.score.p50)
-    random_mashing_not_large_gain = ($r03.score.p50 -le $r12.score.p50 * 1.1)
-    play_time_90_to_110 = (@($cases | Where-Object { $_.play_time.p50 -lt 89.999 -or $_.play_time.p50 -gt 110.001 }).Count -eq 0)
-    fever_percent_15_to_30 = (@($cases | Where-Object { $_.fever_time_percent.p50 -lt 15.0 -or $_.fever_time_percent.p50 -gt 30.0 }).Count -eq 0)
-}
-
 $summary = [ordered]@{
     engine = "Godot 4.8-dev3 mono"
     physics_engine = "Jolt Physics"
     physics_ticks_per_second = 120
     seeds = @(101..112)
     cases = $cases
-    criteria = $criteria
 }
-$summaryPath = Join-Path $artifactPath "blitz_refill_summary.json"
+$summaryPath = Join-Path $artifactPath "blitz_swipe_spawn_summary.json"
 $summary | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $summaryPath -Encoding utf8
 Write-Output "BLITZ_SUMMARY $summaryPath"

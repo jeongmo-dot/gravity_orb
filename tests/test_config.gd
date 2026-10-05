@@ -222,6 +222,7 @@ func test_blitz_spike_defaults() -> void:
 	assert_eq(config.game_mode, GameConfig.GameMode.TURN, "default game mode")
 	assert_near(config.blitz_duration, 90.0, TOLERANCE, "blitz duration")
 	assert_near(config.blitz_swipe_cooldown, 0.12, TOLERANCE, "swipe cooldown")
+	assert_true(config.blitz_spawn_on_swipe, "spawn on accepted swipe")
 	assert_near(config.blitz_spawn_interval, 0.8, TOLERANCE, "spawn interval")
 	assert_eq(
 		config.blitz_spawn_level_weights,
@@ -237,7 +238,7 @@ func test_blitz_spike_defaults() -> void:
 	assert_near(config.blitz_chain_step, 0.25, TOLERANCE, "chain step")
 	assert_near(config.blitz_chain_max_multiplier, 5.0, TOLERANCE, "chain cap")
 	assert_eq(config.blitz_fever_chain, 6, "fever chain")
-	assert_near(config.blitz_fever_duration, 1.2, TOLERANCE, "adjusted fever duration")
+	assert_near(config.blitz_fever_duration, 3.0, TOLERANCE, "fever duration")
 	assert_near(config.blitz_fever_multiplier, 2.0, TOLERANCE, "fever multiplier")
 	assert_near(config.blitz_time_bonus_blast, 1.0, TOLERANCE, "blast bonus")
 	assert_near(config.blitz_time_bonus_jackpot, 3.0, TOLERANCE, "jackpot bonus")

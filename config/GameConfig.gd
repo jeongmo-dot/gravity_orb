@@ -89,6 +89,7 @@ enum GameMode { TURN, BLITZ }
 @export var blast_blink_period: float = 0.8
 @export var blitz_duration: float = 90.0
 @export var blitz_swipe_cooldown: float = 0.12
+@export var blitz_spawn_on_swipe: bool = true
 @export var blitz_spawn_interval: float = 0.8
 @export var blitz_spawn_level_weights: PackedFloat32Array = PackedFloat32Array(
 	[0.7, 0.25, 0.05]
@@ -102,7 +103,7 @@ enum GameMode { TURN, BLITZ }
 @export var blitz_chain_step: float = 0.25
 @export var blitz_chain_max_multiplier: float = 5.0
 @export var blitz_fever_chain: int = 6
-@export var blitz_fever_duration: float = 1.2
+@export var blitz_fever_duration: float = 3.0
 @export var blitz_fever_multiplier: float = 2.0
 @export var blitz_time_bonus_blast: float = 1.0
 @export var blitz_time_bonus_jackpot: float = 3.0
