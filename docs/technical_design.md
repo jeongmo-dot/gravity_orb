@@ -663,12 +663,12 @@ MERGE·MAX_CLEAR 반응 직후 반응 지점 `p`에서 충격파를 낸다.
 
 
 ### 7.7 대폭발 BLAST (기획서 0.9.5 — #29)
-레벨 `blast_min_level`(5) 이상 구체는 **폭발 가능 상태**다. **같은 레벨·다른 색**의 폭발 가능 구체 둘이 닿으면 둘 다 사라지고 판 전체를 밀어낸다. 레벨이 다르면(L5–L6 등) 반응하지 않는다 (2026-10-05 사용자 결정: L5–L6 폭발 제외).
+레벨 `blast_min_level`(**6**, #30에서 5 → 6) 이상 구체는 **폭발 가능 상태**다. **같은 레벨·다른 색**의 폭발 가능 구체 둘이 닿으면 둘 다 사라지고 판 전체를 밀어낸다. 레벨이 다르면(L5–L6 등) 반응하지 않는다 (2026-10-05 사용자 결정: L5–L6 폭발 제외).
 
-- **판정 순서** (`ReactionRules.classify`): ① 같은 색·같은 레벨 → MERGE / MAX_CLEAR (기존, 성장 우선) ② 상극 → ANNIHILATE (현재 비활성) ③ `blast_enabled`이고 **두 레벨이 같고** `≥ blast_min_level` → **BLAST** ④ 그 외 NONE. 같은 색·같은 레벨은 ①에서 먼저 걸리므로 BLAST는 **같은 레벨·다른 색**만이다: L5–L5, L6–L6, L7–L7 (L7 같은 색은 MAX_CLEAR). L5–L6, L5–L7, L6–L7은 색과 무관하게 NONE
+- **판정 순서** (`ReactionRules.classify`): ① 같은 색·같은 레벨 → MERGE / MAX_CLEAR (기존, 성장 우선) ② 상극 → ANNIHILATE (현재 비활성) ③ `blast_enabled`이고 **두 레벨이 같고** `≥ blast_min_level` → **BLAST** ④ 그 외 NONE. 같은 색·같은 레벨은 ①에서 먼저 걸리므로 BLAST는 **같은 레벨·다른 색**만이다: L6–L6, L7–L7 (L7 같은 색은 MAX_CLEAR. #29 때는 L5–L5 포함). 레벨이 다른 쌍은 색과 무관하게 NONE
 - **결과**: 두 구체 제거, 생성 없음. 지점 `p` = 두 중심의 중점
 - **밀어내기**: 판 위 **모든** 일반 구체(유령·입구 대기 제외)에 **질량 무관 속도 변화** `Δv = blast_speed × lerp(1.0, blast_far_factor, clamp(d / board_size, 0, 1))`, 방향 `(q − p).normalized()` (`d ≈ 0`이면 `Vector2.RIGHT`). 큰 구체도 같이 날아가 굳은 더미가 풀린다. 색별 효과(§7.6)·충격파(§7.4)는 BLAST에 적용하지 않는다
-- **점수**: 기본 점수 = `(score_for_level(La) + score_for_level(Lb)) × blast_score_factor` (L5+L5 = 320, L6+L6 = 640, L7+L7 = 1,280). 콤보·위험 배수는 §8.2 그대로. 콤보 +1
+- **점수**: 기본 점수 = `(score_for_level(La) + score_for_level(Lb)) × blast_score_factor` (L6+L6 = 640, L7+L7 = 1,280. `blast_min_level = 5`였던 #29에서는 L5+L5 = 320). 콤보·위험 배수는 §8.2 그대로. 콤보 +1
 - **잠금(§7.5)**: 합체로 막 생긴 L5·L6은 잠금 동안 BLAST도 보류된다 (기존 잠금 규칙 그대로). 결과 구체가 없으므로 BLAST 자체는 잠금을 만들지 않는다
 - **폭발 가능 표시**: 레벨 `≥ blast_min_level` 구체는 발광을 주기 `blast_blink_period`로 깜빡인다 (3D: 머티리얼 emission, 2D: 밝기). 상태 변화는 레벨로만 결정 — 별도 타이머 없음
 - **임시 연출**: 폭발 지점 흰 섬광 고리 1회 + 보드 프레임 짧은 떨림. 정식 연출(화면 흔들림·파편·사운드)은 M8
@@ -678,7 +678,7 @@ MERGE·MAX_CLEAR 반응 직후 반응 지점 `p`에서 충격파를 낸다.
 | 필드 | 타입 | 가안 |
 |---|---|---|
 | `blast_enabled` | bool | true |
-| `blast_min_level` | int | 5 |
+| `blast_min_level` | int | 5 → **6** (#30. #29 측정: 5에서는 12판 모두 800턴, 종료 점유율 17% — L5 쌍 하나가 L1 32개 면적을 치워 들어오는 양과 균형) |
 | `blast_speed` | float | 900 (px/s) |
 | `blast_far_factor` | float | 0.4 (보드 한 변 거리에서 Δv 비율) |
 | `blast_score_factor` | float | 5.0 |
