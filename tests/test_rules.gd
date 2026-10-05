@@ -233,6 +233,15 @@ func test_default_blast_minimum_excludes_level_five() -> void:
 	assert_eq(level_six["type"], ReactionRules.Type.BLAST, "default includes L6")
 
 
+func test_blitz_uses_level_four_blast_without_changing_turn_rule() -> void:
+	var cfg: GameConfig = GameConfig.new()
+	var turn_level_four: Dictionary = ReactionRules.classify(0, 4, 1, 4, cfg)
+	assert_eq(turn_level_four["type"], ReactionRules.Type.NONE, "turn L4 remains none")
+	cfg.game_mode = GameConfig.GameMode.BLITZ
+	var blitz_level_four: Dictionary = ReactionRules.classify(0, 4, 1, 4, cfg)
+	assert_eq(blitz_level_four["type"], ReactionRules.Type.BLAST, "blitz L4 blasts")
+
+
 func _enable_red_blue(cfg: GameConfig) -> void:
 	cfg.opposite_pairs = [
 		Vector2i(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE),

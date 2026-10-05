@@ -96,7 +96,7 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	color = p_color
 	level = p_level
 	_display_color = cfg.color_display[color]
-	_blast_armed = cfg.blast_enabled and level >= cfg.blast_min_level
+	_blast_armed = cfg.blast_enabled and level >= cfg.active_blast_min_level()
 	_blast_blink_period = maxf(cfg.blast_blink_period, 0.001)
 	_blast_blink_elapsed = 0.0
 	_radius = cfg.radius_for_level(level)

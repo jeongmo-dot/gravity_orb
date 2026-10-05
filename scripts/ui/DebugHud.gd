@@ -1,23 +1,26 @@
 class_name DebugHud
 extends CanvasLayer
 
-const STATE_NAMES: Array[String] = [
+const TURN_STATE_NAMES: Array[String] = [
 	"WAITING_INPUT",
 	"SIMULATING",
 	"SPAWNING",
 	"CHECK_GAMEOVER",
 	"GAME_OVER",
 ]
+const BLITZ_STATE_NAMES: Array[String] = ["IDLE", "RUNNING", "FINALE", "FINISHED"]
 const ANNIHILATION_RULE_NAMES: Array[String] = ["A", "B", "C"]
 
 @onready var _turn_manager: TurnManager = %TurnManager
+@onready var _blitz_manager: BlitzManager = %BlitzManager
 @onready var _spawner: Spawner = %Spawner
 @onready var _score_manager: ScoreManager = %ScoreManager
 @onready var _board: Variant = %Board
 @onready var _label: Label = %DebugLabel
 @onready var _hud: Hud = %Hud
 
-var _state: TurnManager.State = TurnManager.State.WAITING_INPUT
+var _game_manager: Variant
+var _state: int = 0
 var _gravity: Vector2i = Vector2i.DOWN
 var _turn_index: int = 0
 var _turn_combo: int = 0
@@ -26,20 +29,25 @@ var _max_combo: int = 0
 
 
 func _ready() -> void:
+	_game_manager = (
+		_blitz_manager
+		if Config.data.game_mode == GameConfig.GameMode.BLITZ
+		else _turn_manager
+	)
 	_hud.bind_spawner(_spawner)
 	_hud.bind_score_manager(_score_manager)
-	_hud.bind_game_state(_turn_manager, _board, _score_manager)
-	_state = _turn_manager.state
-	_gravity = _turn_manager.gravity
-	_turn_index = _turn_manager.turn_index
-	_turn_combo = _turn_manager.turn_combo
-	_combo_multiplier = _turn_manager.current_combo_multiplier()
-	_max_combo = _turn_manager.max_combo
-	_turn_manager.state_changed.connect(_on_state_changed)
-	_turn_manager.gravity_changed.connect(_on_gravity_changed)
-	_turn_manager.turn_started.connect(_on_turn_started)
-	_turn_manager.turn_finished.connect(_on_turn_finished)
-	_turn_manager.combo_changed.connect(_on_combo_changed)
+	_hud.bind_game_state(_game_manager, _board, _score_manager)
+	_state = int(_game_manager.state)
+	_gravity = _game_manager.gravity
+	_turn_index = _game_manager.turn_index
+	_turn_combo = _game_manager.turn_combo
+	_combo_multiplier = _game_manager.current_combo_multiplier()
+	_max_combo = _game_manager.max_combo
+	_game_manager.state_changed.connect(_on_state_changed)
+	_game_manager.gravity_changed.connect(_on_gravity_changed)
+	_game_manager.turn_started.connect(_on_turn_started)
+	_game_manager.turn_finished.connect(_on_turn_finished)
+	_game_manager.combo_changed.connect(_on_combo_changed)
 	_update_label()
 
 
@@ -47,8 +55,8 @@ func _process(_delta: float) -> void:
 	_update_label()
 
 
-func _on_state_changed(next_state: TurnManager.State) -> void:
-	_state = next_state
+func _on_state_changed(next_state: int) -> void:
+	_state = int(next_state)
 
 
 func _on_gravity_changed(direction: Vector2i) -> void:
@@ -70,9 +78,16 @@ func _on_combo_changed(combo: int, multiplier: float, max_combo: int) -> void:
 
 
 func _update_label() -> void:
-	_label.text = "State: %s\nGravity: %s\nTurn: %d\nCombo: %d (x%s)\nMax Combo: %d\nRule: %s\nSpawn: %d\nSettle: %.2f s\nSeed: %d" % [
-		STATE_NAMES[_state],
+	var blitz_mode: bool = Config.data.game_mode == GameConfig.GameMode.BLITZ
+	var state_names: Array[String] = BLITZ_STATE_NAMES if blitz_mode else TURN_STATE_NAMES
+	var spawn_amount: int = 1 if blitz_mode else Config.data.spawn_count_for_turn(
+		_game_manager.turn_index + 1
+	)
+	_label.text = "Mode: %s\nState: %s\nGravity: %s\n%s: %d\nCombo: %d (x%s)\nMax Combo: %d\nRule: %s\nSpawn: %d\nElapsed: %.2f s\nSeed: %d" % [
+		"BLITZ" if blitz_mode else "TURN",
+		state_names[_state],
 		OrbTypes.dir_name(_gravity),
+		"Swipes" if blitz_mode else "Turn",
 		_turn_index,
 		_turn_combo,
 		_format_multiplier(_combo_multiplier),
@@ -82,8 +97,8 @@ func _update_label() -> void:
 			if Config.data.opposite_pairs.is_empty()
 			else ANNIHILATION_RULE_NAMES[Config.data.annihilation_rule]
 		),
-		Config.data.spawn_count_for_turn(_turn_manager.turn_index + 1),
-		_turn_manager.settle_elapsed,
+		spawn_amount,
+		_game_manager.settle_elapsed,
 		_spawner.seed_used,
 	]
 

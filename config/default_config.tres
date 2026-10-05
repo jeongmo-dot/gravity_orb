@@ -4,6 +4,7 @@
 
 [resource]
 script = ExtResource("1_game_config")
+game_mode = 0
 board_size = 960.0
 wall_thickness = 256.0
 level_radii = PackedFloat32Array(25, 40, 60, 85, 100, 120, 140)
@@ -74,3 +75,18 @@ blast_speed = 900.0
 blast_far_factor = 0.4
 blast_score_factor = 5.0
 blast_blink_period = 0.8
+blitz_duration = 90.0
+blitz_swipe_cooldown = 0.12
+blitz_spawn_interval = 0.5
+blitz_spawn_level_weights = PackedFloat32Array(0.7, 0.25, 0.05)
+blitz_combo_window = 1.5
+blitz_combo_step = 0.2
+blitz_combo_max_multiplier = 5.0
+blitz_fever_combo = 8
+blitz_fever_duration = 6.0
+blitz_fever_multiplier = 2.0
+blitz_time_bonus_blast = 3.0
+blitz_time_bonus_jackpot = 5.0
+blitz_time_bonus_combo10 = 2.0
+blitz_blast_min_level = 4
+blitz_finale_interval = 0.3

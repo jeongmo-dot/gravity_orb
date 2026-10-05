@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/core/Main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://scenes/Board3D.tscn" id="2_board"]
@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://scripts/core/Spawner.gd" id="5_spawner"]
 [ext_resource type="Script" path="res://scripts/core/ScoreManager.gd" id="6_score"]
 [ext_resource type="PackedScene" path="res://scenes/UI.tscn" id="7_ui"]
+[ext_resource type="Script" path="res://scripts/core/BlitzManager.gd" id="8_blitz"]
 
 [sub_resource type="Environment" id="Environment_main"]
 background_mode = 1
@@ -51,6 +52,10 @@ unique_name_in_owner = true
 [node name="TurnManager" type="Node" parent="."]
 unique_name_in_owner = true
 script = ExtResource("3_turn")
+
+[node name="BlitzManager" type="Node" parent="."]
+unique_name_in_owner = true
+script = ExtResource("8_blitz")
 
 [node name="CollisionResolver" type="Node" parent="."]
 unique_name_in_owner = true

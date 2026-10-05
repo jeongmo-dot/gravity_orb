@@ -6,12 +6,15 @@ signal preview_changed(batches: Array)
 signal orb_spawned(level: int)
 
 const EFFECT_SEED_SALT: int = 0x25C01A
+const BOT_SEED_SALT: int = 0x31B117
 
 var seed_used: int = 0
 
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _effect_rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var _bot_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _preview_batches: Array[Array] = []
+var _blitz_mode: bool = false
 
 
 func init_rng(seed: int) -> int:
@@ -24,7 +27,22 @@ func init_rng(seed: int) -> int:
 		_rng.seed = seed
 	seed_used = _rng.seed
 	_effect_rng.seed = seed_used ^ EFFECT_SEED_SALT
+	_bot_rng.seed = seed_used ^ BOT_SEED_SALT
 	return seed_used
+
+
+func set_blitz_mode(enabled: bool) -> void:
+	_blitz_mode = enabled
+	_preview_batches.clear()
+
+
+func next_blitz_direction(previous: Vector2i) -> Vector2i:
+	var candidates: Array[Vector2i] = []
+	for direction: Vector2i in OrbTypes.DIRECTIONS:
+		if direction != previous:
+			candidates.append(direction)
+	var index: int = _bot_rng.randi_range(0, candidates.size() - 1)
+	return candidates[index]
 
 
 func next_shake_direction() -> Vector2:
@@ -121,10 +139,7 @@ func sync_next_batch_size(next_turn_index: int = 1) -> void:
 	_sync_preview_count(next_turn_index)
 	for turn_offset: int in range(_preview_batches.size()):
 		var batch: Array = _preview_batches[turn_offset]
-		var target_size: int = maxi(
-			Config.data.spawn_count_for_turn(next_turn_index + turn_offset),
-			1
-		)
+		var target_size: int = _batch_size_for_index(next_turn_index + turn_offset)
 		while batch.size() < target_size:
 			batch.append(_draw_candidate())
 		if batch.size() > target_size:
@@ -133,7 +148,12 @@ func sync_next_batch_size(next_turn_index: int = 1) -> void:
 
 
 func _draw_candidate() -> Dictionary:
-	var level: int = _rng.rand_weighted(Config.data.spawn_level_weights) + 1
+	var level_weights: PackedFloat32Array = (
+		Config.data.blitz_spawn_level_weights
+		if _blitz_mode
+		else Config.data.spawn_level_weights
+	)
+	var level: int = _rng.rand_weighted(level_weights) + 1
 	var color: int = _rng.rand_weighted(Config.data.spawn_color_weights)
 	var position_t: float = _rng.randf()
 	return {"level": level, "color": color, "t": position_t}
@@ -141,19 +161,25 @@ func _draw_candidate() -> Dictionary:
 
 func _draw_batch(turn_index: int = 1) -> Array[Dictionary]:
 	var batch: Array[Dictionary] = []
-	var count: int = maxi(Config.data.spawn_count_for_turn(turn_index), 1)
+	var count: int = _batch_size_for_index(turn_index)
 	for _index: int in range(count):
 		batch.append(_draw_candidate())
 	return batch
 
 
 func _sync_preview_count(next_turn_index: int) -> void:
-	var target_count: int = maxi(Config.data.preview_turns, 1)
+	var target_count: int = 2 if _blitz_mode else maxi(Config.data.preview_turns, 1)
 	if _preview_batches.size() > target_count:
 		_preview_batches.resize(target_count)
 	while _preview_batches.size() < target_count:
 		var turn_offset: int = _preview_batches.size()
 		_preview_batches.append(_draw_batch(next_turn_index + turn_offset))
+
+
+func _batch_size_for_index(turn_index: int) -> int:
+	if _blitz_mode:
+		return 1
+	return maxi(Config.data.spawn_count_for_turn(turn_index), 1)
 
 
 func _publish_preview() -> void:

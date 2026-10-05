@@ -14,10 +14,14 @@ const PREVIEW_GAP: float = 16.0
 @onready var _combo_label: Label = %ComboLabel
 @onready var _danger_label: Label = %DangerLabel
 @onready var _blocked_label: Label = %BlockedLabel
+@onready var _timer_label: Label = %TimerLabel
+@onready var _fever_label: Label = %FeverLabel
+@onready var _bonus_label: Label = %BonusLabel
 @onready var _game_over_panel: GameOverPanel = %GameOverPanel
 
 var _spawner: Spawner
 var _score_manager: ScoreManager
+var _bonus_tween: Tween
 
 
 func bind_spawner(spawner: Spawner) -> void:
@@ -34,20 +38,30 @@ func bind_score_manager(score_manager: ScoreManager) -> void:
 
 
 func bind_game_state(
-	turn_manager: TurnManager,
+	game_manager: Variant,
 	board: Variant,
 	score_manager: ScoreManager
 ) -> void:
-	turn_manager.warning_changed.connect(_on_warning_changed)
-	turn_manager.combo_changed.connect(_on_combo_changed)
-	_game_over_panel.bind(turn_manager, score_manager)
-	_on_warning_changed(turn_manager.blocked_directions)
+	game_manager.warning_changed.connect(_on_warning_changed)
+	game_manager.combo_changed.connect(_on_combo_changed)
+	_game_over_panel.bind(game_manager, score_manager)
+	_on_warning_changed(game_manager.blocked_directions)
 	_on_combo_changed(
-		turn_manager.turn_combo,
-		turn_manager.current_combo_multiplier(),
-		turn_manager.max_combo
+		game_manager.turn_combo,
+		game_manager.current_combo_multiplier(),
+		game_manager.max_combo
 	)
-	board.set_warning_directions(turn_manager.blocked_directions)
+	board.set_warning_directions(game_manager.blocked_directions)
+	var blitz_mode: bool = game_manager is BlitzManager
+	_timer_label.visible = blitz_mode
+	_fever_label.visible = false
+	_bonus_label.visible = false
+	_blocked_label.visible = not blitz_mode
+	if blitz_mode:
+		game_manager.time_changed.connect(_on_time_changed)
+		game_manager.fever_changed.connect(_on_fever_changed)
+		game_manager.time_bonus_awarded.connect(_on_time_bonus_awarded)
+		_on_time_changed(game_manager.remaining_time)
 
 
 func _on_preview_changed(batches: Array) -> void:
@@ -144,3 +158,28 @@ func _on_warning_changed(directions: Array[Vector2i]) -> void:
 		if names.is_empty()
 		else "BLOCKED: %s" % ", ".join(names)
 	)
+
+
+func _on_time_changed(remaining: float) -> void:
+	_timer_label.text = "%.1f" % maxf(remaining, 0.0)
+	_timer_label.modulate = Color("#FF3B30") if remaining <= 10.0 else Color.WHITE
+
+
+func _on_fever_changed(active: bool, remaining: float) -> void:
+	_fever_label.visible = active
+	_fever_label.text = "FEVER x%.0f  %.1fs" % [
+		Config.data.blitz_fever_multiplier,
+		remaining,
+	]
+
+
+func _on_time_bonus_awarded(seconds: float, source: String) -> void:
+	if _bonus_tween != null and _bonus_tween.is_valid():
+		_bonus_tween.kill()
+	_bonus_label.visible = true
+	_bonus_label.modulate = Color.WHITE
+	_bonus_label.text = "+%gs  %s" % [seconds, source]
+	_bonus_tween = create_tween()
+	_bonus_tween.tween_interval(0.7)
+	_bonus_tween.tween_property(_bonus_label, "modulate:a", 0.0, 0.3)
+	_bonus_tween.tween_callback(func() -> void: _bonus_label.visible = false)

@@ -80,7 +80,7 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	_collision_shape.shape = circle
 	_visual.setup(cfg.color_display[color], _current_radius)
 	_visual.set_blast_armed(
-		cfg.blast_enabled and level >= cfg.blast_min_level,
+		cfg.blast_enabled and level >= cfg.active_blast_min_level(),
 		cfg.blast_blink_period
 	)
 

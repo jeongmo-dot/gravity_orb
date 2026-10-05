@@ -10,6 +10,7 @@ const VISUAL_TILT_DEGREES: float = 4.0
 const VISUAL_TILT_DURATION: float = 0.25
 const WARNING_FRAME_COLOR: Color = Color("#FF3B30")
 const NORMAL_FRAME_COLOR: Color = Color("#8ec5ff")
+const FEVER_FRAME_COLOR: Color = Color("#FF9F0A")
 const BLAST_FLASH_DURATION: float = 0.18
 const BLAST_FLASH_RADIUS_M: float = 1.5
 const BLAST_SHAKE_DISTANCE_M: float = 0.06
@@ -27,6 +28,7 @@ var _tilt_tween: Tween
 var _blast_flash: MeshInstance3D
 var _blast_flash_material: StandardMaterial3D
 var _blast_flash_remaining: float = 0.0
+var _fever_active: bool = false
 var orb_contact_reporting_enabled: bool = true
 var orb_continuous_cd_enabled: bool = true
 var orb_allow_sleep: bool = false
@@ -405,6 +407,11 @@ func set_warning_directions(directions: Array[Vector2i]) -> void:
 	_update_warning_visuals()
 
 
+func set_fever_active(active: bool) -> void:
+	_fever_active = active
+	_update_warning_visuals()
+
+
 func _batch_fits_spawn_line(gravity: Vector2i, batch: Array[Dictionary]) -> bool:
 	var radii: Array[float] = []
 	for candidate: Dictionary in batch:
@@ -640,11 +647,15 @@ func _update_warning_visuals() -> void:
 			continue
 		var direction: Vector2i = Vector2i(direction_by_name[wall_name])
 		var warning: bool = _warning_directions.has(direction)
-		wall.material_override = _visual_material(
-			WARNING_FRAME_COLOR if warning else NORMAL_FRAME_COLOR,
-			0.22,
-			0.35 if warning else 0.18
-		)
+		var frame_color: Color = NORMAL_FRAME_COLOR
+		var emission: float = 0.18
+		if warning:
+			frame_color = WARNING_FRAME_COLOR
+			emission = 0.35
+		elif _fever_active:
+			frame_color = FEVER_FRAME_COLOR
+			emission = 0.55
+		wall.material_override = _visual_material(frame_color, 0.22, emission)
 
 
 func _visual_material(color_value: Color, roughness: float, emission_energy: float) -> StandardMaterial3D:
