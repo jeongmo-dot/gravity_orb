@@ -80,7 +80,7 @@ enum ShockMode { PUSH, PULL, SHAKE, LIFT }
 @export var green_shake_max_speed: float = 600.0
 @export var chain_reaction_delay: float = 0.2
 @export var blast_enabled: bool = true
-@export var blast_min_level: int = 5
+@export var blast_min_level: int = 6
 @export var blast_speed: float = 900.0
 @export var blast_far_factor: float = 0.4
 @export var blast_score_factor: float = 5.0

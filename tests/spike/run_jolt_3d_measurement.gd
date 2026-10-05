@@ -1119,6 +1119,11 @@ func _apply_arguments() -> void:
 			Config.data.blast_enabled = false
 		elif argument.begins_with("--blast-speed="):
 			Config.data.blast_speed = argument.trim_prefix("--blast-speed=").to_float()
+		elif argument.begins_with("--blast-min-level="):
+			Config.data.blast_min_level = maxi(
+				argument.trim_prefix("--blast-min-level=").to_int(),
+				1
+			)
 		elif argument == "--color-effects=on":
 			Config.data.color_effects_enabled = true
 		elif argument == "--color-effects=off":

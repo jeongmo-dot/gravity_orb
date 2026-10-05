@@ -186,6 +186,7 @@ func test_rule_change_is_read_on_each_classification() -> void:
 
 func test_blast_requires_same_level_different_color_and_minimum_level() -> void:
 	var cfg: GameConfig = GameConfig.new()
+	cfg.blast_min_level = 5
 	var cases: Array[Dictionary] = [
 		{"colors": [0, 1], "levels": [5, 5], "type": ReactionRules.Type.BLAST},
 		{"colors": [0, 0], "levels": [5, 5], "type": ReactionRules.Type.MERGE},
@@ -222,6 +223,14 @@ func test_blast_toggle_and_minimum_level_preserve_old_behavior() -> void:
 	var level_six: Dictionary = ReactionRules.classify(0, 6, 1, 6, cfg)
 	assert_eq(level_five["type"], ReactionRules.Type.NONE, "minimum excludes L5")
 	assert_eq(level_six["type"], ReactionRules.Type.BLAST, "minimum includes L6")
+
+
+func test_default_blast_minimum_excludes_level_five() -> void:
+	var cfg: GameConfig = GameConfig.new()
+	var level_five: Dictionary = ReactionRules.classify(0, 5, 1, 5, cfg)
+	var level_six: Dictionary = ReactionRules.classify(0, 6, 1, 6, cfg)
+	assert_eq(level_five["type"], ReactionRules.Type.NONE, "default excludes L5")
+	assert_eq(level_six["type"], ReactionRules.Type.BLAST, "default includes L6")
 
 
 func _enable_red_blue(cfg: GameConfig) -> void:
