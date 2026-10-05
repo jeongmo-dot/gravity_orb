@@ -40,7 +40,7 @@
 
 ### [2026-10-05] 대상 #33 — BLITZ 스와이프마다 생성 + 피버 3초
 - 상태: 완료
-- 브랜치 / PR: `m10-blitz-swipe-spawn` / 생성 예정
+- 브랜치 / PR: `m10-blitz-swipe-spawn` / https://github.com/jeongmo-dot/gravity_orb/pull/34
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/BlitzManager.gd`, `tests/{test_blitz_manager,test_config,run_blitz_measurement.ps1}`, `tests/spike/run_blitz_measurement.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `blitz_spawn_on_swipe=true` 기본값에서 받아들여진 스와이프마다 NEXT 1개를 새 중력 반대 벽에 생성. `Spawner.try_spawn()`과 기존 NEXT/THEN 승격 경로를 재사용
