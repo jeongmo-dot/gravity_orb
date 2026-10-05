@@ -8,7 +8,9 @@ const TURN_STATE_NAMES: Array[String] = [
 	"CHECK_GAMEOVER",
 	"GAME_OVER",
 ]
-const BLITZ_STATE_NAMES: Array[String] = ["IDLE", "RUNNING", "FINALE", "FINISHED"]
+const BLITZ_STATE_NAMES: Array[String] = [
+	"IDLE", "READY", "RUNNING", "FINALE", "FINISHED"
+]
 const ANNIHILATION_RULE_NAMES: Array[String] = ["A", "B", "C"]
 
 @onready var _turn_manager: TurnManager = %TurnManager
@@ -83,14 +85,16 @@ func _update_label() -> void:
 	var spawn_amount: int = 1 if blitz_mode else Config.data.spawn_count_for_turn(
 		_game_manager.turn_index + 1
 	)
-	_label.text = "Mode: %s\nState: %s\nGravity: %s\n%s: %d\nCombo: %d (x%s)\nMax Combo: %d\nRule: %s\nSpawn: %d\nElapsed: %.2f s\nSeed: %d" % [
+	_label.text = "Mode: %s\nState: %s\nGravity: %s\n%s: %d\n%s: %d (x%s)\n%s: %d\nRule: %s\nSpawn: %d\nElapsed: %.2f s\nSeed: %d" % [
 		"BLITZ" if blitz_mode else "TURN",
 		state_names[_state],
 		OrbTypes.dir_name(_gravity),
 		"Swipes" if blitz_mode else "Turn",
 		_turn_index,
+		"Chain" if blitz_mode else "Combo",
 		_turn_combo,
 		_format_multiplier(_combo_multiplier),
+		"Max Chain" if blitz_mode else "Max Combo",
 		_max_combo,
 		(
 			"off"

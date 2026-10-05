@@ -6,19 +6,25 @@ param(
 $ErrorActionPreference = "Stop"
 $repoPath = Split-Path -Parent $PSScriptRoot
 $artifactPath = Join-Path $repoPath "artifacts"
-$intervals = @(0.3, 0.6, 1.2)
+$conditions = @(
+    [ordered]@{ bot = "heuristic"; interval = 0.3; name = "heuristic_0_3" },
+    [ordered]@{ bot = "heuristic"; interval = 0.6; name = "heuristic_0_6" },
+    [ordered]@{ bot = "heuristic"; interval = 1.2; name = "heuristic_1_2" },
+    [ordered]@{ bot = "random"; interval = 0.3; name = "random_0_3" },
+    [ordered]@{ bot = "random"; interval = 1.2; name = "random_1_2" }
+)
 New-Item -ItemType Directory -Force -Path $artifactPath | Out-Null
 
 if (-not $AggregateOnly) {
-    foreach ($interval in $intervals) {
-        $name = $interval.ToString("0.0", [Globalization.CultureInfo]::InvariantCulture).Replace(".", "_")
-        $rawName = "blitz_$($name)_raw.json"
+    foreach ($condition in $conditions) {
+        $rawName = "blitz_$($condition.name)_raw.json"
         & $GodotPath --headless --path $repoPath --fixed-fps 120 tests/spike/BlitzMeasurement.tscn -- `
-            --blitz-bot-interval=$interval `
+            --blitz-bot=$($condition.bot) `
+            --blitz-bot-interval=$($condition.interval) `
             --blitz-seeds=101,102,103,104,105,106,107,108,109,110,111,112 `
             --blitz-output=res://artifacts/$rawName
         if ($LASTEXITCODE -ne 0) {
-            throw "BLITZ measurement interval $interval failed with exit code $LASTEXITCODE"
+            throw "BLITZ measurement $($condition.name) failed with exit code $LASTEXITCODE"
         }
     }
 }
@@ -43,9 +49,8 @@ function Get-Distribution([double[]]$Values) {
 }
 
 $cases = @()
-foreach ($interval in $intervals) {
-    $name = $interval.ToString("0.0", [Globalization.CultureInfo]::InvariantCulture).Replace(".", "_")
-    $rawPath = Join-Path $artifactPath "blitz_$($name)_raw.json"
+foreach ($condition in $conditions) {
+    $rawPath = Join-Path $artifactPath "blitz_$($condition.name)_raw.json"
     $report = Get-Content -LiteralPath $rawPath -Raw | ConvertFrom-Json
     $rows = @($report.seeds)
     $timeline = @()
@@ -60,19 +65,35 @@ foreach ($interval in $intervals) {
             occupancy_percent = Get-Distribution $values
         }
     }
+    $chainDistribution = [ordered]@{}
+    foreach ($row in $rows) {
+        foreach ($property in $row.chain_histogram.PSObject.Properties) {
+            $key = [string]$property.Name
+            if (-not $chainDistribution.Contains($key)) { $chainDistribution[$key] = 0 }
+            $chainDistribution[$key] += [int]$property.Value
+        }
+    }
     $cases += [ordered]@{
-        bot_interval = [double]$interval
+        name = [string]$condition.name
+        bot = [string]$condition.bot
+        bot_interval = [double]$condition.interval
         seed_count = $rows.Count
         completed_count = @($rows | Where-Object { [bool]$_.completed }).Count
         score = Get-Distribution @($rows | ForEach-Object { [double]$_.score })
         reactions = Get-Distribution @($rows | ForEach-Object { [double]$_.reactions })
-        max_combo = Get-Distribution @($rows | ForEach-Object { [double]$_.max_combo })
+        max_chain = Get-Distribution @($rows | ForEach-Object { [double]$_.max_chain })
+        chain_distribution = $chainDistribution
+        accepted_swipes = Get-Distribution @($rows | ForEach-Object { [double]$_.accepted_swipes })
+        productive_swipes = Get-Distribution @($rows | ForEach-Object { [double]$_.productive_swipes })
+        productive_swipe_percent = Get-Distribution @($rows | ForEach-Object { [double]$_.productive_swipe_percent })
         fever_count = Get-Distribution @($rows | ForEach-Object { [double]$_.fever_count })
         fever_total_time = Get-Distribution @($rows | ForEach-Object { [double]$_.fever_total_time })
+        fever_time_percent = Get-Distribution @($rows | ForEach-Object { [double]$_.fever_time_percent })
         blast_count = Get-Distribution @($rows | ForEach-Object { [double]$_.blast_count })
         time_bonus_total = Get-Distribution @($rows | ForEach-Object { [double]$_.time_bonus_total })
         play_time = Get-Distribution @($rows | ForEach-Object { [double]$_.play_time })
-        accepted_swipes = Get-Distribution @($rows | ForEach-Object { [double]$_.accepted_swipes })
+        initial_fill_count = Get-Distribution @($rows | ForEach-Object { [double]$_.initial_fill_count })
+        refill_spawn_count = Get-Distribution @($rows | ForEach-Object { [double]$_.refill_spawn_count })
         first_reaction_time = Get-Distribution @($rows | ForEach-Object { [double]$_.first_reaction_time })
         finale_score_percent = Get-Distribution @($rows | ForEach-Object { [double]$_.finale_score_percent })
         final_occupancy_percent = Get-Distribution @($rows | ForEach-Object { [double]$_.final_occupancy_percent })
@@ -84,13 +105,32 @@ foreach ($interval in $intervals) {
     }
 }
 
+function Get-Case([string]$Name) {
+    return $cases | Where-Object { $_.name -eq $Name } | Select-Object -First 1
+}
+
+$h03 = Get-Case "heuristic_0_3"
+$h06 = Get-Case "heuristic_0_6"
+$h12 = Get-Case "heuristic_1_2"
+$r03 = Get-Case "random_0_3"
+$r12 = Get-Case "random_1_2"
+$criteria = [ordered]@{
+    heuristic_speed_order = ($h03.score.p50 -gt $h06.score.p50 -and $h06.score.p50 -gt $h12.score.p50)
+    heuristic_beats_random_0_3 = ($h03.score.p50 -gt $r03.score.p50)
+    heuristic_beats_random_1_2 = ($h12.score.p50 -gt $r12.score.p50)
+    random_mashing_not_large_gain = ($r03.score.p50 -le $r12.score.p50 * 1.1)
+    play_time_90_to_110 = (@($cases | Where-Object { $_.play_time.p50 -lt 89.999 -or $_.play_time.p50 -gt 110.001 }).Count -eq 0)
+    fever_percent_15_to_30 = (@($cases | Where-Object { $_.fever_time_percent.p50 -lt 15.0 -or $_.fever_time_percent.p50 -gt 30.0 }).Count -eq 0)
+}
+
 $summary = [ordered]@{
     engine = "Godot 4.8-dev3 mono"
     physics_engine = "Jolt Physics"
     physics_ticks_per_second = 120
     seeds = @(101..112)
     cases = $cases
+    criteria = $criteria
 }
-$summaryPath = Join-Path $artifactPath "blitz_summary.json"
+$summaryPath = Join-Path $artifactPath "blitz_refill_summary.json"
 $summary | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $summaryPath -Encoding utf8
 Write-Output "BLITZ_SUMMARY $summaryPath"

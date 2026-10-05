@@ -22,6 +22,7 @@ const PREVIEW_GAP: float = 16.0
 var _spawner: Spawner
 var _score_manager: ScoreManager
 var _bonus_tween: Tween
+var _blitz_mode: bool = false
 
 
 func bind_spawner(spawner: Spawner) -> void:
@@ -45,6 +46,7 @@ func bind_game_state(
 	game_manager.warning_changed.connect(_on_warning_changed)
 	game_manager.combo_changed.connect(_on_combo_changed)
 	_game_over_panel.bind(game_manager, score_manager)
+	_blitz_mode = game_manager is BlitzManager
 	_on_warning_changed(game_manager.blocked_directions)
 	_on_combo_changed(
 		game_manager.turn_combo,
@@ -52,16 +54,18 @@ func bind_game_state(
 		game_manager.max_combo
 	)
 	board.set_warning_directions(game_manager.blocked_directions)
-	var blitz_mode: bool = game_manager is BlitzManager
-	_timer_label.visible = blitz_mode
+	_timer_label.visible = _blitz_mode
 	_fever_label.visible = false
 	_bonus_label.visible = false
-	_blocked_label.visible = not blitz_mode
-	if blitz_mode:
+	_blocked_label.visible = not _blitz_mode
+	if _blitz_mode:
 		game_manager.time_changed.connect(_on_time_changed)
+		game_manager.ready_changed.connect(_on_ready_changed)
 		game_manager.fever_changed.connect(_on_fever_changed)
 		game_manager.time_bonus_awarded.connect(_on_time_bonus_awarded)
 		_on_time_changed(game_manager.remaining_time)
+		if game_manager.state == BlitzManager.State.READY:
+			_on_ready_changed(true, game_manager.ready_remaining)
 
 
 func _on_preview_changed(batches: Array) -> void:
@@ -127,12 +131,19 @@ func _on_score_changed(score: int, best: int) -> void:
 
 
 func _on_combo_changed(combo: int, multiplier: float, max_combo: int) -> void:
-	_max_combo_label.text = "MAX COMBO %d" % max_combo
+	_max_combo_label.text = "%s %d" % [
+		"MAX CHAIN" if _blitz_mode else "MAX COMBO",
+		max_combo,
+	]
 	_combo_label.visible = combo > 0
 	if combo <= 0:
 		_danger_label.visible = false
 		return
-	_combo_label.text = "COMBO %d (x%s)" % [combo, _format_multiplier(multiplier)]
+	_combo_label.text = "%s %d (x%s)" % [
+		"CHAIN" if _blitz_mode else "COMBO",
+		combo,
+		_format_multiplier(multiplier),
+	]
 
 
 func _on_reaction_scored(reaction: Dictionary) -> void:
@@ -163,6 +174,12 @@ func _on_warning_changed(directions: Array[Vector2i]) -> void:
 func _on_time_changed(remaining: float) -> void:
 	_timer_label.text = "%.1f" % maxf(remaining, 0.0)
 	_timer_label.modulate = Color("#FF3B30") if remaining <= 10.0 else Color.WHITE
+
+
+func _on_ready_changed(active: bool, remaining: float) -> void:
+	if active:
+		_timer_label.text = "READY %.1f" % remaining
+		_timer_label.modulate = Color.WHITE
 
 
 func _on_fever_changed(active: bool, remaining: float) -> void:
