@@ -224,6 +224,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M1 | `wall_thickness` | float | 256.0 | 터널링 방지용으로 두껍게 |
 | ~~M1~~ | ~~`orb_base_radius`, `orb_radius_growth`~~ | | | **#14에서 제거** → `level_radii` |
 | #14 | `level_radii` | PackedFloat32Array | [25, 40, 60, 85, 115, 150, 190] → **[25, 40, 60, 85, 100, 120, 140]** (기획서 0.6.2. #18은 보류, **#22 추가 요구 1 측정으로 2026-10-05 확정, #27 적용**) | 레벨별 반지름 |
+| #31 | `game_mode`, `blitz_*` | | §12-B 표 | 타임어택 모드 스파이크 (§12-B) |
 | #29 | `blast_enabled` 외 5개 | | §7.7 표 | 대폭발 BLAST (§7.7) |
 | #25 | `color_effects_enabled` 외 5개 | | §7.6 표 | 색별 합체 효과 (§7.6) |
 | #23 | `chain_reaction_delay` | float | 0.2 (가안, 플레이 체감으로 조정) | 합체 결과의 반응 잠금 시간 (초, §7.5) |
@@ -987,6 +988,54 @@ M4 검수(2026-09-28)에서 발견. 합체가 없는 M4 상태에서 **이동·�
 - 2D 물리·보정 장치 코드 정리는 3D 회귀가 안정된 뒤 별도 항목
 - **#21 이후 기준**: 질량 지수 2로 바닥 압력이 커져 연속 턴 벽 침투가 약 25px. 연속 턴 벽 한도 28px (22시드 14 / 16px 유지). position steps 6·8은 일관된 개선이 없어 4 유지
 - **M8 후보 — 표시 위치 보정**: 물리 위치는 그대로 두고, 렌더링할 때만 구슬 중심을 보드 안쪽 `half − r`로 제한해 벽 박힘이 보이지 않게 한다 (게임 로직·측정은 물리 위치 기준)
+
+## 12-B. 스파이크: 타임어택 모드 BLITZ (기획서 0.10 — #31, 2026-10-05 사용자 결정)
+
+턴제와 **별도 모드**로 실시간 타임어택을 만들어 둘 다 플레이해 보고 메인을 고른다. 목표 경험: **빠르게 손을 움직일수록 고득점** (참고: 비주얼드 블리츠). 턴제 코드·기본 동작은 그대로 둔다.
+
+**모드 전환**
+- `game_mode: GameMode { TURN, BLITZ }` (기본 TURN). 실행 인자 `--mode=blitz`, 디버그 키 **F4**(모드 전환 후 재시작, M9 디버그 패널이 대체할 때까지 TEMP)
+- BLITZ에서는 `TurnManager` 대신 `BlitzManager`가 흐름을 맡는다. `CollisionResolver.flush(delta)`를 매 물리 프레임 호출하는 것, 반응 흐름 `reaction_applied → (모드 매니저).on_reaction → reaction_ready → ScoreManager`, 콤보 단일 출처(#24)는 같다. HUD·DebugHud·결과 패널은 모드 매니저의 같은 이름 신호·필드에 붙는다 (덕 타이핑)
+
+**흐름**
+| 단계 | 내용 |
+|---|---|
+| 시작 | 초기 구체는 턴제와 같다 (`initial_orb_count`). 타이머 `blitz_duration` **90초** 시작 |
+| 진행 | **입력 잠금 없음**. 스와이프 즉시 중력 전환(굴러가는 중에도). 같은 방향 스와이프는 무시. 연타 방지 `blitz_swipe_cooldown` 0.12초. 보드 기울기 연출은 턴제와 같다 |
+| 생성 | 스와이프와 무관하게 `blitz_spawn_interval`(0.5초)마다 1개, 현재 중력의 반대 벽에서. 입구 대기 구체가 있으면 그 틱은 건너뛴다 (쌓이지 않음). NEXT/THEN은 다음 생성 2개. 레벨 확률 `blitz_spawn_level_weights` |
+| 종료 | 남은 시간 0 → 입력 잠금·생성 정지 → **피날레** → 결과 패널. 입구 막힘 게임오버는 없다 (판이 차면 반응이 줄어드는 것이 벌) |
+
+**스피드 콤보·피버**
+- 콤보: 반응(MERGE·MAX_CLEAR·BLAST)이 직전 반응 후 `blitz_combo_window`(1.5초) 안에 일어나면 `combo += 1`, 아니면 1부터 다시. 반응 없이 창이 지나면 0. 최대 콤보는 판 전체
+- 콤보 배수 = `min(1 + blitz_combo_step × (combo − 1), blitz_combo_max_multiplier)` (가안 0.2 / ×5). 턴제의 2^(n−1)은 실시간 콤보 수에서 폭주하므로 쓰지 않는다. 위험 배수(§8.2)는 그대로
+- **피버**: 콤보가 `blitz_fever_combo`(8)에 닿으면 `blitz_fever_duration`(6초) 동안 모든 반응 점수 ×`blitz_fever_multiplier`(2). 보드 프레임 주황 발광(임시). 피버 중 콤보 8 재도달은 시간 갱신만
+- 반응 딕셔너리에 `combo`, `combo_multiplier`, `fever` 를 싣고 `ScoreManager`는 그 값을 쓴다 (모드별 배수 계산은 모드 매니저 한 곳)
+
+**시간 보너스** (남은 시간에 더함, 화면에 `+3s` 표시)
+- BLAST `blitz_time_bonus_blast` +3초, MAX_CLEAR `blitz_time_bonus_jackpot` +5초, 콤보가 10의 배수에 닿을 때마다 `blitz_time_bonus_combo10` +2초
+
+**대폭발 레벨**: 90초 동안 들어오는 구체는 약 180개(색당 약 45개)라 L6(L1 32개 분량)은 거의 못 만든다. BLITZ에서는 `blitz_blast_min_level`(가안 **4**)을 쓴다 (턴제는 `blast_min_level` 6, #30). 깜빡임도 같은 기준
+
+**피날레 (Last Hurrah)**: 시간 종료 후 폭발 가능 구체를 큰 레벨부터 `blitz_finale_interval`(0.3초) 간격으로 **하나씩** 터뜨린다 — 그 구체만 제거 + 전역 밀어내기(§7.7과 같은 Δv) + 점수 `score_for_level(L) × blast_score_factor`(배수 없음). 밀려서 생긴 반응은 콤보·피버 규칙대로 점수. 폭발 가능 구체가 없고 마지막 반응 후 1.5초(상한 5초)가 지나면 결과 패널 `TIME UP` — 점수, 최고 점수(**BLITZ 전용 저장 키**), 최대 콤보, 대폭발 수, 피버 횟수
+
+**HUD**: 남은 시간(큰 숫자, 10초 이하 빨강), `COMBO n (x1.4)`, 피버 표시, 시간 보너스 팝업. 턴 수 표시는 숨김
+
+**새 필드 (가안, 스파이크 측정·플레이로 조정)**
+| 필드 | 가안 |
+|---|---|
+| `game_mode` | TURN |
+| `blitz_duration` | 90.0 |
+| `blitz_swipe_cooldown` | 0.12 |
+| `blitz_spawn_interval` | 0.5 |
+| `blitz_spawn_level_weights` | [0.7, 0.25, 0.05] |
+| `blitz_combo_window` | 1.5 |
+| `blitz_combo_step` / `blitz_combo_max_multiplier` | 0.2 / 5.0 |
+| `blitz_fever_combo` / `blitz_fever_duration` / `blitz_fever_multiplier` | 8 / 6.0 / 2.0 |
+| `blitz_time_bonus_blast` / `_jackpot` / `_combo10` | 3.0 / 5.0 / 2.0 |
+| `blitz_blast_min_level` | 4 |
+| `blitz_finale_interval` | 0.3 |
+
+**측정 — 이 모드의 전제 검증**: 자동 입력 봇이 `blitz_bot_interval`마다 무작위(직전과 다른) 방향으로 스와이프. **0.3 / 0.6 / 1.2초** 3조건 × 시드 101~112. 보고: 점수 분포, 반응 수, 최대 콤보, 피버 횟수·누적 시간, BLAST 수, 시간 보너스 합·실제 플레이 시간, 점유율 시계열(10초 단위), 첫 반응까지 시간, 피날레 점수 비중, wall/pair·이탈·발산(빠른 중력 전환에서의 물리 안정성). **빠른 손일수록 점수가 뚜렷하게 높아야 한다** — 아니면 전제가 성립하지 않으므로 `상태: 질문`으로 보고
 
 ## 13. 알려진 함정 (Godot 4)
 
