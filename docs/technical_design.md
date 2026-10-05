@@ -224,6 +224,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M1 | `wall_thickness` | float | 256.0 | 터널링 방지용으로 두껍게 |
 | ~~M1~~ | ~~`orb_base_radius`, `orb_radius_growth`~~ | | | **#14에서 제거** → `level_radii` |
 | #14 | `level_radii` | PackedFloat32Array | [25, 40, 60, 85, 115, 150, 190] → **[25, 40, 60, 85, 100, 120, 140]** (기획서 0.6.2. #18은 보류, **#22 추가 요구 1 측정으로 2026-10-05 확정, #27 적용**) | 레벨별 반지름 |
+| #29 | `blast_enabled` 외 5개 | | §7.7 표 | 대폭발 BLAST (§7.7) |
 | #25 | `color_effects_enabled` 외 5개 | | §7.6 표 | 색별 합체 효과 (§7.6) |
 | #23 | `chain_reaction_delay` | float | 0.2 (가안, 플레이 체감으로 조정) | 합체 결과의 반응 잠금 시간 (초, §7.5) |
 | #21 | `combo_multiplier_base` | float | 2.0 | 콤보 배수 밑 (§8.2) |
@@ -659,6 +660,31 @@ MERGE·MAX_CLEAR 반응 직후 반응 지점 `p`에서 충격파를 낸다.
 | `green_shake_speed` / `green_shake_max_speed` | float | 150 / 600 (px/s) |
 
 - 위험: PULL은 구체를 서로·벽 쪽으로 몰아 **겹침·벽 관통**을 늘릴 수 있다. §10 3D 임계값(22시드 벽 ≤14 / 쌍 ≤16px, 연속 턴 벽 ≤28 / 쌍 ≤60px, 이탈·발산 0)을 그대로 지켜야 하며, 넘으면 계수를 낮추는 쪽으로 보고한다
+
+
+### 7.7 대폭발 BLAST (기획서 0.9.5 — #29)
+레벨 `blast_min_level`(5) 이상 구체는 **폭발 가능 상태**다. 폭발 가능 구체 둘이 닿으면 **색과 무관하게** 둘 다 사라지고 판 전체를 밀어낸다.
+
+- **판정 순서** (`ReactionRules.classify`): ① 같은 색·같은 레벨 → MERGE / MAX_CLEAR (기존, 성장 우선) ② 상극 → ANNIHILATE (현재 비활성) ③ `blast_enabled`이고 두 레벨 모두 `≥ blast_min_level` → **BLAST** ④ 그 외 NONE. 즉 L5–L5(다른 색), L5–L6(색 무관), L6–L6(다른 색), L7이 낀 쌍(L7은 `orb_max_level`이라 같은 색끼리는 MAX_CLEAR)이 BLAST
+- **결과**: 두 구체 제거, 생성 없음. 지점 `p` = 두 중심의 중점
+- **밀어내기**: 판 위 **모든** 일반 구체(유령·입구 대기 제외)에 **질량 무관 속도 변화** `Δv = blast_speed × lerp(1.0, blast_far_factor, clamp(d / board_size, 0, 1))`, 방향 `(q − p).normalized()` (`d ≈ 0`이면 `Vector2.RIGHT`). 큰 구체도 같이 날아가 굳은 더미가 풀린다. 색별 효과(§7.6)·충격파(§7.4)는 BLAST에 적용하지 않는다
+- **점수**: 기본 점수 = `(score_for_level(La) + score_for_level(Lb)) × blast_score_factor` (L5+L5 = 320, L6+L6 = 640, L5+L6 = 480). 콤보·위험 배수는 §8.2 그대로. 콤보 +1
+- **잠금(§7.5)**: 합체로 막 생긴 L5·L6은 잠금 동안 BLAST도 보류된다 (기존 잠금 규칙 그대로). 결과 구체가 없으므로 BLAST 자체는 잠금을 만들지 않는다
+- **폭발 가능 표시**: 레벨 `≥ blast_min_level` 구체는 발광을 주기 `blast_blink_period`로 깜빡인다 (3D: 머티리얼 emission, 2D: 밝기). 상태 변화는 레벨로만 결정 — 별도 타이머 없음
+- **임시 연출**: 폭발 지점 흰 섬광 고리 1회 + 보드 프레임 짧은 떨림. 정식 연출(화면 흔들림·파편·사운드)은 M8
+- 반응 딕셔너리 `type = BLAST`, `levels`, `colors`, `position`, 점수 필드(§8.2). HUD·점수·콤보는 기존 경로로 처리
+- 새 필드 (가안, #29 측정 후 확정):
+
+| 필드 | 타입 | 가안 |
+|---|---|---|
+| `blast_enabled` | bool | true |
+| `blast_min_level` | int | 5 |
+| `blast_speed` | float | 900 (px/s) |
+| `blast_far_factor` | float | 0.4 (보드 한 변 거리에서 Δv 비율) |
+| `blast_score_factor` | float | 5.0 |
+| `blast_blink_period` | float | 0.8 (초) |
+
+- 위험: 판 전체에 큰 속도를 주므로 **벽 관통·겹침**이 늘 수 있다. §10 임계값을 지켜야 하며, 넘으면 `blast_speed`를 낮춘 값으로 재측정해 함께 보고
 
 ---
 
