@@ -4,7 +4,9 @@ extends Resource
 enum SpawnPositionMode { RANDOM, CENTER }
 enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 enum ShockMode { PUSH, PULL, SHAKE, LIFT }
+enum GameMode { TURN, BLITZ }
 
+@export var game_mode: GameMode = GameMode.TURN
 @export var board_size: float = 960.0
 @export var wall_thickness: float = 256.0
 @export var level_radii: PackedFloat32Array = PackedFloat32Array(
@@ -85,6 +87,23 @@ enum ShockMode { PUSH, PULL, SHAKE, LIFT }
 @export var blast_far_factor: float = 0.4
 @export var blast_score_factor: float = 5.0
 @export var blast_blink_period: float = 0.8
+@export var blitz_duration: float = 90.0
+@export var blitz_swipe_cooldown: float = 0.12
+@export var blitz_spawn_interval: float = 0.5
+@export var blitz_spawn_level_weights: PackedFloat32Array = PackedFloat32Array(
+	[0.7, 0.25, 0.05]
+)
+@export var blitz_combo_window: float = 1.5
+@export var blitz_combo_step: float = 0.2
+@export var blitz_combo_max_multiplier: float = 5.0
+@export var blitz_fever_combo: int = 8
+@export var blitz_fever_duration: float = 6.0
+@export var blitz_fever_multiplier: float = 2.0
+@export var blitz_time_bonus_blast: float = 3.0
+@export var blitz_time_bonus_jackpot: float = 5.0
+@export var blitz_time_bonus_combo10: float = 2.0
+@export var blitz_blast_min_level: int = 4
+@export var blitz_finale_interval: float = 0.3
 
 
 func radius_for_level(level: int) -> float:
@@ -102,6 +121,12 @@ func gravity_for_level(level: int) -> float:
 
 func score_for_level(level: int) -> int:
 	return level_scores[level - 1]
+
+
+func active_blast_min_level() -> int:
+	if game_mode == GameMode.BLITZ:
+		return blitz_blast_min_level
+	return blast_min_level
 
 
 func spawn_count_for_turn(turn_index: int) -> int:

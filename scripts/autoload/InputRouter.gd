@@ -4,6 +4,7 @@ signal swipe(direction: Vector2i)
 signal restart_requested
 signal debug_cycle_annihilation_rule
 signal debug_cycle_spawn_count
+signal debug_toggle_game_mode
 
 enum PointerSource { NONE, MOUSE, TOUCH }
 
@@ -48,6 +49,10 @@ func _handle_keyboard(event: InputEvent) -> bool:
 	# TEMP(M7): M9 디버그 패널이 생성 수 선택을 대체할 때 제거한다.
 	if OS.is_debug_build() and event.is_action_pressed(&"debug_cycle_spawn_count", false):
 		debug_cycle_spawn_count.emit()
+		return true
+	# TEMP(M9): 정식 모드 선택 UI가 생기면 제거한다.
+	if OS.is_debug_build() and event.is_action_pressed(&"debug_toggle_game_mode", false):
+		debug_toggle_game_mode.emit()
 		return true
 	if _locked:
 		return false

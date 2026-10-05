@@ -96,6 +96,48 @@ theme_override_font_sizes/font_size = 32
 text = "DANGER x1.0"
 horizontal_alignment = 1
 
+[node name="TimerLabel" type="Label" parent="Hud"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 0
+offset_left = 390.0
+offset_top = 360.0
+offset_right = 770.0
+offset_bottom = 470.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 72
+text = "90.0"
+horizontal_alignment = 1
+
+[node name="FeverLabel" type="Label" parent="Hud"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 0
+offset_left = 330.0
+offset_top = 480.0
+offset_right = 830.0
+offset_bottom = 550.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.623529, 0.0392157, 1)
+theme_override_font_sizes/font_size = 40
+text = "FEVER x2  6.0s"
+horizontal_alignment = 1
+
+[node name="BonusLabel" type="Label" parent="Hud"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 0
+offset_left = 330.0
+offset_top = 560.0
+offset_right = 830.0
+offset_bottom = 630.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.188235, 0.643137, 0.423529, 1)
+theme_override_font_sizes/font_size = 38
+text = "+3s  BLAST"
+horizontal_alignment = 1
+
 [node name="NextLabel" type="Label" parent="Hud"]
 unique_name_in_owner = true
 layout_mode = 0
@@ -171,7 +213,8 @@ mouse_filter = 2
 theme_override_constants/separation = 28
 alignment = 1
 
-[node name="Title" type="Label" parent="Hud/GameOverPanel/Margin/Content"]
+[node name="ResultTitle" type="Label" parent="Hud/GameOverPanel/Margin/Content"]
+unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 0.231373, 0.188235, 1)

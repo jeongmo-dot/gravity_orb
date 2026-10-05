@@ -33,7 +33,7 @@ static func classify(
 	if (
 		cfg.blast_enabled
 		and level_a == level_b
-		and level_a >= cfg.blast_min_level
+		and level_a >= cfg.active_blast_min_level()
 	):
 		return _result(Type.BLAST, 0, color_a)
 	return _result(Type.NONE, 0, color_a)

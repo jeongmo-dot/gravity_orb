@@ -112,6 +112,35 @@ func test_scoring_populates_reaction_dictionary() -> void:
 		assert_true(reaction.has(key), "scored reaction key %s" % key)
 
 
+func test_blitz_combo_fever_and_finale_scoring() -> void:
+	var cfg: GameConfig = _config()
+	var reaction: Dictionary = _reaction(
+		ReactionRules.Type.MERGE,
+		8,
+		[3, 3],
+		4,
+		0.20
+	)
+	reaction["combo_multiplier"] = 2.4
+	reaction["fever"] = true
+	assert_eq(ScoreManager.points_for(reaction, cfg), 76, "blitz combo and fever")
+	assert_near(float(reaction["fever_multiplier"]), 2.0, TOLERANCE, "fever x2")
+	var finale: Dictionary = _reaction(
+		ReactionRules.Type.BLAST,
+		20,
+		[5],
+		0,
+		0.80
+	)
+	finale["combo_multiplier"] = 5.0
+	finale["fever"] = true
+	finale["finale"] = true
+	assert_eq(ScoreManager.points_for(finale, cfg), 160, "finale single-orb base only")
+	assert_near(float(finale["combo_multiplier"]), 1.0, TOLERANCE, "finale combo ignored")
+	assert_near(float(finale["danger_multiplier"]), 1.0, TOLERANCE, "finale danger ignored")
+	assert_near(float(finale["fever_multiplier"]), 1.0, TOLERANCE, "finale fever ignored")
+
+
 func _config() -> GameConfig:
 	return CONFIG_RESOURCE.duplicate(true) as GameConfig
 

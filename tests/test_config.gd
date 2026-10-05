@@ -215,3 +215,30 @@ func test_m9_blast_defaults() -> void:
 	assert_near(config.blast_far_factor, 0.4, TOLERANCE, "blast far factor")
 	assert_near(config.blast_score_factor, 5.0, TOLERANCE, "blast score factor")
 	assert_near(config.blast_blink_period, 0.8, TOLERANCE, "blast blink period")
+
+
+func test_blitz_spike_defaults() -> void:
+	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
+	assert_eq(config.game_mode, GameConfig.GameMode.TURN, "default game mode")
+	assert_near(config.blitz_duration, 90.0, TOLERANCE, "blitz duration")
+	assert_near(config.blitz_swipe_cooldown, 0.12, TOLERANCE, "swipe cooldown")
+	assert_near(config.blitz_spawn_interval, 0.5, TOLERANCE, "spawn interval")
+	assert_eq(
+		config.blitz_spawn_level_weights,
+		PackedFloat32Array([0.7, 0.25, 0.05]),
+		"blitz spawn weights"
+	)
+	assert_near(config.blitz_combo_window, 1.5, TOLERANCE, "combo window")
+	assert_near(config.blitz_combo_step, 0.2, TOLERANCE, "combo step")
+	assert_near(config.blitz_combo_max_multiplier, 5.0, TOLERANCE, "combo cap")
+	assert_eq(config.blitz_fever_combo, 8, "fever combo")
+	assert_near(config.blitz_fever_duration, 6.0, TOLERANCE, "fever duration")
+	assert_near(config.blitz_fever_multiplier, 2.0, TOLERANCE, "fever multiplier")
+	assert_near(config.blitz_time_bonus_blast, 3.0, TOLERANCE, "blast bonus")
+	assert_near(config.blitz_time_bonus_jackpot, 5.0, TOLERANCE, "jackpot bonus")
+	assert_near(config.blitz_time_bonus_combo10, 2.0, TOLERANCE, "combo bonus")
+	assert_eq(config.blitz_blast_min_level, 4, "blitz blast level")
+	assert_near(config.blitz_finale_interval, 0.3, TOLERANCE, "finale interval")
+	assert_eq(config.active_blast_min_level(), 6, "turn blast level")
+	config.game_mode = GameConfig.GameMode.BLITZ
+	assert_eq(config.active_blast_min_level(), 4, "blitz active blast level")

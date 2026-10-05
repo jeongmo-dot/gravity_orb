@@ -111,6 +111,18 @@ func test_3d_blast_armed_orb_blinks_emission_by_level() -> void:
 	_cleanup(board)
 
 
+func test_3d_blitz_blink_starts_at_level_four() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.BLITZ
+	var board: Board3D = await _create_board()
+	var level_three: Orb3D = board.spawn_orb(0, 3, Vector2(-100.0, 0.0))
+	var level_four: Orb3D = board.spawn_orb(1, 4, Vector2(100.0, 0.0))
+	assert_true(not level_three.is_blast_armed(), "BLITZ L3 is not armed")
+	assert_true(level_four.is_blast_armed(), "BLITZ L4 is armed")
+	_cleanup(board)
+	Config.data.game_mode = original_mode
+
+
 func test_jolt_reaction_uses_shared_rules_and_spawns_3d_result() -> void:
 	var fixture_root: Node = Node.new()
 	fixture_root.name = "JoltReactionFixture"
