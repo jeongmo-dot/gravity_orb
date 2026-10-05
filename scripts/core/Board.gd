@@ -7,12 +7,16 @@ const ORB_SCENE: PackedScene = preload("res://scenes/Orb.tscn")
 const FRAME_WIDTH: float = 4.0
 const WARNING_FRAME_WIDTH: float = 12.0
 const WARNING_FRAME_COLOR: Color = Color("#FF3B30")
+const BLAST_FLASH_DURATION: float = 0.18
+const BLAST_FLASH_RADIUS: float = 150.0
+const BLAST_SHAKE_DISTANCE: float = 6.0
 
 @onready var _wall_top: StaticBody2D = %WallTop
 @onready var _wall_bottom: StaticBody2D = %WallBottom
 @onready var _wall_left: StaticBody2D = %WallLeft
 @onready var _wall_right: StaticBody2D = %WallRight
 @onready var _frame_border: Line2D = %Border
+@onready var _frame: Node2D = _frame_border.get_parent() as Node2D
 @onready var _orbs_node: Node2D = %Orbs
 
 var _orbs: Array[Orb] = []
@@ -31,6 +35,8 @@ var ghost_completed_count: int = 0
 var ghost_total_duration: float = 0.0
 var diagnostic_warnings_enabled: bool = true
 var _warning_directions: Array[Vector2i] = []
+var _blast_flash_position: Vector2 = Vector2.ZERO
+var _blast_flash_remaining: float = 0.0
 
 
 func _ready() -> void:
@@ -41,6 +47,7 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	_update_entrance_waiters()
 	_update_ghost_orbs(delta)
+	_update_blast_effect(delta)
 
 
 func half_size() -> float:
@@ -177,6 +184,57 @@ func apply_shockwave(
 			"velocity_change": velocity_change,
 		})
 	return targets
+
+
+func apply_blast(origin: Vector2) -> Array[Dictionary]:
+	var targets: Array[Dictionary] = []
+	for orb: Orb in get_orbs():
+		if orb.is_ghost or orb.is_waiting_at_entrance:
+			continue
+		var offset: Vector2 = orb.position - origin
+		var distance: float = offset.length()
+		var direction: Vector2 = (
+			Vector2.RIGHT if is_zero_approx(distance) else offset / distance
+		)
+		var distance_ratio: float = clampf(distance / Config.data.board_size, 0.0, 1.0)
+		var speed: float = Config.data.blast_speed * lerpf(
+			1.0,
+			Config.data.blast_far_factor,
+			distance_ratio
+		)
+		var velocity_change: Vector2 = direction * speed
+		orb.apply_plane_velocity_change(velocity_change)
+		targets.append({
+			"orb": orb,
+			"stable_spawn_id": orb.stable_spawn_id,
+			"level": orb.level,
+			"position": orb.position,
+			"velocity_change": velocity_change,
+		})
+	_play_blast_effect(origin)
+	return targets
+
+
+func _play_blast_effect(origin: Vector2) -> void:
+	_blast_flash_position = origin
+	_blast_flash_remaining = BLAST_FLASH_DURATION
+	queue_redraw()
+
+
+func _update_blast_effect(delta: float) -> void:
+	if _blast_flash_remaining <= 0.0:
+		return
+	_blast_flash_remaining = maxf(_blast_flash_remaining - delta, 0.0)
+	if _blast_flash_remaining <= 0.0:
+		_frame.position = Vector2.ZERO
+	else:
+		var progress: float = 1.0 - _blast_flash_remaining / BLAST_FLASH_DURATION
+		var strength: float = (1.0 - progress) * BLAST_SHAKE_DISTANCE
+		_frame.position = Vector2(
+			sin(progress * TAU * 3.0),
+			cos(progress * TAU * 4.0)
+		) * strength
+	queue_redraw()
 
 
 func _shock_mode_for_color(color: int) -> GameConfig.ShockMode:
@@ -838,6 +896,18 @@ func _configure_frame() -> void:
 
 
 func _draw() -> void:
+	if _blast_flash_remaining > 0.0:
+		var progress: float = 1.0 - _blast_flash_remaining / BLAST_FLASH_DURATION
+		draw_arc(
+			_blast_flash_position,
+			lerpf(12.0, BLAST_FLASH_RADIUS, progress),
+			0.0,
+			TAU,
+			64,
+			Color(1.0, 1.0, 1.0, 1.0 - progress),
+			8.0,
+			true
+		)
 	var half: float = half_size()
 	for direction: Vector2i in _warning_directions:
 		var wall_center: Vector2 = -Vector2(direction) * half

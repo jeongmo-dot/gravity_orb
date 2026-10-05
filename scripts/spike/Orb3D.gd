@@ -28,6 +28,10 @@ var _contact_reporting_enabled: bool = true
 var _continuous_cd_enabled: bool = true
 var _allow_sleep: bool = false
 var _progressive_growth_enabled: bool = false
+var _display_color: Color = Color.WHITE
+var _blast_armed: bool = false
+var _blast_blink_period: float = 0.8
+var _blast_blink_elapsed: float = 0.0
 
 var position: Vector2:
 	get:
@@ -91,6 +95,10 @@ static func world_angular_velocity_to_plane(value: float) -> float:
 func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	color = p_color
 	level = p_level
+	_display_color = cfg.color_display[color]
+	_blast_armed = cfg.blast_enabled and level >= cfg.blast_min_level
+	_blast_blink_period = maxf(cfg.blast_blink_period, 0.001)
+	_blast_blink_elapsed = 0.0
 	_radius = cfg.radius_for_level(level)
 	_growth_duration = maxf(cfg.grow_duration, 0.0) if _progressive_growth_enabled else 0.0
 	_growth_start_radius = _radius * clampf(cfg.grow_start_ratio, 0.0, 1.0)
@@ -130,16 +138,17 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	sphere_mesh.rings = 16
 	_mesh.mesh = sphere_mesh
 	var visual_material: StandardMaterial3D = StandardMaterial3D.new()
-	visual_material.albedo_color = cfg.color_display[color]
+	visual_material.albedo_color = _display_color
 	visual_material.metallic = 0.18
 	visual_material.roughness = 0.24
 	visual_material.emission_enabled = true
-	visual_material.emission = cfg.color_display[color] * 0.08
+	visual_material.emission = _display_color * blast_emission_strength()
 	_mesh.material_override = visual_material
 
 
 func _physics_process(delta: float) -> void:
 	_advance_growth(delta)
+	_advance_blast_blink(delta)
 
 
 func configure_physics_profile(
@@ -160,6 +169,18 @@ func get_radius() -> float:
 
 func get_current_radius() -> float:
 	return _current_radius
+
+
+func is_blast_armed() -> bool:
+	return _blast_armed
+
+
+func blast_emission_strength() -> float:
+	if not _blast_armed:
+		return 0.08
+	return 0.20 + 0.80 * (
+		0.5 + 0.5 * sin(TAU * _blast_blink_elapsed / _blast_blink_period)
+	)
 
 
 func enter_ghost_state(alpha: float) -> void:
@@ -278,9 +299,19 @@ func _set_visual_alpha(alpha: float) -> void:
 		if alpha < 1.0
 		else BaseMaterial3D.TRANSPARENCY_DISABLED
 	)
-	var display_color: Color = Config.data.color_display[color]
+	var display_color: Color = _display_color
 	display_color.a = alpha
 	material.albedo_color = display_color
+	material.emission = _display_color * blast_emission_strength()
+
+
+func _advance_blast_blink(delta: float) -> void:
+	if not _blast_armed:
+		return
+	_blast_blink_elapsed += delta
+	var material: StandardMaterial3D = _mesh.material_override as StandardMaterial3D
+	if material != null:
+		material.emission = _display_color * blast_emission_strength()
 
 
 func _advance_growth(delta: float) -> void:

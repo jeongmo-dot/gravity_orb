@@ -71,6 +71,29 @@ func test_annihilation_uses_original_levels_and_combo() -> void:
 	assert_eq(reaction["base_points"], 3, "annihilation base")
 
 
+func test_blast_uses_both_levels_combo_and_danger_multipliers() -> void:
+	var cfg: GameConfig = _config()
+	for level: int in [5, 6, 7]:
+		var reaction: Dictionary = _reaction(
+			ReactionRules.Type.BLAST,
+			1,
+			[level, level],
+			0,
+			0.20
+		)
+		var expected: int = (cfg.score_for_level(level) * 2) * 5
+		assert_eq(ScoreManager.points_for(reaction, cfg), expected, "L%d blast" % level)
+	var multiplied: Dictionary = _reaction(
+		ReactionRules.Type.BLAST,
+		2,
+		[5, 5],
+		0,
+		0.50
+	)
+	assert_eq(ScoreManager.points_for(multiplied, cfg), 1280, "blast combo and danger")
+	assert_eq(multiplied["base_points"], 320, "blast base points")
+
+
 func test_scoring_populates_reaction_dictionary() -> void:
 	var reaction: Dictionary = _reaction(
 		ReactionRules.Type.MERGE,

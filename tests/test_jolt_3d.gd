@@ -94,6 +94,21 @@ func test_level_gravity_scale_accelerates_large_orbs() -> void:
 	Config.data.gravity_level_scale = original_scale
 
 
+func test_3d_blast_armed_orb_blinks_emission_by_level() -> void:
+	var board: Board3D = await _create_board()
+	var level_four: Orb3D = board.spawn_orb(0, 4, Vector2(-100.0, 0.0))
+	var level_five: Orb3D = board.spawn_orb(1, 5, Vector2(100.0, 0.0))
+	assert_true(not level_four.is_blast_armed(), "3D L4 is not armed")
+	assert_true(level_five.is_blast_armed(), "3D L5 is armed")
+	var initial_strength: float = level_five.blast_emission_strength()
+	level_five._physics_process(Config.data.blast_blink_period * 0.25)
+	assert_true(
+		not is_equal_approx(level_five.blast_emission_strength(), initial_strength),
+		"3D armed emission oscillates"
+	)
+	_cleanup(board)
+
+
 func test_jolt_reaction_uses_shared_rules_and_spawns_3d_result() -> void:
 	var fixture_root: Node = Node.new()
 	fixture_root.name = "JoltReactionFixture"

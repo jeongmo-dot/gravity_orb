@@ -10,6 +10,9 @@ const VISUAL_TILT_DEGREES: float = 4.0
 const VISUAL_TILT_DURATION: float = 0.25
 const WARNING_FRAME_COLOR: Color = Color("#FF3B30")
 const NORMAL_FRAME_COLOR: Color = Color("#8ec5ff")
+const BLAST_FLASH_DURATION: float = 0.18
+const BLAST_FLASH_RADIUS_M: float = 1.5
+const BLAST_SHAKE_DISTANCE_M: float = 0.06
 
 @onready var _orbs_node: Node3D = %Orbs
 @onready var _physics_geometry: Node3D = %PhysicsGeometry
@@ -21,6 +24,9 @@ var _gravity_direction: Vector2i = Vector2i.DOWN
 var _warning_directions: Array[Vector2i] = []
 var _visual_walls: Dictionary = {}
 var _tilt_tween: Tween
+var _blast_flash: MeshInstance3D
+var _blast_flash_material: StandardMaterial3D
+var _blast_flash_remaining: float = 0.0
 var orb_contact_reporting_enabled: bool = true
 var orb_continuous_cd_enabled: bool = true
 var orb_allow_sleep: bool = false
@@ -36,9 +42,10 @@ func _ready() -> void:
 	_configure_visuals()
 
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	_update_entrance_waiters()
-	_update_ghost_orbs(_delta)
+	_update_ghost_orbs(delta)
+	_update_blast_effect(delta)
 
 
 func half_size() -> float:
@@ -196,6 +203,87 @@ func apply_shockwave(
 			"velocity_change": velocity_change,
 		})
 	return targets
+
+
+func apply_blast(origin: Vector2) -> Array[Dictionary]:
+	var targets: Array[Dictionary] = []
+	for orb: Orb3D in get_orbs():
+		if orb.is_ghost or orb.is_waiting_at_entrance:
+			continue
+		var offset: Vector2 = orb.position - origin
+		var distance: float = offset.length()
+		var direction: Vector2 = (
+			Vector2.RIGHT if is_zero_approx(distance) else offset / distance
+		)
+		var distance_ratio: float = clampf(distance / Config.data.board_size, 0.0, 1.0)
+		var speed: float = Config.data.blast_speed * lerpf(
+			1.0,
+			Config.data.blast_far_factor,
+			distance_ratio
+		)
+		var velocity_change: Vector2 = direction * speed
+		orb.apply_plane_velocity_change(velocity_change)
+		targets.append({
+			"orb": orb,
+			"stable_spawn_id": orb.stable_spawn_id,
+			"level": orb.level,
+			"position": orb.position,
+			"velocity_change": velocity_change,
+		})
+	_play_blast_effect(origin)
+	return targets
+
+
+func _play_blast_effect(origin: Vector2) -> void:
+	if is_instance_valid(_blast_flash):
+		_blast_flash.queue_free()
+	_blast_flash = MeshInstance3D.new()
+	_blast_flash.name = "BlastFlash"
+	var ring_mesh: ImmediateMesh = ImmediateMesh.new()
+	_blast_flash_material = StandardMaterial3D.new()
+	_blast_flash_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_blast_flash_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_blast_flash_material.albedo_color = Color.WHITE
+	_blast_flash_material.emission_enabled = true
+	_blast_flash_material.emission = Color.WHITE
+	_blast_flash_material.vertex_color_use_as_albedo = true
+	ring_mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP, _blast_flash_material)
+	for point_index: int in range(65):
+		var angle: float = TAU * float(point_index) / 64.0
+		ring_mesh.surface_set_color(Color.WHITE)
+		ring_mesh.surface_add_vertex(Vector3(cos(angle), sin(angle), 0.0))
+	ring_mesh.surface_end()
+	_blast_flash.mesh = ring_mesh
+	_blast_flash.position = Orb3D.plane_position_to_world(origin, 0.35)
+	_visual_tilt.add_child(_blast_flash)
+	_blast_flash_remaining = BLAST_FLASH_DURATION
+
+
+func _update_blast_effect(delta: float) -> void:
+	if _blast_flash_remaining <= 0.0:
+		return
+	_blast_flash_remaining = maxf(_blast_flash_remaining - delta, 0.0)
+	var progress: float = 1.0 - _blast_flash_remaining / BLAST_FLASH_DURATION
+	if is_instance_valid(_blast_flash):
+		var radius: float = lerpf(0.12, BLAST_FLASH_RADIUS_M, progress)
+		_blast_flash.scale = Vector3(radius, radius, radius)
+	if _blast_flash_material != null:
+		var flash_color: Color = Color(1.0, 1.0, 1.0, 1.0 - progress)
+		_blast_flash_material.albedo_color = flash_color
+		_blast_flash_material.emission = Color.WHITE * (1.0 - progress)
+	if _blast_flash_remaining <= 0.0:
+		_visual_tilt.position = Vector3.ZERO
+		if is_instance_valid(_blast_flash):
+			_blast_flash.queue_free()
+		_blast_flash = null
+		_blast_flash_material = null
+	else:
+		var strength: float = (1.0 - progress) * BLAST_SHAKE_DISTANCE_M
+		_visual_tilt.position = Vector3(
+			sin(progress * TAU * 3.0),
+			cos(progress * TAU * 4.0),
+			0.0
+		) * strength
 
 
 func _shock_mode_for_color(color: int) -> GameConfig.ShockMode:

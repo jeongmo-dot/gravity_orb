@@ -52,6 +52,7 @@ func test_rule_a_annihilates_every_red_blue_level_pair() -> void:
 
 func test_rule_b_annihilates_only_equal_red_blue_levels() -> void:
 	var cfg: GameConfig = GameConfig.new()
+	cfg.blast_enabled = false
 	_enable_red_blue(cfg)
 	cfg.annihilation_rule = GameConfig.AnnihilationRule.B_SAME_LEVEL
 	for red_level: int in range(1, cfg.orb_max_level + 1):
@@ -181,6 +182,46 @@ func test_rule_change_is_read_on_each_classification() -> void:
 		cfg
 	)
 	assert_eq(under_b["type"], ReactionRules.Type.NONE, "rule B after change")
+
+
+func test_blast_requires_same_level_different_color_and_minimum_level() -> void:
+	var cfg: GameConfig = GameConfig.new()
+	var cases: Array[Dictionary] = [
+		{"colors": [0, 1], "levels": [5, 5], "type": ReactionRules.Type.BLAST},
+		{"colors": [0, 0], "levels": [5, 5], "type": ReactionRules.Type.MERGE},
+		{"colors": [0, 0], "levels": [5, 6], "type": ReactionRules.Type.NONE},
+		{"colors": [0, 1], "levels": [5, 6], "type": ReactionRules.Type.NONE},
+		{"colors": [0, 2], "levels": [6, 6], "type": ReactionRules.Type.BLAST},
+		{"colors": [2, 2], "levels": [6, 6], "type": ReactionRules.Type.MERGE},
+		{"colors": [0, 1], "levels": [4, 4], "type": ReactionRules.Type.NONE},
+		{"colors": [0, 1], "levels": [5, 7], "type": ReactionRules.Type.NONE},
+		{"colors": [0, 3], "levels": [7, 7], "type": ReactionRules.Type.BLAST},
+		{"colors": [3, 3], "levels": [7, 7], "type": ReactionRules.Type.MAX_CLEAR},
+	]
+	for item: Dictionary in cases:
+		var colors: Array = item["colors"] as Array
+		var levels: Array = item["levels"] as Array
+		var result: Dictionary = ReactionRules.classify(
+			int(colors[0]),
+			int(levels[0]),
+			int(colors[1]),
+			int(levels[1]),
+			cfg
+		)
+		assert_eq(result["type"], item["type"], "blast table %s" % str(item))
+
+
+func test_blast_toggle_and_minimum_level_preserve_old_behavior() -> void:
+	var cfg: GameConfig = GameConfig.new()
+	cfg.blast_enabled = false
+	var disabled: Dictionary = ReactionRules.classify(0, 5, 1, 5, cfg)
+	assert_eq(disabled["type"], ReactionRules.Type.NONE, "disabled blast")
+	cfg.blast_enabled = true
+	cfg.blast_min_level = 6
+	var level_five: Dictionary = ReactionRules.classify(0, 5, 1, 5, cfg)
+	var level_six: Dictionary = ReactionRules.classify(0, 6, 1, 6, cfg)
+	assert_eq(level_five["type"], ReactionRules.Type.NONE, "minimum excludes L5")
+	assert_eq(level_six["type"], ReactionRules.Type.BLAST, "minimum includes L6")
 
 
 func _enable_red_blue(cfg: GameConfig) -> void:

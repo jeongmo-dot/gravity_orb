@@ -43,6 +43,11 @@ var _skip_determinism: bool = false
 var _turn_shock_events: Array[Dictionary] = []
 var _seed_reactions_by_color: Dictionary = {}
 var _seed_max_clear_count: int = 0
+var _seed_blast_count: int = 0
+var _seed_first_blast_turn: int = -1
+var _current_measurement_turn: int = 0
+var _turn_reaction_count: int = 0
+var _turn_blast_count: int = 0
 
 
 func _ready() -> void:
@@ -74,6 +79,11 @@ func _run() -> void:
 		"shock_color_radius_factor": Array(Config.data.shock_color_radius_factor),
 		"green_shake_speed": Config.data.green_shake_speed,
 		"green_shake_max_speed": Config.data.green_shake_max_speed,
+		"blast_enabled": Config.data.blast_enabled,
+		"blast_min_level": Config.data.blast_min_level,
+		"blast_speed": Config.data.blast_speed,
+		"blast_far_factor": Config.data.blast_far_factor,
+		"blast_score_factor": Config.data.blast_score_factor,
 		"spawn_count_per_turn": Config.data.spawn_count_per_turn,
 		"preview_turns": Config.data.preview_turns,
 		"level_radii_px": Array(Config.data.level_radii),
@@ -189,6 +199,9 @@ func _run_seed(
 ) -> Dictionary:
 	_seed_reactions_by_color = {"RED": 0, "BLUE": 0, "GREEN": 0, "YELLOW": 0}
 	_seed_max_clear_count = 0
+	_seed_blast_count = 0
+	_seed_first_blast_turn = -1
+	_current_measurement_turn = 0
 	var fixture: Dictionary = await _create_fixture(seed)
 	var fixture_root: Node = fixture["root"] as Node
 	var board: Board3D = fixture["board"] as Board3D
@@ -200,11 +213,16 @@ func _run_seed(
 	var hashes: Array[String] = []
 	var engine_count_samples: Array[Dictionary] = []
 	var turn_performance_samples: Array[Dictionary] = []
+	var turn_rows: Array[Dictionary] = []
 	var seed_max_pair_end: Dictionary = {"penetration_px": 0.0, "category": "none"}
 	var seed_max_pair_end_turn: int = 0
 	var seed_max_wall: float = 0.0
 	for turn_offset: int in range(max_turns):
 		_turn_shock_events.clear()
+		_current_measurement_turn = turn_offset + 1
+		_turn_reaction_count = 0
+		_turn_blast_count = 0
+		var score_before: int = score_manager.score
 		var direction: Vector2i = DIRECTION_PATTERN[turn_offset % DIRECTION_PATTERN.size()]
 		var same_direction: bool = direction == manager.gravity
 		var before: Dictionary = _snapshot_orbs(board)
@@ -228,6 +246,14 @@ func _run_seed(
 			"physics_ms_max": float(frame_metrics["physics_ms_max"]),
 		})
 		var occupancy: float = _board_occupancy(board)
+		turn_rows.append({
+			"turn": completed_turns,
+			"occupancy": occupancy,
+			"reactions": _turn_reaction_count,
+			"combo": manager.turn_combo,
+			"score_gain": score_manager.score - score_before,
+			"blast_count": _turn_blast_count,
+		})
 		var bin_name: String = _occupancy_bin(occupancy)
 		var bin_values: Dictionary = bins[bin_name] as Dictionary
 		bin_values["turns"] = int(bin_values["turns"]) + 1
@@ -295,6 +321,10 @@ func _run_seed(
 		"reactions_by_color": _seed_reactions_by_color.duplicate(),
 		"max_level_reached": score_manager.max_level_reached,
 		"max_clear_count": _seed_max_clear_count,
+		"blast_count": _seed_blast_count,
+		"first_blast_turn": _seed_first_blast_turn,
+		"reactions_three_turns_after_blast": _reactions_after_blast(turn_rows),
+		"turn_rows": turn_rows,
 		"aborted": aborted,
 		"abort_reason": abort_reason,
 		"hashes": hashes,
@@ -623,6 +653,13 @@ func _projection_item_less(first: Dictionary, second: Dictionary) -> bool:
 
 func _record_shock_event(reaction: Dictionary) -> void:
 	var reaction_type: ReactionRules.Type = reaction["type"] as ReactionRules.Type
+	_turn_reaction_count += 1
+	if reaction_type == ReactionRules.Type.BLAST:
+		_turn_blast_count += 1
+		_seed_blast_count += 1
+		if _seed_first_blast_turn < 0:
+			_seed_first_blast_turn = _current_measurement_turn
+		return
 	if (
 		reaction_type != ReactionRules.Type.MERGE
 		and reaction_type != ReactionRules.Type.MAX_CLEAR
@@ -639,6 +676,25 @@ func _record_shock_event(reaction: Dictionary) -> void:
 		)
 	var targets: Array[Dictionary] = reaction["shock_targets"] as Array[Dictionary]
 	_turn_shock_events.append({"targets": targets})
+
+
+func _reactions_after_blast(turn_rows: Array[Dictionary]) -> Dictionary:
+	var reaction_sum: int = 0
+	var blast_windows: int = 0
+	for index: int in range(turn_rows.size()):
+		var blast_count: int = int(turn_rows[index]["blast_count"])
+		if blast_count <= 0:
+			continue
+		var following_reactions: int = 0
+		for following_index: int in range(index + 1, mini(index + 4, turn_rows.size())):
+			following_reactions += int(turn_rows[following_index]["reactions"])
+		reaction_sum += following_reactions * blast_count
+		blast_windows += blast_count
+	return {
+		"sum": reaction_sum,
+		"windows": blast_windows,
+		"mean": _safe_ratio(float(reaction_sum), blast_windows),
+	}
 
 
 func _empty_shock_displacements() -> Dictionary:
@@ -1057,6 +1113,12 @@ func _apply_arguments() -> void:
 			Config.data.shock_jackpot_scale = argument.trim_prefix(
 				"--shock-jackpot-scale="
 			).to_float()
+		elif argument == "--blast=on":
+			Config.data.blast_enabled = true
+		elif argument == "--blast=off":
+			Config.data.blast_enabled = false
+		elif argument.begins_with("--blast-speed="):
+			Config.data.blast_speed = argument.trim_prefix("--blast-speed=").to_float()
 		elif argument == "--color-effects=on":
 			Config.data.color_effects_enabled = true
 		elif argument == "--color-effects=off":

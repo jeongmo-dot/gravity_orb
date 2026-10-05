@@ -1,7 +1,7 @@
 class_name ReactionRules
 extends RefCounted
 
-enum Type { NONE, MERGE, MAX_CLEAR, ANNIHILATE }
+enum Type { NONE, MERGE, MAX_CLEAR, ANNIHILATE, BLAST }
 
 
 static func classify(
@@ -16,21 +16,26 @@ static func classify(
 			return _result(Type.MAX_CLEAR, 0, color_a)
 		return _result(Type.MERGE, level_a + 1, color_a)
 
-	if not cfg.is_opposite(color_a, color_b):
-		return _result(Type.NONE, 0, color_a)
+	if cfg.is_opposite(color_a, color_b):
+		match cfg.annihilation_rule:
+			GameConfig.AnnihilationRule.A_BOTH:
+				return _result(Type.ANNIHILATE, 0, color_a)
+			GameConfig.AnnihilationRule.B_SAME_LEVEL:
+				if level_a == level_b:
+					return _result(Type.ANNIHILATE, 0, color_a)
+			GameConfig.AnnihilationRule.C_REMAINDER:
+				if level_a == level_b:
+					return _result(Type.ANNIHILATE, 0, color_a)
+				if level_a > level_b:
+					return _result(Type.ANNIHILATE, level_a - level_b, color_a, 1)
+				return _result(Type.ANNIHILATE, level_b - level_a, color_b, 2)
 
-	match cfg.annihilation_rule:
-		GameConfig.AnnihilationRule.A_BOTH:
-			return _result(Type.ANNIHILATE, 0, color_a)
-		GameConfig.AnnihilationRule.B_SAME_LEVEL:
-			if level_a == level_b:
-				return _result(Type.ANNIHILATE, 0, color_a)
-		GameConfig.AnnihilationRule.C_REMAINDER:
-			if level_a == level_b:
-				return _result(Type.ANNIHILATE, 0, color_a)
-			if level_a > level_b:
-				return _result(Type.ANNIHILATE, level_a - level_b, color_a, 1)
-			return _result(Type.ANNIHILATE, level_b - level_a, color_b, 2)
+	if (
+		cfg.blast_enabled
+		and level_a == level_b
+		and level_a >= cfg.blast_min_level
+	):
+		return _result(Type.BLAST, 0, color_a)
 	return _result(Type.NONE, 0, color_a)
 
 

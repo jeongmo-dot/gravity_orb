@@ -117,6 +117,7 @@ func flush(delta: float = 0.0) -> int:
 			else result_level
 		)
 		var shock_targets: Array[Dictionary] = []
+		var blast_targets: Array[Dictionary] = []
 		if (
 			reaction_type == ReactionRules.Type.MERGE
 			or reaction_type == ReactionRules.Type.MAX_CLEAR
@@ -133,6 +134,8 @@ func flush(delta: float = 0.0) -> int:
 					else Callable()
 				)
 			)
+		elif reaction_type == ReactionRules.Type.BLAST:
+			blast_targets = _board.apply_blast(reaction_position)
 
 		var reaction: Dictionary = {
 			"type": reaction_type,
@@ -146,6 +149,7 @@ func flush(delta: float = 0.0) -> int:
 			"result_orb": result_orb,
 			"shock_level": shock_level,
 			"shock_targets": shock_targets,
+			"blast_targets": blast_targets,
 		}
 		reaction_applied.emit(reaction)
 		applied += 1
