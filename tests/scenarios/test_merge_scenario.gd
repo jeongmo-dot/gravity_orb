@@ -480,8 +480,19 @@ func test_max_level_pair_clears_without_result() -> void:
 	var fixture: Dictionary = await _create_fixture()
 	var board: Board = fixture["board"] as Board
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
-	board.spawn_orb(OrbTypes.OrbColor.RED, Config.data.orb_max_level, Vector2(-180.0, 0.0))
-	board.spawn_orb(OrbTypes.OrbColor.RED, Config.data.orb_max_level, Vector2(180.0, 0.0))
+	var half_distance: float = (
+		Config.data.radius_for_level(Config.data.orb_max_level) - 0.5
+	)
+	board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		Config.data.orb_max_level,
+		Vector2(-half_distance, 0.0)
+	)
+	board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		Config.data.orb_max_level,
+		Vector2(half_distance, 0.0)
+	)
 
 	var applied: int = await _advance_and_flush(board, resolver, OBSERVE_SECONDS)
 	assert_eq(applied, 1, "maximum clear reaction count")

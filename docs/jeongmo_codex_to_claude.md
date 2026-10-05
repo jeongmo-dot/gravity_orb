@@ -38,6 +38,33 @@
 
 ## 미확인
 
+### [2026-10-05] 대상 #27 — 큰 구체 반지름 축소 기본값 적용
+- 상태: 완료
+- 브랜치 / PR: `m9-reduced-large-orb-radii` / https://github.com/jeongmo-dot/gravity_orb/pull/29
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `tests/{test_config,test_shockwave}.gd`, `tests/scenarios/test_merge_scenario.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `level_radii` 선언·기본 리소스·config 기대값을 `[25,40,60,85,100,120,140]`으로 변경
+  - [x] 반지름 의존 픽스처 2곳을 설정값 기준으로 변경: MAX_CLEAR 충격파 대상은 L7 충격 반경의 50%, L7 두 구체는 1px 겹침
+  - [x] 3D 구슬은 `Orb3D.setup()`에서 충돌 `SphereShape3D`와 시각 `SphereMesh`를 모두 `cfg.radius_for_level()`로 만들며 Jolt 단위 테스트 `6/6` 통과
+  - [x] HUD NEXT/THEN은 `Hud._render_preview()`에서 `Config.data.radius_for_level()`을 사용하고 실제 `OrbVisual.get_radius()`를 같은 값과 대조하는 점수 흐름 테스트 `10/10` 통과
+  - [x] 전체 테스트 `147/147`, 3D 22시드·20턴·120턴 회귀 및 §10.1 명령 3종 완료
+- QA 관측값:
+  - config `10/10`, 충격파 `9/9`, 합체 시나리오 `15/15`, Jolt 3D 단위 `6/6`, HUD·점수 흐름 `10/10`; 각 종료 코드 0
+  - 최초 전체 회귀에서 기존 L7 190px에 고정된 충격파 거리 `237.5px` 때문에 기대 충격량 `1260` 대신 `810`이 관측됨. 거리 정의를 `L7 반지름 × shock_radius_factor × 0.5`로 바꿔 같은 falloff 의도를 유지
+  - 두 번째 전체 회귀에서 기존 L7 190px에 맞춘 중심 `±180px`의 MAX_CLEAR 구체가 새 반지름 140px에서는 접촉하지 않아 반응 `0`이 관측됨. 중심 거리를 `±(L7 반지름−0.5)`로 바꿔 1px 겹침을 명시
+  - 최종 `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 최종 `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . -s res://tests/run_tests.gd` → `147/147`, 종료 코드 0
+  - 최종 `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe --headless --path . --quit-after 300` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 2D 22시드: 최대 침투 `10.595px`, 이탈·발산·escape guard·벽 복구·timeout 보정 `0`
+  - 3D 22시드: wall/pair `12.9515/11.9914px`, 이탈·발산 `0`; 20턴: 최대 침투 `8.543px`, 이탈·발산 `0`; 120턴: 최대 침투 `14.542px`, 이탈·발산·escape guard·벽 복구·timeout 보정 `0`
+  - 규칙 점검 → `Input`/`InputEvent`는 `InputRouter.gd`만, 난수 호출은 `Spawner.gd`만 검출
+  - Windows 사용자 로그·루트 인증서·에디터 설정 저장 오류는 제한 실행 환경 메시지이며 프로젝트 스크립트 오류는 없음
+- 수동 확인 절차:
+  1. 디버그에서 L5→L6→L7 구체를 만들거나 배치한다 → 반지름이 각각 100/120/140px로 단계적으로 커지고 3D 시각 구체와 충돌 크기가 일치한다.
+  2. NEXT/THEN에 L5~L7 후보가 나올 때 표시 크기를 기억한 뒤 생성한다 → HUD 미리보기와 실제 구체가 같은 레벨 반지름 비율을 사용한다.
+- 결정 사항: 측정은 #22 추가 요구 1로 대체해 다시 실행하지 않았다. 반지름 변경에 따라 `mass_for_level()` 공식이 계산하는 실제 질량은 설계대로 함께 달라지지만, 질량 지수·중력·충격파·색 효과·생성 계수는 변경하지 않았다.
+- 남은 것 · 질문: 자동 검증 기준의 미완료 항목 없음. 실제 화면에서 L5~L7 시각 체감은 위 수동 절차로 확인 필요.
+
 ### [2026-10-05] 대상 #22 추가 요구 1 — 턴당 1개 기준 큰 구체 반지름 재측정
 - 상태: 질문
 - 브랜치 / PR: `m9-large-orb-radius-remeasure` / https://github.com/jeongmo-dot/gravity_orb/pull/28

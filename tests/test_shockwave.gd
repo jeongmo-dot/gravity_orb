@@ -74,7 +74,10 @@ func test_max_clear_applies_level_and_jackpot_multipliers() -> void:
 	var target: Orb3D = board.spawn_orb(
 		OrbTypes.OrbColor.GREEN,
 		1,
-		Vector2(237.5, 0.0)
+		Vector2(
+			Config.data.radius_for_level(7) * Config.data.shock_radius_factor * 0.5,
+			0.0
+		)
 	)
 	var targets: Array[Dictionary] = board.apply_shockwave(
 		Vector2.ZERO,
