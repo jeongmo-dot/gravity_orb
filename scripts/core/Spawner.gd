@@ -7,8 +7,10 @@ signal orb_spawned(level: int)
 
 const EFFECT_SEED_SALT: int = 0x25C01A
 const BOT_SEED_SALT: int = 0x31B117
+const BLITZ_FILL_MAX_ATTEMPTS: int = 20000
 
 var seed_used: int = 0
+var last_blitz_initial_count: int = 0
 
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _effect_rng: RandomNumberGenerator = RandomNumberGenerator.new()
@@ -45,6 +47,13 @@ func next_blitz_direction(previous: Vector2i) -> Vector2i:
 	return candidates[index]
 
 
+func choose_blitz_direction(candidates: Array[Vector2i]) -> Vector2i:
+	if candidates.is_empty():
+		return Vector2i.DOWN
+	var index: int = _bot_rng.randi_range(0, candidates.size() - 1)
+	return candidates[index]
+
+
 func next_shake_direction() -> Vector2:
 	var angle: float = _effect_rng.randf_range(-PI, PI)
 	return Vector2.from_angle(angle)
@@ -52,6 +61,12 @@ func next_shake_direction() -> Vector2:
 
 func spawn_initial(board: Variant, gravity: Vector2i) -> void:
 	board.set_gravity(gravity)
+	last_blitz_initial_count = 0
+	if _blitz_mode:
+		_spawn_blitz_initial(board)
+		_sync_preview_count(1)
+		_publish_preview()
+		return
 	var count: int = Config.data.initial_orb_count
 	var half: float = board.half_size()
 	for index: int in range(count):
@@ -68,6 +83,54 @@ func spawn_initial(board: Variant, gravity: Vector2i) -> void:
 		orb_spawned.emit(level)
 	_sync_preview_count(1)
 	_publish_preview()
+
+
+func _spawn_blitz_initial(board: Variant) -> void:
+	var board_area: float = Config.data.board_size * Config.data.board_size
+	var target_area: float = board_area * Config.data.blitz_initial_occupancy
+	var occupied_area: float = 0.0
+	var half: float = board.half_size()
+	var placed: Array[Dictionary] = []
+	var attempts: int = 0
+	while occupied_area < target_area and attempts < BLITZ_FILL_MAX_ATTEMPTS:
+		attempts += 1
+		var candidate: Dictionary = _draw_candidate()
+		var level: int = int(candidate["level"])
+		var radius: float = Config.data.radius_for_level(level)
+		var limit: float = half - radius - Config.data.spawn_margin
+		var position: Vector2 = Vector2(
+			_rng.randf_range(-limit, limit),
+			_rng.randf_range(-limit, limit)
+		)
+		if not _blitz_fill_position_is_clear(position, radius, placed):
+			continue
+		var orb: Variant = board.spawn_orb(
+			int(candidate["color"]),
+			level,
+			position
+		)
+		orb.exit_ghost_state()
+		placed.append({"position": position, "radius": radius})
+		occupied_area += PI * radius * radius
+		last_blitz_initial_count += 1
+		orb_spawned.emit(level)
+	if occupied_area < target_area:
+		push_warning(
+			"BLITZ initial fill stopped at %.3f after %d attempts"
+			% [occupied_area / board_area, attempts]
+		)
+
+
+func _blitz_fill_position_is_clear(
+	position: Vector2,
+	radius: float,
+	placed: Array[Dictionary]
+) -> bool:
+	for item: Dictionary in placed:
+		var minimum_distance: float = radius + float(item["radius"])
+		if position.distance_squared_to(item["position"] as Vector2) < minimum_distance * minimum_distance:
+			return false
+	return true
 
 
 func try_spawn(board: Variant, gravity: Vector2i, turn_index: int = 1) -> Array:

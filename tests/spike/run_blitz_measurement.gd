@@ -13,6 +13,7 @@ const DEPARTURE_MARGIN: float = 100.0
 const PAIR_SAMPLE_FRAMES: int = 12
 
 var _bot_interval: float = 0.6
+var _bot_kind: String = "heuristic"
 var _seeds: Array[int] = []
 var _output_path: String = DEFAULT_OUTPUT
 var _runner_failed: bool = false
@@ -36,16 +37,22 @@ func _run() -> void:
 		"physics_engine": str(ProjectSettings.get_setting("physics/3d/physics_engine")),
 		"physics_ticks_per_second": 120,
 		"bot_interval": _bot_interval,
+		"bot_kind": _bot_kind,
 		"seeds": rows,
 		"config": {
 			"duration": Config.data.blitz_duration,
 			"swipe_cooldown": Config.data.blitz_swipe_cooldown,
 			"spawn_interval": Config.data.blitz_spawn_interval,
 			"spawn_level_weights": Array(Config.data.blitz_spawn_level_weights),
-			"combo_window": Config.data.blitz_combo_window,
-			"combo_step": Config.data.blitz_combo_step,
-			"combo_max_multiplier": Config.data.blitz_combo_max_multiplier,
-			"fever_combo": Config.data.blitz_fever_combo,
+			"initial_occupancy": Config.data.blitz_initial_occupancy,
+			"target_occupancy": Config.data.blitz_target_occupancy,
+			"refill_interval": Config.data.blitz_refill_interval,
+			"ready_time": Config.data.blitz_ready_time,
+			"chain_window": Config.data.blitz_chain_window,
+			"chain_idle": Config.data.blitz_chain_idle,
+			"chain_step": Config.data.blitz_chain_step,
+			"chain_max_multiplier": Config.data.blitz_chain_max_multiplier,
+			"fever_chain": Config.data.blitz_fever_chain,
 			"fever_duration": Config.data.blitz_fever_duration,
 			"fever_multiplier": Config.data.blitz_fever_multiplier,
 			"blast_min_level": Config.data.blitz_blast_min_level,
@@ -84,7 +91,7 @@ func _run_seed(seed: int) -> Dictionary:
 			bot_elapsed += tick
 			while bot_elapsed + 0.000001 >= _bot_interval:
 				bot_elapsed -= _bot_interval
-				manager.on_swipe(spawner.next_blitz_direction(manager.gravity))
+				manager.on_swipe(_choose_bot_direction(board, spawner, manager.gravity))
 		while manager.play_time_elapsed + 0.000001 >= next_occupancy_sample:
 			occupancy_timeline.append({
 				"second": int(next_occupancy_sample),
@@ -105,14 +112,27 @@ func _run_seed(seed: int) -> Dictionary:
 		"score": score.score,
 		"reactions": _seed_reactions,
 		"max_combo": manager.max_combo,
+		"max_chain": manager.max_chain,
+		"chain_histogram": manager.chain_histogram,
 		"fever_count": manager.fever_count,
 		"fever_total_time": manager.fever_total_time,
+		"fever_time_percent": _safe_percent_float(
+			manager.fever_total_time,
+			manager.play_time_elapsed
+		),
 		"blast_count": manager.blast_count,
 		"finale_blast_count": manager.finale_blast_count,
 		"time_bonus_total": manager.time_bonus_total,
 		"play_time": manager.play_time_elapsed,
 		"session_time": session_elapsed,
 		"accepted_swipes": manager.accepted_swipes,
+		"productive_swipes": manager.productive_swipes,
+		"productive_swipe_percent": _safe_percent(
+			manager.productive_swipes,
+			manager.accepted_swipes
+		),
+		"initial_fill_count": spawner.last_blitz_initial_count,
+		"refill_spawn_count": manager.spawn_count,
 		"spawn_count": manager.spawn_count,
 		"skipped_spawn_ticks": manager.skipped_spawn_ticks,
 		"first_reaction_time": manager.first_reaction_time,
@@ -126,17 +146,19 @@ func _run_seed(seed: int) -> Dictionary:
 		"divergences": divergent_ids.size(),
 	}
 	print(
-		"BLITZ_SEED interval=%.1f seed=%d score=%d reactions=%d combo=%d fever=%d blast=%d bonus=%.1f play=%.2f finale=%.2f%% wall=%.3f pair=%.3f departures=%d divergences=%d" % [
+		"BLITZ_SEED bot=%s interval=%.1f seed=%d score=%d reactions=%d chain=%d productive=%.1f%% fever=%.1f%% blast=%d refill=%d bonus=%.1f play=%.2f wall=%.3f pair=%.3f departures=%d divergences=%d" % [
+			_bot_kind,
 			_bot_interval,
 			seed,
 			score.score,
 			_seed_reactions,
-			manager.max_combo,
-			manager.fever_count,
+			manager.max_chain,
+			float(row["productive_swipe_percent"]),
+			float(row["fever_time_percent"]),
 			manager.blast_count,
+			manager.spawn_count,
 			manager.time_bonus_total,
 			manager.play_time_elapsed,
-			float(row["finale_score_percent"]),
 			max_wall,
 			max_pair,
 			departed_ids.size(),
@@ -262,6 +284,73 @@ func _safe_percent(numerator: int, denominator: int) -> float:
 	return float(numerator) * 100.0 / float(denominator)
 
 
+func _safe_percent_float(numerator: float, denominator: float) -> float:
+	if denominator <= 0.0:
+		return 0.0
+	return numerator * 100.0 / denominator
+
+
+func _choose_bot_direction(
+	board: Board3D,
+	spawner: Spawner,
+	previous: Vector2i
+) -> Vector2i:
+	if _bot_kind == "random":
+		return spawner.next_blitz_direction(previous)
+	var candidates: Array[Vector2i] = []
+	for direction: Vector2i in OrbTypes.DIRECTIONS:
+		if direction != previous:
+			candidates.append(direction)
+	var best_directions: Array[Vector2i] = []
+	var best_count: int = -1
+	for direction: Vector2i in candidates:
+		var count: int = _count_reaction_pairs(board, direction)
+		if count > best_count:
+			best_count = count
+			best_directions = [direction]
+		elif count == best_count:
+			best_directions.append(direction)
+	if best_count <= 0:
+		return previous
+	return spawner.choose_blitz_direction(best_directions)
+
+
+func _count_reaction_pairs(board: Board3D, direction: Vector2i) -> int:
+	var count: int = 0
+	var orbs: Array[Orb3D] = board.get_orbs()
+	for first_index: int in range(orbs.size()):
+		var first: Orb3D = orbs[first_index]
+		if first.is_ghost or first.is_waiting_at_entrance:
+			continue
+		for second_index: int in range(first_index + 1, orbs.size()):
+			var second: Orb3D = orbs[second_index]
+			if second.is_ghost or second.is_waiting_at_entrance:
+				continue
+			var reaction: Dictionary = ReactionRules.classify(
+				first.color,
+				first.level,
+				second.color,
+				second.level,
+				Config.data
+			)
+			var reaction_type: ReactionRules.Type = reaction["type"] as ReactionRules.Type
+			if (
+				reaction_type != ReactionRules.Type.MERGE
+				and reaction_type != ReactionRules.Type.MAX_CLEAR
+				and reaction_type != ReactionRules.Type.BLAST
+			):
+				continue
+			var offset: Vector2 = second.position - first.position
+			var maximum_distance: float = (
+				first.get_radius() + second.get_radius()
+			) * 3.0
+			if offset.length() > maximum_distance or offset.is_zero_approx():
+				continue
+			if absf(offset.normalized().dot(Vector2(direction))) >= 0.8:
+				count += 1
+	return count
+
+
 func _apply_arguments() -> void:
 	_seeds.append_array(DEFAULT_SEEDS)
 	for argument: String in OS.get_cmdline_user_args():
@@ -270,6 +359,8 @@ func _apply_arguments() -> void:
 				argument.trim_prefix("--blitz-bot-interval=").to_float(),
 				0.001
 			)
+		elif argument.begins_with("--blitz-bot="):
+			_bot_kind = argument.trim_prefix("--blitz-bot=").to_lower()
 		elif argument.begins_with("--blitz-seeds="):
 			_seeds.clear()
 			for value: String in argument.trim_prefix("--blitz-seeds=").split(","):

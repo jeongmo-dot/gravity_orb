@@ -25,7 +25,10 @@ func _on_game_over() -> void:
 	_title_label.text = "TIME UP" if blitz_mode else "GAME OVER"
 	_score_label.text = "SCORE  %d" % _score_manager.score
 	_best_label.text = "BEST  %d" % _score_manager.best_score
-	_max_combo_label.text = "MAX COMBO %d" % _game_manager.max_combo
+	_max_combo_label.text = "%s %d" % [
+		"MAX CHAIN" if blitz_mode else "MAX COMBO",
+		_game_manager.max_combo,
+	]
 	if blitz_mode:
 		_blocked_label.text = "BLAST %d   FEVER %d" % [
 			_game_manager.blast_count,
