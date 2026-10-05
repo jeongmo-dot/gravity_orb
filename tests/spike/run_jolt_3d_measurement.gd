@@ -1033,6 +1033,10 @@ func _apply_arguments() -> void:
 				argument.trim_prefix("--spawn-count=").to_int(),
 				1
 			)
+		elif argument.begins_with("--level-radii="):
+			Config.data.level_radii = _parse_float_list(
+				argument.trim_prefix("--level-radii=")
+			)
 		elif argument.begins_with("--mass-exponent="):
 			Config.data.mass_exponent = argument.trim_prefix("--mass-exponent=").to_float()
 		elif argument.begins_with("--gravity-level-scale="):
@@ -1087,4 +1091,11 @@ func _parse_int_list(csv: String) -> Array[int]:
 	var result: Array[int] = []
 	for raw_value: String in csv.split(",", false):
 		result.append(raw_value.strip_edges().to_int())
+	return result
+
+
+func _parse_float_list(csv: String) -> PackedFloat32Array:
+	var result: PackedFloat32Array = PackedFloat32Array()
+	for raw_value: String in csv.split(",", false):
+		result.append(raw_value.strip_edges().to_float())
 	return result
