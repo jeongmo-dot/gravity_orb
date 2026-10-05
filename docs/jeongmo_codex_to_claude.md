@@ -40,7 +40,7 @@
 
 ### [2026-10-05] 대상 #27 — 큰 구체 반지름 축소 기본값 적용
 - 상태: 완료
-- 브랜치 / PR: `m9-reduced-large-orb-radii` / 생성 전
+- 브랜치 / PR: `m9-reduced-large-orb-radii` / https://github.com/jeongmo-dot/gravity_orb/pull/29
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `tests/{test_config,test_shockwave}.gd`, `tests/scenarios/test_merge_scenario.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `level_radii` 선언·기본 리소스·config 기대값을 `[25,40,60,85,100,120,140]`으로 변경
