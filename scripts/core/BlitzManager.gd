@@ -147,6 +147,8 @@ func on_swipe(dir: Vector2i) -> void:
 	_board.set_gravity(gravity)
 	if _board.has_method("play_visual_tilt"):
 		_board.play_visual_tilt(gravity)
+	if Config.data.blitz_spawn_on_swipe:
+		_try_spawn_next()
 	gravity_changed.emit(gravity)
 	turn_started.emit(turn_index, gravity)
 
@@ -214,17 +216,14 @@ func _advance_running(delta: float) -> void:
 	_swipe_cooldown_remaining = maxf(_swipe_cooldown_remaining - step, 0.0)
 	_advance_chain(step)
 	_advance_fever(step)
-	_spawn_elapsed += step
-	while state == State.RUNNING:
-		var spawn_interval: float = _current_spawn_interval()
-		if _spawn_elapsed < spawn_interval:
-			break
-		_spawn_elapsed -= spawn_interval
-		if not _board.entrance_waiting_orbs().is_empty():
-			skipped_spawn_ticks += 1
-			continue
-		var spawned: Array = _spawner.try_spawn(_board, gravity, spawn_count + 1)
-		spawn_count += spawned.size()
+	if not Config.data.blitz_spawn_on_swipe:
+		_spawn_elapsed += step
+		while state == State.RUNNING:
+			var spawn_interval: float = _current_spawn_interval()
+			if _spawn_elapsed < spawn_interval:
+				break
+			_spawn_elapsed -= spawn_interval
+			_try_spawn_next()
 	remaining_time = maxf(remaining_time - step, 0.0)
 	time_changed.emit(remaining_time)
 	if remaining_time <= 0.0:
@@ -236,6 +235,14 @@ func _current_spawn_interval() -> float:
 	if _board_occupancy() < Config.data.blitz_target_occupancy:
 		interval = Config.data.blitz_refill_interval
 	return maxf(interval, 0.001)
+
+
+func _try_spawn_next() -> void:
+	if not _board.entrance_waiting_orbs().is_empty():
+		skipped_spawn_ticks += 1
+		return
+	var spawned: Array = _spawner.try_spawn(_board, gravity, spawn_count + 1)
+	spawn_count += spawned.size()
 
 
 func _advance_chain(delta: float) -> void:

@@ -42,6 +42,7 @@ func _run() -> void:
 		"config": {
 			"duration": Config.data.blitz_duration,
 			"swipe_cooldown": Config.data.blitz_swipe_cooldown,
+			"spawn_on_swipe": Config.data.blitz_spawn_on_swipe,
 			"spawn_interval": Config.data.blitz_spawn_interval,
 			"spawn_level_weights": Array(Config.data.blitz_spawn_level_weights),
 			"initial_occupancy": Config.data.blitz_initial_occupancy,
@@ -132,9 +133,9 @@ func _run_seed(seed: int) -> Dictionary:
 			manager.accepted_swipes
 		),
 		"initial_fill_count": spawner.last_blitz_initial_count,
-		"refill_spawn_count": manager.spawn_count,
 		"spawn_count": manager.spawn_count,
 		"skipped_spawn_ticks": manager.skipped_spawn_ticks,
+		"skipped_spawn_count": manager.skipped_spawn_ticks,
 		"first_reaction_time": manager.first_reaction_time,
 		"finale_score": finale_score,
 		"finale_score_percent": _safe_percent(finale_score, score.score),
@@ -146,7 +147,7 @@ func _run_seed(seed: int) -> Dictionary:
 		"divergences": divergent_ids.size(),
 	}
 	print(
-		"BLITZ_SEED bot=%s interval=%.1f seed=%d score=%d reactions=%d chain=%d productive=%.1f%% fever=%.1f%% blast=%d refill=%d bonus=%.1f play=%.2f wall=%.3f pair=%.3f departures=%d divergences=%d" % [
+		"BLITZ_SEED bot=%s interval=%.1f seed=%d score=%d reactions=%d chain=%d productive=%.1f%% fever=%.1f%% blast=%d spawn=%d skipped=%d bonus=%.1f play=%.2f wall=%.3f pair=%.3f departures=%d divergences=%d" % [
 			_bot_kind,
 			_bot_interval,
 			seed,
@@ -157,6 +158,7 @@ func _run_seed(seed: int) -> Dictionary:
 			float(row["fever_time_percent"]),
 			manager.blast_count,
 			manager.spawn_count,
+			manager.skipped_spawn_ticks,
 			manager.time_bonus_total,
 			manager.play_time_elapsed,
 			max_wall,
