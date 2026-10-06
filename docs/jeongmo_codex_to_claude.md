@@ -40,7 +40,7 @@
 
 ### [2026-10-06] 대상 #34 — BLITZ 6색: 보라·청록 추가
 - 상태: 완료
-- 브랜치 / PR: `m10-blitz-six-colors` / push 후 PR 생성 예정
+- 브랜치 / PR: `m10-blitz-six-colors` / https://github.com/jeongmo-dot/gravity_orb/pull/35
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/{OrbTypes,Spawner,BlitzManager}.gd`, `tests/{test_config,test_spawner,test_rules,test_shockwave,test_orb_growth,test_jolt_3d,test_blitz_manager,run_tests.gd,run_blitz_measurement.ps1,run_color_effect_measurement.ps1}`, `tests/spike/{run_blitz_measurement,run_jolt_3d_measurement}.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `OrbColor` 뒤에 `PURPLE=4`, `CYAN=5`를 추가하고 표시색 `#A35CF0`, `#22C7D9` 및 색 효과 배열을 §12-B.4의 6칸 값으로 확장
