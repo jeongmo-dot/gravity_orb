@@ -257,3 +257,21 @@ func test_blitz_spike_defaults() -> void:
 	assert_eq(config.active_blast_min_level(), 6, "turn blast level")
 	config.game_mode = GameConfig.GameMode.BLITZ
 	assert_eq(config.active_blast_min_level(), 4, "blitz active blast level")
+
+
+func test_m8_feedback_defaults() -> void:
+	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
+	assert_true(config.fx_enabled, "FX enabled")
+	assert_true(config.fx_hitstop_enabled, "hitstop enabled")
+	assert_near(config.fx_hitstop_scale, 0.12, TOLERANCE, "hitstop time scale")
+	assert_near(config.fx_hitstop_time, 0.07, TOLERANCE, "hitstop duration")
+	assert_near(config.fx_shake_px, 16.0, TOLERANCE, "camera shake pixels")
+	assert_near(config.fx_shake_time, 0.4, TOLERANCE, "camera shake duration")
+	assert_near(config.fx_flash_alpha, 0.35, TOLERANCE, "flash alpha")
+	assert_near(config.fx_flash_time, 0.15, TOLERANCE, "flash duration")
+	assert_near(config.fx_ring_radius_factor, 4.0, TOLERANCE, "ring radius factor")
+	assert_eq(config.fx_debris_per_orb, 24, "debris count per orb")
+	assert_true(config.sfx_enabled, "SFX enabled")
+	assert_near(config.sfx_volume_db, 0.0, TOLERANCE, "SFX volume")
+	assert_eq(config.sfx_chain_semitones_max, 12, "chain pitch cap")
+	assert_near(config.sfx_pitch_jitter, 0.03, TOLERANCE, "pitch jitter")

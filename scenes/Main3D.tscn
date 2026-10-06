@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://scripts/core/Main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://scenes/Board3D.tscn" id="2_board"]
@@ -8,6 +8,8 @@
 [ext_resource type="Script" path="res://scripts/core/ScoreManager.gd" id="6_score"]
 [ext_resource type="PackedScene" path="res://scenes/UI.tscn" id="7_ui"]
 [ext_resource type="Script" path="res://scripts/core/BlitzManager.gd" id="8_blitz"]
+[ext_resource type="Script" path="res://scripts/fx/FeedbackDirector.gd" id="9_feedback"]
+[ext_resource type="Script" path="res://scripts/fx/SfxBank.gd" id="10_sfx"]
 
 [sub_resource type="Environment" id="Environment_main"]
 background_mode = 1
@@ -68,5 +70,13 @@ script = ExtResource("5_spawner")
 [node name="ScoreManager" type="Node" parent="."]
 unique_name_in_owner = true
 script = ExtResource("6_score")
+
+[node name="FeedbackDirector" type="Node" parent="."]
+unique_name_in_owner = true
+script = ExtResource("9_feedback")
+
+[node name="SfxBank" type="Node" parent="FeedbackDirector"]
+unique_name_in_owner = true
+script = ExtResource("10_sfx")
 
 [node name="UI" parent="." instance=ExtResource("7_ui")]

@@ -34,6 +34,9 @@ func _init() -> void:
 
 
 func _run_all_tests() -> void:
+	var config_node: Node = root.get_node("Config")
+	var config_data: GameConfig = config_node.get("data") as GameConfig
+	config_data.fx_hitstop_enabled = false
 	var measurement_suite: String = _apply_measurement_arguments()
 	var requested_test_file: String = _requested_test_file()
 	if not requested_test_file.is_empty():

@@ -370,6 +370,8 @@ func _next_finale_orb() -> Variant:
 
 func _apply_finale_blast(orb: Variant) -> void:
 	var level: int = orb.level
+	var color: int = orb.color
+	var stable_spawn_id: int = orb.stable_spawn_id
 	var origin: Vector2 = orb.position
 	var occupancy: float = _board_occupancy()
 	_board.remove_orb(orb)
@@ -380,6 +382,9 @@ func _apply_finale_blast(orb: Variant) -> void:
 	var reaction: Dictionary = {
 		"type": ReactionRules.Type.BLAST,
 		"levels": levels,
+		"colors": [color],
+		"stable_spawn_ids": [stable_spawn_id],
+		"position": origin,
 		"result_level": 0,
 		"occupancy": occupancy,
 		"chain": turn_combo,
@@ -387,6 +392,7 @@ func _apply_finale_blast(orb: Variant) -> void:
 		"combo_multiplier": 1.0,
 		"fever": false,
 		"finale": true,
+		"finale_index": finale_blast_count,
 		"blast_targets": blast_targets,
 	}
 	reaction_ready.emit(reaction)

@@ -129,6 +129,20 @@ enum GameMode { TURN, BLITZ }
 @export var blitz_time_bonus_cap: float = 20.0
 @export var blitz_blast_min_level: int = 4
 @export var blitz_finale_interval: float = 0.3
+@export var fx_enabled: bool = true
+@export var fx_hitstop_enabled: bool = true
+@export var fx_hitstop_scale: float = 0.12
+@export var fx_hitstop_time: float = 0.07
+@export var fx_shake_px: float = 16.0
+@export var fx_shake_time: float = 0.4
+@export var fx_flash_alpha: float = 0.35
+@export var fx_flash_time: float = 0.15
+@export var fx_ring_radius_factor: float = 4.0
+@export var fx_debris_per_orb: int = 24
+@export var sfx_enabled: bool = true
+@export var sfx_volume_db: float = 0.0
+@export var sfx_chain_semitones_max: int = 12
+@export var sfx_pitch_jitter: float = 0.03
 
 
 func radius_for_level(level: int) -> float:

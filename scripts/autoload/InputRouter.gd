@@ -5,6 +5,7 @@ signal restart_requested
 signal debug_cycle_annihilation_rule
 signal debug_cycle_spawn_count
 signal debug_toggle_game_mode
+signal debug_toggle_sfx_mute
 
 enum PointerSource { NONE, MOUSE, TOUCH }
 
@@ -53,6 +54,10 @@ func _handle_keyboard(event: InputEvent) -> bool:
 	# TEMP(M9): 정식 모드 선택 UI가 생기면 제거한다.
 	if OS.is_debug_build() and event.is_action_pressed(&"debug_toggle_game_mode", false):
 		debug_toggle_game_mode.emit()
+		return true
+	# TEMP(M8): M9 설정 화면이 SFX 음소거를 대체할 때 제거한다.
+	if OS.is_debug_build() and event.is_action_pressed(&"debug_toggle_sfx_mute", false):
+		debug_toggle_sfx_mute.emit()
 		return true
 	if _locked:
 		return false

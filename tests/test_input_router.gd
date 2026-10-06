@@ -7,6 +7,7 @@ var _debug_cycles: int = 0
 var _spawn_count_cycles: int = 0
 var _mode_toggles: int = 0
 var _restart_requests: int = 0
+var _sfx_mute_toggles: int = 0
 
 
 func test_mouse_left_drag_emits_once() -> void:
@@ -157,18 +158,28 @@ func test_restart_action_emits_even_while_locked() -> void:
 	router.free()
 
 
+func test_m_sfx_mute_action_emits_even_while_locked() -> void:
+	var router: Variant = _new_router()
+	router.set_locked(true)
+	router._handle_event(_key(KEY_M, true, false))
+	assert_eq(_sfx_mute_toggles, 1, "SFX mute toggle signal count")
+	router.free()
+
+
 func _new_router() -> Variant:
 	_received.clear()
 	_debug_cycles = 0
 	_spawn_count_cycles = 0
 	_mode_toggles = 0
 	_restart_requests = 0
+	_sfx_mute_toggles = 0
 	var router: Variant = INPUT_ROUTER_SCRIPT.new()
 	router.swipe.connect(_record_swipe)
 	router.restart_requested.connect(_record_restart_request)
 	router.debug_cycle_annihilation_rule.connect(_record_debug_cycle)
 	router.debug_cycle_spawn_count.connect(_record_spawn_count_cycle)
 	router.debug_toggle_game_mode.connect(_record_mode_toggle)
+	router.debug_toggle_sfx_mute.connect(_record_sfx_mute_toggle)
 	return router
 
 
@@ -190,6 +201,10 @@ func _record_mode_toggle() -> void:
 
 func _record_restart_request() -> void:
 	_restart_requests += 1
+
+
+func _record_sfx_mute_toggle() -> void:
+	_sfx_mute_toggles += 1
 
 
 func _assert_swipes(expected: Array[Vector2i]) -> void:
