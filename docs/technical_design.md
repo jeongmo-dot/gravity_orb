@@ -224,6 +224,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M1 | `wall_thickness` | float | 256.0 | 터널링 방지용으로 두껍게 |
 | ~~M1~~ | ~~`orb_base_radius`, `orb_radius_growth`~~ | | | **#14에서 제거** → `level_radii` |
 | #14 | `level_radii` | PackedFloat32Array | [25, 40, 60, 85, 115, 150, 190] → **[25, 40, 60, 85, 100, 120, 140]** (기획서 0.6.2. #18은 보류, **#22 추가 요구 1 측정으로 2026-10-05 확정, #27 적용**) | 레벨별 반지름 |
+| #35 | `fx_*`, `sfx_*` | | §12-F 표 | 대폭발 VFX·뽁뽁이 사운드 (§12-F) |
 | #34 | `blitz_spawn_color_weights` | PackedFloat32Array | **[1, 1, 1, 1, 1, 1]** | BLITZ 생성 색 확률 (§12-B.4). 턴제 `spawn_color_weights`는 [1, 1, 1, 1, 0, 0] |
 | #33 | `blitz_spawn_on_swipe` | bool | **true** | BLITZ에서 스와이프마다 생성 (§12-B.3) |
 | #31 | `game_mode`, `blitz_*` | | §12-B 표 | 타임어택 모드 스파이크 (§12-B) |
@@ -1094,6 +1095,57 @@ M4 검수(2026-09-28)에서 발견. 합체가 없는 M4 상태에서 **이동·�
 - 생성 색 확률: 턴제 `spawn_color_weights`는 **[1, 1, 1, 1, 0, 0]** — 턴제 생성 순서는 **시드별로 이전과 완전히 같아야 한다**. BLITZ는 새 필드 `blitz_spawn_color_weights` **[1, 1, 1, 1, 1, 1]**을 생성·시작 채움 모두에 쓴다
 - 색 개수를 4로 가정한 코드(배열 길이·`range(4)`·색 순환 등)가 남지 않게 한다. 휴리스틱 봇도 6색에서 그대로 동작
 - 색각 문양(M8)을 넣을 때 보라 ★, 청록 ✚로 한다 (기존 ▲ ● ■ ◆)
+
+## 12-F. 피드백 연출 1차: 대폭발 VFX·뽁뽁이 사운드 (기획서 0.10.4 — #35, M8 일부)
+
+사용자 (2026-10-06): "폭발할 때 VFX가 더 강하게 들어갔으면 하고, 사운드도 그 뽁뽁이 있잖아, 그 사운드가 들어갔으면 해". 현재 3D 대폭발은 반지름 1.5m 흰 고리 0.18초 + 프레임 떨림 6cm뿐이고 소리가 없다.
+
+**구조**
+- 연출 전용 노드 `FeedbackDirector`를 메인 씬에 둔다. 모드 매니저의 `reaction_ready`(점수·콤보·체인이 채워진 반응)와 BLITZ 피날레 폭발을 받아 **VFX·SFX만** 만든다. 게임 상태·물리·점수는 바꾸지 않는다 (히트스톱만 예외 — 아래)
+- VFX는 3D 메인 씬 기준. 2D 회귀 씬은 지금 연출 그대로 두고 SFX만 붙여도 된다
+- 기존 `Board3D._play_blast_effect`(흰 고리·프레임 떨림)는 이 연출로 대체한다
+- 레벨 계수 `k = 1 + 0.25 × (L − 4)` (최소 1). BLITZ L4 = 1.0, 턴제 L6 = 1.5, L7 = 1.75
+
+**대폭발 VFX** (BLAST·MAX_CLEAR)
+| 요소 | 내용 | 가안 |
+|---|---|---|
+| 히트스톱 | `Engine.time_scale`을 잠깐 낮춘다. 해제는 실시간 타이머(`ignore_time_scale`) | `fx_hitstop_scale` 0.12, `fx_hitstop_time` 0.07초 (MAX_CLEAR 0.1초) |
+| 카메라 흔들림 | `Camera3D.h_offset/v_offset`를 감쇠 사인 합으로 흔든다 (난수 없음, 결정적). 물리 노드는 움직이지 않는다 | 진폭 `fx_shake_px` 16px × k (px → m는 ÷100), `fx_shake_time` 0.4초 |
+| 화면 섬광 | HUD 아래 전체 화면 흰색 `ColorRect`, 알파 → 0 | `fx_flash_alpha` 0.35, `fx_flash_time` 0.15초 |
+| 충격파 고리 | 평면 고리 메시 2개(첫째 흰색, 둘째 두 구체 색 섞음), 0.08초 간격. 반지름 0 → `fx_ring_radius_factor` 4.0 × r_L, 0.35초, 두께 감소·알파 페이드, unshaded·additive | |
+| 파편 | `CPUParticles3D` 원샷 (Compatibility 렌더러·모바일 대응). 터진 구체마다 그 색 `fx_debris_per_orb` 24개 + 흰 불꽃 16개. XY 평면 방사 6~14 m/s × k, 현재 중력 방향 가속, 수명 0.5~0.8초, 크기 줄어듦 | |
+| 섬광 조명 | 폭발 지점 `OmniLight3D`, 에너지 6 × k → 0, 0.2초, 범위 6m | |
+
+- BLITZ 피날레의 단일 구체 폭발: 같은 연출 × 0.6, 히트스톱 없음 (연속으로 터지므로)
+- **합체 연출(가볍게)**: 결과 구체 **메시만** 스케일 1.0 → 1.18 → 1.0 (0.14초, 충돌 크기 불변) + 결과 색 파티클 10개. 히트스톱·흔들림 없음
+
+**뽁뽁이 사운드**
+- `SfxBank`가 시작할 때 소리를 **코드로 합성**해 `AudioStreamWAV`(16bit 모노 44.1kHz)로 만든다 — 외부 음원·저작권 문제 없음. `res://assets/sfx/pop.wav`·`blast.wav`(또는 `.ogg`)가 있으면 그 파일을 대신 쓴다 (실제 뽁뽁이 녹음으로 교체 가능)
+- 합성 **"뽁"(pop)**: 1.5ms 백색 잡음 클릭 + 감쇠 사인 (8ms 동안 1,800 → 900Hz로 피치 하강, 감쇠 시상수 18ms), 총 60ms
+- 합성 **"대폭발"**: pop 7개를 25~45ms 간격으로 겹침 (피치 ±15%, 결정적 패턴 — 뽁뽁이를 한꺼번에 비트는 소리) + 저음 쿵 (사인 70 → 45Hz, 감쇠 180ms) + 잡음 휙 (감쇠 250ms)
+- 재생 규칙
+  - MERGE: pop. 피치 = 레벨 계수(결과 L2 1.35 … L7 0.75, 선형) × **연쇄 상승** `2^(min(n − 1, sfx_chain_semitones_max) / 12)` (n = 현재 콤보·체인, 반음씩 올라가 최대 한 옥타브) × 지터 ±`sfx_pitch_jitter`(3%). 지터는 `stable_spawn_id` 해시로 정한다 (난수 호출은 `Spawner.gd`만 규칙 유지)
+  - BLAST·MAX_CLEAR: 대폭발 소리, +4dB
+  - BLITZ 피날레 폭발: 대폭발 소리 −2dB, 터질 때마다 반음 상승
+- 보이스: `AudioStreamPlayer` 12개 풀, 라운드로빈, 모자라면 가장 오래된 것을 끊는다. 버스 `SFX` 신설 (Master 아래)
+- `sfx_volume_db` 0, 디버그 키 **M** 음소거 토글 (TEMP — M9 설정 화면에서 대체)
+
+**새 필드 (가안)**
+| 필드 | 가안 |
+|---|---|
+| `fx_enabled` / `fx_hitstop_enabled` | true / true |
+| `fx_hitstop_scale` / `fx_hitstop_time` | 0.12 / 0.07 |
+| `fx_shake_px` / `fx_shake_time` | 16.0 / 0.4 |
+| `fx_flash_alpha` / `fx_flash_time` | 0.35 / 0.15 |
+| `fx_ring_radius_factor` | 4.0 |
+| `fx_debris_per_orb` | 24 |
+| `sfx_enabled` / `sfx_volume_db` | true / 0.0 |
+| `sfx_chain_semitones_max` / `sfx_pitch_jitter` | 12 / 0.03 |
+
+**주의**
+- 히트스톱은 물리 시간도 늦춘다. 실시간 타이머로 풀기 때문에 프레임 타이밍에 따라 결과가 달라진다 → **헤드리스 테스트·측정 러너는 `fx_hitstop_enabled = false`로 실행**한다. 히트스톱을 끄면 연출은 게임 결과에 영향이 없어야 한다
+- 섬광은 광과민 우려가 있어 알파 0.35 이하로 둔다. 끄는 설정은 M8 접근성에서
+- 동시 대폭발 3개 + 합체 다수일 때 3D 프레임 시간을 확인한다 (모바일 대비)
 
 ## 13. 알려진 함정 (Godot 4)
 
