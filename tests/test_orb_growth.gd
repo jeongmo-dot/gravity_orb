@@ -80,6 +80,29 @@ func test_zero_duration_spawns_at_final_radius() -> void:
 	_restore_growth_config(snapshot)
 
 
+func test_new_color_2d_visuals_match_display_table() -> void:
+	var board: Board = await _create_board()
+	var colors: Array[int] = [
+		OrbTypes.OrbColor.PURPLE,
+		OrbTypes.OrbColor.CYAN,
+	]
+	for index: int in range(colors.size()):
+		var color: int = colors[index]
+		var orb: Orb = board.spawn_orb(
+			color,
+			1,
+			Vector2(float(index * 100), 0.0)
+		)
+		orb.exit_ghost_state()
+		var visual: OrbVisual = orb.get_node("Visual") as OrbVisual
+		assert_eq(
+			visual._display_color,
+			Config.data.color_display[color],
+			"2D visual uses configured new color"
+		)
+	await _cleanup_board(board)
+
+
 func _create_board() -> Board:
 	var board: Board = BOARD_SCENE.instantiate() as Board
 	tree.root.add_child(board)

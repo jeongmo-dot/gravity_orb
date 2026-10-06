@@ -185,6 +185,39 @@ func test_color_modes_keep_screen_directions_in_3d_plane() -> void:
 	_restore_config(snapshot)
 
 
+func test_new_colors_use_default_push_impulse_and_radius() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	_configure_color_effects()
+	for color: int in [OrbTypes.OrbColor.PURPLE, OrbTypes.OrbColor.CYAN]:
+		var board: Board = BOARD_2D_SCENE.instantiate() as Board
+		tree.root.add_child(board)
+		await tree.process_frame
+		board.set_gravity(Vector2i.DOWN)
+		var result: Orb = board.spawn_orb(color, 2, Vector2.ZERO)
+		var target: Orb = board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(50.0, 0.0))
+		result.exit_ghost_state()
+		target.exit_ghost_state()
+		var targets: Array[Dictionary] = board.apply_shockwave(
+			Vector2.ZERO,
+			2,
+			result,
+			false,
+			color
+		)
+		assert_eq(targets.size(), 1, "new color PUSH target")
+		if targets.size() == 1:
+			assert_eq(targets[0]["orb"], target, "new color target reference")
+			assert_near(
+				(targets[0]["impulse"] as Vector2).x,
+				195.0,
+				TOLERANCE,
+				"new color uses PUSH 1.0/2.5"
+			)
+		board.queue_free()
+		await tree.process_frame
+	_restore_config(snapshot)
+
+
 func test_shake_is_global_mass_independent_capped_and_seed_deterministic() -> void:
 	var snapshot: Dictionary = _snapshot_config()
 	_configure_color_effects()
@@ -446,9 +479,15 @@ func _configure_color_effects() -> void:
 		GameConfig.ShockMode.PULL,
 		GameConfig.ShockMode.SHAKE,
 		GameConfig.ShockMode.LIFT,
+		GameConfig.ShockMode.PUSH,
+		GameConfig.ShockMode.PUSH,
 	])
-	Config.data.shock_color_impulse_scale = PackedFloat32Array([1.0, 1.0, 0.0, 1.0])
-	Config.data.shock_color_radius_factor = PackedFloat32Array([3.0, 3.0, 0.0, 3.0])
+	Config.data.shock_color_impulse_scale = PackedFloat32Array(
+		[1.0, 1.0, 0.0, 1.0, 1.0, 1.0]
+	)
+	Config.data.shock_color_radius_factor = PackedFloat32Array(
+		[3.0, 3.0, 0.0, 3.0, 2.5, 2.5]
+	)
 
 
 func _snapshot_config() -> Dictionary:

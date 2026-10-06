@@ -146,6 +146,23 @@ func test_yellow_same_level_merges() -> void:
 	assert_eq(result["result_color"], OrbTypes.OrbColor.YELLOW, "yellow merge color")
 
 
+func test_new_blitz_colors_merge_and_blast() -> void:
+	var cfg: GameConfig = GameConfig.new()
+	cfg.game_mode = GameConfig.GameMode.BLITZ
+	for color: int in [OrbTypes.OrbColor.PURPLE, OrbTypes.OrbColor.CYAN]:
+		var merge: Dictionary = ReactionRules.classify(color, 3, color, 3, cfg)
+		assert_eq(merge["type"], ReactionRules.Type.MERGE, "new color merge")
+		assert_eq(merge["result_color"], color, "new color merge result")
+	var blast: Dictionary = ReactionRules.classify(
+		OrbTypes.OrbColor.PURPLE,
+		4,
+		OrbTypes.OrbColor.CYAN,
+		4,
+		cfg
+	)
+	assert_eq(blast["type"], ReactionRules.Type.BLAST, "new colors BLITZ blast")
+
+
 func test_same_color_merge_has_precedence_over_configured_opposite_pair() -> void:
 	var cfg: GameConfig = GameConfig.new()
 	cfg.opposite_pairs.append(Vector2i(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.RED))

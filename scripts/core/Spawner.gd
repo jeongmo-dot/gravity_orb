@@ -217,7 +217,12 @@ func _draw_candidate() -> Dictionary:
 		else Config.data.spawn_level_weights
 	)
 	var level: int = _rng.rand_weighted(level_weights) + 1
-	var color: int = _rng.rand_weighted(Config.data.spawn_color_weights)
+	var color_weights: PackedFloat32Array = (
+		Config.data.blitz_spawn_color_weights
+		if _blitz_mode
+		else Config.data.spawn_color_weights
+	)
+	var color: int = _rng.rand_weighted(color_weights)
 	var position_t: float = _rng.randf()
 	return {"level": level, "color": color, "t": position_t}
 

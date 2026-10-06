@@ -94,6 +94,32 @@ func test_level_gravity_scale_accelerates_large_orbs() -> void:
 	Config.data.gravity_level_scale = original_scale
 
 
+func test_new_color_3d_materials_match_display_table() -> void:
+	var board: Board3D = await _create_board()
+	var colors: Array[int] = [
+		OrbTypes.OrbColor.PURPLE,
+		OrbTypes.OrbColor.CYAN,
+	]
+	for index: int in range(colors.size()):
+		var color: int = colors[index]
+		var orb: Orb3D = board.spawn_orb(
+			color,
+			1,
+			Vector2(float(index * 100), 0.0)
+		)
+		var material: StandardMaterial3D = (
+			orb._mesh.material_override as StandardMaterial3D
+		)
+		assert_true(material != null, "new color uses a 3D material")
+		if material != null:
+			assert_eq(
+				material.albedo_color,
+				Config.data.color_display[color],
+				"3D material uses configured new color"
+			)
+	_cleanup(board)
+
+
 func test_3d_blast_armed_orb_blinks_emission_by_level() -> void:
 	var board: Board3D = await _create_board()
 	var level_four: Orb3D = board.spawn_orb(0, 4, Vector2(-100.0, 0.0))

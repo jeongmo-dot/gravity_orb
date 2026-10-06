@@ -24,7 +24,14 @@ enum GameMode { TURN, BLITZ }
 @export var orb_linear_damp: float = 0.1
 @export var orb_angular_damp: float = 1.0
 @export var color_display: PackedColorArray = PackedColorArray(
-	[Color("#E5484D"), Color("#3E7BFA"), Color("#30A46C"), Color("#F5C542")]
+	[
+		Color("#E5484D"),
+		Color("#3E7BFA"),
+		Color("#30A46C"),
+		Color("#F5C542"),
+		Color("#A35CF0"),
+		Color("#22C7D9"),
+	]
 )
 @export var swipe_min_distance: float = 80.0
 @export var swipe_dominance_ratio: float = 1.5
@@ -34,7 +41,9 @@ enum GameMode { TURN, BLITZ }
 @export var max_settle_time: float = 3.0
 @export var allow_same_direction_swipe: bool = true
 @export var spawn_level_weights: PackedFloat32Array = PackedFloat32Array([0.9, 0.1])
-@export var spawn_color_weights: PackedFloat32Array = PackedFloat32Array([1.0, 1.0, 1.0, 1.0])
+@export var spawn_color_weights: PackedFloat32Array = PackedFloat32Array(
+	[1.0, 1.0, 1.0, 1.0, 0.0, 0.0]
+)
 @export var spawn_count_per_turn: int = 1
 @export var preview_turns: int = 2
 @export var spawn_count_ramp_turns: int = 0
@@ -70,13 +79,20 @@ enum GameMode { TURN, BLITZ }
 @export var shock_jackpot_scale: float = 3.0
 @export var color_effects_enabled: bool = true
 @export var shock_color_modes: PackedInt32Array = PackedInt32Array(
-	[ShockMode.PUSH, ShockMode.PULL, ShockMode.SHAKE, ShockMode.LIFT]
+	[
+		ShockMode.PUSH,
+		ShockMode.PULL,
+		ShockMode.SHAKE,
+		ShockMode.LIFT,
+		ShockMode.PUSH,
+		ShockMode.PUSH,
+	]
 )
 @export var shock_color_impulse_scale: PackedFloat32Array = PackedFloat32Array(
-	[1.5, 0.8, 0.0, 1.0]
+	[1.5, 0.8, 0.0, 1.0, 1.0, 1.0]
 )
 @export var shock_color_radius_factor: PackedFloat32Array = PackedFloat32Array(
-	[3.0, 3.0, 0.0, 3.0]
+	[3.0, 3.0, 0.0, 3.0, 2.5, 2.5]
 )
 @export var green_shake_speed: float = 150.0
 @export var green_shake_max_speed: float = 600.0
@@ -93,6 +109,9 @@ enum GameMode { TURN, BLITZ }
 @export var blitz_spawn_interval: float = 0.8
 @export var blitz_spawn_level_weights: PackedFloat32Array = PackedFloat32Array(
 	[0.7, 0.25, 0.05]
+)
+@export var blitz_spawn_color_weights: PackedFloat32Array = PackedFloat32Array(
+	[1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 )
 @export var blitz_initial_occupancy: float = 0.35
 @export var blitz_target_occupancy: float = 0.40
