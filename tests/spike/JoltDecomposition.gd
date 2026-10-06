@@ -36,6 +36,7 @@ func _ready() -> void:
 
 
 func _run() -> void:
+	Config.data.fx_hitstop_enabled = false
 	_apply_arguments()
 	_load_snapshot()
 	Engine.physics_ticks_per_second = TICKS

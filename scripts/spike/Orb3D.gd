@@ -32,6 +32,7 @@ var _display_color: Color = Color.WHITE
 var _blast_armed: bool = false
 var _blast_blink_period: float = 0.8
 var _blast_blink_elapsed: float = 0.0
+var _visual_punch_tween: Tween
 
 var position: Vector2:
 	get:
@@ -180,6 +181,29 @@ func blast_emission_strength() -> float:
 		return 0.08
 	return 0.20 + 0.80 * (
 		0.5 + 0.5 * sin(TAU * _blast_blink_elapsed / _blast_blink_period)
+	)
+
+
+func play_visual_punch(scale_factor: float = 1.18, duration: float = 0.14) -> void:
+	if _visual_punch_tween != null and _visual_punch_tween.is_valid():
+		_visual_punch_tween.kill()
+	_mesh.scale = Vector3.ONE
+	_visual_punch_tween = create_tween()
+	_visual_punch_tween.set_trans(Tween.TRANS_BACK)
+	_visual_punch_tween.set_ease(Tween.EASE_OUT)
+	_visual_punch_tween.tween_property(
+		_mesh,
+		"scale",
+		Vector3.ONE * scale_factor,
+		duration * 0.45
+	)
+	_visual_punch_tween.set_trans(Tween.TRANS_QUAD)
+	_visual_punch_tween.set_ease(Tween.EASE_IN_OUT)
+	_visual_punch_tween.tween_property(
+		_mesh,
+		"scale",
+		Vector3.ONE,
+		duration * 0.55
 	)
 
 

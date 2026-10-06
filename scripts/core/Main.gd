@@ -14,6 +14,7 @@ static var _debug_mode_override: GameConfig.GameMode = GameConfig.GameMode.TURN
 @onready var _spawner: Spawner = %Spawner
 @onready var _collision_resolver: CollisionResolver = %CollisionResolver
 @onready var _score_manager: ScoreManager = %ScoreManager
+@onready var _feedback_director: FeedbackDirector = %FeedbackDirector
 
 var _game_manager: Variant
 
@@ -36,6 +37,7 @@ func _ready() -> void:
 	InputRouter.swipe.connect(_game_manager.on_swipe)
 	InputRouter.restart_requested.connect(restart)
 	_game_manager.reaction_ready.connect(_score_manager.on_reaction)
+	_feedback_director.bind(_game_manager, _board)
 	_spawner.orb_spawned.connect(_score_manager.on_orb_spawned)
 	# TEMP(M6): M9 디버그 패널이 규칙 선택을 대체할 때 제거한다.
 	if OS.is_debug_build():

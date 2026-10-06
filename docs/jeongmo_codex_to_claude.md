@@ -38,6 +38,36 @@
 
 ## 미확인
 
+### [2026-10-07] 대상 #35 — 대폭발 VFX 강화 + 뽁뽁이 사운드
+- 상태: 완료
+- 브랜치 / PR: `m8-feedback-vfx-sfx` / https://github.com/jeongmo-dot/gravity_orb/pull/36
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `default_bus_layout.tres`, `project.godot`, `scenes/{Main,Main3D}.tscn`, `scripts/autoload/InputRouter.gd`, `scripts/core/{Main,CollisionResolver,BlitzManager}.gd`, `scripts/fx/{FeedbackDirector,SfxBank}.gd`, `scripts/spike/{Board3D,Orb3D}.gd`, `tests/{test_feedback,test_config,test_input_router,run_tests}.gd`, `tests/spike/{FeedbackMeasurement.tscn,run_feedback_measurement,JoltDecomposition,Profile2DBaseline,run_blitz_measurement,run_jolt_3d_measurement}.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `FeedbackDirector`가 TURN/BLITZ 매니저의 점수 처리 후 `reaction_ready`를 받아 규칙·점수·물리를 바꾸지 않고 연출만 생성. 기존 `Board3D` 단일 흰 고리·보드 이동 떨림은 제거하고 2D 기존 VFX는 유지
+  - [x] BLAST/MAX_CLEAR 3D 연출: 실시간 해제 히트스톱, 결정적 감쇠 카메라 오프셋, HUD 아래 흰 섬광, 0.08초 간격 흰색/혼합색 고리 2개, 입력 구체별 색 파편 24개와 흰 불꽃 16개, 중력 방향 가속, 축소 곡선, OmniLight3D를 구현. 고리·파편·조명·섬광과 카메라 오프셋이 1.1초 관측 시 모두 0으로 정리됨을 자동 검증
+  - [x] BLITZ 피날레는 구체 색·위치·안정 ID·피날레 순번을 반응에 보존해 같은 연출 강도 0.6, 히트스톱 없음, 폭발마다 반음 상승으로 재생
+  - [x] MERGE 결과 `Orb3D`의 메시만 `1.0 → 1.18 → 1.0`/0.14초로 펀치하고 결과 색 `CPUParticles3D` 10개를 생성. 테스트에서 `SphereShape3D.radius`가 전·중·후 동일함을 확인
+  - [x] `SfxBank`가 외부 `pop/blast.wav`·`.ogg`를 우선하고 없으면 44.1kHz 16bit 모노 pop 60ms/대폭발 460ms를 결정적으로 합성. 합성 데이터 비어 있지 않음과 길이를 자동 검증
+  - [x] MERGE L2 1.35~L7 0.75 선형 계수, 체인 2 반음 상승·체인 13 이후 12반음 상한, 안정 ID 지터 반복성·±3% 범위를 검증. BLAST +4dB, 피날레 -2dB/반음 상승, `SFX` 버스 아래 12보이스 라운드로빈과 M 디버그 음소거를 구현·검증
+  - [x] 새 14개 config 필드를 §12-F 값 그대로 추가하고 모든 헤드리스 테스트·측정 러너에서 히트스톱을 비활성화
+  - [x] 히트스톱 on에서 `Engine.time_scale=0.12` 후 실시간 0.03초 테스트가 1.0으로 복구되고 off에서는 1.0 불변. 연출 on/off(히트스톱 off) 각각 스크립트 TURN 20턴·BLITZ 20초 상태 해시 일치
+  - [x] 동시 BLAST 3개 + MERGE 8개를 45프레임마다 재생한 180프레임 헤드리스 관측: frame p50 `6.900ms`, p95 `6.906ms`, max `6.914ms`
+- QA 관측값:
+  - `Godot 4.8-dev3 --headless --path . --import` → 종료 코드 0, SCRIPT/Parse Error 0
+  - `Godot 4.8-dev3 --headless --path . -s res://tests/run_tests.gd` → `182/182`, 종료 코드 0. 2D 22시드 이탈/발산 `0/0`, 최대 wall `7.670px`; 3D 22시드 이탈/발산 `0/0`, 최대 wall/pair `12.9515/12.8371px`
+  - `--test-file=res://tests/test_feedback.gd` → `5/5`, 종료 코드 0, 헤드리스 오디오 재생 오류 0
+  - `Godot 4.8-dev3 --headless --path . --quit-after 300` → 종료 코드 0, SCRIPT/Parse Error 0
+  - `Godot 4.8-dev3 --headless --path . --quit-after 300 -- --mode=blitz --jolt-seed=101` → 종료 코드 0, SCRIPT/Parse Error 0
+  - `FeedbackMeasurement.tscn` → 종료 코드 0, p50/p95/max `6.900/6.906/6.914ms`; 로컬 산출물 `artifacts/feedback_frame_measurement.json`은 gitignore로 제외
+  - 규칙 점검 → `Input`/`InputEvent`는 `InputRouter.gd`만, 난수 호출은 `Spawner.gd`만
+- 수동 확인 절차:
+  1. 3D TURN에서 같은 색·같은 레벨 두 구체를 합체 → 결과 구체가 짧게 커졌다 원래 크기로 돌아오고 작은 결과색 파편과 레벨에 따른 뽁 소리가 나는지 확인한다.
+  2. TURN L6 이상 서로 다른 색·같은 레벨 구체를 접촉 → 짧은 히트스톱 뒤 흰색/혼합색 고리 2개, 각 구체색 파편, 흰 불꽃, 조명·화면 섬광·감쇠 카메라 흔들림과 +4dB 대폭발 소리가 나타나는지 확인한다.
+  3. BLITZ 시간 종료 뒤 피날레 → 각 단일 구체 폭발 연출이 일반 폭발보다 약하고 연속 폭발 중 히트스톱이 없으며 소리가 반음씩 높아지는지 확인한다.
+  4. 디버그 빌드에서 M을 누른 뒤 합체·폭발 → SFX만 음소거되고 다시 M을 누르면 복구되는지 확인한다. F4로 2D 회귀 씬을 선택했을 때 기존 2D VFX와 새 SFX가 함께 유지되는지도 확인한다.
+- 결정 사항: 화면 섬광은 기본 `CanvasLayer.layer=1`인 UI 아래에 오도록 연출 레이어를 0으로 두었다. 파편 수명은 `0.8초`, lifetime randomness `0.30`과 1→0 크기 곡선을 사용해 약 0.56~0.8초 안에 사라지도록 했다. 문서 수치·공개 API·게임 규칙은 변경하지 않았다.
+- 남은 것 · 질문: 없음
+
 ### [2026-10-06] 대상 #34 — BLITZ 6색: 보라·청록 추가
 - 상태: 완료
 - 브랜치 / PR: `m10-blitz-six-colors` / https://github.com/jeongmo-dot/gravity_orb/pull/35

@@ -25,6 +25,7 @@ func _ready() -> void:
 
 
 func _run() -> void:
+	Config.data.fx_hitstop_enabled = false
 	Engine.physics_ticks_per_second = 240
 	InputRouter.set_locked(false)
 	var fixture_root: Node = Node.new()

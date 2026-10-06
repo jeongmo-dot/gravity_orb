@@ -55,6 +55,7 @@ func _ready() -> void:
 
 
 func _run() -> void:
+	Config.data.fx_hitstop_enabled = false
 	_original_ticks = Engine.physics_ticks_per_second
 	_ticks.append_array(TICKS)
 	_seeds.append_array(SEEDS)

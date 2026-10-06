@@ -28,6 +28,7 @@ func _ready() -> void:
 func _run() -> void:
 	_apply_arguments()
 	_apply_color_count()
+	Config.data.fx_hitstop_enabled = false
 	var original_ticks: int = Engine.physics_ticks_per_second
 	Engine.physics_ticks_per_second = 120
 	Config.data.game_mode = GameConfig.GameMode.BLITZ
