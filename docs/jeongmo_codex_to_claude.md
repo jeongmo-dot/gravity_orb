@@ -40,7 +40,7 @@
 
 ### [2026-10-07] 대상 #35 — 대폭발 VFX 강화 + 뽁뽁이 사운드
 - 상태: 완료
-- 브랜치 / PR: `m8-feedback-vfx-sfx` / PR 생성 예정
+- 브랜치 / PR: `m8-feedback-vfx-sfx` / https://github.com/jeongmo-dot/gravity_orb/pull/36
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `default_bus_layout.tres`, `project.godot`, `scenes/{Main,Main3D}.tscn`, `scripts/autoload/InputRouter.gd`, `scripts/core/{Main,CollisionResolver,BlitzManager}.gd`, `scripts/fx/{FeedbackDirector,SfxBank}.gd`, `scripts/spike/{Board3D,Orb3D}.gd`, `tests/{test_feedback,test_config,test_input_router,run_tests}.gd`, `tests/spike/{FeedbackMeasurement.tscn,run_feedback_measurement,JoltDecomposition,Profile2DBaseline,run_blitz_measurement,run_jolt_3d_measurement}.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `FeedbackDirector`가 TURN/BLITZ 매니저의 점수 처리 후 `reaction_ready`를 받아 규칙·점수·물리를 바꾸지 않고 연출만 생성. 기존 `Board3D` 단일 흰 고리·보드 이동 떨림은 제거하고 2D 기존 VFX는 유지
