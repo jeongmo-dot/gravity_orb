@@ -61,9 +61,16 @@ foreach ($condition in $conditions) {
     $turns = [double[]]@($seedRows | ForEach-Object { [double]$_.completed_turns })
     $scores = [double[]]@($seedRows | ForEach-Object { [double]$_.score })
     $maxCombos = [double[]]@($seedRows | ForEach-Object { [double]$_.max_combo })
-    $reactionCounts = [ordered]@{ RED = 0; BLUE = 0; GREEN = 0; YELLOW = 0 }
+    $reactionCounts = [ordered]@{
+        RED = 0
+        BLUE = 0
+        GREEN = 0
+        YELLOW = 0
+        PURPLE = 0
+        CYAN = 0
+    }
     foreach ($seedRow in $seedRows) {
-        foreach ($color in @("RED", "BLUE", "GREEN", "YELLOW")) {
+        foreach ($color in @("RED", "BLUE", "GREEN", "YELLOW", "PURPLE", "CYAN")) {
             $reactionCounts[$color] += [int]$seedRow.reactions_by_color.$color
         }
     }

@@ -47,6 +47,8 @@ var spawn_count: int = 0
 var skipped_spawn_ticks: int = 0
 var accepted_swipes: int = 0
 var productive_swipes: int = 0
+var reaction_count: int = 0
+var passive_reaction_count: int = 0
 var chain_histogram: Dictionary = {}
 var first_reaction_time: float = -1.0
 var finale_score_start: int = 0
@@ -99,6 +101,8 @@ func start_game() -> void:
 	skipped_spawn_ticks = 0
 	accepted_swipes = 0
 	productive_swipes = 0
+	reaction_count = 0
+	passive_reaction_count = 0
 	chain_histogram.clear()
 	first_reaction_time = -1.0
 	finale_score_start = 0
@@ -172,7 +176,12 @@ func on_reaction(reaction: Dictionary) -> void:
 		return
 	if first_reaction_time < 0.0:
 		first_reaction_time = play_time_elapsed
-	_mark_latest_productive_swipe()
+	var productive_swipe: bool = _mark_latest_productive_swipe()
+	reaction["productive_swipe"] = productive_swipe
+	if state == State.RUNNING:
+		reaction_count += 1
+		if not productive_swipe:
+			passive_reaction_count += 1
 	reaction["chain"] = turn_combo
 	reaction["combo"] = turn_combo
 	reaction["combo_multiplier"] = current_combo_multiplier()
@@ -262,9 +271,9 @@ func _advance_chain(delta: float) -> void:
 		_reset_chain()
 
 
-func _mark_latest_productive_swipe() -> void:
+func _mark_latest_productive_swipe() -> bool:
 	if _pending_swipe_windows.is_empty():
-		return
+		return false
 	_pending_swipe_windows.pop_back()
 	turn_combo += 1
 	max_combo = maxi(max_combo, turn_combo)
@@ -279,6 +288,7 @@ func _mark_latest_productive_swipe() -> void:
 		_set_fever_visual(fever_remaining > 0.0)
 		fever_changed.emit(fever_remaining > 0.0, fever_remaining)
 	_emit_combo_changed()
+	return true
 
 
 func _reset_chain() -> void:

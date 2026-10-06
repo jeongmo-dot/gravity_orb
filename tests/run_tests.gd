@@ -78,7 +78,7 @@ func _apply_measurement_arguments() -> String:
 	var is_spawn_measurement: bool = false
 	var config_node: Node = root.get_node("Config")
 	var config_data: GameConfig = config_node.get("data") as GameConfig
-	var active_colors: int = config_data.spawn_color_weights.size()
+	var active_colors: int = _positive_weight_count(config_data.spawn_color_weights)
 	var spawn_case: String = ""
 	var physics_case: String = ""
 	for argument: String in OS.get_cmdline_user_args():
@@ -127,9 +127,13 @@ func _apply_measurement_arguments() -> String:
 		if not spawn_case.is_empty():
 			active_colors = _apply_spawn_case(config_data, spawn_case)
 		elif active_colors == 3:
-			config_data.spawn_color_weights = PackedFloat32Array([1.0, 1.0, 1.0, 0.0])
+			config_data.spawn_color_weights = PackedFloat32Array(
+				[1.0, 1.0, 1.0, 0.0, 0.0, 0.0]
+			)
 		else:
-			config_data.spawn_color_weights = PackedFloat32Array([1.0, 1.0, 1.0, 1.0])
+			config_data.spawn_color_weights = PackedFloat32Array(
+				[1.0, 1.0, 1.0, 1.0, 0.0, 0.0]
+			)
 		print(
 			"Spawn candidate case=%s count=%d ramp=%d max=%d active_colors=%d opposite_pairs=%s suite=%s" % [
 				spawn_case,
@@ -200,15 +204,23 @@ func _apply_spawn_case(config_data: GameConfig, spawn_case: String) -> int:
 		_:
 			push_error("Unknown spawn measurement case: %s" % spawn_case)
 	config_data.spawn_color_weights = (
-		PackedFloat32Array([1.0, 1.0, 1.0, 0.0])
+		PackedFloat32Array([1.0, 1.0, 1.0, 0.0, 0.0, 0.0])
 		if active_colors == 3
-		else PackedFloat32Array([1.0, 1.0, 1.0, 1.0])
+		else PackedFloat32Array([1.0, 1.0, 1.0, 1.0, 0.0, 0.0])
 	)
 	var red_blue_only: Array[Vector2i] = [
 		Vector2i(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE),
 	]
 	config_data.opposite_pairs = red_blue_only
 	return active_colors
+
+
+func _positive_weight_count(weights: PackedFloat32Array) -> int:
+	var count: int = 0
+	for weight: float in weights:
+		if weight > 0.0:
+			count += 1
+	return count
 
 
 func _run_directory(directory: String) -> void:

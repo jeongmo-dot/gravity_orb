@@ -126,6 +126,9 @@ func test_speed_chain_productive_miss_idle_fever_and_time_bonus_cap() -> void:
 	Config.data.blitz_spawn_on_swipe = false
 	var first: Dictionary = _productive_swipe(manager, Vector2i.RIGHT)
 	assert_eq(manager.chain, 1, "productive swipe raises chain once")
+	assert_eq(manager.reaction_count, 1, "running reaction is counted")
+	assert_eq(manager.passive_reaction_count, 0, "productive reaction is not passive")
+	assert_eq(bool(first["productive_swipe"]), true, "reaction records productive swipe")
 	assert_near(float(first["combo_multiplier"]), 1.25, TOLERANCE, "chain step")
 	manager._physics_process(Config.data.blitz_swipe_cooldown)
 	manager.on_swipe(Vector2i.UP)
@@ -146,6 +149,8 @@ func test_speed_chain_productive_miss_idle_fever_and_time_bonus_cap() -> void:
 	var passive: Dictionary = _reaction(ReactionRules.Type.MERGE, 2)
 	manager.on_reaction(passive)
 	assert_eq(manager.chain, 12, "reaction without swipe does not raise chain")
+	assert_eq(manager.passive_reaction_count, 1, "reaction without swipe is counted")
+	assert_eq(bool(passive["productive_swipe"]), false, "reaction records passive state")
 	assert_near(float(passive["combo_multiplier"]), 4.0, TOLERANCE, "passive reaction uses current chain")
 	for index: int in range(4):
 		manager._physics_process(Config.data.blitz_swipe_cooldown)
@@ -241,10 +246,27 @@ func test_main_selects_blitz_manager_and_shows_time_up_results() -> void:
 	var max_chain_label: Label = main.get_node("UI/Hud/MaxComboLabel") as Label
 	var chain_label: Label = main.get_node("UI/Hud/ComboLabel") as Label
 	var blocked_label: Label = main.get_node("UI/Hud/BlockedLabel") as Label
+	var hud: Hud = main.get_node("UI/Hud") as Hud
 	assert_true(timer_label.visible, "blitz timer is visible")
 	assert_true(timer_label.text.begins_with("READY"), "ready countdown is visible")
 	assert_eq(max_chain_label.text, "MAX CHAIN 0", "blitz maximum uses chain label")
 	assert_true(not blocked_label.visible, "turn blocked label is hidden")
+	hud._on_preview_changed([
+		[{"color": OrbTypes.OrbColor.PURPLE, "level": 1}],
+		[{"color": OrbTypes.OrbColor.CYAN, "level": 2}],
+	])
+	var next_visual: OrbVisual = hud._next_preview.get_child(0) as OrbVisual
+	var then_visual: OrbVisual = hud._then_preview.get_child(0) as OrbVisual
+	assert_eq(
+		next_visual._display_color,
+		Config.data.color_display[OrbTypes.OrbColor.PURPLE],
+		"NEXT renders purple"
+	)
+	assert_eq(
+		then_visual._display_color,
+		Config.data.color_display[OrbTypes.OrbColor.CYAN],
+		"THEN renders cyan"
+	)
 	manager._physics_process(1.5)
 	assert_eq(manager.state, BlitzManager.State.RUNNING, "main starts blitz after ready")
 	manager.on_swipe(Vector2i.RIGHT)

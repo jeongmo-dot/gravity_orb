@@ -68,13 +68,15 @@ func test_m3_turn_defaults() -> void:
 
 func test_m4_spawn_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
-	assert_eq(config.color_display.size(), 4, "display color count")
+	assert_eq(config.color_display.size(), 6, "display color count")
 	assert_eq(config.color_display[OrbTypes.OrbColor.YELLOW], Color("#F5C542"), "yellow display")
+	assert_eq(config.color_display[OrbTypes.OrbColor.PURPLE], Color("#A35CF0"), "purple display")
+	assert_eq(config.color_display[OrbTypes.OrbColor.CYAN], Color("#22C7D9"), "cyan display")
 	assert_eq(config.spawn_level_weights, PackedFloat32Array([0.9, 0.1]), "level weights")
 	assert_eq(
 		config.spawn_color_weights,
-		PackedFloat32Array([1.0, 1.0, 1.0, 1.0]),
-		"color weights"
+		PackedFloat32Array([1.0, 1.0, 1.0, 1.0, 0.0, 0.0]),
+		"turn color weights"
 	)
 	assert_eq(config.spawn_count_per_turn, 1, "spawn count per turn")
 	assert_eq(config.preview_turns, 2, "preview turns")
@@ -183,17 +185,19 @@ func test_m7_score_defaults() -> void:
 			GameConfig.ShockMode.PULL,
 			GameConfig.ShockMode.SHAKE,
 			GameConfig.ShockMode.LIFT,
+			GameConfig.ShockMode.PUSH,
+			GameConfig.ShockMode.PUSH,
 		]),
 		"color effect modes"
 	)
 	assert_eq(
 		config.shock_color_impulse_scale,
-		PackedFloat32Array([1.5, 0.8, 0.0, 1.0]),
+		PackedFloat32Array([1.5, 0.8, 0.0, 1.0, 1.0, 1.0]),
 		"color impulse scales"
 	)
 	assert_eq(
 		config.shock_color_radius_factor,
-		PackedFloat32Array([3.0, 3.0, 0.0, 3.0]),
+		PackedFloat32Array([3.0, 3.0, 0.0, 3.0, 2.5, 2.5]),
 		"color radius factors"
 	)
 	assert_near(config.green_shake_speed, 150.0, TOLERANCE, "green shake speed")
@@ -227,7 +231,12 @@ func test_blitz_spike_defaults() -> void:
 	assert_eq(
 		config.blitz_spawn_level_weights,
 		PackedFloat32Array([0.7, 0.25, 0.05]),
-		"blitz spawn weights"
+		"blitz spawn level weights"
+	)
+	assert_eq(
+		config.blitz_spawn_color_weights,
+		PackedFloat32Array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0]),
+		"blitz spawn color weights"
 	)
 	assert_near(config.blitz_initial_occupancy, 0.35, TOLERANCE, "initial occupancy")
 	assert_near(config.blitz_target_occupancy, 0.4, TOLERANCE, "target occupancy")

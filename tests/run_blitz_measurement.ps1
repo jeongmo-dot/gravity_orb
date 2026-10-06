@@ -7,9 +7,10 @@ $ErrorActionPreference = "Stop"
 $repoPath = Split-Path -Parent $PSScriptRoot
 $artifactPath = Join-Path $repoPath "artifacts"
 $conditions = @(
-    [ordered]@{ bot = "heuristic"; interval = 0.6; name = "heuristic_0_6" },
-    [ordered]@{ bot = "heuristic"; interval = 1.2; name = "heuristic_1_2" },
-    [ordered]@{ bot = "random"; interval = 0.3; name = "random_0_3" }
+    [ordered]@{ colors = 4; bot = "heuristic"; interval = 0.6; name = "4color_heuristic_0_6" },
+    [ordered]@{ colors = 4; bot = "random"; interval = 0.3; name = "4color_random_0_3" },
+    [ordered]@{ colors = 6; bot = "heuristic"; interval = 0.6; name = "6color_heuristic_0_6" },
+    [ordered]@{ colors = 6; bot = "random"; interval = 0.3; name = "6color_random_0_3" }
 )
 New-Item -ItemType Directory -Force -Path $artifactPath | Out-Null
 
@@ -19,6 +20,7 @@ if (-not $AggregateOnly) {
         & $GodotPath --headless --path $repoPath --fixed-fps 120 tests/spike/BlitzMeasurement.tscn -- `
             --blitz-bot=$($condition.bot) `
             --blitz-bot-interval=$($condition.interval) `
+            --blitz-color-count=$($condition.colors) `
             --blitz-seeds=101,102,103,104,105,106,107,108,109,110,111,112 `
             --blitz-output=res://artifacts/$rawName
         if ($LASTEXITCODE -ne 0) {
@@ -73,12 +75,17 @@ foreach ($condition in $conditions) {
     }
     $cases += [ordered]@{
         name = [string]$condition.name
+        color_count = [int]$condition.colors
         bot = [string]$condition.bot
         bot_interval = [double]$condition.interval
         seed_count = $rows.Count
         completed_count = @($rows | Where-Object { [bool]$_.completed }).Count
         score = Get-Distribution @($rows | ForEach-Object { [double]$_.score })
         reactions = Get-Distribution @($rows | ForEach-Object { [double]$_.reactions })
+        running_reactions = Get-Distribution @($rows | ForEach-Object { [double]$_.running_reactions })
+        reaction_without_swipe_count = Get-Distribution @($rows | ForEach-Object { [double]$_.reaction_without_swipe_count })
+        reaction_without_swipe_percent = Get-Distribution @($rows | ForEach-Object { [double]$_.reaction_without_swipe_percent })
+        reactions_per_second = Get-Distribution @($rows | ForEach-Object { [double]$_.reactions_per_second })
         max_chain = Get-Distribution @($rows | ForEach-Object { [double]$_.max_chain })
         chain_distribution = $chainDistribution
         accepted_swipes = Get-Distribution @($rows | ForEach-Object { [double]$_.accepted_swipes })
@@ -104,13 +111,33 @@ foreach ($condition in $conditions) {
     }
 }
 
+$scoreComparisons = @()
+foreach ($colorCount in @(4, 6)) {
+    $heuristic = $cases | Where-Object {
+        [int]$_.color_count -eq $colorCount -and [string]$_.bot -eq "heuristic"
+    }
+    $random = $cases | Where-Object {
+        [int]$_.color_count -eq $colorCount -and [string]$_.bot -eq "random"
+    }
+    $heuristicScore = [double]$heuristic.score.p50
+    $randomScore = [double]$random.score.p50
+    $ratio = if ($heuristicScore -gt 0.0) { $randomScore / $heuristicScore } else { 0.0 }
+    $scoreComparisons += [ordered]@{
+        color_count = $colorCount
+        heuristic_score_p50 = $heuristicScore
+        random_score_p50 = $randomScore
+        random_to_heuristic_score_ratio = $ratio
+    }
+}
+
 $summary = [ordered]@{
     engine = "Godot 4.8-dev3 mono"
     physics_engine = "Jolt Physics"
     physics_ticks_per_second = 120
     seeds = @(101..112)
     cases = $cases
+    score_comparisons = $scoreComparisons
 }
-$summaryPath = Join-Path $artifactPath "blitz_swipe_spawn_summary.json"
+$summaryPath = Join-Path $artifactPath "blitz_six_color_summary.json"
 $summary | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $summaryPath -Encoding utf8
 Write-Output "BLITZ_SUMMARY $summaryPath"

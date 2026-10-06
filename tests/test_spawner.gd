@@ -3,6 +3,62 @@ extends TestCase
 const SEQUENCE_COUNT: int = 50
 const DISTRIBUTION_COUNT: int = 10000
 const DISTRIBUTION_TOLERANCE: float = 0.02
+const LEGACY_SEQUENCE_TOLERANCE: float = 1.0e-9
+
+
+func test_turn_sequence_matches_pre_six_color_baseline_for_three_seeds() -> void:
+	var snapshot: Dictionary = _snapshot_spawn_config()
+	var expected_by_seed: Dictionary = {
+		101: [
+			[1, 2, 0.391725897789],
+			[1, 1, 0.46784633398056],
+			[1, 2, 0.41243773698807],
+			[1, 1, 0.08886755257845],
+			[1, 0, 0.40030378103256],
+			[1, 1, 0.18263983726501],
+			[1, 1, 0.32996472716331],
+			[1, 1, 0.04768922179937],
+		],
+		777: [
+			[1, 0, 0.80851691961288],
+			[1, 3, 0.75154829025269],
+			[1, 0, 0.9190845489502],
+			[1, 1, 0.16851322352886],
+			[1, 2, 0.45896261930466],
+			[1, 2, 0.65874481201172],
+			[1, 2, 0.17010578513145],
+			[2, 0, 0.87970560789108],
+		],
+		4242: [
+			[1, 3, 0.31177765130997],
+			[1, 0, 0.31287559866905],
+			[1, 2, 0.48825904726982],
+			[1, 0, 0.06588395684958],
+			[1, 1, 0.20683698356152],
+			[1, 0, 0.91876804828644],
+			[1, 3, 0.10133952647448],
+			[1, 0, 0.609992146492],
+		],
+	}
+	for seed_value: Variant in expected_by_seed:
+		var seed: int = int(seed_value)
+		var actual: Array[Dictionary] = _draw_sequence(
+			seed,
+			8,
+			GameConfig.SpawnPositionMode.RANDOM
+		)
+		var expected: Array = expected_by_seed[seed] as Array
+		for index: int in range(expected.size()):
+			var item: Array = expected[index] as Array
+			assert_eq(actual[index]["level"], item[0], "seed %d level %d" % [seed, index])
+			assert_eq(actual[index]["color"], item[1], "seed %d color %d" % [seed, index])
+			assert_near(
+				float(actual[index]["t"]),
+				float(item[2]),
+				LEGACY_SEQUENCE_TOLERANCE,
+				"seed %d position %d" % [seed, index]
+			)
+	_restore_spawn_config(snapshot)
 
 
 func test_same_seed_produces_identical_fifty_item_sequence() -> void:
@@ -53,23 +109,44 @@ func test_weighted_distribution_matches_config() -> void:
 
 	var level_one_ratio: float = float(level_one_count) / float(DISTRIBUTION_COUNT)
 	assert_near(level_one_ratio, 0.9, DISTRIBUTION_TOLERANCE, "level 1 ratio")
+	var total_color_weight: float = 0.0
+	for weight: float in Config.data.spawn_color_weights:
+		total_color_weight += weight
 	for color: int in range(color_counts.size()):
 		var color_ratio: float = float(color_counts[color]) / float(DISTRIBUTION_COUNT)
 		assert_near(
 			color_ratio,
-			1.0 / float(color_counts.size()),
+			Config.data.spawn_color_weights[color] / total_color_weight,
 			DISTRIBUTION_TOLERANCE,
 			"color %d ratio" % color
 		)
-	print(
-		"Spawner distribution: level1=%.4f colors=[%.4f, %.4f, %.4f, %.4f]" % [
-			level_one_ratio,
-			float(color_counts[0]) / float(DISTRIBUTION_COUNT),
-			float(color_counts[1]) / float(DISTRIBUTION_COUNT),
-			float(color_counts[2]) / float(DISTRIBUTION_COUNT),
-			float(color_counts[3]) / float(DISTRIBUTION_COUNT),
-		]
-	)
+	assert_eq(color_counts[OrbTypes.OrbColor.PURPLE], 0, "TURN never spawns purple")
+	assert_eq(color_counts[OrbTypes.OrbColor.CYAN], 0, "TURN never spawns cyan")
+	print("TURN Spawner distribution: level1=%.4f colors=%s" % [level_one_ratio, str(color_counts)])
+	spawner.free()
+	_restore_spawn_config(snapshot)
+
+
+func test_blitz_weighted_distribution_uses_all_six_colors() -> void:
+	var snapshot: Dictionary = _snapshot_spawn_config()
+	var spawner: Spawner = Spawner.new()
+	spawner.set_blitz_mode(true)
+	spawner.init_rng(3401)
+	var color_counts: Array[int] = []
+	color_counts.resize(Config.data.blitz_spawn_color_weights.size())
+	color_counts.fill(0)
+	for _index: int in range(DISTRIBUTION_COUNT):
+		var candidate: Dictionary = spawner._draw_candidate()
+		color_counts[int(candidate["color"])] += 1
+	for color: int in range(color_counts.size()):
+		assert_true(color_counts[color] > 0, "BLITZ color %d appears" % color)
+		assert_near(
+			float(color_counts[color]) / float(DISTRIBUTION_COUNT),
+			1.0 / float(color_counts.size()),
+			DISTRIBUTION_TOLERANCE,
+			"BLITZ color %d ratio" % color
+		)
+	print("BLITZ Spawner distribution: colors=%s" % str(color_counts))
 	spawner.free()
 	_restore_spawn_config(snapshot)
 
@@ -216,6 +293,7 @@ func _snapshot_spawn_config() -> Dictionary:
 	return {
 		"spawn_level_weights": Config.data.spawn_level_weights.duplicate(),
 		"spawn_color_weights": Config.data.spawn_color_weights.duplicate(),
+		"blitz_spawn_color_weights": Config.data.blitz_spawn_color_weights.duplicate(),
 		"spawn_position_mode": Config.data.spawn_position_mode,
 		"spawn_count_per_turn": Config.data.spawn_count_per_turn,
 		"preview_turns": Config.data.preview_turns,
@@ -227,6 +305,9 @@ func _snapshot_spawn_config() -> Dictionary:
 func _restore_spawn_config(snapshot: Dictionary) -> void:
 	Config.data.spawn_level_weights = snapshot["spawn_level_weights"] as PackedFloat32Array
 	Config.data.spawn_color_weights = snapshot["spawn_color_weights"] as PackedFloat32Array
+	Config.data.blitz_spawn_color_weights = (
+		snapshot["blitz_spawn_color_weights"] as PackedFloat32Array
+	)
 	Config.data.spawn_position_mode = int(snapshot["spawn_position_mode"]) as GameConfig.SpawnPositionMode
 	Config.data.spawn_count_per_turn = int(snapshot["spawn_count_per_turn"])
 	Config.data.preview_turns = int(snapshot["preview_turns"])

@@ -1,7 +1,7 @@
 class_name OrbTypes
 extends RefCounted
 
-enum OrbColor { RED, BLUE, GREEN, YELLOW }
+enum OrbColor { RED, BLUE, GREEN, YELLOW, PURPLE, CYAN }
 
 const DIRECTIONS: Array[Vector2i] = [
 	Vector2i.UP,

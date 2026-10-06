@@ -197,7 +197,14 @@ func _run_seed(
 	rearrangement_values: Array[float],
 	shock_displacements: Dictionary
 ) -> Dictionary:
-	_seed_reactions_by_color = {"RED": 0, "BLUE": 0, "GREEN": 0, "YELLOW": 0}
+	_seed_reactions_by_color = {
+		"RED": 0,
+		"BLUE": 0,
+		"GREEN": 0,
+		"YELLOW": 0,
+		"PURPLE": 0,
+		"CYAN": 0,
+	}
 	_seed_max_clear_count = 0
 	_seed_blast_count = 0
 	_seed_first_blast_turn = -1
@@ -668,7 +675,14 @@ func _record_shock_event(reaction: Dictionary) -> void:
 	if reaction_type == ReactionRules.Type.MAX_CLEAR:
 		_seed_max_clear_count += 1
 	var color: int = int(reaction["result_color"])
-	var color_names: Array[String] = ["RED", "BLUE", "GREEN", "YELLOW"]
+	var color_names: Array[String] = [
+		"RED",
+		"BLUE",
+		"GREEN",
+		"YELLOW",
+		"PURPLE",
+		"CYAN",
+	]
 	if color >= 0 and color < color_names.size():
 		var color_name: String = color_names[color]
 		_seed_reactions_by_color[color_name] = (
