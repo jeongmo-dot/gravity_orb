@@ -15,6 +15,7 @@ const PAIR_SAMPLE_FRAMES: int = 12
 var _bot_interval: float = 0.6
 var _bot_kind: String = "heuristic"
 var _color_count: int = 6
+var _refill_rule: String = "debt"
 var _seeds: Array[int] = []
 var _output_path: String = DEFAULT_OUTPUT
 var _runner_failed: bool = false
@@ -28,6 +29,7 @@ func _ready() -> void:
 func _run() -> void:
 	_apply_arguments()
 	_apply_color_count()
+	_apply_refill_rule()
 	Config.data.fx_hitstop_enabled = false
 	var original_ticks: int = Engine.physics_ticks_per_second
 	Engine.physics_ticks_per_second = 120
@@ -42,11 +44,14 @@ func _run() -> void:
 		"bot_interval": _bot_interval,
 		"bot_kind": _bot_kind,
 		"color_count": _color_count,
+		"refill_rule": _refill_rule,
 		"seeds": rows,
 		"config": {
 			"duration": Config.data.blitz_duration,
 			"swipe_cooldown": Config.data.blitz_swipe_cooldown,
 			"spawn_on_swipe": Config.data.blitz_spawn_on_swipe,
+			"min_spawn_per_swipe": Config.data.blitz_min_spawn_per_swipe,
+			"max_spawn_per_swipe": Config.data.blitz_max_spawn_per_swipe,
 			"spawn_interval": Config.data.blitz_spawn_interval,
 			"spawn_level_weights": Array(Config.data.blitz_spawn_level_weights),
 			"spawn_color_weights": Array(Config.data.blitz_spawn_color_weights),
@@ -150,6 +155,9 @@ func _run_seed(seed: int) -> Dictionary:
 		),
 		"initial_fill_count": spawner.last_blitz_initial_count,
 		"spawn_count": manager.spawn_count,
+		"spawn_batch_histogram": manager.spawn_batch_histogram,
+		"max_spawn_batch": manager.max_spawn_batch,
+		"remaining_refill_debt": manager.refill_debt,
 		"skipped_spawn_ticks": manager.skipped_spawn_ticks,
 		"skipped_spawn_count": manager.skipped_spawn_ticks,
 		"first_reaction_time": manager.first_reaction_time,
@@ -163,7 +171,8 @@ func _run_seed(seed: int) -> Dictionary:
 		"divergences": divergent_ids.size(),
 	}
 	print(
-		"BLITZ_SEED colors=%d bot=%s interval=%.1f seed=%d score=%d reactions=%d passive=%.1f%% rate=%.2f/s chain=%d productive=%.1f%% fever=%.1f%% blast=%d spawn=%d skipped=%d bonus=%.1f play=%.2f wall=%.3f pair=%.3f departures=%d divergences=%d" % [
+		"BLITZ_SEED rule=%s colors=%d bot=%s interval=%.1f seed=%d score=%d reactions=%d passive=%.1f%% rate=%.2f/s chain=%d productive=%.1f%% fever=%.1f%% blast=%d spawn=%d batch_max=%d debt=%d skipped=%d bonus=%.1f play=%.2f wall=%.3f pair=%.3f departures=%d divergences=%d" % [
+			_refill_rule,
 			_color_count,
 			_bot_kind,
 			_bot_interval,
@@ -177,6 +186,8 @@ func _run_seed(seed: int) -> Dictionary:
 			float(row["fever_time_percent"]),
 			manager.blast_count,
 			manager.spawn_count,
+			manager.max_spawn_batch,
+			manager.refill_debt,
 			manager.skipped_spawn_ticks,
 			manager.time_bonus_total,
 			manager.play_time_elapsed,
@@ -384,6 +395,8 @@ func _apply_arguments() -> void:
 			_bot_kind = argument.trim_prefix("--blitz-bot=").to_lower()
 		elif argument.begins_with("--blitz-color-count="):
 			_color_count = argument.trim_prefix("--blitz-color-count=").to_int()
+		elif argument.begins_with("--blitz-refill-rule="):
+			_refill_rule = argument.trim_prefix("--blitz-refill-rule=").to_lower()
 		elif argument.begins_with("--blitz-seeds="):
 			_seeds.clear()
 			for value: String in argument.trim_prefix("--blitz-seeds=").split(","):
@@ -404,6 +417,18 @@ func _apply_color_count() -> void:
 		)
 		return
 	push_error("BLITZ color count must be 4 or 6, got %d" % _color_count)
+	_runner_failed = true
+
+
+func _apply_refill_rule() -> void:
+	Config.data.blitz_min_spawn_per_swipe = 1
+	if _refill_rule == "baseline":
+		Config.data.blitz_max_spawn_per_swipe = 1
+		return
+	if _refill_rule == "debt":
+		Config.data.blitz_max_spawn_per_swipe = 8
+		return
+	push_error("BLITZ refill rule must be baseline or debt, got %s" % _refill_rule)
 	_runner_failed = true
 
 

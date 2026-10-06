@@ -1,5 +1,6 @@
 extends TestCase
 
+const BOARD_SCENE: PackedScene = preload("res://scenes/Board.tscn")
 const SEQUENCE_COUNT: int = 50
 const DISTRIBUTION_COUNT: int = 10000
 const DISTRIBUTION_TOLERANCE: float = 0.02
@@ -193,6 +194,20 @@ func test_count_two_batch_sequence_matches_continuous_count_one_sequence() -> vo
 	_restore_spawn_config(snapshot)
 
 
+func test_blitz_candidate_order_is_independent_of_batch_grouping() -> void:
+	var snapshot: Dictionary = _snapshot_spawn_config()
+	var first: Array[Dictionary] = await _draw_blitz_grouped_sequence(
+		3636,
+		[1, 3, 2]
+	)
+	var second: Array[Dictionary] = await _draw_blitz_grouped_sequence(
+		3636,
+		[3, 1, 2]
+	)
+	assert_eq(first, second, "BLITZ candidate line ignores batch grouping")
+	_restore_spawn_config(snapshot)
+
+
 func test_ramp_draws_next_turn_batch_sizes_at_boundaries() -> void:
 	var snapshot: Dictionary = _snapshot_spawn_config()
 	Config.data.spawn_count_per_turn = 1
@@ -274,6 +289,26 @@ func _draw_batched_sequence(seed: int, batch_size: int, batch_count: int) -> Arr
 	var sequence: Array[Dictionary] = []
 	for _batch_index: int in range(batch_count):
 		sequence.append_array(spawner._draw_batch())
+	spawner.free()
+	return sequence
+
+
+func _draw_blitz_grouped_sequence(seed: int, group_sizes: Array[int]) -> Array[Dictionary]:
+	var board: Board = BOARD_SCENE.instantiate() as Board
+	tree.root.add_child(board)
+	await tree.process_frame
+	var spawner: Spawner = Spawner.new()
+	spawner.set_blitz_mode(true)
+	spawner.init_rng(seed)
+	var sequence: Array[Dictionary] = []
+	for group_size: int in group_sizes:
+		spawner.sync_blitz_next_batch_size(group_size)
+		var internal_batch: Array = spawner._preview_batches[0] as Array
+		for candidate: Dictionary in internal_batch:
+			sequence.append(candidate.duplicate())
+		spawner.try_spawn(board, Vector2i.DOWN)
+	board.queue_free()
+	await tree.process_frame
 	spawner.free()
 	return sequence
 

@@ -67,6 +67,59 @@ func test_swipe_changes_gravity_immediately_with_cooldown_and_same_direction_ign
 	await _cleanup_fixture(fixture)
 
 
+func test_refill_debt_spawns_merge_blast_and_empty_amounts() -> void:
+	var fixture: Dictionary = await _create_fixture(3136)
+	var manager: BlitzManager = fixture["manager"] as BlitzManager
+	var board: Board = fixture["board"] as Board
+	var spawner: Spawner = fixture["spawner"] as Spawner
+	var initial_count: int = board.get_orbs().size()
+	for _index: int in range(3):
+		manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 2))
+	assert_eq(manager.refill_debt, 3, "three merges add three debt")
+	assert_eq((spawner.peek_preview()[0] as Array).size(), 3, "NEXT shows three")
+	assert_eq((spawner.peek_preview()[1] as Array).size(), 1, "THEN stays one")
+	manager.on_swipe(Vector2i.RIGHT)
+	assert_eq(manager.spawn_count, 3, "three merge debt spawns three")
+	assert_eq(board.get_orbs().size(), initial_count + 3, "three orbs enter as one batch")
+	assert_eq(manager.refill_debt, 0, "three spawn clears debt")
+	manager._physics_process(Config.data.blitz_swipe_cooldown)
+	manager.on_reaction(_reaction(ReactionRules.Type.BLAST, 4))
+	assert_eq(manager.refill_debt, 2, "blast adds two debt")
+	manager.on_swipe(Vector2i.UP)
+	assert_eq(manager.spawn_count, 5, "blast debt spawns two")
+	assert_eq(manager.refill_debt, 0, "blast debt is cleared")
+	manager._physics_process(Config.data.blitz_swipe_cooldown)
+	manager.on_swipe(Vector2i.LEFT)
+	assert_eq(manager.spawn_count, 6, "empty debt keeps one-orb swipe penalty")
+	assert_eq(manager.spawn_batch_histogram[3], 1, "three batch histogram")
+	assert_eq(manager.spawn_batch_histogram[2], 1, "two batch histogram")
+	assert_eq(manager.spawn_batch_histogram[1], 1, "one batch histogram")
+	assert_eq(manager.max_spawn_batch, 3, "maximum batch tracks observation")
+	await _cleanup_fixture(fixture)
+
+
+func test_refill_debt_caps_at_eight_and_carries_three() -> void:
+	var fixture: Dictionary = await _create_fixture(3137)
+	var manager: BlitzManager = fixture["manager"] as BlitzManager
+	var board: Board = fixture["board"] as Board
+	var spawner: Spawner = fixture["spawner"] as Spawner
+	for _index: int in range(11):
+		manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 2))
+	assert_eq(manager.refill_debt, 11, "eleven debt accumulated")
+	assert_eq((spawner.peek_preview()[0] as Array).size(), 8, "NEXT caps at eight")
+	manager.on_swipe(Vector2i.RIGHT)
+	assert_eq(manager.spawn_count, 8, "first swipe spawns capped eight")
+	assert_eq(manager.refill_debt, 3, "three debt carries")
+	for orb: Orb in board.get_orbs():
+		board.remove_orb(orb)
+	manager._physics_process(Config.data.blitz_swipe_cooldown)
+	manager.on_swipe(Vector2i.UP)
+	assert_eq(manager.spawn_count, 11, "second swipe spawns carried three")
+	assert_eq(manager.refill_debt, 0, "carried debt clears")
+	assert_eq(manager.max_spawn_batch, 8, "maximum batch cap observed")
+	await _cleanup_fixture(fixture)
+
+
 func test_disabled_swipe_spawn_preserves_time_refill_and_blocked_tick() -> void:
 	var fixture: Dictionary = await _create_fixture(3102)
 	var manager: BlitzManager = fixture["manager"] as BlitzManager
@@ -74,6 +127,8 @@ func test_disabled_swipe_spawn_preserves_time_refill_and_blocked_tick() -> void:
 	Config.data.blitz_spawn_on_swipe = false
 	Config.data.blitz_spawn_interval = 0.8
 	Config.data.blitz_refill_interval = 0.15
+	manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 2))
+	assert_eq(manager.refill_debt, 1, "time mode still records reaction debt")
 	var initial_count: int = board.get_orbs().size()
 	Config.data.blitz_target_occupancy = 1.0
 	manager._physics_process(0.149)
@@ -98,6 +153,7 @@ func test_disabled_swipe_spawn_preserves_time_refill_and_blocked_tick() -> void:
 	assert_eq(preview.size(), 2, "blitz keeps NEXT and THEN")
 	assert_eq((preview[0] as Array).size(), 1, "NEXT is one timed spawn")
 	assert_eq((preview[1] as Array).size(), 1, "THEN is one timed spawn")
+	assert_eq(manager.refill_debt, 1, "time spawns do not consume swipe debt")
 	await _cleanup_fixture(fixture)
 
 
@@ -109,6 +165,8 @@ func test_blocked_swipe_changes_gravity_without_consuming_next() -> void:
 	manager.on_swipe(Vector2i.RIGHT)
 	var waiting: Orb = board.get_orbs()[-1]
 	waiting.enter_entrance_wait(waiting.position, manager.gravity)
+	for _index: int in range(3):
+		manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 2))
 	var next_before: Array[Dictionary] = spawner.peek_next()
 	manager._physics_process(Config.data.blitz_swipe_cooldown)
 	manager.on_swipe(Vector2i.UP)
@@ -116,7 +174,20 @@ func test_blocked_swipe_changes_gravity_without_consuming_next() -> void:
 	assert_eq(manager.accepted_swipes, 2, "blocked swipe remains accepted")
 	assert_eq(manager.spawn_count, 1, "blocked entrance skips spawn")
 	assert_eq(manager.skipped_spawn_ticks, 1, "blocked spawn is counted")
+	assert_eq(manager.refill_debt, 3, "blocked spawn keeps debt")
 	assert_eq(spawner.peek_next(), next_before, "blocked spawn keeps NEXT")
+	await _cleanup_fixture(fixture)
+
+
+func test_finale_reactions_do_not_add_refill_debt() -> void:
+	var fixture: Dictionary = await _create_fixture(3138)
+	var manager: BlitzManager = fixture["manager"] as BlitzManager
+	manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 2))
+	assert_eq(manager.refill_debt, 1, "running merge adds debt")
+	manager._begin_finale()
+	manager.on_reaction(_reaction(ReactionRules.Type.BLAST, 4))
+	manager.on_reaction(_reaction(ReactionRules.Type.MAX_CLEAR, 7))
+	assert_eq(manager.refill_debt, 1, "finale reactions add no debt")
 	await _cleanup_fixture(fixture)
 
 
@@ -267,6 +338,18 @@ func test_main_selects_blitz_manager_and_shows_time_up_results() -> void:
 		Config.data.color_display[OrbTypes.OrbColor.CYAN],
 		"THEN renders cyan"
 	)
+	var eight_candidates: Array[Dictionary] = []
+	for index: int in range(8):
+		eight_candidates.append({"color": index % 6, "level": 1})
+	hud._on_preview_changed([
+		eight_candidates,
+		[{"color": OrbTypes.OrbColor.RED, "level": 1}],
+	])
+	var next_count_label: Label = main.get_node("UI/Hud/NextCountLabel") as Label
+	assert_eq(hud._next_preview.get_child_count(), 5, "NEXT renders at most five orbs")
+	assert_true(next_count_label.visible, "large NEXT count label is visible")
+	assert_eq(next_count_label.text, "×8", "large NEXT count label")
+	assert_eq(hud._then_preview.get_child_count(), 1, "THEN renders following one orb")
 	manager._physics_process(1.5)
 	assert_eq(manager.state, BlitzManager.State.RUNNING, "main starts blitz after ready")
 	manager.on_swipe(Vector2i.RIGHT)
@@ -383,6 +466,8 @@ func _snapshot_config() -> Dictionary:
 		"game_mode": Config.data.game_mode,
 		"blitz_duration": Config.data.blitz_duration,
 		"blitz_spawn_on_swipe": Config.data.blitz_spawn_on_swipe,
+		"blitz_min_spawn_per_swipe": Config.data.blitz_min_spawn_per_swipe,
+		"blitz_max_spawn_per_swipe": Config.data.blitz_max_spawn_per_swipe,
 		"blitz_spawn_interval": Config.data.blitz_spawn_interval,
 		"blitz_initial_occupancy": Config.data.blitz_initial_occupancy,
 		"blitz_target_occupancy": Config.data.blitz_target_occupancy,
@@ -396,6 +481,8 @@ func _restore_config(snapshot: Dictionary) -> void:
 	Config.data.game_mode = snapshot["game_mode"] as GameConfig.GameMode
 	Config.data.blitz_duration = float(snapshot["blitz_duration"])
 	Config.data.blitz_spawn_on_swipe = bool(snapshot["blitz_spawn_on_swipe"])
+	Config.data.blitz_min_spawn_per_swipe = int(snapshot["blitz_min_spawn_per_swipe"])
+	Config.data.blitz_max_spawn_per_swipe = int(snapshot["blitz_max_spawn_per_swipe"])
 	Config.data.blitz_spawn_interval = float(snapshot["blitz_spawn_interval"])
 	Config.data.blitz_initial_occupancy = float(snapshot["blitz_initial_occupancy"])
 	Config.data.blitz_target_occupancy = float(snapshot["blitz_target_occupancy"])

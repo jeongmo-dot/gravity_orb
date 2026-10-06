@@ -52,6 +52,9 @@ var passive_reaction_count: int = 0
 var chain_histogram: Dictionary = {}
 var first_reaction_time: float = -1.0
 var finale_score_start: int = 0
+var refill_debt: int = 0
+var spawn_batch_histogram: Dictionary = {}
+var max_spawn_batch: int = 0
 
 var chain: int:
 	get:
@@ -106,6 +109,9 @@ func start_game() -> void:
 	chain_histogram.clear()
 	first_reaction_time = -1.0
 	finale_score_start = 0
+	refill_debt = 0
+	spawn_batch_histogram.clear()
+	max_spawn_batch = 0
 	_swipe_cooldown_remaining = 0.0
 	_spawn_elapsed = 0.0
 	_chain_idle_elapsed = 0.0
@@ -117,7 +123,7 @@ func start_game() -> void:
 	if not _collision_resolver.reaction_applied.is_connected(on_reaction):
 		_collision_resolver.reaction_applied.connect(on_reaction)
 	_spawner.set_blitz_mode(true)
-	_spawner.sync_next_batch_size(1)
+	_sync_swipe_spawn_preview()
 	_board.set_gravity(gravity)
 	_board.set_warning_directions(blocked_directions)
 	_set_fever_visual(false)
@@ -152,7 +158,7 @@ func on_swipe(dir: Vector2i) -> void:
 	if _board.has_method("play_visual_tilt"):
 		_board.play_visual_tilt(gravity)
 	if Config.data.blitz_spawn_on_swipe:
-		_try_spawn_next()
+		_try_spawn_for_swipe()
 	gravity_changed.emit(gravity)
 	turn_started.emit(turn_index, gravity)
 
@@ -190,6 +196,7 @@ func on_reaction(reaction: Dictionary) -> void:
 	if reaction_type == ReactionRules.Type.BLAST:
 		blast_count += 1
 	if state == State.RUNNING:
+		_add_refill_debt(reaction_type)
 		if reaction_type == ReactionRules.Type.BLAST:
 			_award_time_bonus(Config.data.blitz_time_bonus_blast, "BLAST")
 		elif reaction_type == ReactionRules.Type.MAX_CLEAR:
@@ -246,12 +253,55 @@ func _current_spawn_interval() -> float:
 	return maxf(interval, 0.001)
 
 
-func _try_spawn_next() -> void:
+func _try_spawn_next() -> int:
 	if not _board.entrance_waiting_orbs().is_empty():
 		skipped_spawn_ticks += 1
-		return
+		return 0
 	var spawned: Array = _spawner.try_spawn(_board, gravity, spawn_count + 1)
 	spawn_count += spawned.size()
+	return spawned.size()
+
+
+func _try_spawn_for_swipe() -> void:
+	var batch_size: int = _next_swipe_spawn_count()
+	_spawner.sync_blitz_next_batch_size(batch_size)
+	var spawned_count: int = _try_spawn_next()
+	spawn_batch_histogram[spawned_count] = (
+		int(spawn_batch_histogram.get(spawned_count, 0)) + 1
+	)
+	max_spawn_batch = maxi(max_spawn_batch, spawned_count)
+	if spawned_count <= 0:
+		return
+	refill_debt = maxi(refill_debt - batch_size, 0)
+	_sync_swipe_spawn_preview()
+
+
+func _add_refill_debt(reaction_type: ReactionRules.Type) -> void:
+	if reaction_type == ReactionRules.Type.MERGE:
+		refill_debt += 1
+	elif (
+		reaction_type == ReactionRules.Type.BLAST
+		or reaction_type == ReactionRules.Type.MAX_CLEAR
+	):
+		refill_debt += 2
+	else:
+		return
+	if Config.data.blitz_spawn_on_swipe:
+		_sync_swipe_spawn_preview()
+
+
+func _next_swipe_spawn_count() -> int:
+	return mini(
+		maxi(Config.data.blitz_min_spawn_per_swipe, refill_debt),
+		Config.data.blitz_max_spawn_per_swipe
+	)
+
+
+func _sync_swipe_spawn_preview() -> void:
+	var batch_size: int = 1
+	if Config.data.blitz_spawn_on_swipe:
+		batch_size = _next_swipe_spawn_count()
+	_spawner.sync_blitz_next_batch_size(batch_size)
 
 
 func _advance_chain(delta: float) -> void:

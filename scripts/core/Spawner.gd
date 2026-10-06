@@ -17,10 +17,14 @@ var _effect_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _bot_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _preview_batches: Array[Array] = []
 var _blitz_mode: bool = false
+var _blitz_candidate_queue: Array[Dictionary] = []
+var _blitz_next_batch_size: int = 1
 
 
 func init_rng(seed: int) -> int:
 	_preview_batches.clear()
+	_blitz_candidate_queue.clear()
+	_blitz_next_batch_size = 1
 	if seed == 0:
 		_rng.randomize()
 		while _rng.seed == 0:
@@ -36,6 +40,8 @@ func init_rng(seed: int) -> int:
 func set_blitz_mode(enabled: bool) -> void:
 	_blitz_mode = enabled
 	_preview_batches.clear()
+	_blitz_candidate_queue.clear()
+	_blitz_next_batch_size = 1
 
 
 func next_blitz_direction(previous: Vector2i) -> Vector2i:
@@ -179,7 +185,11 @@ func try_spawn(board: Variant, gravity: Vector2i, turn_index: int = 1) -> Array:
 			orb.enter_entrance_wait(preferred_position, gravity)
 		spawned.append(orb)
 		orb_spawned.emit(level)
-	_preview_batches.pop_front()
+	if _blitz_mode:
+		for _index: int in range(next_batch.size()):
+			_blitz_candidate_queue.pop_front()
+	else:
+		_preview_batches.pop_front()
 	_sync_preview_count(turn_index + 1)
 	_publish_preview()
 	return spawned
@@ -199,6 +209,10 @@ func peek_preview() -> Array:
 
 
 func sync_next_batch_size(next_turn_index: int = 1) -> void:
+	if _blitz_mode:
+		_sync_blitz_preview()
+		_publish_preview()
+		return
 	_sync_preview_count(next_turn_index)
 	for turn_offset: int in range(_preview_batches.size()):
 		var batch: Array = _preview_batches[turn_offset]
@@ -207,6 +221,14 @@ func sync_next_batch_size(next_turn_index: int = 1) -> void:
 			batch.append(_draw_candidate())
 		if batch.size() > target_size:
 			batch.resize(target_size)
+	_publish_preview()
+
+
+func sync_blitz_next_batch_size(batch_size: int) -> void:
+	if not _blitz_mode:
+		return
+	_blitz_next_batch_size = maxi(batch_size, 1)
+	_sync_blitz_preview()
 	_publish_preview()
 
 
@@ -236,12 +258,28 @@ func _draw_batch(turn_index: int = 1) -> Array[Dictionary]:
 
 
 func _sync_preview_count(next_turn_index: int) -> void:
-	var target_count: int = 2 if _blitz_mode else maxi(Config.data.preview_turns, 1)
+	if _blitz_mode:
+		_sync_blitz_preview()
+		return
+	var target_count: int = maxi(Config.data.preview_turns, 1)
 	if _preview_batches.size() > target_count:
 		_preview_batches.resize(target_count)
 	while _preview_batches.size() < target_count:
 		var turn_offset: int = _preview_batches.size()
 		_preview_batches.append(_draw_batch(next_turn_index + turn_offset))
+
+
+func _sync_blitz_preview() -> void:
+	var required_count: int = _blitz_next_batch_size + 1
+	while _blitz_candidate_queue.size() < required_count:
+		_blitz_candidate_queue.append(_draw_candidate())
+	var next_batch: Array[Dictionary] = []
+	for index: int in range(_blitz_next_batch_size):
+		next_batch.append(_blitz_candidate_queue[index])
+	var then_batch: Array[Dictionary] = [_blitz_candidate_queue[_blitz_next_batch_size]]
+	_preview_batches.clear()
+	_preview_batches.append(next_batch)
+	_preview_batches.append(then_batch)
 
 
 func _batch_size_for_index(turn_index: int) -> int:

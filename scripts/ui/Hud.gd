@@ -1,13 +1,14 @@
 class_name Hud
 extends Control
 
-const MAX_PREVIEW_COUNT: int = 3
+const MAX_PREVIEW_COUNT: int = 5
 const PREVIEW_REGION_SIZE: Vector2 = Vector2(280.0, 150.0)
 const PREVIEW_GAP: float = 16.0
 
 @onready var _next_preview: Node2D = %NextPreview
 @onready var _then_preview: Node2D = %ThenPreview
 @onready var _then_label: Label = %ThenLabel
+@onready var _next_count_label: Label = %NextCountLabel
 @onready var _score_label: Label = %ScoreLabel
 @onready var _best_label: Label = %BestLabel
 @onready var _max_combo_label: Label = %MaxComboLabel
@@ -71,6 +72,8 @@ func bind_game_state(
 func _on_preview_changed(batches: Array) -> void:
 	var next_batch: Array = batches[0] if not batches.is_empty() else []
 	_render_preview(_next_preview, next_batch)
+	_next_count_label.visible = next_batch.size() > MAX_PREVIEW_COUNT
+	_next_count_label.text = "×%d" % next_batch.size()
 	var has_then: bool = batches.size() > 1
 	_then_label.visible = has_then
 	_then_preview.visible = has_then

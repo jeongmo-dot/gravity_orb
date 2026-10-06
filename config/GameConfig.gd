@@ -106,6 +106,8 @@ enum GameMode { TURN, BLITZ }
 @export var blitz_duration: float = 90.0
 @export var blitz_swipe_cooldown: float = 0.12
 @export var blitz_spawn_on_swipe: bool = true
+@export var blitz_min_spawn_per_swipe: int = 1
+@export var blitz_max_spawn_per_swipe: int = 8
 @export var blitz_spawn_interval: float = 0.8
 @export var blitz_spawn_level_weights: PackedFloat32Array = PackedFloat32Array(
 	[0.7, 0.25, 0.05]

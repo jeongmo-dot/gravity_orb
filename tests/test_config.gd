@@ -227,6 +227,8 @@ func test_blitz_spike_defaults() -> void:
 	assert_near(config.blitz_duration, 90.0, TOLERANCE, "blitz duration")
 	assert_near(config.blitz_swipe_cooldown, 0.12, TOLERANCE, "swipe cooldown")
 	assert_true(config.blitz_spawn_on_swipe, "spawn on accepted swipe")
+	assert_eq(config.blitz_min_spawn_per_swipe, 1, "minimum swipe spawn count")
+	assert_eq(config.blitz_max_spawn_per_swipe, 8, "maximum swipe spawn count")
 	assert_near(config.blitz_spawn_interval, 0.8, TOLERANCE, "spawn interval")
 	assert_eq(
 		config.blitz_spawn_level_weights,
