@@ -40,7 +40,7 @@
 
 ### [2026-10-07] 대상 #37 — 시작 화면·모드 선택·소리 설정
 - 상태: 완료
-- 브랜치 / PR: `m8-start-screen` / PR 생성 후 갱신 예정
+- 브랜치 / PR: `m8-start-screen` / https://github.com/jeongmo-dot/gravity_orb/pull/38
 - 변경 파일: `scenes/{Main,Main3D,UI}.tscn`, `scripts/core/{Main,SaveStore,ScoreManager}.gd`, `scripts/fx/SfxBank.gd`, `scripts/ui/{DebugHud,GameOverPanel,Hud,StartScreen}.gd`, `tests/{test_frontend,test_blitz_manager}.gd`, `tests/scenarios/{test_jolt_integration,test_score_flow}.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 인자 없는 실행에서 `GRAVITY ORB`, `BLITZ / 90초 타임어택`, `CLASSIC / 턴제`, 모드별 최고 점수, 소리 버튼을 표시하고 게임 HUD·두 매니저의 물리 처리를 대기시킴
