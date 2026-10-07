@@ -40,7 +40,7 @@
 
 ### [2026-10-07] 대상 #38 — 색각 보조 문양 6종
 - 상태: 완료
-- 브랜치 / PR: `m8-color-symbols` / 생성 예정
+- 브랜치 / PR: `m8-color-symbols` / https://github.com/jeongmo-dot/gravity_orb/pull/39
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scenes/Orb3D.tscn`, `scripts/core/{Orb,OrbSymbols,OrbVisual}.gd`, `scripts/spike/Orb3D.gd`, `scripts/ui/Hud.gd`, `tests/test_config.gd`, `tests/scenarios/test_orb_symbols.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] RED 삼각형·BLUE 작은 원·GREEN 사각형·YELLOW 마름모·PURPLE 별·CYAN 플러스 매핑을 하나의 `OrbSymbols` 도형 정의로 구현하고, 이름과 꼭짓점 수 `[3,24,4,4,10,12]`를 자동 검증
