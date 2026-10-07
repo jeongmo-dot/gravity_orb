@@ -15,7 +15,7 @@ const PAIR_SAMPLE_FRAMES: int = 12
 var _bot_interval: float = 0.6
 var _bot_kind: String = "heuristic"
 var _color_count: int = 6
-var _refill_rule: String = "debt"
+var _refill_rule: String = "target"
 var _seeds: Array[int] = []
 var _output_path: String = DEFAULT_OUTPUT
 var _runner_failed: bool = false
@@ -230,6 +230,7 @@ func _create_fixture(seed: int) -> Dictionary:
 	var manager: BlitzManager = BLITZ_SCRIPT.new() as BlitzManager
 	manager.name = "BlitzManager"
 	manager.unique_name_in_owner = true
+	manager.refill_rule = _measurement_refill_rule()
 	root.add_child(manager)
 	manager.owner = root
 	add_child(root)
@@ -422,14 +423,22 @@ func _apply_color_count() -> void:
 
 func _apply_refill_rule() -> void:
 	Config.data.blitz_min_spawn_per_swipe = 1
-	if _refill_rule == "baseline":
-		Config.data.blitz_max_spawn_per_swipe = 1
+	Config.data.blitz_max_spawn_per_swipe = 8
+	if _refill_rule in ["baseline", "debt", "target"]:
 		return
-	if _refill_rule == "debt":
-		Config.data.blitz_max_spawn_per_swipe = 8
-		return
-	push_error("BLITZ refill rule must be baseline or debt, got %s" % _refill_rule)
+	push_error(
+		"BLITZ refill rule must be baseline, debt, or target, got %s"
+		% _refill_rule
+	)
 	_runner_failed = true
+
+
+func _measurement_refill_rule() -> BlitzManager.RefillRule:
+	if _refill_rule == "baseline":
+		return BlitzManager.RefillRule.SINGLE
+	if _refill_rule == "debt":
+		return BlitzManager.RefillRule.COUNT_DEBT
+	return BlitzManager.RefillRule.TARGET_DENSITY
 
 
 func _write_report(report: Dictionary) -> void:

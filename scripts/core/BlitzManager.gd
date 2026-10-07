@@ -2,6 +2,7 @@ class_name BlitzManager
 extends Node
 
 enum State { IDLE, READY, RUNNING, FINALE, FINISHED }
+enum RefillRule { SINGLE, COUNT_DEBT, TARGET_DENSITY }
 
 signal state_changed(state: State)
 signal gravity_changed(dir: Vector2i)
@@ -55,6 +56,7 @@ var finale_score_start: int = 0
 var refill_debt: int = 0
 var spawn_batch_histogram: Dictionary = {}
 var max_spawn_batch: int = 0
+var refill_rule: RefillRule = RefillRule.TARGET_DENSITY
 
 var chain: int:
 	get:
@@ -196,7 +198,7 @@ func on_reaction(reaction: Dictionary) -> void:
 	if reaction_type == ReactionRules.Type.BLAST:
 		blast_count += 1
 	if state == State.RUNNING:
-		_add_refill_debt(reaction_type)
+		_update_refill_after_reaction(reaction_type)
 		if reaction_type == ReactionRules.Type.BLAST:
 			_award_time_bonus(Config.data.blitz_time_bonus_blast, "BLAST")
 		elif reaction_type == ReactionRules.Type.MAX_CLEAR:
@@ -239,6 +241,7 @@ func _advance_running(delta: float) -> void:
 			if _spawn_elapsed < spawn_interval:
 				break
 			_spawn_elapsed -= spawn_interval
+			_spawner.sync_blitz_next_batch_size(1)
 			_try_spawn_next()
 	remaining_time = maxf(remaining_time - step, 0.0)
 	time_changed.emit(remaining_time)
@@ -272,29 +275,60 @@ func _try_spawn_for_swipe() -> void:
 	max_spawn_batch = maxi(max_spawn_batch, spawned_count)
 	if spawned_count <= 0:
 		return
-	refill_debt = maxi(refill_debt - batch_size, 0)
+	if refill_rule == RefillRule.COUNT_DEBT:
+		refill_debt = maxi(refill_debt - batch_size, 0)
 	_sync_swipe_spawn_preview()
 
 
-func _add_refill_debt(reaction_type: ReactionRules.Type) -> void:
-	if reaction_type == ReactionRules.Type.MERGE:
-		refill_debt += 1
-	elif (
-		reaction_type == ReactionRules.Type.BLAST
-		or reaction_type == ReactionRules.Type.MAX_CLEAR
-	):
-		refill_debt += 2
-	else:
-		return
+func _update_refill_after_reaction(reaction_type: ReactionRules.Type) -> void:
+	if refill_rule == RefillRule.COUNT_DEBT:
+		if reaction_type == ReactionRules.Type.MERGE:
+			refill_debt += 1
+		elif (
+			reaction_type == ReactionRules.Type.BLAST
+			or reaction_type == ReactionRules.Type.MAX_CLEAR
+		):
+			refill_debt += 2
 	if Config.data.blitz_spawn_on_swipe:
 		_sync_swipe_spawn_preview()
 
 
 func _next_swipe_spawn_count() -> int:
-	return mini(
-		maxi(Config.data.blitz_min_spawn_per_swipe, refill_debt),
-		Config.data.blitz_max_spawn_per_swipe
+	if refill_rule == RefillRule.SINGLE:
+		return 1
+	if refill_rule == RefillRule.COUNT_DEBT:
+		return mini(
+			maxi(Config.data.blitz_min_spawn_per_swipe, refill_debt),
+			Config.data.blitz_max_spawn_per_swipe
+		)
+	return _target_density_spawn_count()
+
+
+func _target_density_spawn_count() -> int:
+	var max_count: int = maxi(Config.data.blitz_max_spawn_per_swipe, 1)
+	var min_count: int = clampi(
+		Config.data.blitz_min_spawn_per_swipe,
+		1,
+		max_count
 	)
+	var candidates: Array[Dictionary] = _spawner.peek_blitz_candidates(max_count)
+	var batch_size: int = mini(min_count, candidates.size())
+	var projected_occupancy: float = _board_occupancy()
+	for index: int in range(batch_size):
+		projected_occupancy += _candidate_occupancy(candidates[index])
+	while (
+		batch_size < candidates.size()
+		and batch_size < max_count
+		and projected_occupancy < Config.data.blitz_target_occupancy
+	):
+		projected_occupancy += _candidate_occupancy(candidates[batch_size])
+		batch_size += 1
+	return maxi(batch_size, 1)
+
+
+func _candidate_occupancy(candidate: Dictionary) -> float:
+	var radius: float = Config.data.radius_for_level(int(candidate["level"]))
+	return PI * radius * radius / (Config.data.board_size * Config.data.board_size)
 
 
 func _sync_swipe_spawn_preview() -> void:

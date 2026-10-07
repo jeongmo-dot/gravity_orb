@@ -208,6 +208,23 @@ func peek_preview() -> Array:
 	return result
 
 
+func peek_blitz_candidates(count: int) -> Array[Dictionary]:
+	if not _blitz_mode:
+		return []
+	var requested_count: int = maxi(count, 0)
+	while _blitz_candidate_queue.size() < requested_count:
+		_blitz_candidate_queue.append(_draw_candidate())
+	var result: Array[Dictionary] = []
+	for index: int in range(requested_count):
+		result.append(
+			{
+				"color": int(_blitz_candidate_queue[index]["color"]),
+				"level": int(_blitz_candidate_queue[index]["level"]),
+			}
+		)
+	return result
+
+
 func sync_next_batch_size(next_turn_index: int = 1) -> void:
 	if _blitz_mode:
 		_sync_blitz_preview()

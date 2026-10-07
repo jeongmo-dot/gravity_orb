@@ -10,7 +10,9 @@ $conditions = @(
     [ordered]@{ colors = 6; rule = "baseline"; bot = "heuristic"; interval = 0.6; name = "baseline_heuristic_0_6" },
     [ordered]@{ colors = 6; rule = "baseline"; bot = "random"; interval = 0.3; name = "baseline_random_0_3" },
     [ordered]@{ colors = 6; rule = "debt"; bot = "heuristic"; interval = 0.6; name = "debt_heuristic_0_6" },
-    [ordered]@{ colors = 6; rule = "debt"; bot = "random"; interval = 0.3; name = "debt_random_0_3" }
+    [ordered]@{ colors = 6; rule = "debt"; bot = "random"; interval = 0.3; name = "debt_random_0_3" },
+    [ordered]@{ colors = 6; rule = "target"; bot = "heuristic"; interval = 0.6; name = "target_heuristic_0_6" },
+    [ordered]@{ colors = 6; rule = "target"; bot = "random"; interval = 0.3; name = "target_random_0_3" }
 )
 New-Item -ItemType Directory -Force -Path $artifactPath | Out-Null
 
@@ -124,7 +126,7 @@ foreach ($condition in $conditions) {
 }
 
 $scoreComparisons = @()
-foreach ($rule in @("baseline", "debt")) {
+foreach ($rule in @("baseline", "debt", "target")) {
     $heuristic = $cases | Where-Object {
         [string]$_.refill_rule -eq $rule -and [string]$_.bot -eq "heuristic"
     }
@@ -150,6 +152,6 @@ $summary = [ordered]@{
     cases = $cases
     score_comparisons = $scoreComparisons
 }
-$summaryPath = Join-Path $artifactPath "blitz_refill_debt_summary.json"
+$summaryPath = Join-Path $artifactPath "blitz_target_density_summary.json"
 $summary | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $summaryPath -Encoding utf8
 Write-Output "BLITZ_SUMMARY $summaryPath"

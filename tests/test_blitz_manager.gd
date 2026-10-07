@@ -37,6 +37,8 @@ func test_swipe_changes_gravity_immediately_with_cooldown_and_same_direction_ign
 	var manager: BlitzManager = fixture["manager"] as BlitzManager
 	var board: Board = fixture["board"] as Board
 	var spawner: Spawner = fixture["spawner"] as Spawner
+	Config.data.blitz_target_occupancy = 0.0
+	manager._sync_swipe_spawn_preview()
 	var initial_count: int = board.get_orbs().size()
 	var preview_before: Array = spawner.peek_preview()
 	manager._physics_process(5.0)
@@ -67,11 +69,73 @@ func test_swipe_changes_gravity_immediately_with_cooldown_and_same_direction_ign
 	await _cleanup_fixture(fixture)
 
 
-func test_refill_debt_spawns_merge_blast_and_empty_amounts() -> void:
+func test_target_density_empty_board_caps_at_eight_and_full_board_spawns_one() -> void:
 	var fixture: Dictionary = await _create_fixture(3136)
 	var manager: BlitzManager = fixture["manager"] as BlitzManager
 	var board: Board = fixture["board"] as Board
 	var spawner: Spawner = fixture["spawner"] as Spawner
+	_clear_board(board)
+	manager._sync_swipe_spawn_preview()
+	assert_eq((spawner.peek_preview()[0] as Array).size(), 8, "empty board NEXT caps at eight")
+	_add_level_orbs(board, 7, 7)
+	manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 7))
+	assert_eq(
+		(spawner.peek_preview()[0] as Array).size(),
+		1,
+		"reaction refreshes NEXT from changed occupancy"
+	)
+	_clear_board(board)
+	manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 7))
+	assert_eq(
+		(spawner.peek_preview()[0] as Array).size(),
+		8,
+		"NEXT returns to cap when reactions leave board empty"
+	)
+	manager.on_swipe(Vector2i.RIGHT)
+	assert_eq(manager.spawn_count, 8, "empty board swipe spawns capped eight")
+	_clear_board(board)
+	_add_level_orbs(board, 7, 7)
+	manager._physics_process(Config.data.blitz_swipe_cooldown)
+	manager._sync_swipe_spawn_preview()
+	assert_true(_occupancy(board) >= 0.4, "seven level seven orbs exceed target")
+	assert_eq((spawner.peek_preview()[0] as Array).size(), 1, "full board NEXT falls to one")
+	manager.on_swipe(Vector2i.UP)
+	assert_eq(manager.spawn_count, 9, "full board keeps one-orb swipe penalty")
+	assert_eq(manager.refill_debt, 0, "target density has no carried count debt")
+	await _cleanup_fixture(fixture)
+
+
+func test_target_density_thirty_percent_fills_toward_target() -> void:
+	var fixture: Dictionary = await _create_fixture(3139)
+	var manager: BlitzManager = fixture["manager"] as BlitzManager
+	var board: Board = fixture["board"] as Board
+	var spawner: Spawner = fixture["spawner"] as Spawner
+	_clear_board(board)
+	_add_level_orbs(board, 5, 7)
+	manager._sync_swipe_spawn_preview()
+	var occupancy_before: float = _occupancy(board)
+	var next_batch: Array = spawner.peek_preview()[0] as Array
+	var projected: float = occupancy_before + _candidate_batch_occupancy(next_batch)
+	assert_true(occupancy_before >= 0.30, "fixture starts around thirty percent")
+	assert_true(occupancy_before < 0.40, "fixture starts below target")
+	assert_true(next_batch.size() > 1, "below target produces multiple candidates")
+	assert_true(next_batch.size() <= 8, "target batch respects cap")
+	assert_true(
+		next_batch.size() == 8 or projected >= Config.data.blitz_target_occupancy,
+		"batch reaches target or exhausts cap"
+	)
+	manager.on_swipe(Vector2i.RIGHT)
+	assert_eq(manager.spawn_count, next_batch.size(), "previewed density batch spawns together")
+	await _cleanup_fixture(fixture)
+
+
+func test_count_debt_measurement_rule_spawns_merge_blast_and_empty_amounts() -> void:
+	var fixture: Dictionary = await _create_fixture(3136)
+	var manager: BlitzManager = fixture["manager"] as BlitzManager
+	var board: Board = fixture["board"] as Board
+	var spawner: Spawner = fixture["spawner"] as Spawner
+	manager.refill_rule = BlitzManager.RefillRule.COUNT_DEBT
+	manager._sync_swipe_spawn_preview()
 	var initial_count: int = board.get_orbs().size()
 	for _index: int in range(3):
 		manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 2))
@@ -98,11 +162,13 @@ func test_refill_debt_spawns_merge_blast_and_empty_amounts() -> void:
 	await _cleanup_fixture(fixture)
 
 
-func test_refill_debt_caps_at_eight_and_carries_three() -> void:
+func test_count_debt_measurement_rule_caps_at_eight_and_carries_three() -> void:
 	var fixture: Dictionary = await _create_fixture(3137)
 	var manager: BlitzManager = fixture["manager"] as BlitzManager
 	var board: Board = fixture["board"] as Board
 	var spawner: Spawner = fixture["spawner"] as Spawner
+	manager.refill_rule = BlitzManager.RefillRule.COUNT_DEBT
+	manager._sync_swipe_spawn_preview()
 	for _index: int in range(11):
 		manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 2))
 	assert_eq(manager.refill_debt, 11, "eleven debt accumulated")
@@ -128,7 +194,7 @@ func test_disabled_swipe_spawn_preserves_time_refill_and_blocked_tick() -> void:
 	Config.data.blitz_spawn_interval = 0.8
 	Config.data.blitz_refill_interval = 0.15
 	manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 2))
-	assert_eq(manager.refill_debt, 1, "time mode still records reaction debt")
+	assert_eq(manager.refill_debt, 0, "target density does not record count debt")
 	var initial_count: int = board.get_orbs().size()
 	Config.data.blitz_target_occupancy = 1.0
 	manager._physics_process(0.149)
@@ -153,7 +219,7 @@ func test_disabled_swipe_spawn_preserves_time_refill_and_blocked_tick() -> void:
 	assert_eq(preview.size(), 2, "blitz keeps NEXT and THEN")
 	assert_eq((preview[0] as Array).size(), 1, "NEXT is one timed spawn")
 	assert_eq((preview[1] as Array).size(), 1, "THEN is one timed spawn")
-	assert_eq(manager.refill_debt, 1, "time spawns do not consume swipe debt")
+	assert_eq(manager.refill_debt, 0, "time path keeps target density debt-free")
 	await _cleanup_fixture(fixture)
 
 
@@ -162,6 +228,8 @@ func test_blocked_swipe_changes_gravity_without_consuming_next() -> void:
 	var manager: BlitzManager = fixture["manager"] as BlitzManager
 	var board: Board = fixture["board"] as Board
 	var spawner: Spawner = fixture["spawner"] as Spawner
+	Config.data.blitz_target_occupancy = 0.0
+	manager._sync_swipe_spawn_preview()
 	manager.on_swipe(Vector2i.RIGHT)
 	var waiting: Orb = board.get_orbs()[-1]
 	waiting.enter_entrance_wait(waiting.position, manager.gravity)
@@ -174,20 +242,20 @@ func test_blocked_swipe_changes_gravity_without_consuming_next() -> void:
 	assert_eq(manager.accepted_swipes, 2, "blocked swipe remains accepted")
 	assert_eq(manager.spawn_count, 1, "blocked entrance skips spawn")
 	assert_eq(manager.skipped_spawn_ticks, 1, "blocked spawn is counted")
-	assert_eq(manager.refill_debt, 3, "blocked spawn keeps debt")
+	assert_eq(manager.refill_debt, 0, "blocked target refill has no carry")
 	assert_eq(spawner.peek_next(), next_before, "blocked spawn keeps NEXT")
 	await _cleanup_fixture(fixture)
 
 
-func test_finale_reactions_do_not_add_refill_debt() -> void:
+func test_target_density_reactions_do_not_add_refill_debt() -> void:
 	var fixture: Dictionary = await _create_fixture(3138)
 	var manager: BlitzManager = fixture["manager"] as BlitzManager
 	manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 2))
-	assert_eq(manager.refill_debt, 1, "running merge adds debt")
+	assert_eq(manager.refill_debt, 0, "running merge uses density instead of count debt")
 	manager._begin_finale()
 	manager.on_reaction(_reaction(ReactionRules.Type.BLAST, 4))
 	manager.on_reaction(_reaction(ReactionRules.Type.MAX_CLEAR, 7))
-	assert_eq(manager.refill_debt, 1, "finale reactions add no debt")
+	assert_eq(manager.refill_debt, 0, "finale reactions add no debt")
 	await _cleanup_fixture(fixture)
 
 
@@ -510,6 +578,28 @@ func _occupancy(board: Board) -> float:
 	var occupied_area: float = 0.0
 	for orb: Orb in board.get_orbs():
 		var radius: float = Config.data.radius_for_level(orb.level)
+		occupied_area += PI * radius * radius
+	return occupied_area / (Config.data.board_size * Config.data.board_size)
+
+
+func _clear_board(board: Board) -> void:
+	for orb: Orb in board.get_orbs():
+		board.remove_orb(orb)
+
+
+func _add_level_orbs(board: Board, count: int, level: int) -> void:
+	for index: int in range(count):
+		board.spawn_orb(
+			OrbTypes.OrbColor.RED,
+			level,
+			Vector2(float(index) * 2.0, 0.0)
+		)
+
+
+func _candidate_batch_occupancy(batch: Array) -> float:
+	var occupied_area: float = 0.0
+	for candidate: Dictionary in batch:
+		var radius: float = Config.data.radius_for_level(int(candidate["level"]))
 		occupied_area += PI * radius * radius
 	return occupied_area / (Config.data.board_size * Config.data.board_size)
 

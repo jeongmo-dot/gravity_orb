@@ -300,6 +300,7 @@ func _draw_blitz_grouped_sequence(seed: int, group_sizes: Array[int]) -> Array[D
 	var spawner: Spawner = Spawner.new()
 	spawner.set_blitz_mode(true)
 	spawner.init_rng(seed)
+	spawner.peek_blitz_candidates(Config.data.blitz_max_spawn_per_swipe)
 	var sequence: Array[Dictionary] = []
 	for group_size: int in group_sizes:
 		spawner.sync_blitz_next_batch_size(group_size)
