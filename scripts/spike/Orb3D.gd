@@ -6,6 +6,7 @@ const PIXELS_PER_METER: float = 100.0
 @onready var _body: RigidBody3D = %Body
 @onready var _collision_shape: CollisionShape3D = %CollisionShape3D
 @onready var _mesh: MeshInstance3D = %Mesh
+@onready var _symbol_mesh: MeshInstance3D = %Symbol
 
 var color: int = 0
 var level: int = 1
@@ -39,6 +40,7 @@ var position: Vector2:
 		return world_position_to_plane(_body.position)
 	set(value):
 		_body.position = plane_position_to_world(value)
+		_update_symbol_transform()
 
 var linear_velocity: Vector2:
 	get:
@@ -145,11 +147,17 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	visual_material.emission_enabled = true
 	visual_material.emission = _display_color * blast_emission_strength()
 	_mesh.material_override = visual_material
+	_symbol_mesh.mesh = OrbSymbols.mesh_for_color(color)
+	_symbol_mesh.visible = cfg.orb_symbols_enabled
+	_symbol_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_symbol_mesh.transparency = 0.0
+	_update_symbol_transform()
 
 
 func _physics_process(delta: float) -> void:
 	_advance_growth(delta)
 	_advance_blast_blink(delta)
+	_update_symbol_transform()
 
 
 func configure_physics_profile(
@@ -327,6 +335,7 @@ func _set_visual_alpha(alpha: float) -> void:
 	display_color.a = alpha
 	material.albedo_color = display_color
 	material.emission = _display_color * blast_emission_strength()
+	_symbol_mesh.transparency = 1.0 - clampf(alpha, 0.0, 1.0)
 
 
 func _advance_blast_blink(delta: float) -> void:
@@ -356,3 +365,14 @@ func _set_current_radius(radius_px: float) -> void:
 	if sphere_mesh != null:
 		sphere_mesh.radius = radius_m
 		sphere_mesh.height = radius_m * 2.0
+	_update_symbol_transform()
+
+
+func _update_symbol_transform() -> void:
+	if not is_instance_valid(_symbol_mesh) or not is_instance_valid(_body):
+		return
+	var radius_m: float = _current_radius / PIXELS_PER_METER
+	_symbol_mesh.position = _body.position + Vector3(0.0, 0.0, radius_m + 0.002)
+	_symbol_mesh.rotation = Vector3.ZERO
+	var symbol_size_m: float = radius_m * OrbSymbols.SYMBOL_SIZE_FACTOR
+	_symbol_mesh.scale = Vector3(symbol_size_m, symbol_size_m, 1.0)
