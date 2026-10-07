@@ -561,6 +561,7 @@ func _create_fixture(seed: int, create_initial: bool) -> Dictionary:
 	tree.root.add_child(fixture_root)
 	await tree.process_frame
 	board.orb_contact.disconnect(resolver.report_contact)
+	resolver.proximity_reaction_scan_enabled = false
 	spawner.init_rng(seed)
 	if create_initial:
 		spawner.spawn_initial(board, Vector2i.DOWN)

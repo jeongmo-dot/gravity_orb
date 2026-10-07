@@ -106,7 +106,7 @@ func test_spawn_count_ramp_turn_boundaries() -> void:
 
 func test_m5_contact_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
-	assert_eq(config.contact_max_reported, 6, "maximum reported contacts")
+	assert_eq(config.contact_max_reported, 16, "maximum reported contacts")
 
 
 func test_m5_plus_tuning_defaults() -> void:

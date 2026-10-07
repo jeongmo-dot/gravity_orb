@@ -55,10 +55,16 @@ func bind(game_manager: Variant, board: Variant) -> void:
 
 
 func _on_reaction_ready(reaction: Dictionary) -> void:
-	call_deferred("play_reaction", reaction.duplicate())
+	_play_reaction_sfx(reaction)
+	call_deferred("play_reaction_visuals", reaction.duplicate())
 
 
 func play_reaction(reaction: Dictionary) -> void:
+	_play_reaction_sfx(reaction)
+	play_reaction_visuals(reaction)
+
+
+func play_reaction_visuals(reaction: Dictionary) -> void:
 	var reaction_type: ReactionRules.Type = reaction["type"] as ReactionRules.Type
 	var finale: bool = bool(reaction.get("finale", false))
 	if reaction_type == ReactionRules.Type.MERGE:
@@ -69,11 +75,6 @@ func play_reaction(reaction: Dictionary) -> void:
 		and reaction_type != ReactionRules.Type.MAX_CLEAR
 	):
 		return
-	if finale:
-		_finale_sfx_index = int(reaction.get("finale_index", _finale_sfx_index + 1))
-	else:
-		_finale_sfx_index = 0
-	_sfx_bank.play_blast(finale, maxi(_finale_sfx_index, 1))
 	if not Config.data.fx_enabled or _camera == null:
 		return
 	var level: int = _effect_level(reaction)
@@ -86,6 +87,41 @@ func play_reaction(reaction: Dictionary) -> void:
 			else Config.data.fx_hitstop_time
 		)
 		begin_hitstop(hitstop_time)
+
+
+func _play_reaction_sfx(reaction: Dictionary) -> void:
+	var reaction_type: ReactionRules.Type = reaction["type"] as ReactionRules.Type
+	if reaction_type == ReactionRules.Type.MERGE:
+		var result_orb: Variant = reaction.get("result_orb")
+		var stable_spawn_id: int = 0
+		if is_instance_valid(result_orb):
+			stable_spawn_id = int(result_orb.stable_spawn_id)
+		_sfx_bank.play_merge(
+			int(reaction.get("result_level", 2)),
+			maxi(int(reaction.get("chain", reaction.get("combo", 1))), 1),
+			stable_spawn_id,
+			int(reaction.get("reaction_applied_usec", 0)),
+			int(reaction.get("reaction_physics_frame", -1)),
+			int(reaction.get("reaction_process_frame", -1))
+		)
+		return
+	if (
+		reaction_type != ReactionRules.Type.BLAST
+		and reaction_type != ReactionRules.Type.MAX_CLEAR
+	):
+		return
+	var finale: bool = bool(reaction.get("finale", false))
+	if finale:
+		_finale_sfx_index = int(reaction.get("finale_index", _finale_sfx_index + 1))
+	else:
+		_finale_sfx_index = 0
+	_sfx_bank.play_blast(
+		finale,
+		maxi(_finale_sfx_index, 1),
+		int(reaction.get("reaction_applied_usec", 0)),
+		int(reaction.get("reaction_physics_frame", -1)),
+		int(reaction.get("reaction_process_frame", -1))
+	)
 
 
 func begin_hitstop(duration: float) -> void:
@@ -162,16 +198,9 @@ func _process(delta: float) -> void:
 
 func _play_merge_feedback(reaction: Dictionary) -> void:
 	var result_orb: Variant = reaction.get("result_orb")
-	var stable_spawn_id: int = 0
 	if is_instance_valid(result_orb):
-		stable_spawn_id = int(result_orb.stable_spawn_id)
 		if result_orb.has_method("play_visual_punch"):
 			result_orb.play_visual_punch(1.18, 0.14)
-	_sfx_bank.play_merge(
-		int(reaction.get("result_level", 2)),
-		maxi(int(reaction.get("chain", reaction.get("combo", 1))), 1),
-		stable_spawn_id
-	)
 	if not Config.data.fx_enabled or _camera == null:
 		return
 	var color_index: int = int(reaction.get("result_color", 0))
