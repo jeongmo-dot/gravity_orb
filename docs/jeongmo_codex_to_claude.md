@@ -40,7 +40,7 @@
 
 ### [2026-10-08] 대상 #39 — 작은 UI 버그 묶음 수정
 - 상태: 완료
-- 브랜치 / PR: `m8-ui-bug-fixes` / 생성 후 기록 예정
+- 브랜치 / PR: `m8-ui-bug-fixes` / https://github.com/jeongmo-dot/gravity_orb/pull/40
 - 변경 파일: `scenes/{Orb3D,UI}.tscn`, `scripts/core/{Orb,Spawner}.gd`, `scripts/spike/Orb3D.gd`, `scripts/ui/GameOverPanel.gd`, `tests/{test_blitz_manager,test_spawner}.gd`, `tests/scenarios/{test_score_flow,test_ui_fixes}.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 공통 결과 패널 배경을 alpha `0.96`으로 올리고 패널 뒤 전체 화면에 검정 alpha `0.60` 디머를 추가. TURN `GAME OVER`와 BLITZ `TIME UP` 양쪽에서 같은 패널·디머가 나타남을 자동 검증
