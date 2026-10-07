@@ -498,6 +498,8 @@ func test_blocked_3d_spawn_reaches_game_over_and_warning_edge_is_red() -> void:
 	Config.data.max_settle_time = 0.25
 	var fixture: Dictionary = await _create_fixture(false, true)
 	var board: Board3D = fixture["board"] as Board3D
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	resolver.proximity_reaction_scan_enabled = false
 	var spawner: Spawner = fixture["spawner"] as Spawner
 	var manager: TurnManager = fixture["manager"] as TurnManager
 	_fill_spawn_wall(board, Vector2i.DOWN)

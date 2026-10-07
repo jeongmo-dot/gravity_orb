@@ -223,6 +223,7 @@ func _create_fixture(seed: int) -> Dictionary:
 	var resolver: CollisionResolver = COLLISION_RESOLVER_SCRIPT.new() as CollisionResolver
 	resolver.name = "CollisionResolver"
 	resolver.unique_name_in_owner = true
+	resolver.proximity_reaction_scan_enabled = false
 	fixture_root.add_child(resolver)
 	resolver.owner = fixture_root
 	var manager: TurnManager = TURN_MANAGER_SCRIPT.new() as TurnManager

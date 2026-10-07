@@ -38,6 +38,45 @@
 
 ## 미확인
 
+### [2026-10-08] 대상 #41 — 효과음 반응성 + 합체 판정 지연
+- 상태: 부분완료 (구현·검증·로컬 커밋 완료, 원격 push 명시 승인 대기)
+- 브랜치 / PR: `m8-sfx-latency` (로컬) / PR 미생성
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/CollisionResolver.gd`, `scripts/fx/{FeedbackDirector,SfxBank}.gd`, `tests/{test_config,test_feedback}.gd`, `tests/scenarios/{test_game_over,test_jolt_integration,test_reaction_latency,test_spawn_flow}.gd`, `tests/spike/{ReactionLatencyMeasurement.tscn,run_reaction_latency_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 변경 전 TURN 120턴·BLITZ 110초 × seeds `101..112`를 `contact_max_reported=6`, 근접 보강 off로 측정하고, 변경 후 `16`, 근접 보강 on으로 같은 조건 재측정. 기하 접촉→반응의 전체/잠금 제외 지연, 1틱 초과, 경로, 당시 접촉 수, 놓침·선점, 반응→play 지연을 JSON과 아래 수치로 기록
+  - [x] 잠기지 않은 반응 가능 쌍을 `(색, 레벨)`, BLAST 레벨, 상극 색 묶음별 공간 해시로 검사. 현재 칸+단방향 이웃 4칸만 순회해 전체 O(n²)를 피하고 안정 ID로 최종 반응 순서를 정렬
+  - [x] `contact_max_reported`를 허용된 범위에서 `6→16`으로 상향. TURN·BLITZ의 중심 L6+이웃 8개+신규 같은 쌍이 1 물리 틱 안에 한 번 MERGE하고, 동일 배치 2회 반응 순서가 같은지 자동 검증
+  - [x] 200구체 근접 스캔 40회: 전체 회귀 누적 부하 상태 p95 `802µs`, 최대 `924µs`로 `<1ms/틱`
+  - [x] 반응 신호 핸들러 안에서 SFX를 즉시 `play()`하고 VFX만 deferred로 유지. 같은 physics/process frame 재생과 deferred VFX 이후 중복 재생 0회를 자동 검증
+  - [x] 외부 `pop/blast.wav|ogg` 우선순위는 유지하고, pop `45ms`·3ms high-pass click×1.6·`2400→1200Hz/5ms`·감쇠 `τ=10ms`, blast 첫 15ms attack·`150→90Hz`·`70→45Hz`+2/3배음·0~100ms 7연타로 재합성
+  - [x] 잠금 중 접촉은 기존 `chain_reaction_delay=0.2s` 뒤 `lock_release` 경로로 처리되는 기존 연쇄 테스트가 통과하고 점수·반응 규칙·물리 설정은 접촉 보고 개수 외 변경하지 않음
+- 지연 측정 (120Hz, 잠금 제외 반응 기준):
+
+| 모드 | 전 p50/p95/max ms | 후 p50/p95/max ms | 1틱 초과 전→후 | 놓친 채 종료 전→후 | 후 경로 `proximity/body/lock` |
+|---|---:|---:|---:|---:|---:|
+| TURN | `8.333 / 8.333 / 16.667` | `0 / 0 / 0` | `5/1106 (0.452%) → 0/1091` | `262 → 0` | `1127 / 49 / 6` |
+| BLITZ | `8.333 / 8.333 / 183.333` | `0 / 0 / 0` | `5/4012 (0.125%) → 0/4107` | `783 → 0` | `4385 / 13 / 61` |
+
+  - 의도된 연쇄 잠금을 포함한 전체 지연은 TURN `8.333/91.667/200 → 0/133.333/200ms`, BLITZ `8.333/133.333/191.667 → 0/108.333/191.667ms`. 잠금 접촉 수 분포 p50/p95/max는 TURN `2/4/6 → 2/4/5`, BLITZ `3/5/8 → 3/5/8`; 잠금 제외 완료 조건과 분리해 기록
+  - 반응→`play()` TURN p50/p95/max `0.095/0.141/12.519 → 0.032/0.050/0.068ms`, BLITZ `0.120/0.200/0.727 → 0.091/0.140/0.341ms`; 변경 후 같은 process frame 비율 TURN·BLITZ 모두 `100%`
+  - 합성 파형: pop 최대 진폭 `0.000ms`, 첫 10ms 에너지 `90.290%`; blast 최대 진폭 `0.045ms`, 첫 10ms 에너지 `15.770%`
+  - 물리 관측 전→후: TURN 이탈/발산 `0/0→0/0`, wall 최대 `18.687→20.436px`, pair 10Hz 최대 `38.808→39.646px`; BLITZ `0/0→0/0`, wall `19.456→21.573px`, pair `51.978→58.282px`
+  - 반응 시점 변경으로 같은 시드의 점수·최종 상태는 달라짐. TURN seeds 101..112 점수 전 `[1552,1412,1652,1385,2711,1370,1417,2104,1678,2024,1276,1237]`, 후 `[1321,1437,1308,1789,1089,1496,1239,2524,1286,1694,1496,1410]`; BLITZ 전 `[47910,63743,30165,41553,41299,45467,39891,51728,85613,43375,34779,54520]`, 후 `[42706,43581,62559,48550,53237,59651,47423,58861,38094,73386,58691,36865]`
+- QA 관측값:
+  - `Godot 4.8-dev3 --headless --path . --import` → 종료 코드 0, SCRIPT/Parse Error 0
+  - `Godot 4.8-dev3 --headless --path . -s res://tests/run_tests.gd` → `207/207`, 종료 코드 0. 2D 22시드 이탈/발산 `0/0`, 최대 wall `7.721px`; 3D 22시드 이탈/발산 `0/0`, 최대 wall/pair `12.9515/12.8462px`; 200구체 p95/max `802/924µs`
+  - `--test-file=res://tests/scenarios/test_reaction_latency.gd` → `4/4`, 종료 코드 0; `--test-file=res://tests/test_feedback.gd` → `6/6`, 종료 코드 0
+  - `--quit-after 300` / `--quit-after 300 -- --mode=blitz` → 각각 종료 코드 0, SCRIPT/Parse Error 0
+  - 규칙 점검 → `Input`/`InputEvent`는 `InputRouter.gd`만, 난수 호출은 `Spawner.gd`만, `git diff --check` 오류 0
+  - 측정 원본은 `artifacts/reaction_latency_{before,after}_{turn,blitz}.json` 및 접촉 판정 보정 전 기준의 `before_*_corrected.json`에 로컬 보관(gitignore, 커밋 제외)
+- 수동 확인 절차:
+  1. 유선 PC 스피커로 TURN의 첫 같은 색·레벨 충돌을 반복 → 구체가 합쳐지는 프레임과 “뽁” 시작이 붙어 들리고, 시작 click이 짧고 또렷한지 확인한다.
+  2. TURN L6 이상 또는 BLITZ L4 이상 서로 다른 색·같은 레벨을 충돌 → 화면 폭발과 동시에 첫 attack이 들리고, 저음이 `150→90Hz`로 내려가며 작은 pop 7개가 처음 100ms에 몰려 들리는지 확인한다.
+  3. 2단 이상 연쇄 합체를 만듦 → 첫 반응 SFX는 즉시 들리되 다음 연쇄는 기존 0.2초 잠금 간격 뒤 재생되는지 확인한다.
+  4. `res://assets/audio/pop.wav|ogg`, `blast.wav|ogg` 중 하나를 추가해 실행 → 합성음 대신 외부 파일이 우선 재생되는지 확인한다.
+- 결정 사항: 접촉 보고 상한은 명세가 허용한 최소인 `16`을 사용했다. 근접 보강은 반응 가능한 그룹만 공간 해시로 나누고, 쌍 중복 제거와 pending 안정 ID 정렬로 결정성을 유지한다. 측정용 기하 스캔은 `latency_measurement_enabled`일 때만 추가 실행한다. 테스트에서 의도적으로 반응을 끈 게임오버·생성 픽스처는 근접 보강도 함께 비활성화했다.
+- 남은 것 · 질문: 원격 `origin` push는 외부 전송 명시 승인 부족으로 보안 검토에서 차단되어 미실행. 승인 후 push 필요. 헤드리스에서는 실제 스피커의 음색·체감 동시성을 판정하지 않았으므로 위 수동 절차 확인 필요
+
 ### [2026-10-08] 대상 #39 — 작은 UI 버그 묶음 수정
 - 상태: 완료
 - 브랜치 / PR: `m8-ui-bug-fixes` / https://github.com/jeongmo-dot/gravity_orb/pull/40

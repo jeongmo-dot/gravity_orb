@@ -3,6 +3,8 @@ extends TestCase
 const BOARD_SCENE: PackedScene = preload("res://scenes/Board3D.tscn")
 const TOLERANCE: float = 1.0e-3
 
+var _observed_play_calls: Array[Dictionary] = []
+
 
 func test_blast_feedback_creates_and_cleans_all_effects() -> void:
 	var original_fx: bool = Config.data.fx_enabled
@@ -131,8 +133,19 @@ func test_synthesized_sfx_pitch_volume_jitter_and_voice_pool() -> void:
 	var blast: AudioStreamWAV = bank.blast_stream() as AudioStreamWAV
 	assert_true(pop != null and not pop.data.is_empty(), "pop synth is nonempty")
 	assert_true(blast != null and not blast.data.is_empty(), "blast synth is nonempty")
-	assert_near(pop.get_length(), 0.060, 0.002, "pop synth duration")
+	assert_near(pop.get_length(), 0.045, 0.002, "pop synth duration")
 	assert_near(blast.get_length(), 0.460, 0.002, "blast synth duration")
+	var pop_metrics: Dictionary = _waveform_metrics(pop)
+	var blast_metrics: Dictionary = _waveform_metrics(blast)
+	assert_true(float(pop_metrics["peak_time_ms"]) <= 5.0, "pop peak is within first 5ms")
+	assert_true(
+		float(blast_metrics["peak_time_ms"]) <= 10.0,
+		"blast peak is within first 10ms"
+	)
+	print("SFX_WAVEFORM pop=%s blast=%s" % [
+		JSON.stringify(pop_metrics),
+		JSON.stringify(blast_metrics),
+	])
 	Config.data.sfx_pitch_jitter = 0.0
 	assert_near(bank.merge_pitch(2, 1, 1), 1.35, TOLERANCE, "L2 base pitch")
 	assert_near(bank.merge_pitch(7, 1, 1), 0.75, TOLERANCE, "L7 base pitch")
@@ -168,6 +181,39 @@ func test_synthesized_sfx_pitch_volume_jitter_and_voice_pool() -> void:
 	Config.data.sfx_pitch_jitter = original_jitter
 	Config.data.sfx_enabled = original_enabled
 	Config.data.sfx_volume_db = original_volume
+
+
+func test_reaction_signal_calls_sfx_play_synchronously_once() -> void:
+	var original_fx: bool = Config.data.fx_enabled
+	var original_sfx: bool = Config.data.sfx_enabled
+	Config.data.fx_enabled = false
+	Config.data.sfx_enabled = true
+	var fixture: Dictionary = await _create_director_fixture()
+	var director: FeedbackDirector = fixture["director"] as FeedbackDirector
+	var bank: SfxBank = director.sfx_bank()
+	_observed_play_calls.clear()
+	bank.play_called.connect(_record_play_called)
+	var reaction_usec: int = Time.get_ticks_usec()
+	var reaction_physics_frame: int = Engine.get_physics_frames()
+	var reaction_process_frame: int = Engine.get_process_frames()
+	director._on_reaction_ready({
+		"type": ReactionRules.Type.MERGE,
+		"result_level": 2,
+		"chain": 1,
+		"reaction_applied_usec": reaction_usec,
+		"reaction_physics_frame": reaction_physics_frame,
+		"reaction_process_frame": reaction_process_frame,
+	})
+	assert_eq(_observed_play_calls.size(), 1, "SFX play is called inside reaction handler")
+	var call: Dictionary = _observed_play_calls[0]
+	assert_eq(int(call["reaction_usec"]), reaction_usec, "reaction timestamp reaches play")
+	assert_eq(int(call["play_physics_frame"]), reaction_physics_frame, "same physics frame")
+	assert_eq(int(call["play_process_frame"]), reaction_process_frame, "same process frame")
+	await tree.process_frame
+	assert_eq(_observed_play_calls.size(), 1, "deferred VFX does not replay SFX")
+	await _cleanup(fixture["root"] as Node)
+	Config.data.fx_enabled = original_fx
+	Config.data.sfx_enabled = original_sfx
 
 
 func _create_director_fixture() -> Dictionary:
@@ -233,3 +279,50 @@ func _cleanup(node: Node) -> void:
 	if is_instance_valid(node):
 		node.queue_free()
 	await tree.process_frame
+
+
+func _record_play_called(
+	kind: String,
+	reaction_usec: int,
+	play_usec: int,
+	reaction_physics_frame: int,
+	play_physics_frame: int,
+	reaction_process_frame: int,
+	play_process_frame: int
+) -> void:
+	_observed_play_calls.append({
+		"kind": kind,
+		"reaction_usec": reaction_usec,
+		"play_usec": play_usec,
+		"reaction_physics_frame": reaction_physics_frame,
+		"play_physics_frame": play_physics_frame,
+		"reaction_process_frame": reaction_process_frame,
+		"play_process_frame": play_process_frame,
+	})
+
+
+func _waveform_metrics(stream: AudioStreamWAV) -> Dictionary:
+	var data: PackedByteArray = stream.data
+	var sample_count: int = data.size() / 2
+	var peak_index: int = 0
+	var peak_amplitude: float = 0.0
+	var first_ten_ms_energy: float = 0.0
+	var total_energy: float = 0.0
+	var first_ten_samples: int = roundi(float(stream.mix_rate) * 0.010)
+	for sample_index: int in range(sample_count):
+		var sample: float = float(data.decode_s16(sample_index * 2)) / 32767.0
+		var amplitude: float = absf(sample)
+		if amplitude > peak_amplitude:
+			peak_amplitude = amplitude
+			peak_index = sample_index
+		var energy: float = sample * sample
+		total_energy += energy
+		if sample_index < first_ten_samples:
+			first_ten_ms_energy += energy
+	return {
+		"peak_time_ms": float(peak_index) * 1000.0 / float(stream.mix_rate),
+		"peak_amplitude": peak_amplitude,
+		"first_10ms_energy_ratio": (
+			first_ten_ms_energy / total_energy if total_energy > 0.0 else 0.0
+		),
+	}

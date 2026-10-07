@@ -2,9 +2,18 @@ class_name SfxBank
 extends Node
 
 signal mute_changed(muted: bool)
+signal play_called(
+	kind: String,
+	reaction_usec: int,
+	play_usec: int,
+	reaction_physics_frame: int,
+	play_physics_frame: int,
+	reaction_process_frame: int,
+	play_process_frame: int
+)
 
 const SAMPLE_RATE: int = 44100
-const POP_DURATION: float = 0.060
+const POP_DURATION: float = 0.045
 const BLAST_DURATION: float = 0.460
 const VOICE_COUNT: int = 12
 const SFX_BUS: StringName = &"SFX"
@@ -18,13 +27,14 @@ const BLAST_ASSET_PATHS: Array[String] = [
 ]
 const BLAST_POP_OFFSETS: Array[float] = [
 	0.000,
-	0.027,
-	0.058,
-	0.096,
-	0.132,
-	0.173,
-	0.218,
+	0.012,
+	0.028,
+	0.045,
+	0.063,
+	0.081,
+	0.100,
 ]
+const BLAST_POP_GAINS: Array[float] = [1.00, 0.76, 0.64, 0.55, 0.47, 0.40, 0.34]
 const BLAST_POP_PITCHES: Array[float] = [
 	1.00,
 	0.88,
@@ -69,17 +79,34 @@ func _exit_tree() -> void:
 		InputRouter.debug_toggle_sfx_mute.disconnect(toggle_mute)
 
 
-func play_merge(result_level: int, chain: int, stable_spawn_id: int) -> void:
+func play_merge(
+	result_level: int,
+	chain: int,
+	stable_spawn_id: int,
+	reaction_usec: int = 0,
+	reaction_physics_frame: int = -1,
+	reaction_process_frame: int = -1
+) -> void:
 	if not Config.data.sfx_enabled:
 		return
 	_play(
 		_pop_stream,
 		merge_pitch(result_level, chain, stable_spawn_id),
-		Config.data.sfx_volume_db
+		Config.data.sfx_volume_db,
+		"merge",
+		reaction_usec,
+		reaction_physics_frame,
+		reaction_process_frame
 	)
 
 
-func play_blast(finale: bool = false, finale_index: int = 1) -> void:
+func play_blast(
+	finale: bool = false,
+	finale_index: int = 1,
+	reaction_usec: int = 0,
+	reaction_physics_frame: int = -1,
+	reaction_process_frame: int = -1
+) -> void:
 	if not Config.data.sfx_enabled:
 		return
 	var pitch: float = 1.0
@@ -87,7 +114,15 @@ func play_blast(finale: bool = false, finale_index: int = 1) -> void:
 	if finale:
 		pitch = pow(2.0, float(maxi(finale_index - 1, 0)) / 12.0)
 		volume_db = Config.data.sfx_volume_db - 2.0
-	_play(_blast_stream, pitch, volume_db)
+	_play(
+		_blast_stream,
+		pitch,
+		volume_db,
+		"blast",
+		reaction_usec,
+		reaction_physics_frame,
+		reaction_process_frame
+	)
 
 
 func merge_pitch(result_level: int, chain: int, stable_spawn_id: int) -> float:
@@ -156,7 +191,15 @@ func set_muted(muted: bool, persist: bool = true) -> void:
 	mute_changed.emit(_muted)
 
 
-func _play(stream_value: AudioStream, pitch: float, volume_db: float) -> void:
+func _play(
+	stream_value: AudioStream,
+	pitch: float,
+	volume_db: float,
+	kind: String,
+	reaction_usec: int,
+	reaction_physics_frame: int,
+	reaction_process_frame: int
+) -> void:
 	if stream_value == null or _voices.is_empty():
 		return
 	var voice: AudioStreamPlayer = _voices[_next_voice]
@@ -167,6 +210,15 @@ func _play(stream_value: AudioStream, pitch: float, volume_db: float) -> void:
 	voice.pitch_scale = pitch
 	voice.volume_db = volume_db
 	voice.play()
+	play_called.emit(
+		kind,
+		reaction_usec,
+		Time.get_ticks_usec(),
+		reaction_physics_frame,
+		Engine.get_physics_frames(),
+		reaction_process_frame,
+		Engine.get_process_frames()
+	)
 
 
 func _ensure_sfx_bus() -> void:
@@ -209,11 +261,31 @@ func _synthesize_blast() -> AudioStreamWAV:
 					pop_time,
 					BLAST_POP_PITCHES[pop_index],
 					index + pop_index * 7919
-				) * 0.30
-		var bass_progress: float = minf(time / 0.30, 1.0)
-		var bass_frequency: float = lerpf(70.0, 45.0, bass_progress)
-		value += sin(TAU * bass_frequency * time) * exp(-time / 0.18) * 0.62
-		value += _deterministic_noise(index + 4049) * exp(-time / 0.25) * 0.22
+				) * 0.34 * BLAST_POP_GAINS[pop_index]
+		if time < 0.015:
+			var attack_envelope: float = 1.0 - time / 0.015
+			value += _high_pass_noise(index + 4049) * attack_envelope * 0.90
+		var mid_progress: float = minf(time / 0.12, 1.0)
+		var mid_frequency: float = lerpf(150.0, 90.0, mid_progress)
+		var mid_attack: float = 1.0 - exp(-time / 0.0005)
+		value += (
+			sin(TAU * mid_frequency * time)
+			* mid_attack
+			* exp(-time / 0.12)
+			* 0.72
+		)
+		var sub_progress: float = minf(time / 0.30, 1.0)
+		var sub_frequency: float = lerpf(70.0, 45.0, sub_progress)
+		var sub_phase: float = TAU * sub_frequency * time
+		value += (
+			(
+				sin(sub_phase)
+				+ sin(sub_phase * 2.0) * 0.32
+				+ sin(sub_phase * 3.0) * 0.18
+			)
+			* exp(-time / 0.18)
+			* 0.44
+		)
 		samples[index] = clampf(value, -1.0, 1.0)
 	return _make_wav(samples)
 
@@ -222,12 +294,20 @@ func _pop_sample(time: float, pitch: float, noise_index: int) -> float:
 	if time < 0.0 or time >= POP_DURATION:
 		return 0.0
 	var value: float = 0.0
-	if time < 0.0015:
-		value += _deterministic_noise(noise_index) * (1.0 - time / 0.0015)
-	var chirp_progress: float = minf(time / 0.008, 1.0)
-	var frequency: float = lerpf(1800.0, 900.0, chirp_progress) * pitch
-	value += sin(TAU * frequency * time) * exp(-time / 0.018)
+	if time < 0.003:
+		value += (
+			_high_pass_noise(noise_index)
+			* (1.0 - time / 0.003)
+			* 1.6
+		)
+	var chirp_progress: float = minf(time / 0.005, 1.0)
+	var frequency: float = lerpf(2400.0, 1200.0, chirp_progress) * pitch
+	value += sin(TAU * frequency * time) * exp(-time / 0.010)
 	return value
+
+
+func _high_pass_noise(index: int) -> float:
+	return _deterministic_noise(index) - _deterministic_noise(index - 1)
 
 
 func _deterministic_noise(index: int) -> float:
