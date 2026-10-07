@@ -169,6 +169,7 @@ func test_main_scene_binds_score_hud_and_restart() -> void:
 	Config.data.spawn_count_per_turn = 1
 	Config.data.preview_turns = 2
 	var main: Main = MAIN_SCENE.instantiate() as Main
+	main.launch_immediately(GameConfig.GameMode.TURN)
 	var score_manager: ScoreManager = main.get_node("ScoreManager") as ScoreManager
 	score_manager.save_path = ""
 	tree.root.add_child(main)
@@ -251,6 +252,7 @@ func test_main_scene_binds_score_hud_and_restart() -> void:
 
 func test_game_over_panel_shows_scores_direction_and_restart_button() -> void:
 	var main: Main = MAIN_SCENE.instantiate() as Main
+	main.launch_immediately(GameConfig.GameMode.TURN)
 	var score_manager: ScoreManager = main.get_node("ScoreManager") as ScoreManager
 	score_manager.save_path = ""
 	tree.root.add_child(main)
@@ -283,6 +285,7 @@ func test_game_over_panel_shows_scores_direction_and_restart_button() -> void:
 
 func test_new_main_resets_combo_ui_after_restart_reload() -> void:
 	var first_main: Main = MAIN_SCENE.instantiate() as Main
+	first_main.launch_immediately(GameConfig.GameMode.TURN)
 	var first_score: ScoreManager = first_main.get_node("ScoreManager") as ScoreManager
 	first_score.save_path = ""
 	tree.root.add_child(first_main)
@@ -297,6 +300,7 @@ func test_new_main_resets_combo_ui_after_restart_reload() -> void:
 	await tree.process_frame
 
 	var restarted_main: Main = MAIN_SCENE.instantiate() as Main
+	restarted_main.launch_immediately(GameConfig.GameMode.TURN)
 	var restarted_score: ScoreManager = restarted_main.get_node("ScoreManager") as ScoreManager
 	restarted_score.save_path = ""
 	tree.root.add_child(restarted_main)
