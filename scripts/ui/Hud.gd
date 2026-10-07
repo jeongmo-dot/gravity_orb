@@ -131,7 +131,9 @@ func _render_preview(preview_root: Node2D, batch: Array) -> void:
 		preview_root.add_child(visual)
 		visual.setup(
 			Config.data.color_display[int(candidate["color"])],
-			radius
+			radius,
+			int(candidate["color"]),
+			Config.data.orb_symbols_enabled
 		)
 		visual.scale = Vector2.ONE * preview_scale
 		visual.position = Vector2(

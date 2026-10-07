@@ -33,6 +33,7 @@ enum GameMode { TURN, BLITZ }
 		Color("#22C7D9"),
 	]
 )
+@export var orb_symbols_enabled: bool = true
 @export var swipe_min_distance: float = 80.0
 @export var swipe_dominance_ratio: float = 1.5
 @export var stable_linear_speed: float = 12.0

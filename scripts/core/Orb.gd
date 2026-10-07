@@ -78,7 +78,12 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	var circle: CircleShape2D = CircleShape2D.new()
 	circle.radius = _current_radius
 	_collision_shape.shape = circle
-	_visual.setup(cfg.color_display[color], _current_radius)
+	_visual.setup(
+		cfg.color_display[color],
+		_current_radius,
+		color,
+		cfg.orb_symbols_enabled
+	)
 	_visual.set_blast_armed(
 		cfg.blast_enabled and level >= cfg.active_blast_min_level(),
 		cfg.blast_blink_period

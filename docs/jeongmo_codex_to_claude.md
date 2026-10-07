@@ -38,6 +38,32 @@
 
 ## 미확인
 
+### [2026-10-07] 대상 #38 — 색각 보조 문양 6종
+- 상태: 완료
+- 브랜치 / PR: `m8-color-symbols` / 생성 예정
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scenes/Orb3D.tscn`, `scripts/core/{Orb,OrbSymbols,OrbVisual}.gd`, `scripts/spike/Orb3D.gd`, `scripts/ui/Hud.gd`, `tests/test_config.gd`, `tests/scenarios/test_orb_symbols.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] RED 삼각형·BLUE 작은 원·GREEN 사각형·YELLOW 마름모·PURPLE 별·CYAN 플러스 매핑을 하나의 `OrbSymbols` 도형 정의로 구현하고, 이름과 꼭짓점 수 `[3,24,4,4,10,12]`를 자동 검증
+  - [x] 2D `OrbVisual`이 폰트 없이 흰색 반투명(`alpha=0.55`) 폴리곤을 반지름의 `0.45` 비율로 그리고, 6색 공과 HUD NEXT/THEN이 후보 색에 맞는 문양을 갖는지 자동 검증
+  - [x] 3D `Orb3D` 루트에 회전하는 `Body`의 형제 `Symbol`을 두고 카메라 방향 표면 `z + radius + 0.002m`를 따라가게 구현. 바디를 1.2rad 회전한 뒤 문양 회전은 `Vector3.ZERO`이고 위치는 바디 x/y를 따름을 자동 검증
+  - [x] 3D 문양용 `QuadMesh`·`StandardMaterial3D`·`ImageTexture`를 색별 정적 캐시로 공유. 공 100개에서 각 인스턴스 ID 종류가 정확히 `6/6/6`인지 자동 검증
+  - [x] `GameConfig.orb_symbols_enabled=true`를 새 필드로 추가하고 false에서 2D·3D 문양이 숨는지 자동 검증
+  - [x] BLITZ L4 무장 구체의 문양과 기존 구체 emission이 함께 유지되고, 기본/BLITZ 300프레임 스모크에서 SCRIPT/Parse Error 0건임을 자동 검증
+- QA 관측값:
+  - `Godot 4.8-dev3 --headless --path . --import` → 종료 코드 0, SCRIPT/Parse Error 0
+  - `Godot 4.8-dev3 --headless --path . -s res://tests/run_tests.gd` → `198/198`, 종료 코드 0. 2D 22시드 이탈/발산 `0/0`, 최대 wall `6.977px`; 3D 22시드 이탈/발산 `0/0`, 최대 wall/pair `12.9515/12.8371px`
+  - `--test-file=res://tests/scenarios/test_orb_symbols.gd` → `5/5`, 종료 코드 0
+  - `--quit-after 300` / `--quit-after 300 -- --mode=blitz` → 각각 종료 코드 0, SCRIPT/Parse Error 0
+  - 규칙 점검 → `Input`/`InputEvent`는 `InputRouter.gd`만, 난수 호출은 `Spawner.gd`만, `git diff --check` 오류 0
+- 수동 확인 절차:
+  1. TURN 또는 BLITZ를 실행해 6색 구체를 확인 → 빨강 ▲, 파랑 ●, 초록 ■, 노랑 ◆, 보라 ★, 청록 ✚가 흰색 반투명으로 보이고 작은 L1에서도 서로 구분되는지 확인한다.
+  2. 좌우 중력으로 3D 구체를 굴림 → 구체 메시가 회전해도 문양은 화면 기준 정방향을 유지하며 구체 중심과 함께 움직이는지 확인한다.
+  3. NEXT/THEN 후보와 실제 생성 구체를 비교 → 각 후보의 문양과 실제 구체의 문양이 같은지 확인한다.
+  4. BLITZ L4 이상 서로 다른 색 구체를 접근시킴 → 폭발 대기 깜박임 중에도 문양과 구체 emission이 함께 식별되는지 확인한다.
+  5. `default_config.tres`의 `orb_symbols_enabled=false`로 실행 → 게임 구체와 NEXT/THEN에서 문양만 사라지고 색·물리·규칙은 그대로인지 확인한다.
+- 결정 사항: 외부 글꼴·이미지 자산 없이 같은 정규화 폴리곤에서 2D 도형과 128×128 3D 알파 텍스처를 생성한다. 3D 공유 재질은 인스턴스별 복제 없이 유지하고 깜박임 투명도는 `MeshInstance3D.transparency`로 적용했다. 최초 테스트 파일을 상위 `tests/`에 두었을 때 공 100개 생성이 기존 Jolt 장기 테스트의 물리 RID 순서를 바꿔 시드 101에서 중심 이탈 5프레임을 재현했다. 제품 코드는 바꾸지 않고 전체 장면 통합 테스트를 `tests/scenarios/`의 Jolt 검증 뒤로 격리했으며, 이후 시드 101 120턴과 전체 `198/198`이 통과했다. 게임 규칙·물리 형상·기존 밸런스 수치는 변경하지 않았다.
+- 남은 것 · 질문: 헤드리스에서는 실제 화면의 작은 문양 가독성·알파 인상을 판정하지 않았으므로 위 수동 절차 확인 필요
+
 ### [2026-10-07] 대상 #37 — 시작 화면·모드 선택·소리 설정
 - 상태: 완료
 - 브랜치 / PR: `m8-start-screen` / https://github.com/jeongmo-dot/gravity_orb/pull/38

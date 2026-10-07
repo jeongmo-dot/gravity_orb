@@ -263,6 +263,7 @@ func test_blitz_spike_defaults() -> void:
 
 func test_m8_feedback_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
+	assert_true(config.orb_symbols_enabled, "orb symbols enabled")
 	assert_true(config.fx_enabled, "FX enabled")
 	assert_true(config.fx_hitstop_enabled, "hitstop enabled")
 	assert_near(config.fx_hitstop_scale, 0.12, TOLERANCE, "hitstop time scale")
