@@ -38,6 +38,42 @@
 
 ## 미확인
 
+### [2026-10-08] 대상 #40 — 3D 중심 이탈 견고성 측정 (생성 순서 흔들기)
+- 상태: 완료
+- 브랜치 / PR: `m8-jolt-rid-robustness` / 미생성
+- 변경 파일: `tests/run_jolt_rid_robustness.ps1`, `tests/spike/{JoltRidRobustnessMeasurement.tscn,run_jolt_rid_robustness.gd}`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 각 실행 전에 충돌 비활성·동결 `RigidBody3D`와 고유 `SphereShape3D`를 `P=0/1/7/50/100`개 생성해 physics frame에 등록한 뒤 삭제하고, 실제 픽스처는 다음 process/physics frame 뒤 생성
+  - [x] TURN 120턴과 BLITZ 기본 세션(90초 + 보너스 최대 20초, 실제 `107~110초`)을 휴리스틱 0.6초·6색·목표 밀도·BLAST 900px/s로 seeds `101..112` × P 5종 실행. `120/120` 케이스를 각각 별도 Godot 프로세스로 격리했고 모두 완료
+  - [x] 매 physics frame 구체 중심 이탈, 이탈 구체-프레임·레벨·바깥 거리·복귀/영구 이탈/바깥 삭제·직전 사건을 기록하고 벽 침투를 측정. 구체 간 침투는 10Hz로 함께 관측
+  - [x] 모든 조건에서 이탈 판/프레임/구체-프레임/episode가 `0/0/0/0`, 최대 바깥 거리 `0px`. 따라서 레벨·직전 사건 분포는 `{}`, 복귀/영구 이탈/바깥 삭제는 `0/0/0`
+  - [x] 제품 코드·게임 규칙·물리 수치·config를 변경하지 않고 측정 장면·실행/집계 도구만 추가
+- 조건별 관측값 (`완료`, `이탈 판`, `이탈 프레임`, `바깥 최대 px`, `복귀/영구/삭제`, `벽 최대 px`, `쌍 최대 px@10Hz`):
+
+| 모드 / P | 완료 | 이탈 판 | 이탈 프레임 | 바깥 최대 | 복귀/영구/삭제 | 벽 최대 | 쌍 최대@10Hz |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| TURN / 0 | `12/12` | 0 | 0 | 0.000 | `0/0/0` | 20.568 | 43.123 |
+| TURN / 1 | `12/12` | 0 | 0 | 0.000 | `0/0/0` | 21.978 | 37.385 |
+| TURN / 7 | `12/12` | 0 | 0 | 0.000 | `0/0/0` | 20.562 | 49.912 |
+| TURN / 50 | `12/12` | 0 | 0 | 0.000 | `0/0/0` | 21.527 | 43.735 |
+| TURN / 100 | `12/12` | 0 | 0 | 0.000 | `0/0/0` | 21.527 | 43.735 |
+| BLITZ / 0 | `12/12` | 0 | 0 | 0.000 | `0/0/0` | 19.714 | 47.708 |
+| BLITZ / 1 | `12/12` | 0 | 0 | 0.000 | `0/0/0` | 21.013 | 40.317 |
+| BLITZ / 7 | `12/12` | 0 | 0 | 0.000 | `0/0/0` | 20.373 | 41.283 |
+| BLITZ / 50 | `12/12` | 0 | 0 | 0.000 | `0/0/0` | 19.478 | 42.295 |
+| BLITZ / 100 | `12/12` | 0 | 0 | 0.000 | `0/0/0` | 23.708 | 43.355 |
+
+- QA 관측값:
+  - `Godot 4.8-dev3 --headless --path . --import` → 종료 코드 0, SCRIPT/Parse Error 0
+  - `tests/run_jolt_rid_robustness.ps1 -MaxParallel 4` → `120/120` 완료, 프로세스 실패 0, 측정 로그의 SCRIPT/Parse/ERROR 0; 전체 최대 wall `23.708px`, pair `49.912px`, 결과 `artifacts/jolt_rid_robustness/jolt_rid_robustness_summary.json` (gitignore)
+  - `Godot 4.8-dev3 --headless --path . -s res://tests/run_tests.gd` → `207/207`, 종료 코드 0. 2D 22시드 이탈/발산 `0/0`, 최대 wall `6.977px`; 3D 22시드 이탈/발산 `0/0`, 최대 wall/pair `12.9515/12.8462px`; 200구체 근접 검사 p95/max `612/720µs`
+  - `--quit-after 300` / `--quit-after 300 -- --mode=blitz` → 각각 종료 코드 0, SCRIPT/Parse Error 0
+  - 규칙 점검 → `Input`/`InputEvent`는 `InputRouter.gd`만, 난수 호출은 `Spawner.gd`만, `git diff --check` 오류 0
+- 수동 확인 절차: 측정 전용 항목이며 모든 완료 조건을 헤드리스 자동 측정·로그 집계로 확인해 별도 수동 판정 없음
+- 결정 사항: 이탈 기준은 렌더 보정 위치가 아닌 물리 중심의 `max(abs(x), abs(y)) > board.half_size()`로 두었다. 이탈 episode 시작 시 해당 구체의 최근 진단 event와 reaction signal을 비교해 `blast_impulse / merge_result_spawn / swipe_spawn / gravity_change`를 기록하도록 했다. P=50과 P=100 TURN은 최대치까지 동일하게 관측됐지만 원인을 추정해 합치지 않고 독립 조건으로 그대로 기록했다.
+- 장기 Jolt 테스트 격리 제안: 장기 메서드를 `test_jolt_long.gd`로 분리하고 일반 suite에는 해당 파일 제외 인자를 추가한 뒤, PowerShell/CI 실행기가 일반 suite 프로세스 종료 후 `--test-file=res://tests/scenarios/test_jolt_long.gd`를 새 Godot 프로세스로 실행한다. 이번 측정 실행기처럼 프로세스 단위 격리를 강제하면 앞선 테스트의 RID 생성 순서가 장기 테스트에 전파되지 않는다. 제안만 기록했으며 이번 항목에서는 기존 테스트 러너를 바꾸지 않았다.
+- 남은 것 · 질문: 중심 이탈이 0건이므로 대책 구현 질문 없음. BLITZ는 기본 90초에 시드별 획득 보너스 `17~20초`가 더해져 실제 RUNNING 시간이 `107~110초`였으며, 최대 110초인 현재 기본 게임 규칙을 그대로 측정했다.
+
 ### [2026-10-08] 대상 #41 — 효과음 반응성 + 합체 판정 지연
 - 상태: 완료
 - 브랜치 / PR: `m8-sfx-latency` / https://github.com/jeongmo-dot/gravity_orb/pull/41
