@@ -1,12 +1,15 @@
 class_name GameOverPanel
 extends PanelContainer
 
+signal mode_select_requested
+
 @onready var _title_label: Label = %ResultTitle
 @onready var _score_label: Label = %GameOverScore
 @onready var _best_label: Label = %GameOverBest
 @onready var _max_combo_label: Label = %GameOverMaxCombo
 @onready var _blocked_label: Label = %GameOverBlocked
 @onready var _restart_button: Button = %RestartButton
+@onready var _mode_select_button: Button = %ModeSelectButton
 
 var _game_manager: Variant
 var _score_manager: ScoreManager
@@ -17,6 +20,7 @@ func bind(game_manager: Variant, score_manager: ScoreManager) -> void:
 	_score_manager = score_manager
 	_game_manager.game_over.connect(_on_game_over)
 	_restart_button.pressed.connect(_on_restart_pressed)
+	_mode_select_button.pressed.connect(_on_mode_select_pressed)
 	visible = false
 
 
@@ -41,3 +45,7 @@ func _on_game_over() -> void:
 
 func _on_restart_pressed() -> void:
 	InputRouter.restart_requested.emit()
+
+
+func _on_mode_select_pressed() -> void:
+	mode_select_requested.emit()

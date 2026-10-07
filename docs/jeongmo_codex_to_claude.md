@@ -38,6 +38,33 @@
 
 ## 미확인
 
+### [2026-10-07] 대상 #37 — 시작 화면·모드 선택·소리 설정
+- 상태: 완료
+- 브랜치 / PR: `m8-start-screen` / PR 생성 후 갱신 예정
+- 변경 파일: `scenes/{Main,Main3D,UI}.tscn`, `scripts/core/{Main,SaveStore,ScoreManager}.gd`, `scripts/fx/SfxBank.gd`, `scripts/ui/{DebugHud,GameOverPanel,Hud,StartScreen}.gd`, `tests/{test_frontend,test_blitz_manager}.gd`, `tests/scenarios/{test_jolt_integration,test_score_flow}.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 인자 없는 실행에서 `GRAVITY ORB`, `BLITZ / 90초 타임어택`, `CLASSIC / 턴제`, 모드별 최고 점수, 소리 버튼을 표시하고 게임 HUD·두 매니저의 물리 처리를 대기시킴
+  - [x] `settings.last_mode`를 읽어 해당 모드 버튼의 pressed 상태를 강조하고, BLITZ·CLASSIC 버튼 신호가 각각 정확한 모드를 선택함을 자동 검증. 선택 모드를 저장한 뒤 같은 씬을 다시 불러 게임을 시작하도록 연결
+  - [x] `--mode=turn|blitz` 파싱과 직접 실행 경로를 자동 검증하고, 두 인자로 각각 300프레임 스모크 실행 시 시작 화면을 건너뛴 게임 경로에서 종료 코드 0 관측
+  - [x] 결과 패널에 높이 120px의 `다시 하기`·`모드 선택` 버튼을 두고 같은 모드 재시작 및 시작 화면 복귀에 연결. 게임 HUD 소리 버튼도 120×120px·`MOUSE_FILTER_STOP`으로 추가
+  - [x] 시작 화면·HUD 소리 버튼·M키가 `SfxBank.set_muted()` 한 상태를 공유하고 `SFX` 버스와 두 아이콘이 함께 갱신됨을 자동 검증. `settings.sfx_muted`가 씬 재생성 후 유지됨을 확인
+  - [x] 설정 저장 뒤 기존 `records.best_score=41`, `records.blitz_best_score=82`가 그대로 남음을 자동 검증. 손상된 저장 파일은 기존 동작대로 점수 0으로 읽고 SCRIPT/Parse Error 없이 계속 실행
+  - [x] 시작 화면 버튼 3개와 결과 버튼 2개 높이 120px 이상, 게임 중 HUD 바탕 `MOUSE_FILTER_IGNORE`, 소리·결과 버튼만 `MOUSE_FILTER_STOP`임을 자동 검증
+- QA 관측값:
+  - `Godot 4.8-dev3 --headless --path . --import` → 종료 코드 0, SCRIPT/Parse Error 0
+  - `Godot 4.8-dev3 --headless --path . -s res://tests/run_tests.gd` → `193/193`, 종료 코드 0. 2D 22시드 이탈/발산 `0/0`, 최대 wall `6.977px`; 3D 22시드 이탈/발산 `0/0`, 최대 wall/pair `12.9515/12.8371px`
+  - `--test-file=res://tests/test_frontend.gd` → `5/5`, 종료 코드 0
+  - `--quit-after 300` / `--quit-after 300 -- --mode=turn` / `--quit-after 300 -- --mode=blitz` → 각각 종료 코드 0, SCRIPT/Parse Error 0
+  - 규칙 점검 → `Input`/`InputEvent`는 `InputRouter.gd`만, 난수 호출은 `Spawner.gd`만
+- 수동 확인 절차:
+  1. 인자 없이 실행 → 시작 화면에 제목·BLITZ/CLASSIC 부제·각 모드 최고 점수가 보이고 마지막에 선택했던 모드 버튼만 강조되는지 확인한다.
+  2. BLITZ를 누름 → READY 카운트다운을 거쳐 BLITZ가 시작되는지 확인한다. 앱을 다시 열어 BLITZ가 강조되는지 확인한 뒤 CLASSIC도 같은 방식으로 턴제에 진입하는지 확인한다.
+  3. 시작 화면 소리 버튼을 눌러 `🔊↔🔇` 전환 → 게임에 진입한 뒤 HUD 아이콘이 같은 상태인지, M키와 HUD 버튼으로 전환할 때 실제 합체·폭발 SFX와 두 아이콘이 함께 바뀌는지 확인한다. 앱 재실행 후 상태 유지도 확인한다.
+  4. TURN 게임오버 또는 BLITZ TIME UP까지 진행 → `다시 하기`는 같은 모드 새 판, `모드 선택`은 시작 화면으로 이동하는지 확인한다.
+  5. 게임 중 소리 버튼이 아닌 HUD·보드 바깥에서 상하좌우 드래그 → 정상 스와이프로 인식되고, 소리 버튼 위 드래그만 게임 입력을 막는지 확인한다.
+- 결정 사항: 기존 `user://save.cfg`의 `records` 섹션은 유지하고 새 설정은 `settings` 섹션에 문자열 `last_mode=turn|blitz`와 bool `sfx_muted`로 저장했다. 모드 선택은 UI가 현재 씬 안의 이미 바인딩된 매니저를 교체하지 않고 선택 모드를 큐에 둔 뒤 씬을 다시 불러, 시작 전부터 HUD·점수·매니저가 한 모드로 일관되게 초기화되도록 했다. 외부 애드온·게임 규칙·밸런스 수치는 변경하지 않았다.
+- 남은 것 · 질문: 자동 검증과 헤드리스 스모크만 수행했으므로 실제 폰의 글꼴(한국어·🔊/🔇), 버튼 배치·터치 감각은 위 수동 절차로 확인 필요
+
 ### [2026-10-07] 대상 #36 추가 요구 1 — BLITZ 목표 밀도 보충
 - 상태: 완료
 - 브랜치 / PR: `m10-blitz-refill-debt` / https://github.com/jeongmo-dot/gravity_orb/pull/37

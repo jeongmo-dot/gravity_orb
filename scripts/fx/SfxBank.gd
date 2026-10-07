@@ -1,6 +1,8 @@
 class_name SfxBank
 extends Node
 
+signal mute_changed(muted: bool)
+
 const SAMPLE_RATE: int = 44100
 const POP_DURATION: float = 0.060
 const BLAST_DURATION: float = 0.460
@@ -33,6 +35,8 @@ const BLAST_POP_PITCHES: Array[float] = [
 	1.05,
 ]
 
+@export var save_path: String = ""
+
 var _pop_stream: AudioStream
 var _blast_stream: AudioStream
 var _voices: Array[AudioStreamPlayer] = []
@@ -43,6 +47,7 @@ var _last_voice: AudioStreamPlayer
 
 func _ready() -> void:
 	_ensure_sfx_bus()
+	set_muted(SaveStore.load_sfx_muted(save_path), false)
 	_pop_stream = _load_first(POP_ASSET_PATHS)
 	if _pop_stream == null:
 		_pop_stream = _synthesize_pop()
@@ -138,10 +143,17 @@ func is_muted() -> bool:
 
 
 func toggle_mute() -> void:
-	_muted = not _muted
+	set_muted(not _muted)
+
+
+func set_muted(muted: bool, persist: bool = true) -> void:
+	_muted = muted
 	var bus_index: int = AudioServer.get_bus_index(SFX_BUS)
 	if bus_index >= 0:
 		AudioServer.set_bus_mute(bus_index, _muted)
+	if persist and not save_path.is_empty():
+		SaveStore.save_sfx_muted(save_path, _muted)
+	mute_changed.emit(_muted)
 
 
 func _play(stream_value: AudioStream, pitch: float, volume_db: float) -> void:

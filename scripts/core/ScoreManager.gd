@@ -111,48 +111,10 @@ static func danger_multiplier_for(occupancy: float, cfg: GameConfig) -> float:
 
 
 func _load_best_score() -> void:
-	best_score = 0
-	if save_path.is_empty() or not FileAccess.file_exists(save_path):
-		return
-	var record_key: String = _record_key()
-	if not _has_valid_best_score_entry(
-		FileAccess.get_file_as_string(save_path),
-		record_key
-	):
-		return
-	var save_file: ConfigFile = ConfigFile.new()
-	if save_file.load(save_path) != OK:
-		return
-	best_score = maxi(int(save_file.get_value("records", record_key, 0)), 0)
+	best_score = SaveStore.load_best_score(save_path, Config.data.game_mode)
 
 
 func _save_best_score() -> void:
 	if save_path.is_empty():
 		return
-	var save_file: ConfigFile = ConfigFile.new()
-	if FileAccess.file_exists(save_path):
-		save_file.load(save_path)
-	save_file.set_value("records", _record_key(), best_score)
-	save_file.save(save_path)
-
-
-func _has_valid_best_score_entry(contents: String, record_key: String) -> bool:
-	var in_records_section: bool = false
-	for raw_line: String in contents.split("\n"):
-		var line: String = raw_line.strip_edges()
-		if line == "[records]":
-			in_records_section = true
-			continue
-		if line.begins_with("["):
-			in_records_section = false
-			continue
-		var prefix: String = "%s=" % record_key
-		if in_records_section and line.begins_with(prefix):
-			return line.trim_prefix(prefix).strip_edges().is_valid_int()
-	return false
-
-
-func _record_key() -> String:
-	if Config.data.game_mode == GameConfig.GameMode.BLITZ:
-		return "blitz_best_score"
-	return "best_score"
+	SaveStore.save_best_score(save_path, Config.data.game_mode, best_score)

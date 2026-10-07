@@ -26,6 +26,7 @@ const TURN_MAX_PAIR_OVERLAP: float = 60.0
 
 func test_main_3d_uses_shared_core_and_full_ui() -> void:
 	var main: Main = MAIN_SCENE.instantiate() as Main
+	main.launch_immediately(GameConfig.GameMode.TURN)
 	assert_true(main.get_node("TurnManager") is TurnManager, "shared TurnManager")
 	assert_true(main.get_node("CollisionResolver") is CollisionResolver, "shared resolver")
 	assert_true(main.get_node("Spawner") is Spawner, "shared spawner")

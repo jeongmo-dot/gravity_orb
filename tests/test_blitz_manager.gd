@@ -368,6 +368,7 @@ func test_main_selects_blitz_manager_and_shows_time_up_results() -> void:
 	Config.data.game_mode = GameConfig.GameMode.BLITZ
 	Config.data.blitz_ready_time = 1.5
 	var main: Main = MAIN_SCENE.instantiate() as Main
+	main.launch_immediately(GameConfig.GameMode.BLITZ)
 	var score: ScoreManager = main.get_node("ScoreManager") as ScoreManager
 	score.save_path = ""
 	tree.root.add_child(main)

@@ -19,11 +19,24 @@ const PREVIEW_GAP: float = 16.0
 @onready var _fever_label: Label = %FeverLabel
 @onready var _bonus_label: Label = %BonusLabel
 @onready var _game_over_panel: GameOverPanel = %GameOverPanel
+@onready var _sound_button: Button = %HudSoundButton
 
 var _spawner: Spawner
 var _score_manager: ScoreManager
 var _bonus_tween: Tween
 var _blitz_mode: bool = false
+var _sfx_bank: SfxBank
+
+
+func _ready() -> void:
+	_sound_button.pressed.connect(_on_sound_pressed)
+
+
+func bind_sfx_bank(sfx_bank: SfxBank) -> void:
+	_sfx_bank = sfx_bank
+	if not _sfx_bank.mute_changed.is_connected(_on_mute_changed):
+		_sfx_bank.mute_changed.connect(_on_mute_changed)
+	_on_mute_changed(_sfx_bank.is_muted())
 
 
 func bind_spawner(spawner: Spawner) -> void:
@@ -203,3 +216,13 @@ func _on_time_bonus_awarded(seconds: float, source: String) -> void:
 	_bonus_tween.tween_interval(0.7)
 	_bonus_tween.tween_property(_bonus_label, "modulate:a", 0.0, 0.3)
 	_bonus_tween.tween_callback(func() -> void: _bonus_label.visible = false)
+
+
+func _on_sound_pressed() -> void:
+	if _sfx_bank != null:
+		_sfx_bank.toggle_mute()
+
+
+func _on_mute_changed(muted: bool) -> void:
+	_sound_button.text = "🔇" if muted else "🔊"
+	_sound_button.tooltip_text = "소리 켜기" if muted else "소리 끄기"

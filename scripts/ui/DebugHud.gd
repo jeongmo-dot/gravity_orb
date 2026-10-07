@@ -20,6 +20,8 @@ const ANNIHILATION_RULE_NAMES: Array[String] = ["A", "B", "C"]
 @onready var _board: Variant = %Board
 @onready var _label: Label = %DebugLabel
 @onready var _hud: Hud = %Hud
+@onready var _start_screen: StartScreen = %StartScreen
+@onready var _sfx_bank: SfxBank = %SfxBank
 
 var _game_manager: Variant
 var _state: int = 0
@@ -39,6 +41,7 @@ func _ready() -> void:
 	_hud.bind_spawner(_spawner)
 	_hud.bind_score_manager(_score_manager)
 	_hud.bind_game_state(_game_manager, _board, _score_manager)
+	_hud.bind_sfx_bank(_sfx_bank)
 	_state = int(_game_manager.state)
 	_gravity = _game_manager.gravity
 	_turn_index = _game_manager.turn_index
@@ -51,6 +54,26 @@ func _ready() -> void:
 	_game_manager.turn_finished.connect(_on_turn_finished)
 	_game_manager.combo_changed.connect(_on_combo_changed)
 	_update_label()
+
+
+func bind_start_screen(save_path: String) -> void:
+	_start_screen.bind(save_path, _sfx_bank)
+
+
+func show_start_screen() -> void:
+	_start_screen.visible = true
+	_hud.visible = false
+	_label.visible = false
+
+
+func show_gameplay() -> void:
+	_start_screen.visible = false
+	_hud.visible = true
+	_label.visible = OS.is_debug_build()
+
+
+func start_screen() -> StartScreen:
+	return _start_screen
 
 
 func _process(_delta: float) -> void:
