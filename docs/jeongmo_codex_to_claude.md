@@ -39,8 +39,8 @@
 ## 미확인
 
 ### [2026-10-08] 대상 #41 — 효과음 반응성 + 합체 판정 지연
-- 상태: 부분완료 (구현·검증·로컬 커밋 완료, 원격 push 명시 승인 대기)
-- 브랜치 / PR: `m8-sfx-latency` (로컬) / PR 미생성
+- 상태: 완료
+- 브랜치 / PR: `m8-sfx-latency` / https://github.com/jeongmo-dot/gravity_orb/pull/41
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/CollisionResolver.gd`, `scripts/fx/{FeedbackDirector,SfxBank}.gd`, `tests/{test_config,test_feedback}.gd`, `tests/scenarios/{test_game_over,test_jolt_integration,test_reaction_latency,test_spawn_flow}.gd`, `tests/spike/{ReactionLatencyMeasurement.tscn,run_reaction_latency_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 변경 전 TURN 120턴·BLITZ 110초 × seeds `101..112`를 `contact_max_reported=6`, 근접 보강 off로 측정하고, 변경 후 `16`, 근접 보강 on으로 같은 조건 재측정. 기하 접촉→반응의 전체/잠금 제외 지연, 1틱 초과, 경로, 당시 접촉 수, 놓침·선점, 반응→play 지연을 JSON과 아래 수치로 기록
@@ -75,7 +75,7 @@
   3. 2단 이상 연쇄 합체를 만듦 → 첫 반응 SFX는 즉시 들리되 다음 연쇄는 기존 0.2초 잠금 간격 뒤 재생되는지 확인한다.
   4. `res://assets/audio/pop.wav|ogg`, `blast.wav|ogg` 중 하나를 추가해 실행 → 합성음 대신 외부 파일이 우선 재생되는지 확인한다.
 - 결정 사항: 접촉 보고 상한은 명세가 허용한 최소인 `16`을 사용했다. 근접 보강은 반응 가능한 그룹만 공간 해시로 나누고, 쌍 중복 제거와 pending 안정 ID 정렬로 결정성을 유지한다. 측정용 기하 스캔은 `latency_measurement_enabled`일 때만 추가 실행한다. 테스트에서 의도적으로 반응을 끈 게임오버·생성 픽스처는 근접 보강도 함께 비활성화했다.
-- 남은 것 · 질문: 원격 `origin` push는 외부 전송 명시 승인 부족으로 보안 검토에서 차단되어 미실행. 승인 후 push 필요. 헤드리스에서는 실제 스피커의 음색·체감 동시성을 판정하지 않았으므로 위 수동 절차 확인 필요
+- 남은 것 · 질문: 헤드리스에서는 실제 스피커의 음색·체감 동시성을 판정하지 않았으므로 위 수동 절차 확인 필요
 
 ### [2026-10-08] 대상 #39 — 작은 UI 버그 묶음 수정
 - 상태: 완료
