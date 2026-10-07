@@ -42,6 +42,7 @@ var _last_rolling_resistance_force: Vector2 = Vector2.ZERO
 var _timeout_correction_pending: bool = false
 var _timeout_corrected_position: Vector2 = Vector2.ZERO
 var _timeout_corrected_velocity: Vector2 = Vector2.ZERO
+var _render_clamp_enabled: bool = true
 
 
 func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
@@ -84,6 +85,8 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 		color,
 		cfg.orb_symbols_enabled
 	)
+	_visual.top_level = true
+	_update_visual_transform()
 	_visual.set_blast_armed(
 		cfg.blast_enabled and level >= cfg.active_blast_min_level(),
 		cfg.blast_blink_period
@@ -104,6 +107,11 @@ func is_blast_armed() -> bool:
 
 func blast_brightness() -> float:
 	return _visual.blast_brightness()
+
+
+func set_render_clamp_enabled(enabled: bool) -> void:
+	_render_clamp_enabled = enabled
+	_update_visual_transform()
 
 
 func get_colliding_orbs() -> Array:
@@ -335,6 +343,10 @@ func _physics_process(delta: float) -> void:
 	apply_torque(angular_acceleration * circle_inertia)
 
 
+func _process(_delta: float) -> void:
+	_update_visual_transform()
+
+
 func _apply_escape_guard() -> bool:
 	var half: float = Config.data.board_size * 0.5
 	var corrected_position: Vector2 = position
@@ -406,3 +418,24 @@ func _set_current_radius(radius: float) -> void:
 	if circle != null:
 		circle.radius = _current_radius
 	_visual.set_radius(_current_radius)
+	_update_visual_transform()
+
+
+func _update_visual_transform() -> void:
+	if not is_instance_valid(_visual):
+		return
+	var render_position: Vector2 = position
+	if _render_clamp_enabled:
+		var half: float = Config.data.board_size * 0.5
+		var limit: float = maxf(half - _current_radius, 0.0)
+		render_position = Vector2(
+			clampf(render_position.x, -limit, limit),
+			clampf(render_position.y, -limit, limit)
+		)
+	var parent_2d: Node2D = get_parent() as Node2D
+	_visual.global_position = (
+		render_position
+		if parent_2d == null
+		else parent_2d.to_global(render_position)
+	)
+	_visual.global_rotation = 0.0

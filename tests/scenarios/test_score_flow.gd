@@ -270,7 +270,14 @@ func test_game_over_panel_shows_scores_direction_and_restart_button() -> void:
 	var combo_label: Label = panel.get_node("Margin/Content/GameOverMaxCombo") as Label
 	var blocked_label: Label = panel.get_node("Margin/Content/GameOverBlocked") as Label
 	var restart_button: Button = panel.get_node("Margin/Content/RestartButton") as Button
+	var dimmer: ColorRect = main.get_node("UI/Hud/ResultDimmer") as ColorRect
+	var panel_style: StyleBoxFlat = panel.get_theme_stylebox("panel") as StyleBoxFlat
 	assert_true(panel.visible, "game-over panel visible")
+	assert_true(dimmer.visible, "game-over dims the whole screen")
+	assert_near(dimmer.color.a, 0.6, 0.001, "game-over dim alpha")
+	assert_true(panel_style != null, "game-over panel has a flat opaque style")
+	if panel_style != null:
+		assert_true(panel_style.bg_color.a >= 0.92, "game-over panel opacity")
 	assert_eq(score_label.text, "SCORE  48", "game-over score")
 	assert_eq(best_label.text, "BEST  48", "game-over best")
 	assert_eq(combo_label.text, "MAX COMBO 2", "game-over max combo")

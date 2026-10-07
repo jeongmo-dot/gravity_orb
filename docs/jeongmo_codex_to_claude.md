@@ -38,6 +38,30 @@
 
 ## 미확인
 
+### [2026-10-08] 대상 #39 — 작은 UI 버그 묶음 수정
+- 상태: 완료
+- 브랜치 / PR: `m8-ui-bug-fixes` / 생성 후 기록 예정
+- 변경 파일: `scenes/{Orb3D,UI}.tscn`, `scripts/core/{Orb,Spawner}.gd`, `scripts/spike/Orb3D.gd`, `scripts/ui/GameOverPanel.gd`, `tests/{test_blitz_manager,test_spawner}.gd`, `tests/scenarios/{test_score_flow,test_ui_fixes}.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 공통 결과 패널 배경을 alpha `0.96`으로 올리고 패널 뒤 전체 화면에 검정 alpha `0.60` 디머를 추가. TURN `GAME OVER`와 BLITZ `TIME UP` 양쪽에서 같은 패널·디머가 나타남을 자동 검증
+  - [x] 무작위 시작 시 표시 시드를 `1..2^31-1`로 확정한 뒤 그 값으로 게임 RNG를 다시 시드. 표시값을 고정 시드로 넣은 두 Spawner의 후보 12개가 일치하고 기존 고정 시드 `101/777/4242` 기준값이 유지됨을 자동 검증
+  - [x] 2D Visual과 3D Mesh·Symbol의 렌더 위치만 `board_half-current_radius` 안으로 제한. 벽 안쪽 10px의 물리 위치·속도·각속도·충돌·반지름 상태가 클램프 on/off에서 동일함을 자동 검증
+  - [x] 3D Mesh와 Symbol을 물리 Body의 형제로 두고 `_process()`에서 같은 최신 물리 위치와 같은 클램프 계산을 적용. `900px/s` 이동 뒤 Mesh↔Body와 Symbol↔Mesh 중심 오차가 각각 `<0.5px`, Symbol 회전은 `Vector3.ZERO`임을 자동 검증
+  - [x] 게임 규칙·물리 바디/충돌 형상·밸런스 config 값과 공개 API를 변경하지 않음
+- QA 관측값:
+  - `Godot 4.8-dev3 --headless --path . --import` → 종료 코드 0, SCRIPT/Parse Error 0
+  - `Godot 4.8-dev3 --headless --path . -s res://tests/run_tests.gd` → `202/202`, 종료 코드 0. 2D 22시드 이탈/발산 `0/0`, 최대 wall `6.746px`; 3D 22시드 이탈/발산 `0/0`, 최대 wall/pair `12.9515/12.8371px`; 120턴 계측 wall recovery `1`, escape/timeout correction `0/0`
+  - `--test-file=res://tests/scenarios/test_ui_fixes.gd` → `4/4`, 종료 코드 0
+  - `--quit-after 300` / `--quit-after 300 -- --mode=blitz` → 각각 종료 코드 0, SCRIPT/Parse Error 0
+  - 규칙 점검 → `Input`/`InputEvent`는 `InputRouter.gd`만, 난수 호출은 `Spawner.gd`만, `git diff --check` 오류 0
+- 수동 확인 절차:
+  1. TURN 게임오버와 BLITZ 시간 종료까지 진행 → 각 결과 패널 본체는 뒤 게임 화면이 거의 비치지 않고, 패널 바깥 전체 화면은 동일한 60% 검정 디머로 어두워지는지 확인한다.
+  2. 시드 인자 없이 시작해 디버그 HUD의 양수 Seed를 기록하고 `--jolt-seed=<표시값>`으로 재실행 → 첫 후보와 이후 NEXT 순서가 같은지 확인한다.
+  3. 폭발 또는 고속 충돌로 구체 중심이 잠시 벽 안쪽에 들어가는 장면을 관찰 → 구체 그림은 반지름만큼 보드 안에 유지되며 물리 반응·합체 위치에는 점프가 없는지 확인한다.
+  4. 3D에서 작은 L1 구체를 좌우 중력으로 빠르게 이동 → 흰 문양이 구체 메시 중심에서 한 프레임 뒤처지지 않고 정방향을 유지하는지 확인한다.
+- 결정 사항: 결과 패널 alpha는 명세 하한 `0.92`보다 높은 `0.96`을 사용했다. 무작위 시드는 양수 31비트 범위로 생성하고, 명시적인 음수 시드는 같은 범위의 재현 가능한 표시 키로 정규화한다. 2D Visual은 top-level, 3D Mesh·Symbol은 Body 형제로 분리해 `_process()`에서 표시 좌표만 갱신하며 테스트용 내부 클램프 토글 외 config 필드는 추가하지 않았다.
+- 남은 것 · 질문: 헤드리스에서는 실제 화면의 결과 패널 가독성, 고속 이동 시 육안상 클램프·문양 추종을 판정하지 않았으므로 위 수동 절차 확인 필요
+
 ### [2026-10-07] 대상 #38 — 색각 보조 문양 6종
 - 상태: 완료
 - 브랜치 / PR: `m8-color-symbols` / https://github.com/jeongmo-dot/gravity_orb/pull/39

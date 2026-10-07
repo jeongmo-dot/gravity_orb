@@ -181,9 +181,23 @@ func test_center_mode_consumes_position_and_preserves_item_sequence() -> void:
 func test_zero_seed_randomizes_and_reports_actual_seed() -> void:
 	var spawner: Spawner = Spawner.new()
 	var actual_seed: int = spawner.init_rng(0)
-	assert_true(actual_seed != 0, "randomized seed must be nonzero")
+	assert_true(actual_seed >= 1, "randomized seed must be positive")
+	assert_true(
+		actual_seed <= Spawner.MAX_DISPLAY_SEED,
+		"randomized seed fits the displayed replay range"
+	)
 	assert_eq(spawner.seed_used, actual_seed, "reported seed")
+	var random_sequence: Array[Dictionary] = []
+	for _index: int in range(12):
+		random_sequence.append(spawner._draw_candidate())
+	var replay: Spawner = Spawner.new()
+	assert_eq(replay.init_rng(actual_seed), actual_seed, "displayed seed is reusable")
+	var replay_sequence: Array[Dictionary] = []
+	for _index: int in range(12):
+		replay_sequence.append(replay._draw_candidate())
+	assert_eq(replay_sequence, random_sequence, "displayed seed reproduces generated candidates")
 	spawner.free()
+	replay.free()
 
 
 func test_count_two_batch_sequence_matches_continuous_count_one_sequence() -> void:

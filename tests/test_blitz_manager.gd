@@ -430,7 +430,14 @@ func test_main_selects_blitz_manager_and_shows_time_up_results() -> void:
 	var title: Label = panel.get_node("Margin/Content/ResultTitle") as Label
 	var detail: Label = panel.get_node("Margin/Content/GameOverBlocked") as Label
 	var result_chain: Label = panel.get_node("Margin/Content/GameOverMaxCombo") as Label
+	var dimmer: ColorRect = main.get_node("UI/Hud/ResultDimmer") as ColorRect
+	var panel_style: StyleBoxFlat = panel.get_theme_stylebox("panel") as StyleBoxFlat
 	assert_true(panel.visible, "time-up result panel visible")
+	assert_true(dimmer.visible, "time-up dims the whole screen")
+	assert_near(dimmer.color.a, 0.6, TOLERANCE, "time-up dim alpha")
+	assert_true(panel_style != null, "time-up panel has a flat opaque style")
+	if panel_style != null:
+		assert_true(panel_style.bg_color.a >= 0.92, "time-up panel opacity")
 	assert_eq(title.text, "TIME UP", "blitz result title")
 	assert_eq(result_chain.text, "MAX CHAIN 1", "result uses maximum chain label")
 	assert_eq(detail.text, "BLAST 0   FEVER 0", "blitz result counters")

@@ -8,6 +8,7 @@ signal orb_spawned(level: int)
 const EFFECT_SEED_SALT: int = 0x25C01A
 const BOT_SEED_SALT: int = 0x31B117
 const BLITZ_FILL_MAX_ATTEMPTS: int = 20000
+const MAX_DISPLAY_SEED: int = 2147483647
 
 var seed_used: int = 0
 var last_blitz_initial_count: int = 0
@@ -27,14 +28,20 @@ func init_rng(seed: int) -> int:
 	_blitz_next_batch_size = 1
 	if seed == 0:
 		_rng.randomize()
-		while _rng.seed == 0:
-			_rng.randomize()
+		seed_used = _rng.randi_range(1, MAX_DISPLAY_SEED)
 	else:
-		_rng.seed = seed
-	seed_used = _rng.seed
+		seed_used = _normalize_seed(seed)
+	_rng.seed = seed_used
 	_effect_rng.seed = seed_used ^ EFFECT_SEED_SALT
 	_bot_rng.seed = seed_used ^ BOT_SEED_SALT
 	return seed_used
+
+
+func _normalize_seed(seed: int) -> int:
+	if seed > 0:
+		return seed
+	var normalized: int = seed & MAX_DISPLAY_SEED
+	return normalized if normalized > 0 else 1
 
 
 func set_blitz_mode(enabled: bool) -> void:

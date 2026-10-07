@@ -10,6 +10,7 @@ signal mode_select_requested
 @onready var _blocked_label: Label = %GameOverBlocked
 @onready var _restart_button: Button = %RestartButton
 @onready var _mode_select_button: Button = %ModeSelectButton
+@onready var _dimmer: ColorRect = %ResultDimmer
 
 var _game_manager: Variant
 var _score_manager: ScoreManager
@@ -21,6 +22,7 @@ func bind(game_manager: Variant, score_manager: ScoreManager) -> void:
 	_game_manager.game_over.connect(_on_game_over)
 	_restart_button.pressed.connect(_on_restart_pressed)
 	_mode_select_button.pressed.connect(_on_mode_select_pressed)
+	_dimmer.visible = false
 	visible = false
 
 
@@ -40,6 +42,7 @@ func _on_game_over() -> void:
 		]
 	else:
 		_blocked_label.text = "BLOCKED: %s" % OrbTypes.dir_name(_game_manager.gravity)
+	_dimmer.visible = true
 	visible = true
 
 

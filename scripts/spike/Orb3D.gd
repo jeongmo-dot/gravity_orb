@@ -34,13 +34,14 @@ var _blast_armed: bool = false
 var _blast_blink_period: float = 0.8
 var _blast_blink_elapsed: float = 0.0
 var _visual_punch_tween: Tween
+var _render_clamp_enabled: bool = true
 
 var position: Vector2:
 	get:
 		return world_position_to_plane(_body.position)
 	set(value):
 		_body.position = plane_position_to_world(value)
-		_update_symbol_transform()
+		_update_visual_transform()
 
 var linear_velocity: Vector2:
 	get:
@@ -151,13 +152,16 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	_symbol_mesh.visible = cfg.orb_symbols_enabled
 	_symbol_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_symbol_mesh.transparency = 0.0
-	_update_symbol_transform()
+	_update_visual_transform()
 
 
 func _physics_process(delta: float) -> void:
 	_advance_growth(delta)
 	_advance_blast_blink(delta)
-	_update_symbol_transform()
+
+
+func _process(_delta: float) -> void:
+	_update_visual_transform()
 
 
 func configure_physics_profile(
@@ -178,6 +182,11 @@ func get_radius() -> float:
 
 func get_current_radius() -> float:
 	return _current_radius
+
+
+func set_render_clamp_enabled(enabled: bool) -> void:
+	_render_clamp_enabled = enabled
+	_update_visual_transform()
 
 
 func is_blast_armed() -> bool:
@@ -365,14 +374,32 @@ func _set_current_radius(radius_px: float) -> void:
 	if sphere_mesh != null:
 		sphere_mesh.radius = radius_m
 		sphere_mesh.height = radius_m * 2.0
-	_update_symbol_transform()
+	_update_visual_transform()
 
 
-func _update_symbol_transform() -> void:
-	if not is_instance_valid(_symbol_mesh) or not is_instance_valid(_body):
+func _update_visual_transform() -> void:
+	if (
+		not is_instance_valid(_mesh)
+		or not is_instance_valid(_symbol_mesh)
+		or not is_instance_valid(_body)
+	):
 		return
 	var radius_m: float = _current_radius / PIXELS_PER_METER
-	_symbol_mesh.position = _body.position + Vector3(0.0, 0.0, radius_m + 0.002)
+	var render_plane_position: Vector2 = world_position_to_plane(_body.position)
+	if _render_clamp_enabled:
+		var half: float = Config.data.board_size * 0.5
+		var limit: float = maxf(half - _current_radius, 0.0)
+		render_plane_position = Vector2(
+			clampf(render_plane_position.x, -limit, limit),
+			clampf(render_plane_position.y, -limit, limit)
+		)
+	var render_world_position: Vector3 = plane_position_to_world(
+		render_plane_position,
+		_body.position.z
+	)
+	_mesh.position = render_world_position
+	_mesh.rotation = _body.rotation
+	_symbol_mesh.position = render_world_position + Vector3(0.0, 0.0, radius_m + 0.002)
 	_symbol_mesh.rotation = Vector3.ZERO
 	var symbol_size_m: float = radius_m * OrbSymbols.SYMBOL_SIZE_FACTOR
 	_symbol_mesh.scale = Vector3(symbol_size_m, symbol_size_m, 1.0)
