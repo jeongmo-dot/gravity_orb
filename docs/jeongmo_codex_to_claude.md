@@ -40,7 +40,7 @@
 
 ### [2026-10-08] 대상 #45 — M8 연출: 점수 팝업 + 배수 크게
 - 상태: 완료
-- 브랜치 / PR: `m8-score-popups` / 미생성
+- 브랜치 / PR: `m8-score-popups` / https://github.com/jeongmo-dot/gravity_orb/pull/46
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scenes/UI.tscn`, `scripts/ui/{Hud.gd,ScorePopup.gd}`, `tests/{run_tests.gd,test_blitz_manager.gd,test_config.gd,test_score_popups.gd}`, `tests/scenarios/test_score_flow.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 점수가 붙은 반응마다 2D 캔버스 변환 / 3D `Camera3D.unproject_position()`으로 반응 위치에 `+점수` 팝업을 표시. 명세의 로그 글자 크기, 반응 종류별 색·금색 테두리, 0.12초 스케일, 60px 상승·페이드, 1,000점 이상 0.2초 연장·흔들림을 구현 — `test_each_scored_reaction_shows_matching_popup_and_conditional_formula`, `test_popup_colors_follow_merge_blast_and_finale_rules`, `test_3d_reaction_position_is_unprojected_to_popup_anchor`
