@@ -30,15 +30,6 @@
 
 ## 대기 중
 
-### [2026-10-08 #44] 테스트 래퍼 — PowerShell 5.1 출력 리다이렉션에서 중단
-- 상태: 대기 (**다음 차례**, 작은 항목)
-- 근거: #43 검수 (2026-10-08), [technical_design.md](technical_design.md) §10.1 주의
-- 현상: Windows PowerShell 5.1에서 `.\tests\run_tests.ps1 *> log`처럼 PowerShell 안에서 출력을 받으면, 일반 묶음의 Godot `WARNING: [ESCAPE_GUARD] ...`(stderr)가 `NativeCommandError`로 바뀌고 `$ErrorActionPreference = "Stop"` 때문에 **래퍼가 첫 묶음 도중 종료**한다. 바깥 셸에서 `powershell -File tests/run_tests.ps1 > log 2>&1`로 받으면 정상 (207/207, 38초)
-- 요구: 네이티브 Godot 호출이 stderr 출력 때문에 멈추지 않게 (예: 호출 구간만 `$ErrorActionPreference = "Continue"`, 종료 코드는 `$LASTEXITCODE`로만 판정). PowerShell 5.1에서 `*>`·`2>&1 | Tee-Object` 두 방식 모두 끝까지 돌고 종료 코드가 맞게 나오는지 확인. 실패 전파(자식 종료 코드 ≠ 0 → 래퍼 1)는 그대로
-- 건드리지 말 것: 테스트 내용·판정, 제품 코드, `docs/` (회신 파일 제외)
-- Done-when: 위 두 리다이렉션 방식으로 래퍼 통과·종료 코드 0, 실패 프로브에서 종료 코드 1
-- 커밋: 항목 단위 브랜치, push까지
-
 ### [2026-10-05 #28] 후반 루즈함 — 생성 증가·L6 잭팟 비교 측정
 - 상태: **보류** (2026-10-05 사용자 결정: 대폭발 #29를 먼저. #29 측정 후 후반이 여전히 마르면 다시 연다)
 - 근거: 사용자 플레이 소감 (2026-10-05, #27 이후): **"후반 플레이가 확실히 루즈해진다" — 가장 큰 원인은 "터지는 게 없음"** (기울여도 합체·콤보가 거의 안 일어남)
@@ -59,6 +50,16 @@
 ---
 
 ## 처리 완료
+
+### [2026-10-08 #44] 테스트 래퍼 — PowerShell 5.1 출력 리다이렉션에서 중단 — 완료
+- 상태: 완료 (2026-10-08 Claude 검수 통과 · [PR #45](https://github.com/jeongmo-dot/gravity_orb/pull/45) 병합 `8d24b68`)
+- 검수: Claude가 이전에 멈췄던 그대로 PowerShell 5.1 `& .\tests\run_tests.ps1 *> log`로 재실행 — 일반 202·장기 4·성능 1 = 207/207, 37.5초, 종료 코드 0. Godot 호출 구간만 `ErrorActionPreference = Continue`, 판정은 `$LASTEXITCODE`
+- 근거: #43 검수 (2026-10-08), [technical_design.md](technical_design.md) §10.1 주의
+- 현상: Windows PowerShell 5.1에서 `.\tests\run_tests.ps1 *> log`처럼 PowerShell 안에서 출력을 받으면, 일반 묶음의 Godot `WARNING: [ESCAPE_GUARD] ...`(stderr)가 `NativeCommandError`로 바뀌고 `$ErrorActionPreference = "Stop"` 때문에 **래퍼가 첫 묶음 도중 종료**한다. 바깥 셸에서 `powershell -File tests/run_tests.ps1 > log 2>&1`로 받으면 정상 (207/207, 38초)
+- 요구: 네이티브 Godot 호출이 stderr 출력 때문에 멈추지 않게 (예: 호출 구간만 `$ErrorActionPreference = "Continue"`, 종료 코드는 `$LASTEXITCODE`로만 판정). PowerShell 5.1에서 `*>`·`2>&1 | Tee-Object` 두 방식 모두 끝까지 돌고 종료 코드가 맞게 나오는지 확인. 실패 전파(자식 종료 코드 ≠ 0 → 래퍼 1)는 그대로
+- 건드리지 말 것: 테스트 내용·판정, 제품 코드, `docs/` (회신 파일 제외)
+- Done-when: 위 두 리다이렉션 방식으로 래퍼 통과·종료 코드 0, 실패 프로브에서 종료 코드 1
+- 커밋: 항목 단위 브랜치, push까지
 
 ### [2026-10-08 #43] 테스트 래퍼 고정 FPS + 흔들리는 성능 테스트 정리 — 완료
 - 상태: 완료 (2026-10-08 Claude 검수 통과 · [PR #44](https://github.com/jeongmo-dot/gravity_orb/pull/44) 병합 `a8272cf`)
