@@ -40,7 +40,7 @@
 
 ### [2026-10-08] 대상 #44 — 테스트 래퍼 PowerShell 5.1 출력 리다이렉션 중단 수정
 - 상태: 완료
-- 브랜치 / PR: `m8-powershell-output-redirect` / 미생성
+- 브랜치 / PR: `m8-powershell-output-redirect` / https://github.com/jeongmo-dot/gravity_orb/pull/45
 - 변경 파일: `tests/run_tests.ps1`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] Godot 호출을 `Invoke-GodotSuite`로 한정해 호출 구간에서만 `$ErrorActionPreference = "Continue"`를 적용하고 `finally`에서 기존 값을 복원. 자식 성공·실패는 `$LASTEXITCODE`만 `[ref]` 출력으로 전달
