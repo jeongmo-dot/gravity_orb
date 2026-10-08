@@ -19,6 +19,7 @@ const CHIME_DURATION: float = 0.340
 const FEVER_SWEEP_DURATION: float = 0.400
 const TIMER_TICK_DURATION: float = 0.060
 const TIME_UP_DURATION: float = 0.520
+const SWIPE_DURATION: float = 0.120
 const VOICE_COUNT: int = 12
 const SFX_BUS: StringName = &"SFX"
 const POP_ASSET_PATHS: Array[String] = [
@@ -49,6 +50,10 @@ const TIME_UP_ASSET_PATHS: Array[String] = [
 	"res://assets/sfx/time_up.wav",
 	"res://assets/sfx/time_up.ogg",
 ]
+const SWIPE_ASSET_PATHS: Array[String] = [
+	"res://assets/sfx/swipe.wav",
+	"res://assets/sfx/swipe.ogg",
+]
 const BLAST_POP_OFFSETS: Array[float] = [
 	0.000,
 	0.012,
@@ -78,6 +83,7 @@ var _fever_start_stream: AudioStream
 var _fever_end_stream: AudioStream
 var _timer_tick_stream: AudioStream
 var _time_up_stream: AudioStream
+var _swipe_stream: AudioStream
 var _voices: Array[AudioStreamPlayer] = []
 var _next_voice: int = 0
 var _muted: bool = false
@@ -108,6 +114,9 @@ func _ready() -> void:
 	_time_up_stream = _load_first(TIME_UP_ASSET_PATHS)
 	if _time_up_stream == null:
 		_time_up_stream = _synthesize_time_up_buzzer()
+	_swipe_stream = _load_first(SWIPE_ASSET_PATHS)
+	if _swipe_stream == null:
+		_swipe_stream = _synthesize_swipe()
 	for voice_index: int in range(VOICE_COUNT):
 		var voice: AudioStreamPlayer = AudioStreamPlayer.new()
 		voice.name = "Voice%d" % voice_index
@@ -133,6 +142,7 @@ func _exit_tree() -> void:
 	_fever_end_stream = null
 	_timer_tick_stream = null
 	_time_up_stream = null
+	_swipe_stream = null
 
 
 func play_merge(
@@ -222,6 +232,12 @@ func play_time_up_buzzer() -> void:
 	_play(_time_up_stream, 1.0, Config.data.sfx_volume_db + 2.0, "time_up", 0, -1, -1)
 
 
+func play_swipe() -> void:
+	if not Config.data.sfx_enabled:
+		return
+	_play(_swipe_stream, 1.0, Config.data.sfx_volume_db, "swipe", 0, -1, -1)
+
+
 func merge_pitch(result_level: int, chain: int, stable_spawn_id: int) -> float:
 	var clamped_level: int = clampi(result_level, 2, 7)
 	var level_ratio: float = float(clamped_level - 2) / 5.0
@@ -248,6 +264,10 @@ func pop_stream() -> AudioStream:
 
 func blast_stream() -> AudioStream:
 	return _blast_stream
+
+
+func swipe_stream() -> AudioStream:
+	return _swipe_stream
 
 
 func voice_count() -> int:
@@ -460,6 +480,26 @@ func _synthesize_time_up_buzzer() -> AudioStreamWAV:
 		var pulse: float = 1.0 if sin(TAU * 110.0 * time) >= 0.0 else -1.0
 		var wobble: float = sin(TAU * 7.0 * time) * 0.16
 		samples[index] = clampf((pulse * 0.55 + wobble) * envelope, -1.0, 1.0)
+	return _make_wav(samples)
+
+
+func _synthesize_swipe() -> AudioStreamWAV:
+	var sample_count: int = ceili(SWIPE_DURATION * float(SAMPLE_RATE))
+	var samples: PackedFloat32Array = PackedFloat32Array()
+	samples.resize(sample_count)
+	var filtered_noise: float = 0.0
+	var phase: float = 0.0
+	for index: int in range(sample_count):
+		var time: float = float(index) / float(SAMPLE_RATE)
+		var progress: float = time / SWIPE_DURATION
+		var envelope: float = sin(PI * progress)
+		var cutoff_blend: float = lerpf(0.38, 0.08, progress)
+		var noise: float = _high_pass_noise(index + 8117)
+		filtered_noise += (noise - filtered_noise) * cutoff_blend
+		var frequency: float = lerpf(760.0, 260.0, progress)
+		phase += TAU * frequency / float(SAMPLE_RATE)
+		var value: float = (filtered_noise * 0.72 + sin(phase) * 0.16) * envelope
+		samples[index] = clampf(value, -1.0, 1.0)
 	return _make_wav(samples)
 
 

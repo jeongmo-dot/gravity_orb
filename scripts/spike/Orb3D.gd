@@ -2,6 +2,9 @@ class_name Orb3D
 extends Node
 
 const PIXELS_PER_METER: float = 100.0
+const STRETCH_SPEED_THRESHOLD: float = 900.0
+const STRETCH_ALONG_SCALE: float = 1.15
+const STRETCH_PERPENDICULAR_SCALE: float = 0.92
 
 @onready var _body: RigidBody3D = %Body
 @onready var _collision_shape: CollisionShape3D = %CollisionShape3D
@@ -34,6 +37,10 @@ var _blast_armed: bool = false
 var _blast_blink_period: float = 0.8
 var _blast_blink_elapsed: float = 0.0
 var _visual_punch_tween: Tween
+var _visual_punch_scale: Vector3 = Vector3.ONE:
+	set(value):
+		_visual_punch_scale = value
+		_update_visual_transform()
 var _render_clamp_enabled: bool = true
 
 var position: Vector2:
@@ -204,21 +211,23 @@ func blast_emission_strength() -> float:
 func play_visual_punch(scale_factor: float = 1.18, duration: float = 0.14) -> void:
 	if _visual_punch_tween != null and _visual_punch_tween.is_valid():
 		_visual_punch_tween.kill()
-	_mesh.scale = Vector3.ONE
+	var target_scale: Vector3 = Vector3.ONE * scale_factor
+	var start_scale: Vector3 = Vector3.ONE.lerp(target_scale, 0.02)
+	_visual_punch_scale = start_scale
 	_visual_punch_tween = create_tween()
 	_visual_punch_tween.set_trans(Tween.TRANS_BACK)
 	_visual_punch_tween.set_ease(Tween.EASE_OUT)
-	_visual_punch_tween.tween_property(
-		_mesh,
-		"scale",
-		Vector3.ONE * scale_factor,
+	_visual_punch_tween.tween_method(
+		_set_visual_punch_scale,
+		start_scale,
+		target_scale,
 		duration * 0.45
 	)
 	_visual_punch_tween.set_trans(Tween.TRANS_QUAD)
 	_visual_punch_tween.set_ease(Tween.EASE_IN_OUT)
-	_visual_punch_tween.tween_property(
-		_mesh,
-		"scale",
+	_visual_punch_tween.tween_method(
+		_set_visual_punch_scale,
+		target_scale,
 		Vector3.ONE,
 		duration * 0.55
 	)
@@ -227,31 +236,38 @@ func play_visual_punch(scale_factor: float = 1.18, duration: float = 0.14) -> vo
 func play_visual_pull_punch(duration: float = 0.3) -> void:
 	if _visual_punch_tween != null and _visual_punch_tween.is_valid():
 		_visual_punch_tween.kill()
-	_mesh.scale = Vector3.ONE
+	var contracted_scale: Vector3 = Vector3.ONE / 1.18
+	var expanded_scale: Vector3 = Vector3.ONE * 1.18
+	var start_scale: Vector3 = Vector3.ONE.lerp(contracted_scale, 0.02)
+	_visual_punch_scale = start_scale
 	_visual_punch_tween = create_tween()
 	_visual_punch_tween.set_trans(Tween.TRANS_QUAD)
 	_visual_punch_tween.set_ease(Tween.EASE_OUT)
-	_visual_punch_tween.tween_property(
-		_mesh,
-		"scale",
-		Vector3.ONE / 1.18,
+	_visual_punch_tween.tween_method(
+		_set_visual_punch_scale,
+		start_scale,
+		contracted_scale,
 		duration * 0.35
 	)
 	_visual_punch_tween.set_trans(Tween.TRANS_BACK)
-	_visual_punch_tween.tween_property(
-		_mesh,
-		"scale",
-		Vector3.ONE * 1.18,
+	_visual_punch_tween.tween_method(
+		_set_visual_punch_scale,
+		contracted_scale,
+		expanded_scale,
 		duration * 0.30
 	)
 	_visual_punch_tween.set_trans(Tween.TRANS_QUAD)
 	_visual_punch_tween.set_ease(Tween.EASE_IN_OUT)
-	_visual_punch_tween.tween_property(
-		_mesh,
-		"scale",
+	_visual_punch_tween.tween_method(
+		_set_visual_punch_scale,
+		expanded_scale,
 		Vector3.ONE,
 		duration * 0.35
 	)
+
+
+func _set_visual_punch_scale(value: Vector3) -> void:
+	_visual_punch_scale = value
 
 
 func enter_ghost_state(alpha: float) -> void:
@@ -346,6 +362,22 @@ func get_physics_body() -> RigidBody3D:
 	return _body
 
 
+func visual_stretch_scale() -> Vector3:
+	if not Config.data.fx_enabled or not Config.data.fx_orb_stretch_enabled:
+		return Vector3.ONE
+	if linear_velocity.length() < STRETCH_SPEED_THRESHOLD:
+		return Vector3.ONE
+	return Vector3(
+		STRETCH_ALONG_SCALE,
+		STRETCH_PERPENDICULAR_SCALE,
+		STRETCH_PERPENDICULAR_SCALE
+	)
+
+
+func visual_mesh_scale() -> Vector3:
+	return _mesh.scale
+
+
 func get_colliding_orbs() -> Array[Orb3D]:
 	var result: Array[Orb3D] = []
 	if not _body.contact_monitor:
@@ -428,7 +460,13 @@ func _update_visual_transform() -> void:
 		_body.position.z
 	)
 	_mesh.position = render_world_position
-	_mesh.rotation = _body.rotation
+	var stretch_scale: Vector3 = visual_stretch_scale()
+	_mesh.scale = _visual_punch_scale * stretch_scale
+	if stretch_scale.is_equal_approx(Vector3.ONE):
+		_mesh.rotation = _body.rotation
+	else:
+		var world_velocity: Vector3 = _body.linear_velocity
+		_mesh.rotation = Vector3(0.0, 0.0, atan2(world_velocity.y, world_velocity.x))
 	_symbol_mesh.position = render_world_position + Vector3(0.0, 0.0, radius_m + 0.002)
 	_symbol_mesh.rotation = Vector3.ZERO
 	var symbol_size_m: float = radius_m * OrbSymbols.SYMBOL_SIZE_FACTOR

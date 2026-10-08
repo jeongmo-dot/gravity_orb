@@ -6,8 +6,8 @@ signal orb_contact(a: Orb3D, b: Orb3D)
 const ORB_SCENE: PackedScene = preload("res://scenes/Orb3D.tscn")
 const PIXELS_PER_METER: float = 100.0
 const VISUAL_WALL_WIDTH_M: float = 0.12
-const VISUAL_TILT_DEGREES: float = 4.0
-const VISUAL_TILT_DURATION: float = 0.25
+const VISUAL_TILT_DEGREES: float = 6.0
+const VISUAL_TILT_DURATION: float = 0.3
 const WARNING_FRAME_COLOR: Color = Color("#FF3B30")
 const NORMAL_FRAME_COLOR: Color = Color("#8ec5ff")
 const FEVER_FRAME_COLOR: Color = Color("#FF9F0A")
@@ -56,10 +56,15 @@ func set_gravity(direction: Vector2i) -> void:
 func play_visual_tilt(direction: Vector2i) -> void:
 	if _tilt_tween != null and _tilt_tween.is_valid():
 		_tilt_tween.kill()
+	var tilt_degrees: float = maxf(Config.data.fx_tilt_degrees, 0.0)
+	var tilt_duration: float = maxf(Config.data.fx_tilt_duration, 0.0)
+	if not Config.data.fx_enabled or tilt_degrees <= 0.0 or tilt_duration <= 0.0:
+		_visual_tilt.rotation_degrees = Vector3.ZERO
+		return
 	var world_direction: Vector3 = Orb3D.plane_direction_to_world(direction)
 	var target: Vector3 = Vector3(
-		world_direction.y * VISUAL_TILT_DEGREES,
-		world_direction.x * VISUAL_TILT_DEGREES,
+		world_direction.y * tilt_degrees,
+		world_direction.x * tilt_degrees,
 		0.0
 	)
 	_tilt_tween = create_tween()
@@ -69,14 +74,15 @@ func play_visual_tilt(direction: Vector2i) -> void:
 		_visual_tilt,
 		"rotation_degrees",
 		target,
-		VISUAL_TILT_DURATION * 0.45
+		tilt_duration * 0.45
 	)
-	_tilt_tween.set_ease(Tween.EASE_IN_OUT)
+	_tilt_tween.set_trans(Tween.TRANS_BACK)
+	_tilt_tween.set_ease(Tween.EASE_OUT)
 	_tilt_tween.tween_property(
 		_visual_tilt,
 		"rotation_degrees",
 		Vector3.ZERO,
-		VISUAL_TILT_DURATION * 0.55
+		tilt_duration * 0.55
 	)
 
 
