@@ -38,6 +38,37 @@
 
 ## 미확인
 
+### [2026-10-08] 대상 #42 — 장기 Jolt 테스트 프로세스 격리
+- 상태: 완료
+- 브랜치 / PR: `m8-jolt-test-isolation` / 미생성
+- 변경 파일: `tests/run_tests.gd`, `tests/run_tests.ps1`, `tests/scenarios/test_orb_symbols.gd` → `tests/test_orb_symbols.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `run_tests.gd`에 `--test-suite=general|long`을 추가. 장기 묶음은 2D 22시드 중력 순환과 3D 22시드·20턴·시드 101 120턴의 생성 순서 민감 메서드 4개, 일반 묶음은 나머지 203개로 분리
+  - [x] `tests/run_tests.ps1`가 일반 묶음과 장기 묶음을 각각 별도 Godot 프로세스로 차례로 실행하고, 각 종료 코드·소요 시간과 최종 종료 코드를 출력. `-GodotPath`, `GODOT` 환경변수, 저장소 로컬 4.8-dev3 경로, PATH의 `godot` 순으로 실행 파일을 선택
+  - [x] 래퍼 최종 실행: 일반 `203/203`, 장기 `4/4`, 합계 `207/207`, 양쪽 종료 코드 0. 일반 `249.640초`, 장기 `1622.289초`, 합계 `1871.929초`
+  - [x] 장기 단독 프로세스와 일반 묶음 뒤 래퍼의 새 장기 프로세스 결과가 일치: 2D 22시드 이탈/발산 `0/0`, 최대 침투 `7.441px`, 최대 속도 `1662.688px/s`; 3D 22시드 이탈/발산 `0/0`, wall/pair `12.9515/14.4729px`; 시드 101 120턴과 3D 20턴 모두 통과
+  - [x] 한쪽 실패 프로브에서 일반 자식 종료 `0`, 장기 자식 종료 `9`를 반환하게 했을 때 래퍼 최종 종료 코드 `1`. 알 수 없는 두 suite를 실제 Godot에 전달한 프로브도 자식 `1/1`, 래퍼 `1`
+  - [x] #38 순서 우회로 `tests/scenarios/`에 있던 `test_orb_symbols.gd`를 자연스러운 `tests/` 위치로 이동. 일반 프로세스에서 100구체 테스트를 먼저 실행한 뒤 별도 장기 프로세스가 위 단독 수치와 동일
+  - [x] 기존 `godot --headless --path . -s res://tests/run_tests.gd`는 호환 모드로 장기→일반 순서의 같은 프로세스 실행을 유지하고 `207/207`, 종료 코드 0. `--test-file=` 및 기존 측정 suite 동작은 변경하지 않음
+  - [x] 제품 코드·게임 규칙·물리 수치·테스트 판정 기준은 변경하지 않음
+- 새 권장 실행 명령:
+
+```powershell
+# GODOT 환경변수가 있으면 자동 사용. 필요하면 -GodotPath로 직접 지정
+.\tests\run_tests.ps1
+```
+
+- QA 관측값:
+  - `Godot 4.8-dev3 --headless --path . --import` → 종료 코드 0, SCRIPT/Parse Error 0
+  - `.\tests\run_tests.ps1` → general `203/203` / long `4/4`, 자식 종료 코드 `0/0`, 최종 종료 코드 0, 총 `207/207`
+  - `Godot 4.8-dev3 --headless --path . -s res://tests/run_tests.gd` → 호환 실행 `207/207`, 종료 코드 0
+  - `--quit-after 300` / `--quit-after 300 -- --mode=blitz` → 각각 종료 코드 0, SCRIPT/Parse Error 0
+  - PowerShell parser → `tests/run_tests.ps1` 구문 오류 0; `git diff --check` 오류 0
+  - 규칙 점검 → `Input`/`InputEvent`는 `InputRouter.gd`만, 난수 호출은 `Spawner.gd`만
+- 수동 확인 절차: 테스트 실행 구조만 변경한 항목이며 전체 완료 조건을 헤드리스 자동 실행과 종료 코드로 검증해 별도 수동 확인 없음
+- 결정 사항: `test_turn_time.gd`는 오래 걸리지만 서로 다른 깨끗한 프로세스에서도 점수·관통 관측치가 달라져 “생성 순서 민감 장기 결과 수치 일치” 대상으로 부적합했고, 명세가 직접 지목한 격리 대상도 아니므로 일반 묶음에 유지했다. 격리 대상은 단독/래퍼에서 수치가 일치한 4개 메서드로 한정했다. 인자 없는 호환 명령은 새 프로세스를 만들 수 없으므로 장기를 먼저 실행해 과거 순서 우회를 보존하고, 권장 래퍼만 물리적으로 두 프로세스를 보장한다.
+- 남은 것 · 질문: 없음. Claude가 §10.1과 AGENTS.md의 테스트 명령을 `.\tests\run_tests.ps1`로 갱신하면 이후 기본 검증에서 프로세스 격리가 적용된다.
+
 ### [2026-10-08] 대상 #40 — 3D 중심 이탈 견고성 측정 (생성 순서 흔들기)
 - 상태: 완료
 - 브랜치 / PR: `m8-jolt-rid-robustness` / 미생성
