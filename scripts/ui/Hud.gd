@@ -9,6 +9,19 @@ const SCORE_ROLL_DURATION: float = 0.25
 const BADGE_PUNCH_DURATION: float = 0.15
 const POPUP_MERGE_DISTANCE: float = 40.0
 const GOLD_COLOR: Color = Color("#FFD54A")
+const CALLOUT_POP_DURATION: float = 0.12
+const CALLOUT_TOTAL_DURATION: float = 0.80
+const FEVER_ENTRY_DURATION: float = 0.30
+const FEVER_EXIT_DURATION: float = 0.30
+const TIME_BONUS_TRAVEL_DURATION: float = 0.50
+const TURN_CALLOUT_STEPS: Array[int] = [3, 5, 8, 12]
+const BLITZ_CALLOUT_STEPS: Array[int] = [5, 10, 15, 20, 30]
+const CALLOUT_WORDS: Array[String] = [
+	"NICE!", "GREAT!", "AMAZING!", "INCREDIBLE!", "UNSTOPPABLE!"
+]
+const TIMER_NORMAL_COLOR: Color = Color.WHITE
+const TIMER_DANGER_COLOR: Color = Color("#FF3B30")
+const TIMER_BONUS_COLOR: Color = Color("#30D158")
 
 @onready var _next_preview: Node2D = %NextPreview
 @onready var _then_preview: Node2D = %ThenPreview
@@ -21,6 +34,10 @@ const GOLD_COLOR: Color = Color("#FFD54A")
 @onready var _combo_label: Label = %ComboLabel
 @onready var _danger_label: Label = %DangerLabel
 @onready var _score_popup_layer: Control = %ScorePopupLayer
+@onready var _fever_vignette: ColorRect = %FeverVignette
+@onready var _fever_band: ColorRect = %FeverBand
+@onready var _callout_label: Label = %CalloutLabel
+@onready var _time_up_label: Label = %TimeUpLabel
 @onready var _blocked_label: Label = %BlockedLabel
 @onready var _timer_label: Label = %TimerLabel
 @onready var _fever_label: Label = %FeverLabel
@@ -31,6 +48,11 @@ const GOLD_COLOR: Color = Color("#FFD54A")
 var _spawner: Spawner
 var _score_manager: ScoreManager
 var _bonus_tween: Tween
+var _callout_tween: Tween
+var _fever_tween: Tween
+var _timer_punch_tween: Tween
+var _timer_flash_tween: Tween
+var _time_up_tween: Tween
 var _blitz_mode: bool = false
 var _sfx_bank: SfxBank
 var _board: Variant
@@ -46,16 +68,35 @@ var _danger_multiplier: float = 1.0
 var _danger_refresh_elapsed: float = 0.0
 var _pulse_elapsed: float = 0.0
 var _badge_punching: bool = false
+var _fever_active: bool = false
+var _fever_band_base_position: Vector2 = Vector2.ZERO
+var _fever_label_base_position: Vector2 = Vector2.ZERO
+var _previous_time_remaining: float = -1.0
+var _timer_flashing: bool = false
+var _callout_seen: Dictionary = {}
+var _callout_history: Array[int] = []
+var _timer_tick_history: Array[int] = []
+var _urgent_timer_tick_history: Array[int] = []
+var _timer_tick_seen: Dictionary = {}
+var _pending_time_bonuses: Array[Dictionary] = []
+var _last_bonus_target: Vector2 = Vector2.ZERO
+var _time_up_count: int = 0
 
 
 func _ready() -> void:
 	_sound_button.pressed.connect(_on_sound_pressed)
+	_fever_band_base_position = _fever_band.position
+	_fever_label_base_position = _fever_label.position
+	_configure_fever_vignette()
 	set_process(true)
 
 
 func _process(delta: float) -> void:
 	_danger_refresh_elapsed += delta
 	_pulse_elapsed += delta
+	_update_fever_pulse()
+	if not Config.data.fx_callouts_enabled:
+		_hide_callout_visuals()
 	if _board != null and _danger_refresh_elapsed >= DANGER_REFRESH_INTERVAL:
 		_danger_refresh_elapsed = fmod(_danger_refresh_elapsed, DANGER_REFRESH_INTERVAL)
 		_refresh_danger_badge()
@@ -106,6 +147,7 @@ func bind_game_state(
 	score_manager: ScoreManager
 ) -> void:
 	_board = board
+	_reset_callout_tracking()
 	game_manager.warning_changed.connect(_on_warning_changed)
 	game_manager.combo_changed.connect(_on_combo_changed)
 	_game_over_panel.bind(game_manager, score_manager)
@@ -126,6 +168,7 @@ func bind_game_state(
 		game_manager.ready_changed.connect(_on_ready_changed)
 		game_manager.fever_changed.connect(_on_fever_changed)
 		game_manager.time_bonus_awarded.connect(_on_time_bonus_awarded)
+		game_manager.finale_started.connect(_on_finale_started)
 		_on_time_changed(game_manager.remaining_time)
 		if game_manager.state == BlitzManager.State.READY:
 			_on_ready_changed(true, game_manager.ready_remaining)
@@ -232,6 +275,7 @@ func _on_combo_changed(combo: int, multiplier: float, max_combo: int) -> void:
 	]
 	var previous_multiplier: float = _current_multiplier
 	_current_multiplier = multiplier
+	_update_callout(combo)
 	_multiplier_label.visible = combo > 0
 	_combo_label.visible = combo > 0
 	if combo <= 0:
@@ -250,6 +294,7 @@ func _on_combo_changed(combo: int, multiplier: float, max_combo: int) -> void:
 
 
 func _on_reaction_scored(reaction: Dictionary) -> void:
+	_play_pending_time_bonus(reaction)
 	var occupancy: float = float(reaction.get("occupancy", 0.0))
 	_set_danger_badge(
 		occupancy,
@@ -462,34 +507,338 @@ func _on_warning_changed(directions: Array[Vector2i]) -> void:
 
 
 func _on_time_changed(remaining: float) -> void:
-	_timer_label.text = "%.1f" % maxf(remaining, 0.0)
-	_timer_label.modulate = Color("#FF3B30") if remaining <= 10.0 else Color.WHITE
+	var clamped_remaining: float = maxf(remaining, 0.0)
+	_timer_label.text = "%.1f" % clamped_remaining
+	if not _timer_flashing:
+		_timer_label.modulate = _timer_color_for(clamped_remaining)
+	_record_timer_ticks(_previous_time_remaining, clamped_remaining)
+	_previous_time_remaining = clamped_remaining
 
 
 func _on_ready_changed(active: bool, remaining: float) -> void:
 	if active:
 		_timer_label.text = "READY %.1f" % remaining
-		_timer_label.modulate = Color.WHITE
+		if not _timer_flashing:
+			_timer_label.modulate = TIMER_NORMAL_COLOR
 
 
 func _on_fever_changed(active: bool, remaining: float) -> void:
-	_fever_label.visible = active
-	_fever_label.text = "FEVER x%.0f  %.1fs" % [
-		Config.data.blitz_fever_multiplier,
-		remaining,
-	]
+	if active:
+		_fever_label.text = "FEVER ×%.0f   %.1fs" % [
+			Config.data.blitz_fever_multiplier,
+			remaining,
+		]
+		if not _fever_active:
+			_fever_active = true
+			if Config.data.fx_callouts_enabled:
+				_start_fever_presentation()
+		return
+	if not _fever_active:
+		return
+	_fever_active = false
+	if Config.data.fx_callouts_enabled:
+		_end_fever_presentation()
+	else:
+		_hide_fever_visuals()
 
 
 func _on_time_bonus_awarded(seconds: float, source: String) -> void:
+	if not Config.data.fx_callouts_enabled:
+		return
+	_pending_time_bonuses.append({"seconds": seconds, "source": source})
+
+
+func _on_finale_started() -> void:
+	if not Config.data.fx_callouts_enabled:
+		return
+	_time_up_count += 1
+	if _sfx_bank != null:
+		_sfx_bank.play_time_up_buzzer()
+	if _time_up_tween != null and _time_up_tween.is_valid():
+		_time_up_tween.kill()
+	_time_up_label.visible = true
+	_time_up_label.modulate = Color.WHITE
+	_time_up_label.scale = Vector2.ONE * 0.60
+	_time_up_tween = create_tween()
+	_time_up_tween.tween_property(
+		_time_up_label, "scale", Vector2.ONE * 1.15, CALLOUT_POP_DURATION
+	).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_time_up_tween.tween_property(_time_up_label, "scale", Vector2.ONE, 0.10)
+	_time_up_tween.tween_interval(0.48)
+	_time_up_tween.tween_property(_time_up_label, "modulate:a", 0.0, 0.25)
+	_time_up_tween.tween_callback(_hide_time_up_label)
+
+
+func _update_callout(combo: int) -> void:
+	if combo <= 0:
+		_callout_seen.clear()
+		return
+	if not Config.data.fx_callouts_enabled:
+		return
+	var steps: Array[int] = BLITZ_CALLOUT_STEPS if _blitz_mode else TURN_CALLOUT_STEPS
+	var stage_index: int = steps.find(combo)
+	if stage_index < 0 or _callout_seen.has(combo):
+		return
+	_callout_seen[combo] = true
+	_callout_history.append(combo)
+	_show_callout(CALLOUT_WORDS[stage_index])
+	if _sfx_bank != null:
+		_sfx_bank.play_callout_chime(stage_index)
+
+
+func _show_callout(text: String) -> void:
+	if _callout_tween != null and _callout_tween.is_valid():
+		_callout_tween.kill()
+	_callout_label.text = text
+	_callout_label.visible = true
+	_callout_label.modulate = Color.WHITE
+	_callout_label.scale = Vector2.ONE * 0.60
+	_callout_tween = create_tween()
+	_callout_tween.tween_property(
+		_callout_label, "scale", Vector2.ONE * 1.15, CALLOUT_POP_DURATION
+	).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_callout_tween.tween_property(_callout_label, "scale", Vector2.ONE, 0.10)
+	_callout_tween.tween_interval(
+		CALLOUT_TOTAL_DURATION - CALLOUT_POP_DURATION - 0.10 - 0.25
+	)
+	_callout_tween.tween_property(_callout_label, "modulate:a", 0.0, 0.25)
+	_callout_tween.tween_callback(_hide_callout_label)
+
+
+func _start_fever_presentation() -> void:
+	if _fever_tween != null and _fever_tween.is_valid():
+		_fever_tween.kill()
+	var slide_distance: float = get_viewport_rect().size.x
+	_fever_band.position = _fever_band_base_position + Vector2(slide_distance, 0.0)
+	_fever_label.position = _fever_label_base_position + Vector2(slide_distance, 0.0)
+	_fever_band.modulate = Color.WHITE
+	_fever_label.modulate = Color.WHITE
+	_fever_vignette.modulate = Color.WHITE
+	_fever_band.visible = true
+	_fever_label.visible = true
+	_fever_vignette.visible = true
+	_fever_tween = create_tween()
+	_fever_tween.set_parallel(true)
+	_fever_tween.tween_property(
+		_fever_band, "position", _fever_band_base_position, FEVER_ENTRY_DURATION
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_fever_tween.tween_property(
+		_fever_label, "position", _fever_label_base_position, FEVER_ENTRY_DURATION
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	if _sfx_bank != null:
+		_sfx_bank.play_fever_sweep(true)
+
+
+func _end_fever_presentation() -> void:
+	if _fever_tween != null and _fever_tween.is_valid():
+		_fever_tween.kill()
+	_fever_tween = create_tween()
+	_fever_tween.set_parallel(true)
+	_fever_tween.tween_property(_fever_band, "modulate:a", 0.0, FEVER_EXIT_DURATION)
+	_fever_tween.tween_property(_fever_label, "modulate:a", 0.0, FEVER_EXIT_DURATION)
+	_fever_tween.tween_property(_fever_vignette, "modulate:a", 0.0, FEVER_EXIT_DURATION)
+	_fever_tween.chain().tween_callback(_hide_fever_visuals)
+	if _sfx_bank != null:
+		_sfx_bank.play_fever_sweep(false)
+
+
+func _update_fever_pulse() -> void:
+	if not _fever_active or not Config.data.fx_callouts_enabled:
+		return
+	var pulse: float = 0.74 + 0.26 * (
+		0.5 + 0.5 * sin(_pulse_elapsed * TAU * 2.0)
+	)
+	_fever_vignette.modulate.a = pulse
+
+
+func _record_timer_ticks(previous: float, current: float) -> void:
+	if (
+		not Config.data.fx_callouts_enabled
+		or previous < 0.0
+		or current >= previous
+	):
+		return
+	for second: int in range(10, 0, -1):
+		if previous < float(second) or current >= float(second):
+			continue
+		if _timer_tick_seen.has(second):
+			continue
+		_timer_tick_seen[second] = true
+		_timer_tick_history.append(second)
+		var urgent: bool = second <= 3
+		if urgent:
+			_urgent_timer_tick_history.append(second)
+		_punch_timer(urgent)
+		if _sfx_bank != null:
+			_sfx_bank.play_timer_tick(urgent)
+
+
+func _punch_timer(urgent: bool) -> void:
+	if _timer_punch_tween != null and _timer_punch_tween.is_valid():
+		_timer_punch_tween.kill()
+	_timer_label.scale = Vector2.ONE
+	_timer_punch_tween = create_tween()
+	_timer_punch_tween.tween_property(
+		_timer_label,
+		"scale",
+		Vector2.ONE * (1.32 if urgent else 1.18),
+		0.08
+	).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_timer_punch_tween.tween_property(_timer_label, "scale", Vector2.ONE, 0.10)
+
+
+func _play_pending_time_bonus(reaction: Dictionary) -> void:
+	if _pending_time_bonuses.is_empty() or not Config.data.fx_callouts_enabled:
+		return
+	var reaction_type: ReactionRules.Type = reaction.get(
+		"type", ReactionRules.Type.NONE
+	) as ReactionRules.Type
+	if reaction_type not in [ReactionRules.Type.BLAST, ReactionRules.Type.MAX_CLEAR]:
+		return
+	var bonus: Dictionary = _pending_time_bonuses.pop_front() as Dictionary
+	_show_time_bonus(
+		_reaction_screen_position(reaction.get("position", Vector2.ZERO) as Vector2),
+		float(bonus["seconds"])
+	)
+
+
+func _show_time_bonus(screen_position: Vector2, seconds: float) -> void:
 	if _bonus_tween != null and _bonus_tween.is_valid():
 		_bonus_tween.kill()
 	_bonus_label.visible = true
 	_bonus_label.modulate = Color.WHITE
-	_bonus_label.text = "+%gs  %s" % [seconds, source]
+	_bonus_label.scale = Vector2.ONE
+	_bonus_label.text = (
+		"+%ds" % roundi(seconds)
+		if is_equal_approx(seconds, float(roundi(seconds)))
+		else "+%.1fs" % seconds
+	)
+	_bonus_label.position = screen_position - _bonus_label.size * 0.5
+	_last_bonus_target = (
+		_timer_label.position
+		+ _timer_label.size * 0.5
+		- _bonus_label.size * 0.5
+	)
 	_bonus_tween = create_tween()
-	_bonus_tween.tween_interval(0.7)
-	_bonus_tween.tween_property(_bonus_label, "modulate:a", 0.0, 0.3)
-	_bonus_tween.tween_callback(func() -> void: _bonus_label.visible = false)
+	_bonus_tween.tween_property(
+		_bonus_label, "position", _last_bonus_target, TIME_BONUS_TRAVEL_DURATION
+	).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	_bonus_tween.parallel().tween_property(
+		_bonus_label, "scale", Vector2.ONE * 0.82, TIME_BONUS_TRAVEL_DURATION
+	)
+	_bonus_tween.tween_callback(_flash_timer_green)
+	_bonus_tween.tween_interval(0.10)
+	_bonus_tween.tween_property(_bonus_label, "modulate:a", 0.0, 0.20)
+	_bonus_tween.tween_callback(_hide_bonus_label)
+
+
+func _flash_timer_green() -> void:
+	if _timer_flash_tween != null and _timer_flash_tween.is_valid():
+		_timer_flash_tween.kill()
+	_timer_flashing = true
+	_timer_label.modulate = TIMER_BONUS_COLOR
+	_timer_flash_tween = create_tween()
+	_timer_flash_tween.tween_interval(0.12)
+	_timer_flash_tween.tween_property(
+		_timer_label, "modulate", _timer_color_for(_previous_time_remaining), 0.18
+	)
+	_timer_flash_tween.tween_callback(_finish_timer_flash)
+
+
+func _finish_timer_flash() -> void:
+	_timer_flashing = false
+	_timer_label.modulate = _timer_color_for(_previous_time_remaining)
+
+
+func _timer_color_for(remaining: float) -> Color:
+	return TIMER_DANGER_COLOR if remaining <= 10.0 else TIMER_NORMAL_COLOR
+
+
+func _configure_fever_vignette() -> void:
+	var shader: Shader = Shader.new()
+	shader.code = "\n".join([
+		"shader_type canvas_item;",
+		"render_mode unshaded;",
+		"void fragment() {",
+		"  vec2 edge_distance = abs(UV - vec2(0.5)) * 2.0;",
+		"  float edge = smoothstep(0.54, 1.0, max(edge_distance.x, edge_distance.y));",
+		"  float alpha = 0.035 + edge * 0.22;",
+		"  COLOR = vec4(1.0, 0.30, 0.015, alpha);",
+		"}",
+	])
+	var shader_material: ShaderMaterial = ShaderMaterial.new()
+	shader_material.shader = shader
+	_fever_vignette.material = shader_material
+
+
+func _reset_callout_tracking() -> void:
+	_callout_seen.clear()
+	_callout_history.clear()
+	_timer_tick_seen.clear()
+	_timer_tick_history.clear()
+	_urgent_timer_tick_history.clear()
+	_pending_time_bonuses.clear()
+	_previous_time_remaining = -1.0
+	_fever_active = false
+	_time_up_count = 0
+	_hide_callout_visuals()
+
+
+func _hide_callout_visuals() -> void:
+	_callout_label.visible = false
+	_time_up_label.visible = false
+	_bonus_label.visible = false
+	_hide_fever_visuals()
+
+
+func _hide_callout_label() -> void:
+	_callout_label.visible = false
+	_callout_label.scale = Vector2.ONE
+
+
+func _hide_time_up_label() -> void:
+	_time_up_label.visible = false
+	_time_up_label.scale = Vector2.ONE
+
+
+func _hide_bonus_label() -> void:
+	_bonus_label.visible = false
+	_bonus_label.scale = Vector2.ONE
+
+
+func _hide_fever_visuals() -> void:
+	_fever_vignette.visible = false
+	_fever_band.visible = false
+	_fever_label.visible = false
+	_fever_vignette.modulate = Color.WHITE
+	_fever_band.modulate = Color.WHITE
+	_fever_label.modulate = Color.WHITE
+	_fever_band.position = _fever_band_base_position
+	_fever_label.position = _fever_label_base_position
+
+
+func callout_history() -> Array[int]:
+	return _callout_history.duplicate()
+
+
+func timer_tick_history() -> Array[int]:
+	return _timer_tick_history.duplicate()
+
+
+func urgent_timer_tick_history() -> Array[int]:
+	return _urgent_timer_tick_history.duplicate()
+
+
+func last_bonus_target() -> Vector2:
+	return _last_bonus_target
+
+
+func timer_bonus_target() -> Vector2:
+	return _timer_label.position + _timer_label.size * 0.5 - _bonus_label.size * 0.5
+
+
+func time_up_count() -> int:
+	return _time_up_count
 
 
 func _on_sound_pressed() -> void:

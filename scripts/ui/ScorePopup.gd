@@ -87,6 +87,8 @@ func merge_score(additional_points: int) -> void:
 	_duration = POP_DURATION + (LARGE_SCORE_EXTRA_DURATION if points >= 1000 else 0.0)
 	_score_label.text = "+%d" % points
 	_score_label.add_theme_font_size_override("font_size", popup_font_size(points))
+	_formula_label.text = ""
+	_formula_label.visible = false
 
 
 func deactivate(emit_finished: bool = true) -> void:
