@@ -206,10 +206,12 @@ func test_main_scene_binds_score_hud_and_restart() -> void:
 		_reaction(ReactionRules.Type.MERGE, 0, [1, 1], 2, 0.50)
 	)
 	_assert_combo_labels(main, 3, 3, "x4")
+	assert_eq(danger_label.text, "DANGER ×2", "danger multiplier text")
+	assert_true(danger_label.visible, "danger visible at threshold")
+	await tree.create_timer(0.3, true, false, true).timeout
 	assert_eq(score_label.text, "SCORE\n44", "score HUD text")
 	assert_eq(best_label.text, "BEST\n44", "best HUD text")
-	assert_eq(danger_label.text, "DANGER x2.0", "danger multiplier text")
-	assert_true(danger_label.visible, "danger visible at threshold")
+	assert_true(not danger_label.visible, "periodic board occupancy refresh hides stale danger")
 
 	manager._set_state(TurnManager.State.WAITING_INPUT)
 	InputRouter.set_locked(false)
@@ -218,9 +220,10 @@ func test_main_scene_binds_score_hud_and_restart() -> void:
 	manager._set_state(TurnManager.State.WAITING_INPUT)
 	manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 0, [1, 1], 2))
 	_assert_combo_labels(main, 1, 3, "x1")
+	await tree.create_timer(0.3, true, false, true).timeout
 	assert_eq(score_label.text, "SCORE\n48", "waiting-input reaction score")
 	assert_eq(max_combo_label.text, "MAX COMBO 3", "maximum survives swipe reset")
-	assert_eq(combo_label.text, "COMBO 1 (x1)", "waiting-input combo text")
+	assert_eq(combo_label.text, "COMBO 1", "waiting-input combo text")
 	assert_eq(score_label.mouse_filter, Control.MOUSE_FILTER_IGNORE, "score ignores pointer")
 	assert_eq(best_label.mouse_filter, Control.MOUSE_FILTER_IGNORE, "best ignores pointer")
 	assert_eq(max_combo_label.mouse_filter, Control.MOUSE_FILTER_IGNORE, "combo ignores pointer")
@@ -416,16 +419,23 @@ func _assert_combo_labels(
 	expected_multiplier: String
 ) -> void:
 	var combo_label: Label = main.get_node("UI/Hud/ComboLabel") as Label
+	var multiplier_label: Label = main.get_node("UI/Hud/MultiplierLabel") as Label
 	var max_combo_label: Label = main.get_node("UI/Hud/MaxComboLabel") as Label
 	var debug_hud: DebugHud = main.get_node("UI") as DebugHud
 	var debug_label: Label = main.get_node("UI/DebugLabel") as Label
 	debug_hud._update_label()
 	assert_eq(combo_label.visible, combo > 0, "combo visibility")
+	assert_eq(multiplier_label.visible, combo > 0, "multiplier visibility")
 	if combo > 0:
 		assert_eq(
 			combo_label.text,
-			"COMBO %d (%s)" % [combo, expected_multiplier],
+			"COMBO %d" % combo,
 			"current combo HUD text"
+		)
+		assert_eq(
+			multiplier_label.text,
+			"×%s" % expected_multiplier.trim_prefix("x"),
+			"current multiplier HUD text"
 		)
 	assert_eq(max_combo_label.text, "MAX COMBO %d" % max_combo, "maximum combo HUD text")
 	assert_true(
