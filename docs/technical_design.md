@@ -741,15 +741,21 @@ MERGE·MAX_CLEAR 반응 직후 반응 지점 `p`에서 충격파를 낸다.
 ```bash
 # 임포트·스크립트 파싱 검사
 godot --headless --path . --import
-# 단위·시나리오 테스트 (실패 시 종료 코드 1)
-godot --headless --path . -s res://tests/run_tests.gd
-# 메인 씬 스모크: 300프레임 실행 후 종료, 출력에 SCRIPT ERROR가 없어야 함
+# 단위·시나리오 테스트 — 일반 묶음과 장기 Jolt 묶음을 **각각 새 프로세스**로 (#42). --fixed-fps 120이면 물리를 실시간보다 빠르게 돌린다 (결과 동일)
+godot --headless --fixed-fps 120 --path . -s res://tests/run_tests.gd -- --test-suite=general
+godot --headless --fixed-fps 120 --path . -s res://tests/run_tests.gd -- --test-suite=long
+# 메인 씬 스모크: 300프레임 실행 후 종료, 출력에 SCRIPT ERROR가 없어야 함 (시작 화면 / 턴제 / BLITZ)
 godot --headless --path . --quit-after 300
+godot --headless --path . --quit-after 300 -- --mode=turn
+godot --headless --path . --quit-after 300 -- --mode=blitz
 ```
+
+- 한 번에 돌리는 래퍼: `.\tests\run_tests.ps1` (일반 → 장기를 별도 프로세스로, 하나라도 실패하면 종료 코드 1). #43에서 `--fixed-fps` 지원을 넣기 전에는 실시간이라 약 31분 걸린다
+- 인자 없는 `-s res://tests/run_tests.gd`는 호환용(한 프로세스, 장기 → 일반 순서)으로 남아 있다
 
 `godot` 실행 파일 경로는 환경마다 다르다. `GODOT` 환경변수가 있으면 그것을 쓴다.
 
-> #42 이후: 장기 Jolt 테스트(22시드·20턴·120턴 등)는 일반 묶음과 **별도 프로세스**로 돌린다 — 앞선 테스트가 만든 물리 바디가 Jolt 생성 순서를 바꿔 결과를 흔들 수 있기 때문 (#38). 실행 방법은 #42 회신의 래퍼 명령으로 이 절을 갱신한다
+> #42 (PR #43, `563ccbe`): 장기 Jolt 테스트(2D 22시드 중력 순환, 3D 22시드·20턴·시드 101 120턴) 4개를 `--test-suite=long`으로 분리했다 — 앞선 테스트가 만든 물리 바디가 Jolt 생성 순서를 바꿔 결과를 흔들 수 있기 때문 (#38). 위 명령처럼 일반·장기를 각각 새 프로세스로 돌린다
 
 ### 10.2 러너 규약
 

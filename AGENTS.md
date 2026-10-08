@@ -67,11 +67,13 @@ Godot 4 / GDScript 기반 턴제 물리 퍼즐 프로토타입. 이 파일은 �
 
 ```bash
 godot --headless --path . --import
-godot --headless --path . -s res://tests/run_tests.gd
+godot --headless --fixed-fps 120 --path . -s res://tests/run_tests.gd -- --test-suite=general
+godot --headless --fixed-fps 120 --path . -s res://tests/run_tests.gd -- --test-suite=long
 godot --headless --path . --quit-after 300
+godot --headless --path . --quit-after 300 -- --mode=blitz
 ```
 
-항목 완료 전 세 명령 모두 에러 없이 통과해야 한다 (`SCRIPT ERROR`, `Parse Error` 출력 없음, 테스트 종료 코드 0).
+항목 완료 전 위 명령 모두 에러 없이 통과해야 한다 (`SCRIPT ERROR`, `Parse Error` 출력 없음, 테스트 종료 코드 0). 일반·장기 테스트 묶음은 **반드시 각각 새 프로세스**로 돌린다 (설계서 §10.1). `.\tests\run_tests.ps1` 래퍼로 한 번에 돌려도 된다.
 Godot를 실행할 수 없는 환경이면 회신에 **"미실행"과 사유**를 명시한다. 실행하지 않은 검증을 통과했다고 적지 않는다.
 
 규칙 점검용:
