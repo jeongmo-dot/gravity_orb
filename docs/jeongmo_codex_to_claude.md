@@ -38,6 +38,28 @@
 
 ## 미확인
 
+### [2026-10-08] 대상 #44 — 테스트 래퍼 PowerShell 5.1 출력 리다이렉션 중단 수정
+- 상태: 완료
+- 브랜치 / PR: `m8-powershell-output-redirect` / 미생성
+- 변경 파일: `tests/run_tests.ps1`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] Godot 호출을 `Invoke-GodotSuite`로 한정해 호출 구간에서만 `$ErrorActionPreference = "Continue"`를 적용하고 `finally`에서 기존 값을 복원. 자식 성공·실패는 `$LASTEXITCODE`만 `[ref]` 출력으로 전달
+  - [x] Windows PowerShell `5.1.26100.9549`에서 `& '.\tests\run_tests.ps1' *> log` 전체 실행 완료: 일반 `202/202`, 장기 `4/4`, 성능 `1/1`, 최종 종료 코드 0, 총 35.653초
+  - [x] 같은 PowerShell 5.1에서 `& '.\tests\run_tests.ps1' 2>&1 | Tee-Object -FilePath log` 전체 실행 완료: 일반 `202/202`, 장기 `4/4`, 성능 `1/1`, 최종 종료 코드 0, 총 35.556초
+  - [x] 실패 전파 유지: 일반·장기에는 `perf`, 성능에는 `invalid` 묶음을 전달한 `*>` 프로브에서 자식 종료 코드 `0/0/1`, 래퍼 최종 종료 코드 1
+  - [x] 테스트 내용·판정·제품 코드 변경 없음
+- 관측 및 결정:
+  - PowerShell 5.1은 리다이렉션된 Godot 경고 stderr를 `NativeCommandError` 레코드로 로그에 남긴다. 이 레코드를 숨기지는 않고 호출 중에만 비종료 오류로 통과시키며, 실제 테스트 판정은 Godot 프로세스 종료 코드로 유지했다.
+  - 함수 안에서 로컬 `$LASTEXITCODE`를 미리 초기화하면 네이티브 프로세스가 갱신한 자동 변수를 가리는 PowerShell 스코프 동작을 확인해 해당 초기화는 두지 않았다. 대신 각 `[ref]` 결과 변수의 기본값을 1로 둔다.
+- QA 관측값:
+  - Godot `4.8-dev3` `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0
+  - PowerShell 5.1 리다이렉션 2방식 → 각각 총 `207/207`, 종료 코드 0
+  - 실패 프로브 → 래퍼 종료 코드 1
+  - 시작 화면 / `--mode=turn` / `--mode=blitz` 300프레임 스모크 → 모두 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0
+  - PowerShell parser·`git diff --check` → 오류 0
+- 수동 확인 절차: 테스트 래퍼의 출력·종료 동작만 변경한 항목이며 실제 PowerShell 5.1의 두 리다이렉션 전체 실행으로 자동 검증해 별도 수동 확인 없음
+- 문서에 없던 결정 사항·알려진 문제: 없음
+
 ### [2026-10-08] 대상 #43 — 테스트 래퍼 고정 FPS + 흔들리는 성능 테스트 정리
 - 상태: 완료
 - 브랜치 / PR: `m8-test-wrapper-fixed-fps` / https://github.com/jeongmo-dot/gravity_orb/pull/44

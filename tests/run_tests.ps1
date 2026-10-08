@@ -29,9 +29,28 @@ $godotArguments += @(
 )
 Write-Output ("TEST_WRAPPER_START fixed_fps={0}" -f $FixedFps)
 
+function Invoke-GodotSuite {
+    param(
+        [string]$Suite,
+        [ref]$ExitCode
+    )
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        # Windows PowerShell 5.1 converts redirected native stderr into
+        # non-terminating NativeCommandError records. Keep those records in
+        # the output while judging the child process only by LASTEXITCODE.
+        $ErrorActionPreference = "Continue"
+        & $GodotPath @godotArguments -- "--test-suite=$Suite"
+        $ExitCode.Value = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+}
+
 $generalStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-& $GodotPath @godotArguments -- "--test-suite=$GeneralSuite"
-$generalExit = $LASTEXITCODE
+$generalExit = 1
+Invoke-GodotSuite -Suite $GeneralSuite -ExitCode ([ref]$generalExit)
 $generalStopwatch.Stop()
 Write-Output (
     "TEST_SUITE_RESULT name=general suite={0} exit={1} duration_seconds={2:F3}" -f `
@@ -41,8 +60,8 @@ Write-Output (
 )
 
 $longStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-& $GodotPath @godotArguments -- "--test-suite=$LongSuite"
-$longExit = $LASTEXITCODE
+$longExit = 1
+Invoke-GodotSuite -Suite $LongSuite -ExitCode ([ref]$longExit)
 $longStopwatch.Stop()
 Write-Output (
     "TEST_SUITE_RESULT name=long suite={0} exit={1} duration_seconds={2:F3}" -f `
@@ -52,8 +71,8 @@ Write-Output (
 )
 
 $perfStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-& $GodotPath @godotArguments -- "--test-suite=$PerfSuite"
-$perfExit = $LASTEXITCODE
+$perfExit = 1
+Invoke-GodotSuite -Suite $PerfSuite -ExitCode ([ref]$perfExit)
 $perfStopwatch.Stop()
 Write-Output (
     "TEST_SUITE_RESULT name=perf suite={0} exit={1} duration_seconds={2:F3}" -f `
