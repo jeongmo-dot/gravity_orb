@@ -40,7 +40,7 @@
 
 ### [2026-10-08] 대상 #42 — 장기 Jolt 테스트 프로세스 격리
 - 상태: 완료
-- 브랜치 / PR: `m8-jolt-test-isolation` / 미생성
+- 브랜치 / PR: `m8-jolt-test-isolation` / https://github.com/jeongmo-dot/gravity_orb/pull/43
 - 변경 파일: `tests/run_tests.gd`, `tests/run_tests.ps1`, `tests/scenarios/test_orb_symbols.gd` → `tests/test_orb_symbols.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `run_tests.gd`에 `--test-suite=general|long`을 추가. 장기 묶음은 2D 22시드 중력 순환과 3D 22시드·20턴·시드 101 120턴의 생성 순서 민감 메서드 4개, 일반 묶음은 나머지 203개로 분리
