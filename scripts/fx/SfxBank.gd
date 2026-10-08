@@ -15,6 +15,10 @@ signal play_called(
 const SAMPLE_RATE: int = 44100
 const POP_DURATION: float = 0.045
 const BLAST_DURATION: float = 0.460
+const CHIME_DURATION: float = 0.340
+const FEVER_SWEEP_DURATION: float = 0.400
+const TIMER_TICK_DURATION: float = 0.060
+const TIME_UP_DURATION: float = 0.520
 const VOICE_COUNT: int = 12
 const SFX_BUS: StringName = &"SFX"
 const POP_ASSET_PATHS: Array[String] = [
@@ -24,6 +28,26 @@ const POP_ASSET_PATHS: Array[String] = [
 const BLAST_ASSET_PATHS: Array[String] = [
 	"res://assets/sfx/blast.wav",
 	"res://assets/sfx/blast.ogg",
+]
+const CALLOUT_ASSET_PATHS: Array[String] = [
+	"res://assets/sfx/callout.wav",
+	"res://assets/sfx/callout.ogg",
+]
+const FEVER_START_ASSET_PATHS: Array[String] = [
+	"res://assets/sfx/fever_start.wav",
+	"res://assets/sfx/fever_start.ogg",
+]
+const FEVER_END_ASSET_PATHS: Array[String] = [
+	"res://assets/sfx/fever_end.wav",
+	"res://assets/sfx/fever_end.ogg",
+]
+const TIMER_TICK_ASSET_PATHS: Array[String] = [
+	"res://assets/sfx/timer_tick.wav",
+	"res://assets/sfx/timer_tick.ogg",
+]
+const TIME_UP_ASSET_PATHS: Array[String] = [
+	"res://assets/sfx/time_up.wav",
+	"res://assets/sfx/time_up.ogg",
 ]
 const BLAST_POP_OFFSETS: Array[float] = [
 	0.000,
@@ -49,6 +73,11 @@ const BLAST_POP_PITCHES: Array[float] = [
 
 var _pop_stream: AudioStream
 var _blast_stream: AudioStream
+var _callout_stream: AudioStream
+var _fever_start_stream: AudioStream
+var _fever_end_stream: AudioStream
+var _timer_tick_stream: AudioStream
+var _time_up_stream: AudioStream
 var _voices: Array[AudioStreamPlayer] = []
 var _next_voice: int = 0
 var _muted: bool = false
@@ -64,6 +93,21 @@ func _ready() -> void:
 	_blast_stream = _load_first(BLAST_ASSET_PATHS)
 	if _blast_stream == null:
 		_blast_stream = _synthesize_blast()
+	_callout_stream = _load_first(CALLOUT_ASSET_PATHS)
+	if _callout_stream == null:
+		_callout_stream = _synthesize_callout_chime()
+	_fever_start_stream = _load_first(FEVER_START_ASSET_PATHS)
+	if _fever_start_stream == null:
+		_fever_start_stream = _synthesize_fever_sweep(true)
+	_fever_end_stream = _load_first(FEVER_END_ASSET_PATHS)
+	if _fever_end_stream == null:
+		_fever_end_stream = _synthesize_fever_sweep(false)
+	_timer_tick_stream = _load_first(TIMER_TICK_ASSET_PATHS)
+	if _timer_tick_stream == null:
+		_timer_tick_stream = _synthesize_timer_tick()
+	_time_up_stream = _load_first(TIME_UP_ASSET_PATHS)
+	if _time_up_stream == null:
+		_time_up_stream = _synthesize_time_up_buzzer()
 	for voice_index: int in range(VOICE_COUNT):
 		var voice: AudioStreamPlayer = AudioStreamPlayer.new()
 		voice.name = "Voice%d" % voice_index
@@ -77,6 +121,18 @@ func _ready() -> void:
 func _exit_tree() -> void:
 	if InputRouter.debug_toggle_sfx_mute.is_connected(toggle_mute):
 		InputRouter.debug_toggle_sfx_mute.disconnect(toggle_mute)
+	for voice: AudioStreamPlayer in _voices:
+		voice.stop()
+		voice.stream = null
+	_voices.clear()
+	_last_voice = null
+	_pop_stream = null
+	_blast_stream = null
+	_callout_stream = null
+	_fever_start_stream = null
+	_fever_end_stream = null
+	_timer_tick_stream = null
+	_time_up_stream = null
 
 
 func play_merge(
@@ -123,6 +179,47 @@ func play_blast(
 		reaction_physics_frame,
 		reaction_process_frame
 	)
+
+
+func play_callout_chime(stage_index: int) -> void:
+	if not Config.data.sfx_enabled:
+		return
+	var pitch: float = pow(2.0, float(maxi(stage_index, 0) * 2) / 12.0)
+	_play(_callout_stream, pitch, Config.data.sfx_volume_db, "callout", 0, -1, -1)
+
+
+func play_fever_sweep(starting: bool) -> void:
+	if not Config.data.sfx_enabled:
+		return
+	_play(
+		_fever_start_stream if starting else _fever_end_stream,
+		1.0,
+		Config.data.sfx_volume_db,
+		"fever_start" if starting else "fever_end",
+		0,
+		-1,
+		-1
+	)
+
+
+func play_timer_tick(urgent: bool) -> void:
+	if not Config.data.sfx_enabled:
+		return
+	_play(
+		_timer_tick_stream,
+		1.28 if urgent else 1.0,
+		Config.data.sfx_volume_db + (3.0 if urgent else 0.0),
+		"timer_tick_urgent" if urgent else "timer_tick",
+		0,
+		-1,
+		-1
+	)
+
+
+func play_time_up_buzzer() -> void:
+	if not Config.data.sfx_enabled:
+		return
+	_play(_time_up_stream, 1.0, Config.data.sfx_volume_db + 2.0, "time_up", 0, -1, -1)
 
 
 func merge_pitch(result_level: int, chain: int, stable_spawn_id: int) -> float:
@@ -287,6 +384,82 @@ func _synthesize_blast() -> AudioStreamWAV:
 			* 0.44
 		)
 		samples[index] = clampf(value, -1.0, 1.0)
+	return _make_wav(samples)
+
+
+func _synthesize_callout_chime() -> AudioStreamWAV:
+	var sample_count: int = ceili(CHIME_DURATION * float(SAMPLE_RATE))
+	var samples: PackedFloat32Array = PackedFloat32Array()
+	samples.resize(sample_count)
+	var note_offsets: Array[float] = [0.0, 0.075, 0.150]
+	var note_ratios: Array[float] = [1.0, 1.259921, 1.498307]
+	for index: int in range(sample_count):
+		var time: float = float(index) / float(SAMPLE_RATE)
+		var value: float = 0.0
+		for note_index: int in range(note_offsets.size()):
+			var note_time: float = time - note_offsets[note_index]
+			if note_time < 0.0 or note_time >= 0.19:
+				continue
+			var attack: float = minf(note_time / 0.008, 1.0)
+			var envelope: float = attack * exp(-note_time / 0.085)
+			var frequency: float = 523.25 * note_ratios[note_index]
+			value += (
+				sin(TAU * frequency * note_time)
+				+ 0.24 * sin(TAU * frequency * 2.0 * note_time)
+			) * envelope * 0.42
+		samples[index] = clampf(value, -1.0, 1.0)
+	return _make_wav(samples)
+
+
+func _synthesize_fever_sweep(rising: bool) -> AudioStreamWAV:
+	var sample_count: int = ceili(FEVER_SWEEP_DURATION * float(SAMPLE_RATE))
+	var samples: PackedFloat32Array = PackedFloat32Array()
+	samples.resize(sample_count)
+	var phase: float = 0.0
+	for index: int in range(sample_count):
+		var time: float = float(index) / float(SAMPLE_RATE)
+		var progress: float = time / FEVER_SWEEP_DURATION
+		var shaped: float = progress * progress * (3.0 - 2.0 * progress)
+		var frequency: float = (
+			lerpf(220.0, 960.0, shaped)
+			if rising
+			else lerpf(720.0, 150.0, shaped)
+		)
+		phase += TAU * frequency / float(SAMPLE_RATE)
+		var envelope: float = sin(PI * progress)
+		var shimmer: float = _high_pass_noise(index + (1709 if rising else 2909)) * 0.12
+		samples[index] = clampf((sin(phase) * 0.58 + shimmer) * envelope, -1.0, 1.0)
+	return _make_wav(samples)
+
+
+func _synthesize_timer_tick() -> AudioStreamWAV:
+	var sample_count: int = ceili(TIMER_TICK_DURATION * float(SAMPLE_RATE))
+	var samples: PackedFloat32Array = PackedFloat32Array()
+	samples.resize(sample_count)
+	for index: int in range(sample_count):
+		var time: float = float(index) / float(SAMPLE_RATE)
+		var attack: float = minf(time / 0.0015, 1.0)
+		var envelope: float = attack * exp(-time / 0.014)
+		var value: float = (
+			sin(TAU * 920.0 * time)
+			+ 0.62 * sin(TAU * 1380.0 * time)
+		) * envelope * 0.56
+		samples[index] = clampf(value, -1.0, 1.0)
+	return _make_wav(samples)
+
+
+func _synthesize_time_up_buzzer() -> AudioStreamWAV:
+	var sample_count: int = ceili(TIME_UP_DURATION * float(SAMPLE_RATE))
+	var samples: PackedFloat32Array = PackedFloat32Array()
+	samples.resize(sample_count)
+	for index: int in range(sample_count):
+		var time: float = float(index) / float(SAMPLE_RATE)
+		var progress: float = time / TIME_UP_DURATION
+		var attack: float = minf(time / 0.008, 1.0)
+		var envelope: float = attack * (1.0 - smoothstep(0.72, 1.0, progress))
+		var pulse: float = 1.0 if sin(TAU * 110.0 * time) >= 0.0 else -1.0
+		var wobble: float = sin(TAU * 7.0 * time) * 0.16
+		samples[index] = clampf((pulse * 0.55 + wobble) * envelope, -1.0, 1.0)
 	return _make_wav(samples)
 
 

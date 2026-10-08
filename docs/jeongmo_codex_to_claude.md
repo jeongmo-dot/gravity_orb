@@ -38,6 +38,41 @@
 
 ## 미확인
 
+### [2026-10-08] 대상 #47 — M8 연출: 콤보 호령 + 피버·타이머 강화
+- 상태: 완료
+- 브랜치 / PR: `m8-callouts-fever-timer` / 미생성
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scenes/UI.tscn`, `scripts/fx/SfxBank.gd`, `scripts/ui/{Hud.gd,ScorePopup.gd}`, `tests/{run_tests.gd,test_callouts.gd,test_config.gd,test_score_popups.gd}`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 턴제 콤보 `3/5/8/12`와 BLITZ 체인 `5/10/15/20/30`에 `NICE!/GREAT!/AMAZING!/INCREDIBLE!/UNSTOPPABLE!`를 0.12초 팝·총 0.8초로 표시. 같은 턴/체인의 단계는 1회만, 콤보 0 이후 같은 단계 재호령 — `test_turn_and_blitz_callout_stages_fire_once_per_chain`
+  - [x] 피버 시작 시 `FEVER ×2` 띠가 오른쪽에서 0.3초에 진입하고 따뜻한 주황 가장자리 비네트가 2Hz로 맥동. 피버 갱신은 노드·시작음을 중복 생성하지 않고, 종료 시 0.3초 페이드 — `test_fever_vignette_only_lives_during_fever_and_uses_reusable_nodes`
+  - [x] BLITZ 남은 시간 10초부터 `10..1`을 각각 정확히 1회 기록해 타이머 펀치·똑딱을 실행하고, `3/2/1`은 1.32배 펀치와 더 높은 피치·+3dB 음을 사용 — `test_blitz_timer_ticks_exactly_ten_times_with_urgent_last_three`, `test_new_sounds_share_sfx_mute_and_raise_callout_pitch`
+  - [x] `finale_started` 동기 신호에서 버저와 큰 `TIME UP!`을 표시해 첫 피날레 폭발보다 앞서 시작. 시간 보너스 신호를 바로 다음 점수 반응 위치와 결합해 `+1s/+3s`가 0.5초 동안 타이머로 이동하고 도착 시 초록으로 번쩍 — `test_time_bonus_flies_to_timer_flashes_green_and_time_up_cleans`
+  - [x] 차임·피버 상승/하강 스윕·우드블록 똑딱·버저를 `SfxBank`에서 코드 합성하고 동일한 `SFX` 버스·저장 음소거를 공유. 동일 이름 외부 wav/ogg가 있으면 기존 규칙대로 우선 로드 — `test_new_sounds_share_sfx_mute_and_raise_callout_pitch`
+  - [x] `fx_callouts_enabled=true` 추가. false이면 호령·피버·타이머·보너스·종료 연출과 새 소리가 모두 발생하지 않으며, 켬/끔 TURN 20단계·BLITZ 20단계 보드/관리자 상태 해시 동일 — `test_callout_toggle_hides_all_effects_and_preserves_state_hashes`
+  - [x] 새 화면 노드는 씬에 1세트만 두고 매 연출에서 트윈 후 숨겨 재사용. 호령 0.8초, 보너스 0.8초, TIME UP 0.95초, 피버 종료 0.3초로 모두 1.5초 안에 비활성화 — 전용 테스트의 인스턴스 ID·가시성 검사
+  - [x] #45 검수 덧붙임: 같은 프레임·40px 이내에서 점수 팝업이 합쳐지는 순간 계산식 텍스트와 가시성을 제거하고, 단일 팝업은 기존 조건대로 유지 — `test_popup_capacity_evicts_oldest_and_same_frame_nearby_scores_merge`
+  - [x] 전체 래퍼, import, 시작 화면·TURN·BLITZ 스모크에서 `SCRIPT ERROR`·`Parse Error` 0건
+- QA 관측값:
+  - Godot `4.8-dev3` `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0
+  - `tests/run_tests.ps1` (`--fixed-fps 120`) → 일반 `224/224` 14.877초, 장기 `4/4` 24.185초, 성능 `4/4` 1.290초, 총 `232/232`, 최종 종료 코드 0, 합계 40.352초
+  - #47 전용 테스트 → 헤드리스·창 모드 각각 `7/7`, 종료 코드 0. #45 팝업 후속 전용 테스트 `10/10`, 종료 코드 0
+  - 호령+피버+타이머 동시 활성·400표본 부담 → 헤드리스 p50/p95 `1/1µs`; 창 모드 OpenGL 3.3, RTX 4070 Ti SUPER에서 `1/1µs`
+  - 시작 화면 / `--mode=turn` / `--mode=blitz` 300프레임 스모크 → 모두 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0
+  - 전용 테스트에서 발견한 공유 `game_mode` 오염을 복원한 뒤 일반 회귀를 재실행해 `224/224`; 별도 Jolt 3D 파일 `9/9`
+- 수동 확인 절차:
+  1. TURN에서 한 턴에 합체를 3·5·8·12회까지 이어간다 → 화면 중앙 호령이 단계마다 한 번만 0.12초 튀어나오고 차임이 단계별로 높아지는지 확인한다. 다음 스와이프 뒤 콤보 3에서 `NICE!`가 다시 나와야 한다.
+  2. BLITZ에서 체인 5·10·15·20·30을 만든다 → 각 단계 호령과 30의 `UNSTOPPABLE!`을 확인하고, 체인이 끊긴 뒤 같은 단계가 다시 나오는지 확인한다.
+  3. BLITZ 체인 6으로 피버를 시작한다 → `FEVER ×2` 띠가 오른쪽에서 들어오고 가장자리만 주황색으로 2Hz 맥동하며 배경이 살짝 따뜻해지는지 확인한다. 피버 종료 시 0.3초 페이드와 하강 스윕을 확인한다.
+  4. BLITZ 타이머 10초부터 관찰한다 → 10~1초에 각각 한 번만 펀치·똑딱이 나고 3초부터 더 크고 높은 음인지, 0초에 버저와 큰 `TIME UP!`이 첫 피날레 폭발 전에 보이는지 확인한다.
+  5. 일반 대폭발과 MAX_CLEAR를 만든다 → 반응 위치의 `+1s`/`+3s`가 타이머로 날아가 닿을 때 타이머가 초록으로 번쩍이는지 확인한다. HUD 소리 버튼과 M 키로 모든 새 소리가 함께 음소거되는지 확인한다.
+  6. 같은 프레임·가까운 위치에서 두 반응을 만든다 → 합계 팝업에는 계산식이 없고, 떨어진 단일 큰 배수 팝업에는 기존 계산식이 남는지 확인한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 호령 차임은 C5 장3화음(C5/E5/G5)을 75ms 간격으로 합성하고 단계마다 +2반음, 피버 스윕은 0.4초 선형 주파수 스윕, 똑딱은 920/1380Hz 감쇠음, 버저는 110Hz 사각파 계열로 합성했다. 외부 에셋 경로는 `assets/sfx/{callout,fever_start,fever_end,timer_tick,time_up}.{wav,ogg}`다.
+  - 시간 보너스 공개 신호 시그니처는 바꾸지 않았다. `time_bonus_awarded`를 HUD 내부 대기열에 보관하고 동기적으로 뒤따르는 BLAST/MAX_CLEAR `reaction_scored`의 위치를 결합한다.
+  - 비네트 셰이더 알파는 중앙 0.035, 가장자리 최대 0.255로 두고 UI 글자보다 뒤에서 렌더링한다. 호령·띠·종료 문구는 1080×1920 기준 화면 중앙에 배치했다.
+  - Godot 4.8-dev3의 headless Dummy 오디오에서 재생 중 `AudioStreamPlaybackWAV` 종료 누수 경고가 남는다. 기존 `test_feedback.gd` 단독 실행에서도 같은 경고(25개)가 재현됐으며, 새 `SfxBank._exit_tree()`는 보이스 stop·stream 해제를 수행한다. 테스트 종료 코드와 게임 스모크에는 영향 없음.
+- 남은 것 · 질문: 실제 플레이에서 호령/피버가 점수 팝업과 겹칠 때 가독성, 합성음 체감 음량, 2Hz 비네트 강도는 위 수동 절차 확인 필요. 자동 검증 기준의 남은 항목은 없음.
+
 ### [2026-10-08] 대상 #46 — M8 연출: 색별 합체 효과 시각화
 - 상태: 완료
 - 브랜치 / PR: `m8-color-effect-visuals` / 미생성

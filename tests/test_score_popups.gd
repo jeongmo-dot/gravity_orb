@@ -52,10 +52,26 @@ func test_popup_capacity_evicts_oldest_and_same_frame_nearby_scores_merge() -> v
 
 	main = await _create_main(GameConfig.GameMode.TURN)
 	hud = main.get_node("UI/Hud") as Hud
-	hud._on_reaction_scored(_display_reaction(Vector2.ZERO, 100))
-	hud._on_reaction_scored(_display_reaction(Vector2(30.0, 0.0), 60))
+	var formula_reaction: Dictionary = _display_reaction(Vector2.ZERO, 100)
+	formula_reaction["base_points"] = 25
+	formula_reaction["combo_multiplier"] = 4.0
+	hud._on_reaction_scored(formula_reaction)
+	assert_eq(
+		hud.active_score_popups()[0].formula_text(),
+		"25 ×4",
+		"single popup keeps its calculation"
+	)
+	var merged_reaction: Dictionary = _display_reaction(Vector2(30.0, 0.0), 60)
+	merged_reaction["base_points"] = 15
+	merged_reaction["combo_multiplier"] = 4.0
+	hud._on_reaction_scored(merged_reaction)
 	assert_eq(hud.active_score_popup_count(), 1, "same-frame reactions within 40 px merge")
 	assert_eq(hud.active_score_popups()[0].score_text(), "+160", "merged popup sums scores")
+	assert_eq(
+		hud.active_score_popups()[0].formula_text(),
+		"",
+		"merged popup hides the first reaction calculation"
+	)
 	await _destroy_main(main)
 	Config.data.fx_score_popups_enabled = original_enabled
 	Config.data.fx_popup_max = original_max

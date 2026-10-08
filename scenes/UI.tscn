@@ -137,6 +137,70 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
+[node name="FeverVignette" type="ColorRect" parent="Hud"]
+unique_name_in_owner = true
+visible = false
+z_index = -10
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(1, 1, 1, 1)
+
+[node name="FeverBand" type="ColorRect" parent="Hud"]
+unique_name_in_owner = true
+visible = false
+z_index = 18
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 880.0
+offset_bottom = 1040.0
+grow_horizontal = 2
+mouse_filter = 2
+color = Color(0.84, 0.24, 0.015, 0.88)
+
+[node name="CalloutLabel" type="Label" parent="Hud"]
+unique_name_in_owner = true
+visible = false
+z_index = 30
+layout_mode = 0
+offset_left = 40.0
+offset_top = 840.0
+offset_right = 1040.0
+offset_bottom = 1040.0
+pivot_offset = Vector2(500, 100)
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.835294, 0.227451, 1)
+theme_override_colors/font_outline_color = Color(0.08, 0.02, 0, 0.95)
+theme_override_constants/outline_size = 12
+theme_override_font_sizes/font_size = 96
+text = "AMAZING!"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="TimeUpLabel" type="Label" parent="Hud"]
+unique_name_in_owner = true
+visible = false
+z_index = 31
+layout_mode = 0
+offset_left = 40.0
+offset_top = 830.0
+offset_right = 1040.0
+offset_bottom = 1090.0
+pivot_offset = Vector2(500, 130)
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.231373, 0.188235, 1)
+theme_override_colors/font_outline_color = Color(0.08, 0.02, 0, 0.95)
+theme_override_constants/outline_size = 14
+theme_override_font_sizes/font_size = 112
+text = "TIME UP!"
+horizontal_alignment = 1
+vertical_alignment = 1
+
 [node name="TimerLabel" type="Label" parent="Hud"]
 unique_name_in_owner = true
 visible = false
@@ -145,6 +209,7 @@ offset_left = 390.0
 offset_top = 360.0
 offset_right = 770.0
 offset_bottom = 470.0
+pivot_offset = Vector2(190, 55)
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 72
@@ -154,20 +219,26 @@ horizontal_alignment = 1
 [node name="FeverLabel" type="Label" parent="Hud"]
 unique_name_in_owner = true
 visible = false
+z_index = 19
 layout_mode = 0
-offset_left = 330.0
-offset_top = 480.0
-offset_right = 830.0
-offset_bottom = 550.0
+offset_left = 140.0
+offset_top = 900.0
+offset_right = 940.0
+offset_bottom = 1020.0
+pivot_offset = Vector2(400, 60)
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 0.623529, 0.0392157, 1)
-theme_override_font_sizes/font_size = 40
+theme_override_colors/font_outline_color = Color(0.08, 0.02, 0, 0.95)
+theme_override_constants/outline_size = 8
+theme_override_font_sizes/font_size = 58
 text = "FEVER x2  6.0s"
 horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="BonusLabel" type="Label" parent="Hud"]
 unique_name_in_owner = true
 visible = false
+z_index = 25
 layout_mode = 0
 offset_left = 330.0
 offset_top = 560.0

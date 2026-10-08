@@ -277,6 +277,7 @@ func test_m8_feedback_defaults() -> void:
 	assert_true(config.fx_score_popups_enabled, "score popups enabled")
 	assert_eq(config.fx_popup_max, 16, "score popup capacity")
 	assert_true(config.fx_color_effect_visuals_enabled, "color effect visuals enabled")
+	assert_true(config.fx_callouts_enabled, "callouts enabled")
 	assert_true(config.sfx_enabled, "SFX enabled")
 	assert_near(config.sfx_volume_db, 0.0, TOLERANCE, "SFX volume")
 	assert_eq(config.sfx_chain_semitones_max, 12, "chain pitch cap")
