@@ -40,7 +40,7 @@
 
 ### [2026-10-08] 대상 #48 — M8 연출: 중력 전환 손맛 강화
 - 상태: 완료
-- 브랜치 / PR: `m8-gravity-switch-polish` / 미생성
+- 브랜치 / PR: `m8-gravity-switch-polish` / https://github.com/jeongmo-dot/gravity_orb/pull/49
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/fx/{FeedbackDirector.gd,SfxBank.gd,SwipeTrail.gd}`, `scripts/platform/Haptics.gd`, `scripts/spike/{Board3D.gd,Orb3D.gd}`, `tests/{run_tests.gd,test_config.gd,test_gravity_switch_feedback.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 수락된 스와이프마다 보드 시각 프레임을 최대 6°까지 기울이고 총 0.3초에 BACK 탄성으로 원점 복귀. 진행 중 다음 스와이프는 현재 각도에서 이어져 호출 순간 각도 점프 0° — `test_tilt_reaches_six_degrees_returns_by_point_three_and_continues_smoothly`
