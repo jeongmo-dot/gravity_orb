@@ -750,7 +750,8 @@ godot --headless --path . --quit-after 300 -- --mode=turn
 godot --headless --path . --quit-after 300 -- --mode=blitz
 ```
 
-- 한 번에 돌리는 래퍼: `.\tests\run_tests.ps1` (일반 → 장기를 별도 프로세스로, 하나라도 실패하면 종료 코드 1). #43에서 `--fixed-fps` 지원을 넣기 전에는 실시간이라 약 31분 걸린다
+- **권장: 래퍼 한 번** `.\tests\run_tests.ps1` — 일반·장기·성능(`--test-suite=perf`, 200구체 근접 검사 예열 후 3회 중 최선 p95 < 1ms) 세 묶음을 각각 새 프로세스로, 기본 `--fixed-fps 120` (약 40초). `-FixedFps 0`이면 실시간. 하나라도 실패하면 종료 코드 1
+- Windows PowerShell 5.1 주의 (#44 전까지): 래퍼 출력을 PowerShell 안에서 `*>`·`2>&1`·`Tee-Object`로 받으면 Godot 경고(stderr)가 오류로 바뀌어 래퍼가 멈춘다. 콘솔에서 그대로 실행하거나 바깥 셸에서 `powershell -File tests/run_tests.ps1 > log 2>&1`로 받는다
 - 인자 없는 `-s res://tests/run_tests.gd`는 호환용(한 프로세스, 장기 → 일반 순서)으로 남아 있다
 
 `godot` 실행 파일 경로는 환경마다 다르다. `GODOT` 환경변수가 있으면 그것을 쓴다.
