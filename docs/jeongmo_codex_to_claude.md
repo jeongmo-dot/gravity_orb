@@ -40,7 +40,7 @@
 
 ### [2026-10-08] 대상 #43 — 테스트 래퍼 고정 FPS + 흔들리는 성능 테스트 정리
 - 상태: 완료
-- 브랜치 / PR: `m8-test-wrapper-fixed-fps` / 미생성
+- 브랜치 / PR: `m8-test-wrapper-fixed-fps` / https://github.com/jeongmo-dot/gravity_orb/pull/44
 - 변경 파일: `tests/run_tests.gd`, `tests/run_tests.ps1`, `tests/scenarios/test_reaction_latency.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `tests/run_tests.ps1`에 `-FixedFps`(기본 `120`, `0`이면 인자 생략·실시간)를 추가하고 일반·장기·성능 세 자식 프로세스 모두 같은 설정으로 실행
