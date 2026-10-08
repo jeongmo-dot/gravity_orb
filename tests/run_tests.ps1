@@ -1,7 +1,10 @@
 param(
     [string]$GodotPath = "",
+    [ValidateRange(0, [int]::MaxValue)]
+    [int]$FixedFps = 120,
     [string]$GeneralSuite = "general",
-    [string]$LongSuite = "long"
+    [string]$LongSuite = "long",
+    [string]$PerfSuite = "perf"
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,13 +19,18 @@ if ([string]::IsNullOrWhiteSpace($GodotPath)) {
     }
 }
 
+$godotArguments = @("--headless")
+if ($FixedFps -gt 0) {
+    $godotArguments += @("--fixed-fps", $FixedFps.ToString())
+}
+$godotArguments += @(
+    "--path", $repoPath,
+    "-s", "res://tests/run_tests.gd"
+)
+Write-Output ("TEST_WRAPPER_START fixed_fps={0}" -f $FixedFps)
+
 $generalStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-& $GodotPath `
-    --headless `
-    --path $repoPath `
-    -s res://tests/run_tests.gd `
-    -- `
-    "--test-suite=$GeneralSuite"
+& $GodotPath @godotArguments -- "--test-suite=$GeneralSuite"
 $generalExit = $LASTEXITCODE
 $generalStopwatch.Stop()
 Write-Output (
@@ -33,12 +41,7 @@ Write-Output (
 )
 
 $longStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-& $GodotPath `
-    --headless `
-    --path $repoPath `
-    -s res://tests/run_tests.gd `
-    -- `
-    "--test-suite=$LongSuite"
+& $GodotPath @godotArguments -- "--test-suite=$LongSuite"
 $longExit = $LASTEXITCODE
 $longStopwatch.Stop()
 Write-Output (
@@ -48,12 +51,31 @@ Write-Output (
         $longStopwatch.Elapsed.TotalSeconds
 )
 
-$wrapperExit = if ($generalExit -eq 0 -and $longExit -eq 0) { 0 } else { 1 }
+$perfStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+& $GodotPath @godotArguments -- "--test-suite=$PerfSuite"
+$perfExit = $LASTEXITCODE
+$perfStopwatch.Stop()
 Write-Output (
-    "TEST_WRAPPER_RESULT general_exit={0} long_exit={1} exit={2} total_seconds={3:F3}" -f `
+    "TEST_SUITE_RESULT name=perf suite={0} exit={1} duration_seconds={2:F3}" -f `
+        $PerfSuite,
+        $perfExit,
+        $perfStopwatch.Elapsed.TotalSeconds
+)
+
+$wrapperExit = if (
+    $generalExit -eq 0 -and $longExit -eq 0 -and $perfExit -eq 0
+) { 0 } else { 1 }
+Write-Output (
+    "TEST_WRAPPER_RESULT fixed_fps={0} general_exit={1} long_exit={2} perf_exit={3} exit={4} total_seconds={5:F3}" -f `
+        $FixedFps,
         $generalExit,
         $longExit,
+        $perfExit,
         $wrapperExit,
-        ($generalStopwatch.Elapsed.TotalSeconds + $longStopwatch.Elapsed.TotalSeconds)
+        (
+            $generalStopwatch.Elapsed.TotalSeconds +
+            $longStopwatch.Elapsed.TotalSeconds +
+            $perfStopwatch.Elapsed.TotalSeconds
+        )
 )
 exit $wrapperExit

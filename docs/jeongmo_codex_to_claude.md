@@ -38,6 +38,43 @@
 
 ## 미확인
 
+### [2026-10-08] 대상 #43 — 테스트 래퍼 고정 FPS + 흔들리는 성능 테스트 정리
+- 상태: 완료
+- 브랜치 / PR: `m8-test-wrapper-fixed-fps` / https://github.com/jeongmo-dot/gravity_orb/pull/44
+- 변경 파일: `tests/run_tests.gd`, `tests/run_tests.ps1`, `tests/scenarios/test_reaction_latency.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `tests/run_tests.ps1`에 `-FixedFps`(기본 `120`, `0`이면 인자 생략·실시간)를 추가하고 일반·장기·성능 세 자식 프로세스 모두 같은 설정으로 실행
+  - [x] `--test-suite=perf`를 추가해 200구체 근접 검사 성능 메서드 1개를 일반 묶음에서 제외. 최종 분리는 일반 `202`, 장기 `4`, 성능 `1`로 전체 `207`개 유지
+  - [x] 성능 판정을 5회 예열 뒤 3회 × 40표본의 p95 중 최선값 `< 1ms`로 변경. 기본 래퍼 관측은 `[633, 672, 829]µs`, 최선 `633µs`로 통과
+  - [x] 기본 래퍼 전체 통과: 일반 `202/202` 11.003초, 장기 `4/4` 24.012초, 성능 `1/1` 0.641초, 합계 `207/207` 35.656초, 최종 종료 코드 0
+  - [x] 성능 자식 실패 전파 프로브: `-FixedFps 0 -GeneralSuite perf -LongSuite perf -PerfSuite invalid`에서 일반/장기 자식 `0/0`, 성능 자식 `1`, 래퍼 최종 `1`. `FixedFps=0` 경로도 별도 확인
+  - [x] 인자 없는 호환 실행도 장기→일반→성능 순서로 총 `207/207`, 종료 코드 0 유지
+  - [x] 제품 코드·게임 규칙·물리 수치·성능 외 기존 판정 기준은 변경하지 않음
+- 고정 FPS와 실시간 장기 묶음 비교:
+  - #42 실시간 래퍼(장기 1,622.289초): 2D 22시드 이탈/발산 `0/0`, 최대 침투 `7.441px`, 최대 속도 `1662.688px/s`; 3D 22시드 이탈/발산 `0/0`, wall/pair `12.9515/14.4729px`
+  - #43 `--fixed-fps 120`(장기 24.012초): 위 이탈·발산·침투·속도·wall/pair 수치가 모두 정확히 일치. 장기 묶음 벽시계 소요는 약 67.6배 단축
+- `test_turn_time.gd` 재확인:
+  - 깨끗한 `--fixed-fps 120` 프로세스 2회 결과는 완전히 일치: 시드별 점수 `[132, 76, 68, 172, 92, 108]`, 최대 침투 `10.430px`, 최대 속도 `1074.580px/s`, wall recovery `0`, ghost timeout `1`
+  - 일반 묶음 안에서는 점수 `[148, 96, 72, 152, 84, 80]`, 최대 침투 `15.340px`, 최대 속도 `1329.973px/s`, wall recovery `1`, ghost timeout `2`로 달랐다. 따라서 #42의 “깨끗한 프로세스끼리도 다름” 판단은 고정 FPS 조건에서는 재현되지 않았고, 차이는 벽시계가 아니라 같은 프로세스에서 앞선 물리 테스트가 바꾼 바디/RID 생성 순서에 따른 물리 접촉 순서 영향으로 관측된다. `TurnManager`와 이 테스트는 물리 `delta`·physics frame만 사용하며 벽시계 API는 사용하지 않는다. 지시대로 제품 코드나 이 테스트의 기능 판정은 고치지 않음
+- 새 실행 명령:
+
+```powershell
+# 기본: 세 묶음을 각각 새 프로세스, --fixed-fps 120
+.\tests\run_tests.ps1
+# 필요할 때만 실시간 실행
+.\tests\run_tests.ps1 -FixedFps 0
+```
+
+- QA 관측값:
+  - Godot `4.8-dev3` `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0
+  - 기본 래퍼 → `202/202 + 4/4 + 1/1 = 207/207`, 종료 코드 0, 총 35.656초
+  - 인자 없는 `run_tests.gd` 호환 실행(`--fixed-fps 120`) → `207/207`, 종료 코드 0
+  - 시작 화면 / `--mode=turn` / `--mode=blitz` 300프레임 스모크 → 모두 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0
+  - PowerShell parser·`git diff --check` → 오류 0. 규칙 점검 → `Input`/`InputEvent`는 `InputRouter.gd`만, 난수 호출은 `Spawner.gd`만
+- 수동 확인 절차: 테스트 실행 구조와 판정 방법만 변경한 항목이며 모든 완료 조건을 헤드리스 실행·종료 코드·관측 로그로 자동 검증해 별도 수동 확인 없음
+- 문서에 없던 결정 사항: 인자 없는 호환 경로는 전체 테스트 수 보존을 위해 `long → general → perf` 순서로 세 묶음을 같은 프로세스에서 실행한다. 프로세스 격리를 보장하는 권장 경로는 래퍼다.
+- 남은 것 · 질문: 없음
+
 ### [2026-10-08] 대상 #42 — 장기 Jolt 테스트 프로세스 격리
 - 상태: 완료
 - 브랜치 / PR: `m8-jolt-test-isolation` / https://github.com/jeongmo-dot/gravity_orb/pull/43
