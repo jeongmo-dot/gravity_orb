@@ -39,6 +39,9 @@ const LONG_TEST_METHODS: Dictionary = {
 	],
 }
 const PERF_TEST_METHODS: Dictionary = {
+	"res://tests/test_score_popups.gd": [
+		"test_score_popup_frame_cost_report",
+	],
 	"res://tests/scenarios/test_reaction_latency.gd": [
 		"test_two_hundred_orb_proximity_scan_p95_is_below_one_millisecond",
 	],

@@ -385,6 +385,7 @@ func test_main_selects_blitz_manager_and_shows_time_up_results() -> void:
 	var timer_label: Label = main.get_node("UI/Hud/TimerLabel") as Label
 	var max_chain_label: Label = main.get_node("UI/Hud/MaxComboLabel") as Label
 	var chain_label: Label = main.get_node("UI/Hud/ComboLabel") as Label
+	var multiplier_label: Label = main.get_node("UI/Hud/MultiplierLabel") as Label
 	var blocked_label: Label = main.get_node("UI/Hud/BlockedLabel") as Label
 	var hud: Hud = main.get_node("UI/Hud") as Hud
 	assert_true(timer_label.visible, "blitz timer is visible")
@@ -423,7 +424,8 @@ func test_main_selects_blitz_manager_and_shows_time_up_results() -> void:
 	assert_eq(manager.state, BlitzManager.State.RUNNING, "main starts blitz after ready")
 	manager.on_swipe(Vector2i.RIGHT)
 	manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 2))
-	assert_eq(chain_label.text, "CHAIN 1 (x1.25)", "blitz HUD uses chain label")
+	assert_eq(chain_label.text, "CHAIN 1", "blitz HUD uses chain label")
+	assert_eq(multiplier_label.text, "×1.25", "blitz HUD uses large multiplier")
 	manager._finish_game()
 	await tree.process_frame
 	var panel: GameOverPanel = main.get_node("UI/Hud/GameOverPanel") as GameOverPanel

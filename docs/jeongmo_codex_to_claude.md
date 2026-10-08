@@ -38,6 +38,37 @@
 
 ## 미확인
 
+### [2026-10-08] 대상 #45 — M8 연출: 점수 팝업 + 배수 크게
+- 상태: 완료
+- 브랜치 / PR: `m8-score-popups` / https://github.com/jeongmo-dot/gravity_orb/pull/46
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scenes/UI.tscn`, `scripts/ui/{Hud.gd,ScorePopup.gd}`, `tests/{run_tests.gd,test_blitz_manager.gd,test_config.gd,test_score_popups.gd}`, `tests/scenarios/test_score_flow.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 점수가 붙은 반응마다 2D 캔버스 변환 / 3D `Camera3D.unproject_position()`으로 반응 위치에 `+점수` 팝업을 표시. 명세의 로그 글자 크기, 반응 종류별 색·금색 테두리, 0.12초 스케일, 60px 상승·페이드, 1,000점 이상 0.2초 연장·흔들림을 구현 — `test_each_scored_reaction_shows_matching_popup_and_conditional_formula`, `test_popup_colors_follow_merge_blast_and_finale_rules`, `test_3d_reaction_position_is_unprojected_to_popup_anchor`
+  - [x] 콤보 ×4 이상 또는 위험 ×2 이상에서 계산식 줄을 표시하고, 같은 process frame의 40px 이내 반응은 점수를 합침. 동시 활성 16개에서 17번째는 가장 오래된 내용을 제거하고 같은 노드를 즉시 재사용 — `test_each_scored_reaction_shows_matching_popup_and_conditional_formula`, `test_popup_capacity_evicts_oldest_and_same_frame_nearby_scores_merge`
+  - [x] 팝업 종료 뒤 노드를 삭제하지 않고 풀로 반환하며 큰 점수 포함 1.0초 뒤 활성 노드 0개 관측 — `test_score_popup_nodes_return_to_pool_before_one_point_five_seconds`
+  - [x] 기존 한 줄 콤보 표시를 위쪽 가운데 큰 `×M`과 작은 `COMBO/CHAIN n`으로 분리. ×1 흰색, ×2~3 노랑, ×4~7 주황, ×8 이상 빨강과 상승 시 0.15초 펀치 적용 — `test_multiplier_has_four_color_stages`, 기존 TURN/BLITZ HUD 회귀 테스트
+  - [x] 보드 구체 면적을 0.25초마다 다시 합산해 반응 신호가 없어도 `danger_start` 이상이면 `DANGER ×M`을 유지하고 위험 배수에 따라 맥동 속도를 높임 — `test_danger_refreshes_from_board_without_reaction`
+  - [x] SCORE를 0.25초 동안 굴려 목표값에 도달시키고 1,000점 이상 획득 시 펀치 적용 — `test_score_rolls_to_target_in_a_quarter_second`
+  - [x] `fx_score_popups_enabled=true`, `fx_popup_max=16` 기본값 추가. 켬/끔으로 실제 HUD 반응 경로를 20단계씩 실행한 TURN·BLITZ 점수/보드 상태 해시가 각각 동일 — `test_score_popup_toggle_preserves_turn_and_blitz_state_hashes`
+  - [x] 전체 래퍼와 import, 시작 화면·TURN·BLITZ 스모크에서 `SCRIPT ERROR`·`Parse Error` 0건
+- QA 관측값:
+  - Godot `4.8-dev3` `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0
+  - `tests/run_tests.ps1` (`--fixed-fps 120`) → 일반 `211/211` 11.643초, 장기 `4/4` 24.109초, 성능 `2/2` 0.916초, 총 `217/217`, 최종 종료 코드 0, 합계 36.668초
+  - 점수 팝업 전용 테스트 → `10/10`, 종료 코드 0
+  - 헤드리스 팝업 프레임 부담(활성 16개, 400표본) → p50 `17µs`, p95 `18µs`. 창 모드 측정은 미실행(수동 화면 확인 절차로 대체)
+  - 시작 화면 / `--mode=turn` / `--mode=blitz` 300프레임 스모크 → 모두 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0
+  - `git diff --check` 오류 0. 규칙 점검 → `Input`/`InputEvent`는 `InputRouter.gd`만, 난수 호출은 `Spawner.gd`만
+- 수동 확인 절차:
+  1. `-- --mode=turn`으로 실행해 합체·대폭발을 만든다 → 반응 지점에서 결과 색 또는 흰색+금색 테두리의 `+점수`가 튀어나와 위로 60px 이동하고 사라지는지 확인한다.
+  2. 같은 턴 연쇄를 3회 이상 만든다 → 화면 위 가운데 큰 배수가 `×1 → ×2 → ×4` 단계 색으로 바뀌고 오를 때 펀치하며, 작은 줄에는 `COMBO n`만 표시되고 큰 점수에는 계산식 줄이 나타나는지 확인한다.
+  3. `-- --mode=blitz`로 실행해 초기 판을 그대로 둔다 → 반응이 없어도 약 35% 점유 상태에서 `DANGER ×M`이 계속 보이고, 위험 배수가 커질수록 맥동이 빨라지는지 확인한다.
+  4. 1,000점 이상 반응을 만든다 → SCORE가 0.25초 동안 굴러 올라가며 펀치하고, 해당 팝업이 일반 점수보다 0.2초 더 머물며 살짝 흔들리는지 확인한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - `fx_score_popups_enabled=false`는 점수 팝업과 SCORE/배수/DANGER의 움직임만 끄고, 점수·배수·DANGER 정보 자체는 접근성을 위해 계속 표시한다.
+  - 같은 프레임 근접 팝업은 합산 점수를 표시하되 서로 다른 계산식을 억지로 합치지 않고 첫 팝업의 계산식 줄을 유지한다.
+  - “은은한/살짝/펀치”의 미지정 시각 세부값은 배수 맥동 3%, DANGER 맥동 4%, 큰 SCORE 펀치 15%, 큰 점수 좌우 흔들림 3px로 두었다. 점수·규칙·물리 상태에는 영향을 주지 않는다.
+- 남은 것 · 질문: 실제 창/모바일에서 겹침·가독성 수동 확인 필요. 자동 검증 기준의 남은 항목은 없음.
+
 ### [2026-10-08] 대상 #44 — 테스트 래퍼 PowerShell 5.1 출력 리다이렉션 중단 수정
 - 상태: 완료
 - 브랜치 / PR: `m8-powershell-output-redirect` / https://github.com/jeongmo-dot/gravity_orb/pull/45
