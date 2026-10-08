@@ -224,6 +224,36 @@ func play_visual_punch(scale_factor: float = 1.18, duration: float = 0.14) -> vo
 	)
 
 
+func play_visual_pull_punch(duration: float = 0.3) -> void:
+	if _visual_punch_tween != null and _visual_punch_tween.is_valid():
+		_visual_punch_tween.kill()
+	_mesh.scale = Vector3.ONE
+	_visual_punch_tween = create_tween()
+	_visual_punch_tween.set_trans(Tween.TRANS_QUAD)
+	_visual_punch_tween.set_ease(Tween.EASE_OUT)
+	_visual_punch_tween.tween_property(
+		_mesh,
+		"scale",
+		Vector3.ONE / 1.18,
+		duration * 0.35
+	)
+	_visual_punch_tween.set_trans(Tween.TRANS_BACK)
+	_visual_punch_tween.tween_property(
+		_mesh,
+		"scale",
+		Vector3.ONE * 1.18,
+		duration * 0.30
+	)
+	_visual_punch_tween.set_trans(Tween.TRANS_QUAD)
+	_visual_punch_tween.set_ease(Tween.EASE_IN_OUT)
+	_visual_punch_tween.tween_property(
+		_mesh,
+		"scale",
+		Vector3.ONE,
+		duration * 0.35
+	)
+
+
 func enter_ghost_state(alpha: float) -> void:
 	is_ghost = true
 	ghost_elapsed = 0.0
