@@ -45,6 +45,9 @@ const PERF_TEST_METHODS: Dictionary = {
 	"res://tests/test_color_effect_visuals.gd": [
 		"test_color_effect_frame_cost_report",
 	],
+	"res://tests/test_gravity_switch_feedback.gd": [
+		"test_gravity_switch_feedback_frame_cost_report",
+	],
 	"res://tests/test_score_popups.gd": [
 		"test_score_popup_frame_cost_report",
 	],

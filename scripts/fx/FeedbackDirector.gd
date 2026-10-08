@@ -16,11 +16,14 @@ var _game_manager: Variant
 var _board: Variant
 var _camera: Camera3D
 var _sfx_bank: SfxBank
+var _haptics: Haptics
 var _effects_root: Node3D
 var _overlay: CanvasLayer
 var _effects: Array[Dictionary] = []
 var _active_color_effects: Array[ColorEffectVisual] = []
 var _color_effect_pool: Array[ColorEffectVisual] = []
+var _active_swipe_trails: Array[SwipeTrail] = []
+var _swipe_trail_pool: Array[SwipeTrail] = []
 var _color_frame_shakes: Array[Dictionary] = []
 var _shake_elapsed: float = 0.0
 var _shake_duration: float = 0.0
@@ -36,6 +39,9 @@ func _ready() -> void:
 		_sfx_bank = SfxBank.new()
 		_sfx_bank.name = "SfxBank"
 		add_child(_sfx_bank)
+	_haptics = Haptics.new()
+	_haptics.name = "Haptics"
+	add_child(_haptics)
 	_effects_root = Node3D.new()
 	_effects_root.name = "FeedbackEffects"
 	add_child(_effects_root)
@@ -59,16 +65,34 @@ func bind(game_manager: Variant, board: Variant) -> void:
 	_board = board
 	if not game_manager.reaction_ready.is_connected(_on_reaction_ready):
 		game_manager.reaction_ready.connect(_on_reaction_ready)
+	if not game_manager.turn_started.is_connected(_on_turn_started):
+		game_manager.turn_started.connect(_on_turn_started)
 
 
 func _on_reaction_ready(reaction: Dictionary) -> void:
 	_play_reaction_sfx(reaction)
+	_play_reaction_haptics(reaction)
 	call_deferred("play_reaction_visuals", reaction.duplicate())
 
 
 func play_reaction(reaction: Dictionary) -> void:
 	_play_reaction_sfx(reaction)
+	_play_reaction_haptics(reaction)
 	play_reaction_visuals(reaction)
+
+
+func _on_turn_started(_turn_index: int, direction: Vector2i) -> void:
+	_sfx_bank.play_swipe()
+	_haptics.play_swipe()
+	if (
+		not Config.data.fx_enabled
+		or not Config.data.fx_swipe_trail_enabled
+		or _camera == null
+	):
+		return
+	var trail: SwipeTrail = _acquire_swipe_trail()
+	trail.play(direction, Config.data.board_size)
+	_active_swipe_trails.append(trail)
 
 
 func play_reaction_visuals(reaction: Dictionary) -> void:
@@ -133,6 +157,12 @@ func _play_reaction_sfx(reaction: Dictionary) -> void:
 	)
 
 
+func _play_reaction_haptics(reaction: Dictionary) -> void:
+	var reaction_type: ReactionRules.Type = reaction["type"] as ReactionRules.Type
+	if reaction_type in [ReactionRules.Type.BLAST, ReactionRules.Type.MAX_CLEAR]:
+		_haptics.play_blast()
+
+
 func begin_hitstop(duration: float) -> void:
 	if not Config.data.fx_hitstop_enabled or duration <= 0.0:
 		return
@@ -172,6 +202,18 @@ func color_effect_pool_count() -> int:
 	return _color_effect_pool.size()
 
 
+func active_swipe_trail_count() -> int:
+	return _active_swipe_trails.size()
+
+
+func swipe_trail_pool_count() -> int:
+	return _swipe_trail_pool.size()
+
+
+func active_swipe_trails() -> Array[SwipeTrail]:
+	return _active_swipe_trails.duplicate()
+
+
 func active_color_effects() -> Array[ColorEffectVisual]:
 	return _active_color_effects.duplicate()
 
@@ -190,6 +232,10 @@ func sfx_bank() -> SfxBank:
 	return _sfx_bank
 
 
+func haptics() -> Haptics:
+	return _haptics
+
+
 func clear_effects() -> void:
 	for effect: Dictionary in _effects:
 		var node: Node = effect.get("node") as Node
@@ -198,6 +244,8 @@ func clear_effects() -> void:
 	_effects.clear()
 	for color_effect: ColorEffectVisual in _active_color_effects.duplicate():
 		_release_color_effect(color_effect)
+	for trail: SwipeTrail in _active_swipe_trails.duplicate():
+		_release_swipe_trail(trail)
 	_color_frame_shakes.clear()
 	_reset_camera()
 	_reset_color_frame()
@@ -207,6 +255,7 @@ func _process(delta: float) -> void:
 	var real_delta: float = delta / maxf(Engine.time_scale, 0.001)
 	_update_shake(real_delta)
 	_update_color_effects(real_delta)
+	_update_swipe_trails(real_delta)
 	_update_color_frame_shakes(real_delta)
 	for index: int in range(_effects.size() - 1, -1, -1):
 		var effect: Dictionary = _effects[index]
@@ -347,6 +396,31 @@ func _release_color_effect(effect: ColorEffectVisual) -> void:
 	_active_color_effects.erase(effect)
 	if not _color_effect_pool.has(effect):
 		_color_effect_pool.append(effect)
+
+
+func _acquire_swipe_trail() -> SwipeTrail:
+	if not _swipe_trail_pool.is_empty():
+		return _swipe_trail_pool.pop_back()
+	var trail: SwipeTrail = SwipeTrail.new()
+	trail.name = "SwipeTrail%d" % (
+		_active_swipe_trails.size() + _swipe_trail_pool.size()
+	)
+	_effects_root.add_child(trail)
+	return trail
+
+
+func _release_swipe_trail(trail: SwipeTrail) -> void:
+	trail.deactivate()
+	_active_swipe_trails.erase(trail)
+	if not _swipe_trail_pool.has(trail):
+		_swipe_trail_pool.append(trail)
+
+
+func _update_swipe_trails(delta: float) -> void:
+	for index: int in range(_active_swipe_trails.size() - 1, -1, -1):
+		var trail: SwipeTrail = _active_swipe_trails[index]
+		if trail.advance(delta):
+			_release_swipe_trail(trail)
 
 
 func _update_color_effects(delta: float) -> void:

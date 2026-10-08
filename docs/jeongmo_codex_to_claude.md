@@ -38,6 +38,39 @@
 
 ## 미확인
 
+### [2026-10-08] 대상 #48 — M8 연출: 중력 전환 손맛 강화
+- 상태: 완료
+- 브랜치 / PR: `m8-gravity-switch-polish` / 미생성
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/fx/{FeedbackDirector.gd,SfxBank.gd,SwipeTrail.gd}`, `scripts/platform/Haptics.gd`, `scripts/spike/{Board3D.gd,Orb3D.gd}`, `tests/{run_tests.gd,test_config.gd,test_gravity_switch_feedback.gd}`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 수락된 스와이프마다 보드 시각 프레임을 최대 6°까지 기울이고 총 0.3초에 BACK 탄성으로 원점 복귀. 진행 중 다음 스와이프는 현재 각도에서 이어져 호출 순간 각도 점프 0° — `test_tilt_reaches_six_degrees_returns_by_point_three_and_continues_smoothly`
+  - [x] #46 SHAKE가 `Board3D/VisualTilt.position`, 새 틸트가 `rotation_degrees`만 사용해 동시 재생 중 둘 다 0보다 크고 종료 뒤 각각 원점/0° 복귀 — `test_tilt_rotation_and_green_frame_shake_position_coexist_and_restore`
+  - [x] 수락된 스와이프 방향으로 판을 가로지르는 반투명 화살표 잔상을 네 방향 모두 표시하고 0.2초 뒤 비활성화·풀 반환. 무시된 입력은 기존 관리자 경로상 `turn_started`를 내지 않아 연출을 시작하지 않음 — `test_swipe_trails_cover_four_directions_and_return_to_pool`, 기존 TURN/BLITZ 스와이프 테스트
+  - [x] 120ms 필터 노이즈 기반 `휙` 합성음을 `SfxBank`의 12보이스 풀·SFX 버스·저장 음소거 경로로 재생하며 외부 `swipe.wav/.ogg`가 있으면 우선 로드 — `test_swipe_sfx_and_pc_haptics_use_specified_durations`
+  - [x] 속도 900px/s 이상에서 구슬 메시만 진행축 1.15·수직축 0.92로 늘리고 속도 방향으로 정렬. 899px/s에서는 원래 스케일이며, 심볼 스케일·충돌 반지름·물리 위치는 불변 — `test_fast_orb_stretches_only_mesh_and_slow_orb_keeps_original_scale`
+  - [x] 기존 합체/PULL 펀치와 속도 스트레치를 메시 스케일에서 곱셈 합성하고 펀치 변경 즉시 시각 변환을 갱신. 기존 펀치·PULL 회귀 `6/6`, `8/8` 통과
+  - [x] `Haptics.gd`에서만 모바일 진동 API를 사용해 스와이프 8ms·BLAST/MAX_CLEAR 25ms를 요청하고 PC에서는 플랫폼 진동 호출 0회 — `test_swipe_sfx_and_pc_haptics_use_specified_durations`
+  - [x] `fx_tilt_degrees=6.0`, `fx_tilt_duration=0.3`, `fx_swipe_trail_enabled=true`, `fx_orb_stretch_enabled=true`, `haptics_enabled=true` 추가. 새 시각/진동 토글 켬·끔 TURN 20단계 및 BLITZ 20단계 물리 상태 해시 각각 동일 — `test_m8_feedback_defaults`, `test_gravity_switch_toggles_preserve_turn_and_blitz_state_hashes`
+  - [x] 잔상은 새 노드를 매번 삭제하지 않고 풀로 재사용하며 0.2초에 정리. 전체 import·공식 래퍼·시작/TURN/BLITZ 스모크에서 `SCRIPT ERROR`·`Parse Error` 0건
+- QA 관측값:
+  - Godot `4.8-dev3` `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` (`--fixed-fps 120`) → 일반 `230/230` 15.808초, 장기 `4/4` 24.657초, 성능 `5/5` 1.568초, 총 `239/239`, 최종 종료 코드 0, 합계 42.033초
+  - #48 전용 테스트 → `7/7`, 종료 코드 0. 기존 `test_feedback.gd` 고정 60fps `6/6`, `test_color_effect_visuals.gd` `8/8`
+  - 활성 구슬 200개·동시 잔상 16개·200표본 프레임 부담 → p50 `400µs`, p95 `457µs`
+  - 시작 화면 / `--mode=turn` / `--mode=blitz` 300프레임 스모크 → 모두 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `git diff --check` 오류 0건. 규칙 점검 → `Input`/`InputEvent`는 `InputRouter.gd`, `Haptics.gd`만; 난수 호출은 `Spawner.gd`만
+- 수동 확인 절차:
+  1. `-- --mode=blitz`로 시작해 0.12초 간격으로 네 방향을 연속 스와이프한다 → 보드가 현재 기울기에서 끊김 없이 다음 방향으로 휘고 매번 6° 이내, 마지막 입력 뒤 0.3초에 0°로 복귀하는지 확인한다.
+  2. TURN/BLITZ에서 네 방향을 각각 스와이프한다 → 반투명 화살표 잔상이 해당 방향으로 판을 가로질러 0.2초 안에 사라지고 `휙` 소리가 입력마다 한 번 들리는지 확인한다.
+  3. 대폭발 뒤 900px/s 이상으로 이동하는 구슬을 관찰한다 → 구체 메시만 이동 방향으로 늘어나고 중앙 색 심볼은 찌그러지거나 회전하지 않으며, 느려지면 원형으로 복귀하는지 확인한다.
+  4. 초록 합체 직후 바로 스와이프한다 → 보드 프레임 위치 SHAKE와 회전 틸트가 동시에 보이고, 종료 뒤 보드 중심·각도가 모두 정확히 복귀하는지 확인한다.
+  5. Android/iOS 실기에서 스와이프와 BLAST/MAX_CLEAR를 만든다 → 각각 짧은 8ms와 강한 25ms 진동이 느껴지는지 확인한다. PC에서는 진동 장치 호출이 없어야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 900px/s 이후의 보간 구간이나 추가 상한 수치가 명세에 없어 임계값 미만은 `1,1,1`, 임계값 이상은 명세 최대값 `1.15,0.92,0.92`를 즉시 적용했다. 물리/충돌/심볼에는 적용하지 않는다.
+  - 잔상은 판 길이의 76%를 차지하는 결정적 삼각형 메시(몸통+화살촉)로 구성했고 난수는 사용하지 않았다. 색은 연한 청백색 알파 0.58에서 0.2초 동안 선형 페이드한다.
+  - 모바일 판정은 Godot feature tag `mobile/android/ios` 중 하나가 있을 때만 `Input.vibrate_handheld()`를 호출한다. PC 자동 테스트의 실제 플랫폼 호출은 0회다.
+- 남은 것 · 질문: 실제 모바일 진동 세기·브라우저/기기별 지원과 플레이 중 잔상 가독성·합성음 체감 음량은 위 수동 절차 확인 필요. 자동 검증 기준의 남은 항목은 없음.
+
 ### [2026-10-08] 대상 #47 — M8 연출: 콤보 호령 + 피버·타이머 강화
 - 상태: 완료
 - 브랜치 / PR: `m8-callouts-fever-timer` / 미생성
