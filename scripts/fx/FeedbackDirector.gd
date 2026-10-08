@@ -8,6 +8,9 @@ const DEBRIS_LIFETIME: float = 0.72
 const WHITE_SPARK_COUNT: int = 16
 const MERGE_PARTICLE_COUNT: int = 10
 const FINALE_INTENSITY: float = 0.6
+const COLOR_JACKPOT_INTENSITY: float = 1.5
+const COLOR_SHAKE_DURATION: float = 0.25
+const COLOR_SHAKE_DISTANCE_PX: float = 6.0
 
 var _game_manager: Variant
 var _board: Variant
@@ -16,6 +19,9 @@ var _sfx_bank: SfxBank
 var _effects_root: Node3D
 var _overlay: CanvasLayer
 var _effects: Array[Dictionary] = []
+var _active_color_effects: Array[ColorEffectVisual] = []
+var _color_effect_pool: Array[ColorEffectVisual] = []
+var _color_frame_shakes: Array[Dictionary] = []
 var _shake_elapsed: float = 0.0
 var _shake_duration: float = 0.0
 var _shake_strength_m: float = 0.0
@@ -45,6 +51,7 @@ func _exit_tree() -> void:
 	_hitstop_generation += 1
 	Engine.time_scale = 1.0
 	_reset_camera()
+	_reset_color_frame()
 
 
 func bind(game_manager: Variant, board: Variant) -> void:
@@ -80,6 +87,8 @@ func play_reaction_visuals(reaction: Dictionary) -> void:
 	var level: int = _effect_level(reaction)
 	var intensity: float = FINALE_INTENSITY if finale else 1.0
 	_play_blast_feedback(reaction, level, intensity)
+	if reaction_type == ReactionRules.Type.MAX_CLEAR:
+		_play_color_effect_visual(reaction, COLOR_JACKPOT_INTENSITY)
 	if not finale and Config.data.fx_hitstop_enabled:
 		var hitstop_time: float = (
 			0.10
@@ -155,6 +164,28 @@ func active_flash_count() -> int:
 	return get_tree().get_nodes_in_group(&"feedback_flash").size()
 
 
+func active_color_effect_count() -> int:
+	return _active_color_effects.size()
+
+
+func color_effect_pool_count() -> int:
+	return _color_effect_pool.size()
+
+
+func active_color_effects() -> Array[ColorEffectVisual]:
+	return _active_color_effects.duplicate()
+
+
+func active_color_frame_shake_count() -> int:
+	return _color_frame_shakes.size()
+
+
+func color_effect_mode_for_color(color: int) -> GameConfig.ShockMode:
+	if color < 0 or color >= Config.data.shock_color_modes.size():
+		return GameConfig.ShockMode.PUSH
+	return int(Config.data.shock_color_modes[color]) as GameConfig.ShockMode
+
+
 func sfx_bank() -> SfxBank:
 	return _sfx_bank
 
@@ -165,12 +196,18 @@ func clear_effects() -> void:
 		if is_instance_valid(node):
 			node.queue_free()
 	_effects.clear()
+	for color_effect: ColorEffectVisual in _active_color_effects.duplicate():
+		_release_color_effect(color_effect)
+	_color_frame_shakes.clear()
 	_reset_camera()
+	_reset_color_frame()
 
 
 func _process(delta: float) -> void:
 	var real_delta: float = delta / maxf(Engine.time_scale, 0.001)
 	_update_shake(real_delta)
+	_update_color_effects(real_delta)
+	_update_color_frame_shakes(real_delta)
 	for index: int in range(_effects.size() - 1, -1, -1):
 		var effect: Dictionary = _effects[index]
 		effect["elapsed"] = float(effect["elapsed"]) + real_delta
@@ -199,7 +236,16 @@ func _process(delta: float) -> void:
 func _play_merge_feedback(reaction: Dictionary) -> void:
 	var result_orb: Variant = reaction.get("result_orb")
 	if is_instance_valid(result_orb):
-		if result_orb.has_method("play_visual_punch"):
+		var color_mode: GameConfig.ShockMode = color_effect_mode_for_color(
+			int(reaction.get("result_color", 0))
+		)
+		if (
+			_color_effect_visuals_enabled()
+			and color_mode == GameConfig.ShockMode.PULL
+			and result_orb.has_method("play_visual_pull_punch")
+		):
+			result_orb.play_visual_pull_punch(ColorEffectVisual.PUSH_PULL_DURATION)
+		elif result_orb.has_method("play_visual_punch"):
 			result_orb.play_visual_punch(1.18, 0.14)
 	if not Config.data.fx_enabled or _camera == null:
 		return
@@ -212,6 +258,143 @@ func _play_merge_feedback(reaction: Dictionary) -> void:
 		1.0,
 		"MergeDebris"
 	)
+	_play_color_effect_visual(reaction)
+
+
+func _play_color_effect_visual(
+	reaction: Dictionary,
+	visual_intensity: float = 1.0
+) -> void:
+	if not _color_effect_visuals_enabled() or _camera == null:
+		return
+	var reaction_type: ReactionRules.Type = reaction.get(
+		"type", ReactionRules.Type.NONE
+	) as ReactionRules.Type
+	if reaction_type not in [ReactionRules.Type.MERGE, ReactionRules.Type.MAX_CLEAR]:
+		return
+	var color_index: int = clampi(
+		int(reaction.get("result_color", 0)),
+		0,
+		Config.data.color_display.size() - 1
+	)
+	var color_mode: GameConfig.ShockMode = color_effect_mode_for_color(color_index)
+	var level: int = (
+		Config.data.orb_max_level
+		if reaction_type == ReactionRules.Type.MAX_CLEAR
+		else clampi(int(reaction.get("result_level", 1)), 1, Config.data.orb_max_level)
+	)
+	var result_radius_px: float = Config.data.radius_for_level(level)
+	var level_scale: float = 1.0 + Config.data.shock_level_scale * float(level - 1)
+	var radius_factor: float = Config.data.shock_radius_factor
+	if color_index < Config.data.shock_color_radius_factor.size():
+		radius_factor = Config.data.shock_color_radius_factor[color_index]
+	var effect_radius_px: float = result_radius_px * radius_factor
+	if color_mode == GameConfig.ShockMode.SHAKE:
+		effect_radius_px = Config.data.board_size * 0.5
+	var strength_scale: float = level_scale
+	if color_mode == GameConfig.ShockMode.SHAKE:
+		strength_scale = (
+			minf(
+				Config.data.green_shake_speed * level_scale,
+				Config.data.green_shake_max_speed
+			)
+			/ maxf(Config.data.green_shake_speed, 0.001)
+		)
+	elif color_index < Config.data.shock_color_impulse_scale.size():
+		strength_scale *= Config.data.shock_color_impulse_scale[color_index]
+	var gravity_direction: Vector2 = Vector2.DOWN
+	if _board != null:
+		var board_gravity: Variant = _board.get("_gravity_direction")
+		if board_gravity != null:
+			gravity_direction = Vector2(board_gravity).normalized()
+	var effect: ColorEffectVisual = _acquire_color_effect()
+	effect.play(
+		color_mode,
+		reaction.get("position", Vector2.ZERO) as Vector2,
+		Config.data.color_display[color_index],
+		result_radius_px,
+		effect_radius_px,
+		visual_intensity * strength_scale,
+		-gravity_direction,
+		reaction.get("shock_targets", []) as Array
+	)
+	_active_color_effects.append(effect)
+	if color_mode == GameConfig.ShockMode.SHAKE:
+		_color_frame_shakes.append({"elapsed": 0.0, "duration": COLOR_SHAKE_DURATION})
+
+
+func _color_effect_visuals_enabled() -> bool:
+	return (
+		Config.data.fx_enabled
+		and Config.data.color_effects_enabled
+		and Config.data.fx_color_effect_visuals_enabled
+	)
+
+
+func _acquire_color_effect() -> ColorEffectVisual:
+	if not _color_effect_pool.is_empty():
+		return _color_effect_pool.pop_back()
+	var effect: ColorEffectVisual = ColorEffectVisual.new()
+	effect.name = "ColorEffectVisual%d" % (
+		_active_color_effects.size() + _color_effect_pool.size()
+	)
+	_effects_root.add_child(effect)
+	return effect
+
+
+func _release_color_effect(effect: ColorEffectVisual) -> void:
+	effect.deactivate()
+	_active_color_effects.erase(effect)
+	if not _color_effect_pool.has(effect):
+		_color_effect_pool.append(effect)
+
+
+func _update_color_effects(delta: float) -> void:
+	for index: int in range(_active_color_effects.size() - 1, -1, -1):
+		var effect: ColorEffectVisual = _active_color_effects[index]
+		if effect.advance(delta):
+			_release_color_effect(effect)
+
+
+func _update_color_frame_shakes(delta: float) -> void:
+	var offset_px: Vector2 = Vector2.ZERO
+	for index: int in range(_color_frame_shakes.size() - 1, -1, -1):
+		var shake: Dictionary = _color_frame_shakes[index]
+		shake["elapsed"] = float(shake["elapsed"]) + delta
+		var duration: float = float(shake["duration"])
+		var progress: float = clampf(float(shake["elapsed"]) / duration, 0.0, 1.0)
+		if progress >= 1.0:
+			_color_frame_shakes.remove_at(index)
+			continue
+		var direction: Vector2 = Vector2(
+			sin(progress * TAU * 3.0),
+			cos(progress * TAU * 4.0)
+		).normalized()
+		offset_px += direction * COLOR_SHAKE_DISTANCE_PX * (1.0 - progress)
+		_color_frame_shakes[index] = shake
+	_set_color_frame_offset(offset_px.limit_length(COLOR_SHAKE_DISTANCE_PX))
+
+
+func _set_color_frame_offset(offset_px: Vector2) -> void:
+	var frame: Node = _color_frame_node()
+	if frame is Node3D:
+		(frame as Node3D).position = Orb3D.plane_vector_to_world(offset_px)
+	elif frame is Node2D:
+		(frame as Node2D).position = offset_px
+
+
+func _reset_color_frame() -> void:
+	_set_color_frame_offset(Vector2.ZERO)
+
+
+func _color_frame_node() -> Node:
+	if _board == null:
+		return null
+	if _board is Node3D:
+		return (_board as Node3D).get_node_or_null("VisualTilt")
+	if _board is Node2D:
+		return (_board as Node2D).get_node_or_null("Frame")
+	return null
 
 
 func _play_blast_feedback(

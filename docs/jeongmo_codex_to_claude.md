@@ -38,6 +38,38 @@
 
 ## 미확인
 
+### [2026-10-08] 대상 #46 — M8 연출: 색별 합체 효과 시각화
+- 상태: 완료
+- 브랜치 / PR: `m8-color-effect-visuals` / 미생성
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/fx/{ColorEffectVisual.gd,FeedbackDirector.gd}`, `scripts/spike/Orb3D.gd`, `tests/{run_tests.gd,test_color_effect_visuals.gd,test_config.gd}`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] MERGE·MAX_CLEAR의 결과 색을 `shock_color_modes`로 읽어 빨강/보라/청록 PUSH, 파랑 PULL, 초록 SHAKE, 노랑 LIFT 연출로 매핑. 물리 `shock_color_radius_factor`, `shock_color_impulse_scale`, `shock_level_scale`, SHAKE 속도 상한을 시각 반경·밝기에 그대로 반영 — `test_six_colors_map_to_configured_visual_modes`, `test_push_expands_pull_contracts_and_push_has_six_rays`
+  - [x] PUSH는 결과 반지름→R로 0.3초 퍼지는 색 고리와 바깥쪽 선 6개, 빨강은 기본 PUSH보다 두껍고 밝게 표시. PULL은 R→결과 반지름으로 0.3초 수축하는 고리와 안쪽 점 12개를 표시하고 결과 구체 메시만 축소→펀치 — `test_push_expands_pull_contracts_and_push_has_six_rays`, `test_pull_shrinks_only_result_mesh_before_punching`
+  - [x] LIFT는 `shock_targets` 각 위치에서 현재 중력 반대 방향으로 빛줄기와 점을 0.35초 이동. DOWN/RIGHT/UP/LEFT 네 방향에서 벡터 반대 일치 — `test_lift_direction_opposes_each_gravity_direction`
+  - [x] SHAKE는 카메라가 아니라 `Board3D/VisualTilt`만 0.25초·최대 6px 이동 후 원점 복귀하고, 결과 반지름에서 판 끝까지 0.4초 퍼지는 초록 물결을 표시 — `test_shake_moves_board_visual_frame_not_camera_and_restores`
+  - [x] BLAST에는 색 모드 연출을 만들지 않고 MAX_CLEAR에는 기존 대폭발 연출과 색 모드 연출을 함께 만들며 시각 세기를 ×1.5 적용 — `test_toggle_blast_exclusion_jackpot_intensity_and_pool_cleanup`
+  - [x] `fx_color_effect_visuals_enabled=true` 추가. false이거나 `fx_enabled`/`color_effects_enabled`가 false이면 새 색 연출을 만들지 않음. 켬/끔 20단계 TURN·BLITZ 보드 상태 해시가 각각 동일 — `test_color_effect_toggle_preserves_turn_and_blitz_state_hashes`
+  - [x] `ColorEffectVisual`은 노드·메시·멀티메시를 풀로 재사용하고 최장 0.4초 뒤 비활성화·풀 반환. 0.5초 관측에서 활성 0개·풀 1개 — `test_toggle_blast_exclusion_jackpot_intensity_and_pool_cleanup`
+  - [x] 전체 래퍼, import, 시작 화면·TURN·BLITZ 스모크에서 `SCRIPT ERROR`·`Parse Error` 0건
+- QA 관측값:
+  - Godot `4.8-dev3` `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0
+  - `tests/run_tests.ps1` (`--fixed-fps 120`) → 일반 `218/218` 12.017초, 장기 `4/4` 24.570초, 성능 `3/3` 1.013초, 총 `225/225`, 최종 종료 코드 0, 합계 37.600초
+  - 색 연출 전용 테스트 → 헤드리스·창 모드 각각 `8/8`, 종료 코드 0
+  - 활성 색 연출 16개·400표본 부담 → 헤드리스 p50/p95 `71/75µs`; 창 모드 OpenGL 3.3, RTX 4070 Ti SUPER에서 `93/107µs`
+  - 시작 화면 / `--mode=turn` / `--mode=blitz` 300프레임 스모크 → 모두 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0
+  - `git diff --check` 오류 0. 규칙 점검 → `Input`/`InputEvent`는 `InputRouter.gd`만, 난수 호출은 `Spawner.gd`만
+- 수동 확인 절차:
+  1. `-- --mode=turn`으로 실행해 빨강·보라·청록 합체를 만든다 → 결과 색 고리가 바깥으로 퍼지고 짧은 선 6개가 뻗으며, 빨강이 더 두껍고 밝은지 확인한다.
+  2. 파랑 합체를 만든다 → 파란 고리와 점이 안쪽으로 수축하고 결과 구체의 메시만 작아졌다 튀어나오며 충돌 움직임은 그대로인지 확인한다.
+  3. 초록 합체를 만든다 → 카메라와 HUD는 고정된 채 보드 프레임만 최대 6px 떨렸다 복귀하고 초록 물결이 판 끝까지 퍼지는지 확인한다.
+  4. 중력을 네 방향으로 바꾸며 노랑 합체를 만든다 → 영향권 구체 위치의 빛줄기·점이 매번 현재 중력의 정확한 반대 방향으로 솟는지 확인한다.
+  5. L7 같은 색 MAX_CLEAR와 서로 다른 색 BLAST를 각각 만든다 → MAX_CLEAR는 대폭발+색 모드 연출이 함께 강하게 나오고, BLAST는 기존 대폭발만 나오는지 확인한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - PULL 점은 결정적인 등간격 12개, LIFT 점은 대상당 3개로 두었고 난수는 사용하지 않았다. PUSH 선 길이는 결과 반지름의 0.5배, 빨강/기본 고리의 Torus 안쪽 반지름은 각각 0.72/0.86으로 두었다.
+  - PULL 결과 메시의 축소값은 기존 펀치 1.18의 역수, 확대값은 기존 1.18을 재사용하고 0.3초를 축소/확대/복귀 `35/30/35%`로 나눴다. CollisionShape3D·물리 위치·속도는 변경하지 않는다.
+  - SHAKE 물결의 판 끝 기준은 중심에서 보드 한 변의 절반(`board_size × 0.5`)이며, 프레임 이동 파형은 기존 2D 대폭발의 3/4주기 패턴을 재사용했다.
+- 남은 것 · 질문: 실제 플레이에서 색별 가독성·밝기·동시 연출 겹침은 위 수동 절차 확인 필요. 자동 검증 기준의 남은 항목은 없음.
+
 ### [2026-10-08] 대상 #45 — M8 연출: 점수 팝업 + 배수 크게
 - 상태: 완료
 - 브랜치 / PR: `m8-score-popups` / https://github.com/jeongmo-dot/gravity_orb/pull/46

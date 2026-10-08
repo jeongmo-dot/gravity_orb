@@ -39,6 +39,9 @@ const LONG_TEST_METHODS: Dictionary = {
 	],
 }
 const PERF_TEST_METHODS: Dictionary = {
+	"res://tests/test_color_effect_visuals.gd": [
+		"test_color_effect_frame_cost_report",
+	],
 	"res://tests/test_score_popups.gd": [
 		"test_score_popup_frame_cost_report",
 	],

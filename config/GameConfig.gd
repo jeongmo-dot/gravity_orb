@@ -144,6 +144,7 @@ enum GameMode { TURN, BLITZ }
 @export var fx_debris_per_orb: int = 24
 @export var fx_score_popups_enabled: bool = true
 @export var fx_popup_max: int = 16
+@export var fx_color_effect_visuals_enabled: bool = true
 @export var sfx_enabled: bool = true
 @export var sfx_volume_db: float = 0.0
 @export var sfx_chain_semitones_max: int = 12
