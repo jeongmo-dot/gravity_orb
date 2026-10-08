@@ -22,6 +22,7 @@ const TEST_FILE_ARGUMENT_PREFIX: String = "--test-file="
 const TEST_SUITE_ARGUMENT_PREFIX: String = "--test-suite="
 const TEST_SUITE_GENERAL: String = "general"
 const TEST_SUITE_LONG: String = "long"
+const TEST_SUITE_PERF: String = "perf"
 const MEASUREMENT_FIXED_TESTS: Array[String] = [
 	"res://tests/scenarios/test_board_physics.gd",
 	"res://tests/scenarios/test_spawn_flow.gd",
@@ -35,6 +36,11 @@ const LONG_TEST_METHODS: Dictionary = {
 		"test_seed_101_completes_120_3d_turns_with_shared_score_flow",
 		"test_shared_turn_path_completes_twenty_3d_turns",
 		"test_twenty_two_seed_3d_gravity_cycles_have_no_departures_or_divergence",
+	],
+}
+const PERF_TEST_METHODS: Dictionary = {
+	"res://tests/scenarios/test_reaction_latency.gd": [
+		"test_two_hundred_orb_proximity_scan_p95_is_below_one_millisecond",
 	],
 }
 
@@ -84,15 +90,18 @@ func _run_all_tests() -> void:
 		await _run_directories(TEST_SUITE_GENERAL)
 	elif requested_test_suite == TEST_SUITE_LONG:
 		await _run_directories(TEST_SUITE_LONG)
+	elif requested_test_suite == TEST_SUITE_PERF:
+		await _run_directories(TEST_SUITE_PERF)
 	elif requested_test_suite.is_empty():
 		# Keep the original command compatible while protecting long Jolt tests
 		# from RID state created by general tests in this process.
 		await _run_directories(TEST_SUITE_LONG)
 		await _run_directories(TEST_SUITE_GENERAL)
+		await _run_directories(TEST_SUITE_PERF)
 	else:
 		_record_runner_failure(
 			"test-suite",
-			"unknown suite '%s' (expected general or long)" % requested_test_suite
+			"unknown suite '%s' (expected general, long, or perf)" % requested_test_suite
 		)
 
 	var total: int = _passed + _failed
@@ -275,6 +284,8 @@ func _run_directory(directory: String, test_suite: String = "") -> void:
 		var path: String = directory.path_join(file_name)
 		if test_suite == TEST_SUITE_LONG and not LONG_TEST_METHODS.has(path):
 			continue
+		if test_suite == TEST_SUITE_PERF and not PERF_TEST_METHODS.has(path):
+			continue
 		await _run_test_file(path, test_suite)
 
 
@@ -328,8 +339,17 @@ func _method_belongs_to_suite(
 	if test_suite.is_empty():
 		return true
 	var long_methods: Array = LONG_TEST_METHODS.get(path, []) as Array
+	var perf_methods: Array = PERF_TEST_METHODS.get(path, []) as Array
 	var is_long: bool = method_name in long_methods
-	return is_long if test_suite == TEST_SUITE_LONG else not is_long
+	var is_perf: bool = method_name in perf_methods
+	match test_suite:
+		TEST_SUITE_LONG:
+			return is_long
+		TEST_SUITE_PERF:
+			return is_perf
+		TEST_SUITE_GENERAL:
+			return not is_long and not is_perf
+	return true
 
 
 func _record_runner_failure(path: String, message: String) -> void:
