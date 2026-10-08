@@ -19,11 +19,24 @@ const PHYSICS_FRICTION_PREFIX: String = "--physics-friction="
 const PHYSICS_BOUNCE_PREFIX: String = "--physics-bounce="
 const PHYSICS_CASE_PREFIX: String = "--physics-case="
 const TEST_FILE_ARGUMENT_PREFIX: String = "--test-file="
+const TEST_SUITE_ARGUMENT_PREFIX: String = "--test-suite="
+const TEST_SUITE_GENERAL: String = "general"
+const TEST_SUITE_LONG: String = "long"
 const MEASUREMENT_FIXED_TESTS: Array[String] = [
 	"res://tests/scenarios/test_board_physics.gd",
 	"res://tests/scenarios/test_spawn_flow.gd",
 	"res://tests/scenarios/test_turn_time.gd",
 ]
+const LONG_TEST_METHODS: Dictionary = {
+	"res://tests/scenarios/test_board_physics.gd": [
+		"test_cycle_seeded_orbs_remain_inside_board_during_gravity_cycles",
+	],
+	"res://tests/scenarios/test_jolt_integration.gd": [
+		"test_seed_101_completes_120_3d_turns_with_shared_score_flow",
+		"test_shared_turn_path_completes_twenty_3d_turns",
+		"test_twenty_two_seed_3d_gravity_cycles_have_no_departures_or_divergence",
+	],
+}
 
 var _passed: int = 0
 var _failed: int = 0
@@ -39,6 +52,7 @@ func _run_all_tests() -> void:
 	config_data.fx_hitstop_enabled = false
 	var measurement_suite: String = _apply_measurement_arguments()
 	var requested_test_file: String = _requested_test_file()
+	var requested_test_suite: String = _requested_test_suite()
 	if not requested_test_file.is_empty():
 		await _run_test_file(requested_test_file)
 		var requested_total: int = _passed + _failed
@@ -66,9 +80,20 @@ func _run_all_tests() -> void:
 		await _run_test_file("res://tests/scenarios/test_turn_time.gd")
 	elif measurement_suite == "game_over_measurement":
 		await _run_test_file("res://tests/scenarios/test_game_over_measurement.gd")
+	elif requested_test_suite == TEST_SUITE_GENERAL:
+		await _run_directories(TEST_SUITE_GENERAL)
+	elif requested_test_suite == TEST_SUITE_LONG:
+		await _run_directories(TEST_SUITE_LONG)
+	elif requested_test_suite.is_empty():
+		# Keep the original command compatible while protecting long Jolt tests
+		# from RID state created by general tests in this process.
+		await _run_directories(TEST_SUITE_LONG)
+		await _run_directories(TEST_SUITE_GENERAL)
 	else:
-		for directory: String in TEST_DIRECTORIES:
-			await _run_directory(directory)
+		_record_runner_failure(
+			"test-suite",
+			"unknown suite '%s' (expected general or long)" % requested_test_suite
+		)
 
 	var total: int = _passed + _failed
 	print("Tests: %d passed, %d failed, %d total" % [_passed, _failed, total])
@@ -183,6 +208,13 @@ func _requested_test_file() -> String:
 	return ""
 
 
+func _requested_test_suite() -> String:
+	for argument: String in OS.get_cmdline_user_args():
+		if argument.begins_with(TEST_SUITE_ARGUMENT_PREFIX):
+			return argument.trim_prefix(TEST_SUITE_ARGUMENT_PREFIX).to_lower()
+	return ""
+
+
 func _apply_spawn_case(config_data: GameConfig, spawn_case: String) -> int:
 	var active_colors: int = 4
 	config_data.spawn_count_ramp_turns = 0
@@ -226,7 +258,13 @@ func _positive_weight_count(weights: PackedFloat32Array) -> int:
 	return count
 
 
-func _run_directory(directory: String) -> void:
+func _run_directories(test_suite: String) -> void:
+	print("Test suite: %s" % test_suite)
+	for directory: String in TEST_DIRECTORIES:
+		await _run_directory(directory, test_suite)
+
+
+func _run_directory(directory: String, test_suite: String = "") -> void:
 	var files: PackedStringArray = DirAccess.get_files_at(directory)
 	files.sort()
 	for file_name: String in files:
@@ -234,10 +272,13 @@ func _run_directory(directory: String) -> void:
 			continue
 		if file_name == "test_game_over_measurement.gd":
 			continue
-		await _run_test_file(directory.path_join(file_name))
+		var path: String = directory.path_join(file_name)
+		if test_suite == TEST_SUITE_LONG and not LONG_TEST_METHODS.has(path):
+			continue
+		await _run_test_file(path, test_suite)
 
 
-func _run_test_file(path: String) -> void:
+func _run_test_file(path: String, test_suite: String = "") -> void:
 	Engine.physics_ticks_per_second = 120 if path.contains("jolt") else 240
 	var test_script: Script = load(path) as Script
 	if test_script == null:
@@ -257,7 +298,10 @@ func _run_test_file(path: String) -> void:
 	var method_names: Array[String] = []
 	for method_info: Dictionary in test_instance.get_method_list():
 		var method_name: String = str(method_info.get("name", ""))
-		if method_name.begins_with(TEST_METHOD_PREFIX):
+		if (
+			method_name.begins_with(TEST_METHOD_PREFIX)
+			and _method_belongs_to_suite(path, method_name, test_suite)
+		):
 			method_names.append(method_name)
 	method_names.sort()
 
@@ -274,6 +318,18 @@ func _run_test_file(path: String) -> void:
 		print("FAIL %s::%s" % [path, method_name])
 		for failure_index: int in range(failures_before, failures_after):
 			print("  %s" % test_instance.failures[failure_index])
+
+
+func _method_belongs_to_suite(
+	path: String,
+	method_name: String,
+	test_suite: String
+) -> bool:
+	if test_suite.is_empty():
+		return true
+	var long_methods: Array = LONG_TEST_METHODS.get(path, []) as Array
+	var is_long: bool = method_name in long_methods
+	return is_long if test_suite == TEST_SUITE_LONG else not is_long
 
 
 func _record_runner_failure(path: String, message: String) -> void:
