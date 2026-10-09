@@ -1,9 +1,10 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/DebugHud.gd" id="1_debug_hud"]
 [ext_resource type="Script" path="res://scripts/ui/Hud.gd" id="2_hud"]
 [ext_resource type="Script" path="res://scripts/ui/GameOverPanel.gd" id="3_game_over"]
 [ext_resource type="Script" path="res://scripts/ui/StartScreen.gd" id="4_start_screen"]
+[ext_resource type="Script" path="res://scripts/ui/RankingPanel.gd" id="5_ranking_panel"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_result_panel"]
 bg_color = Color(0.035, 0.045, 0.07, 0.96)
@@ -11,6 +12,49 @@ corner_radius_top_left = 24
 corner_radius_top_right = 24
 corner_radius_bottom_right = 24
 corner_radius_bottom_left = 24
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ranking_row"]
+bg_color = Color(0.055, 0.075, 0.12, 0.94)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ranking_highlight"]
+bg_color = Color(0.16, 0.13, 0.035, 0.98)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(1, 0.835, 0.29, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_mode_unselected"]
+bg_color = Color(0.035, 0.05, 0.08, 0.96)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.16, 0.23, 0.34, 1)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_mode_selected"]
+bg_color = Color(0.23, 0.19, 0.055, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 6
+border_color = Color(1, 0.835294, 0.290196, 1)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
 
 [node name="UI" type="CanvasLayer"]
 script = ExtResource("1_debug_hud")
@@ -438,6 +482,18 @@ theme_override_font_sizes/font_size = 32
 text = "BLOCKED: UNKNOWN"
 horizontal_alignment = 1
 
+[node name="RankingResultLabel" type="Label" parent="Hud/GameOverPanel/Margin/Content"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.835294, 0.290196, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.85)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 38
+text = "최고 기록!"
+horizontal_alignment = 1
+
 [node name="RestartButton" type="Button" parent="Hud/GameOverPanel/Margin/Content"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 120)
@@ -445,6 +501,14 @@ layout_mode = 2
 mouse_filter = 0
 theme_override_font_sizes/font_size = 36
 text = "다시 하기"
+
+[node name="ResultRankingButton" type="Button" parent="Hud/GameOverPanel/Margin/Content"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 120)
+layout_mode = 2
+mouse_filter = 0
+theme_override_font_sizes/font_size = 36
+text = "랭킹"
 
 [node name="ModeSelectButton" type="Button" parent="Hud/GameOverPanel/Margin/Content"]
 unique_name_in_owner = true
@@ -511,9 +575,15 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 210)
 layout_mode = 2
 mouse_filter = 0
-theme_override_colors/font_color = Color(1, 0.85, 0.35, 1)
-theme_override_colors/font_pressed_color = Color(1, 0.95, 0.7, 1)
+theme_override_colors/font_color = Color(0.48, 0.57, 0.68, 1)
+theme_override_colors/font_hover_color = Color(0.68, 0.76, 0.86, 1)
+theme_override_colors/font_pressed_color = Color(1, 0.85, 0.35, 1)
+theme_override_colors/font_hover_pressed_color = Color(1, 0.9, 0.5, 1)
 theme_override_font_sizes/font_size = 52
+theme_override_styles/normal = SubResource("StyleBoxFlat_mode_unselected")
+theme_override_styles/hover = SubResource("StyleBoxFlat_mode_unselected")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_mode_selected")
+theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_mode_selected")
 toggle_mode = true
 text = "BLITZ\n90초 타임어택"
 
@@ -536,9 +606,15 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 210)
 layout_mode = 2
 mouse_filter = 0
-theme_override_colors/font_color = Color(0.55, 0.82, 1, 1)
-theme_override_colors/font_pressed_color = Color(0.8, 0.93, 1, 1)
+theme_override_colors/font_color = Color(0.48, 0.57, 0.68, 1)
+theme_override_colors/font_hover_color = Color(0.68, 0.76, 0.86, 1)
+theme_override_colors/font_pressed_color = Color(1, 0.85, 0.35, 1)
+theme_override_colors/font_hover_pressed_color = Color(1, 0.9, 0.5, 1)
 theme_override_font_sizes/font_size = 52
+theme_override_styles/normal = SubResource("StyleBoxFlat_mode_unselected")
+theme_override_styles/hover = SubResource("StyleBoxFlat_mode_unselected")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_mode_selected")
+theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_mode_selected")
 toggle_mode = true
 text = "CLASSIC\n턴제"
 
@@ -551,8 +627,17 @@ theme_override_font_sizes/font_size = 30
 text = "BEST  0"
 horizontal_alignment = 1
 
+[node name="StartRankingButton" type="Button" parent="StartScreen/Content"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 120)
+layout_mode = 2
+mouse_filter = 0
+theme_override_colors/font_color = Color(1, 0.85, 0.35, 1)
+theme_override_font_sizes/font_size = 42
+text = "랭킹"
+
 [node name="SoundSpacer" type="Control" parent="StartScreen/Content"]
-custom_minimum_size = Vector2(0, 70)
+custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
 mouse_filter = 2
 
@@ -563,3 +648,253 @@ layout_mode = 2
 mouse_filter = 0
 theme_override_font_sizes/font_size = 48
 text = "🔊"
+
+[node name="RankingPanel" type="Control" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("5_ranking_panel")
+row_style = SubResource("StyleBoxFlat_ranking_row")
+highlight_style = SubResource("StyleBoxFlat_ranking_highlight")
+
+[node name="Background" type="ColorRect" parent="RankingPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.015, 0.027, 0.06, 0.98)
+
+[node name="Panel" type="PanelContainer" parent="RankingPanel"]
+layout_mode = 0
+offset_left = 54.0
+offset_top = 70.0
+offset_right = 1026.0
+offset_bottom = 1850.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_result_panel")
+
+[node name="Content" type="VBoxContainer" parent="RankingPanel/Panel"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 16
+alignment = 1
+
+[node name="Title" type="Label" parent="RankingPanel/Panel/Content"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.89, 0.95, 1, 1)
+theme_override_font_sizes/font_size = 62
+text = "로컬 랭킹"
+horizontal_alignment = 1
+
+[node name="Tabs" type="HBoxContainer" parent="RankingPanel/Panel/Content"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 16
+alignment = 1
+
+[node name="RankingBlitzTab" type="Button" parent="RankingPanel/Panel/Content/Tabs"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(360, 120)
+layout_mode = 2
+mouse_filter = 0
+theme_override_colors/font_color = Color(0.48, 0.57, 0.68, 1)
+theme_override_colors/font_hover_color = Color(0.68, 0.76, 0.86, 1)
+theme_override_colors/font_pressed_color = Color(1, 0.85, 0.35, 1)
+theme_override_colors/font_hover_pressed_color = Color(1, 0.9, 0.5, 1)
+theme_override_font_sizes/font_size = 38
+theme_override_styles/normal = SubResource("StyleBoxFlat_mode_unselected")
+theme_override_styles/hover = SubResource("StyleBoxFlat_mode_unselected")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_mode_selected")
+theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_mode_selected")
+toggle_mode = true
+text = "BLITZ"
+
+[node name="RankingClassicTab" type="Button" parent="RankingPanel/Panel/Content/Tabs"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(360, 120)
+layout_mode = 2
+mouse_filter = 0
+theme_override_colors/font_color = Color(0.48, 0.57, 0.68, 1)
+theme_override_colors/font_hover_color = Color(0.68, 0.76, 0.86, 1)
+theme_override_colors/font_pressed_color = Color(1, 0.85, 0.35, 1)
+theme_override_colors/font_hover_pressed_color = Color(1, 0.9, 0.5, 1)
+theme_override_font_sizes/font_size = 38
+theme_override_styles/normal = SubResource("StyleBoxFlat_mode_unselected")
+theme_override_styles/hover = SubResource("StyleBoxFlat_mode_unselected")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_mode_selected")
+theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_mode_selected")
+toggle_mode = true
+text = "CLASSIC"
+
+[node name="RankingHeader" type="Label" parent="RankingPanel/Panel/Content"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 54)
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.55, 0.68, 0.84, 1)
+theme_override_font_sizes/font_size = 25
+text = "순위        점수       최대 체인       날짜"
+horizontal_alignment = 1
+
+[node name="Rows" type="VBoxContainer" parent="RankingPanel/Panel/Content"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="RankingRow1" type="PanelContainer" parent="RankingPanel/Panel/Content/Rows"]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_ranking_row")
+
+[node name="Text" type="Label" parent="RankingPanel/Panel/Content/Rows/RankingRow1"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 30
+text = " 1          —"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RankingRow2" type="PanelContainer" parent="RankingPanel/Panel/Content/Rows"]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_ranking_row")
+
+[node name="Text" type="Label" parent="RankingPanel/Panel/Content/Rows/RankingRow2"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 30
+text = " 2          —"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RankingRow3" type="PanelContainer" parent="RankingPanel/Panel/Content/Rows"]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_ranking_row")
+
+[node name="Text" type="Label" parent="RankingPanel/Panel/Content/Rows/RankingRow3"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 30
+text = " 3          —"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RankingRow4" type="PanelContainer" parent="RankingPanel/Panel/Content/Rows"]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_ranking_row")
+
+[node name="Text" type="Label" parent="RankingPanel/Panel/Content/Rows/RankingRow4"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 30
+text = " 4          —"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RankingRow5" type="PanelContainer" parent="RankingPanel/Panel/Content/Rows"]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_ranking_row")
+
+[node name="Text" type="Label" parent="RankingPanel/Panel/Content/Rows/RankingRow5"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 30
+text = " 5          —"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RankingRow6" type="PanelContainer" parent="RankingPanel/Panel/Content/Rows"]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_ranking_row")
+
+[node name="Text" type="Label" parent="RankingPanel/Panel/Content/Rows/RankingRow6"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 30
+text = " 6          —"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RankingRow7" type="PanelContainer" parent="RankingPanel/Panel/Content/Rows"]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_ranking_row")
+
+[node name="Text" type="Label" parent="RankingPanel/Panel/Content/Rows/RankingRow7"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 30
+text = " 7          —"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RankingRow8" type="PanelContainer" parent="RankingPanel/Panel/Content/Rows"]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_ranking_row")
+
+[node name="Text" type="Label" parent="RankingPanel/Panel/Content/Rows/RankingRow8"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 30
+text = " 8          —"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RankingRow9" type="PanelContainer" parent="RankingPanel/Panel/Content/Rows"]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_ranking_row")
+
+[node name="Text" type="Label" parent="RankingPanel/Panel/Content/Rows/RankingRow9"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 30
+text = " 9          —"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RankingRow10" type="PanelContainer" parent="RankingPanel/Panel/Content/Rows"]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_ranking_row")
+
+[node name="Text" type="Label" parent="RankingPanel/Panel/Content/Rows/RankingRow10"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 30
+text = "10          —"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RankingCloseButton" type="Button" parent="RankingPanel/Panel/Content"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 120)
+layout_mode = 2
+mouse_filter = 0
+theme_override_font_sizes/font_size = 38
+text = "닫기"

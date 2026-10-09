@@ -64,10 +64,12 @@ func _ready() -> void:
 	InputRouter.restart_requested.connect(restart)
 	_ui.bind_start_screen(_save_path())
 	_ui.start_screen().mode_selected.connect(_on_mode_selected)
+	_ui.start_screen().ranking_requested.connect(_ui.show_ranking)
 	var game_over_panel: GameOverPanel = (
 		get_node("UI/Hud/GameOverPanel") as GameOverPanel
 	)
 	game_over_panel.mode_select_requested.connect(_show_mode_selection)
+	game_over_panel.ranking_requested.connect(_ui.show_ranking)
 	_bind_debug_controls()
 	if not _launch_game_on_ready:
 		_turn_manager.set_physics_process(false)

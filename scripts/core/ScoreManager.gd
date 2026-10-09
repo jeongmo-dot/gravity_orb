@@ -9,6 +9,7 @@ signal reaction_scored(reaction: Dictionary)
 var score: int = 0
 var best_score: int = 0
 var max_level_reached: int = 0
+var last_ranking_result: Dictionary = {"rank": 0, "record": {}}
 
 
 func _ready() -> void:
@@ -19,6 +20,7 @@ func _ready() -> void:
 func reset() -> void:
 	score = 0
 	max_level_reached = 0
+	last_ranking_result = {"rank": 0, "record": {}}
 	score_changed.emit(score, best_score)
 
 
@@ -29,7 +31,6 @@ func on_reaction(reaction: Dictionary) -> void:
 		max_level_reached = maxi(max_level_reached, int(reaction["result_level"]))
 	if score > best_score:
 		best_score = score
-		_save_best_score()
 	score_changed.emit(score, best_score)
 	reaction_scored.emit(reaction)
 
@@ -40,6 +41,25 @@ func on_orb_spawned(level: int) -> void:
 
 func commit() -> void:
 	_save_best_score()
+
+
+func commit_ranking(
+	mode: GameConfig.GameMode,
+	stats: Dictionary,
+	date_override: String = ""
+) -> Dictionary:
+	last_ranking_result = SaveStore.add_ranking(
+		save_path,
+		mode,
+		score,
+		stats,
+		date_override
+	)
+	var rankings: Array[Dictionary] = SaveStore.load_rankings(save_path, mode)
+	if not rankings.is_empty():
+		best_score = int(rankings[0]["score"])
+	score_changed.emit(score, best_score)
+	return last_ranking_result.duplicate(true)
 
 
 static func points_for(reaction: Dictionary, cfg: GameConfig) -> int:

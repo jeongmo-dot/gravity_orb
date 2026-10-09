@@ -21,6 +21,7 @@ const ANNIHILATION_RULE_NAMES: Array[String] = ["A", "B", "C"]
 @onready var _label: Label = %DebugLabel
 @onready var _hud: Hud = %Hud
 @onready var _start_screen: StartScreen = %StartScreen
+@onready var _ranking_panel: RankingPanel = %RankingPanel
 @onready var _sfx_bank: SfxBank = %SfxBank
 
 var _game_manager: Variant
@@ -31,6 +32,7 @@ var _turn_combo: int = 0
 var _combo_multiplier: float = 1.0
 var _max_combo: int = 0
 var _debug_visible: bool = false
+var _ranking_return_to_start: bool = true
 
 
 func _ready() -> void:
@@ -61,6 +63,9 @@ func _ready() -> void:
 
 func bind_start_screen(save_path: String) -> void:
 	_start_screen.bind(save_path, _sfx_bank)
+	_ranking_panel.bind(save_path)
+	if not _ranking_panel.closed.is_connected(_on_ranking_closed):
+		_ranking_panel.closed.connect(_on_ranking_closed)
 
 
 func show_start_screen() -> void:
@@ -77,6 +82,26 @@ func show_gameplay() -> void:
 
 func start_screen() -> StartScreen:
 	return _start_screen
+
+
+func ranking_panel() -> RankingPanel:
+	return _ranking_panel
+
+
+func show_ranking(mode: GameConfig.GameMode, highlight_rank: int = 0) -> void:
+	if not _ranking_panel.visible:
+		_ranking_return_to_start = _start_screen.visible
+	_start_screen.visible = false
+	_hud.visible = false
+	_label.visible = false
+	_ranking_panel.open(mode, highlight_rank)
+
+
+func _on_ranking_closed() -> void:
+	if _ranking_return_to_start:
+		show_start_screen()
+	else:
+		show_gameplay()
 
 
 func _toggle_debug_hud() -> void:
