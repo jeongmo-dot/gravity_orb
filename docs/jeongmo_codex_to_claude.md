@@ -40,7 +40,7 @@
 
 ### [2026-10-09] 대상 #53 — 로컬 랭킹 화면 (모드별 TOP 10)
 - 상태: 완료
-- 브랜치 / PR: `m8-local-rankings` / PR 생성 후 갱신
+- 브랜치 / PR: `m8-local-rankings` / https://github.com/jeongmo-dot/gravity_orb/pull/54
 - 변경 파일: `scenes/UI.tscn`, `scripts/core/{SaveStore,ScoreManager,TurnManager,BlitzManager,Main}.gd`, `scripts/ui/{StartScreen,GameOverPanel,DebugHud,RankingPanel}.gd`, `tests/{test_rankings,test_blitz_manager}.gd`, `tests/capture_screens.ps1`, `tests/scenarios/test_score_flow.gd`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `save.cfg`의 `rankings.turn`/`rankings.blitz`에 모드별 최대 10개를 저장하고 점수 내림차순·동점 선착순으로 정렬. 11위 이하는 버리고 `records.best_score`/`blitz_best_score`를 1위와 동기화 — `test_rankings_sort_ties_cap_and_sync_best`
