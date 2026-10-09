@@ -40,7 +40,7 @@
 
 ### [2026-10-09] 대상 #52 — 피버 띠·BLOCKED 표시·캡처 장면 일관성
 - 상태: 완료
-- 브랜치 / PR: `m8-fever-band-capture-consistency` / 미생성
+- 브랜치 / PR: `m8-fever-band-capture-consistency` / https://github.com/jeongmo-dot/gravity_orb/pull/52
 - 변경 파일: `scenes/UI.tscn`, `scripts/ui/Hud.gd`, `tests/{test_callouts.gd,test_screen_layout.gd}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 피버 시작 띠를 높이 `160 → 80px`, 배경 알파 `0.55`로 줄이고 외곽선이 있는 `FEVER ×2` 중앙 글자를 추가. 오른쪽에서 0.3초 진입·0.5초 유지·0.3초 퇴장 후 띠만 숨고, 비네트와 상단 `CHAIN · FEVER ×2 Ns` 배지는 피버 종료까지 유지 — `test_fever_vignette_only_lives_during_fever_and_uses_reusable_nodes`
