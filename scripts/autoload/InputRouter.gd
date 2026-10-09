@@ -2,6 +2,7 @@ extends Node
 
 signal swipe(direction: Vector2i)
 signal restart_requested
+signal debug_toggle_hud
 signal debug_cycle_annihilation_rule
 signal debug_cycle_spawn_count
 signal debug_toggle_game_mode
@@ -39,6 +40,10 @@ func _handle_event(event: InputEvent) -> void:
 func _handle_keyboard(event: InputEvent) -> bool:
 	if event.is_action_pressed(&"restart", false):
 		restart_requested.emit()
+		return true
+	# TEMP(M8): M9 디버그 패널이 이 토글을 대체할 때 제거한다.
+	if OS.is_debug_build() and event.is_action_pressed(&"debug_toggle_hud", false):
+		debug_toggle_hud.emit()
 		return true
 	# TEMP(M6): M9 디버그 패널이 규칙 선택을 대체할 때 제거한다.
 	if (

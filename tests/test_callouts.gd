@@ -48,10 +48,13 @@ func test_fever_vignette_only_lives_during_fever_and_uses_reusable_nodes() -> vo
 	var hud: Hud = main.get_node("UI/Hud") as Hud
 	var vignette: ColorRect = main.get_node("UI/Hud/FeverVignette") as ColorRect
 	var band: ColorRect = main.get_node("UI/Hud/FeverBand") as ColorRect
-	var fever_label: Label = main.get_node("UI/Hud/FeverLabel") as Label
+	var combo_label: Label = main.get_node("UI/Hud/ComboLabel") as Label
 	assert_true(not vignette.visible, "vignette starts hidden")
 	hud._on_fever_changed(true, 3.0)
-	assert_true(vignette.visible and band.visible and fever_label.visible, "fever shows overlay")
+	assert_true(vignette.visible and band.visible, "fever shows reusable overlay")
+	assert_true(combo_label.text.contains("FEVER ×2  3.0s"), "fever time uses top badge")
+	assert_true(not main.has_node("UI/Hud/FeverLabel"), "legacy centered fever label removed")
+	assert_true(hud.fever_vignette_max_alpha() <= 0.12, "vignette edge alpha cap")
 	var first_band_id: int = band.get_instance_id()
 	hud._process(0.125)
 	assert_true(vignette.modulate.a > 0.0, "fever vignette pulses")

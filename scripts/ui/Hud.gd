@@ -13,6 +13,7 @@ const CALLOUT_POP_DURATION: float = 0.12
 const CALLOUT_TOTAL_DURATION: float = 0.80
 const FEVER_ENTRY_DURATION: float = 0.30
 const FEVER_EXIT_DURATION: float = 0.30
+const FEVER_VIGNETTE_MAX_ALPHA: float = 0.12
 const TIME_BONUS_TRAVEL_DURATION: float = 0.50
 const TURN_CALLOUT_STEPS: Array[int] = [3, 5, 8, 12]
 const BLITZ_CALLOUT_STEPS: Array[int] = [5, 10, 15, 20, 30]
@@ -40,7 +41,6 @@ const TIMER_BONUS_COLOR: Color = Color("#30D158")
 @onready var _time_up_label: Label = %TimeUpLabel
 @onready var _blocked_label: Label = %BlockedLabel
 @onready var _timer_label: Label = %TimerLabel
-@onready var _fever_label: Label = %FeverLabel
 @onready var _bonus_label: Label = %BonusLabel
 @onready var _game_over_panel: GameOverPanel = %GameOverPanel
 @onready var _sound_button: Button = %HudSoundButton
@@ -69,8 +69,9 @@ var _danger_refresh_elapsed: float = 0.0
 var _pulse_elapsed: float = 0.0
 var _badge_punching: bool = false
 var _fever_active: bool = false
+var _fever_remaining: float = 0.0
 var _fever_band_base_position: Vector2 = Vector2.ZERO
-var _fever_label_base_position: Vector2 = Vector2.ZERO
+var _current_combo: int = 0
 var _previous_time_remaining: float = -1.0
 var _timer_flashing: bool = false
 var _callout_seen: Dictionary = {}
@@ -86,7 +87,6 @@ var _time_up_count: int = 0
 func _ready() -> void:
 	_sound_button.pressed.connect(_on_sound_pressed)
 	_fever_band_base_position = _fever_band.position
-	_fever_label_base_position = _fever_label.position
 	_configure_fever_vignette()
 	set_process(true)
 
@@ -108,10 +108,9 @@ func _process(delta: float) -> void:
 	if not _badge_punching and _current_multiplier >= 8.0:
 		var multiplier_pulse: float = 1.0 + 0.03 * sin(_pulse_elapsed * TAU * 2.0)
 		_multiplier_label.scale = Vector2.ONE * multiplier_pulse
-		_combo_label.scale = Vector2.ONE * multiplier_pulse
 	elif not _badge_punching:
 		_multiplier_label.scale = Vector2.ONE
-		_combo_label.scale = Vector2.ONE
+	_combo_label.scale = Vector2.ONE
 	if _danger_label.visible:
 		var danger_pulse: float = 1.0 + 0.04 * sin(
 			_pulse_elapsed * TAU * maxf(_danger_multiplier, 1.0)
@@ -160,7 +159,6 @@ func bind_game_state(
 	)
 	board.set_warning_directions(game_manager.blocked_directions)
 	_timer_label.visible = _blitz_mode
-	_fever_label.visible = false
 	_bonus_label.visible = false
 	_blocked_label.visible = not _blitz_mode
 	if _blitz_mode:
@@ -274,10 +272,10 @@ func _on_combo_changed(combo: int, multiplier: float, max_combo: int) -> void:
 		max_combo,
 	]
 	var previous_multiplier: float = _current_multiplier
+	_current_combo = combo
 	_current_multiplier = multiplier
 	_update_callout(combo)
-	_multiplier_label.visible = combo > 0
-	_combo_label.visible = combo > 0
+	_refresh_combo_badge()
 	if combo <= 0:
 		_multiplier_label.scale = Vector2.ONE
 		_combo_label.scale = Vector2.ONE
@@ -285,12 +283,31 @@ func _on_combo_changed(combo: int, multiplier: float, max_combo: int) -> void:
 	_multiplier_label.text = "×%s" % _format_multiplier(multiplier)
 	_multiplier_label.add_theme_color_override("font_color", multiplier_stage_color(multiplier))
 	_combo_label.add_theme_color_override("font_color", multiplier_stage_color(multiplier))
-	_combo_label.text = "%s %d" % [
-		"CHAIN" if _blitz_mode else "COMBO",
-		combo,
-	]
 	if multiplier > previous_multiplier and Config.data.fx_score_popups_enabled:
 		_punch_multiplier_badge()
+
+
+func _refresh_combo_badge() -> void:
+	_multiplier_label.visible = _current_combo > 0
+	_combo_label.visible = _current_combo > 0 or (_blitz_mode and _fever_active)
+	if not _combo_label.visible:
+		return
+	var combo_text: String = (
+		"%s %d" % ["CHAIN" if _blitz_mode else "COMBO", _current_combo]
+		if _current_combo > 0
+		else ""
+	)
+	if _blitz_mode and _fever_active:
+		var fever_text: String = "FEVER ×%s  %.1fs" % [
+			_format_multiplier(Config.data.blitz_fever_multiplier),
+			_fever_remaining,
+		]
+		combo_text = (
+			"%s  ·  %s" % [combo_text, fever_text]
+			if not combo_text.is_empty()
+			else fever_text
+		)
+	_combo_label.text = combo_text
 
 
 func _on_reaction_scored(reaction: Dictionary) -> void:
@@ -438,23 +455,14 @@ func _punch_multiplier_badge() -> void:
 		_badge_punch_tween.kill()
 	_badge_punching = true
 	_multiplier_label.scale = Vector2.ONE
-	_combo_label.scale = Vector2.ONE
 	_badge_punch_tween = create_tween()
-	_badge_punch_tween.set_parallel(true)
 	_badge_punch_tween.tween_property(
 		_multiplier_label, "scale", Vector2.ONE * 1.35, BADGE_PUNCH_DURATION * 0.5
 	)
 	_badge_punch_tween.tween_property(
-		_combo_label, "scale", Vector2.ONE * 1.35, BADGE_PUNCH_DURATION * 0.5
-	)
-	_badge_punch_tween.chain().set_parallel(true)
-	_badge_punch_tween.tween_property(
 		_multiplier_label, "scale", Vector2.ONE, BADGE_PUNCH_DURATION * 0.5
 	)
-	_badge_punch_tween.tween_property(
-		_combo_label, "scale", Vector2.ONE, BADGE_PUNCH_DURATION * 0.5
-	)
-	_badge_punch_tween.chain().tween_callback(func() -> void: _badge_punching = false)
+	_badge_punch_tween.tween_callback(func() -> void: _badge_punching = false)
 
 
 func _punch_score_label() -> void:
@@ -523,19 +531,17 @@ func _on_ready_changed(active: bool, remaining: float) -> void:
 
 
 func _on_fever_changed(active: bool, remaining: float) -> void:
+	var was_active: bool = _fever_active
+	_fever_active = active
+	_fever_remaining = maxf(remaining, 0.0)
+	_refresh_combo_badge()
 	if active:
-		_fever_label.text = "FEVER ×%.0f   %.1fs" % [
-			Config.data.blitz_fever_multiplier,
-			remaining,
-		]
-		if not _fever_active:
-			_fever_active = true
+		if not was_active:
 			if Config.data.fx_callouts_enabled:
 				_start_fever_presentation()
 		return
-	if not _fever_active:
+	if not was_active:
 		return
-	_fever_active = false
 	if Config.data.fx_callouts_enabled:
 		_end_fever_presentation()
 	else:
@@ -610,20 +616,14 @@ func _start_fever_presentation() -> void:
 		_fever_tween.kill()
 	var slide_distance: float = get_viewport_rect().size.x
 	_fever_band.position = _fever_band_base_position + Vector2(slide_distance, 0.0)
-	_fever_label.position = _fever_label_base_position + Vector2(slide_distance, 0.0)
 	_fever_band.modulate = Color.WHITE
-	_fever_label.modulate = Color.WHITE
 	_fever_vignette.modulate = Color.WHITE
 	_fever_band.visible = true
-	_fever_label.visible = true
 	_fever_vignette.visible = true
 	_fever_tween = create_tween()
 	_fever_tween.set_parallel(true)
 	_fever_tween.tween_property(
 		_fever_band, "position", _fever_band_base_position, FEVER_ENTRY_DURATION
-	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	_fever_tween.tween_property(
-		_fever_label, "position", _fever_label_base_position, FEVER_ENTRY_DURATION
 	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	if _sfx_bank != null:
 		_sfx_bank.play_fever_sweep(true)
@@ -635,7 +635,6 @@ func _end_fever_presentation() -> void:
 	_fever_tween = create_tween()
 	_fever_tween.set_parallel(true)
 	_fever_tween.tween_property(_fever_band, "modulate:a", 0.0, FEVER_EXIT_DURATION)
-	_fever_tween.tween_property(_fever_label, "modulate:a", 0.0, FEVER_EXIT_DURATION)
 	_fever_tween.tween_property(_fever_vignette, "modulate:a", 0.0, FEVER_EXIT_DURATION)
 	_fever_tween.chain().tween_callback(_hide_fever_visuals)
 	if _sfx_bank != null:
@@ -761,8 +760,8 @@ func _configure_fever_vignette() -> void:
 		"render_mode unshaded;",
 		"void fragment() {",
 		"  vec2 edge_distance = abs(UV - vec2(0.5)) * 2.0;",
-		"  float edge = smoothstep(0.54, 1.0, max(edge_distance.x, edge_distance.y));",
-		"  float alpha = 0.035 + edge * 0.22;",
+		"  float edge = smoothstep(0.70, 1.0, max(edge_distance.x, edge_distance.y));",
+		"  float alpha = edge * 0.12;",
 		"  COLOR = vec4(1.0, 0.30, 0.015, alpha);",
 		"}",
 	])
@@ -780,6 +779,7 @@ func _reset_callout_tracking() -> void:
 	_pending_time_bonuses.clear()
 	_previous_time_remaining = -1.0
 	_fever_active = false
+	_fever_remaining = 0.0
 	_time_up_count = 0
 	_hide_callout_visuals()
 
@@ -809,12 +809,13 @@ func _hide_bonus_label() -> void:
 func _hide_fever_visuals() -> void:
 	_fever_vignette.visible = false
 	_fever_band.visible = false
-	_fever_label.visible = false
 	_fever_vignette.modulate = Color.WHITE
 	_fever_band.modulate = Color.WHITE
-	_fever_label.modulate = Color.WHITE
 	_fever_band.position = _fever_band_base_position
-	_fever_label.position = _fever_label_base_position
+
+
+func fever_vignette_max_alpha() -> float:
+	return FEVER_VIGNETTE_MAX_ALPHA
 
 
 func callout_history() -> Array[int]:
