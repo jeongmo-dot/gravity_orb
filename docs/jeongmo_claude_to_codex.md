@@ -30,8 +30,15 @@
 
 ## 대기 중
 
-### [2026-10-09 #55] 턴제 생성 증가 기본값 적용 (조건 C)
-- 상태: 대기 (**다음 차례**)
+_(없음)_
+
+---
+
+## 처리 완료
+
+### [2026-10-09 #55] 턴제 생성 증가 기본값 적용 (조건 C) — 완료
+- 상태: 완료 (2026-10-10 Claude 검수 통과 · [PR #56](https://github.com/jeongmo-dot/gravity_orb/pull/56) 병합 `79af7e2`)
+- 검수: 래퍼 251/251 (53.4초), 스모크 3종 0, 캡처 12장 Claude 직접 촬영·확인 (사용자 저장 불변). `12_turn_ramp_next` NEXT 2·THEN 2 겹침 없음. 100/101/200/201턴 생성 1/2/2/3, 미리보기 미래 턴 번호 사용, BLITZ 무관 확인. 장기 Jolt 22시드 이탈·발산 0, 벽/쌍 12.95/13.08px
 - 근거: 기획서 **0.10.9**, [technical_design.md](technical_design.md) §4 `spawn_count_ramp_turns`·§12-T 결과·결정
 - 사용자 결정 (2026-10-09): #54 측정 조건 **C** 채택 — 1~100턴 1개, 101~200턴 2개, 201턴부터 3개
 - 요구: `spawn_count_ramp_turns` 기본값 0 → **100** (`GameConfig.gd` 선언·`default_config.tres`·config 테스트), `spawn_count_max` 3 그대로. 턴당 1개 고정을 전제로 한 턴제 테스트는 값을 명시하거나 새 기본값에 맞게. BLITZ 경로(스와이프·목표 밀도 생성)는 영향 없음을 확인
@@ -40,10 +47,6 @@
 - 건드리지 말 것: 다른 수치·규칙, BLITZ, `docs/` (회신 파일 제외)
 - Done-when: 테스트 통과, `.\tests\run_tests.ps1`·`.\tests\capture_screens.ps1` 통과, 스모크 3종 에러 0
 - 커밋: 항목 단위 브랜치, push까지
-
----
-
-## 처리 완료
 
 ### [2026-10-09 #54] 턴제에 끝 만들기 — 생성 증가 측정 — 완료
 - 상태: 완료 (2026-10-09 Claude 검수 · [PR #55](https://github.com/jeongmo-dot/gravity_orb/pull/55) 병합 `109e879`, 측정 도구만)
