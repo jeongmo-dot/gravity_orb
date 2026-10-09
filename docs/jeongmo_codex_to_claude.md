@@ -40,7 +40,7 @@
 
 ### [2026-10-09] 대상 #50 — 화면 배치 정리 + 스크린샷 검수 도구
 - 상태: 완료
-- 브랜치 / PR: `m8-screen-layout-capture` / 미생성
+- 브랜치 / PR: `m8-screen-layout-capture` / https://github.com/jeongmo-dot/gravity_orb/pull/50
 - 변경 파일: `project.godot`, `scenes/UI.tscn`, `scripts/autoload/InputRouter.gd`, `scripts/ui/{DebugHud.gd,Hud.gd}`, `tests/{capture_screens.ps1,test_callouts.gd,test_input_router.gd,test_screen_layout.gd}`, `tests/spike/{CaptureScreens.tscn,capture_screens.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] DANGER를 왼쪽 상단 별도 영역으로 옮기고 SCORE·BEST·MAX CHAIN·배수·CHAIN/FEVER·NEXT·THEN·타이머·소리 버튼과 분리. DANGER·FEVER·NEXT `×8`을 동시에 표시한 1080×1920, 540×960 두 크기에서 `get_global_rect()` 쌍별 교차 0건 — `test_busy_blitz_hud_regions_do_not_overlap_at_supported_sizes`
