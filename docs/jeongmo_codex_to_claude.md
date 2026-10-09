@@ -38,6 +38,51 @@
 
 ## 미확인
 
+### [2026-10-10] 대상 #56 — 턴제 생성 증가 50턴 간격·상한 없음
+- 상태: 완료
+- 브랜치 / PR: `m8-turn-spawn-ramp-uncapped` / PR 생성 전
+- 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, `scripts/ui/Hud.gd`, `scenes/UI.tscn`, `tests/{test_config.gd,test_spawner.gd,test_blitz_manager.gd,capture_screens.ps1,run_turn_ramp_measurement.ps1}`, `tests/spike/{capture_screens.gd,run_jolt_3d_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 기본값을 `spawn_count_ramp_turns=50`, `spawn_count_max=0`으로 변경하고 `spawn_count_max <= 0`이면 상한을 적용하지 않음 — `test_m4_spawn_defaults`, `test_spawn_count_ramp_turn_boundaries`
+  - [x] 1·50·51·100·101·150·151·201·251턴 생성 수 `1/1/2/2/3/3/4/5/6`, 음수 max도 무상한, 양수 max 3은 3개에서 정지 — config·Spawner 경계 테스트
+  - [x] 여러 구체 생성은 기존 `Spawner.try_spawn()` 묶음·빈자리 예약·입구 대기 경로를 그대로 사용. BLITZ는 `_batch_size_for_index()`에서 계속 1을 반환하고 목표 밀도 미리보기 테스트 `13/13` 통과
+  - [x] TURN NEXT/THEN 모두 6개 이상이면 최대 5개만 그리고 각자 `×n` 표시. 251턴 `NEXT ×6`·252턴 `THEN ×6` 캡처 `13_turn_ramp_uncapped_next.png` 추가
+  - [x] 새 기본값 × 시드 101~112를 독립 Jolt 3D 120Hz 프로세스에서 게임오버 또는 800턴까지 측정. 12/12 게임오버, 중단 0
+  - [x] 공식 래퍼 251/251, 캡처 13장, 시작 화면/TURN/BLITZ 스모크 모두 종료 코드 0
+- QA 관측값 — 새 기본값 E(50/무상한), 시드 101~112 (`최소 / p50 / 최대`):
+  - 게임 길이 `143 / 153 / 174턴` (평균 `157.25`), 종료 턴 생성 수 `3 / 4 / 4개` (평균 `3.5`), 종료 점유율 `78.90 / 81.06 / 83.94%`
+  - 점수 `5,455 / 15,896 / 37,722`, 최대 콤보 `5 / 7 / 9`
+  - 대폭발 총 `8회`, 판당 `0 / 0 / 2회`, 5/12판 발생, 첫 대폭발 턴 `102 / 109 / 111`
+  - 1~100턴: 턴당 반응 `1.1792`, 반응 0 `35.25%` (`n=1,200`). 101턴~종료: `2.0160`, `17.76%` (`n=687`). 201턴 도달 판은 0/12라 해당 구간 표본 없음
+  - 마지막 50턴: 턴당 반응 `1.8883`, 반응 0 `18.83%` (`n=600`). 입구 대기 턴 총 `12`(각 판 게임오버 턴 1회)
+  - 측정 물리: 최대 벽 관통 `21.6231px`, 턴 종료 최대 쌍 겹침 `35.1248px`, 이탈 `0`, 발산 `0`, 중단 `0`
+- QA 관측값 — #54 C·D와 나란히 비교 (`최소 / p50 / 최대`):
+
+  | 조건 | 길이 | 종료 턴 생성 | 점수 | 최대 콤보 | 대폭발 총계·판당 | 마지막 50턴 반응 0 |
+  |---|---:|---:|---:|---:|---:|---:|
+  | C 100/max3 | 223 / 241 / 296 | 3 / 3 / 3 | 10,526 / 28,477 / 84,375 | 5 / 7 / 10 | 29회 · 1 / 2 / 5 | 22.17% |
+  | D 60/max3 | 153 / 180 / 201 | 3 / 3 / 3 | 6,736 / 19,049 / 30,668 | 5 / 7 / 9 | 14회 · 0 / 1 / 2 | 20.67% |
+  | **E 50/무상한** | **143 / 153 / 174** | **3 / 4 / 4** | **5,455 / 15,896 / 37,722** | **5 / 7 / 9** | **8회 · 0 / 0 / 2** | **18.83%** |
+
+  - C/D/E 모두 12/12 게임오버·중단 0·이탈 0·발산 0. 최대 벽 관통 `25.6583 / 20.7898 / 21.6231px`, 턴 종료 최대 쌍 겹침 `41.3699 / 37.6513 / 35.1248px`
+- QA 관측값 — 자동 검증:
+  - Godot `4.8-dev3` `--headless --path . --import` → 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - 관련 테스트 → config `13/13`, Spawner `14/14`, BLITZ manager `13/13`, 화면 배치 `4/4`, 각 종료 코드 0
+  - `tests/run_tests.ps1` (`--fixed-fps 120`) → 일반 `242/242` 19.249초, 장기 Jolt `4/4` 34.565초, 성능 `5/5` 1.677초, 총 `251/251`, 최종 종료 코드 0, 합계 55.491초
+  - 장기 Jolt 관측 → 22시드 이탈 `0`, 발산 `0`, 최대 벽 관통 `12.9515px`, 최대 쌍 겹침 `11.8675px`; 시드 101 120턴·20턴 통합 테스트 통과
+  - `tests/capture_screens.ps1` → OpenGL 3.3 / RTX 4070 Ti SUPER, 540×960 PNG `13/13`, 종료 코드 0. 직접 확인 시 NEXT·THEN 각각 구슬 5개와 `×6`, 구슬·라벨·보드 상단선 겹침 없음
+  - 시작 화면 / `--mode=turn --jolt-seed=101` / `--mode=blitz --jolt-seed=101` 300프레임 스모크 → 모두 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - `git diff --check` 오류 0건. 규칙 검색 → `Input`/`InputEvent`는 `InputRouter.gd`, `Haptics.gd`만; 난수 호출은 `Spawner.gd`만
+- 수동 확인 절차:
+  1. `tests/capture_screens.ps1` 실행 후 `artifacts/screens/13_turn_ramp_uncapped_next.png`를 연다 → NEXT와 THEN에 각각 구슬 5개와 `×6`이 보이고 서로 및 보드 상단선과 겹치지 않는지 확인한다.
+  2. 턴제를 진행한다 → 1~50턴 1개, 51~100턴 2개, 101~150턴 3개, 151~200턴 4개로 증가하고 해당 턴의 묶음이 한 번에 같은 생성 경로로 들어오는지 확인한다.
+  3. BLITZ를 시작해 빈 판·고밀도 판에서 스와이프한다 → NEXT 생성량은 기존 목표 밀도 1~8개를 따르고 TURN의 50턴 ramp와 무관한지 확인한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 기존 #55의 `12_turn_ramp_next.png`(100/max3, 101턴 2개)는 회귀 자료로 유지하고, 새 기본값 251턴 묶음은 `13_turn_ramp_uncapped_next.png`로 별도 추가했다. 캡처는 251턴까지 실제 플레이하지 않고 정식 `Spawner.sync_next_batch_size(251)`·HUD 신호 경로로 장면을 구성한다.
+  - 새 기본값 측정은 모든 판이 174턴 안에 끝나 실제 플레이에서 251턴 `×6`에 도달한 판은 없었다. 캡처는 무상한 계산과 큰 묶음 UI의 도달 가능 경로를 검증하는 합성 장면이다.
+  - 캡처 종료 시 기존 `ObjectDB instances leaked` 경고 4건이 있으나 PNG 13장·사용자 저장 불변 검증과 프로세스 종료 코드는 0이다. 캡처·측정 JSON은 `artifacts/`의 gitignore 대상이라 커밋하지 않는다.
+- 남은 것 · 질문: 자동 검증 기준의 남은 항목 없음. Claude의 캡처 시각 검수 및 153턴 안팎 게임 길이 체감 확인 필요.
+
 ### [2026-10-10] 대상 #55 — 턴제 생성 증가 기본값 적용 (조건 C)
 - 상태: 완료
 - 브랜치 / PR: `m8-turn-spawn-ramp-default` / https://github.com/jeongmo-dot/gravity_orb/pull/56

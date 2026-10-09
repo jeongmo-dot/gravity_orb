@@ -47,8 +47,8 @@ enum GameMode { TURN, BLITZ }
 )
 @export var spawn_count_per_turn: int = 1
 @export var preview_turns: int = 2
-@export var spawn_count_ramp_turns: int = 100
-@export var spawn_count_max: int = 3
+@export var spawn_count_ramp_turns: int = 50
+@export var spawn_count_max: int = 0
 @export var spawn_position_mode: SpawnPositionMode = SpawnPositionMode.RANDOM
 @export var spawn_margin: float = 4.0
 @export var spawn_probe_step: float = 5.0
@@ -186,7 +186,10 @@ func spawn_count_for_turn(turn_index: int) -> int:
 	var completed_ramps: int = floori(
 		float(maxi(turn_index, 1) - 1) / float(spawn_count_ramp_turns)
 	)
-	return mini(spawn_count_per_turn + completed_ramps, spawn_count_max)
+	var ramped_count: int = spawn_count_per_turn + completed_ramps
+	if spawn_count_max <= 0:
+		return ramped_count
+	return mini(ramped_count, spawn_count_max)
 
 
 func is_opposite(c1: int, c2: int) -> bool:

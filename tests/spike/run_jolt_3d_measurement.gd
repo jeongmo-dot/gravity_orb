@@ -1120,7 +1120,7 @@ func _apply_arguments() -> void:
 		elif argument.begins_with("--spawn-count-max="):
 			Config.data.spawn_count_max = maxi(
 				argument.trim_prefix("--spawn-count-max=").to_int(),
-				1
+				0
 			)
 		elif argument.begins_with("--level-radii="):
 			Config.data.level_radii = _parse_float_list(

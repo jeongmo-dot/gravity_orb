@@ -429,13 +429,16 @@ func test_main_selects_blitz_manager_and_shows_time_up_results() -> void:
 		eight_candidates.append({"color": index % 6, "level": 1})
 	hud._on_preview_changed([
 		eight_candidates,
-		[{"color": OrbTypes.OrbColor.RED, "level": 1}],
+		eight_candidates,
 	])
 	var next_count_label: Label = main.get_node("UI/Hud/NextCountLabel") as Label
+	var then_count_label: Label = main.get_node("UI/Hud/ThenCountLabel") as Label
 	assert_eq(hud._next_preview.get_child_count(), 5, "NEXT renders at most five orbs")
 	assert_true(next_count_label.visible, "large NEXT count label is visible")
 	assert_eq(next_count_label.text, "×8", "large NEXT count label")
-	assert_eq(hud._then_preview.get_child_count(), 1, "THEN renders following one orb")
+	assert_eq(hud._then_preview.get_child_count(), 5, "THEN renders at most five orbs")
+	assert_true(then_count_label.visible, "large THEN count label is visible")
+	assert_eq(then_count_label.text, "×8", "large THEN count label")
 	manager._physics_process(1.5)
 	assert_eq(manager.state, BlitzManager.State.RUNNING, "main starts blitz after ready")
 	manager.on_swipe(Vector2i.RIGHT)

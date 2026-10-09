@@ -80,8 +80,8 @@ func test_m4_spawn_defaults() -> void:
 	)
 	assert_eq(config.spawn_count_per_turn, 1, "spawn count per turn")
 	assert_eq(config.preview_turns, 2, "preview turns")
-	assert_eq(config.spawn_count_ramp_turns, 100, "spawn count ramp interval")
-	assert_eq(config.spawn_count_max, 3, "spawn count maximum")
+	assert_eq(config.spawn_count_ramp_turns, 50, "spawn count ramp interval")
+	assert_eq(config.spawn_count_max, 0, "non-positive spawn count maximum is uncapped")
 	assert_eq(config.spawn_position_mode, GameConfig.SpawnPositionMode.RANDOM, "position mode")
 	assert_near(config.spawn_margin, 4.0, TOLERANCE, "spawn margin")
 	assert_near(config.spawn_probe_step, 5.0, TOLERANCE, "spawn probe step")
@@ -91,7 +91,17 @@ func test_m4_spawn_defaults() -> void:
 
 func test_spawn_count_ramp_turn_boundaries() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
-	var expected: Dictionary = {100: 1, 101: 2, 200: 2, 201: 3}
+	var expected: Dictionary = {
+		1: 1,
+		50: 1,
+		51: 2,
+		100: 2,
+		101: 3,
+		150: 3,
+		151: 4,
+		201: 5,
+		251: 6,
+	}
 	for turn_value: Variant in expected:
 		var turn_index: int = int(turn_value)
 		assert_eq(
@@ -99,6 +109,12 @@ func test_spawn_count_ramp_turn_boundaries() -> void:
 			int(expected[turn_index]),
 			"spawn count at turn %d" % turn_index
 		)
+	config.spawn_count_max = -1
+	assert_eq(config.spawn_count_for_turn(251), 6, "negative maximum is also uncapped")
+	config.spawn_count_max = 3
+	assert_eq(config.spawn_count_for_turn(101), 3, "positive maximum permits third orb")
+	assert_eq(config.spawn_count_for_turn(151), 3, "positive maximum caps later turns")
+	assert_eq(config.spawn_count_for_turn(251), 3, "positive maximum remains capped")
 
 
 func test_m5_contact_defaults() -> void:

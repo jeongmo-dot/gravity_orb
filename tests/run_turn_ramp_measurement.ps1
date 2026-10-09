@@ -1,17 +1,26 @@
 param(
     [string]$GodotPath = "C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe",
     [string]$SummaryName = "turn_ramp_measurement_summary.json",
+    [switch]$UncappedOnly,
     [switch]$AggregateOnly
 )
 
 $ErrorActionPreference = "Stop"
 $repoPath = Split-Path -Parent $PSScriptRoot
 $artifactPath = Join-Path $repoPath "artifacts"
-$conditions = @(
+$allConditions = @(
     [ordered]@{ id = "A"; name = "current"; ramp = 0; max = 3 },
     [ordered]@{ id = "B"; name = "ramp100_max2"; ramp = 100; max = 2 },
     [ordered]@{ id = "C"; name = "ramp100_max3"; ramp = 100; max = 3 },
-    [ordered]@{ id = "D"; name = "ramp60_max3"; ramp = 60; max = 3 }
+    [ordered]@{ id = "D"; name = "ramp60_max3"; ramp = 60; max = 3 },
+    [ordered]@{ id = "E"; name = "ramp50_uncapped"; ramp = 50; max = 0 }
+)
+$conditions = @(
+    if ($UncappedOnly) {
+        $allConditions | Where-Object { $_.id -eq "E" }
+    } else {
+        $allConditions | Where-Object { $_.id -ne "E" }
+    }
 )
 
 New-Item -ItemType Directory -Force -Path $artifactPath | Out-Null
@@ -63,6 +72,13 @@ function Get-TurnSummary([object[]]$Rows) {
         zero_reaction_turns = $zero
         zero_reaction_turn_percent = $(if ($turns -eq 0) { 0.0 } else { 100.0 * $zero / $turns })
     }
+}
+
+function Get-SpawnCountForTurn([int]$Turn, [int]$Ramp, [int]$Maximum) {
+    if ($Ramp -le 0) { return 1 }
+    $count = 1 + [Math]::Floor(([Math]::Max($Turn, 1) - 1) / [double]$Ramp)
+    if ($Maximum -gt 0) { return [Math]::Min($count, $Maximum) }
+    return $count
 }
 
 $caseSummaries = @()
@@ -123,6 +139,11 @@ foreach ($condition in $conditions) {
             ForEach-Object { [double]$_.first_blast_turn }
     )
     $blockedCounts = [double[]]@($seedRows | ForEach-Object { [double]$_.entrance_blocked_turns })
+    $finalTurnSpawnCounts = [double[]]@(
+        $seedRows | ForEach-Object {
+            Get-SpawnCountForTurn ([int]$_.completed_turns) ([int]$condition.ramp) ([int]$condition.max)
+        }
+    )
     $lateSummary = Get-TurnSummary $lateRows
     $gameOverCount = @($seedRows | Where-Object { [bool]$_.game_over }).Count
     $reached800Count = @($seedRows | Where-Object { -not [bool]$_.game_over -and [int]$_.completed_turns -ge 800 }).Count
@@ -149,6 +170,7 @@ foreach ($condition in $conditions) {
         final_occupancy_percent = Get-Distribution $occupancies
         score = Get-Distribution $scores
         max_combo = Get-Distribution $combos
+        final_turn_spawn_count = Get-Distribution $finalTurnSpawnCounts
         blast = [ordered]@{
             total = [int](($blastCounts | Measure-Object -Sum).Sum)
             per_game = Get-Distribution $blastCounts
