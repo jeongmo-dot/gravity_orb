@@ -273,24 +273,30 @@ func test_speed_chain_productive_miss_idle_fever_and_time_bonus_cap() -> void:
 	manager.on_swipe(Vector2i.UP)
 	manager._physics_process(Config.data.blitz_chain_window + 0.01)
 	assert_eq(manager.chain, 0, "missed swipe resets chain")
-	for index: int in range(12):
+	var second_fever_chain: int = Config.data.blitz_fever_chain * 2
+	for index: int in range(second_fever_chain):
 		manager._physics_process(Config.data.blitz_swipe_cooldown)
 		_productive_swipe(manager, _next_direction(manager.gravity, index))
-	assert_eq(manager.chain, 12, "productive swipes build chain")
-	assert_eq(manager.max_chain, 12, "maximum chain tracks board run")
-	assert_eq(manager.fever_count, 2, "chain six and twelve trigger fever")
+	assert_eq(manager.chain, second_fever_chain, "productive swipes build chain")
+	assert_eq(manager.max_chain, second_fever_chain, "maximum chain tracks board run")
+	assert_eq(manager.fever_count, 2, "two configured chain thresholds trigger fever")
 	assert_near(
 		manager.fever_remaining,
 		Config.data.blitz_fever_duration,
 		TOLERANCE,
-		"chain twelve refreshes fever"
+		"second configured chain threshold refreshes fever"
 	)
 	var passive: Dictionary = _reaction(ReactionRules.Type.MERGE, 2)
 	manager.on_reaction(passive)
-	assert_eq(manager.chain, 12, "reaction without swipe does not raise chain")
+	assert_eq(manager.chain, second_fever_chain, "reaction without swipe does not raise chain")
 	assert_eq(manager.passive_reaction_count, 1, "reaction without swipe is counted")
 	assert_eq(bool(passive["productive_swipe"]), false, "reaction records passive state")
-	assert_near(float(passive["combo_multiplier"]), 4.0, TOLERANCE, "passive reaction uses current chain")
+	assert_near(
+		float(passive["combo_multiplier"]),
+		manager.current_combo_multiplier(),
+		TOLERANCE,
+		"passive reaction uses current chain"
+	)
 	for index: int in range(4):
 		manager._physics_process(Config.data.blitz_swipe_cooldown)
 		_productive_swipe(manager, _next_direction(manager.gravity, index))
