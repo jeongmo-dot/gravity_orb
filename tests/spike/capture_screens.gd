@@ -5,6 +5,11 @@ const OUTPUT_DIRECTORY: String = "res://artifacts/screens"
 const DEFAULT_USER_SAVE: String = "user://save.cfg"
 const TEMP_SAVE_PREFIX: String = "--capture-save-path="
 const CAPTURE_SEED: int = 5050
+const TURN_CAPTURE_SCORE: int = 2048
+const TURN_CAPTURE_BEST: int = 3764
+const BLITZ_CAPTURE_SCORE: int = 18760
+const BLITZ_CAPTURE_BEST: int = 18760
+const TURN_GAME_OVER_DIRECTION: Vector2i = Vector2i.LEFT
 const WAIT_TIMEOUT_SECONDS: float = 5.0
 const DIRECTION_PATTERN: Array[Vector2i] = [
 	Vector2i.LEFT,
@@ -91,16 +96,20 @@ func _capture_turn_scenes() -> void:
 			await _destroy_main(main)
 			return
 	manager.set_physics_process(false)
-	hud._on_score_changed(2048, 3764)
+	hud._on_score_changed(TURN_CAPTURE_SCORE, TURN_CAPTURE_BEST)
 	hud._on_combo_changed(4, 8.0, 4)
 	await get_tree().create_timer(0.30).timeout
 	await _capture("03_turn_combo.png")
 
-	score.score = 2048
-	score.best_score = 3764
+	score.score = TURN_CAPTURE_SCORE
+	score.best_score = TURN_CAPTURE_BEST
 	manager.max_combo = 4
-	manager.gravity = Vector2i.LEFT
+	manager.gravity = TURN_GAME_OVER_DIRECTION
+	manager.blocked_directions.clear()
+	manager.blocked_directions.append(TURN_GAME_OVER_DIRECTION)
+	hud._on_warning_changed(manager.blocked_directions)
 	manager.game_over.emit()
+	_validate_turn_game_over_scene(main)
 	await _capture("04_turn_game_over.png")
 	await _destroy_main(main)
 
@@ -122,7 +131,9 @@ func _capture_blitz_scenes() -> void:
 		await _wait_physics_seconds(0.35)
 	manager.set_physics_process(false)
 
-	hud._on_score_changed(14720, 14720)
+	score.score = BLITZ_CAPTURE_SCORE
+	score.best_score = BLITZ_CAPTURE_BEST
+	hud._on_score_changed(BLITZ_CAPTURE_SCORE, BLITZ_CAPTURE_BEST)
 	hud._on_combo_changed(8, 2.0, 8)
 	hud._on_fever_changed(true, 3.0)
 	if board.has_method("set_fever_active"):
@@ -140,17 +151,19 @@ func _capture_blitz_scenes() -> void:
 
 	hud._set_danger_badge(0.0, 1.0)
 	hud._on_combo_changed(0, 1.0, 8)
+	manager.remaining_time = 0.0
+	hud._on_time_changed(manager.remaining_time)
 	hud._on_finale_started()
 	await get_tree().create_timer(0.15).timeout
+	_validate_blitz_time_up_scene(main)
 	await _capture("08_blitz_time_up.png")
 
 	hud._hide_time_up_label()
-	score.score = 18760
-	score.best_score = 18760
 	manager.max_combo = 8
 	manager.blast_count = 3
 	manager.fever_count = 2
 	manager.game_over.emit()
+	_validate_blitz_result_scene(main)
 	await _capture("09_blitz_result.png")
 	await _destroy_main(main)
 
@@ -228,6 +241,72 @@ func _verify_capture_files() -> void:
 		var path: String = OUTPUT_DIRECTORY.path_join(file_name)
 		if not FileAccess.file_exists(path):
 			_fail("Missing capture %s" % path)
+
+
+func _validate_turn_game_over_scene(main: Main) -> void:
+	var blocked: Label = main.get_node("UI/Hud/BlockedLabel") as Label
+	if not blocked.visible:
+		_fail("TURN game-over capture must show blocked direction")
+	_expect_label_text(blocked, "BLOCKED: LEFT", "TURN HUD blocked direction")
+	_expect_label_text(
+		main.get_node("UI/Hud/ScoreLabel") as Label,
+		"SCORE\n%d" % TURN_CAPTURE_SCORE,
+		"TURN HUD score"
+	)
+	_expect_label_text(
+		main.get_node("UI/Hud/GameOverPanel/Margin/Content/GameOverScore") as Label,
+		"SCORE  %d" % TURN_CAPTURE_SCORE,
+		"TURN result score"
+	)
+	_expect_label_text(
+		main.get_node("UI/Hud/GameOverPanel/Margin/Content/GameOverBlocked") as Label,
+		"BLOCKED: LEFT",
+		"TURN result blocked direction"
+	)
+	print("SCREEN_CAPTURE_CHECK scene=turn_game_over score=%d blocked=LEFT" % TURN_CAPTURE_SCORE)
+
+
+func _validate_blitz_time_up_scene(main: Main) -> void:
+	_expect_label_text(
+		main.get_node("UI/Hud/TimerLabel") as Label,
+		"0.0",
+		"BLITZ TIME UP timer"
+	)
+	_expect_label_text(
+		main.get_node("UI/Hud/ScoreLabel") as Label,
+		"SCORE\n%d" % BLITZ_CAPTURE_SCORE,
+		"BLITZ TIME UP HUD score"
+	)
+	print("SCREEN_CAPTURE_CHECK scene=blitz_time_up timer=0.0 score=%d" % BLITZ_CAPTURE_SCORE)
+
+
+func _validate_blitz_result_scene(main: Main) -> void:
+	_expect_label_text(
+		main.get_node("UI/Hud/TimerLabel") as Label,
+		"0.0",
+		"BLITZ result timer"
+	)
+	_expect_label_text(
+		main.get_node("UI/Hud/ScoreLabel") as Label,
+		"SCORE\n%d" % BLITZ_CAPTURE_SCORE,
+		"BLITZ result HUD score"
+	)
+	_expect_label_text(
+		main.get_node("UI/Hud/GameOverPanel/Margin/Content/GameOverScore") as Label,
+		"SCORE  %d" % BLITZ_CAPTURE_SCORE,
+		"BLITZ result panel score"
+	)
+	_expect_label_text(
+		main.get_node("UI/Hud/GameOverPanel/Margin/Content/GameOverBest") as Label,
+		"BEST  %d" % BLITZ_CAPTURE_BEST,
+		"BLITZ result panel best"
+	)
+	print("SCREEN_CAPTURE_CHECK scene=blitz_result timer=0.0 score=%d" % BLITZ_CAPTURE_SCORE)
+
+
+func _expect_label_text(label: Label, expected: String, description: String) -> void:
+	if label.text != expected:
+		_fail("%s expected '%s', got '%s'" % [description, expected, label.text])
 
 
 func _snapshot_user_save() -> void:

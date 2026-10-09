@@ -48,18 +48,28 @@ func test_fever_vignette_only_lives_during_fever_and_uses_reusable_nodes() -> vo
 	var hud: Hud = main.get_node("UI/Hud") as Hud
 	var vignette: ColorRect = main.get_node("UI/Hud/FeverVignette") as ColorRect
 	var band: ColorRect = main.get_node("UI/Hud/FeverBand") as ColorRect
+	var band_label: Label = main.get_node("UI/Hud/FeverBand/FeverBandLabel") as Label
 	var combo_label: Label = main.get_node("UI/Hud/ComboLabel") as Label
 	assert_true(not vignette.visible, "vignette starts hidden")
 	hud._on_fever_changed(true, 3.0)
 	assert_true(vignette.visible and band.visible, "fever shows reusable overlay")
+	assert_eq(band_label.text, "FEVER ×2", "fever entry band names multiplier")
+	assert_true(band_label.get_theme_constant("outline_size") > 0, "fever band text has outline")
+	assert_true(band.color.a <= 0.55 + TOLERANCE, "fever band alpha cap")
+	assert_near(band.size.y, 80.0, TOLERANCE, "fever band uses half-height strip")
 	assert_true(combo_label.text.contains("FEVER ×2  3.0s"), "fever time uses top badge")
 	assert_true(not main.has_node("UI/Hud/FeverLabel"), "legacy centered fever label removed")
 	assert_true(hud.fever_vignette_max_alpha() <= 0.12, "vignette edge alpha cap")
 	var first_band_id: int = band.get_instance_id()
 	hud._process(0.125)
 	assert_true(vignette.modulate.a > 0.0, "fever vignette pulses")
+	await tree.create_timer(1.2, true, false, true).timeout
+	assert_true(not band.visible, "fever entry band hides after entry hold and exit")
+	assert_true(vignette.visible, "fever vignette remains for active fever")
+	assert_true(combo_label.text.contains("FEVER ×2"), "top fever badge remains after band exits")
 	hud._on_fever_changed(true, 2.0)
 	assert_eq(band.get_instance_id(), first_band_id, "fever refresh reuses overlay node")
+	assert_true(not band.visible, "fever refresh does not replay entry band")
 	hud._on_fever_changed(false, 0.0)
 	await tree.create_timer(0.31, true, false, true).timeout
 	assert_true(not vignette.visible and not band.visible, "fever end fades overlay")
@@ -106,7 +116,8 @@ func test_time_bonus_flies_to_timer_flashes_green_and_time_up_cleans() -> void:
 	})
 	assert_true(bonus_label.visible, "time bonus starts at reaction")
 	assert_eq(bonus_label.text, "+1s", "time bonus text")
-	await tree.create_timer(0.51, true, false, true).timeout
+	await tree.create_timer(0.56, true, false, true).timeout
+	await tree.process_frame
 	assert_near(bonus_label.position.x, hud.timer_bonus_target().x, 0.5, "bonus ends at timer x")
 	assert_near(bonus_label.position.y, hud.timer_bonus_target().y, 0.5, "bonus ends at timer y")
 	assert_near(hud.last_bonus_target().x, hud.timer_bonus_target().x, 0.5, "recorded target x")
