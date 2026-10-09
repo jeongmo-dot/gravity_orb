@@ -40,7 +40,7 @@
 
 ### [2026-10-09] 대상 #49 — 구슬 늘어남 부드럽게
 - 상태: 완료
-- 브랜치 / PR: `m8-orb-stretch-smoothing` / 미생성
+- 브랜치 / PR: `m8-orb-stretch-smoothing` / https://github.com/jeongmo-dot/gravity_orb/pull/53
 - 변경 파일: `scripts/spike/Orb3D.gd`, `tests/{test_gravity_switch_feedback.gd,scenarios/test_ui_fixes.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 구슬 속도 `700 → 1,100px/s`를 표준 `smoothstep` 비율 `t`로 바꾸고 메시 진행축을 `1 + 0.15t`, 수직축을 `1 - 0.08t`로 보간. 699px/s는 `1/1`, 900px/s는 `1.075/0.96`, 1,101px/s는 `1.15/0.92` — `test_orb_stretch_smoothly_interpolates_only_the_mesh`
