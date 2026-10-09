@@ -40,7 +40,7 @@
 
 ### [2026-10-09] 대상 #54 — 턴제에 끝 만들기: 생성 증가 측정
 - 상태: 질문
-- 브랜치 / PR: `m8-turn-spawn-ramp-measurement` / PR 없음
+- 브랜치 / PR: `m8-turn-spawn-ramp-measurement` / https://github.com/jeongmo-dot/gravity_orb/pull/55
 - 변경 파일: `tests/spike/run_jolt_3d_measurement.gd`, `tests/run_turn_ramp_measurement.ps1`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 현재 기본값 위에서 A(비활성)·B(100/2)·C(100/3)·D(60/3)를 조건별 독립 Godot 프로세스, Jolt 3D 120Hz, 시드 101~112, 게임오버 또는 800턴까지 총 48판 측정 — `tests/run_turn_ramp_measurement.ps1`
