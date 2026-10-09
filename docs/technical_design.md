@@ -1063,7 +1063,7 @@ M4 검수(2026-09-28)에서 발견. 합체가 없는 M4 상태에서 **이동·�
 - 받아들여진 스와이프마다 `blitz_chain_window`(1.0초) 창을 연다. 창 안에 반응이 하나라도 나오면 그 스와이프는 **생산적** → `chain += 1` (스와이프당 1회). 창이 반응 없이 끝나면 `chain = 0`
 - 마지막 스와이프 후 `blitz_chain_idle`(2.0초) 동안 스와이프가 없으면 `chain = 0` (손을 멈추면 끊김)
 - 배수 = `min(1 + blitz_chain_step × chain, blitz_chain_max_multiplier)` (0.25 / ×5). **그 순간의 배수를 모든 반응 점수에 적용** (스와이프 없이 일어난 반응 포함). 위험 배수 그대로
-- **피버**: `chain`이 `blitz_fever_chain`(6)의 배수(6, 12, 18 …)에 닿을 때마다 `blitz_fever_duration`(5초)로 시작·갱신, 점수 ×2
+- **피버**: `chain`이 `blitz_fever_chain`의 배수에 닿을 때마다 `blitz_fever_duration`로 시작·갱신, 점수 ×2. **#51 (2026-10-09 사용자 결정): 6 → 8** (8, 16, 24 …) — #36 측정에서 조준 플레이 시간의 49%가 피버(목표 15~30%)
 - HUD `CHAIN 4 (x2.0)`, 결과 패널·디버그는 `MAX CHAIN`. #31의 반응 콤보 필드(`blitz_combo_*`, `blitz_fever_combo`)는 제거
 - 반응 딕셔너리에 `chain`, `combo_multiplier`(체인 배수), `fever`를 싣는다 (`combo`는 `chain`과 같은 값으로 채워 HUD·점수 경로 호환)
 
@@ -1077,7 +1077,7 @@ M4 검수(2026-09-28)에서 발견. 합체가 없는 M4 상태에서 **이동·�
 | 새 `blitz_ready_time` | 1.5 |
 | 새 `blitz_chain_window` / `blitz_chain_idle` | 1.0 / 2.0 |
 | 새 `blitz_chain_step` / `blitz_chain_max_multiplier` | 0.25 / 5.0 |
-| 새 `blitz_fever_chain` | 6 |
+| 새 `blitz_fever_chain` | 6 → **8** (#51) |
 | `blitz_fever_duration` | 6.0 → 5.0 → 1.2 (#32 측정 조정) → **3.0** (#33, 1.2초는 체감이 거의 없음) |
 | `blitz_time_bonus_blast` / `_jackpot` | 3.0 / 5.0 → **1.0 / 3.0** |
 | 새 `blitz_time_bonus_cap` | 20.0 |
