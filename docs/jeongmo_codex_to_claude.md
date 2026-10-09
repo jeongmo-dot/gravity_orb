@@ -40,7 +40,7 @@
 
 ### [2026-10-09] 대상 #51 — BLITZ 피버 조건 체인 6 → 8
 - 상태: 완료
-- 브랜치 / PR: `m8-blitz-fever-chain-8` / 미생성
+- 브랜치 / PR: `m8-blitz-fever-chain-8` / https://github.com/jeongmo-dot/gravity_orb/pull/51
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `tests/{test_blitz_manager.gd,test_config.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `blitz_fever_chain` 선언·기본 리소스·config 테스트를 `6 → 8`로 변경. 다른 BLITZ·TURN 수치와 호령 단계는 변경하지 않음 — `test_blitz_spike_defaults`
