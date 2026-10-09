@@ -38,6 +38,35 @@
 
 ## 미확인
 
+### [2026-10-10] 대상 #55 — 턴제 생성 증가 기본값 적용 (조건 C)
+- 상태: 완료
+- 브랜치 / PR: `m8-turn-spawn-ramp-default` / https://github.com/jeongmo-dot/gravity_orb/pull/56
+- 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, `tests/{test_config.gd,test_spawner.gd,capture_screens.ps1}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `spawn_count_ramp_turns` 선언·기본 리소스를 `0 → 100`, `spawn_count_max=3` 유지. 기본값에서 100/101/200/201턴 생성 수 `1/2/2/3` — `test_m4_spawn_defaults`, `test_spawn_count_ramp_turn_boundaries`, `test_ramp_draws_next_turn_batch_sizes_at_boundaries`
+  - [x] NEXT/THEN이 각 미래 턴 번호를 사용해 100턴 `1/2`, 200턴 `2/3` 묶음을 표시 — `test_ramp_preview_batches_use_each_future_turn_number`
+  - [x] BLITZ는 턴 ramp를 무시하고 목표 밀도 NEXT 크기와 THEN 1개를 유지 — `test_turn_ramp_does_not_change_blitz_preview_sizes` 및 `test_blitz_manager.gd` `13/13`
+  - [x] 101턴 NEXT 2개·102턴 THEN 2개 장면 `12_turn_ramp_next.png` 추가. 생성 전 자식 수 `2/2`를 검사하고 로그 `turn=101 next=2 then=2` 출력
+  - [x] 공식 래퍼·캡처 12장·시작 화면/TURN/BLITZ 스모크 모두 종료 코드 0
+- QA 관측값:
+  - Godot `4.8-dev3` `--headless --path . --import` → 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - 전용 테스트 → `test_config.gd` `13/13`, `test_spawner.gd` `14/14`, `test_blitz_manager.gd` `13/13`, 각 종료 코드 0
+  - `tests/run_tests.ps1` (`--fixed-fps 120`) → 일반 `242/242` 19.044초, 장기 Jolt `4/4` 31.509초, 성능 `5/5` 1.581초, 총 `251/251`, 최종 종료 코드 0, 합계 52.134초
+  - 장기 물리 관측 → 22시드 이탈 `0`, 발산 `0`, 최대 벽 관통 `12.9515px`, 최대 쌍 겹침 `13.0835px` (직전 #54 래퍼 관측 `12.9515/14.4729px`); 120턴 포함 Jolt 통합 테스트 통과
+  - 시드 101·120턴 Jolt 같은 측정기 비교: 이전 ramp 0은 점유율 `29.6655%`, 점수 `1,321`, 최대 콤보 `4`, 대폭발 `0`; 새 기본 ramp 100/max 3은 `34.0459%`, `2,294`, `6`, `0`. 새 기본값은 게임오버·중단 `0`, 최종 구체 `31`, 최대 벽 `18.8551px`, 턴 종료 쌍 `23.1000px`로 한도 안
+  - `tests/capture_screens.ps1` → OpenGL 3.3 / RTX 4070 Ti SUPER, 540×960 PNG `12/12`, 종료 코드 0. `12_turn_ramp_next.png` 직접 확인 시 NEXT 노랑·파랑 2개, THEN 2개가 겹침 없이 표시
+  - 시작 화면 / `--mode=turn --jolt-seed=101` / `--mode=blitz --jolt-seed=101` 300프레임 스모크 → 모두 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - `git diff --check` 오류 0건. 규칙 검색 → `Input`/`InputEvent`는 `InputRouter.gd`, `Haptics.gd`만; 난수 호출은 `Spawner.gd`만
+- 수동 확인 절차:
+  1. `tests/capture_screens.ps1`를 실행하고 `artifacts/screens/12_turn_ramp_next.png`를 연다 → 오른쪽 위 NEXT와 THEN에 각각 구슬 2개가 나란히 보이는지 확인한다. 콘솔에는 `turn=101 next=2 then=2`가 출력되어야 한다.
+  2. 턴제에서 100턴을 마친 뒤 미리보기를 본다 → 다음 101턴부터 NEXT 묶음이 2개이고, 200턴을 마친 뒤에는 다음 201턴 NEXT가 3개인지 확인한다.
+  3. BLITZ에서 빈 판·고밀도 판을 번갈아 만든다 → NEXT 생성량은 기존 목표 밀도 규칙대로 1~8개이고 턴 번호 증가와 무관한지 확인한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 캡처 도구는 100턴을 실제 플레이하지 않고 기존 결정적 12턴 장면에서 `turn_index=100`으로 설정한 뒤 정식 `Spawner.sync_next_batch_size(101)`·HUD 신호 경로를 호출한다. 미리보기 경계만 빠르게 검수하는 장면이며 실제 120턴 동작은 장기 Jolt 테스트와 별도 측정으로 확인했다.
+  - 캡처 PNG와 120턴 JSON은 `artifacts/`의 gitignore 대상이며 커밋하지 않는다.
+  - 샌드박스가 Godot `user://logs`·편집기 설정·Windows 루트 인증서 접근을 막는 환경 오류를 출력했지만 제품 스크립트 오류는 0건이고 모든 필수 검증 종료 코드는 0이다.
+- 남은 것 · 질문: 자동 검증 기준의 남은 항목 없음. Claude 캡처 시각 검수와 실제 장기 플레이 체감 확인 필요.
+
 ### [2026-10-09] 대상 #54 — 턴제에 끝 만들기: 생성 증가 측정
 - 상태: 질문
 - 브랜치 / PR: `m8-turn-spawn-ramp-measurement` / https://github.com/jeongmo-dot/gravity_orb/pull/55
