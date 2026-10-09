@@ -39,7 +39,7 @@
 ## 미확인
 
 ### [2026-10-09] 대상 #53 — 로컬 랭킹 화면 (모드별 TOP 10)
-- 상태: 완료
+- 상태: 완료 (추가 요구 1 반영)
 - 브랜치 / PR: `m8-local-rankings` / https://github.com/jeongmo-dot/gravity_orb/pull/54
 - 변경 파일: `scenes/UI.tscn`, `scripts/core/{SaveStore,ScoreManager,TurnManager,BlitzManager,Main}.gd`, `scripts/ui/{StartScreen,GameOverPanel,DebugHud,RankingPanel}.gd`, `tests/{test_rankings,test_blitz_manager}.gd`, `tests/capture_screens.ps1`, `tests/scenarios/test_score_flow.gd`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
@@ -49,11 +49,13 @@
   - [x] 전체 화면 랭킹에 BLITZ/CLASSIC 탭, 10줄, 빈 줄 `—`, 금·은·동 글자색, 방금 기록의 밝은 테두리·1.5Hz 맥동, 닫기를 구현. 시작 화면은 마지막 모드 탭으로 열고 결과 화면은 끝난 모드와 방금 순위를 전달 — `test_ranking_screen_tabs_rows_highlight_and_touch_filters`, `test_result_panel_rank_messages_buttons_and_ranking_highlight`
   - [x] 시작 화면 `랭킹`과 결과 패널 `다시 하기 / 랭킹 / 모드 선택` 버튼을 모두 120px 이상으로 배치. 순위 안이면 1위 `최고 기록!`, 2~10위 `새 기록! n위`, 순위 밖이면 문구를 숨김. 버튼 외 랭킹 패널·행·배경은 `MOUSE_FILTER_IGNORE` — 같은 UI 테스트와 캡처 장면 검사
   - [x] 캡처 도구에 `10_ranking_blitz.png`, `11_result_new_record.png`를 추가하고 1위 25,000·방금 점수 18,760/3위·BEST 25,000·버튼 3개 일치를 생성 전에 검사. 임시 저장 경로만 사용하며 사용자 저장은 변경하지 않음
+  - [x] 추가 요구 1: 머리줄과 10개 기록/빈 줄을 동일한 `순위 100 / 점수 250 / 최대 체인·콤보 250 / 날짜 300px` 고정 열로 구성. 모든 열 시작 x 위치 차이 `0px`(허용 2px), 빈 줄은 순위 숫자와 점수 칸 `—`를 분리하고 점수 머리줄·값을 오른쪽 정렬 — `test_ranking_screen_tabs_rows_highlight_and_touch_filters`
+  - [x] 추가 요구 1: 시작 화면 모드 버튼과 랭킹 탭이 같은 스타일 리소스를 공유. 선택은 노란 글자·밝은 금색 배경·금색 하단 테두리, 미선택은 흐린 글자·어두운 배경이며 양쪽 선택/미선택 색과 배경이 각각 동일 — 같은 전용 테스트
 - QA 관측값:
   - Godot `4.8-dev3` `--headless --path . --import` → 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
-  - `tests/run_tests.ps1` (`--fixed-fps 120`) → 일반 `241/241` 18.589초, 장기 Jolt `4/4` 29.104초, 성능 `5/5` 1.578초, 총 `250/250`, 최종 종료 코드 0, 합계 49.271초
+  - 추가 요구 1 반영 후 `tests/run_tests.ps1` (`--fixed-fps 120`) → 일반 `241/241` 19.414초, 장기 Jolt `4/4` 31.421초, 성능 `5/5` 1.670초, 총 `250/250`, 최종 종료 코드 0, 합계 52.505초
   - 전용/관련 테스트 → `test_rankings.gd` `6/6`, `test_score_flow.gd` `10/10`, `test_blitz_manager.gd` `13/13`, 각 종료 코드 0
-  - `tests/capture_screens.ps1` → 종료 코드 0, OpenGL 3.3 / RTX 4070 Ti SUPER, 540×960 PNG `11/11`. 장면 일치 로그: `ranking_blitz rank=3 score=18760`, `result_new_record rank=3 buttons=3`
+  - 추가 요구 1 반영 후 `tests/capture_screens.ps1` → 종료 코드 0, OpenGL 3.3 / RTX 4070 Ti SUPER, 540×960 PNG `11/11`. 장면 일치 로그: `ranking_blitz rank=3 score=18760`, `result_new_record rank=3 buttons=3`. `01`·`10`·`11` 직접 확인 시 공통 선택 스타일, 표 열·빈 줄 정렬, 결과 버튼 3개 정상
   - 시작 화면 / `--mode=turn --jolt-seed=101` / `--mode=blitz --jolt-seed=101` 300프레임 스모크 → 모두 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
   - `git diff --check` 오류 0건. 규칙 점검 → `Input`/`InputEvent`는 `InputRouter.gd`, `Haptics.gd`만; 난수 호출은 `Spawner.gd`만
   - 캡처 파일: `artifacts/screens/01_start_screen.png`, `02_turn_early.png`, `03_turn_combo.png`, `04_turn_game_over.png`, `05_blitz_ready.png`, `06_blitz_fever_chain.png`, `07_blitz_danger.png`, `08_blitz_time_up.png`, `09_blitz_result.png`, `10_ranking_blitz.png`, `11_result_new_record.png` (모두 gitignore 대상)
@@ -62,11 +64,13 @@
   2. TURN 게임오버 또는 BLITZ TIME UP까지 한 판을 마친다 → 결과에 1위면 `최고 기록!`, 2~10위면 `새 기록! n위`가 나오고 `랭킹`을 누르면 같은 모드의 같은 순위 줄에 밝은 테두리와 은은한 맥동이 보이는지 확인한다.
   3. 결과 랭킹에서 `닫기`를 누른다 → 결과 패널로 돌아오며 `다시 하기`, `랭킹`, `모드 선택` 세 버튼이 각각 동작하는지 확인한다.
   4. 게임 도중 R 또는 모드 선택으로 나간 뒤 랭킹을 다시 연다 → 중간에 그만둔 점수가 새 기록으로 추가되지 않았는지 확인한다.
+  5. `01_start_screen.png`와 `10_ranking_blitz.png`를 나란히 본다 → 선택된 CLASSIC/BLITZ가 모두 노란 글자·밝은 금색 배경이고 미선택은 흐리며, `10`의 머리줄·기록 줄·빈 줄 네 열이 세로로 곧게 맞는지 확인한다.
 - 문서에 없던 결정 사항·알려진 문제:
   - 중간 포기 판 미기록을 보장하기 위해 플레이 중 `best_score`는 HUD용 메모리 값만 올리고 디스크 BEST/랭킹은 정상 종료 시 한 번에 기록한다. 기존 `ScoreManager.commit()` API는 호환을 위해 유지했지만 게임 경로에서는 완료 기록 API만 사용한다.
   - 손상 날짜 판정은 `-` 또는 정확한 `YYYY-MM-DD HH:MM`만 허용하며 월별 일수와 윤년까지 검사한다. 숫자 통계는 음수가 아닌 정수만 유지한다.
+  - 추가 요구 1의 900px 표 폭은 540×960 캡처에서도 네 열을 읽을 수 있도록 `100/250/250/300px`로 나눴다. 헤더와 모든 행이 같은 열 생성 함수를 사용하므로 내용 길이와 무관하게 x 위치가 같다.
   - 관리형 샌드박스가 Godot의 `user://logs`·편집기 설정·Windows 루트 인증서 접근을 막아 엔진 환경 오류를 출력했지만, 제품 스크립트/파싱 오류는 0건이고 모든 검증 프로세스 종료 코드는 0이다. 저장 테스트·캡처는 저장소 안 임시 파일을 사용하고 매번 삭제했다.
-- 남은 것 · 질문: 11장에 대한 Claude 시각 검수와 실제 기기에서 현지 시각·터치 체감 확인 필요. 자동 검증 기준의 남은 항목은 없음.
+- 남은 것 · 질문: 추가 요구 1 지정 캡처 `01`·`10`·`11`에 대한 Claude 시각 검수와 실제 기기에서 현지 시각·터치 체감 확인 필요. 자동 검증 기준의 남은 항목은 없음.
 
 ### [2026-10-09] 대상 #49 — 구슬 늘어남 부드럽게
 - 상태: 완료

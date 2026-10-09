@@ -7,6 +7,9 @@ const GOLD: Color = Color("#FFD54A")
 const SILVER: Color = Color("#D5DEE8")
 const BRONZE: Color = Color("#CD8B62")
 const DEFAULT_ROW_COLOR: Color = Color("#E5EDF8")
+const HEADER_COLOR: Color = Color("#8CAED6")
+const COLUMN_NAMES: Array[String] = ["Rank", "Score", "Stat", "Date"]
+const COLUMN_WIDTHS: Array[float] = [100.0, 250.0, 250.0, 300.0]
 
 @export var row_style: StyleBoxFlat
 @export var highlight_style: StyleBoxFlat
@@ -21,16 +24,21 @@ var _mode: GameConfig.GameMode = GameConfig.GameMode.TURN
 var _highlight_mode: GameConfig.GameMode = GameConfig.GameMode.TURN
 var _highlight_rank: int = 0
 var _rows: Array[PanelContainer] = []
-var _row_labels: Array[Label] = []
+var _header_columns: Dictionary = {}
+var _row_columns: Array[Dictionary] = []
 var _pulse_elapsed: float = 0.0
 
 
 func _ready() -> void:
+	_header.text = ""
+	_header_columns = _create_columns(_header, true)
 	for rank: int in range(1, SaveStore.RANKING_LIMIT + 1):
 		_rows.append(get_node("Panel/Content/Rows/RankingRow%d" % rank) as PanelContainer)
-		_row_labels.append(
-			get_node("Panel/Content/Rows/RankingRow%d/Text" % rank) as Label
-		)
+		var row_host: Label = get_node(
+			"Panel/Content/Rows/RankingRow%d/Text" % rank
+		) as Label
+		row_host.text = ""
+		_row_columns.append(_create_columns(row_host, false))
 	_blitz_tab.pressed.connect(func() -> void: _show_mode(GameConfig.GameMode.BLITZ))
 	_classic_tab.pressed.connect(func() -> void: _show_mode(GameConfig.GameMode.TURN))
 	_close_button.pressed.connect(_on_close_pressed)
@@ -83,31 +91,64 @@ func _refresh() -> void:
 	var blitz_mode: bool = _mode == GameConfig.GameMode.BLITZ
 	_blitz_tab.set_pressed_no_signal(blitz_mode)
 	_classic_tab.set_pressed_no_signal(not blitz_mode)
-	_header.text = "순위        점수       %s       날짜" % (
-		"최대 체인" if blitz_mode else "최대 콤보"
-	)
+	(_header_columns["Rank"] as Label).text = "순위"
+	(_header_columns["Score"] as Label).text = "점수"
+	(_header_columns["Stat"] as Label).text = "최대 체인" if blitz_mode else "최대 콤보"
+	(_header_columns["Date"] as Label).text = "날짜"
 	var rankings: Array[Dictionary] = SaveStore.load_rankings(_save_path, _mode)
 	var active_rank: int = highlighted_rank()
 	for index: int in range(_rows.size()):
 		var rank: int = index + 1
 		var row: PanelContainer = _rows[index]
-		var label: Label = _row_labels[index]
+		var columns: Dictionary = _row_columns[index]
 		row.add_theme_stylebox_override(
 			"panel",
 			highlight_style if rank == active_rank else row_style
 		)
+		(columns["Rank"] as Label).text = str(rank)
 		if index >= rankings.size():
-			label.text = "%2d          —" % rank
+			(columns["Score"] as Label).text = "—"
+			(columns["Stat"] as Label).text = ""
+			(columns["Date"] as Label).text = ""
 		else:
 			var record: Dictionary = rankings[index]
 			var stat_key: String = "max_chain" if blitz_mode else "max_combo"
-			label.text = "%2d    %10s       %4d       %s" % [
-				rank,
-				_format_score(int(record["score"])),
-				int(record[stat_key]),
-				_short_date(str(record["date"])),
-			]
-		label.add_theme_color_override("font_color", _rank_color(rank))
+			(columns["Score"] as Label).text = _format_score(int(record["score"]))
+			(columns["Stat"] as Label).text = str(int(record[stat_key]))
+			(columns["Date"] as Label).text = _short_date(str(record["date"]))
+		for column_name: String in COLUMN_NAMES:
+			(columns[column_name] as Label).add_theme_color_override(
+				"font_color",
+				_rank_color(rank)
+			)
+
+
+func _create_columns(host: Control, header: bool) -> Dictionary:
+	var columns_container: HBoxContainer = HBoxContainer.new()
+	columns_container.name = "Columns"
+	columns_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	columns_container.alignment = BoxContainer.ALIGNMENT_CENTER
+	columns_container.add_theme_constant_override("separation", 0)
+	host.add_child(columns_container)
+	columns_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var columns: Dictionary = {}
+	for index: int in range(COLUMN_NAMES.size()):
+		var label: Label = Label.new()
+		label.name = COLUMN_NAMES[index]
+		label.custom_minimum_size = Vector2(COLUMN_WIDTHS[index], 0.0)
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		label.horizontal_alignment = (
+			HORIZONTAL_ALIGNMENT_RIGHT
+			if COLUMN_NAMES[index] == "Score"
+			else HORIZONTAL_ALIGNMENT_CENTER
+		)
+		label.add_theme_font_size_override("font_size", 25 if header else 30)
+		if header:
+			label.add_theme_color_override("font_color", HEADER_COLOR)
+		columns_container.add_child(label)
+		columns[COLUMN_NAMES[index]] = label
+	return columns
 
 
 func _on_close_pressed() -> void:

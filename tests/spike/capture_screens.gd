@@ -348,10 +348,10 @@ func _validate_blitz_ranking_scene(main: Main) -> void:
 	if ranking.highlighted_rank() != 3:
 		_fail("BLITZ ranking capture must highlight rank 3")
 	var first_row: Label = main.get_node(
-		"UI/RankingPanel/Panel/Content/Rows/RankingRow1/Text"
+		"UI/RankingPanel/Panel/Content/Rows/RankingRow1/Text/Columns/Score"
 	) as Label
 	var third_row: Label = main.get_node(
-		"UI/RankingPanel/Panel/Content/Rows/RankingRow3/Text"
+		"UI/RankingPanel/Panel/Content/Rows/RankingRow3/Text/Columns/Score"
 	) as Label
 	if not first_row.text.contains("25,000"):
 		_fail("BLITZ ranking first row must show 25,000")

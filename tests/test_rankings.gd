@@ -195,11 +195,20 @@ func test_ranking_screen_tabs_rows_highlight_and_touch_filters() -> void:
 	start_button.pressed.emit()
 	assert_true(ranking.visible, "start ranking button opens panel")
 	assert_eq(ranking.current_mode(), GameConfig.GameMode.BLITZ, "last selected mode opens first")
-	var first_text: Label = ranking.get_node("Panel/Content/Rows/RankingRow1/Text") as Label
-	var second_text: Label = ranking.get_node("Panel/Content/Rows/RankingRow2/Text") as Label
+	var first_rank: Label = ranking.get_node(
+		"Panel/Content/Rows/RankingRow1/Text/Columns/Rank"
+	) as Label
+	var first_score: Label = ranking.get_node(
+		"Panel/Content/Rows/RankingRow1/Text/Columns/Score"
+	) as Label
+	var second_rank: Label = ranking.get_node(
+		"Panel/Content/Rows/RankingRow2/Text/Columns/Rank"
+	) as Label
 	var fourth_row: PanelContainer = ranking.get_node("Panel/Content/Rows/RankingRow4") as PanelContainer
-	assert_true(first_text.text.contains("4,000"), "ranking row shows formatted score")
-	assert_true(first_text.get_theme_color("font_color") != second_text.get_theme_color("font_color"), "top ranks use distinct colors")
+	assert_eq(first_score.text, "4,000", "ranking row shows formatted score")
+	assert_true(first_rank.get_theme_color("font_color") != second_rank.get_theme_color("font_color"), "top ranks use distinct colors")
+	_assert_ranking_columns_align(ranking)
+	_assert_mode_selection_styles_match(start, ranking)
 	ui.show_ranking(GameConfig.GameMode.BLITZ, 4)
 	assert_eq(ranking.highlighted_rank(), 4, "latest ranked row is highlighted")
 	assert_true(
@@ -209,7 +218,15 @@ func test_ranking_screen_tabs_rows_highlight_and_touch_filters() -> void:
 	(ranking.get_node("Panel/Content/Tabs/RankingClassicTab") as Button).pressed.emit()
 	assert_eq(ranking.current_mode(), GameConfig.GameMode.TURN, "CLASSIC tab switches mode")
 	assert_eq(ranking.highlighted_rank(), 0, "highlight stays with recorded mode")
-	assert_true(first_text.text.contains("—"), "empty CLASSIC row uses dash")
+	var empty_rank: Label = ranking.get_node(
+		"Panel/Content/Rows/RankingRow1/Text/Columns/Rank"
+	) as Label
+	var empty_score: Label = ranking.get_node(
+		"Panel/Content/Rows/RankingRow1/Text/Columns/Score"
+	) as Label
+	assert_eq(empty_rank.text, "1", "empty row keeps rank in rank column")
+	assert_eq(empty_score.text, "—", "empty row puts dash in score column")
+	_assert_ranking_columns_align(ranking)
 	var close_button: Button = ranking.get_node("Panel/Content/RankingCloseButton") as Button
 	assert_true(close_button.size.y >= 120.0, "close touch target")
 	close_button.pressed.emit()
@@ -260,6 +277,96 @@ func _ranking_scores(rankings: Array[Dictionary]) -> Array[int]:
 	for ranking: Dictionary in rankings:
 		scores.append(int(ranking["score"]))
 	return scores
+
+
+func _assert_ranking_columns_align(ranking: RankingPanel) -> void:
+	var header_path: String = "Panel/Content/RankingHeader/Columns/"
+	for column_name: String in RankingPanel.COLUMN_NAMES:
+		var header: Label = ranking.get_node(header_path + column_name) as Label
+		for rank: int in range(1, SaveStore.RANKING_LIMIT + 1):
+			var cell: Label = ranking.get_node(
+				"Panel/Content/Rows/RankingRow%d/Text/Columns/%s" % [rank, column_name]
+			) as Label
+			assert_near(
+				cell.get_global_rect().position.x,
+				header.get_global_rect().position.x,
+				2.0,
+				"%s column x aligns for row %d" % [column_name, rank]
+			)
+	var score_header: Label = ranking.get_node(header_path + "Score") as Label
+	assert_eq(
+		score_header.horizontal_alignment,
+		HORIZONTAL_ALIGNMENT_RIGHT,
+		"score header is right aligned"
+	)
+	for rank: int in range(1, SaveStore.RANKING_LIMIT + 1):
+		var score: Label = ranking.get_node(
+			"Panel/Content/Rows/RankingRow%d/Text/Columns/Score" % rank
+		) as Label
+		assert_eq(
+			score.horizontal_alignment,
+			HORIZONTAL_ALIGNMENT_RIGHT,
+			"score row %d is right aligned" % rank
+		)
+
+
+func _assert_mode_selection_styles_match(
+	start: StartScreen,
+	ranking: RankingPanel
+) -> void:
+	var start_selected: Button = start.get_node("Content/BlitzButton") as Button
+	var start_unselected: Button = start.get_node("Content/ClassicButton") as Button
+	var ranking_selected: Button = ranking.get_node(
+		"Panel/Content/Tabs/RankingBlitzTab"
+	) as Button
+	var ranking_unselected: Button = ranking.get_node(
+		"Panel/Content/Tabs/RankingClassicTab"
+	) as Button
+	assert_true(start_selected.button_pressed, "start selected mode is pressed")
+	assert_true(ranking_selected.button_pressed, "ranking selected tab is pressed")
+	assert_true(not start_unselected.button_pressed, "start other mode is unselected")
+	assert_true(not ranking_unselected.button_pressed, "ranking other tab is unselected")
+	assert_eq(
+		start_selected.get_theme_color("font_pressed_color"),
+		ranking_selected.get_theme_color("font_pressed_color"),
+		"selected mode text color is shared"
+	)
+	assert_eq(
+		start_unselected.get_theme_color("font_color"),
+		ranking_unselected.get_theme_color("font_color"),
+		"unselected mode text color is shared"
+	)
+	var selected_style: StyleBoxFlat = start_selected.get_theme_stylebox(
+		"pressed"
+	) as StyleBoxFlat
+	var ranking_selected_style: StyleBoxFlat = ranking_selected.get_theme_stylebox(
+		"pressed"
+	) as StyleBoxFlat
+	var unselected_style: StyleBoxFlat = start_unselected.get_theme_stylebox(
+		"normal"
+	) as StyleBoxFlat
+	var ranking_unselected_style: StyleBoxFlat = ranking_unselected.get_theme_stylebox(
+		"normal"
+	) as StyleBoxFlat
+	assert_eq(
+		selected_style.bg_color,
+		ranking_selected_style.bg_color,
+		"selected mode background is shared"
+	)
+	assert_eq(
+		unselected_style.bg_color,
+		ranking_unselected_style.bg_color,
+		"unselected mode background is shared"
+	)
+	assert_true(
+		selected_style.bg_color.get_luminance() > unselected_style.bg_color.get_luminance(),
+		"selected background is brighter"
+	)
+	assert_eq(
+		start_selected.get_theme_color("font_pressed_color"),
+		Color(1.0, 0.85, 0.35, 1.0),
+		"selected text is yellow"
+	)
 
 
 func _reaction(type: ReactionRules.Type, result_level: int) -> Dictionary:
