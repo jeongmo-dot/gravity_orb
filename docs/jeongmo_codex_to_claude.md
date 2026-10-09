@@ -40,7 +40,7 @@
 
 ### [2026-10-10] 대상 #56 — 턴제 생성 증가 50턴 간격·상한 없음
 - 상태: 완료
-- 브랜치 / PR: `m8-turn-spawn-ramp-uncapped` / PR 생성 전
+- 브랜치 / PR: `m8-turn-spawn-ramp-uncapped` / https://github.com/jeongmo-dot/gravity_orb/pull/57
 - 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, `scripts/ui/Hud.gd`, `scenes/UI.tscn`, `tests/{test_config.gd,test_spawner.gd,test_blitz_manager.gd,capture_screens.ps1,run_turn_ramp_measurement.ps1}`, `tests/spike/{capture_screens.gd,run_jolt_3d_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 기본값을 `spawn_count_ramp_turns=50`, `spawn_count_max=0`으로 변경하고 `spawn_count_max <= 0`이면 상한을 적용하지 않음 — `test_m4_spawn_defaults`, `test_spawn_count_ramp_turn_boundaries`
