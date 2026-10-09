@@ -40,7 +40,7 @@
 
 ### [2026-10-10] 대상 #55 — 턴제 생성 증가 기본값 적용 (조건 C)
 - 상태: 완료
-- 브랜치 / PR: `m8-turn-spawn-ramp-default` / PR 생성 예정
+- 브랜치 / PR: `m8-turn-spawn-ramp-default` / https://github.com/jeongmo-dot/gravity_orb/pull/56
 - 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, `tests/{test_config.gd,test_spawner.gd,capture_screens.ps1}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `spawn_count_ramp_turns` 선언·기본 리소스를 `0 → 100`, `spawn_count_max=3` 유지. 기본값에서 100/101/200/201턴 생성 수 `1/2/2/3` — `test_m4_spawn_defaults`, `test_spawn_count_ramp_turn_boundaries`, `test_ramp_draws_next_turn_batch_sizes_at_boundaries`
