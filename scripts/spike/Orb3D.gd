@@ -2,7 +2,8 @@ class_name Orb3D
 extends Node
 
 const PIXELS_PER_METER: float = 100.0
-const STRETCH_SPEED_THRESHOLD: float = 900.0
+const STRETCH_SPEED_MIN: float = 700.0
+const STRETCH_SPEED_MAX: float = 1100.0
 const STRETCH_ALONG_SCALE: float = 1.15
 const STRETCH_PERPENDICULAR_SCALE: float = 0.92
 
@@ -363,14 +364,20 @@ func get_physics_body() -> RigidBody3D:
 
 
 func visual_stretch_scale() -> Vector3:
+	return _stretch_scale_for_ratio(_visual_stretch_ratio())
+
+
+func _visual_stretch_ratio() -> float:
 	if not Config.data.fx_enabled or not Config.data.fx_orb_stretch_enabled:
-		return Vector3.ONE
-	if linear_velocity.length() < STRETCH_SPEED_THRESHOLD:
-		return Vector3.ONE
+		return 0.0
+	return smoothstep(STRETCH_SPEED_MIN, STRETCH_SPEED_MAX, linear_velocity.length())
+
+
+func _stretch_scale_for_ratio(ratio: float) -> Vector3:
 	return Vector3(
-		STRETCH_ALONG_SCALE,
-		STRETCH_PERPENDICULAR_SCALE,
-		STRETCH_PERPENDICULAR_SCALE
+		lerpf(1.0, STRETCH_ALONG_SCALE, ratio),
+		lerpf(1.0, STRETCH_PERPENDICULAR_SCALE, ratio),
+		lerpf(1.0, STRETCH_PERPENDICULAR_SCALE, ratio)
 	)
 
 
@@ -460,9 +467,10 @@ func _update_visual_transform() -> void:
 		_body.position.z
 	)
 	_mesh.position = render_world_position
-	var stretch_scale: Vector3 = visual_stretch_scale()
+	var stretch_ratio: float = _visual_stretch_ratio()
+	var stretch_scale: Vector3 = _stretch_scale_for_ratio(stretch_ratio)
 	_mesh.scale = _visual_punch_scale * stretch_scale
-	if stretch_scale.is_equal_approx(Vector3.ONE):
+	if stretch_ratio <= 0.0:
 		_mesh.rotation = _body.rotation
 	else:
 		var world_velocity: Vector3 = _body.linear_velocity
