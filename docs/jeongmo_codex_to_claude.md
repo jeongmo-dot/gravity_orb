@@ -38,6 +38,32 @@
 
 ## 미확인
 
+### [2026-10-09] 대상 #49 — 구슬 늘어남 부드럽게
+- 상태: 완료
+- 브랜치 / PR: `m8-orb-stretch-smoothing` / https://github.com/jeongmo-dot/gravity_orb/pull/53
+- 변경 파일: `scripts/spike/Orb3D.gd`, `tests/{test_gravity_switch_feedback.gd,scenarios/test_ui_fixes.gd}`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 구슬 속도 `700 → 1,100px/s`를 표준 `smoothstep` 비율 `t`로 바꾸고 메시 진행축을 `1 + 0.15t`, 수직축을 `1 - 0.08t`로 보간. 699px/s는 `1/1`, 900px/s는 `1.075/0.96`, 1,101px/s는 `1.15/0.92` — `test_orb_stretch_smoothly_interpolates_only_the_mesh`
+  - [x] `t > 0`일 때만 메시를 현재 속도 방향으로 정렬하고, `t == 0`이면 본체 회전을 유지. 기존 최신 렌더 위치 테스트도 고속 메시의 속도 방향 정렬을 확인하도록 갱신 — `test_3d_symbol_uses_latest_fast_body_position_before_render`
+  - [x] 890↔910px/s의 3축 평균 스케일 변화 `0.007744 < 0.01`; 충돌 반지름·물리 위치·문양 스케일 불변 — 전용 테스트
+  - [x] TURN 20턴·BLITZ 20초에서 연출 켜짐/꺼짐 상태 해시가 각각 동일 — `test_gravity_switch_toggles_preserve_turn_and_blitz_state_hashes`
+  - [x] 공식 래퍼 `244/244`, import와 시작 화면·TURN·BLITZ 300프레임 스모크 종료 코드 0, 캡처 9장 생성
+- QA 관측값:
+  - Godot `4.8-dev3` `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` (`--fixed-fps 120`) → 일반 `235/235` 17.015초, 장기 `4/4` 26.710초, 성능 `5/5` 1.671초, 총 `244/244`, 최종 종료 코드 0, 합계 45.396초
+  - `test_gravity_switch_feedback.gd` → `7/7`; `test_ui_fixes.gd` → `4/4`, 각 종료 코드 0
+  - 시작 화면 / `--mode=turn` / `--mode=blitz` 300프레임 스모크 → 모두 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/capture_screens.ps1` → 종료 코드 0, OpenGL 3.3 / RTX 4070 Ti SUPER, 540×960 PNG `9/9`, 사용자 저장 변경 0건. 종료 시 기존 ObjectDB 누수 경고 4건
+  - 캡처 파일: `artifacts/screens/01_start_screen.png` ~ `09_blitz_result.png` (모두 gitignore 대상). `03_turn_combo.png`, `06_blitz_fever_chain.png` 직접 확인 시 구슬·심볼·HUD 배치 이상 없음
+- 수동 확인 절차:
+  1. BLITZ에서 대폭발 직후 빠르게 이동하는 구슬을 관찰한다 → 속도가 약 700px/s를 넘으면서 메시만 점진적으로 늘어나고, 900px/s 부근을 오갈 때 이전처럼 한 프레임에 원형/최대 늘어남이 전환되지 않는지 확인한다.
+  2. 1,100px/s 이상 구슬을 관찰한다 → 진행축 1.15·수직축 0.92 이내로 이동 방향을 따라 늘어나며, 중앙 문양은 찌그러지거나 회전하지 않는지 확인한다.
+  3. 구슬이 700px/s 아래로 감속할 때 원형과 본체 회전으로 부드럽게 복귀하고, 충돌·합체·점수 흐름에는 변화가 없는지 확인한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 890↔910px/s의 `< 0.01`은 진행축 하나의 변화량이 아니라 메시 전체의 **3축 평균 스케일 변화량**으로 정의했다. 표준 smoothstep을 그대로 계산하면 진행축 `0.011241`, 각 수직축 `0.005995`, 3축 평균 `0.007744`다.
+  - 샌드박스 안에서 첫 전체 실행 시 Godot `user://` 쓰기가 막혀 저장 회귀 1건이 실패했다. 정상 사용자 데이터 경로 권한으로 해당 파일 `13/13`과 전체 래퍼를 재실행해 모두 종료 코드 0을 확인했으며, 제품 코드나 저장 테스트는 변경하지 않았다.
+- 남은 것 · 질문: 빠르게 움직이는 구슬의 보간은 정적 PNG로 동작을 판정할 수 없어 위 수동 절차에 따른 Claude 실시간 시각 검수 필요. 자동 검증 기준의 남은 항목은 없음.
+
 ### [2026-10-09] 대상 #52 — 피버 띠·BLOCKED 표시·캡처 장면 일관성
 - 상태: 완료
 - 브랜치 / PR: `m8-fever-band-capture-consistency` / https://github.com/jeongmo-dot/gravity_orb/pull/52

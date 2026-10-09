@@ -62,7 +62,7 @@ func test_swipe_trails_cover_four_directions_and_return_to_pool() -> void:
 	Config.data.sfx_enabled = original_sfx
 
 
-func test_fast_orb_stretches_only_mesh_and_slow_orb_keeps_original_scale() -> void:
+func test_orb_stretch_smoothly_interpolates_only_the_mesh() -> void:
 	var original_fx: bool = Config.data.fx_enabled
 	var original_stretch: bool = Config.data.fx_orb_stretch_enabled
 	Config.data.fx_enabled = true
@@ -76,20 +76,43 @@ func test_fast_orb_stretches_only_mesh_and_slow_orb_keeps_original_scale() -> vo
 	var collision_radius: float = collision.radius
 	var physics_position: Vector3 = body.position
 	var symbol_scale: Vector3 = orb._symbol_mesh.scale
+	body.rotation = Vector3(0.0, 0.0, 0.25)
+	orb.linear_velocity = Vector2(699.0, 0.0)
+	orb._update_visual_transform()
+	assert_near(
+		orb.visual_mesh_scale().distance_to(Vector3.ONE),
+		0.0,
+		TOLERANCE,
+		"699 px/s keeps original scale"
+	)
+	assert_near(orb._mesh.rotation.z, body.rotation.z, TOLERANCE, "zero ratio keeps body rotation")
 	orb.linear_velocity = Vector2(900.0, 0.0)
 	orb._update_visual_transform()
-	assert_near(orb.visual_mesh_scale().x, 1.15, TOLERANCE, "fast along scale")
-	assert_near(orb.visual_mesh_scale().y, 0.92, TOLERANCE, "fast perpendicular scale")
+	assert_near(orb.visual_mesh_scale().x, 1.075, TOLERANCE, "900 px/s along midpoint")
+	assert_near(orb.visual_mesh_scale().y, 0.96, TOLERANCE, "900 px/s perpendicular midpoint")
 	assert_near(orb._mesh.rotation.z, 0.0, TOLERANCE, "stretch aligns with right velocity")
-	assert_near(collision.radius, collision_radius, TOLERANCE, "collision radius unchanged")
-	assert_near(body.position.distance_to(physics_position), 0.0, TOLERANCE, "physics position unchanged")
-	assert_near(orb._symbol_mesh.scale.distance_to(symbol_scale), 0.0, TOLERANCE, "symbol unchanged")
 	orb.linear_velocity = Vector2(0.0, 900.0)
 	orb._update_visual_transform()
 	assert_near(orb._mesh.rotation.z, -PI * 0.5, TOLERANCE, "stretch follows plane velocity")
-	orb.linear_velocity = Vector2(899.0, 0.0)
+	orb.linear_velocity = Vector2(1101.0, 0.0)
 	orb._update_visual_transform()
-	assert_near(orb.visual_mesh_scale().distance_to(Vector3.ONE), 0.0, TOLERANCE, "slow scale")
+	assert_near(orb.visual_mesh_scale().x, 1.15, TOLERANCE, "1101 px/s along maximum")
+	assert_near(orb.visual_mesh_scale().y, 0.92, TOLERANCE, "1101 px/s perpendicular maximum")
+	orb.linear_velocity = Vector2(890.0, 0.0)
+	orb._update_visual_transform()
+	var scale_890: Vector3 = orb.visual_mesh_scale()
+	orb.linear_velocity = Vector2(910.0, 0.0)
+	orb._update_visual_transform()
+	var scale_910: Vector3 = orb.visual_mesh_scale()
+	var average_axis_change: float = (
+		absf(scale_910.x - scale_890.x)
+		+ absf(scale_910.y - scale_890.y)
+		+ absf(scale_910.z - scale_890.z)
+	) / 3.0
+	assert_true(average_axis_change < 0.01, "890 to 910 px/s changes average scale by under 0.01")
+	assert_near(collision.radius, collision_radius, TOLERANCE, "collision radius unchanged")
+	assert_near(body.position.distance_to(physics_position), 0.0, TOLERANCE, "physics position unchanged")
+	assert_near(orb._symbol_mesh.scale.distance_to(symbol_scale), 0.0, TOLERANCE, "symbol unchanged")
 	await _cleanup(fixture["root"] as Node)
 	Config.data.fx_enabled = original_fx
 	Config.data.fx_orb_stretch_enabled = original_stretch
