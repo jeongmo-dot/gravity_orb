@@ -248,7 +248,7 @@ func test_blitz_spike_defaults() -> void:
 	assert_near(config.blitz_chain_idle, 2.0, TOLERANCE, "chain idle")
 	assert_near(config.blitz_chain_step, 0.25, TOLERANCE, "chain step")
 	assert_near(config.blitz_chain_max_multiplier, 5.0, TOLERANCE, "chain cap")
-	assert_eq(config.blitz_fever_chain, 6, "fever chain")
+	assert_eq(config.blitz_fever_chain, 8, "fever chain")
 	assert_near(config.blitz_fever_duration, 3.0, TOLERANCE, "fever duration")
 	assert_near(config.blitz_fever_multiplier, 2.0, TOLERANCE, "fever multiplier")
 	assert_near(config.blitz_time_bonus_blast, 1.0, TOLERANCE, "blast bonus")
