@@ -12,6 +12,7 @@ const GOLD_COLOR: Color = Color("#FFD54A")
 const CALLOUT_POP_DURATION: float = 0.12
 const CALLOUT_TOTAL_DURATION: float = 0.80
 const FEVER_ENTRY_DURATION: float = 0.30
+const FEVER_BAND_HOLD_DURATION: float = 0.50
 const FEVER_EXIT_DURATION: float = 0.30
 const FEVER_VIGNETTE_MAX_ALPHA: float = 0.12
 const TIME_BONUS_TRAVEL_DURATION: float = 0.50
@@ -37,6 +38,7 @@ const TIMER_BONUS_COLOR: Color = Color("#30D158")
 @onready var _score_popup_layer: Control = %ScorePopupLayer
 @onready var _fever_vignette: ColorRect = %FeverVignette
 @onready var _fever_band: ColorRect = %FeverBand
+@onready var _fever_band_label: Label = %FeverBandLabel
 @onready var _callout_label: Label = %CalloutLabel
 @onready var _time_up_label: Label = %TimeUpLabel
 @onready var _blocked_label: Label = %BlockedLabel
@@ -147,10 +149,10 @@ func bind_game_state(
 ) -> void:
 	_board = board
 	_reset_callout_tracking()
+	_blitz_mode = game_manager is BlitzManager
 	game_manager.warning_changed.connect(_on_warning_changed)
 	game_manager.combo_changed.connect(_on_combo_changed)
 	_game_over_panel.bind(game_manager, score_manager)
-	_blitz_mode = game_manager is BlitzManager
 	_on_warning_changed(game_manager.blocked_directions)
 	_on_combo_changed(
 		game_manager.turn_combo,
@@ -160,7 +162,6 @@ func bind_game_state(
 	board.set_warning_directions(game_manager.blocked_directions)
 	_timer_label.visible = _blitz_mode
 	_bonus_label.visible = false
-	_blocked_label.visible = not _blitz_mode
 	if _blitz_mode:
 		game_manager.time_changed.connect(_on_time_changed)
 		game_manager.ready_changed.connect(_on_ready_changed)
@@ -507,11 +508,8 @@ func _on_warning_changed(directions: Array[Vector2i]) -> void:
 	var names: Array[String] = []
 	for direction: Vector2i in directions:
 		names.append(OrbTypes.dir_name(direction))
-	_blocked_label.text = (
-		"BLOCKED: NONE"
-		if names.is_empty()
-		else "BLOCKED: %s" % ", ".join(names)
-	)
+	_blocked_label.visible = not _blitz_mode and not names.is_empty()
+	_blocked_label.text = "" if names.is_empty() else "BLOCKED: %s" % ", ".join(names)
 
 
 func _on_time_changed(remaining: float) -> void:
@@ -615,16 +613,23 @@ func _start_fever_presentation() -> void:
 	if _fever_tween != null and _fever_tween.is_valid():
 		_fever_tween.kill()
 	var slide_distance: float = get_viewport_rect().size.x
+	_fever_band_label.text = "FEVER ×%s" % _format_multiplier(
+		Config.data.blitz_fever_multiplier
+	)
 	_fever_band.position = _fever_band_base_position + Vector2(slide_distance, 0.0)
 	_fever_band.modulate = Color.WHITE
 	_fever_vignette.modulate = Color.WHITE
 	_fever_band.visible = true
 	_fever_vignette.visible = true
 	_fever_tween = create_tween()
-	_fever_tween.set_parallel(true)
 	_fever_tween.tween_property(
 		_fever_band, "position", _fever_band_base_position, FEVER_ENTRY_DURATION
 	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_fever_tween.tween_interval(FEVER_BAND_HOLD_DURATION)
+	_fever_tween.tween_property(
+		_fever_band, "modulate:a", 0.0, FEVER_EXIT_DURATION
+	)
+	_fever_tween.tween_callback(_hide_fever_band)
 	if _sfx_bank != null:
 		_sfx_bank.play_fever_sweep(true)
 
@@ -808,8 +813,12 @@ func _hide_bonus_label() -> void:
 
 func _hide_fever_visuals() -> void:
 	_fever_vignette.visible = false
-	_fever_band.visible = false
 	_fever_vignette.modulate = Color.WHITE
+	_hide_fever_band()
+
+
+func _hide_fever_band() -> void:
+	_fever_band.visible = false
 	_fever_band.modulate = Color.WHITE
 	_fever_band.position = _fever_band_base_position
 

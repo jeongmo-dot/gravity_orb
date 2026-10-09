@@ -80,6 +80,28 @@ func test_debug_hud_starts_hidden_and_f1_signal_toggles_it() -> void:
 	Config.data.game_mode = original_mode
 
 
+func test_turn_blocked_label_only_shows_for_blocked_directions() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var main: Main = await _create_turn_main()
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	var blocked_label: Label = main.get_node("UI/Hud/BlockedLabel") as Label
+	var no_directions: Array[Vector2i] = []
+	var left_blocked: Array[Vector2i] = [Vector2i.LEFT]
+
+	hud._on_warning_changed(no_directions)
+	assert_true(not blocked_label.visible, "empty blocked directions hide warning")
+	hud._on_warning_changed(left_blocked)
+	assert_true(blocked_label.visible, "blocked direction shows warning")
+	assert_eq(blocked_label.text, "BLOCKED: LEFT", "blocked warning names direction")
+	var warning_color: Color = blocked_label.get_theme_color("font_color")
+	assert_true(warning_color.r > warning_color.g, "blocked warning uses red warning color")
+	hud._on_warning_changed(no_directions)
+	assert_true(not blocked_label.visible, "cleared blocked directions hide warning again")
+
+	await _destroy_main(main)
+	Config.data.game_mode = original_mode
+
+
 func _assert_regions_do_not_overlap(regions: Dictionary, output_size: Vector2) -> void:
 	var names: Array = regions.keys()
 	for first_index: int in range(names.size()):
@@ -112,6 +134,18 @@ func _scaled_rect(control: Control, output_size: Vector2) -> Rect2:
 func _create_blitz_main() -> Main:
 	var main: Main = MAIN_SCENE.instantiate() as Main
 	main.launch_immediately(GameConfig.GameMode.BLITZ)
+	(main.get_node("ScoreManager") as ScoreManager).save_path = ""
+	(main.get_node("FeedbackDirector/SfxBank") as SfxBank).save_path = ""
+	tree.root.add_child(main)
+	await tree.process_frame
+	(main.get_node("TurnManager") as TurnManager).set_physics_process(false)
+	(main.get_node("BlitzManager") as BlitzManager).set_physics_process(false)
+	return main
+
+
+func _create_turn_main() -> Main:
+	var main: Main = MAIN_SCENE.instantiate() as Main
+	main.launch_immediately(GameConfig.GameMode.TURN)
 	(main.get_node("ScoreManager") as ScoreManager).save_path = ""
 	(main.get_node("FeedbackDirector/SfxBank") as SfxBank).save_path = ""
 	tree.root.add_child(main)

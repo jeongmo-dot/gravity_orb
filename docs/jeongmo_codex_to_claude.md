@@ -38,6 +38,34 @@
 
 ## 미확인
 
+### [2026-10-09] 대상 #52 — 피버 띠·BLOCKED 표시·캡처 장면 일관성
+- 상태: 완료
+- 브랜치 / PR: `m8-fever-band-capture-consistency` / https://github.com/jeongmo-dot/gravity_orb/pull/52
+- 변경 파일: `scenes/UI.tscn`, `scripts/ui/Hud.gd`, `tests/{test_callouts.gd,test_screen_layout.gd}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 피버 시작 띠를 높이 `160 → 80px`, 배경 알파 `0.55`로 줄이고 외곽선이 있는 `FEVER ×2` 중앙 글자를 추가. 오른쪽에서 0.3초 진입·0.5초 유지·0.3초 퇴장 후 띠만 숨고, 비네트와 상단 `CHAIN · FEVER ×2 Ns` 배지는 피버 종료까지 유지 — `test_fever_vignette_only_lives_during_fever_and_uses_reusable_nodes`
+  - [x] 활성 피버 갱신은 시작 띠를 다시 재생하지 않고 기존 노드를 재사용하며, 피버 종료 시 남은 비네트까지 0.3초에 정리 — 같은 전용 테스트에서 인스턴스 ID·1.2초/종료 후 가시성 확인
+  - [x] TURN의 막힌 방향 배열이 비었으면 `BlockedLabel`을 숨기고, 값이 있을 때만 경고색 `BLOCKED: LEFT`로 표시. BLITZ에서는 계속 숨김 — `test_turn_blocked_label_only_shows_for_blocked_directions`, 기존 BLITZ HUD 회귀
+  - [x] 캡처 장면에 일치 검사를 내장해 TURN 게임오버의 HUD/패널 점수 `2048`·막힌 방향 `LEFT`, BLITZ TIME UP/결과의 타이머 `0.0`·HUD/패널 점수 `18760`·BEST `18760`을 생성 직전에 검증 — `SCREEN_CAPTURE_CHECK` 3종, `tests/capture_screens.ps1` 종료 코드 0
+  - [x] 공식 래퍼 `244/244`, import와 시작 화면·TURN·BLITZ 300프레임 스모크 종료 코드 0, 캡처 9장 생성
+- QA 관측값:
+  - Godot `4.8-dev3` `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` (`--fixed-fps 120`) → 일반 `235/235` 18.400초, 장기 `4/4` 30.887초, 성능 `5/5` 1.597초, 총 `244/244`, 최종 종료 코드 0, 합계 50.884초
+  - `test_callouts.gd` → `7/7`; `test_screen_layout.gd` → `4/4`, 각 종료 코드 0
+  - `tests/capture_screens.ps1` → 종료 코드 0, OpenGL 3.3 / RTX 4070 Ti SUPER, 540×960 PNG `9/9`, 사용자 저장 변경 0건. 장면 일치 로그: `turn_game_over score=2048 blocked=LEFT`, `blitz_time_up timer=0.0 score=18760`, `blitz_result timer=0.0 score=18760`
+  - 시작 화면 / `--mode=turn` / `--mode=blitz` 300프레임 스모크 → 모두 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 캡처 파일: `artifacts/screens/01_start_screen.png`, `02_turn_early.png`, `03_turn_combo.png`, `04_turn_game_over.png`, `05_blitz_ready.png`, `06_blitz_fever_chain.png`, `07_blitz_danger.png`, `08_blitz_time_up.png`, `09_blitz_result.png` (모두 gitignore 대상)
+- 수동 확인 절차:
+  1. `.\tests\capture_screens.ps1`를 실행해 `06_blitz_fever_chain.png`를 연다 → 보드 중앙에 높이가 줄고 투명해진 주황 띠와 외곽선 `FEVER ×2`가 보이며, 상단 배지에는 `CHAIN 8 · FEVER ×2 3.0s`가 별도로 읽히는지 확인한다.
+  2. 실제 BLITZ에서 피버를 발동한다 → 띠가 오른쪽에서 0.3초에 들어와 0.5초 머문 뒤 0.3초에 사라지되, 피버 비네트와 상단 남은 시간은 피버가 끝날 때까지 유지되는지 확인한다.
+  3. `02_turn_early.png`에서는 `BLOCKED: NONE`이 없고, `04_turn_game_over.png`에서는 HUD와 패널 모두 `BLOCKED: LEFT`, 점수 `2048`로 일치하는지 확인한다.
+  4. `08_blitz_time_up.png`와 `09_blitz_result.png`를 연다 → 타이머가 모두 `0.0`, HUD와 패널 점수가 모두 `18760`인지 확인한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 캡처 전용 일치 값은 기존 주입값을 통일해 TURN `SCORE 2048 / BEST 3764 / LEFT`, BLITZ `SCORE·BEST 18760 / 0.0초`로 고정했다. 게임 규칙·점수 계산·피버 판정은 변경하지 않았다.
+  - 기존 시간 보너스 테스트가 0.5초 트윈 직후 한 프레임 먼저 깨어나는 경우가 있어 관측 대기를 `0.51 → 0.56초 + process_frame 1회`로 보강했다. 제품 연출 시간은 그대로다.
+  - 캡처 종료 시 기존과 같은 ObjectDB 누수 경고 4건이 있으나 9장 생성·임시 저장 삭제·사용자 저장 불변 확인 뒤 정상 종료한다.
+- 남은 것 · 질문: 9장에 대한 Claude 시각 검수 필요. 자동 검증 기준의 남은 항목은 없음.
+
 ### [2026-10-09] 대상 #51 — BLITZ 피버 조건 체인 6 → 8
 - 상태: 완료
 - 브랜치 / PR: `m8-blitz-fever-chain-8` / https://github.com/jeongmo-dot/gravity_orb/pull/51

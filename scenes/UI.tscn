@@ -163,11 +163,28 @@ z_index = 18
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 880.0
-offset_bottom = 1040.0
+offset_top = 920.0
+offset_bottom = 1000.0
 grow_horizontal = 2
 mouse_filter = 2
-color = Color(0.84, 0.24, 0.015, 0.88)
+color = Color(0.84, 0.24, 0.015, 0.55)
+
+[node name="FeverBandLabel" type="Label" parent="Hud/FeverBand"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.898039, 0.4, 1)
+theme_override_colors/font_outline_color = Color(0.08, 0.02, 0, 0.95)
+theme_override_constants/outline_size = 8
+theme_override_font_sizes/font_size = 52
+text = "FEVER ×2"
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="CalloutLabel" type="Label" parent="Hud"]
 unique_name_in_owner = true
@@ -316,6 +333,7 @@ scale = Vector2(0.6, 0.6)
 
 [node name="BlockedLabel" type="Label" parent="Hud"]
 unique_name_in_owner = true
+visible = false
 layout_mode = 0
 offset_left = 330.0
 offset_top = 1660.0
@@ -326,7 +344,7 @@ theme_override_colors/font_color = Color(1, 0.231373, 0.188235, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 0.85)
 theme_override_constants/outline_size = 4
 theme_override_font_sizes/font_size = 28
-text = "BLOCKED: NONE"
+text = "BLOCKED: LEFT"
 horizontal_alignment = 1
 
 [node name="HudSoundButton" type="Button" parent="Hud"]
