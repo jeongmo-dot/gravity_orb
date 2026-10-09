@@ -225,11 +225,11 @@ func test_blitz_candidate_order_is_independent_of_batch_grouping() -> void:
 func test_ramp_draws_next_turn_batch_sizes_at_boundaries() -> void:
 	var snapshot: Dictionary = _snapshot_spawn_config()
 	Config.data.spawn_count_per_turn = 1
-	Config.data.spawn_count_ramp_turns = 40
+	Config.data.spawn_count_ramp_turns = 100
 	Config.data.spawn_count_max = 3
 	var spawner: Spawner = Spawner.new()
 	spawner.init_rng(8642)
-	var expected: Dictionary = {1: 1, 40: 1, 41: 2, 81: 3, 121: 3}
+	var expected: Dictionary = {100: 1, 101: 2, 200: 2, 201: 3}
 	for turn_value: Variant in expected:
 		var turn_index: int = int(turn_value)
 		assert_eq(
@@ -259,15 +259,35 @@ func test_ramp_preview_batches_use_each_future_turn_number() -> void:
 	var snapshot: Dictionary = _snapshot_spawn_config()
 	Config.data.preview_turns = 2
 	Config.data.spawn_count_per_turn = 1
-	Config.data.spawn_count_ramp_turns = 40
+	Config.data.spawn_count_ramp_turns = 100
 	Config.data.spawn_count_max = 3
 	var spawner: Spawner = Spawner.new()
 	spawner.init_rng(8642)
-	spawner.sync_next_batch_size(40)
+	spawner.sync_next_batch_size(100)
+	var first_boundary: Array = spawner.peek_preview()
+	assert_eq(first_boundary.size(), 2, "two preview turns")
+	assert_eq((first_boundary[0] as Array).size(), 1, "turn 100 preview size")
+	assert_eq((first_boundary[1] as Array).size(), 2, "turn 101 preview size")
+	spawner.sync_next_batch_size(200)
+	var second_boundary: Array = spawner.peek_preview()
+	assert_eq((second_boundary[0] as Array).size(), 2, "turn 200 preview size")
+	assert_eq((second_boundary[1] as Array).size(), 3, "turn 201 preview size")
+	spawner.free()
+	_restore_spawn_config(snapshot)
+
+
+func test_turn_ramp_does_not_change_blitz_preview_sizes() -> void:
+	var snapshot: Dictionary = _snapshot_spawn_config()
+	Config.data.spawn_count_ramp_turns = 100
+	Config.data.spawn_count_max = 3
+	var spawner: Spawner = Spawner.new()
+	spawner.set_blitz_mode(true)
+	spawner.init_rng(5501)
+	spawner.sync_blitz_next_batch_size(4)
 	var preview: Array = spawner.peek_preview()
-	assert_eq(preview.size(), 2, "two preview turns")
-	assert_eq((preview[0] as Array).size(), 1, "turn 40 preview size")
-	assert_eq((preview[1] as Array).size(), 2, "turn 41 preview size")
+	assert_eq((preview[0] as Array).size(), 4, "BLITZ NEXT follows density batch")
+	assert_eq((preview[1] as Array).size(), 1, "BLITZ THEN remains one candidate")
+	assert_eq(spawner._batch_size_for_index(201), 1, "BLITZ ignores turn ramp")
 	spawner.free()
 	_restore_spawn_config(snapshot)
 

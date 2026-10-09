@@ -47,7 +47,7 @@ enum GameMode { TURN, BLITZ }
 )
 @export var spawn_count_per_turn: int = 1
 @export var preview_turns: int = 2
-@export var spawn_count_ramp_turns: int = 0
+@export var spawn_count_ramp_turns: int = 100
 @export var spawn_count_max: int = 3
 @export var spawn_position_mode: SpawnPositionMode = SpawnPositionMode.RANDOM
 @export var spawn_margin: float = 4.0
