@@ -487,7 +487,6 @@ func _finish_game() -> void:
 	_active = false
 	set_physics_process(false)
 	_set_fever_visual(false)
-	_score_manager.commit()
 	game_over_details = {
 		"reason": "TIME UP",
 		"max_combo": max_combo,
@@ -496,8 +495,20 @@ func _finish_game() -> void:
 		"fever_count": fever_count,
 		"finale_score": _score_manager.score - finale_score_start,
 	}
+	game_over_details["ranking"] = _commit_completed_ranking()
 	_set_state(State.FINISHED)
 	game_over.emit()
+
+
+func _commit_completed_ranking() -> Dictionary:
+	return _score_manager.commit_ranking(
+		GameConfig.GameMode.BLITZ,
+		{
+			"max_chain": max_combo,
+			"blasts": blast_count,
+			"fevers": fever_count,
+		}
+	)
 
 
 func _board_occupancy() -> float:

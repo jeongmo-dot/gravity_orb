@@ -16,6 +16,8 @@ signal game_over
 @onready var _spawner: Spawner = %Spawner
 @onready var _collision_resolver: CollisionResolver = %CollisionResolver
 
+var _score_manager: ScoreManager
+
 var state: State = State.WAITING_INPUT
 var gravity: Vector2i = Vector2i.DOWN
 var turn_index: int = 0
@@ -36,6 +38,7 @@ var _is_initial_settle: bool = false
 
 
 func _ready() -> void:
+	_score_manager = get_node_or_null("%ScoreManager") as ScoreManager
 	_collision_resolver.reaction_applied.connect(on_reaction)
 
 
@@ -159,12 +162,26 @@ func _on_settled() -> void:
 	var blocked_spawns: Array = _board.entrance_waiting_orbs()
 	if not blocked_spawns.is_empty():
 		game_over_details = _build_game_over_details(blocked_spawns)
+		game_over_details["ranking"] = _commit_completed_ranking()
 		_set_state(State.GAME_OVER)
 		game_over.emit()
 		return
 	_update_warnings()
 	InputRouter.set_locked(false)
 	_set_state(State.WAITING_INPUT)
+
+
+func _commit_completed_ranking() -> Dictionary:
+	if _score_manager == null:
+		return {"rank": 0, "record": {}}
+	return _score_manager.commit_ranking(
+		GameConfig.GameMode.TURN,
+		{
+			"max_combo": max_combo,
+			"turns": turn_index,
+			"max_level": _score_manager.max_level_reached,
+		}
+	)
 
 
 func _build_game_over_details(blocked_spawns: Array) -> Dictionary:

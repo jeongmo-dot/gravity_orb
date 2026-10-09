@@ -90,12 +90,19 @@ func test_waiting_input_reaction_scores_immediately() -> void:
 	await _cleanup_fixture(fixture)
 
 
-func test_best_score_is_saved_immediately_and_loaded_by_new_manager() -> void:
+func test_best_score_is_saved_on_completed_ranking_and_loaded_by_new_manager() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.TURN
 	_remove_test_file(BEST_SAVE_PATH)
 	var first: ScoreManager = await _create_score_manager(BEST_SAVE_PATH)
 	first.on_reaction(_reaction(ReactionRules.Type.MERGE, 1, [2, 2], 3))
 	assert_eq(first.score, 8, "first manager score")
 	assert_eq(first.best_score, 8, "first manager best")
+	first.commit_ranking(
+		GameConfig.GameMode.TURN,
+		{"max_combo": 1, "turns": 1, "max_level": 3},
+		"2026-10-09 12:00"
+	)
 	first.queue_free()
 	await tree.process_frame
 
@@ -105,9 +112,12 @@ func test_best_score_is_saved_immediately_and_loaded_by_new_manager() -> void:
 	second.queue_free()
 	await tree.process_frame
 	_remove_test_file(BEST_SAVE_PATH)
+	Config.data.game_mode = original_mode
 
 
 func test_large_int64_score_is_saved_and_loaded() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.TURN
 	_remove_test_file(BEST_SAVE_PATH)
 	var first: ScoreManager = await _create_score_manager(BEST_SAVE_PATH)
 	var levels: Array[int] = [Config.data.orb_max_level, Config.data.orb_max_level]
@@ -115,6 +125,11 @@ func test_large_int64_score_is_saved_and_loaded() -> void:
 	var expected: int = 687194767360
 	assert_eq(first.score, expected, "large score")
 	assert_eq(first.best_score, expected, "large best score")
+	first.commit_ranking(
+		GameConfig.GameMode.TURN,
+		{"max_combo": 31, "turns": 100, "max_level": Config.data.orb_max_level},
+		"2026-10-09 12:00"
+	)
 	first.queue_free()
 	await tree.process_frame
 
@@ -123,6 +138,7 @@ func test_large_int64_score_is_saved_and_loaded() -> void:
 	second.queue_free()
 	await tree.process_frame
 	_remove_test_file(BEST_SAVE_PATH)
+	Config.data.game_mode = original_mode
 
 
 func test_corrupt_save_starts_at_zero_without_stopping() -> void:

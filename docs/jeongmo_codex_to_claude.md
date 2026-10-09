@@ -38,6 +38,36 @@
 
 ## 미확인
 
+### [2026-10-09] 대상 #53 — 로컬 랭킹 화면 (모드별 TOP 10)
+- 상태: 완료
+- 브랜치 / PR: `m8-local-rankings` / PR 생성 후 갱신
+- 변경 파일: `scenes/UI.tscn`, `scripts/core/{SaveStore,ScoreManager,TurnManager,BlitzManager,Main}.gd`, `scripts/ui/{StartScreen,GameOverPanel,DebugHud,RankingPanel}.gd`, `tests/{test_rankings,test_blitz_manager}.gd`, `tests/capture_screens.ps1`, `tests/scenarios/test_score_flow.gd`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `save.cfg`의 `rankings.turn`/`rankings.blitz`에 모드별 최대 10개를 저장하고 점수 내림차순·동점 선착순으로 정렬. 11위 이하는 버리고 `records.best_score`/`blitz_best_score`를 1위와 동기화 — `test_rankings_sort_ties_cap_and_sync_best`
+  - [x] 기존 BEST만 있는 파일을 날짜 `-`인 1위로 이전. 필수 필드·타입·음수·현지 날짜 형식과 실제 달력 범위가 잘못된 항목은 건너뛰고 정상 항목은 유지 — `test_legacy_best_migrates_and_corrupt_entries_are_skipped`
+  - [x] 진행 중 BEST는 메모리에서만 갱신하고 TURN GAME OVER·BLITZ 피날레 완료 때만 점수와 모드별 통계를 기록. 재시작·모드 선택으로 중간 포기한 판은 저장하지 않음 — `test_abandoned_game_is_not_recorded_and_completed_fields_are_saved`, `test_turn_and_blitz_managers_commit_mode_specific_finished_fields`
+  - [x] 전체 화면 랭킹에 BLITZ/CLASSIC 탭, 10줄, 빈 줄 `—`, 금·은·동 글자색, 방금 기록의 밝은 테두리·1.5Hz 맥동, 닫기를 구현. 시작 화면은 마지막 모드 탭으로 열고 결과 화면은 끝난 모드와 방금 순위를 전달 — `test_ranking_screen_tabs_rows_highlight_and_touch_filters`, `test_result_panel_rank_messages_buttons_and_ranking_highlight`
+  - [x] 시작 화면 `랭킹`과 결과 패널 `다시 하기 / 랭킹 / 모드 선택` 버튼을 모두 120px 이상으로 배치. 순위 안이면 1위 `최고 기록!`, 2~10위 `새 기록! n위`, 순위 밖이면 문구를 숨김. 버튼 외 랭킹 패널·행·배경은 `MOUSE_FILTER_IGNORE` — 같은 UI 테스트와 캡처 장면 검사
+  - [x] 캡처 도구에 `10_ranking_blitz.png`, `11_result_new_record.png`를 추가하고 1위 25,000·방금 점수 18,760/3위·BEST 25,000·버튼 3개 일치를 생성 전에 검사. 임시 저장 경로만 사용하며 사용자 저장은 변경하지 않음
+- QA 관측값:
+  - Godot `4.8-dev3` `--headless --path . --import` → 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` (`--fixed-fps 120`) → 일반 `241/241` 18.589초, 장기 Jolt `4/4` 29.104초, 성능 `5/5` 1.578초, 총 `250/250`, 최종 종료 코드 0, 합계 49.271초
+  - 전용/관련 테스트 → `test_rankings.gd` `6/6`, `test_score_flow.gd` `10/10`, `test_blitz_manager.gd` `13/13`, 각 종료 코드 0
+  - `tests/capture_screens.ps1` → 종료 코드 0, OpenGL 3.3 / RTX 4070 Ti SUPER, 540×960 PNG `11/11`. 장면 일치 로그: `ranking_blitz rank=3 score=18760`, `result_new_record rank=3 buttons=3`
+  - 시작 화면 / `--mode=turn --jolt-seed=101` / `--mode=blitz --jolt-seed=101` 300프레임 스모크 → 모두 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - `git diff --check` 오류 0건. 규칙 점검 → `Input`/`InputEvent`는 `InputRouter.gd`, `Haptics.gd`만; 난수 호출은 `Spawner.gd`만
+  - 캡처 파일: `artifacts/screens/01_start_screen.png`, `02_turn_early.png`, `03_turn_combo.png`, `04_turn_game_over.png`, `05_blitz_ready.png`, `06_blitz_fever_chain.png`, `07_blitz_danger.png`, `08_blitz_time_up.png`, `09_blitz_result.png`, `10_ranking_blitz.png`, `11_result_new_record.png` (모두 gitignore 대상)
+- 수동 확인 절차:
+  1. 시작 화면에서 BLITZ를 마지막 모드로 선택한 뒤 다시 모드 선택 화면으로 돌아와 `랭킹`을 누른다 → BLITZ 탭이 먼저 열리고 10줄·금은동·날짜 `MM-DD HH:MM`이 보이며 CLASSIC 탭 전환과 `닫기` 복귀가 되는지 확인한다.
+  2. TURN 게임오버 또는 BLITZ TIME UP까지 한 판을 마친다 → 결과에 1위면 `최고 기록!`, 2~10위면 `새 기록! n위`가 나오고 `랭킹`을 누르면 같은 모드의 같은 순위 줄에 밝은 테두리와 은은한 맥동이 보이는지 확인한다.
+  3. 결과 랭킹에서 `닫기`를 누른다 → 결과 패널로 돌아오며 `다시 하기`, `랭킹`, `모드 선택` 세 버튼이 각각 동작하는지 확인한다.
+  4. 게임 도중 R 또는 모드 선택으로 나간 뒤 랭킹을 다시 연다 → 중간에 그만둔 점수가 새 기록으로 추가되지 않았는지 확인한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 중간 포기 판 미기록을 보장하기 위해 플레이 중 `best_score`는 HUD용 메모리 값만 올리고 디스크 BEST/랭킹은 정상 종료 시 한 번에 기록한다. 기존 `ScoreManager.commit()` API는 호환을 위해 유지했지만 게임 경로에서는 완료 기록 API만 사용한다.
+  - 손상 날짜 판정은 `-` 또는 정확한 `YYYY-MM-DD HH:MM`만 허용하며 월별 일수와 윤년까지 검사한다. 숫자 통계는 음수가 아닌 정수만 유지한다.
+  - 관리형 샌드박스가 Godot의 `user://logs`·편집기 설정·Windows 루트 인증서 접근을 막아 엔진 환경 오류를 출력했지만, 제품 스크립트/파싱 오류는 0건이고 모든 검증 프로세스 종료 코드는 0이다. 저장 테스트·캡처는 저장소 안 임시 파일을 사용하고 매번 삭제했다.
+- 남은 것 · 질문: 11장에 대한 Claude 시각 검수와 실제 기기에서 현지 시각·터치 체감 확인 필요. 자동 검증 기준의 남은 항목은 없음.
+
 ### [2026-10-09] 대상 #49 — 구슬 늘어남 부드럽게
 - 상태: 완료
 - 브랜치 / PR: `m8-orb-stretch-smoothing` / https://github.com/jeongmo-dot/gravity_orb/pull/53

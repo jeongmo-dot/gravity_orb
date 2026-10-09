@@ -9,6 +9,7 @@ const TURN_CAPTURE_SCORE: int = 2048
 const TURN_CAPTURE_BEST: int = 3764
 const BLITZ_CAPTURE_SCORE: int = 18760
 const BLITZ_CAPTURE_BEST: int = 18760
+const RANKING_CAPTURE_BEST: int = 25000
 const TURN_GAME_OVER_DIRECTION: Vector2i = Vector2i.LEFT
 const WAIT_TIMEOUT_SECONDS: float = 5.0
 const DIRECTION_PATTERN: Array[Vector2i] = [
@@ -31,6 +32,8 @@ const CAPTURE_FILES: Array[String] = [
 	"07_blitz_danger.png",
 	"08_blitz_time_up.png",
 	"09_blitz_result.png",
+	"10_ranking_blitz.png",
+	"11_result_new_record.png",
 ]
 
 var _failed: bool = false
@@ -165,7 +168,39 @@ func _capture_blitz_scenes() -> void:
 	manager.game_over.emit()
 	_validate_blitz_result_scene(main)
 	await _capture("09_blitz_result.png")
+
+	var ranking_result: Dictionary = _prepare_blitz_ranking_capture()
+	score.best_score = SaveStore.load_best_score(_temp_save_path, GameConfig.GameMode.BLITZ)
+	hud._on_score_changed(score.score, score.best_score)
+	manager.game_over_details["ranking"] = ranking_result
+	manager.game_over.emit()
+	var ui: DebugHud = main.get_node("UI") as DebugHud
+	ui.show_ranking(GameConfig.GameMode.BLITZ, int(ranking_result["rank"]))
+	_validate_blitz_ranking_scene(main)
+	await _capture("10_ranking_blitz.png")
+	(main.get_node("UI/RankingPanel/Panel/Content/RankingCloseButton") as Button).pressed.emit()
+	_validate_new_record_result_scene(main)
+	await _capture("11_result_new_record.png")
 	await _destroy_main(main)
+
+
+func _prepare_blitz_ranking_capture() -> Dictionary:
+	var fixture_scores: Array[int] = [25000, 22000, 16000, 12000]
+	for index: int in range(fixture_scores.size()):
+		SaveStore.add_ranking(
+			_temp_save_path,
+			GameConfig.GameMode.BLITZ,
+			fixture_scores[index],
+			{"max_chain": 14 - index, "blasts": 5 - index, "fevers": 3 - index},
+			"2026-10-0%d 1%d:00" % [index + 5, index + 4]
+		)
+	return SaveStore.add_ranking(
+		_temp_save_path,
+		GameConfig.GameMode.BLITZ,
+		BLITZ_CAPTURE_SCORE,
+		{"max_chain": 8, "blasts": 3, "fevers": 2},
+		"2026-10-09 18:30"
+	)
 
 
 func _create_main(mode: int) -> Main:
@@ -302,6 +337,46 @@ func _validate_blitz_result_scene(main: Main) -> void:
 		"BLITZ result panel best"
 	)
 	print("SCREEN_CAPTURE_CHECK scene=blitz_result timer=0.0 score=%d" % BLITZ_CAPTURE_SCORE)
+
+
+func _validate_blitz_ranking_scene(main: Main) -> void:
+	var ranking: RankingPanel = main.get_node("UI/RankingPanel") as RankingPanel
+	if not ranking.visible:
+		_fail("BLITZ ranking capture must show ranking panel")
+	if ranking.current_mode() != GameConfig.GameMode.BLITZ:
+		_fail("BLITZ ranking capture must open BLITZ tab")
+	if ranking.highlighted_rank() != 3:
+		_fail("BLITZ ranking capture must highlight rank 3")
+	var first_row: Label = main.get_node(
+		"UI/RankingPanel/Panel/Content/Rows/RankingRow1/Text"
+	) as Label
+	var third_row: Label = main.get_node(
+		"UI/RankingPanel/Panel/Content/Rows/RankingRow3/Text"
+	) as Label
+	if not first_row.text.contains("25,000"):
+		_fail("BLITZ ranking first row must show 25,000")
+	if not third_row.text.contains("18,760"):
+		_fail("BLITZ ranking highlighted row must show 18,760")
+	print("SCREEN_CAPTURE_CHECK scene=ranking_blitz rank=3 score=%d" % BLITZ_CAPTURE_SCORE)
+
+
+func _validate_new_record_result_scene(main: Main) -> void:
+	var content_path: String = "UI/Hud/GameOverPanel/Margin/Content/"
+	_expect_label_text(
+		main.get_node(content_path + "RankingResultLabel") as Label,
+		"새 기록! 3위",
+		"BLITZ result ranking message"
+	)
+	_expect_label_text(
+		main.get_node(content_path + "GameOverBest") as Label,
+		"BEST  %d" % RANKING_CAPTURE_BEST,
+		"BLITZ ranked result BEST"
+	)
+	for button_name: String in ["RestartButton", "ResultRankingButton", "ModeSelectButton"]:
+		var button: Button = main.get_node(content_path + button_name) as Button
+		if not button.visible or button.size.y < 120.0:
+			_fail("BLITZ result button %s must be visible and at least 120px" % button_name)
+	print("SCREEN_CAPTURE_CHECK scene=result_new_record rank=3 buttons=3")
 
 
 func _expect_label_text(label: Label, expected: String, description: String) -> void:

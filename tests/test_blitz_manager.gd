@@ -6,7 +6,7 @@ const RESOLVER_SCRIPT: Script = preload("res://scripts/core/CollisionResolver.gd
 const SCORE_SCRIPT: Script = preload("res://scripts/core/ScoreManager.gd")
 const BLITZ_SCRIPT: Script = preload("res://scripts/core/BlitzManager.gd")
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
-const BEST_SAVE_PATH: String = "user://test_blitz_best.cfg"
+const BEST_SAVE_PATH: String = "res://tests/test_blitz_best.tmp.cfg"
 const TOLERANCE: float = 0.001
 
 
@@ -344,6 +344,11 @@ func test_turn_and_blitz_best_scores_use_separate_save_keys() -> void:
 	var turn_score: ScoreManager = await _create_score_manager(BEST_SAVE_PATH)
 	turn_score.on_reaction(_reaction(ReactionRules.Type.MERGE, 3))
 	var saved_turn_best: int = turn_score.best_score
+	turn_score.commit_ranking(
+		GameConfig.GameMode.TURN,
+		{"max_combo": 1, "turns": 1, "max_level": 4},
+		"2026-10-09 12:00"
+	)
 	turn_score.queue_free()
 	await tree.process_frame
 	Config.data.game_mode = GameConfig.GameMode.BLITZ
@@ -351,6 +356,11 @@ func test_turn_and_blitz_best_scores_use_separate_save_keys() -> void:
 	assert_eq(blitz_score.best_score, 0, "blitz does not load turn best")
 	blitz_score.on_reaction(_reaction(ReactionRules.Type.MERGE, 4))
 	var saved_blitz_best: int = blitz_score.best_score
+	blitz_score.commit_ranking(
+		GameConfig.GameMode.BLITZ,
+		{"max_chain": 1, "blasts": 0, "fevers": 0},
+		"2026-10-09 12:01"
+	)
 	assert_true(saved_blitz_best > saved_turn_best, "blitz best fixture differs")
 	blitz_score.queue_free()
 	await tree.process_frame
