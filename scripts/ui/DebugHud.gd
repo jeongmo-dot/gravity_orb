@@ -30,6 +30,7 @@ var _turn_index: int = 0
 var _turn_combo: int = 0
 var _combo_multiplier: float = 1.0
 var _max_combo: int = 0
+var _debug_visible: bool = false
 
 
 func _ready() -> void:
@@ -53,6 +54,8 @@ func _ready() -> void:
 	_game_manager.turn_started.connect(_on_turn_started)
 	_game_manager.turn_finished.connect(_on_turn_finished)
 	_game_manager.combo_changed.connect(_on_combo_changed)
+	InputRouter.debug_toggle_hud.connect(_toggle_debug_hud)
+	_label.visible = false
 	_update_label()
 
 
@@ -69,11 +72,22 @@ func show_start_screen() -> void:
 func show_gameplay() -> void:
 	_start_screen.visible = false
 	_hud.visible = true
-	_label.visible = OS.is_debug_build()
+	_label.visible = OS.is_debug_build() and _debug_visible
 
 
 func start_screen() -> StartScreen:
 	return _start_screen
+
+
+func _toggle_debug_hud() -> void:
+	if not OS.is_debug_build() or not _hud.visible:
+		return
+	_debug_visible = not _debug_visible
+	_label.visible = _debug_visible
+
+
+func is_debug_hud_visible() -> bool:
+	return _label.visible
 
 
 func _process(_delta: float) -> void:

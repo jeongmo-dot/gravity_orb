@@ -38,6 +38,34 @@
 
 ## 미확인
 
+### [2026-10-09] 대상 #50 — 화면 배치 정리 + 스크린샷 검수 도구
+- 상태: 완료
+- 브랜치 / PR: `m8-screen-layout-capture` / https://github.com/jeongmo-dot/gravity_orb/pull/50
+- 변경 파일: `project.godot`, `scenes/UI.tscn`, `scripts/autoload/InputRouter.gd`, `scripts/ui/{DebugHud.gd,Hud.gd}`, `tests/{capture_screens.ps1,test_callouts.gd,test_input_router.gd,test_screen_layout.gd}`, `tests/spike/{CaptureScreens.tscn,capture_screens.gd}`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] DANGER를 왼쪽 상단 별도 영역으로 옮기고 SCORE·BEST·MAX CHAIN·배수·CHAIN/FEVER·NEXT·THEN·타이머·소리 버튼과 분리. DANGER·FEVER·NEXT `×8`을 동시에 표시한 1080×1920, 540×960 두 크기에서 `get_global_rect()` 쌍별 교차 0건 — `test_busy_blitz_hud_regions_do_not_overlap_at_supported_sizes`
+  - [x] 중앙의 예전 `FeverLabel` 노드를 제거하고 `CHAIN N · FEVER ×2 Ns`를 보드 위 작은 배지 한 줄로 통합. 주요 HUD에 검은 외곽선을 추가해 보드 위에서도 읽히게 함 — `test_legacy_fever_label_is_absent_and_time_stays_in_top_badge`, `test_fever_vignette_only_lives_during_fever_and_uses_reusable_nodes`
+  - [x] 피버 비네트 셰이더의 가장자리 알파 상한을 정확히 `0.12`로 제한 — `test_legacy_fever_label_is_absent_and_time_stays_in_top_badge`, `fever_vignette_max_alpha()` 관측
+  - [x] 디버그 HUD는 게임 시작 시 숨김이며 디버그 빌드에서 F1 입력마다 표시/숨김 전환. 입력 잠금 중에도 F1 신호를 받음 — `test_debug_hud_starts_hidden_and_f1_signal_toggles_it`, `test_f1_debug_hud_action_emits_even_while_locked`
+  - [x] 실제 `Main3D`를 540×960 창에서 고정 시드 `5050`과 스크립트 스와이프로 구동하는 캡처 도구 추가. `artifacts/screens/`의 9장 생성 전후 `user://save.cfg` 바이트·존재 여부가 같고 임시 저장은 삭제됨 — `tests/capture_screens.ps1` 종료 코드 0, `SCREEN_CAPTURE_SUITE files=9`
+  - [x] 공식 래퍼 `243/243`, import와 시작 화면·TURN·BLITZ 300프레임 스모크 종료 코드 0
+- QA 관측값:
+  - Godot `4.8-dev3` `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` (`--fixed-fps 120`) → 일반 `234/234` 17.930초, 장기 `4/4` 30.111초, 성능 `5/5` 1.573초, 총 `243/243`, 최종 종료 코드 0, 합계 49.613초
+  - #50 화면 전용 `test_screen_layout.gd` → `3/3`; F1 입력 `test_input_router.gd` 포함 일반 스위트에서 `17/17`; 피버 회귀 `test_callouts.gd` `7/7`
+  - `tests/capture_screens.ps1` → 종료 코드 0, OpenGL 3.3 / RTX 4070 Ti SUPER, 540×960 PNG 9개, 사용자 저장 변경 0건. 종료 시 `ObjectDB instances were leaked` 경고 4건, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - 시작 화면 / `--mode=turn` / `--mode=blitz` 300프레임 스모크 → 모두 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 캡처 파일: `artifacts/screens/01_start_screen.png`, `02_turn_early.png`, `03_turn_combo.png`, `04_turn_game_over.png`, `05_blitz_ready.png`, `06_blitz_fever_chain.png`, `07_blitz_danger.png`, `08_blitz_time_up.png`, `09_blitz_result.png` (모두 gitignore 대상)
+- 수동 확인 절차:
+  1. 저장소 루트에서 `.\tests\capture_screens.ps1`를 실행한다 → `artifacts/screens/`에 위 9장이 생성되고 마지막에 `SCREEN_CAPTURE_SUITE exit=0 files=9`가 출력되는지 확인한다.
+  2. `06_blitz_fever_chain.png`와 `07_blitz_danger.png`를 연다 → DANGER, 점수/기록, 배수, CHAIN/FEVER 남은 시간, NEXT `×8`, THEN, 타이머가 서로 겹치지 않고 보드 위에서 읽히며 비네트가 가장자리에서 은은한지 확인한다.
+  3. 디버그 빌드 게임을 시작한다 → 화면에 디버그 텍스트가 없고 F1을 한 번 누르면 나타나며 다시 누르면 숨는지 확인한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 캡처 스크립트를 `-s`로 직접 실행하면 프로젝트 autoload보다 먼저 파싱되어 `Config`·`InputRouter` 전역 식별자를 해석하지 못하므로, 일반 프로젝트 초기화 경로로 실행할 지원 씬 `CaptureScreens.tscn`을 두었다. 공개 게임 API와 수치는 바꾸지 않았다.
+  - 특수 상태는 실제 Main3D·고정 시드·스크립트 스와이프로 보드를 만든 뒤 HUD 신호를 결정적으로 주입해 READY/콤보/게임오버/피버/위험/TIME UP/결과 프레임을 고정한다. 출력 PNG는 저장소에 커밋하지 않는다.
+  - 캡처 종료 시 ObjectDB 누수 경고 4건이 있으나 9장 생성·임시 저장 삭제·사용자 저장 불변 확인 뒤 정상 종료한다.
+- 남은 것 · 질문: 9장에 대한 Claude 시각 검수와 실제 디버그 빌드 F1 체감 확인 필요. 자동 검증 기준의 남은 항목은 없음.
+
 ### [2026-10-08] 대상 #48 — M8 연출: 중력 전환 손맛 강화
 - 상태: 완료
 - 브랜치 / PR: `m8-gravity-switch-polish` / https://github.com/jeongmo-dot/gravity_orb/pull/49

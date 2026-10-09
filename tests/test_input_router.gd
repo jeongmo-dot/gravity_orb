@@ -3,6 +3,7 @@ extends TestCase
 const INPUT_ROUTER_SCRIPT: Script = preload("res://scripts/autoload/InputRouter.gd")
 
 var _received: Array[Vector2i] = []
+var _debug_hud_toggles: int = 0
 var _debug_cycles: int = 0
 var _spawn_count_cycles: int = 0
 var _mode_toggles: int = 0
@@ -134,6 +135,14 @@ func test_f2_debug_action_emits_even_while_locked() -> void:
 	router.free()
 
 
+func test_f1_debug_hud_action_emits_even_while_locked() -> void:
+	var router: Variant = _new_router()
+	router.set_locked(true)
+	router._handle_event(_logical_key(KEY_F1))
+	assert_eq(_debug_hud_toggles, 1, "debug HUD toggle signal count")
+	router.free()
+
+
 func test_f3_spawn_count_action_emits_even_while_locked() -> void:
 	var router: Variant = _new_router()
 	router.set_locked(true)
@@ -168,6 +177,7 @@ func test_m_sfx_mute_action_emits_even_while_locked() -> void:
 
 func _new_router() -> Variant:
 	_received.clear()
+	_debug_hud_toggles = 0
 	_debug_cycles = 0
 	_spawn_count_cycles = 0
 	_mode_toggles = 0
@@ -176,6 +186,7 @@ func _new_router() -> Variant:
 	var router: Variant = INPUT_ROUTER_SCRIPT.new()
 	router.swipe.connect(_record_swipe)
 	router.restart_requested.connect(_record_restart_request)
+	router.debug_toggle_hud.connect(_record_debug_hud_toggle)
 	router.debug_cycle_annihilation_rule.connect(_record_debug_cycle)
 	router.debug_cycle_spawn_count.connect(_record_spawn_count_cycle)
 	router.debug_toggle_game_mode.connect(_record_mode_toggle)
@@ -189,6 +200,10 @@ func _record_swipe(direction: Vector2i) -> void:
 
 func _record_debug_cycle() -> void:
 	_debug_cycles += 1
+
+
+func _record_debug_hud_toggle() -> void:
+	_debug_hud_toggles += 1
 
 
 func _record_spawn_count_cycle() -> void:
