@@ -86,6 +86,8 @@ func _run() -> void:
 		"blast_far_factor": Config.data.blast_far_factor,
 		"blast_score_factor": Config.data.blast_score_factor,
 		"spawn_count_per_turn": Config.data.spawn_count_per_turn,
+		"spawn_count_ramp_turns": Config.data.spawn_count_ramp_turns,
+		"spawn_count_max": Config.data.spawn_count_max,
 		"preview_turns": Config.data.preview_turns,
 		"level_radii_px": Array(Config.data.level_radii),
 		"corrections": {
@@ -225,6 +227,7 @@ func _run_seed(
 	var seed_max_pair_end: Dictionary = {"penetration_px": 0.0, "category": "none"}
 	var seed_max_pair_end_turn: int = 0
 	var seed_max_wall: float = 0.0
+	var entrance_blocked_turns: int = 0
 	for turn_offset: int in range(max_turns):
 		_turn_shock_events.clear()
 		_current_measurement_turn = turn_offset + 1
@@ -237,6 +240,9 @@ func _run_seed(
 		var start_occupancy: float = _snapshot_occupancy(before)
 		manager.on_swipe(direction)
 		var frame_metrics: Dictionary = await _wait_for_turn_end(manager, board, physics_ms)
+		var entrance_waiting_count: int = board.entrance_waiting_orbs().size()
+		if entrance_waiting_count > 0:
+			entrance_blocked_turns += 1
 		if start_occupancy >= 0.60:
 			var rearrangement: float = _kendall_rearrangement(before, board, direction)
 			if rearrangement >= 0.0:
@@ -261,6 +267,7 @@ func _run_seed(
 			"combo": manager.turn_combo,
 			"score_gain": score_manager.score - score_before,
 			"blast_count": _turn_blast_count,
+			"entrance_waiting_count": entrance_waiting_count,
 		})
 		var bin_name: String = _occupancy_bin(occupancy)
 		var bin_values: Dictionary = bins[bin_name] as Dictionary
@@ -331,6 +338,7 @@ func _run_seed(
 		"max_clear_count": _seed_max_clear_count,
 		"blast_count": _seed_blast_count,
 		"first_blast_turn": _seed_first_blast_turn,
+		"entrance_blocked_turns": entrance_blocked_turns,
 		"reactions_three_turns_after_blast": _reactions_after_blast(turn_rows),
 		"turn_rows": turn_rows,
 		"aborted": aborted,
@@ -1102,6 +1110,16 @@ func _apply_arguments() -> void:
 		elif argument.begins_with("--spawn-count="):
 			Config.data.spawn_count_per_turn = maxi(
 				argument.trim_prefix("--spawn-count=").to_int(),
+				1
+			)
+		elif argument.begins_with("--spawn-ramp-turns="):
+			Config.data.spawn_count_ramp_turns = maxi(
+				argument.trim_prefix("--spawn-ramp-turns=").to_int(),
+				0
+			)
+		elif argument.begins_with("--spawn-count-max="):
+			Config.data.spawn_count_max = maxi(
+				argument.trim_prefix("--spawn-count-max=").to_int(),
 				1
 			)
 		elif argument.begins_with("--level-radii="):
