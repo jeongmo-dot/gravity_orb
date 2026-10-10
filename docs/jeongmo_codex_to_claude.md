@@ -40,7 +40,7 @@
 
 ### [2026-10-11] 대상 #63 — 비주얼 V1 천체 구슬
 - 상태: 완료 — 7단계 천체 구슬·색각 문양·L4+ 외곽선 맥동·NEXT/THEN 미리보기를 구현하고 도감 색 분석, 창 모드 성능, 물리 상태 해시, 전체 회귀를 관측함
-- 브랜치 / PR: `v1-celestial-orbs` / 생성 예정
+- 브랜치 / PR: `v1-celestial-orbs` / [PR #65](https://github.com/jeongmo-dot/gravity_orb/pull/65)
 - 변경 파일: `scenes/Orb3D.tscn`, `scripts/core/{CelestialOrbArt.gd,OrbSymbols.gd,OrbVisual.gd}`, `scripts/spike/Orb3D.gd`, `scripts/fx/FeedbackDirector.gd`, `scripts/ui/Hud.gd`, `tests/{test_celestial_orbs.gd,test_jolt_3d.gd,test_orb_resource_sharing.gd,test_orb_symbols.gd,capture_screens.ps1,run_blitz_responsiveness_measurement.ps1}`, `tests/spike/{capture_screens.gd,run_blitz_responsiveness_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] L1 운석·L2 달·L3 바위 행성·L4 고리 행성·L5 가스 거인·L6 별·L7 태양을 절차적 셰이더로 구현. 몸통 반지름 비율 `0.94/0.94/0.94/0.68/0.94/0.82/0.84R`, 장식까지 `1.0R` 안이며 충돌 Shape·질량·물리값은 변경하지 않음 — 자동 (`test_all_levels_keep_celestial_art_inside_collision_radius`)
