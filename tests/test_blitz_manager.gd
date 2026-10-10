@@ -308,6 +308,7 @@ func test_target_density_reactions_do_not_add_refill_debt() -> void:
 func test_speed_chain_productive_miss_idle_fever_and_time_bonus_cap() -> void:
 	var fixture: Dictionary = await _create_fixture(3103)
 	var manager: BlitzManager = fixture["manager"] as BlitzManager
+	Config.data.blitz_survival_enabled = false
 	Config.data.blitz_spawn_on_swipe = false
 	var first: Dictionary = _productive_swipe(manager, Vector2i.RIGHT)
 	assert_eq(manager.chain, 1, "productive swipe raises chain once")
@@ -349,10 +350,84 @@ func test_speed_chain_productive_miss_idle_fever_and_time_bonus_cap() -> void:
 	assert_near(manager.current_combo_multiplier(), 5.0, TOLERANCE, "chain multiplier cap")
 	manager._physics_process(Config.data.blitz_chain_idle)
 	assert_eq(manager.chain, 0, "two seconds without swipe resets chain")
-	for _index: int in range(25):
+	for _index: int in range(50):
 		manager.on_reaction(_reaction(ReactionRules.Type.BLAST, 4))
 	manager.on_reaction(_reaction(ReactionRules.Type.MAX_CLEAR, 7))
 	assert_near(manager.time_bonus_total, 20.0, TOLERANCE, "time bonus is capped")
+	await _cleanup_fixture(fixture)
+
+
+func test_survival_clock_ramp_reaction_bonuses_fever_and_clock_cap() -> void:
+	var fixture: Dictionary = await _create_fixture(3161)
+	var manager: BlitzManager = fixture["manager"] as BlitzManager
+	assert_near(manager.remaining_time, 30.0, TOLERANCE, "survival clock starts at thirty")
+	Config.data.blitz_drain_ramp_per_minute = 0.0
+	var original_time_scale: float = Engine.time_scale
+	Engine.time_scale = 0.5
+	manager._physics_process(0.5)
+	Engine.time_scale = original_time_scale
+	assert_near(manager.remaining_time, 29.0, TOLERANCE, "zero ramp drains real seconds")
+	assert_near(manager.play_time_elapsed, 1.0, TOLERANCE, "survival time ignores time scale")
+	manager.remaining_time = 100.0
+	manager.play_time_elapsed = 60.0
+	Config.data.blitz_drain_ramp_per_minute = 0.1
+	manager._physics_process(1.0)
+	assert_near(
+		manager.remaining_time,
+		98.8991667,
+		TOLERANCE,
+		"ramp integrates the multiplier across the elapsed second"
+	)
+	Config.data.blitz_drain_ramp_per_minute = 0.0
+	manager.remaining_time = 20.0
+	manager.time_bonus_total = 0.0
+	manager.time_bonus_by_source.clear()
+	var expected_by_level: Array[float] = [0.05, 0.1, 0.2, 0.4, 0.8, 1.6]
+	for index: int in range(expected_by_level.size()):
+		var result_level: int = index + 2
+		var before: float = manager.remaining_time
+		manager.on_reaction(_merge_result_reaction(result_level))
+		assert_near(
+			manager.remaining_time - before,
+			expected_by_level[index],
+			TOLERANCE,
+			"merge result L%d bonus" % result_level
+		)
+	var before_blast: float = manager.remaining_time
+	manager.on_reaction(_reaction(ReactionRules.Type.BLAST, 4))
+	assert_near(manager.remaining_time - before_blast, 0.5, TOLERANCE, "blast bonus")
+	var before_jackpot: float = manager.remaining_time
+	manager.on_reaction(_reaction(ReactionRules.Type.MAX_CLEAR, 7))
+	assert_near(manager.remaining_time - before_jackpot, 3.0, TOLERANCE, "jackpot bonus")
+	manager.fever_remaining = 1.0
+	var before_fever: float = manager.remaining_time
+	manager.on_reaction(_merge_result_reaction(2))
+	assert_near(manager.remaining_time - before_fever, 0.1, TOLERANCE, "fever doubles bonus")
+	manager.fever_remaining = 0.0
+	manager.remaining_time = 44.8
+	var before_cap_total: float = manager.time_bonus_total
+	manager.on_reaction(_reaction(ReactionRules.Type.MAX_CLEAR, 7))
+	assert_near(manager.remaining_time, 45.0, TOLERANCE, "clock caps at forty five")
+	assert_near(
+		manager.time_bonus_total - before_cap_total,
+		0.2,
+		TOLERANCE,
+		"overflow bonus is discarded"
+	)
+	await _cleanup_fixture(fixture)
+
+
+func test_survival_disabled_preserves_ninety_seconds_and_legacy_bonus_cap() -> void:
+	var fixture: Dictionary = await _create_fixture(3162)
+	var manager: BlitzManager = fixture["manager"] as BlitzManager
+	Config.data.blitz_survival_enabled = false
+	manager.start_game()
+	manager.set_physics_process(false)
+	assert_near(manager.remaining_time, 90.0, TOLERANCE, "legacy clock starts at ninety")
+	for _index: int in range(50):
+		manager.on_reaction(_reaction(ReactionRules.Type.BLAST, 4))
+	assert_near(manager.time_bonus_total, 20.0, TOLERANCE, "legacy bonus cap stays twenty")
+	assert_near(manager.remaining_time, 110.0, TOLERANCE, "legacy bonuses extend duration")
 	await _cleanup_fixture(fixture)
 
 
@@ -487,6 +562,11 @@ func test_main_selects_blitz_manager_and_shows_time_up_results() -> void:
 	assert_eq(then_count_label.text, "×8", "large THEN count label")
 	manager._physics_process(1.5)
 	assert_eq(manager.state, BlitzManager.State.RUNNING, "main starts blitz after ready")
+	manager.play_time_elapsed = 120.0
+	hud._on_time_changed(manager.remaining_time)
+	var drain_label: Label = main.get_node("UI/Hud/DrainRateLabel") as Label
+	assert_true(drain_label.visible, "survival ramp appears from 1.1x")
+	assert_eq(drain_label.text, "×1.2", "survival ramp uses one decimal")
 	manager.on_swipe(Vector2i.RIGHT)
 	manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 2))
 	assert_eq(chain_label.text, "CHAIN 1", "blitz HUD uses chain label")
@@ -496,6 +576,7 @@ func test_main_selects_blitz_manager_and_shows_time_up_results() -> void:
 	var panel: GameOverPanel = main.get_node("UI/Hud/GameOverPanel") as GameOverPanel
 	var title: Label = panel.get_node("Margin/Content/ResultTitle") as Label
 	var detail: Label = panel.get_node("Margin/Content/GameOverBlocked") as Label
+	var survived: Label = panel.get_node("Margin/Content/SurvivedTimeLabel") as Label
 	var result_chain: Label = panel.get_node("Margin/Content/GameOverMaxCombo") as Label
 	var dimmer: ColorRect = main.get_node("UI/Hud/ResultDimmer") as ColorRect
 	var panel_style: StyleBoxFlat = panel.get_theme_stylebox("panel") as StyleBoxFlat
@@ -508,6 +589,8 @@ func test_main_selects_blitz_manager_and_shows_time_up_results() -> void:
 	assert_eq(title.text, "TIME UP", "blitz result title")
 	assert_eq(result_chain.text, "MAX CHAIN 1", "result uses maximum chain label")
 	assert_eq(detail.text, "BLAST 0   FEVER 0", "blitz result counters")
+	assert_true(survived.visible, "survival result shows elapsed time")
+	assert_eq(survived.text, "버틴 시간 2:00", "survived time uses m:ss")
 	main.queue_free()
 	await tree.process_frame
 	InputRouter.set_locked(false)
@@ -591,6 +674,17 @@ func _reaction(type: ReactionRules.Type, level: int) -> Dictionary:
 	}
 
 
+func _merge_result_reaction(result_level: int) -> Dictionary:
+	var source_level: int = maxi(result_level - 1, 1)
+	var levels: Array[int] = [source_level, source_level]
+	return {
+		"type": ReactionRules.Type.MERGE,
+		"levels": levels,
+		"result_level": result_level,
+		"occupancy": 0.2,
+	}
+
+
 func _create_score_manager(path: String) -> ScoreManager:
 	var manager: ScoreManager = SCORE_SCRIPT.new() as ScoreManager
 	manager.save_path = path
@@ -608,6 +702,8 @@ func _snapshot_config() -> Dictionary:
 	return {
 		"game_mode": Config.data.game_mode,
 		"blitz_duration": Config.data.blitz_duration,
+		"blitz_survival_enabled": Config.data.blitz_survival_enabled,
+		"blitz_drain_ramp_per_minute": Config.data.blitz_drain_ramp_per_minute,
 		"blitz_spawn_on_swipe": Config.data.blitz_spawn_on_swipe,
 		"blitz_min_spawn_per_swipe": Config.data.blitz_min_spawn_per_swipe,
 		"blitz_max_spawn_per_swipe": Config.data.blitz_max_spawn_per_swipe,
@@ -625,6 +721,10 @@ func _snapshot_config() -> Dictionary:
 func _restore_config(snapshot: Dictionary) -> void:
 	Config.data.game_mode = snapshot["game_mode"] as GameConfig.GameMode
 	Config.data.blitz_duration = float(snapshot["blitz_duration"])
+	Config.data.blitz_survival_enabled = bool(snapshot["blitz_survival_enabled"])
+	Config.data.blitz_drain_ramp_per_minute = float(
+		snapshot["blitz_drain_ramp_per_minute"]
+	)
 	Config.data.blitz_spawn_on_swipe = bool(snapshot["blitz_spawn_on_swipe"])
 	Config.data.blitz_min_spawn_per_swipe = int(snapshot["blitz_min_spawn_per_swipe"])
 	Config.data.blitz_max_spawn_per_swipe = int(snapshot["blitz_max_spawn_per_swipe"])

@@ -37,6 +37,65 @@ func test_rankings_sort_ties_cap_and_sync_best() -> void:
 	_remove_save()
 
 
+func test_survival_and_legacy_blitz_records_use_isolated_keys() -> void:
+	_remove_save()
+	var original_survival: bool = Config.data.blitz_survival_enabled
+	Config.data.blitz_survival_enabled = false
+	assert_eq(
+		SaveStore.save_best_score(SAVE_PATH, GameConfig.GameMode.BLITZ, 111),
+		OK,
+		"legacy BLITZ best saves"
+	)
+	SaveStore.add_ranking(
+		SAVE_PATH,
+		GameConfig.GameMode.BLITZ,
+		111,
+		{"max_chain": 1, "blasts": 2, "fevers": 3},
+		"2026-10-10 10:00"
+	)
+	Config.data.blitz_survival_enabled = true
+	assert_eq(
+		SaveStore.load_best_score(SAVE_PATH, GameConfig.GameMode.BLITZ),
+		0,
+		"survival does not load legacy BLITZ best"
+	)
+	SaveStore.add_ranking(
+		SAVE_PATH,
+		GameConfig.GameMode.BLITZ,
+		222,
+		{"max_chain": 4, "blasts": 5, "fevers": 6},
+		"2026-10-10 10:01"
+	)
+	assert_eq(
+		SaveStore.load_best_score(SAVE_PATH, GameConfig.GameMode.BLITZ),
+		222,
+		"survival loads its own best"
+	)
+	Config.data.blitz_survival_enabled = false
+	assert_eq(
+		SaveStore.load_best_score(SAVE_PATH, GameConfig.GameMode.BLITZ),
+		111,
+		"legacy best remains intact"
+	)
+	var persisted: ConfigFile = ConfigFile.new()
+	assert_eq(persisted.load(SAVE_PATH), OK, "isolated save reloads")
+	assert_true(
+		persisted.has_section_key("records", "blitz_best_score"),
+		"legacy best key remains"
+	)
+	assert_true(
+		persisted.has_section_key("records", "blitz_survival_best_score"),
+		"survival best key exists"
+	)
+	assert_true(persisted.has_section_key("rankings", "blitz"), "legacy ranking remains")
+	assert_true(
+		persisted.has_section_key("rankings", "blitz_survival"),
+		"survival ranking exists"
+	)
+	Config.data.blitz_survival_enabled = original_survival
+	_remove_save()
+
+
 func test_legacy_best_migrates_and_corrupt_entries_are_skipped() -> void:
 	_remove_save()
 	var legacy: ConfigFile = ConfigFile.new()

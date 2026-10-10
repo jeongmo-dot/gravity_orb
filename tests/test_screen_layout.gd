@@ -13,10 +13,15 @@ func test_busy_blitz_hud_regions_do_not_overlap_at_supported_sizes() -> void:
 	var main: Main = await _create_blitz_main()
 	var hud: Hud = main.get_node("UI/Hud") as Hud
 	var spawner: Spawner = main.get_node("Spawner") as Spawner
+	var manager: BlitzManager = main.get_node("BlitzManager") as BlitzManager
 	hud._on_combo_changed(8, 8.0, 8)
 	hud._on_fever_changed(true, 3.0)
 	hud._set_danger_badge(0.70, 4.0)
 	spawner.sync_blitz_next_batch_size(8)
+	manager.play_time_elapsed = 120.0
+	hud._on_time_changed(manager.remaining_time)
+	hud._on_time_bonus_awarded(0.3, "MERGE_L4")
+	hud._process(Config.data.blitz_time_bonus_display_window)
 	await tree.process_frame
 
 	var score: Label = main.get_node("UI/Hud/ScoreLabel") as Label
@@ -38,6 +43,8 @@ func test_busy_blitz_hud_regions_do_not_overlap_at_supported_sizes() -> void:
 		"next": main.get_node("UI/Hud/NextPreviewRegion") as Control,
 		"then": main.get_node("UI/Hud/ThenPreviewRegion") as Control,
 		"timer": timer,
+		"drain_rate": main.get_node("UI/Hud/DrainRateLabel") as Control,
+		"time_bonus": main.get_node("UI/Hud/BonusLabel") as Control,
 		"sound": main.get_node("UI/Hud/HudSoundButton") as Control,
 	}
 	for output_size: Vector2 in OUTPUT_SIZES:

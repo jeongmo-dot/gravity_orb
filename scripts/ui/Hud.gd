@@ -44,12 +44,14 @@ const TIMER_BONUS_COLOR: Color = Color("#30D158")
 @onready var _time_up_label: Label = %TimeUpLabel
 @onready var _blocked_label: Label = %BlockedLabel
 @onready var _timer_label: Label = %TimerLabel
+@onready var _drain_rate_label: Label = %DrainRateLabel
 @onready var _bonus_label: Label = %BonusLabel
 @onready var _game_over_panel: GameOverPanel = %GameOverPanel
 @onready var _sound_button: Button = %HudSoundButton
 
 var _spawner: Spawner
 var _score_manager: ScoreManager
+var _blitz_manager: BlitzManager
 var _bonus_tween: Tween
 var _callout_tween: Tween
 var _fever_tween: Tween
@@ -85,6 +87,8 @@ var _timer_tick_history: Array[int] = []
 var _urgent_timer_tick_history: Array[int] = []
 var _timer_tick_seen: Dictionary = {}
 var _pending_time_bonuses: Array[Dictionary] = []
+var _time_bonus_accumulator: float = 0.0
+var _time_bonus_window_remaining: float = 0.0
 var _last_bonus_target: Vector2 = Vector2.ZERO
 var _time_up_count: int = 0
 
@@ -104,6 +108,7 @@ func _exit_tree() -> void:
 func _process(delta: float) -> void:
 	_danger_refresh_elapsed += delta
 	_pulse_elapsed += delta
+	_advance_time_bonus_display(delta)
 	_update_fever_pulse()
 	if not Config.data.fx_callouts_enabled:
 		_hide_callout_visuals()
@@ -158,6 +163,7 @@ func bind_game_state(
 	_board = board
 	_reset_callout_tracking()
 	_blitz_mode = game_manager is BlitzManager
+	_blitz_manager = game_manager as BlitzManager if _blitz_mode else null
 	game_manager.warning_changed.connect(_on_warning_changed)
 	game_manager.combo_changed.connect(_on_combo_changed)
 	_game_over_panel.bind(game_manager, score_manager)
@@ -169,6 +175,7 @@ func bind_game_state(
 	)
 	board.set_warning_directions(game_manager.blocked_directions)
 	_timer_label.visible = _blitz_mode
+	_drain_rate_label.visible = false
 	_bonus_label.visible = false
 	if _blitz_mode:
 		game_manager.time_changed.connect(_on_time_changed)
@@ -555,10 +562,12 @@ func _on_time_changed(remaining: float) -> void:
 		_timer_label.modulate = _timer_color_for(clamped_remaining)
 	_record_timer_ticks(_previous_time_remaining, clamped_remaining)
 	_previous_time_remaining = clamped_remaining
+	_update_drain_rate_label()
 
 
 func _on_ready_changed(active: bool, remaining: float) -> void:
 	if active:
+		_drain_rate_label.visible = false
 		_timer_label.text = "READY %.1f" % remaining
 		if not _timer_flashing:
 			_timer_label.modulate = TIMER_NORMAL_COLOR
@@ -585,7 +594,64 @@ func _on_fever_changed(active: bool, remaining: float) -> void:
 func _on_time_bonus_awarded(seconds: float, source: String) -> void:
 	if not Config.data.fx_callouts_enabled:
 		return
+	if Config.data.blitz_survival_enabled:
+		_time_bonus_accumulator += maxf(seconds, 0.0)
+		if _time_bonus_window_remaining <= 0.0:
+			_time_bonus_window_remaining = maxf(
+				Config.data.blitz_time_bonus_display_window,
+				0.0
+			)
+		if _time_bonus_window_remaining <= 0.0:
+			_flush_time_bonus_display()
+		return
 	_pending_time_bonuses.append({"seconds": seconds, "source": source})
+
+
+func _advance_time_bonus_display(delta: float) -> void:
+	if not Config.data.blitz_survival_enabled or _time_bonus_window_remaining <= 0.0:
+		return
+	var real_delta: float = maxf(delta, 0.0) / maxf(Engine.time_scale, 0.001)
+	_time_bonus_window_remaining = maxf(_time_bonus_window_remaining - real_delta, 0.0)
+	if _time_bonus_window_remaining <= 0.0:
+		_flush_time_bonus_display()
+
+
+func _flush_time_bonus_display() -> void:
+	var total: float = _time_bonus_accumulator
+	_time_bonus_accumulator = 0.0
+	_time_bonus_window_remaining = 0.0
+	if total < 0.1 or not Config.data.fx_callouts_enabled:
+		return
+	_show_survival_time_bonus(total)
+
+
+func _show_survival_time_bonus(seconds: float) -> void:
+	if _bonus_tween != null and _bonus_tween.is_valid():
+		_bonus_tween.kill()
+	_bonus_label.text = "+%.1fs" % seconds
+	_bonus_label.visible = true
+	_bonus_label.modulate = Color.WHITE
+	_bonus_label.scale = Vector2.ONE
+	_last_bonus_target = _bonus_label.position
+	_flash_timer_green()
+	_bonus_tween = create_tween()
+	_bonus_tween.tween_interval(0.45)
+	_bonus_tween.tween_property(_bonus_label, "modulate:a", 0.0, 0.20)
+	_bonus_tween.tween_callback(_hide_bonus_label)
+
+
+func _update_drain_rate_label() -> void:
+	if (
+		_blitz_manager == null
+		or not Config.data.blitz_survival_enabled
+		or _blitz_manager.state != BlitzManager.State.RUNNING
+	):
+		_drain_rate_label.visible = false
+		return
+	var multiplier: float = _blitz_manager.current_drain_multiplier()
+	_drain_rate_label.visible = multiplier >= 1.1
+	if _drain_rate_label.visible:
+		_drain_rate_label.text = "×%.1f" % multiplier
 
 
 func _on_finale_started() -> void:
@@ -728,6 +794,8 @@ func _punch_timer(urgent: bool) -> void:
 
 
 func _play_pending_time_bonus(reaction: Dictionary) -> void:
+	if Config.data.blitz_survival_enabled:
+		return
 	if _pending_time_bonuses.is_empty() or not Config.data.fx_callouts_enabled:
 		return
 	var reaction_type: ReactionRules.Type = reaction.get(
@@ -818,6 +886,9 @@ func _reset_callout_tracking() -> void:
 	_timer_tick_history.clear()
 	_urgent_timer_tick_history.clear()
 	_pending_time_bonuses.clear()
+	_time_bonus_accumulator = 0.0
+	_time_bonus_window_remaining = 0.0
+	_drain_rate_label.visible = false
 	_previous_time_remaining = -1.0
 	_fever_active = false
 	_fever_remaining = 0.0

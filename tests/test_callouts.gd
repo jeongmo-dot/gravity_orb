@@ -98,7 +98,7 @@ func test_blitz_timer_ticks_exactly_ten_times_with_urgent_last_three() -> void:
 	Config.data.fx_callouts_enabled = original_enabled
 
 
-func test_time_bonus_flies_to_timer_flashes_green_and_time_up_cleans() -> void:
+func test_time_bonus_aggregates_for_half_second_and_hides_sub_tenth() -> void:
 	var original_enabled: bool = Config.data.fx_callouts_enabled
 	Config.data.fx_callouts_enabled = true
 	var main: Main = await _create_main(GameConfig.GameMode.BLITZ)
@@ -107,27 +107,22 @@ func test_time_bonus_flies_to_timer_flashes_green_and_time_up_cleans() -> void:
 	var timer_label: Label = main.get_node("UI/Hud/TimerLabel") as Label
 	var time_up_label: Label = main.get_node("UI/Hud/TimeUpLabel") as Label
 	hud._on_time_changed(8.0)
-	hud._on_time_bonus_awarded(1.0, "BLAST")
-	hud._on_reaction_scored({
-		"type": ReactionRules.Type.BLAST,
-		"position": Vector2(120.0, -80.0),
-		"occupancy": 0.0,
-		"points": 0,
-	})
-	assert_true(bonus_label.visible, "time bonus starts at reaction")
-	assert_eq(bonus_label.text, "+1s", "time bonus text")
-	await tree.create_timer(0.56, true, false, true).timeout
-	await tree.process_frame
-	assert_near(bonus_label.position.x, hud.timer_bonus_target().x, 0.5, "bonus ends at timer x")
-	assert_near(bonus_label.position.y, hud.timer_bonus_target().y, 0.5, "bonus ends at timer y")
-	assert_near(hud.last_bonus_target().x, hud.timer_bonus_target().x, 0.5, "recorded target x")
-	assert_near(hud.last_bonus_target().y, hud.timer_bonus_target().y, 0.5, "recorded target y")
+	hud._on_time_bonus_awarded(0.05, "MERGE_L2")
+	hud._on_time_bonus_awarded(0.25, "MERGE_L4")
+	hud._process(0.49)
+	assert_true(not bonus_label.visible, "bonus waits for aggregation window")
+	hud._process(0.02)
+	assert_true(bonus_label.visible, "aggregated bonus appears after half second")
+	assert_eq(bonus_label.text, "+0.3s", "aggregated bonus uses one decimal")
 	assert_true(timer_label.modulate.g > timer_label.modulate.r, "timer flashes green")
+	hud._hide_bonus_label()
+	hud._on_time_bonus_awarded(0.05, "MERGE_L2")
+	hud._process(0.51)
+	assert_true(not bonus_label.visible, "sub tenth bonus omits visual")
 	hud._on_finale_started()
 	assert_true(time_up_label.visible, "TIME UP appears before finale")
 	assert_eq(hud.time_up_count(), 1, "time up fires once")
 	await tree.create_timer(1.1, true, false, true).timeout
-	assert_true(not bonus_label.visible, "bonus visual cleans before 1.5 seconds")
 	assert_true(not time_up_label.visible, "time up visual cleans before 1.5 seconds")
 	await _destroy_main(main)
 	Config.data.fx_callouts_enabled = original_enabled
