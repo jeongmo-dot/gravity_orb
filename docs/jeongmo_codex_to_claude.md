@@ -40,7 +40,7 @@
 
 ### [2026-10-10] 대상 #57 — BLITZ 끊김·입력 지연 개선
 - 상태: 완료
-- 브랜치 / PR: `m8-blitz-input-latency` / 미생성
+- 브랜치 / PR: `m8-blitz-input-latency` / [PR #58](https://github.com/jeongmo-dot/gravity_orb/pull/58)
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scenes/UI.tscn`, `scripts/core/{BlitzManager.gd,Spawner.gd}`, `scripts/fx/{ColorEffectVisual.gd,FeedbackDirector.gd}`, `scripts/spike/{Board3D.gd,Orb3D.gd}`, `scripts/ui/Hud.gd`, `tests/{test_blitz_manager.gd,test_config.gd,test_feedback.gd,test_orb_resource_sharing.gd,test_screen_layout.gd,run_blitz_responsiveness_measurement.ps1}`, `tests/spike/{RunBlitzResponsivenessMeasurement.tscn,run_blitz_responsiveness_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] BLITZ 대폭발 히트스톱을 끄고 턴제는 유지. 쿨다운 `0.12 → 0.08초`, `Engine.time_scale=0.12`에서도 실제 시간 0.08초에 종료하며 1칸 마지막 입력 버퍼를 실행 — `test_blitz_blast_skips_hitstop_while_turn_blast_keeps_it`, `test_cooldown_uses_real_time_and_buffer_keeps_last_valid_direction`
