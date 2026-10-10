@@ -12,6 +12,8 @@ const WARNING_FRAME_COLOR: Color = Color("#FF3B30")
 const NORMAL_FRAME_COLOR: Color = Color("#8ec5ff")
 const FEVER_FRAME_COLOR: Color = Color("#FF9F0A")
 
+static var _active_board_count: int = 0
+
 @onready var _orbs_node: Node3D = %Orbs
 @onready var _physics_geometry: Node3D = %PhysicsGeometry
 @onready var _visual_tilt: Node3D = %VisualTilt
@@ -34,8 +36,16 @@ var ghost_total_duration: float = 0.0
 
 
 func _ready() -> void:
+	_active_board_count += 1
+	Orb3D.prewarm_shared_resources(Config.data)
 	_configure_walls()
 	_configure_visuals()
+
+
+func _exit_tree() -> void:
+	_active_board_count = maxi(_active_board_count - 1, 0)
+	if _active_board_count == 0:
+		Orb3D.clear_shared_resource_cache()
 
 
 func _physics_process(delta: float) -> void:
@@ -287,33 +297,70 @@ func find_free_spawn_slot(
 		-extent,
 		extent
 	)
-	var offsets: Array[float] = [preferred_offset]
+	var occupied_positions: PackedVector2Array = PackedVector2Array()
+	var occupied_radii: PackedFloat32Array = PackedFloat32Array()
+	for orb: Orb3D in _orbs:
+		if (
+			not is_instance_valid(orb)
+			or orb.consumed
+			or orb.is_waiting_at_entrance
+			or orb.is_ghost
+		):
+			continue
+		occupied_positions.append(orb.position)
+		occupied_radii.append(orb.get_radius())
+	for item: Dictionary in placed:
+		occupied_positions.append(item["position"] as Vector2)
+		occupied_radii.append(float(item["radius"]))
+
+	var preferred_candidate: Vector2 = origin + axis * preferred_offset
+	if _spawn_probe_is_clear(
+		preferred_candidate,
+		radius,
+		occupied_positions,
+		occupied_radii
+	):
+		return {"found": true, "position": preferred_candidate}
+
 	var step: float = maxf(Config.data.spawn_probe_step, 0.001)
 	var sample_count: int = ceili(extent * 2.0 / step)
-	for sample_index: int in range(sample_count + 1):
-		var offset: float = minf(-extent + float(sample_index) * step, extent)
-		if not _contains_approx(offsets, offset):
-			offsets.append(offset)
-
-	var found: bool = false
-	var best_position: Vector2 = preferred_position
-	var best_distance: float = INF
-	var best_offset: float = INF
-	for offset: float in offsets:
-		var candidate_position: Vector2 = origin + axis * offset
-		if not _spawn_probe_is_clear(candidate_position, radius, placed):
+	var normalized_index: float = (preferred_offset + extent) / step
+	var left_index: int = clampi(floori(normalized_index), 0, sample_count)
+	var right_index: int = left_index + 1
+	while left_index >= 0 or right_index <= sample_count:
+		var choose_left: bool = right_index > sample_count
+		var left_offset: float = INF
+		var right_offset: float = INF
+		if left_index >= 0:
+			left_offset = minf(-extent + float(left_index) * step, extent)
+		if right_index <= sample_count:
+			right_offset = minf(-extent + float(right_index) * step, extent)
+		if left_index >= 0 and right_index <= sample_count:
+			var left_distance: float = absf(left_offset - preferred_offset)
+			var right_distance: float = absf(right_offset - preferred_offset)
+			choose_left = (
+				left_distance < right_distance
+				or (
+					is_equal_approx(left_distance, right_distance)
+					and left_offset < right_offset
+				)
+			)
+		var offset: float = left_offset if choose_left else right_offset
+		if choose_left:
+			left_index -= 1
+		else:
+			right_index += 1
+		if is_equal_approx(offset, preferred_offset):
 			continue
-		var distance: float = absf(offset - preferred_offset)
-		if (
-			not found
-			or distance < best_distance
-			or (is_equal_approx(distance, best_distance) and offset < best_offset)
+		var candidate_position: Vector2 = origin + axis * offset
+		if _spawn_probe_is_clear(
+			candidate_position,
+			radius,
+			occupied_positions,
+			occupied_radii
 		):
-			found = true
-			best_position = candidate_position
-			best_distance = distance
-			best_offset = offset
-	return {"found": found, "position": best_position}
+			return {"found": true, "position": candidate_position}
+	return {"found": false, "position": preferred_position}
 
 
 func entrance_waiting_orbs() -> Array[Orb3D]:
@@ -376,34 +423,22 @@ func _batch_fits_spawn_line(gravity: Vector2i, batch: Array[Dictionary]) -> bool
 func _spawn_probe_is_clear(
 	candidate_position: Vector2,
 	radius: float,
-	placed: Array[Dictionary]
+	occupied_positions: PackedVector2Array,
+	occupied_radii: PackedFloat32Array
 ) -> bool:
-	for orb: Orb3D in get_orbs():
-		if orb.is_waiting_at_entrance or orb.is_ghost:
-			continue
-		var overlap: float = (
+	for index: int in range(occupied_positions.size()):
+		var minimum_distance: float = (
 			radius
-			+ orb.get_radius()
-			- candidate_position.distance_to(orb.position)
+			+ occupied_radii[index]
+			- Config.data.ghost_exit_overlap
 		)
-		if overlap > Config.data.ghost_exit_overlap:
-			return false
-	for item: Dictionary in placed:
-		var overlap: float = (
-			radius
-			+ float(item["radius"])
-			- candidate_position.distance_to(item["position"] as Vector2)
-		)
-		if overlap > Config.data.ghost_exit_overlap:
+		if (
+			minimum_distance > 0.0
+			and candidate_position.distance_squared_to(occupied_positions[index])
+			< minimum_distance * minimum_distance
+		):
 			return false
 	return true
-
-
-func _contains_approx(values: Array[float], target: float) -> bool:
-	for value: float in values:
-		if is_equal_approx(value, target):
-			return true
-	return false
 
 
 func _update_entrance_waiters() -> void:

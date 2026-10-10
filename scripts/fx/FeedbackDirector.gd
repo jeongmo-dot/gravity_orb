@@ -20,6 +20,14 @@ var _haptics: Haptics
 var _effects_root: Node3D
 var _overlay: CanvasLayer
 var _effects: Array[Dictionary] = []
+var _blast_effect_pools: Dictionary = {
+	"ring": [],
+	"particles": [],
+	"light": [],
+	"flash": [],
+}
+var _blast_ring_mesh: TorusMesh
+var _resources_prewarmed: bool = false
 var _active_color_effects: Array[ColorEffectVisual] = []
 var _color_effect_pool: Array[ColorEffectVisual] = []
 var _active_swipe_trails: Array[SwipeTrail] = []
@@ -50,6 +58,8 @@ func _ready() -> void:
 		_overlay.name = "FeedbackOverlay"
 		_overlay.layer = 0
 		add_child(_overlay)
+	_initialize_blast_effect_pool()
+	call_deferred("_prewarm_visual_resources_offscreen")
 	set_process(true)
 
 
@@ -113,7 +123,7 @@ func play_reaction_visuals(reaction: Dictionary) -> void:
 	_play_blast_feedback(reaction, level, intensity)
 	if reaction_type == ReactionRules.Type.MAX_CLEAR:
 		_play_color_effect_visual(reaction, COLOR_JACKPOT_INTENSITY)
-	if not finale and Config.data.fx_hitstop_enabled:
+	if not finale and _hitstop_enabled_for_mode():
 		var hitstop_time: float = (
 			0.10
 			if reaction_type == ReactionRules.Type.MAX_CLEAR
@@ -164,12 +174,21 @@ func _play_reaction_haptics(reaction: Dictionary) -> void:
 
 
 func begin_hitstop(duration: float) -> void:
-	if not Config.data.fx_hitstop_enabled or duration <= 0.0:
+	if not _hitstop_enabled_for_mode() or duration <= 0.0:
 		return
 	_hitstop_generation += 1
 	var generation: int = _hitstop_generation
 	Engine.time_scale = Config.data.fx_hitstop_scale
 	_release_hitstop_after(duration, generation)
+
+
+func _hitstop_enabled_for_mode() -> bool:
+	if not Config.data.fx_hitstop_enabled:
+		return false
+	return (
+		Config.data.game_mode != GameConfig.GameMode.BLITZ
+		or Config.data.blitz_hitstop_enabled
+	)
 
 
 func _release_hitstop_after(duration: float, generation: int) -> void:
@@ -179,19 +198,32 @@ func _release_hitstop_after(duration: float, generation: int) -> void:
 
 
 func active_ring_count() -> int:
-	return get_tree().get_nodes_in_group(&"feedback_ring").size()
+	return _active_effect_count("ring")
 
 
 func active_particle_count() -> int:
-	return get_tree().get_nodes_in_group(&"feedback_particles").size()
+	return _active_effect_count("particles")
 
 
 func active_light_count() -> int:
-	return get_tree().get_nodes_in_group(&"feedback_light").size()
+	return _active_effect_count("light")
 
 
 func active_flash_count() -> int:
-	return get_tree().get_nodes_in_group(&"feedback_flash").size()
+	return _active_effect_count("flash")
+
+
+func blast_effect_pool_count(kind: String = "") -> int:
+	if not kind.is_empty():
+		return _effect_pool(kind).size()
+	var total: int = 0
+	for pool_value: Variant in _blast_effect_pools.values():
+		total += (pool_value as Array).size()
+	return total
+
+
+func resources_prewarmed() -> bool:
+	return _resources_prewarmed
 
 
 func active_color_effect_count() -> int:
@@ -237,10 +269,8 @@ func haptics() -> Haptics:
 
 
 func clear_effects() -> void:
-	for effect: Dictionary in _effects:
-		var node: Node = effect.get("node") as Node
-		if is_instance_valid(node):
-			node.queue_free()
+	for effect: Dictionary in _effects.duplicate():
+		_release_blast_effect(effect)
 	_effects.clear()
 	for color_effect: ColorEffectVisual in _active_color_effects.duplicate():
 		_release_color_effect(color_effect)
@@ -276,7 +306,7 @@ func _process(delta: float) -> void:
 		var progress: float = clampf((elapsed - delay) / duration, 0.0, 1.0)
 		_update_effect(effect, progress)
 		if progress >= 1.0:
-			node.queue_free()
+			_release_blast_effect(effect)
 			_effects.remove_at(index)
 		else:
 			_effects[index] = effect
@@ -519,27 +549,15 @@ func _create_ring(
 	final_radius: float,
 	delay: float
 ) -> void:
-	var ring: MeshInstance3D = MeshInstance3D.new()
+	var ring: MeshInstance3D = _acquire_blast_effect("ring") as MeshInstance3D
 	ring.name = "BlastRing"
-	ring.add_to_group(&"feedback_ring")
-	var mesh: TorusMesh = TorusMesh.new()
-	mesh.inner_radius = 0.86
-	mesh.outer_radius = 1.0
-	mesh.rings = 48
-	mesh.ring_segments = 8
-	ring.mesh = mesh
-	var material: StandardMaterial3D = StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	var material: StandardMaterial3D = ring.material_override as StandardMaterial3D
 	material.albedo_color = color_value
 	material.emission_enabled = true
 	material.emission = color_value
-	ring.material_override = material
 	ring.position = Orb3D.plane_position_to_world(origin, 0.45)
 	ring.rotation_degrees.x = 90.0
 	ring.scale = Vector3.ONE * 0.01
-	_effects_root.add_child(ring)
 	_effects.append({
 		"node": ring,
 		"kind": "ring",
@@ -559,9 +577,8 @@ func _create_particles(
 	level_scale: float,
 	node_name: String
 ) -> void:
-	var particles: CPUParticles3D = CPUParticles3D.new()
+	var particles: CPUParticles3D = _acquire_blast_effect("particles") as CPUParticles3D
 	particles.name = node_name
-	particles.add_to_group(&"feedback_particles")
 	particles.amount = amount
 	particles.lifetime = DEBRIS_LIFETIME
 	particles.lifetime_randomness = 0.30
@@ -576,22 +593,12 @@ func _create_particles(
 	particles.gravity = _particle_gravity()
 	particles.scale_amount_min = 0.45
 	particles.scale_amount_max = 1.0
-	var scale_curve: Curve = Curve.new()
-	scale_curve.add_point(Vector2(0.0, 1.0))
-	scale_curve.add_point(Vector2(1.0, 0.0))
-	particles.scale_amount_curve = scale_curve
-	var quad: QuadMesh = QuadMesh.new()
-	quad.size = Vector2(0.12, 0.12)
-	var material: StandardMaterial3D = StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	var quad: QuadMesh = particles.mesh as QuadMesh
+	var material: StandardMaterial3D = quad.material as StandardMaterial3D
 	material.albedo_color = color_value
 	material.emission_enabled = true
 	material.emission = color_value
-	quad.material = material
-	particles.mesh = quad
-	_effects_root.add_child(particles)
+	particles.restart()
 	particles.emitting = true
 	_effects.append({
 		"node": particles,
@@ -602,14 +609,12 @@ func _create_particles(
 
 
 func _create_light(origin: Vector2, intensity: float) -> void:
-	var light: OmniLight3D = OmniLight3D.new()
+	var light: OmniLight3D = _acquire_blast_effect("light") as OmniLight3D
 	light.name = "BlastLight"
-	light.add_to_group(&"feedback_light")
 	light.position = Orb3D.plane_position_to_world(origin, 1.5)
 	light.light_color = Color.WHITE
 	light.light_energy = 6.0 * intensity
 	light.omni_range = 6.0
-	_effects_root.add_child(light)
 	_effects.append({
 		"node": light,
 		"kind": "light",
@@ -622,12 +627,9 @@ func _create_light(origin: Vector2, intensity: float) -> void:
 func _create_flash(intensity: float) -> void:
 	if _overlay == null:
 		return
-	var flash: ColorRect = ColorRect.new()
+	var flash: ColorRect = _acquire_blast_effect("flash") as ColorRect
 	flash.name = "BlastScreenFlash"
-	flash.add_to_group(&"feedback_flash")
-	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	flash.color = Color(1.0, 1.0, 1.0, Config.data.fx_flash_alpha * intensity)
-	_overlay.add_child(flash)
 	flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_effects.append({
 		"node": flash,
@@ -636,6 +638,228 @@ func _create_flash(intensity: float) -> void:
 		"duration": maxf(Config.data.fx_flash_time * intensity, 0.001),
 		"start_alpha": flash.color.a,
 	})
+
+
+func _initialize_blast_effect_pool() -> void:
+	_blast_ring_mesh = TorusMesh.new()
+	_blast_ring_mesh.inner_radius = 0.86
+	_blast_ring_mesh.outer_radius = 1.0
+	_blast_ring_mesh.rings = 48
+	_blast_ring_mesh.ring_segments = 8
+	for _index: int in range(2):
+		_pool_blast_node("ring", _new_ring_node())
+	for _index: int in range(3):
+		_pool_blast_node("particles", _new_particle_node())
+	_pool_blast_node("light", _new_light_node())
+	if _overlay != null:
+		_pool_blast_node("flash", _new_flash_node())
+
+
+func _new_ring_node() -> MeshInstance3D:
+	var ring: MeshInstance3D = MeshInstance3D.new()
+	ring.mesh = _blast_ring_mesh
+	var material: StandardMaterial3D = StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	material.emission_enabled = true
+	ring.material_override = material
+	_effects_root.add_child(ring)
+	return ring
+
+
+func _new_particle_node() -> CPUParticles3D:
+	var particles: CPUParticles3D = CPUParticles3D.new()
+	particles.emitting = false
+	particles.lifetime = DEBRIS_LIFETIME
+	particles.lifetime_randomness = 0.30
+	particles.one_shot = true
+	particles.explosiveness = 1.0
+	particles.direction = Vector3.RIGHT
+	particles.spread = 180.0
+	particles.flatness = 1.0
+	particles.scale_amount_min = 0.45
+	particles.scale_amount_max = 1.0
+	var scale_curve: Curve = Curve.new()
+	scale_curve.add_point(Vector2(0.0, 1.0))
+	scale_curve.add_point(Vector2(1.0, 0.0))
+	particles.scale_amount_curve = scale_curve
+	var quad: QuadMesh = QuadMesh.new()
+	quad.size = Vector2(0.12, 0.12)
+	var material: StandardMaterial3D = StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	material.emission_enabled = true
+	quad.material = material
+	particles.mesh = quad
+	_effects_root.add_child(particles)
+	return particles
+
+
+func _new_light_node() -> OmniLight3D:
+	var light: OmniLight3D = OmniLight3D.new()
+	light.light_color = Color.WHITE
+	light.omni_range = 6.0
+	_effects_root.add_child(light)
+	return light
+
+
+func _new_flash_node() -> ColorRect:
+	var flash: ColorRect = ColorRect.new()
+	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_overlay.add_child(flash)
+	flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	return flash
+
+
+func _acquire_blast_effect(kind: String) -> Node:
+	var pool: Array = _effect_pool(kind)
+	var node: Node
+	if not pool.is_empty():
+		node = pool.pop_back() as Node
+	else:
+		match kind:
+			"ring":
+				node = _new_ring_node()
+			"particles":
+				node = _new_particle_node()
+			"light":
+				node = _new_light_node()
+			"flash":
+				node = _new_flash_node()
+	_set_effect_node_visible(node, true)
+	var group_name: StringName = _effect_group(kind)
+	if not node.is_in_group(group_name):
+		node.add_to_group(group_name)
+	return node
+
+
+func _release_blast_effect(effect: Dictionary) -> void:
+	var node: Node = effect.get("node") as Node
+	var kind: String = str(effect.get("kind", ""))
+	if not is_instance_valid(node) or not _blast_effect_pools.has(kind):
+		return
+	if node is CPUParticles3D:
+		(node as CPUParticles3D).emitting = false
+	var group_name: StringName = _effect_group(kind)
+	if node.is_in_group(group_name):
+		node.remove_from_group(group_name)
+	_pool_blast_node(kind, node)
+
+
+func _pool_blast_node(kind: String, node: Node) -> void:
+	_set_effect_node_visible(node, false)
+	var pool: Array = _effect_pool(kind)
+	if not pool.has(node):
+		pool.append(node)
+
+
+func _set_effect_node_visible(node: Node, visible_value: bool) -> void:
+	if node is Node3D:
+		(node as Node3D).visible = visible_value
+	elif node is CanvasItem:
+		(node as CanvasItem).visible = visible_value
+
+
+func _effect_pool(kind: String) -> Array:
+	return _blast_effect_pools[kind] as Array
+
+
+func _effect_group(kind: String) -> StringName:
+	match kind:
+		"ring":
+			return &"feedback_ring"
+		"particles":
+			return &"feedback_particles"
+		"light":
+			return &"feedback_light"
+		_:
+			return &"feedback_flash"
+
+
+func _active_effect_count(kind: String) -> int:
+	var count: int = 0
+	for effect: Dictionary in _effects:
+		if str(effect.get("kind", "")) == kind:
+			count += 1
+	return count
+
+
+func _prewarm_visual_resources_offscreen() -> void:
+	Orb3D.prewarm_shared_resources(Config.data)
+	if DisplayServer.get_name() == "headless":
+		_resources_prewarmed = true
+		return
+	var viewport: SubViewport = SubViewport.new()
+	viewport.name = "VisualResourcePrewarmer"
+	viewport.size = Vector2i(64, 64)
+	viewport.transparent_bg = true
+	viewport.own_world_3d = true
+	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	add_child(viewport)
+	var prewarm_root: Node3D = Node3D.new()
+	viewport.add_child(prewarm_root)
+	var camera: Camera3D = Camera3D.new()
+	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+	camera.size = 12.0
+	camera.position = Vector3(0.0, 0.0, 10.0)
+	camera.current = true
+	prewarm_root.add_child(camera)
+	var combination_index: int = 0
+	for color_index: int in range(Config.data.color_display.size()):
+		for level_index: int in range(1, Config.data.orb_max_level + 1):
+			var mesh_instance: MeshInstance3D = MeshInstance3D.new()
+			mesh_instance.mesh = Orb3D.shared_mesh_for_level(Config.data, level_index)
+			mesh_instance.material_override = Orb3D.shared_visual_material_for_color(
+				Config.data,
+				color_index
+			)
+			mesh_instance.position = Vector3(
+				float(combination_index % 7) - 3.0,
+				float(combination_index / 7) - 2.5,
+				0.0
+			)
+			mesh_instance.scale = Vector3.ONE * 0.15
+			prewarm_root.add_child(mesh_instance)
+			combination_index += 1
+	var ring_pool: Array = _effect_pool("ring")
+	if not ring_pool.is_empty():
+		var pooled_ring: MeshInstance3D = ring_pool[0] as MeshInstance3D
+		var ring_sample: MeshInstance3D = MeshInstance3D.new()
+		ring_sample.mesh = pooled_ring.mesh
+		ring_sample.material_override = pooled_ring.material_override
+		ring_sample.position = Vector3(-4.0, 4.0, 0.0)
+		prewarm_root.add_child(ring_sample)
+	var particle_pool: Array = _effect_pool("particles")
+	if not particle_pool.is_empty():
+		var pooled_particles: CPUParticles3D = particle_pool[0] as CPUParticles3D
+		var particle_sample: MeshInstance3D = MeshInstance3D.new()
+		particle_sample.mesh = pooled_particles.mesh
+		particle_sample.position = Vector3(4.0, 4.0, 0.0)
+		prewarm_root.add_child(particle_sample)
+	var color_effects: Array[ColorEffectVisual] = []
+	for mode_value: int in range(4):
+		var color_effect: ColorEffectVisual = ColorEffectVisual.new()
+		prewarm_root.add_child(color_effect)
+		color_effects.append(color_effect)
+	await get_tree().process_frame
+	var lift_targets: Array[Dictionary] = [{"position": Vector2(20.0, 20.0)}]
+	for mode_value: int in range(color_effects.size()):
+		color_effects[mode_value].play(
+			mode_value as GameConfig.ShockMode,
+			Vector2.ZERO,
+			Config.data.color_display[mode_value % Config.data.color_display.size()],
+			25.0,
+			100.0,
+			1.0,
+			Vector2.UP,
+			lift_targets
+		)
+	await RenderingServer.frame_post_draw
+	viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	viewport.queue_free()
+	_resources_prewarmed = true
 
 
 func _update_effect(effect: Dictionary, progress: float) -> void:

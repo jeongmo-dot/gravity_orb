@@ -18,6 +18,8 @@ signal fever_changed(active: bool, remaining: float)
 signal time_bonus_awarded(seconds: float, source: String)
 signal finale_started
 signal finale_blast(level: int)
+signal swipe_accepted(dir: Vector2i)
+signal swipe_spawn_completed(dir: Vector2i, spawned_count: int)
 
 const FINALE_REACTION_IDLE_TIME: float = 1.5
 const FINALE_SETTLE_LIMIT: float = 5.0
@@ -68,6 +70,8 @@ var max_chain: int:
 
 var _active: bool = false
 var _swipe_cooldown_remaining: float = 0.0
+var _buffered_swipe: Vector2i = Vector2i.ZERO
+var _has_buffered_swipe: bool = false
 var _spawn_elapsed: float = 0.0
 var _chain_idle_elapsed: float = 0.0
 var _has_accepted_swipe: bool = false
@@ -115,6 +119,8 @@ func start_game() -> void:
 	spawn_batch_histogram.clear()
 	max_spawn_batch = 0
 	_swipe_cooldown_remaining = 0.0
+	_buffered_swipe = Vector2i.ZERO
+	_has_buffered_swipe = false
 	_spawn_elapsed = 0.0
 	_chain_idle_elapsed = 0.0
 	_has_accepted_swipe = false
@@ -145,11 +151,21 @@ func start_game() -> void:
 func on_swipe(dir: Vector2i) -> void:
 	if state != State.RUNNING:
 		return
-	if dir == gravity or _swipe_cooldown_remaining > 0.0:
+	if dir == gravity:
 		return
+	if _swipe_cooldown_remaining > 0.0:
+		if Config.data.blitz_swipe_buffer_enabled:
+			_buffered_swipe = dir
+			_has_buffered_swipe = true
+		return
+	_accept_swipe(dir)
+
+
+func _accept_swipe(dir: Vector2i) -> void:
 	gravity = dir
 	turn_index += 1
 	accepted_swipes += 1
+	swipe_accepted.emit(dir)
 	_swipe_cooldown_remaining = maxf(Config.data.blitz_swipe_cooldown, 0.0)
 	_chain_idle_elapsed = 0.0
 	_has_accepted_swipe = true
@@ -159,8 +175,10 @@ func on_swipe(dir: Vector2i) -> void:
 	_board.set_gravity(gravity)
 	if _board.has_method("play_visual_tilt"):
 		_board.play_visual_tilt(gravity)
+	var spawned_count: int = 0
 	if Config.data.blitz_spawn_on_swipe:
-		_try_spawn_for_swipe()
+		spawned_count = _try_spawn_for_swipe()
+	swipe_spawn_completed.emit(dir, spawned_count)
 	gravity_changed.emit(gravity)
 	turn_started.emit(turn_index, gravity)
 
@@ -229,9 +247,18 @@ func _start_running() -> void:
 
 func _advance_running(delta: float) -> void:
 	var step: float = maxf(delta, 0.0)
+	var real_step: float = step / maxf(Engine.time_scale, 0.001)
 	settle_elapsed += step
 	play_time_elapsed += step
-	_swipe_cooldown_remaining = maxf(_swipe_cooldown_remaining - step, 0.0)
+	_swipe_cooldown_remaining = maxf(_swipe_cooldown_remaining - real_step, 0.0)
+	if is_zero_approx(_swipe_cooldown_remaining):
+		_swipe_cooldown_remaining = 0.0
+	if _swipe_cooldown_remaining <= 0.0 and _has_buffered_swipe:
+		var buffered_dir: Vector2i = _buffered_swipe
+		_buffered_swipe = Vector2i.ZERO
+		_has_buffered_swipe = false
+		if buffered_dir != gravity:
+			_accept_swipe(buffered_dir)
 	_advance_chain(step)
 	_advance_fever(step)
 	if not Config.data.blitz_spawn_on_swipe:
@@ -265,7 +292,7 @@ func _try_spawn_next() -> int:
 	return spawned.size()
 
 
-func _try_spawn_for_swipe() -> void:
+func _try_spawn_for_swipe() -> int:
 	var batch_size: int = _next_swipe_spawn_count()
 	_spawner.sync_blitz_next_batch_size(batch_size)
 	var spawned_count: int = _try_spawn_next()
@@ -274,10 +301,11 @@ func _try_spawn_for_swipe() -> void:
 	)
 	max_spawn_batch = maxi(max_spawn_batch, spawned_count)
 	if spawned_count <= 0:
-		return
+		return 0
 	if refill_rule == RefillRule.COUNT_DEBT:
 		refill_debt = maxi(refill_debt - batch_size, 0)
 	_sync_swipe_spawn_preview()
+	return spawned_count
 
 
 func _update_refill_after_reaction(reaction_type: ReactionRules.Type) -> void:
@@ -408,6 +436,8 @@ func _award_time_bonus(seconds: float, source: String) -> void:
 
 
 func _begin_finale() -> void:
+	_buffered_swipe = Vector2i.ZERO
+	_has_buffered_swipe = false
 	InputRouter.set_locked(true)
 	_pending_swipe_windows.clear()
 	finale_score_start = _score_manager.score

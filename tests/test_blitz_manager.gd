@@ -32,7 +32,7 @@ func test_initial_fill_is_non_overlapping_and_ready_locks_input() -> void:
 	await _cleanup_fixture(fixture)
 
 
-func test_swipe_changes_gravity_immediately_with_cooldown_and_same_direction_ignore() -> void:
+func test_swipe_changes_gravity_with_cooldown_buffer_and_same_direction_ignore() -> void:
 	var fixture: Dictionary = await _create_fixture(3101)
 	var manager: BlitzManager = fixture["manager"] as BlitzManager
 	var board: Board = fixture["board"] as Board
@@ -56,16 +56,62 @@ func test_swipe_changes_gravity_immediately_with_cooldown_and_same_direction_ign
 	var preview_after: Array = spawner.peek_preview()
 	assert_eq(preview_after[0], preview_before[1], "THEN advances to NEXT")
 	manager.on_swipe(Vector2i.UP)
-	assert_eq(manager.gravity, Vector2i.RIGHT, "cooldown ignores rapid swipe")
-	assert_eq(manager.spawn_count, 1, "cooldown rejection does not spawn")
+	assert_eq(manager.gravity, Vector2i.RIGHT, "cooldown delays rapid swipe")
+	assert_eq(manager.spawn_count, 1, "buffered swipe does not spawn early")
 	manager._physics_process(Config.data.blitz_swipe_cooldown)
-	manager.on_swipe(Vector2i.RIGHT)
-	assert_eq(manager.spawn_count, 1, "same direction rejection does not spawn")
-	manager.on_swipe(Vector2i.UP)
-	assert_eq(manager.gravity, Vector2i.UP, "swipe after cooldown applies")
+	assert_eq(manager.gravity, Vector2i.UP, "buffer executes on cooldown end frame")
+	assert_eq(manager.spawn_count, 2, "buffered swipe spawns once")
 	manager.on_swipe(Vector2i.UP)
 	assert_eq(manager.accepted_swipes, 2, "same direction ignored")
 	assert_eq(manager.spawn_count, 2, "only accepted swipes spawn")
+	await _cleanup_fixture(fixture)
+
+
+func test_cooldown_uses_real_time_and_buffer_keeps_last_valid_direction() -> void:
+	var fixture: Dictionary = await _create_fixture(3157)
+	var manager: BlitzManager = fixture["manager"] as BlitzManager
+	Config.data.blitz_spawn_on_swipe = false
+	var original_time_scale: float = Engine.time_scale
+	manager.on_swipe(Vector2i.RIGHT)
+	manager.on_swipe(Vector2i.UP)
+	manager.on_swipe(Vector2i.RIGHT)
+	manager.on_swipe(Vector2i.LEFT)
+	Engine.time_scale = 0.12
+	manager._physics_process(0.0095)
+	assert_eq(manager.gravity, Vector2i.RIGHT, "scaled 79ms keeps cooldown active")
+	manager._physics_process(0.0001)
+	assert_eq(manager.gravity, Vector2i.LEFT, "real 80ms executes latest buffered direction")
+	assert_eq(manager.accepted_swipes, 2, "intermediate and same directions are discarded")
+	Engine.time_scale = original_time_scale
+	await _cleanup_fixture(fixture)
+
+
+func test_ready_and_finale_do_not_store_buffered_swipes() -> void:
+	var fixture: Dictionary = await _create_fixture(3158, 0.0, 1.5)
+	var manager: BlitzManager = fixture["manager"] as BlitzManager
+	Config.data.blitz_spawn_on_swipe = false
+	manager.on_swipe(Vector2i.RIGHT)
+	manager._physics_process(1.5)
+	assert_eq(manager.accepted_swipes, 0, "READY swipe is not buffered")
+	manager.on_swipe(Vector2i.RIGHT)
+	manager.on_swipe(Vector2i.UP)
+	manager._begin_finale()
+	manager._physics_process(Config.data.blitz_swipe_cooldown)
+	assert_eq(manager.accepted_swipes, 1, "FINALE clears pending buffered swipe")
+	await _cleanup_fixture(fixture)
+
+
+func test_blitz_preview_signal_is_coalesced_to_one_per_swipe_frame() -> void:
+	var fixture: Dictionary = await _create_fixture(3159)
+	var manager: BlitzManager = fixture["manager"] as BlitzManager
+	var spawner: Spawner = fixture["spawner"] as Spawner
+	await tree.process_frame
+	var signal_count: Array[int] = [0]
+	spawner.preview_changed.connect(func(_batches: Array) -> void: signal_count[0] += 1)
+	manager.on_swipe(Vector2i.RIGHT)
+	manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 2))
+	await tree.process_frame
+	assert_eq(signal_count[0], 1, "same-frame preview changes publish once")
 	await _cleanup_fixture(fixture)
 
 
@@ -571,6 +617,8 @@ func _snapshot_config() -> Dictionary:
 		"blitz_refill_interval": Config.data.blitz_refill_interval,
 		"blitz_ready_time": Config.data.blitz_ready_time,
 		"blitz_finale_interval": Config.data.blitz_finale_interval,
+		"blitz_swipe_cooldown": Config.data.blitz_swipe_cooldown,
+		"blitz_swipe_buffer_enabled": Config.data.blitz_swipe_buffer_enabled,
 	}
 
 
@@ -586,6 +634,8 @@ func _restore_config(snapshot: Dictionary) -> void:
 	Config.data.blitz_refill_interval = float(snapshot["blitz_refill_interval"])
 	Config.data.blitz_ready_time = float(snapshot["blitz_ready_time"])
 	Config.data.blitz_finale_interval = float(snapshot["blitz_finale_interval"])
+	Config.data.blitz_swipe_cooldown = float(snapshot["blitz_swipe_cooldown"])
+	Config.data.blitz_swipe_buffer_enabled = bool(snapshot["blitz_swipe_buffer_enabled"])
 
 
 func _productive_swipe(manager: BlitzManager, direction: Vector2i) -> Dictionary:

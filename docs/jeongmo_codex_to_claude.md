@@ -38,6 +38,51 @@
 
 ## 미확인
 
+### [2026-10-10] 대상 #57 — BLITZ 끊김·입력 지연 개선
+- 상태: 완료
+- 브랜치 / PR: `m8-blitz-input-latency` / [PR #58](https://github.com/jeongmo-dot/gravity_orb/pull/58)
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scenes/UI.tscn`, `scripts/core/{BlitzManager.gd,Spawner.gd}`, `scripts/fx/{ColorEffectVisual.gd,FeedbackDirector.gd}`, `scripts/spike/{Board3D.gd,Orb3D.gd}`, `scripts/ui/Hud.gd`, `tests/{test_blitz_manager.gd,test_config.gd,test_feedback.gd,test_orb_resource_sharing.gd,test_screen_layout.gd,run_blitz_responsiveness_measurement.ps1}`, `tests/spike/{RunBlitzResponsivenessMeasurement.tscn,run_blitz_responsiveness_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] BLITZ 대폭발 히트스톱을 끄고 턴제는 유지. 쿨다운 `0.12 → 0.08초`, `Engine.time_scale=0.12`에서도 실제 시간 0.08초에 종료하며 1칸 마지막 입력 버퍼를 실행 — `test_blitz_blast_skips_hitstop_while_turn_blast_keeps_it`, `test_cooldown_uses_real_time_and_buffer_keeps_last_valid_direction`
+  - [x] 현재 중력과 같은 방향은 저장/실행하지 않고 READY·피날레 입력도 저장하지 않음 — `test_ready_and_finale_do_not_store_buffered_swipes`와 기존 스와이프 회귀
+  - [x] 구슬 100개의 PhysicsMaterial 1개·레벨별 메시/Shape·색별 기본 머티리얼 공유. 깜빡임 머티리얼과 반지름 변경 메시/Shape만 copy-on-write — `test_orb_resource_sharing.gd` `2/2`
+  - [x] 6색×7레벨 구슬과 BLAST·합체·색 효과 렌더 자원을 첫 플레이 전 화면 밖 SubViewport에서 예열하고, BLAST 고리 2·파티클 3·조명 1·플래시 1을 풀로 재사용 — `test_blast_effect_nodes_return_to_pool_and_are_reused`, `resources_prewarmed()`
+  - [x] BLITZ 미리보기 발행을 프레임당 1회로 합치고 NEXT/THEN `OrbVisual`을 분리된 풀에서 재사용·종료 시 해제 — `test_blitz_preview_signal_is_coalesced_to_one_per_swipe_frame` 및 기존 HUD 회귀
+  - [x] THEN `×n` 폰트 23px(NEXT 28px의 82.1%)와 보드 윗선 8px 이상 간격 — `test_then_count_is_readable_and_clear_of_board_top`, 캡처 `13_turn_ramp_uncapped_next.png` 직접 확인
+  - [x] 같은 창 모드 측정(540×960, OpenGL 3.3, RTX 4070 Ti SUPER, 시드 101~104, 봇 0.3초·강제 BLAST·8개 생성) 전후 완료. 개선 후 p99 `8.710ms < 16.7ms`, 33.3ms 초과 `0`, 유실 `0`, 입력 수락 최대 `48.389ms < 88.33ms`
+  - [x] Godot 4.8 import, 공식 래퍼 259/259, 캡처 13장, 시작 화면/TURN/BLITZ 스모크 3종, 규칙 검색 완료
+- 창 모드 성능 관측 (`main 2ae0bb8` → #57, 시드 4개 합산):
+
+  | 지표 | 개선 전 | 개선 후 |
+  |---|---:|---:|
+  | 프레임 p50 / p95 / p99 / 최대 | 6.065 / 9.709 / 32.357 / 382.137ms | 6.060 / 7.488 / 8.710 / 26.814ms |
+  | 16.7ms / 33.3ms 초과 | 128 / 40 | 3 / 0 |
+  | 입력→수락 p50 / p95 / 최대 | 0.008 / 0.012 / 0.033ms | 0.009 / 17.861 / 48.389ms |
+  | 수락→생성 완료 p50 / p95 / 최대 | 10.036 / 66.951 / 90.108ms | 0.726 / 2.266 / 12.401ms |
+  | 요청 / 수락 / 유실 | 120 / 105 / 15 | 120 / 120 / 0 |
+  | 첫 강제 BLAST 프레임(시드 101~104) | 7.002 / 7.999 / 8.331 / 8.832ms | 8.284 / 7.864 / 6.904 / 8.465ms |
+  | 첫 8개 생성 프레임(시드 101~104) | 73.196 / 88.999 / 79.918 / 76.761ms | 10.109 / 18.911 / 9.412 / 9.793ms |
+
+  - 개선 후 입력→수락 p95가 기준보다 커진 것은 이전에는 쿨다운 중 요청을 버려 표본에서 빠졌지만, 지금은 마지막 입력을 0.08초 안에 실행해 표본에 포함하기 때문이다. 관측 최대 `48.389ms`는 목표 `쿨다운 80ms + 1프레임` 안이다.
+- QA 관측값:
+  - Godot `4.8-dev3` `--headless --path . --import` → 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` (`--fixed-fps 120`) → 일반 `250/250` 18.479초, 장기 Jolt `4/4` 31.070초, 성능 `5/5` 1.761초, 합계 `259/259`, 최종 종료 코드 0, 총 51.309초
+  - 장기 Jolt 관측 → 22시드 이탈 `0`, 발산 `0`, 최대 벽 관통 `12.9515px`, 최대 쌍 겹침 `11.8675px`; 시드 101 120턴·20턴 통합 테스트 통과
+  - `tests/capture_screens.ps1` → 540×960 PNG `13/13`, 종료 코드 0. `05_blitz_ready`, `07_blitz_danger`, `13_turn_ramp_uncapped_next` 직접 확인: 구슬·HUD 정상, NEXT/THEN `×n` 가독성 동일, THEN과 보드 윗선 겹침 없음
+  - 시작 화면 / `--mode=turn` / `--mode=blitz` 300프레임 스모크 → 모두 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - `git diff --check` 오류 0건. 규칙 검색 → `Input`/`InputEvent`는 `InputRouter.gd`, `Haptics.gd`만; 난수 호출은 `Spawner.gd`만
+- 수동 확인 절차:
+  1. BLITZ에서 서로 다른 방향을 0.08초보다 빠르게 여러 번 스와이프한다 → 마지막 방향이 쿨다운 종료 때 실행되고 입력이 사라지는 느낌이 없는지 확인한다.
+  2. BLAST 직전·직후 연속 스와이프한다 → 화면 흔들림·섬광·고리·파편·소리는 유지되지만 전체 화면 정지와 입력 지연은 없는지 확인한다.
+  3. 낮은 밀도에서 NEXT `×8` 상태를 만든 뒤 스와이프한다 → 8개가 한 번에 생성되어도 눈에 띄는 멈춤 없이 중력이 바뀌는지 확인한다.
+  4. `tests/capture_screens.ps1` 후 `13_turn_ramp_uncapped_next.png`를 연다 → 오른쪽 THEN `×6`이 NEXT `×6`과 비슷한 크기이며 보드 윗선에 붙지 않는지 확인한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 명세의 리소스 공유만으로는 고밀도 생성 위치 탐색이 p95 60ms대를 남겼다. 기존 `Board3D.find_free_spawn_slot()`은 후보마다 `get_orbs()` 배열을 다시 만들고 빈 칸을 찾아도 전체 라인을 끝까지 검사했다. 같은 우선순위(선호 위치, 가까운 거리, 동률이면 작은 offset)를 유지하면서 구슬 위치를 호출당 1회 스냅샷하고 가까운 후보부터 첫 빈 칸에서 종료하도록 바꿨다. 전체 물리·결정성 회귀 259개가 통과했다.
+  - 측정기의 강제 8개 생성은 COUNT_DEBT를 한 입력에만 주입하고 즉시 기존 목표 밀도 규칙으로 되돌린다. 보드 전체 삭제로 인한 대량 `queue_free()` 프레임을 섞지 않는다. JSON·캡처는 `artifacts/` gitignore 대상이다.
+  - 개선 전 main의 시드 104에서는 기존 빈 LIFT 표적이 `ImmediateMesh.surface_end()` 오류를 반복해 최대 프레임에 로그 비용도 포함됐다. 빈 표적이면 메시 surface를 만들지 않도록 방어해 개선 후 오류 0건으로 확인했다.
+  - 캡처 종료 시 기존과 같은 `ObjectDB instances leaked` 경고 4건은 남지만 13장 생성·장면 값 검사·종료 코드는 0이다.
+- 남은 것 · 질문: 자동 검증 기준의 남은 항목 없음. 실제 플레이에서 연속 스와이프·대폭발·8개 생성 체감과 캡처 시각 검수 필요.
+
 ### [2026-10-10] 대상 #56 후속 — BLITZ 수동 QA 끊김·입력 지연
 - 상태: 질문
 - 브랜치 / PR: `m8-turn-spawn-ramp-uncapped` / https://github.com/jeongmo-dot/gravity_orb/pull/57

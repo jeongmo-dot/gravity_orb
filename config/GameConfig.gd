@@ -105,7 +105,9 @@ enum GameMode { TURN, BLITZ }
 @export var blast_score_factor: float = 5.0
 @export var blast_blink_period: float = 0.8
 @export var blitz_duration: float = 90.0
-@export var blitz_swipe_cooldown: float = 0.12
+@export var blitz_swipe_cooldown: float = 0.08
+@export var blitz_swipe_buffer_enabled: bool = true
+@export var blitz_hitstop_enabled: bool = false
 @export var blitz_spawn_on_swipe: bool = true
 @export var blitz_min_spawn_per_swipe: int = 1
 @export var blitz_max_spawn_per_swipe: int = 8

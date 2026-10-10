@@ -102,6 +102,35 @@ func test_turn_blocked_label_only_shows_for_blocked_directions() -> void:
 	Config.data.game_mode = original_mode
 
 
+func test_then_count_is_readable_and_clear_of_board_top() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_ramp: int = Config.data.spawn_count_ramp_turns
+	var original_max: int = Config.data.spawn_count_max
+	var main: Main = await _create_turn_main()
+	var spawner: Spawner = main.get_node("Spawner") as Spawner
+	Config.data.spawn_count_ramp_turns = 50
+	Config.data.spawn_count_max = 0
+	spawner.sync_next_batch_size(251)
+	await tree.process_frame
+	var next_count: Label = main.get_node("UI/Hud/NextCountLabel") as Label
+	var then_count: Label = main.get_node("UI/Hud/ThenCountLabel") as Label
+	var then_region: Control = main.get_node("UI/Hud/ThenPreviewRegion") as Control
+	assert_true(then_count.visible, "THEN count is visible for six orbs")
+	assert_true(
+		then_count.get_theme_font_size("font_size")
+		>= ceili(float(next_count.get_theme_font_size("font_size")) * 0.8),
+		"THEN count font is at least 80 percent of NEXT"
+	)
+	assert_true(
+		then_region.get_global_rect().end.y <= 480.0 - 8.0,
+		"THEN region keeps at least eight pixels above board top"
+	)
+	await _destroy_main(main)
+	Config.data.game_mode = original_mode
+	Config.data.spawn_count_ramp_turns = original_ramp
+	Config.data.spawn_count_max = original_max
+
+
 func _assert_regions_do_not_overlap(regions: Dictionary, output_size: Vector2) -> void:
 	var names: Array = regions.keys()
 	for first_index: int in range(names.size()):
