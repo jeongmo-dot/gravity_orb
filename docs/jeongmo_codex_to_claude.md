@@ -40,7 +40,7 @@
 
 ### [2026-10-11] 대상 #62 — BLITZ 대폭발 L6 통일
 - 상태: 질문 — 규칙 구현·검증은 완료했으나 B 조건의 휴리스틱 0.6초 생존 p50이 모든 후보에서 기준 `60~150초`보다 짧음. §12-B.10 선택 규칙에 따라 제품 기본값 `k=1.0`을 유지했고 수치를 임의 변경하지 않음
-- 브랜치 / PR: `m8-blitz-blast-l6` / 생성 예정
+- 브랜치 / PR: `m8-blitz-blast-l6` / [PR #63](https://github.com/jeongmo-dot/gravity_orb/pull/63)
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/BlitzManager.gd`, `tests/{test_blitz_manager.gd,test_config.gd,test_jolt_3d.gd,test_rules.gd,run_blitz_blast_l6_measurement.ps1}`, `tests/spike/{capture_screens.gd,run_blitz_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] BLITZ 대폭발 최소 레벨을 `L4 → L6`, 기본 BLAST 시간 보너스를 `0.5 → 2.0초`로 변경. 피버 배수로 `4.0초` 적용
