@@ -40,7 +40,7 @@
 
 ### [2026-10-11] 대상 #62 — 약 250턴 램프 + TURN 콤보 상한 (추가 요구 3)
 - 상태: 완료 — 후보 기준을 만족해 `spawn_count_ramp_turns=20`을 선택·적용했고 `combo_multiplier_max=128.0`을 추가함. 추가 요구 1·2 회신의 램프 질문은 이 결정으로 해소됨
-- 브랜치 / PR: `m8-turn-250-combo-cap` / 생성 후 갱신 예정
+- 브랜치 / PR: `m8-turn-250-combo-cap` / [PR #64](https://github.com/jeongmo-dot/gravity_orb/pull/64)
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/{ScoreManager.gd,TurnManager.gd}`, `tests/{test_config.gd,test_score.gd,test_score_popups.gd,test_screen_layout.gd,test_spawner.gd,run_blast_l4_turn_measurement.ps1}`, `tests/scenarios/{test_score_flow.gd,test_turn_manager.gd}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 시드 101~112에서 램프 25·20·15를 게임오버까지 측정. p50 `239·240·203턴` 중 허용 범위 `220~280`에 들고 250과 차이가 가장 작은 램프 **20**(차이 10)을 선택. 램프 25는 차이 11, 램프 15는 허용 범위 밖
