@@ -40,7 +40,7 @@
 
 ### [2026-10-10] 대상 #60 — 중력 1800 복원 + 레벨당 25% 차등
 - 상태: 완료
-- 브랜치 / PR: `m8-level-gravity-scaling` / PR 미생성
+- 브랜치 / PR: `m8-level-gravity-scaling` / [PR #61](https://github.com/jeongmo-dot/gravity_orb/pull/61)
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `tests/{test_config.gd,test_jolt_3d.gd,run_gravity_comparison.ps1,run_blitz_responsiveness_measurement.ps1}`, `tests/scenarios/test_jolt_integration.gd`, `tests/spike/{run_jolt_3d_measurement.gd,run_blitz_measurement.gd,run_blitz_responsiveness_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `gravity_strength=1800`, `gravity_level_scale=0.25`를 선언·기본 리소스·config 테스트에 적용. L7 기대값은 `gravity_strength * (1 + gravity_level_scale * 6)`에서 계산
