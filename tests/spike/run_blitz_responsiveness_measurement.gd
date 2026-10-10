@@ -25,6 +25,7 @@ var _manager: BlitzManager
 var _board: Board3D
 var _requests: Array[Dictionary] = []
 var _frame_samples_ms: Array[float] = []
+var _draw_call_samples: Array[int] = []
 var _input_latency_ms: Array[float] = []
 var _spawn_latency_ms: Array[float] = []
 var _last_process_usec: int = 0
@@ -47,6 +48,9 @@ func _process(_delta: float) -> void:
 		var frame_ms: float = float(now_usec - _last_process_usec) / 1000.0
 		if _record_frames:
 			_frame_samples_ms.append(frame_ms)
+			_draw_call_samples.append(RenderingServer.get_rendering_info(
+				RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME
+			))
 			if not _pending_frame_marker.is_empty():
 				_marker_frames_ms[_pending_frame_marker] = frame_ms
 				_pending_frame_marker = ""
@@ -219,6 +223,7 @@ func _build_report() -> Dictionary:
 		"gravity_level_scale": Config.data.gravity_level_scale,
 		"duration_seconds": RUN_DURATION_SECONDS,
 		"frame_samples_ms": _frame_samples_ms,
+		"draw_call_samples": _draw_call_samples,
 		"input_latency_ms": _input_latency_ms,
 		"spawn_latency_ms": _spawn_latency_ms,
 		"requested_inputs": _requests.size(),
@@ -230,12 +235,14 @@ func _build_report() -> Dictionary:
 		),
 		"max_spawn_batch": _manager.max_spawn_batch,
 		"renderer": RenderingServer.get_video_adapter_name(),
+		"shared_resources": Orb3D.shared_resource_counts(),
 	}
 
 
 func _summary_without_samples(report: Dictionary) -> Dictionary:
 	var summary: Dictionary = report.duplicate(true)
 	summary.erase("frame_samples_ms")
+	summary.erase("draw_call_samples")
 	summary.erase("input_latency_ms")
 	summary.erase("spawn_latency_ms")
 	return summary

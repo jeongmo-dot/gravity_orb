@@ -38,6 +38,66 @@
 
 ## 미확인
 
+### [2026-10-11] 대상 #63 — 비주얼 V1 천체 구슬
+- 상태: 완료 — 7단계 천체 구슬·색각 문양·L4+ 외곽선 맥동·NEXT/THEN 미리보기를 구현하고 도감 색 분석, 창 모드 성능, 물리 상태 해시, 전체 회귀를 관측함
+- 브랜치 / PR: `v1-celestial-orbs` / 생성 예정
+- 변경 파일: `scenes/Orb3D.tscn`, `scripts/core/{CelestialOrbArt.gd,OrbSymbols.gd,OrbVisual.gd}`, `scripts/spike/Orb3D.gd`, `scripts/fx/FeedbackDirector.gd`, `scripts/ui/Hud.gd`, `tests/{test_celestial_orbs.gd,test_jolt_3d.gd,test_orb_resource_sharing.gd,test_orb_symbols.gd,capture_screens.ps1,run_blitz_responsiveness_measurement.ps1}`, `tests/spike/{capture_screens.gd,run_blitz_responsiveness_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] L1 운석·L2 달·L3 바위 행성·L4 고리 행성·L5 가스 거인·L6 별·L7 태양을 절차적 셰이더로 구현. 몸통 반지름 비율 `0.94/0.94/0.94/0.68/0.94/0.82/0.84R`, 장식까지 `1.0R` 안이며 충돌 Shape·질량·물리값은 변경하지 않음 — 자동 (`test_all_levels_keep_celestial_art_inside_collision_radius`)
+  - [x] 몸통은 RigidBody 회전을 따르고 L4 고리 `20°`, L6·L7 광채, 색각 문양, 폭발 외곽선은 카메라 기준 고정 — 자동 (`test_body_rolls_while_ring_halo_symbol_and_outline_face_camera`)
+  - [x] 6색 모두 어두운 외곽선이 있는 흰 ▲●■◆★✚ 문양을 사용하고 설정 켬/끔 유지 — 자동 (`test_3d_symbol_texture_has_white_fill_and_dark_outline`, 기존 2D/3D 토글 테스트)
+  - [x] 몸통 깜빡임 대신 L4 이상에서만 구슬 색 외곽선이 `blast_blink_period`로 맥동. L1~L3은 외곽선 숨김 — 자동 (`test_pulse_outline_is_only_visible_for_level_four_and_above`)
+  - [x] NEXT/THEN이 동일한 천체 레벨·색 프로필과 문양/폭발 상태를 사용 — 자동 (`test_preview_uses_same_level_and_color_art_profile`) 및 캡처 `02`, `03`, `12`, `13` 직접 확인
+  - [x] 색×레벨 공유 머티리얼 `42`, 레벨 메시 `7`, UV 레이어 공유 메시 `2`, Shape `7`, 물리 머티리얼 `1`; 성장 때만 메시·Shape copy-on-write — 자동 (`test_celestial_materials_and_adornments_remain_shared`, `test_orb_resource_sharing.gd`)
+  - [x] TURN 20턴·BLITZ 20초 표시 켬/끔 물리 상태 해시 동일 — 자동 (`test_visual_layers_preserve_turn_and_blitz_state_hashes`)
+  - [x] 기존 13장 + `14_orb_codex` 6색×7레벨 캡처, 밝은 40% 픽셀 Lab 분석, 창 모드 #57 성능 전후 측정, 전체 래퍼·스모크 완료
+
+- 도감 색 분석 (Compatibility, 캡처 `540×960`, 밝은 40% 평균, CIE76):
+
+  | 레벨 | 같은 레벨 6색 최소 ΔE76 | 기준색 대비 최대 색상각 오차 |
+  |---:|---:|---:|
+  | L1 운석 | 27.32 | 1.93° |
+  | L2 달 | 29.34 | 1.81° |
+  | L3 바위 행성 | 29.26 | 1.87° |
+  | L4 고리 행성 | 30.73 | 1.86° |
+  | L5 가스 거인 | 32.38 | 1.44° |
+  | L6 별 | 30.93 | 1.80° |
+  | L7 태양 | 30.91 | 1.76° |
+
+  - 기준 `color_display` 6색 자체의 최소 ΔE76은 `33.37`. 분석 원본은 gitignore 대상 `artifacts/measurements/orb_codex_color_report.json`
+
+- 창 모드 성능 관측 (RTX 4070 Ti SUPER, Compatibility, BLITZ 시드 101~104, 봇 0.3초):
+
+  | 구분 | 프레임 p50 / p95 / p99 / 최대 | >16.7ms / >33.3ms | 드로콜 p50 / p95 / 최대 | 생성 수락→spawn p50 / p95 / 최대 |
+  |---|---|---:|---|---|
+  | 변경 전 | 1.224 / 2.245 / 3.314 / 825.367ms | 2 / 1 | 448 / 476 / 490 | 0.808 / 2.617 / 6.483ms |
+  | 변경 후 | 1.458 / 2.476 / 3.821 / 8.013ms | 0 / 0 | 486 / 512 / 522 | 0.873 / 2.095 / 6.346ms |
+
+  - 변경 전 첫 BLAST 프레임 `2.309~5.537ms`, 첫 8개 생성 프레임 `3.204~5.737ms`; 변경 후 각각 `3.047~4.615ms`, `3.961~8.013ms`
+  - 변경 전 머티리얼 `6`, 레벨 메시 `7`; 변경 후 머티리얼 `42`, 레벨 메시 `7` + UV 레이어 메시 `2`. 변경 후 입력 `120/120` 수락, p99 `<16.7ms`, 33.3ms 초과 `0`
+  - 변경 전 최대 `825.367ms`·33.3ms 초과 1회와 입력 누락 1회는 같은 측정의 단발 관측값이며, 코드는 변경 전 main이었다. 원시 보고서는 gitignore 대상 `blitz_responsiveness_v1_before.json`, `..._v1_after.json`
+
+- QA 관측값:
+  - Godot `4.8-dev3 mono` `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` 최종 → 일반 `265/265` 19.274초, 장기 `4/4` 30.508초, 성능 `5/5` 2.582초, 합계 `274/274`; 종료 코드 0, 총 52.364초
+  - 물리 상태 해시: TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`; 각 표시 숨김/표시에서 동일
+  - `tests/capture_screens.ps1` → `01_start_screen`~`14_orb_codex` PNG `14/14`, 종료 코드 0, 렌더/스크립트 오류 0건. 직접 확인: `02·03` 게임판 천체 구슬, `06` L4 고리·L6 광채·외곽선, `07` 혼잡한 BLITZ 색/문양, `12·13` NEXT/THEN, `14` 6색×7레벨 도감에서 잘림·1.0R 밖 장식 없음
+  - 시작 화면 / TURN / BLITZ 300프레임 스모크 → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 규칙 검사 → `Input`/`InputEvent`는 허용 파일 밖 0건, 전역 난수 호출은 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+
+- 수동 확인 절차:
+  1. `tests/capture_screens.ps1`을 실행하고 `artifacts/screens/14_orb_codex.png`를 연다 → 행마다 빨강/파랑/초록/노랑/보라/청록, 열마다 운석/달/바위 행성/고리 행성/가스 거인/별/태양이 보이고 흰 문양에 어두운 외곽선이 있어야 한다.
+  2. TURN 또는 BLITZ에서 L4 구슬을 굴린다 → 몸통 줄무늬는 구르지만 고리는 약 20°를 유지하고, L6·L7 광채와 문양도 화면을 향해야 한다.
+  3. L3와 L4를 나란히 둔다 → L3은 폭발 외곽선이 없고 L4는 몸통 밝기를 깜빡이지 않은 채 색 외곽선만 맥동해야 한다.
+  4. NEXT/THEN에 여러 레벨을 만든다 → 게임판과 같은 천체 종류·색·문양이며 작은 크기에서도 잘리지 않아야 한다.
+  5. 설정에서 `orb_symbols_enabled=false`로 실행한다 → 게임판과 NEXT/THEN 모두 문양만 사라지고 천체 그림·물리·규칙은 그대로여야 한다.
+
+- 문서에 없던 결정 사항·알려진 문제:
+  - Compatibility의 인스턴스 uniform 버퍼를 쓰지 않고, 장식/외곽선 레이어를 UV 구간으로 구분하는 공유 `ArrayMesh` 2개를 사용함. 캡처 반복 실행에서 발생했던 인스턴스 버퍼 할당 오류를 제거하면서 전체 셰이더 머티리얼 수를 색×레벨 `42`로 유지함
+  - 3D 게임 구슬은 공유 셰이더, 2D NEXT/THEN은 같은 레벨·색 프로필의 Canvas 절차 드로잉을 사용함. 기존 2D 회귀 게임 씬의 `OrbVisual.setup()` 경로는 변경하지 않음
+  - 제품 밸런스 수치·충돌 Shape·질량·중력·규칙·배경·보드·HUD 배치·이펙트·사용자 저장 파일은 변경하지 않음
+- 남은 것 · 질문: 없음
+
 ### [2026-10-11] 대상 #62 — 약 250턴 램프 + TURN 콤보 상한 (추가 요구 3)
 - 상태: 완료 — 후보 기준을 만족해 `spawn_count_ramp_turns=20`을 선택·적용했고 `combo_multiplier_max=128.0`을 추가함. 추가 요구 1·2 회신의 램프 질문은 이 결정으로 해소됨
 - 브랜치 / PR: `m8-turn-250-combo-cap` / [PR #64](https://github.com/jeongmo-dot/gravity_orb/pull/64)

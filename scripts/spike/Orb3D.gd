@@ -10,11 +10,12 @@ const STRETCH_PERPENDICULAR_SCALE: float = 0.92
 static var _shared_physics_materials: Dictionary = {}
 static var _shared_shapes: Dictionary = {}
 static var _shared_meshes: Dictionary = {}
-static var _shared_visual_materials: Dictionary = {}
 
 @onready var _body: RigidBody3D = %Body
 @onready var _collision_shape: CollisionShape3D = %CollisionShape3D
 @onready var _mesh: MeshInstance3D = %Mesh
+@onready var _adornment: MeshInstance3D = %Adornment
+@onready var _blast_outline: MeshInstance3D = %BlastOutline
 @onready var _symbol_mesh: MeshInstance3D = %Symbol
 
 var color: int = 0
@@ -38,7 +39,6 @@ var _contact_reporting_enabled: bool = true
 var _continuous_cd_enabled: bool = true
 var _allow_sleep: bool = false
 var _progressive_growth_enabled: bool = false
-var _display_color: Color = Color.WHITE
 var _blast_armed: bool = false
 var _blast_blink_period: float = 0.8
 var _blast_blink_elapsed: float = 0.0
@@ -48,7 +48,6 @@ var _visual_punch_scale: Vector3 = Vector3.ONE:
 		_visual_punch_scale = value
 		_update_visual_transform()
 var _render_clamp_enabled: bool = true
-var _visual_material_is_unique: bool = false
 var _radius_resources_are_unique: bool = false
 var _visual_alpha: float = 1.0
 
@@ -117,15 +116,15 @@ static func prewarm_shared_resources(cfg: GameConfig) -> void:
 	for level_index: int in range(1, cfg.orb_max_level + 1):
 		_shared_shape_for_level(cfg, level_index)
 		_shared_mesh_for_level(cfg, level_index)
-	for color_index: int in range(cfg.color_display.size()):
-		_shared_visual_material_for_color(cfg, color_index)
+	CelestialOrbArt.prewarm(cfg)
+	OrbSymbols.prewarm_shared_resources()
 
 
 static func clear_shared_resource_cache() -> void:
 	_shared_physics_materials.clear()
 	_shared_shapes.clear()
 	_shared_meshes.clear()
-	_shared_visual_materials.clear()
+	CelestialOrbArt.clear_cache()
 
 
 static func shared_resource_counts() -> Dictionary:
@@ -133,7 +132,8 @@ static func shared_resource_counts() -> Dictionary:
 		"physics_materials": _shared_physics_materials.size(),
 		"shapes": _shared_shapes.size(),
 		"meshes": _shared_meshes.size(),
-		"visual_materials": _shared_visual_materials.size(),
+		"visual_materials": CelestialOrbArt.shared_material_count(),
+		"adornment_meshes": CelestialOrbArt.shared_mesh_count(),
 	}
 
 
@@ -143,15 +143,15 @@ static func shared_mesh_for_level(cfg: GameConfig, level_index: int) -> SphereMe
 
 static func shared_visual_material_for_color(
 	cfg: GameConfig,
-	color_index: int
-) -> StandardMaterial3D:
-	return _shared_visual_material_for_color(cfg, color_index)
+	color_index: int,
+	level_index: int = 1
+) -> ShaderMaterial:
+	return CelestialOrbArt.material_for(cfg, color_index, level_index)
 
 
 func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	color = p_color
 	level = p_level
-	_display_color = cfg.color_display[color]
 	_visual_alpha = 1.0
 	_blast_armed = cfg.blast_enabled and level >= cfg.active_blast_min_level()
 	_blast_blink_period = maxf(cfg.blast_blink_period, 0.001)
@@ -183,17 +183,18 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	_collision_shape.shape = _shared_shape_for_level(cfg, level)
 	_mesh.mesh = _shared_mesh_for_level(cfg, level)
 	_radius_resources_are_unique = false
-	_mesh.material_override = _shared_visual_material_for_color(cfg, color)
-	_visual_material_is_unique = false
+	var celestial_material: ShaderMaterial = CelestialOrbArt.material_for(cfg, color, level)
+	_mesh.material_override = celestial_material
+	_adornment.mesh = CelestialOrbArt.billboard_mesh(1)
+	_adornment.material_override = celestial_material
+	_adornment.visible = CelestialOrbArt.has_adornment(level)
+	_blast_outline.mesh = CelestialOrbArt.billboard_mesh(2)
+	_blast_outline.material_override = celestial_material
+	_blast_outline.visible = _blast_armed
+	_apply_visual_transparency()
 	if _current_radius < _radius:
 		_ensure_unique_radius_resources()
 		_apply_current_radius_to_resources(radius_m)
-	if _blast_armed:
-		_ensure_unique_visual_material()
-		var blast_material: StandardMaterial3D = (
-			_mesh.material_override as StandardMaterial3D
-		)
-		blast_material.emission = _display_color * blast_emission_strength()
 	_symbol_mesh.mesh = OrbSymbols.mesh_for_color(color)
 	_symbol_mesh.visible = cfg.orb_symbols_enabled
 	_symbol_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -409,8 +410,20 @@ func shape_resource() -> SphereShape3D:
 	return _collision_shape.shape as SphereShape3D
 
 
-func visual_material_resource() -> StandardMaterial3D:
-	return _mesh.material_override as StandardMaterial3D
+func visual_material_resource() -> ShaderMaterial:
+	return _mesh.material_override as ShaderMaterial
+
+
+func celestial_art_key() -> String:
+	return "%s:%d" % [CelestialOrbArt.level_name(level), color]
+
+
+func adornment_mesh_resource() -> Mesh:
+	return _adornment.mesh
+
+
+func blast_outline_strength() -> float:
+	return blast_emission_strength() if _blast_armed else 0.0
 
 
 func visual_stretch_scale() -> Vector3:
@@ -454,30 +467,27 @@ func _set_visual_alpha(alpha: float) -> void:
 	alpha = clampf(alpha, 0.0, 1.0)
 	if is_equal_approx(alpha, _visual_alpha):
 		return
-	_ensure_unique_visual_material()
-	var material: StandardMaterial3D = _mesh.material_override as StandardMaterial3D
-	if material == null:
-		return
-	material.transparency = (
-		BaseMaterial3D.TRANSPARENCY_ALPHA
-		if alpha < 1.0
-		else BaseMaterial3D.TRANSPARENCY_DISABLED
-	)
-	var display_color: Color = _display_color
-	display_color.a = alpha
 	_visual_alpha = alpha
-	material.albedo_color = display_color
-	material.emission = _display_color * blast_emission_strength()
-	_symbol_mesh.transparency = 1.0 - clampf(alpha, 0.0, 1.0)
+	_apply_visual_transparency()
 
 
 func _advance_blast_blink(delta: float) -> void:
 	if not _blast_armed:
 		return
 	_blast_blink_elapsed += delta
-	var material: StandardMaterial3D = _mesh.material_override as StandardMaterial3D
-	if material != null:
-		material.emission = _display_color * blast_emission_strength()
+	_apply_visual_transparency()
+
+
+func _apply_visual_transparency() -> void:
+	var base_transparency: float = 1.0 - clampf(_visual_alpha, 0.0, 1.0)
+	_mesh.transparency = base_transparency
+	_adornment.transparency = base_transparency
+	_blast_outline.transparency = 1.0 - clampf(
+		_visual_alpha * blast_emission_strength(),
+		0.0,
+		1.0
+	)
+	_symbol_mesh.transparency = base_transparency
 
 
 func _advance_growth(delta: float) -> void:
@@ -502,17 +512,9 @@ func _apply_current_radius_to_resources(radius_m: float) -> void:
 		sphere_shape.radius = radius_m
 	var sphere_mesh: SphereMesh = _mesh.mesh as SphereMesh
 	if sphere_mesh != null:
-		sphere_mesh.radius = radius_m
-		sphere_mesh.height = radius_m * 2.0
-
-
-func _ensure_unique_visual_material() -> void:
-	if _visual_material_is_unique:
-		return
-	var shared_material: StandardMaterial3D = _mesh.material_override as StandardMaterial3D
-	if shared_material != null:
-		_mesh.material_override = shared_material.duplicate(true) as StandardMaterial3D
-	_visual_material_is_unique = true
+		var visual_radius_m: float = radius_m * CelestialOrbArt.body_radius_ratio(level)
+		sphere_mesh.radius = visual_radius_m
+		sphere_mesh.height = visual_radius_m * 2.0
 
 
 func _ensure_unique_radius_resources() -> void:
@@ -549,32 +551,17 @@ static func _shared_shape_for_level(cfg: GameConfig, level_index: int) -> Sphere
 
 static func _shared_mesh_for_level(cfg: GameConfig, level_index: int) -> SphereMesh:
 	var radius_m: float = cfg.radius_for_level(level_index) / PIXELS_PER_METER
-	var key: String = "%.6f" % radius_m
+	var visual_radius_m: float = radius_m * CelestialOrbArt.body_radius_ratio(level_index)
+	var key: String = "%d:%.6f" % [level_index, visual_radius_m]
 	if not _shared_meshes.has(key):
 		var mesh: SphereMesh = SphereMesh.new()
-		mesh.radius = radius_m
-		mesh.height = radius_m * 2.0
-		mesh.radial_segments = 32
-		mesh.rings = 16
+		mesh.resource_name = "celestial_%s_mesh" % CelestialOrbArt.level_name(level_index)
+		mesh.radius = visual_radius_m
+		mesh.height = visual_radius_m * 2.0
+		mesh.radial_segments = 14 if level_index == 1 else 32
+		mesh.rings = 8 if level_index == 1 else 16
 		_shared_meshes[key] = mesh
 	return _shared_meshes[key] as SphereMesh
-
-
-static func _shared_visual_material_for_color(
-	cfg: GameConfig,
-	color_index: int
-) -> StandardMaterial3D:
-	var display_color: Color = cfg.color_display[color_index]
-	var key: String = display_color.to_html(true)
-	if not _shared_visual_materials.has(key):
-		var material: StandardMaterial3D = StandardMaterial3D.new()
-		material.albedo_color = display_color
-		material.metallic = 0.18
-		material.roughness = 0.24
-		material.emission_enabled = true
-		material.emission = display_color * 0.08
-		_shared_visual_materials[key] = material
-	return _shared_visual_materials[key] as StandardMaterial3D
 
 
 func _update_visual_transform() -> void:
@@ -598,6 +585,8 @@ func _update_visual_transform() -> void:
 		_body.position.z
 	)
 	_mesh.position = render_world_position
+	_adornment.position = render_world_position + Vector3(0.0, 0.0, 0.001)
+	_blast_outline.position = render_world_position + Vector3(0.0, 0.0, radius_m + 0.004)
 	var stretch_ratio: float = _visual_stretch_ratio()
 	var stretch_scale: Vector3 = _stretch_scale_for_ratio(stretch_ratio)
 	_mesh.scale = _visual_punch_scale * stretch_scale
@@ -606,6 +595,18 @@ func _update_visual_transform() -> void:
 	else:
 		var world_velocity: Vector3 = _body.linear_velocity
 		_mesh.rotation = Vector3(0.0, 0.0, atan2(world_velocity.y, world_velocity.x))
+	_adornment.rotation = Vector3(
+		0.0,
+		0.0,
+		CelestialOrbArt.RING_TILT_RADIANS if level == 4 else 0.0
+	)
+	_blast_outline.rotation = Vector3.ZERO
+	var punch_scale: float = maxf(
+		_visual_punch_scale.x,
+		maxf(_visual_punch_scale.y, _visual_punch_scale.z)
+	)
+	_adornment.scale = Vector3(radius_m, radius_m, 1.0) * punch_scale
+	_blast_outline.scale = Vector3(radius_m, radius_m, 1.0) * punch_scale
 	_symbol_mesh.position = render_world_position + Vector3(0.0, 0.0, radius_m + 0.002)
 	_symbol_mesh.rotation = Vector3.ZERO
 	var symbol_size_m: float = radius_m * OrbSymbols.SYMBOL_SIZE_FACTOR

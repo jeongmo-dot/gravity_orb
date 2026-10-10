@@ -162,15 +162,20 @@ func test_new_color_3d_materials_match_display_table() -> void:
 			1,
 			Vector2(float(index * 100), 0.0)
 		)
-		var material: StandardMaterial3D = (
-			orb._mesh.material_override as StandardMaterial3D
+		var material: ShaderMaterial = (
+			orb._mesh.material_override as ShaderMaterial
 		)
 		assert_true(material != null, "new color uses a 3D material")
 		if material != null:
 			assert_eq(
-				material.albedo_color,
+				material.get_shader_parameter("base_color"),
 				Config.data.color_display[color],
 				"3D material uses configured new color"
+			)
+			assert_eq(
+				material.get_shader_parameter("level_id"),
+				1,
+				"3D material uses the spawned level art"
 			)
 	_cleanup(board)
 
@@ -183,11 +188,14 @@ func test_3d_blast_armed_orb_blinks_emission_by_level() -> void:
 	assert_true(level_four.is_blast_armed(), "3D L4 is armed")
 	assert_true(level_five.is_blast_armed(), "3D L5 is armed")
 	assert_true(level_six.is_blast_armed(), "3D L6 is armed")
-	var initial_strength: float = level_four.blast_emission_strength()
+	assert_true(level_four._blast_outline.visible, "L4 uses a visible pulse outline")
+	assert_true(level_five._blast_outline.visible, "L5 uses a visible pulse outline")
+	assert_true(level_six._blast_outline.visible, "L6 uses a visible pulse outline")
+	var initial_strength: float = level_four.blast_outline_strength()
 	level_four._physics_process(Config.data.blast_blink_period * 0.25)
 	assert_true(
-		not is_equal_approx(level_four.blast_emission_strength(), initial_strength),
-		"3D armed emission oscillates"
+		not is_equal_approx(level_four.blast_outline_strength(), initial_strength),
+		"3D armed outline oscillates"
 	)
 	_cleanup(board)
 
@@ -201,11 +209,13 @@ func test_3d_blast_blink_starts_at_shared_level_four_in_both_modes() -> void:
 		var level_four: Orb3D = board.spawn_orb(1, 4, Vector2(180.0, 0.0))
 		assert_true(not level_three.is_blast_armed(), "L3 is not armed in mode %d" % mode)
 		assert_true(level_four.is_blast_armed(), "L4 is armed in mode %d" % mode)
-		var initial_strength: float = level_four.blast_emission_strength()
+		assert_true(not level_three._blast_outline.visible, "L3 outline is hidden")
+		assert_true(level_four._blast_outline.visible, "L4 outline is visible")
+		var initial_strength: float = level_four.blast_outline_strength()
 		level_four._physics_process(Config.data.blast_blink_period * 0.25)
 		assert_true(
-			not is_equal_approx(level_four.blast_emission_strength(), initial_strength),
-			"L4 emission oscillates in mode %d" % mode
+			not is_equal_approx(level_four.blast_outline_strength(), initial_strength),
+			"L4 outline oscillates in mode %d" % mode
 		)
 		_cleanup(board)
 	Config.data.game_mode = original_mode

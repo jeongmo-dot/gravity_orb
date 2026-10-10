@@ -246,11 +246,18 @@ func _render_preview(preview_root: Node2D, batch: Array) -> void:
 			visual = _acquire_preview_visual(preview_root)
 			preview_root.add_child(visual)
 		visual.visible = true
-		visual.setup(
+		var preview_level: int = int(candidate["level"])
+		visual.setup_celestial_preview(
 			Config.data.color_display[int(candidate["color"])],
 			radius,
+			preview_level,
 			int(candidate["color"]),
 			Config.data.orb_symbols_enabled
+		)
+		visual.set_blast_armed(
+			Config.data.blast_enabled
+			and preview_level >= Config.data.active_blast_min_level(),
+			Config.data.blast_blink_period
 		)
 		visual.scale = Vector2.ONE * preview_scale
 		visual.position = Vector2(
