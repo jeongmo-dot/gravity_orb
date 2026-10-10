@@ -812,7 +812,8 @@ func _prewarm_visual_resources_offscreen() -> void:
 			mesh_instance.mesh = Orb3D.shared_mesh_for_level(Config.data, level_index)
 			mesh_instance.material_override = Orb3D.shared_visual_material_for_color(
 				Config.data,
-				color_index
+				color_index,
+				level_index
 			)
 			mesh_instance.position = Vector3(
 				float(combination_index % 7) - 3.0,
