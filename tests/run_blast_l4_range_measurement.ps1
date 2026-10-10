@@ -16,47 +16,22 @@ $bots = @(
     [ordered]@{ Id = "random_0_6"; Kind = "random"; Interval = 0.6 }
 )
 $allBotIds = @($bots | ForEach-Object { $_.Id })
-$tuningBotIds = @("heuristic_0_6", "random_0_3")
 $conditions = @(
     [ordered]@{
-        Id = "a_l4_k1"
-        Label = "A L4 +0.5 k1"
+        Id = "a_l4_full_board"
+        Label = "A L4 full-board blast"
         BlastMinLevel = 4
-        BlastBonus = 0.5
-        BonusScale = 1.0
+        BlastRadiusByLevel = "0,0,0,1,1,1,1"
+        BlastBonusByLevel = "0,0,0,0.5,0.5,0.5,0.5"
         BotIds = $allBotIds
     },
     [ordered]@{
-        Id = "b_l6_k1"
-        Label = "B L6 +2.0 k1"
-        BlastMinLevel = 6
-        BlastBonus = 2.0
-        BonusScale = 1.0
+        Id = "b_l4_level_range"
+        Label = "B L4 level-scaled blast"
+        BlastMinLevel = 4
+        BlastRadiusByLevel = "0,0,0,0.3,0.55,1,1"
+        BlastBonusByLevel = "0,0,0,0.5,1,2,3"
         BotIds = $allBotIds
-    },
-    [ordered]@{
-        Id = "b_l6_k0_75"
-        Label = "B L6 +2.0 k0.75"
-        BlastMinLevel = 6
-        BlastBonus = 2.0
-        BonusScale = 0.75
-        BotIds = $tuningBotIds
-    },
-    [ordered]@{
-        Id = "b_l6_k1_5"
-        Label = "B L6 +2.0 k1.5"
-        BlastMinLevel = 6
-        BlastBonus = 2.0
-        BonusScale = 1.5
-        BotIds = $tuningBotIds
-    },
-    [ordered]@{
-        Id = "b_l6_k2"
-        Label = "B L6 +2.0 k2"
-        BlastMinLevel = 6
-        BlastBonus = 2.0
-        BonusScale = 2.0
-        BotIds = $tuningBotIds
     }
 )
 
@@ -84,7 +59,7 @@ if (-not $AggregateOnly) {
     $tasks = @()
     foreach ($condition in $conditions) {
         foreach ($bot in (Get-ConditionBots $condition)) {
-            $baseName = "blitz_blast_l6_$($condition.Id)_$($bot.Id)"
+            $baseName = "blast_l4_range_$($condition.Id)_$($bot.Id)"
             $combinedPath = Join-Path $outputDirectory "${baseName}_raw.json"
             if (Test-Path -LiteralPath $combinedPath) { continue }
             foreach ($seed in $seedValues) {
@@ -102,10 +77,11 @@ if (-not $AggregateOnly) {
                         "--blitz-bot-interval=$(Format-Invariant ([double]$bot.Interval))",
                         "--blitz-color-count=6", "--blitz-refill-rule=target",
                         "--blitz-seeds=$seed",
-                        "--blitz-survival-bonus-scale=$(Format-Invariant ([double]$condition.BonusScale))",
+                        "--blitz-survival-bonus-scale=1",
                         "--blitz-drain-ramp=0.1",
-                        "--blitz-blast-min-level=$($condition.BlastMinLevel)",
-                        "--blitz-time-bonus-blast=$(Format-Invariant ([double]$condition.BlastBonus))",
+                        "--blast-min-level=$($condition.BlastMinLevel)",
+                        "--blast-push-radius-by-level=$($condition.BlastRadiusByLevel)",
+                        "--blitz-time-bonus-blast-by-level=$($condition.BlastBonusByLevel)",
                         "--blitz-output=res://artifacts/measurements/${seedName}.json"
                     )
                 }
@@ -127,7 +103,7 @@ if (-not $AggregateOnly) {
                 -RedirectStandardOutput $task.Stdout `
                 -RedirectStandardError $task.Stderr
             $running += [ordered]@{ Task = $task; Process = $process }
-            Write-Output ("BLITZ_BLAST_L6_START name={0} pid={1}" -f $task.Name, $process.Id)
+            Write-Output ("BLAST_L4_RANGE_START name={0} pid={1}" -f $task.Name, $process.Id)
         }
         foreach ($entry in $running) {
             $entry.Process.WaitForExit()
@@ -137,13 +113,13 @@ if (-not $AggregateOnly) {
                 $stderr = Get-Content -LiteralPath $entry.Task.Stderr -Raw -ErrorAction SilentlyContinue
                 throw "$($entry.Task.Name) failed with exit $($entry.Process.ExitCode)`n$stdout`n$stderr"
             }
-            Write-Output ("BLITZ_BLAST_L6_DONE name={0} exit=0" -f $entry.Task.Name)
+            Write-Output ("BLAST_L4_RANGE_DONE name={0} exit=0" -f $entry.Task.Name)
         }
     }
 
     foreach ($condition in $conditions) {
         foreach ($bot in (Get-ConditionBots $condition)) {
-            $baseName = "blitz_blast_l6_$($condition.Id)_$($bot.Id)"
+            $baseName = "blast_l4_range_$($condition.Id)_$($bot.Id)"
             $combinedPath = Join-Path $outputDirectory "${baseName}_raw.json"
             if (Test-Path -LiteralPath $combinedPath) { continue }
             $combined = $null
@@ -159,7 +135,7 @@ if (-not $AggregateOnly) {
             }
             $combined.seeds = $rows
             $combined | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $combinedPath -Encoding utf8
-            Write-Output ("BLITZ_BLAST_L6_MERGED name={0} seeds={1}" -f $baseName, $rows.Count)
+            Write-Output ("BLAST_L4_RANGE_MERGED name={0} seeds={1}" -f $baseName, $rows.Count)
         }
     }
 }
@@ -197,11 +173,41 @@ function Get-DynamicSum([object[]]$Rows, [string]$PropertyName) {
     return $sums
 }
 
+function Get-WeightedBlastMovedRatios([object[]]$Rows) {
+    $counts = [ordered]@{}
+    $weightedSums = [ordered]@{}
+    foreach ($row in $Rows) {
+        $countContainer = $row.blast_count_by_level
+        $ratioContainer = $row.blast_moved_orb_ratio_by_level
+        if ($null -eq $countContainer -or $null -eq $ratioContainer) { continue }
+        foreach ($property in $countContainer.PSObject.Properties) {
+            $level = [int]$property.Name.TrimStart('L')
+            $key = if ($level -ge 6) { "L6_plus" } else { "L$level" }
+            $count = [double]$property.Value
+            $ratioProperty = $ratioContainer.PSObject.Properties[$property.Name]
+            $ratio = if ($null -eq $ratioProperty) { 0.0 } else { [double]$ratioProperty.Value }
+            if (-not $counts.Contains($key)) {
+                $counts[$key] = 0.0
+                $weightedSums[$key] = 0.0
+            }
+            $counts[$key] = [double]$counts[$key] + $count
+            $weightedSums[$key] = [double]$weightedSums[$key] + $ratio * $count
+        }
+    }
+    $result = [ordered]@{}
+    foreach ($key in $counts.Keys) {
+        $result[$key] = if ([double]$counts[$key] -gt 0.0) {
+            [double]$weightedSums[$key] / [double]$counts[$key]
+        } else { 0.0 }
+    }
+    return $result
+}
+
 function Get-BotSummary(
     [System.Collections.IDictionary]$Condition,
     [System.Collections.IDictionary]$Bot
 ) {
-    $path = Join-Path $outputDirectory "blitz_blast_l6_$($Condition.Id)_$($Bot.Id)_raw.json"
+    $path = Join-Path $outputDirectory "blast_l4_range_$($Condition.Id)_$($Bot.Id)_raw.json"
     $report = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
     $rows = @($report.seeds)
     $playMinutes = [double](($rows | Measure-Object -Property play_time -Sum).Sum) / 60.0
@@ -222,6 +228,8 @@ function Get-BotSummary(
         score = Get-Distribution @($rows | ForEach-Object { [double]$_.score })
         merge_count_by_result_level = Get-DynamicSum $rows "merge_count_by_result_level"
         blast_count = Get-Distribution @($rows | ForEach-Object { [double]$_.blast_count })
+        blast_count_by_level = Get-DynamicSum $rows "blast_count_by_level"
+        blast_moved_orb_ratio_by_level = Get-WeightedBlastMovedRatios $rows
         jackpot_count = Get-Distribution @($rows | ForEach-Object { [double]$_.jackpot_count })
         finale_blast_count = Get-Distribution @($rows | ForEach-Object { [double]$_.finale_blast_count })
         time_bonus_by_source_per_minute = $bonusPerMinute
@@ -251,33 +259,9 @@ foreach ($condition in $conditions) {
         id = [string]$condition.Id
         label = [string]$condition.Label
         blast_min_level = [int]$condition.BlastMinLevel
-        base_blast_bonus = [double]$condition.BlastBonus
-        bonus_scale = [double]$condition.BonusScale
+        blast_push_radius_by_level = [string]$condition.BlastRadiusByLevel
+        blast_time_bonus_by_level = [string]$condition.BlastBonusByLevel
         bots = $botReports
-    }
-}
-
-$defaultCase = @($caseReports | Where-Object { $_.id -eq "b_l6_k1" })[0]
-$defaultSurvival = [double]$defaultCase.bots.heuristic_0_6.survived_seconds.p50
-$selected = $defaultCase
-$requiresQuestion = $false
-if ($defaultSurvival -lt 60.0 -or $defaultSurvival -gt 150.0) {
-    $alternatives = @($caseReports | Where-Object {
-        $_.id -in @("b_l6_k0_75", "b_l6_k1_5", "b_l6_k2")
-    })
-    $inRange = @($alternatives | Where-Object {
-        $value = [double]$_.bots.heuristic_0_6.survived_seconds.p50
-        $value -ge 60.0 -and $value -le 150.0
-    } | Sort-Object {
-        [Math]::Abs([double]$_.bots.heuristic_0_6.survived_seconds.p50 - 90.0)
-    })
-    if ($inRange.Count -gt 0) {
-        $selected = $inRange[0]
-    } else {
-        $requiresQuestion = $true
-        $selected = @($alternatives | Sort-Object {
-            [Math]::Abs([double]$_.bots.heuristic_0_6.survived_seconds.p50 - 90.0)
-        })[0]
     }
 }
 
@@ -287,22 +271,13 @@ $summary = [ordered]@{
     physics_ticks_per_second = 120
     seeds = $seedValues
     session_cap_seconds = 600.0
-    default_rule = [ordered]@{
-        survival_p50_min = 60.0
-        survival_p50_max = 150.0
-        target_seconds = 90.0
-    }
-    selected_condition = [string]$selected.id
-    selected_bonus_scale = [double]$selected.bonus_scale
-    selected_requires_question = $requiresQuestion
     cases = $caseReports
 }
-$summaryPath = Join-Path $outputDirectory "blitz_blast_l6_summary.json"
+$summaryPath = Join-Path $outputDirectory "blast_l4_range_summary.json"
 $summary | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $summaryPath -Encoding utf8
 $consoleRows = @($caseReports | ForEach-Object {
     [ordered]@{
         id = $_.id
-        k = $_.bonus_scale
         h06_survival_p50 = $_.bots.heuristic_0_6.survived_seconds.p50
         h06_score_p50 = $_.bots.heuristic_0_6.score.p50
         h06_blast_p50 = $_.bots.heuristic_0_6.blast_count.p50
@@ -311,7 +286,5 @@ $consoleRows = @($caseReports | ForEach-Object {
         h06_max_occupancy_p50 = $_.bots.heuristic_0_6.max_occupancy_percent.p50
     }
 })
-Write-Output ("BLITZ_BLAST_L6_RESULT {0}" -f ($consoleRows | ConvertTo-Json -Compress -Depth 8))
-Write-Output ("BLITZ_BLAST_L6_SELECTION selected={0} k={1} question={2}" -f `
-    $selected.id, $selected.bonus_scale, $requiresQuestion)
-Write-Output ("BLITZ_BLAST_L6_SUITE exit=0 report={0}" -f $summaryPath)
+Write-Output ("BLAST_L4_RANGE_RESULT {0}" -f ($consoleRows | ConvertTo-Json -Compress -Depth 8))
+Write-Output ("BLAST_L4_RANGE_SUITE exit=0 report={0}" -f $summaryPath)

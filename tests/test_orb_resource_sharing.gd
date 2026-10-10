@@ -15,7 +15,8 @@ func test_one_hundred_orbs_share_level_color_and_physics_resources() -> void:
 	var materials: Dictionary = {}
 	var physics_materials: Dictionary = {}
 	for index: int in range(100):
-		var level: int = index % 5 + 1
+		var ordinary_level_count: int = Config.data.active_blast_min_level() - 1
+		var level: int = index % ordinary_level_count + 1
 		var color: int = index % Config.data.color_display.size()
 		var orb: Orb3D = board.spawn_orb(color, level, Vector2.ZERO)
 		meshes[orb.mesh_resource().get_instance_id()] = true
@@ -47,7 +48,7 @@ func test_blink_and_radius_mutation_use_copy_on_write() -> void:
 	var second: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2.ZERO)
 	var blinking: Orb3D = board.spawn_orb(
 		OrbTypes.OrbColor.RED,
-		Config.data.blitz_blast_min_level,
+		Config.data.active_blast_min_level(),
 		Vector2.ZERO
 	)
 	assert_eq(

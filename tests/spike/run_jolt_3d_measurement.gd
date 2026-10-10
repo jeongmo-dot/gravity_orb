@@ -44,6 +44,8 @@ var _turn_shock_events: Array[Dictionary] = []
 var _seed_reactions_by_color: Dictionary = {}
 var _seed_max_clear_count: int = 0
 var _seed_blast_count: int = 0
+var _seed_blast_count_by_level: Dictionary = {}
+var _seed_blast_moved_ratio_sum_by_level: Dictionary = {}
 var _seed_first_blast_turn: int = -1
 var _current_measurement_turn: int = 0
 var _turn_reaction_count: int = 0
@@ -82,6 +84,7 @@ func _run() -> void:
 		"green_shake_max_speed": Config.data.green_shake_max_speed,
 		"blast_enabled": Config.data.blast_enabled,
 		"blast_min_level": Config.data.blast_min_level,
+		"blast_push_radius_by_level": Array(Config.data.blast_push_radius_by_level),
 		"blast_speed": Config.data.blast_speed,
 		"blast_far_factor": Config.data.blast_far_factor,
 		"blast_score_factor": Config.data.blast_score_factor,
@@ -210,6 +213,8 @@ func _run_seed(
 	}
 	_seed_max_clear_count = 0
 	_seed_blast_count = 0
+	_seed_blast_count_by_level.clear()
+	_seed_blast_moved_ratio_sum_by_level.clear()
 	_seed_first_blast_turn = -1
 	_current_measurement_turn = 0
 	var fixture: Dictionary = await _create_fixture(seed)
@@ -340,6 +345,8 @@ func _run_seed(
 		"max_level_reached": score_manager.max_level_reached,
 		"max_clear_count": _seed_max_clear_count,
 		"blast_count": _seed_blast_count,
+		"blast_count_by_level": _seed_blast_count_by_level.duplicate(true),
+		"blast_moved_orb_ratio_by_level": _blast_moved_ratio_by_level(),
 		"first_blast_turn": _seed_first_blast_turn,
 		"entrance_blocked_turns": entrance_blocked_turns,
 		"reactions_three_turns_after_blast": _reactions_after_blast(turn_rows),
@@ -733,6 +740,33 @@ func _record_shock_event(reaction: Dictionary) -> void:
 	if reaction_type == ReactionRules.Type.BLAST:
 		_turn_blast_count += 1
 		_seed_blast_count += 1
+		var levels: Array = reaction.get("levels", []) as Array
+		var blast_level: int = (
+			Config.data.active_blast_min_level()
+			if levels.is_empty()
+			else int(levels[0])
+		)
+		var blast_key: String = "L%d" % blast_level
+		var targets: Array = reaction.get("blast_targets", []) as Array
+		var moved_count: int = 0
+		for target_value: Variant in targets:
+			var target: Dictionary = target_value as Dictionary
+			var velocity_change: Vector2 = target.get(
+				"velocity_change", Vector2.ZERO
+			) as Vector2
+			if not velocity_change.is_zero_approx():
+				moved_count += 1
+		var moved_ratio: float = (
+			float(moved_count) / float(targets.size())
+			if not targets.is_empty()
+			else 0.0
+		)
+		_seed_blast_count_by_level[blast_key] = int(
+			_seed_blast_count_by_level.get(blast_key, 0)
+		) + 1
+		_seed_blast_moved_ratio_sum_by_level[blast_key] = float(
+			_seed_blast_moved_ratio_sum_by_level.get(blast_key, 0.0)
+		) + moved_ratio
 		if _seed_first_blast_turn < 0:
 			_seed_first_blast_turn = _current_measurement_turn
 		return
@@ -759,6 +793,19 @@ func _record_shock_event(reaction: Dictionary) -> void:
 		)
 	var targets: Array[Dictionary] = reaction["shock_targets"] as Array[Dictionary]
 	_turn_shock_events.append({"targets": targets})
+
+
+func _blast_moved_ratio_by_level() -> Dictionary:
+	var result: Dictionary = {}
+	for key_value: Variant in _seed_blast_count_by_level.keys():
+		var key: String = str(key_value)
+		var count: int = int(_seed_blast_count_by_level[key])
+		result[key] = (
+			float(_seed_blast_moved_ratio_sum_by_level.get(key, 0.0)) / float(count)
+			if count > 0
+			else 0.0
+		)
+	return result
 
 
 func _reactions_after_blast(turn_rows: Array[Dictionary]) -> Dictionary:
@@ -1220,6 +1267,10 @@ func _apply_arguments() -> void:
 			Config.data.blast_min_level = maxi(
 				argument.trim_prefix("--blast-min-level=").to_int(),
 				1
+			)
+		elif argument.begins_with("--blast-push-radius-by-level="):
+			Config.data.blast_push_radius_by_level = _parse_float_list(
+				argument.trim_prefix("--blast-push-radius-by-level=")
 			)
 		elif argument == "--color-effects=on":
 			Config.data.color_effects_enabled = true

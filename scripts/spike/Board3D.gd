@@ -216,8 +216,10 @@ func apply_shockwave(
 	return targets
 
 
-func apply_blast(origin: Vector2) -> Array[Dictionary]:
+func apply_blast(origin: Vector2, blast_level: int) -> Array[Dictionary]:
 	var targets: Array[Dictionary] = []
+	var radius_factor: float = Config.data.blast_push_radius_factor_for_level(blast_level)
+	var limited_radius: float = radius_factor * Config.data.board_size
 	for orb: Orb3D in get_orbs():
 		if orb.is_ghost or orb.is_waiting_at_entrance:
 			continue
@@ -226,14 +228,22 @@ func apply_blast(origin: Vector2) -> Array[Dictionary]:
 		var direction: Vector2 = (
 			Vector2.RIGHT if is_zero_approx(distance) else offset / distance
 		)
-		var distance_ratio: float = clampf(distance / Config.data.board_size, 0.0, 1.0)
+		var full_board: bool = radius_factor >= 1.0
+		var in_range: bool = full_board or distance <= limited_radius
+		var falloff_radius: float = Config.data.board_size if full_board else limited_radius
+		var distance_ratio: float = (
+			clampf(distance / falloff_radius, 0.0, 1.0)
+			if falloff_radius > 0.0
+			else 1.0
+		)
 		var speed: float = Config.data.blast_speed * lerpf(
 			1.0,
 			Config.data.blast_far_factor,
 			distance_ratio
 		)
-		var velocity_change: Vector2 = direction * speed
-		orb.apply_plane_velocity_change(velocity_change)
+		var velocity_change: Vector2 = direction * speed if in_range else Vector2.ZERO
+		if not velocity_change.is_zero_approx():
+			orb.apply_plane_velocity_change(velocity_change)
 		targets.append({
 			"orb": orb,
 			"stable_spawn_id": orb.stable_spawn_id,

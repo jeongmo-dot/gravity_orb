@@ -156,7 +156,7 @@ func flush(delta: float = 0.0) -> int:
 				)
 			)
 		elif reaction_type == ReactionRules.Type.BLAST:
-			blast_targets = _board.apply_blast(reaction_position)
+			blast_targets = _board.apply_blast(reaction_position, levels[0])
 
 		var reaction: Dictionary = {
 			"type": reaction_type,

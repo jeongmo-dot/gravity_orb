@@ -449,7 +449,11 @@ func _award_reaction_time_bonus(
 ) -> void:
 	if not Config.data.blitz_survival_enabled:
 		if reaction_type == ReactionRules.Type.BLAST:
-			_award_time_bonus(Config.data.blitz_time_bonus_blast, "BLAST")
+			var legacy_blast_level: int = _blast_level(reaction)
+			_award_time_bonus(
+				Config.data.blitz_blast_time_bonus_for_level(legacy_blast_level),
+				"BLAST_L%d" % legacy_blast_level
+			)
 		elif reaction_type == ReactionRules.Type.MAX_CLEAR:
 			_award_time_bonus(Config.data.blitz_time_bonus_jackpot, "MAX CLEAR")
 		return
@@ -465,8 +469,9 @@ func _award_reaction_time_bonus(
 			bonus = Config.data.blitz_time_bonus_merge_by_level[bonus_index]
 			source = "MERGE_L%d" % result_level
 	elif reaction_type == ReactionRules.Type.BLAST:
-		bonus = Config.data.blitz_time_bonus_blast
-		source = "BLAST"
+		var blast_level: int = _blast_level(reaction)
+		bonus = Config.data.blitz_blast_time_bonus_for_level(blast_level)
+		source = "BLAST_L%d" % blast_level
 	elif reaction_type == ReactionRules.Type.MAX_CLEAR:
 		bonus = Config.data.blitz_time_bonus_jackpot
 		source = "MAX CLEAR"
@@ -475,6 +480,13 @@ func _award_reaction_time_bonus(
 	if bool(reaction.get("fever", false)):
 		bonus *= maxf(Config.data.blitz_fever_time_multiplier, 0.0)
 	_award_time_bonus(bonus, source)
+
+
+func _blast_level(reaction: Dictionary) -> int:
+	var levels: Array = reaction.get("levels", []) as Array
+	if levels.is_empty():
+		return Config.data.active_blast_min_level()
+	return clampi(int(levels[0]), 1, Config.data.orb_max_level)
 
 
 func _award_time_bonus(seconds: float, source: String) -> void:
@@ -547,7 +559,7 @@ func _apply_finale_blast(orb: Variant) -> void:
 	var origin: Vector2 = orb.position
 	var occupancy: float = _board_occupancy()
 	_board.remove_orb(orb)
-	var blast_targets: Array[Dictionary] = _board.apply_blast(origin)
+	var blast_targets: Array[Dictionary] = _board.apply_blast(origin, level)
 	blast_count += 1
 	finale_blast_count += 1
 	var levels: Array[int] = [level]

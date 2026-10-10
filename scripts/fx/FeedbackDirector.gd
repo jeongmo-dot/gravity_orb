@@ -509,10 +509,9 @@ func _play_blast_feedback(
 	var origin: Vector2 = reaction.get("position", Vector2.ZERO) as Vector2
 	var level_scale: float = maxf(1.0, 1.0 + 0.25 * float(level - 4))
 	var radius_m: float = (
-		Config.data.fx_ring_radius_factor
-		* Config.data.radius_for_level(level)
+		Config.data.board_size
+		* Config.data.blast_push_radius_factor_for_level(level)
 		/ Orb3D.PIXELS_PER_METER
-		* intensity
 	)
 	var colors: Array = reaction.get("colors", []) as Array
 	var mixed_color: Color = _mixed_color(colors)

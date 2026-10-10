@@ -155,9 +155,9 @@ func test_new_blitz_colors_merge_and_blast() -> void:
 		assert_eq(merge["result_color"], color, "new color merge result")
 	var blast: Dictionary = ReactionRules.classify(
 		OrbTypes.OrbColor.PURPLE,
-		6,
+		4,
 		OrbTypes.OrbColor.CYAN,
-		6,
+		4,
 		cfg
 	)
 	assert_eq(blast["type"], ReactionRules.Type.BLAST, "new colors BLITZ blast")
@@ -242,36 +242,27 @@ func test_blast_toggle_and_minimum_level_preserve_old_behavior() -> void:
 	assert_eq(level_six["type"], ReactionRules.Type.BLAST, "minimum includes L6")
 
 
-func test_default_blast_minimum_excludes_level_five() -> void:
+func test_default_blast_minimum_starts_at_level_four() -> void:
 	var cfg: GameConfig = GameConfig.new()
-	var level_five: Dictionary = ReactionRules.classify(0, 5, 1, 5, cfg)
-	var level_six: Dictionary = ReactionRules.classify(0, 6, 1, 6, cfg)
-	assert_eq(level_five["type"], ReactionRules.Type.NONE, "default excludes L5")
-	assert_eq(level_six["type"], ReactionRules.Type.BLAST, "default includes L6")
+	var level_three: Dictionary = ReactionRules.classify(0, 3, 1, 3, cfg)
+	var level_four: Dictionary = ReactionRules.classify(0, 4, 1, 4, cfg)
+	assert_eq(level_three["type"], ReactionRules.Type.NONE, "default excludes L3")
+	assert_eq(level_four["type"], ReactionRules.Type.BLAST, "default includes L4")
 
 
-func test_blitz_and_turn_use_level_six_blast_with_lower_same_color_merges() -> void:
+func test_blitz_and_turn_share_level_four_blast_with_same_color_merge() -> void:
 	var cfg: GameConfig = GameConfig.new()
-	var turn_level_five: Dictionary = ReactionRules.classify(0, 5, 1, 5, cfg)
-	var turn_level_six: Dictionary = ReactionRules.classify(0, 6, 1, 6, cfg)
-	assert_eq(turn_level_five["type"], ReactionRules.Type.NONE, "turn L5 remains none")
-	assert_eq(turn_level_six["type"], ReactionRules.Type.BLAST, "turn L6 still blasts")
+	var turn_level_three: Dictionary = ReactionRules.classify(0, 3, 1, 3, cfg)
+	var turn_level_four: Dictionary = ReactionRules.classify(0, 4, 1, 4, cfg)
+	assert_eq(turn_level_three["type"], ReactionRules.Type.NONE, "turn L3 is none")
+	assert_eq(turn_level_four["type"], ReactionRules.Type.BLAST, "turn L4 blasts")
 	cfg.game_mode = GameConfig.GameMode.BLITZ
-	for level: int in [4, 5]:
-		var different_colors: Dictionary = ReactionRules.classify(0, level, 1, level, cfg)
-		var same_color: Dictionary = ReactionRules.classify(0, level, 0, level, cfg)
-		assert_eq(
-			different_colors["type"],
-			ReactionRules.Type.NONE,
-			"BLITZ different-color L%d does not react" % level
-		)
-		assert_eq(
-			same_color["type"],
-			ReactionRules.Type.MERGE,
-			"BLITZ same-color L%d merges" % level
-		)
-	var blitz_level_six: Dictionary = ReactionRules.classify(0, 6, 1, 6, cfg)
-	assert_eq(blitz_level_six["type"], ReactionRules.Type.BLAST, "BLITZ L6 blasts")
+	var blitz_level_three: Dictionary = ReactionRules.classify(0, 3, 1, 3, cfg)
+	var blitz_level_four: Dictionary = ReactionRules.classify(0, 4, 1, 4, cfg)
+	var same_color_four: Dictionary = ReactionRules.classify(0, 4, 0, 4, cfg)
+	assert_eq(blitz_level_three["type"], ReactionRules.Type.NONE, "BLITZ L3 is none")
+	assert_eq(blitz_level_four["type"], ReactionRules.Type.BLAST, "BLITZ L4 blasts")
+	assert_eq(same_color_four["type"], ReactionRules.Type.MERGE, "L4 same color merges")
 
 
 func _enable_red_blue(cfg: GameConfig) -> void:

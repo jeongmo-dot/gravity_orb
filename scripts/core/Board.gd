@@ -9,7 +9,6 @@ const WARNING_FRAME_WIDTH: float = 12.0
 const WARNING_FRAME_COLOR: Color = Color("#FF3B30")
 const FEVER_FRAME_COLOR: Color = Color("#FF9F0A")
 const BLAST_FLASH_DURATION: float = 0.18
-const BLAST_FLASH_RADIUS: float = 150.0
 const BLAST_SHAKE_DISTANCE: float = 6.0
 
 @onready var _wall_top: StaticBody2D = %WallTop
@@ -38,6 +37,7 @@ var diagnostic_warnings_enabled: bool = true
 var _warning_directions: Array[Vector2i] = []
 var _blast_flash_position: Vector2 = Vector2.ZERO
 var _blast_flash_remaining: float = 0.0
+var _blast_flash_radius: float = 0.0
 var _fever_active: bool = false
 
 
@@ -188,8 +188,10 @@ func apply_shockwave(
 	return targets
 
 
-func apply_blast(origin: Vector2) -> Array[Dictionary]:
+func apply_blast(origin: Vector2, blast_level: int) -> Array[Dictionary]:
 	var targets: Array[Dictionary] = []
+	var radius_factor: float = Config.data.blast_push_radius_factor_for_level(blast_level)
+	var limited_radius: float = radius_factor * Config.data.board_size
 	for orb: Orb in get_orbs():
 		if orb.is_ghost or orb.is_waiting_at_entrance:
 			continue
@@ -198,14 +200,22 @@ func apply_blast(origin: Vector2) -> Array[Dictionary]:
 		var direction: Vector2 = (
 			Vector2.RIGHT if is_zero_approx(distance) else offset / distance
 		)
-		var distance_ratio: float = clampf(distance / Config.data.board_size, 0.0, 1.0)
+		var full_board: bool = radius_factor >= 1.0
+		var in_range: bool = full_board or distance <= limited_radius
+		var falloff_radius: float = Config.data.board_size if full_board else limited_radius
+		var distance_ratio: float = (
+			clampf(distance / falloff_radius, 0.0, 1.0)
+			if falloff_radius > 0.0
+			else 1.0
+		)
 		var speed: float = Config.data.blast_speed * lerpf(
 			1.0,
 			Config.data.blast_far_factor,
 			distance_ratio
 		)
-		var velocity_change: Vector2 = direction * speed
-		orb.apply_plane_velocity_change(velocity_change)
+		var velocity_change: Vector2 = direction * speed if in_range else Vector2.ZERO
+		if not velocity_change.is_zero_approx():
+			orb.apply_plane_velocity_change(velocity_change)
 		targets.append({
 			"orb": orb,
 			"stable_spawn_id": orb.stable_spawn_id,
@@ -213,12 +223,16 @@ func apply_blast(origin: Vector2) -> Array[Dictionary]:
 			"position": orb.position,
 			"velocity_change": velocity_change,
 		})
-	_play_blast_effect(origin)
+	_play_blast_effect(origin, blast_level)
 	return targets
 
 
-func _play_blast_effect(origin: Vector2) -> void:
+func _play_blast_effect(origin: Vector2, blast_level: int) -> void:
 	_blast_flash_position = origin
+	_blast_flash_radius = (
+		Config.data.board_size
+		* Config.data.blast_push_radius_factor_for_level(blast_level)
+	)
 	_blast_flash_remaining = BLAST_FLASH_DURATION
 	queue_redraw()
 
@@ -907,7 +921,7 @@ func _draw() -> void:
 		var progress: float = 1.0 - _blast_flash_remaining / BLAST_FLASH_DURATION
 		draw_arc(
 			_blast_flash_position,
-			lerpf(12.0, BLAST_FLASH_RADIUS, progress),
+			lerpf(12.0, _blast_flash_radius, progress),
 			0.0,
 			TAU,
 			64,

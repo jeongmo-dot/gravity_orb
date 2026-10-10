@@ -236,7 +236,12 @@ func test_m7_score_defaults() -> void:
 func test_m9_blast_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	assert_true(config.blast_enabled, "blast enabled")
-	assert_eq(config.blast_min_level, 6, "blast minimum level")
+	assert_eq(config.blast_min_level, 4, "shared blast minimum level")
+	assert_eq(
+		config.blast_push_radius_by_level,
+		PackedFloat32Array([0.0, 0.0, 0.0, 0.3, 0.55, 1.0, 1.0]),
+		"blast push radius by level"
+	)
 	assert_near(config.blast_speed, 900.0, TOLERANCE, "blast speed")
 	assert_near(config.blast_far_factor, 0.4, TOLERANCE, "blast far factor")
 	assert_near(config.blast_score_factor, 5.0, TOLERANCE, "blast score factor")
@@ -291,14 +296,22 @@ func test_blitz_spike_defaults() -> void:
 	assert_eq(config.blitz_fever_chain, 8, "fever chain")
 	assert_near(config.blitz_fever_duration, 3.0, TOLERANCE, "fever duration")
 	assert_near(config.blitz_fever_multiplier, 2.0, TOLERANCE, "fever multiplier")
-	assert_near(config.blitz_time_bonus_blast, 2.0, TOLERANCE, "blast bonus")
+	assert_eq(
+		config.blitz_time_bonus_blast_by_level,
+		PackedFloat32Array([0.0, 0.0, 0.0, 0.5, 1.0, 2.0, 3.0]),
+		"blast time bonus by level"
+	)
 	assert_near(config.blitz_time_bonus_jackpot, 3.0, TOLERANCE, "jackpot bonus")
 	assert_near(config.blitz_time_bonus_cap, 20.0, TOLERANCE, "bonus cap")
-	assert_eq(config.blitz_blast_min_level, 6, "blitz blast level")
 	assert_near(config.blitz_finale_interval, 0.3, TOLERANCE, "finale interval")
-	assert_eq(config.active_blast_min_level(), 6, "turn blast level")
+	assert_eq(config.active_blast_min_level(), 4, "turn blast level")
 	config.game_mode = GameConfig.GameMode.BLITZ
-	assert_eq(config.active_blast_min_level(), 6, "blitz active blast level")
+	assert_eq(config.active_blast_min_level(), 4, "BLITZ uses shared blast level")
+	assert_near(config.blast_push_radius_factor_for_level(4), 0.3, TOLERANCE)
+	assert_near(config.blast_push_radius_factor_for_level(5), 0.55, TOLERANCE)
+	assert_near(config.blast_push_radius_factor_for_level(6), 1.0, TOLERANCE)
+	assert_near(config.blitz_blast_time_bonus_for_level(4), 0.5, TOLERANCE)
+	assert_near(config.blitz_blast_time_bonus_for_level(7), 3.0, TOLERANCE)
 
 
 func test_m8_feedback_defaults() -> void:
