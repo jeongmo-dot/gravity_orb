@@ -38,6 +38,37 @@
 
 ## 미확인
 
+### [2026-10-10] 대상 #56 후속 — BLITZ 수동 QA 끊김·입력 지연
+- 상태: 질문
+- 브랜치 / PR: `m8-turn-spawn-ramp-uncapped` / https://github.com/jeongmo-dot/gravity_orb/pull/57
+- 변경 파일: `docs/jeongmo_codex_to_claude.md`
+- 사용자 수동 QA 관측:
+  - BLITZ 모드에서 끊김 또는 입력 지연이 느껴져 조작감이 좋지 않다는 보고가 있었다.
+  - #56의 턴제 생성 증가 로직은 `Spawner._batch_size_for_index()`에서 BLITZ일 때 계속 1을 반환하므로 이번 현상을 새로 만들지 않는다. 아래 항목은 기존 BLITZ 경로의 후속 조사 결과다.
+- 코드 관측:
+  - `BlitzManager.on_swipe()`는 같은 방향이거나 `_swipe_cooldown_remaining > 0`이면 입력을 즉시 버리며 버퍼·큐가 없다. 수락된 입력은 `Config.data.blitz_swipe_cooldown` 기본값 `0.12초`를 설정하고, 쿨다운은 물리 프레임의 `delta`로 감소한다.
+  - BLAST는 `FeedbackDirector`의 전역 히트스톱을 호출한다. 기본값 `fx_hitstop_scale=0.12`, `fx_hitstop_time=0.07초`이므로 70ms 동안 쿨다운은 약 8.4ms만 감소한다. 스와이프 직후 BLAST가 발생하면 120ms 쿨다운의 실제 종료 시점은 이론상 약 181.6ms까지 늘 수 있고, 그동안 들어온 스와이프는 지연 실행되지 않고 폐기된다. 연속 히트스톱은 generation 갱신으로 마지막 타이머까지 연장될 수 있다.
+  - 수락된 BLITZ 스와이프 한 번은 동기적으로 구체 1~8개를 생성할 수 있다. `Board3D.spawn_orb()` → `Orb3D.setup()` 경로는 각 구체마다 `PhysicsMaterial`, `SphereShape3D`, `SphereMesh`(32×16), `StandardMaterial3D`를 새로 만든다. 프레임 끊김 후보이며 실기기 프레임 프로파일링은 아직 하지 않았다.
+  - 성공한 스와이프에서 미리보기 갱신 신호가 최대 3회 발생한다: 생성 전 `sync_blitz_next_batch_size()`, `Spawner.try_spawn()` 소비 후 갱신, 생성 후 `_sync_swipe_spawn_preview()`. `Hud._render_preview()`는 매번 기존 자식을 `queue_free()`하고 NEXT 최대 5개와 THEN 1개를 새 `OrbVisual`로 만든다. 한 스와이프에서 미리보기 노드가 최대 18개 생성될 수 있다.
+  - BLAST 연출도 폭발마다 링 2개, 색상별 파티클과 흰색 스파크, 라이트, 플래시를 새로 생성한 뒤 해제한다. 이것도 끊김 후보이나 단독 원인으로 판정할 프로파일 자료는 없다.
+- 자동 QA 관측값:
+  - Godot `4.8-dev3`, `test_blitz_manager.gd` → `13/13` 통과, 종료 코드 0.
+  - Godot `4.8-dev3`, `test_feedback.gd` → `6/6` 통과, 종료 코드 0.
+  - 두 실행 모두 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건. 테스트는 현재 명세 동작을 확인하며 실제 입력 체감과 전체 프레임 스파이크는 측정하지 않는다.
+  - #56 성능 묶음의 격리 측정은 중력 전환 피드백 200개 p95 `518us`, 색상 효과 p95 `104us`, 팝업 p95 `23us`, 콜아웃 p95 `1us`, 근접 스캔 best p95 `717us`였다. 동기 생성·미리보기 재생성·BLAST VFX가 한 프레임에 겹치는 실제 경로는 이 측정 범위 밖이다.
+- 수동 재현 절차:
+  1. BLITZ에서 서로 다른 방향을 0.12초보다 빠르게 연속 스와이프한다 → 쿨다운 중 입력 일부가 실행 예약 없이 사라지는지 확인한다.
+  2. BLAST를 발생시키고 히트스톱 도중 또는 직후 다시 스와이프한다 → 화면 정지와 함께 입력 수락이 늦어지거나 입력이 사라지는지 확인한다.
+  3. 빈 판 또는 낮은 밀도에서 NEXT 수가 큰 상태로 스와이프한다 → 1~8개 동기 생성 시 순간 프레임 끊김이 커지는지 프로파일러로 확인한다.
+- 제안하는 후속 명세 순서:
+  1. BLITZ에서 전역 `Engine.time_scale` 히트스톱을 사용하지 않고 흔들림·플래시만 유지할지 결정한다. 유지한다면 BLITZ 전용 scale/time 수치가 필요하다.
+  2. 쿨다운 중 마지막 유효 방향을 1개 버퍼링해 종료 시 실행할지, 또는 `blitz_swipe_cooldown` 값을 조정할지 결정한다. 입력 정책과 수치는 기획 결정이라 구현하지 않았다.
+  3. 밸런스와 무관한 최적화로 성공 스와이프당 미리보기 발행을 1회로 합치고, 미리보기 구체와 Orb3D/BLAST VFX의 재사용·사전 준비를 검토한다.
+  4. 실제 입력 이벤트 시각→수락/생성 완료 시각, 프레임 시간 p95/p99, 최대 프레임을 함께 기록하는 BLITZ 통합 측정을 추가한다.
+- 남은 것 · 질문:
+  - 위 1~2의 BLITZ 히트스톱·입력 버퍼 정책과 정확한 수치를 Claude가 정해 다음 인수인계 항목으로 지시해 주기 바란다.
+  - 코드 변경은 하지 않았으며 현재 PR #57의 #56 구현 상태는 그대로다.
+
 ### [2026-10-10] 대상 #56 — 턴제 생성 증가 50턴 간격·상한 없음
 - 상태: 완료
 - 브랜치 / PR: `m8-turn-spawn-ramp-uncapped` / https://github.com/jeongmo-dot/gravity_orb/pull/57
