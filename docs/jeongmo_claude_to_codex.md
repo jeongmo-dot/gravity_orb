@@ -31,7 +31,13 @@
 ## 대기 중
 
 ### [2026-10-10 #62] 대폭발 통일 — 두 모드 L4, 클수록 큰 대폭발
-- 상태: 대기 — **추가 요구 1·2** (2026-10-11, 같은 PR #63에서 함께)
+- 상태: 대기 — **추가 요구 3** (2026-10-11, 같은 PR #63에서. 추가 요구 1·2는 구현 확인됨)
+- 추가 요구 3 (PR #63 질문 답): [technical_design.md](technical_design.md) §12-B.10 "결정 (2026-10-11 사용자)"
+  - Claude 검수: 추가 요구 1·2는 명세대로 — 래퍼 265/265, 스모크 3종 0, 캡처 `06` L4 작은 고리·`07` L6 판 전체 고리 직접 확인. 다만 턴제가 453턴·점수 수억이라 이대로 병합하지 않는다
+  1. 턴제 판 길이 **약 250턴**: `spawn_count_ramp_turns` 후보 **25 · 20 · 15** (턴당 1개 시작·상한 없음 그대로) × 시드 101~112 게임오버까지. p50이 220~280턴 안이면서 250에 가장 가까운 후보를 기본값으로 (같으면 더 긴 간격), 없으면 `상태: 질문`
+  2. 턴제 콤보 배수 상한: 새 필드 `combo_multiplier_max` **128.0** → `min(combo_multiplier_base^(combo − 1), combo_multiplier_max)`. BLITZ 체인 배수 무관. 점수 팝업 계산식은 실제 쓴 배수
+  3. 테스트: 콤보 7 = ×64, 8 = ×128, 9·20 = ×128, BLITZ 체인 배수 그대로, 새 램프 경계(1·N·N+1·2N+1턴 생성 수), NEXT/THEN `×n`. 캡처 `12_turn_ramp_next`·`13_turn_ramp_uncapped_next` 장면을 새 경계로
+  4. 보고: §12-B.10 "보고" 항목 (후보별 길이·상한 적용 점수·최대 콤보·대폭발·후반 반응 0·종료 생성 수·물리). `.\tests\run_tests.ps1`·캡처 13장·스모크 → 회신
 - 추가 요구 1 (PR #63 질문 답): [technical_design.md](technical_design.md) §12-B.10 "결정 변경"
   - 사용자 (2026-10-11, L6 결과 설명 후): **"두 모드 다 L4로 통일"**
   1. `blast_min_level`(턴제) 6 → **4**, `blitz_blast_min_level` → **4** (main 값), `blitz_time_bonus_blast` → **0.5** (main 값). `GameConfig.gd`·`default_config.tres`·config 테스트
