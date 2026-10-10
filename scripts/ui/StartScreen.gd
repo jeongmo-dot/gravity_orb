@@ -28,6 +28,11 @@ func _ready() -> void:
 
 func bind(save_path: String, sfx_bank: SfxBank) -> void:
 	_sfx_bank = sfx_bank
+	_blitz_button.text = (
+		"BLITZ\n버티기 타임어택"
+		if Config.data.blitz_survival_enabled
+		else "BLITZ\n90초 타임어택"
+	)
 	_blitz_best_label.text = "BEST  %d" % SaveStore.load_best_score(
 		save_path,
 		GameConfig.GameMode.BLITZ

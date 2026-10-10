@@ -46,6 +46,7 @@ var fever_total_time: float = 0.0
 var blast_count: int = 0
 var finale_blast_count: int = 0
 var time_bonus_total: float = 0.0
+var time_bonus_by_source: Dictionary = {}
 var spawn_count: int = 0
 var skipped_spawn_ticks: int = 0
 var accepted_swipes: int = 0
@@ -98,7 +99,12 @@ func start_game() -> void:
 	game_over_details.clear()
 	settle_elapsed = 0.0
 	ready_remaining = maxf(Config.data.blitz_ready_time, 0.0)
-	remaining_time = maxf(Config.data.blitz_duration, 0.0)
+	remaining_time = maxf(
+		Config.data.blitz_start_time
+		if Config.data.blitz_survival_enabled
+		else Config.data.blitz_duration,
+		0.0
+	)
 	play_time_elapsed = 0.0
 	fever_remaining = 0.0
 	fever_count = 0
@@ -106,6 +112,7 @@ func start_game() -> void:
 	blast_count = 0
 	finale_blast_count = 0
 	time_bonus_total = 0.0
+	time_bonus_by_source.clear()
 	spawn_count = 0
 	skipped_spawn_ticks = 0
 	accepted_swipes = 0
@@ -217,10 +224,7 @@ func on_reaction(reaction: Dictionary) -> void:
 		blast_count += 1
 	if state == State.RUNNING:
 		_update_refill_after_reaction(reaction_type)
-		if reaction_type == ReactionRules.Type.BLAST:
-			_award_time_bonus(Config.data.blitz_time_bonus_blast, "BLAST")
-		elif reaction_type == ReactionRules.Type.MAX_CLEAR:
-			_award_time_bonus(Config.data.blitz_time_bonus_jackpot, "MAX CLEAR")
+		_award_reaction_time_bonus(reaction, reaction_type)
 	_finale_idle_elapsed = 0.0
 	reaction_ready.emit(reaction)
 
@@ -249,7 +253,11 @@ func _advance_running(delta: float) -> void:
 	var step: float = maxf(delta, 0.0)
 	var real_step: float = step / maxf(Engine.time_scale, 0.001)
 	settle_elapsed += step
-	play_time_elapsed += step
+	var clock_step: float = real_step if Config.data.blitz_survival_enabled else step
+	var drain: float = clock_step
+	if Config.data.blitz_survival_enabled:
+		drain = _survival_drain_for_step(clock_step)
+	play_time_elapsed += clock_step
 	_swipe_cooldown_remaining = maxf(_swipe_cooldown_remaining - real_step, 0.0)
 	if is_zero_approx(_swipe_cooldown_remaining):
 		_swipe_cooldown_remaining = 0.0
@@ -270,7 +278,7 @@ func _advance_running(delta: float) -> void:
 			_spawn_elapsed -= spawn_interval
 			_spawner.sync_blitz_next_batch_size(1)
 			_try_spawn_next()
-	remaining_time = maxf(remaining_time - step, 0.0)
+	remaining_time = maxf(remaining_time - drain, 0.0)
 	time_changed.emit(remaining_time)
 	if remaining_time <= 0.0:
 		_begin_finale()
@@ -421,16 +429,66 @@ func _advance_fever(delta: float) -> void:
 	fever_changed.emit(fever_remaining > 0.0, fever_remaining)
 
 
+func current_drain_multiplier() -> float:
+	if not Config.data.blitz_survival_enabled:
+		return 1.0
+	return 1.0 + maxf(Config.data.blitz_drain_ramp_per_minute, 0.0) * (
+		play_time_elapsed / 60.0
+	)
+
+
+func _survival_drain_for_step(step: float) -> float:
+	var ramp: float = maxf(Config.data.blitz_drain_ramp_per_minute, 0.0)
+	var midpoint_elapsed: float = play_time_elapsed + step * 0.5
+	return step * (1.0 + ramp * midpoint_elapsed / 60.0)
+
+
+func _award_reaction_time_bonus(
+	reaction: Dictionary,
+	reaction_type: ReactionRules.Type
+) -> void:
+	if not Config.data.blitz_survival_enabled:
+		if reaction_type == ReactionRules.Type.BLAST:
+			_award_time_bonus(Config.data.blitz_time_bonus_blast, "BLAST")
+		elif reaction_type == ReactionRules.Type.MAX_CLEAR:
+			_award_time_bonus(Config.data.blitz_time_bonus_jackpot, "MAX CLEAR")
+		return
+	var bonus: float = 0.0
+	var source: String = ""
+	if reaction_type == ReactionRules.Type.MERGE:
+		var result_level: int = int(reaction.get("result_level", 0))
+		var bonus_index: int = result_level - 1
+		if (
+			bonus_index >= 0
+			and bonus_index < Config.data.blitz_time_bonus_merge_by_level.size()
+		):
+			bonus = Config.data.blitz_time_bonus_merge_by_level[bonus_index]
+			source = "MERGE_L%d" % result_level
+	elif reaction_type == ReactionRules.Type.BLAST:
+		bonus = Config.data.blitz_time_bonus_blast
+		source = "BLAST"
+	elif reaction_type == ReactionRules.Type.MAX_CLEAR:
+		bonus = Config.data.blitz_time_bonus_jackpot
+		source = "MAX CLEAR"
+	if bonus <= 0.0:
+		return
+	if bool(reaction.get("fever", false)):
+		bonus *= maxf(Config.data.blitz_fever_time_multiplier, 0.0)
+	_award_time_bonus(bonus, source)
+
+
 func _award_time_bonus(seconds: float, source: String) -> void:
-	var available: float = maxf(
-		Config.data.blitz_time_bonus_cap - time_bonus_total,
-		0.0
+	var available: float = (
+		maxf(Config.data.blitz_time_max - remaining_time, 0.0)
+		if Config.data.blitz_survival_enabled
+		else maxf(Config.data.blitz_time_bonus_cap - time_bonus_total, 0.0)
 	)
 	var bonus: float = minf(maxf(seconds, 0.0), available)
 	if bonus <= 0.0:
 		return
 	remaining_time += bonus
 	time_bonus_total += bonus
+	time_bonus_by_source[source] = float(time_bonus_by_source.get(source, 0.0)) + bonus
 	time_changed.emit(remaining_time)
 	time_bonus_awarded.emit(bonus, source)
 
@@ -519,6 +577,7 @@ func _finish_game() -> void:
 	_set_fever_visual(false)
 	game_over_details = {
 		"reason": "TIME UP",
+		"survived_time": play_time_elapsed,
 		"max_combo": max_combo,
 		"max_chain": max_combo,
 		"blast_count": blast_count,

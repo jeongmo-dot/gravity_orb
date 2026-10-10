@@ -20,6 +20,9 @@ var _seeds: Array[int] = []
 var _output_path: String = DEFAULT_OUTPUT
 var _runner_failed: bool = false
 var _seed_reactions: int = 0
+var _bonus_scale: float = 1.0
+var _seed_merge_count_by_level: Dictionary = {}
+var _seed_first_l4_merge_time: float = -1.0
 
 
 func _ready() -> void:
@@ -30,6 +33,7 @@ func _run() -> void:
 	_apply_arguments()
 	_apply_color_count()
 	_apply_refill_rule()
+	_apply_survival_condition()
 	Config.data.fx_hitstop_enabled = false
 	var original_ticks: int = Engine.physics_ticks_per_second
 	Engine.physics_ticks_per_second = 120
@@ -47,9 +51,20 @@ func _run() -> void:
 		"refill_rule": _refill_rule,
 		"gravity_strength": Config.data.gravity_strength,
 		"gravity_level_scale": Config.data.gravity_level_scale,
+		"survival_bonus_scale": _bonus_scale,
+		"survival_drain_ramp_per_minute": Config.data.blitz_drain_ramp_per_minute,
 		"seeds": rows,
 		"config": {
 			"duration": Config.data.blitz_duration,
+			"survival_enabled": Config.data.blitz_survival_enabled,
+			"start_time": Config.data.blitz_start_time,
+			"time_max": Config.data.blitz_time_max,
+			"time_bonus_merge_by_level": Array(
+				Config.data.blitz_time_bonus_merge_by_level
+			),
+			"time_bonus_blast": Config.data.blitz_time_bonus_blast,
+			"time_bonus_jackpot": Config.data.blitz_time_bonus_jackpot,
+			"fever_time_multiplier": Config.data.blitz_fever_time_multiplier,
 			"swipe_cooldown": Config.data.blitz_swipe_cooldown,
 			"spawn_on_swipe": Config.data.blitz_spawn_on_swipe,
 			"min_spawn_per_swipe": Config.data.blitz_min_spawn_per_swipe,
@@ -80,6 +95,8 @@ func _run() -> void:
 
 func _run_seed(seed: int) -> Dictionary:
 	_seed_reactions = 0
+	_seed_merge_count_by_level.clear()
+	_seed_first_l4_merge_time = -1.0
 	var fixture: Dictionary = await _create_fixture(seed)
 	var root: Node = fixture["root"] as Node
 	var board: Board3D = fixture["board"] as Board3D
@@ -98,6 +115,7 @@ func _run_seed(seed: int) -> Dictionary:
 	var physics_frame_index: int = 0
 	var pending_layer_samples: Array[Dictionary] = []
 	var layer_distances: Dictionary = _empty_layer_distances()
+	var cap_reached: bool = false
 	while manager.state != BlitzManager.State.FINISHED:
 		await get_tree().physics_frame
 		session_elapsed += tick
@@ -138,12 +156,13 @@ func _run_seed(seed: int) -> Dictionary:
 		if physics_frame_index % PAIR_SAMPLE_FRAMES == 0:
 			max_pair = maxf(max_pair, _max_pair_penetration(board))
 		if session_elapsed >= MAX_SESSION_SECONDS:
-			_runner_failed = true
+			cap_reached = true
 			break
 	var finale_score: int = score.score - manager.finale_score_start
 	var row: Dictionary = {
 		"seed": seed,
 		"completed": manager.state == BlitzManager.State.FINISHED,
+		"measurement_cap_reached": cap_reached,
 		"score": score.score,
 		"reactions": _seed_reactions,
 		"running_reactions": manager.reaction_count,
@@ -169,6 +188,9 @@ func _run_seed(seed: int) -> Dictionary:
 		"blast_count": manager.blast_count,
 		"finale_blast_count": manager.finale_blast_count,
 		"time_bonus_total": manager.time_bonus_total,
+		"time_bonus_by_source": manager.time_bonus_by_source.duplicate(true),
+		"merge_count_by_result_level": _seed_merge_count_by_level.duplicate(true),
+		"first_l4_merge_time": _seed_first_l4_merge_time,
 		"play_time": manager.play_time_elapsed,
 		"session_time": session_elapsed,
 		"accepted_swipes": manager.accepted_swipes,
@@ -277,8 +299,26 @@ func _create_fixture(seed: int) -> Dictionary:
 	}
 
 
-func _on_reaction_scored(_reaction: Dictionary) -> void:
+func _on_reaction_scored(reaction: Dictionary) -> void:
 	_seed_reactions += 1
+	var reaction_type: ReactionRules.Type = reaction.get(
+		"type", ReactionRules.Type.NONE
+	) as ReactionRules.Type
+	if reaction_type != ReactionRules.Type.MERGE:
+		return
+	var result_level: int = int(reaction.get("result_level", 0))
+	var key: String = "L%d" % result_level
+	_seed_merge_count_by_level[key] = int(_seed_merge_count_by_level.get(key, 0)) + 1
+	if result_level >= 4 and _seed_first_l4_merge_time < 0.0:
+		_seed_first_l4_merge_time = _current_measurement_play_time()
+
+
+func _current_measurement_play_time() -> float:
+	for child: Node in get_children():
+		var manager: BlitzManager = child.get_node_or_null("BlitzManager") as BlitzManager
+		if manager != null:
+			return manager.play_time_elapsed
+	return 0.0
 
 
 func _occupancy(board: Board3D) -> float:
@@ -496,6 +536,26 @@ func _apply_arguments() -> void:
 			Config.data.gravity_level_scale = argument.trim_prefix(
 				"--gravity-level-scale="
 			).to_float()
+		elif argument.begins_with("--blitz-survival-bonus-scale="):
+			_bonus_scale = maxf(
+				argument.trim_prefix("--blitz-survival-bonus-scale=").to_float(),
+				0.0
+			)
+		elif argument.begins_with("--blitz-drain-ramp="):
+			Config.data.blitz_drain_ramp_per_minute = maxf(
+				argument.trim_prefix("--blitz-drain-ramp=").to_float(),
+				0.0
+			)
+
+
+func _apply_survival_condition() -> void:
+	Config.data.blitz_survival_enabled = true
+	var scaled_merge_bonuses: PackedFloat32Array = PackedFloat32Array()
+	for bonus: float in Config.data.blitz_time_bonus_merge_by_level:
+		scaled_merge_bonuses.append(bonus * _bonus_scale)
+	Config.data.blitz_time_bonus_merge_by_level = scaled_merge_bonuses
+	Config.data.blitz_time_bonus_blast *= _bonus_scale
+	Config.data.blitz_time_bonus_jackpot *= _bonus_scale
 
 
 func _apply_color_count() -> void:

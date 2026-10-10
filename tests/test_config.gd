@@ -247,6 +247,22 @@ func test_blitz_spike_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	assert_eq(config.game_mode, GameConfig.GameMode.TURN, "default game mode")
 	assert_near(config.blitz_duration, 90.0, TOLERANCE, "blitz duration")
+	assert_true(config.blitz_survival_enabled, "survival clock enabled")
+	assert_near(config.blitz_start_time, 30.0, TOLERANCE, "survival start time")
+	assert_near(config.blitz_time_max, 45.0, TOLERANCE, "survival clock maximum")
+	assert_eq(
+		config.blitz_time_bonus_merge_by_level,
+		PackedFloat32Array([0.0, 0.05, 0.1, 0.2, 0.4, 0.8, 1.6]),
+		"merge time bonuses by result level"
+	)
+	assert_near(
+		config.blitz_time_bonus_display_window,
+		0.5,
+		TOLERANCE,
+		"time bonus display window"
+	)
+	assert_near(config.blitz_fever_time_multiplier, 2.0, TOLERANCE, "fever time bonus")
+	assert_near(config.blitz_drain_ramp_per_minute, 0.1, TOLERANCE, "clock ramp")
 	assert_near(config.blitz_swipe_cooldown, 0.08, TOLERANCE, "swipe cooldown")
 	assert_true(config.blitz_swipe_buffer_enabled, "one-slot swipe buffer enabled")
 	assert_true(not config.blitz_hitstop_enabled, "BLITZ hitstop disabled")
@@ -275,7 +291,7 @@ func test_blitz_spike_defaults() -> void:
 	assert_eq(config.blitz_fever_chain, 8, "fever chain")
 	assert_near(config.blitz_fever_duration, 3.0, TOLERANCE, "fever duration")
 	assert_near(config.blitz_fever_multiplier, 2.0, TOLERANCE, "fever multiplier")
-	assert_near(config.blitz_time_bonus_blast, 1.0, TOLERANCE, "blast bonus")
+	assert_near(config.blitz_time_bonus_blast, 0.5, TOLERANCE, "blast bonus")
 	assert_near(config.blitz_time_bonus_jackpot, 3.0, TOLERANCE, "jackpot bonus")
 	assert_near(config.blitz_time_bonus_cap, 20.0, TOLERANCE, "bonus cap")
 	assert_eq(config.blitz_blast_min_level, 4, "blitz blast level")

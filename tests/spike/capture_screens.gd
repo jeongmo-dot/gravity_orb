@@ -73,6 +73,9 @@ func _run_capture_suite() -> void:
 
 func _capture_start_screen() -> void:
 	var main: Main = await _create_main(Main.NO_MODE)
+	var blitz_button: Button = main.get_node("UI/StartScreen/Content/BlitzButton") as Button
+	if blitz_button.text != "BLITZ\n버티기 타임어택":
+		_fail("BLITZ start subtitle mismatch")
 	await _capture("01_start_screen.png")
 	await _destroy_main(main)
 
@@ -154,13 +157,24 @@ func _capture_blitz_scenes() -> void:
 	score.score = BLITZ_CAPTURE_SCORE
 	score.best_score = BLITZ_CAPTURE_BEST
 	hud._on_score_changed(BLITZ_CAPTURE_SCORE, BLITZ_CAPTURE_BEST)
+	hud._reset_callout_tracking()
+	manager.play_time_elapsed = 120.0
+	manager.remaining_time = Config.data.blitz_start_time
+	hud._on_time_changed(manager.remaining_time)
+	hud._on_time_bonus_awarded(0.1, "MERGE_L3")
+	hud._on_time_bonus_awarded(0.2, "MERGE_L4")
+	hud._process(Config.data.blitz_time_bonus_display_window)
 	hud._on_combo_changed(8, 2.0, 8)
 	hud._on_fever_changed(true, 3.0)
 	if board.has_method("set_fever_active"):
 		board.call("set_fever_active", true)
 	await get_tree().create_timer(0.35).timeout
+	_validate_blitz_survival_hud_scene(main)
 	await _capture("06_blitz_fever_chain.png")
 
+	hud._hide_bonus_label()
+	for popup: ScorePopup in hud.active_score_popups():
+		popup.deactivate()
 	hud._on_fever_changed(false, 0.0)
 	hud._hide_fever_visuals()
 	hud._on_combo_changed(3, 1.3, 8)
@@ -171,6 +185,7 @@ func _capture_blitz_scenes() -> void:
 
 	hud._set_danger_badge(0.0, 1.0)
 	hud._on_combo_changed(0, 1.0, 8)
+	manager.state = BlitzManager.State.FINALE
 	manager.remaining_time = 0.0
 	hud._on_time_changed(manager.remaining_time)
 	hud._on_finale_started()
@@ -182,6 +197,7 @@ func _capture_blitz_scenes() -> void:
 	manager.max_combo = 8
 	manager.blast_count = 3
 	manager.fever_count = 2
+	manager.game_over_details["survived_time"] = 125.0
 	manager.game_over.emit()
 	_validate_blitz_result_scene(main)
 	await _capture("09_blitz_result.png")
@@ -381,7 +397,31 @@ func _validate_blitz_result_scene(main: Main) -> void:
 		"BEST  %d" % BLITZ_CAPTURE_BEST,
 		"BLITZ result panel best"
 	)
+	_expect_label_text(
+		main.get_node("UI/Hud/GameOverPanel/Margin/Content/SurvivedTimeLabel") as Label,
+		"버틴 시간 2:05",
+		"BLITZ survived time"
+	)
 	print("SCREEN_CAPTURE_CHECK scene=blitz_result timer=0.0 score=%d" % BLITZ_CAPTURE_SCORE)
+
+
+func _validate_blitz_survival_hud_scene(main: Main) -> void:
+	_expect_label_text(
+		main.get_node("UI/Hud/TimerLabel") as Label,
+		"30.0",
+		"BLITZ survival start clock"
+	)
+	_expect_label_text(
+		main.get_node("UI/Hud/BonusLabel") as Label,
+		"+0.3s",
+		"BLITZ aggregated time bonus"
+	)
+	_expect_label_text(
+		main.get_node("UI/Hud/DrainRateLabel") as Label,
+		"×1.2",
+		"BLITZ drain multiplier"
+	)
+	print("SCREEN_CAPTURE_CHECK scene=blitz_survival_hud bonus=+0.3s drain=1.2")
 
 
 func _validate_blitz_ranking_scene(main: Main) -> void:

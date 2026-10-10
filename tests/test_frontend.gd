@@ -21,8 +21,9 @@ func test_start_screen_shows_records_last_mode_and_touch_targets() -> void:
 	var classic_best: Label = start_screen.get_node("Content/ClassicBestLabel") as Label
 	assert_true(start_screen.visible, "start screen is shown without --mode")
 	assert_true(not hud.visible, "game HUD stays hidden on start screen")
-	assert_eq(blitz_best.text, "BEST  5678", "BLITZ record text")
+	assert_eq(blitz_best.text, "BEST  6789", "survival BLITZ record text")
 	assert_eq(classic_best.text, "BEST  1234", "CLASSIC record text")
+	assert_eq(blitz_button.text, "BLITZ\n버티기 타임어택", "survival subtitle")
 	assert_true(blitz_button.button_pressed, "last BLITZ mode is highlighted")
 	assert_true(not classic_button.button_pressed, "other mode is not highlighted")
 	assert_true(blitz_button.size.y >= 120.0, "BLITZ touch target height")
@@ -216,6 +217,7 @@ func _write_save(
 	var save_file: ConfigFile = ConfigFile.new()
 	save_file.set_value("records", "best_score", turn_best)
 	save_file.set_value("records", "blitz_best_score", blitz_best)
+	save_file.set_value("records", "blitz_survival_best_score", 6789)
 	save_file.set_value("settings", "last_mode", last_mode)
 	save_file.set_value("settings", "sfx_muted", sfx_muted)
 	assert_eq(save_file.save(SAVE_PATH), OK, "save fixture writes")

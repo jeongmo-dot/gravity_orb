@@ -6,8 +6,10 @@ const RANKINGS_SECTION: String = "rankings"
 const SETTINGS_SECTION: String = "settings"
 const TURN_BEST_KEY: String = "best_score"
 const BLITZ_BEST_KEY: String = "blitz_best_score"
+const BLITZ_SURVIVAL_BEST_KEY: String = "blitz_survival_best_score"
 const TURN_RANKING_KEY: String = "turn"
 const BLITZ_RANKING_KEY: String = "blitz"
+const BLITZ_SURVIVAL_RANKING_KEY: String = "blitz_survival"
 const LAST_MODE_KEY: String = "last_mode"
 const SFX_MUTED_KEY: String = "sfx_muted"
 const RANKING_LIMIT: int = 10
@@ -148,12 +150,16 @@ static func save_sfx_muted(path: String, muted: bool) -> Error:
 
 static func record_key_for_mode(mode: GameConfig.GameMode) -> String:
 	if mode == GameConfig.GameMode.BLITZ:
+		if Config.data.blitz_survival_enabled:
+			return BLITZ_SURVIVAL_BEST_KEY
 		return BLITZ_BEST_KEY
 	return TURN_BEST_KEY
 
 
 static func ranking_key_for_mode(mode: GameConfig.GameMode) -> String:
 	if mode == GameConfig.GameMode.BLITZ:
+		if Config.data.blitz_survival_enabled:
+			return BLITZ_SURVIVAL_RANKING_KEY
 		return BLITZ_RANKING_KEY
 	return TURN_RANKING_KEY
 
