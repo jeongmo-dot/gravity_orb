@@ -40,7 +40,7 @@
 
 ### [2026-10-10] 대상 #61 — BLITZ 줄어드는 시간 (서바이벌 시계)
 - 상태: 질문 — 구현·검증은 완료했으나 6개 측정 조건 중 기준 ①~④를 모두 만족하는 조건이 없음. §12-B.9 규칙에 따라 가장 가까운 가안 `k=1.0`, 램프 `0.1`을 기본값으로 유지했으며 수치 확정이 필요함
-- 브랜치 / PR: `m8-blitz-survival-clock` / 생성 예정
+- 브랜치 / PR: `m8-blitz-survival-clock` / [PR #62](https://github.com/jeongmo-dot/gravity_orb/pull/62)
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scenes/UI.tscn`, `scripts/core/{BlitzManager.gd,SaveStore.gd}`, `scripts/ui/{Hud.gd,GameOverPanel.gd,StartScreen.gd}`, `tests/{test_blitz_manager.gd,test_callouts.gd,test_config.gd,test_frontend.gd,test_rankings.gd,test_screen_layout.gd,run_blitz_survival_measurement.ps1}`, `tests/spike/{capture_screens.gd,run_blitz_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 서바이벌 ON: 30초 시작, 실제 시간 감소, 분당 램프, 시계 상한 45초, 0초 피날레를 구현·자동 검증
