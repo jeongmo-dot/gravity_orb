@@ -137,7 +137,7 @@ func on_reaction(reaction: Dictionary) -> void:
 
 
 func current_combo_multiplier() -> float:
-	return pow(Config.data.combo_multiplier_base, float(maxi(turn_combo, 1) - 1))
+	return ScoreManager.combo_multiplier_for(turn_combo, Config.data)
 
 
 func _emit_combo_changed() -> void:

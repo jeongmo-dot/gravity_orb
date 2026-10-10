@@ -120,9 +120,9 @@ func test_large_int64_score_is_saved_and_loaded() -> void:
 	Config.data.game_mode = GameConfig.GameMode.TURN
 	_remove_test_file(BEST_SAVE_PATH)
 	var first: ScoreManager = await _create_score_manager(BEST_SAVE_PATH)
-	var levels: Array[int] = [Config.data.orb_max_level, Config.data.orb_max_level]
-	first.on_reaction(_reaction(ReactionRules.Type.MAX_CLEAR, 31, levels, 0))
 	var expected: int = 687194767360
+	first.score = expected
+	first.best_score = expected
 	assert_eq(first.score, expected, "large score")
 	assert_eq(first.best_score, expected, "large best score")
 	first.commit_ranking(

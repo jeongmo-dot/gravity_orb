@@ -1,6 +1,7 @@
 param(
     [string]$GodotPath = "",
     [switch]$AggregateOnly,
+    [switch]$Followup3,
     [ValidateRange(1, 24)]
     [int]$Parallelism = 12
 )
@@ -11,11 +12,20 @@ $outputDirectory = Join-Path $repoPath "artifacts\measurements"
 $seedValues = @(101..112)
 $wallLimitPx = 34.0
 $pairLimitPx = 68.0
-$conditions = @(
-    [ordered]@{ Id = "ramp50"; Ramp = 50 },
-    [ordered]@{ Id = "ramp40"; Ramp = 40 },
-    [ordered]@{ Id = "ramp30"; Ramp = 30 }
-)
+$measurementPrefix = if ($Followup3) { "turn_250_combo" } else { "blast_l4_turn" }
+$conditions = if ($Followup3) {
+    @(
+        [ordered]@{ Id = "ramp25"; Ramp = 25 },
+        [ordered]@{ Id = "ramp20"; Ramp = 20 },
+        [ordered]@{ Id = "ramp15"; Ramp = 15 }
+    )
+} else {
+    @(
+        [ordered]@{ Id = "ramp50"; Ramp = 50 },
+        [ordered]@{ Id = "ramp40"; Ramp = 40 },
+        [ordered]@{ Id = "ramp30"; Ramp = 30 }
+    )
+}
 
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {
     if (-not [string]::IsNullOrWhiteSpace($env:GODOT)) {
@@ -93,12 +103,12 @@ function Get-WeightedBlastMovedRatios([object[]]$Rows) {
 }
 
 function Invoke-Condition([System.Collections.IDictionary]$Condition) {
-    $rawName = "blast_l4_turn_$($Condition.Id)_raw.json"
+    $rawName = "$($measurementPrefix)_$($Condition.Id)_raw.json"
     $rawPath = Join-Path $outputDirectory $rawName
     if (Test-Path -LiteralPath $rawPath) { return }
     $tasks = @()
     foreach ($seed in $seedValues) {
-        $seedName = "blast_l4_turn_$($Condition.Id)_seed${seed}"
+        $seedName = "$($measurementPrefix)_$($Condition.Id)_seed${seed}"
         $seedPath = Join-Path $outputDirectory "${seedName}.json"
         if (Test-Path -LiteralPath $seedPath) { continue }
         $tasks += [ordered]@{
@@ -131,10 +141,13 @@ function Invoke-Condition([System.Collections.IDictionary]$Condition) {
         foreach ($entry in $running) {
             $entry.Process.WaitForExit()
             $entry.Process.Refresh()
-            if ($entry.Process.ExitCode -ne 0) {
+            $exitCode = $entry.Process.ExitCode
+            $resultPath = Join-Path $outputDirectory "$($entry.Task.Name).json"
+            $resultMissing = -not (Test-Path -LiteralPath $resultPath)
+            if (($null -ne $exitCode -and $exitCode -ne 0) -or $resultMissing) {
                 $stdout = Get-Content -LiteralPath $entry.Task.Stdout -Raw -ErrorAction SilentlyContinue
                 $stderr = Get-Content -LiteralPath $entry.Task.Stderr -Raw -ErrorAction SilentlyContinue
-                throw "$($entry.Task.Name) failed with exit $($entry.Process.ExitCode)`n$stdout`n$stderr"
+                throw "$($entry.Task.Name) failed with exit $exitCode`n$stdout`n$stderr"
             }
             Write-Output ("BLAST_L4_TURN_DONE name={0} exit=0" -f $entry.Task.Name)
         }
@@ -143,7 +156,7 @@ function Invoke-Condition([System.Collections.IDictionary]$Condition) {
     $combinedTick = $null
     $rows = @()
     foreach ($seed in $seedValues) {
-        $seedPath = Join-Path $outputDirectory "blast_l4_turn_$($Condition.Id)_seed${seed}.json"
+        $seedPath = Join-Path $outputDirectory "$($measurementPrefix)_$($Condition.Id)_seed${seed}.json"
         if (-not (Test-Path -LiteralPath $seedPath)) { throw "Missing report $seedPath" }
         $seedReport = Get-Content -LiteralPath $seedPath -Raw | ConvertFrom-Json
         $seedTick = @($seedReport.ticks)[0]
@@ -176,7 +189,7 @@ function Invoke-Condition([System.Collections.IDictionary]$Condition) {
 }
 
 function Get-RawRows([System.Collections.IDictionary]$Condition) {
-    $rawPath = Join-Path $outputDirectory "blast_l4_turn_$($Condition.Id)_raw.json"
+    $rawPath = Join-Path $outputDirectory "$($measurementPrefix)_$($Condition.Id)_raw.json"
     if (-not (Test-Path -LiteralPath $rawPath)) {
         throw "Missing raw report $rawPath"
     }
@@ -188,7 +201,11 @@ function Get-RawRows([System.Collections.IDictionary]$Condition) {
     return @(@($report.ticks)[0].seeds)
 }
 
-if (-not $AggregateOnly) {
+if ($Followup3) {
+    if (-not $AggregateOnly) {
+        foreach ($condition in $conditions) { Invoke-Condition $condition }
+    }
+} elseif (-not $AggregateOnly) {
     Invoke-Condition $conditions[0]
 }
 
@@ -200,13 +217,15 @@ $baseReached800 = @($baseRows | Where-Object {
 $baseP50 = Get-Percentile $baseLengths 0.50
 $runExtraRamps = $baseReached800 -gt 0 -or $baseP50 -gt 250.0
 
-if ($runExtraRamps -and -not $AggregateOnly) {
+if (-not $Followup3 -and $runExtraRamps -and -not $AggregateOnly) {
     Invoke-Condition $conditions[1]
     Invoke-Condition $conditions[2]
 }
 
-$selectedConditions = @($conditions[0])
-if ($runExtraRamps) { $selectedConditions += @($conditions[1], $conditions[2]) }
+$selectedConditions = if ($Followup3) { @($conditions) } else { @($conditions[0]) }
+if (-not $Followup3 -and $runExtraRamps) {
+    $selectedConditions += @($conditions[1], $conditions[2])
+}
 $caseReports = @()
 foreach ($condition in $selectedConditions) {
     $rows = @(Get-RawRows $condition)
@@ -220,7 +239,7 @@ foreach ($condition in $selectedConditions) {
     $maxPair = 0.0
     $departures = 0
     $divergences = 0
-    $rawPath = Join-Path $outputDirectory "blast_l4_turn_$($condition.Id)_raw.json"
+    $rawPath = Join-Path $outputDirectory "$($measurementPrefix)_$($condition.Id)_raw.json"
     $rawReport = Get-Content -LiteralPath $rawPath -Raw | ConvertFrom-Json
     $tick = @($rawReport.ticks)[0]
     foreach ($binProperty in $tick.bins.PSObject.Properties) {
@@ -233,6 +252,7 @@ foreach ($condition in $selectedConditions) {
     $lengths = [double[]]@($rows | ForEach-Object { [double]$_.completed_turns })
     $scores = [double[]]@($rows | ForEach-Object { [double]$_.score })
     $blasts = [double[]]@($rows | ForEach-Object { [double]$_.blast_count })
+    $maxCombos = [double[]]@($rows | ForEach-Object { [double]$_.max_combo })
     $occupancies = [double[]]@($rows | ForEach-Object { [double]$_.final_occupancy_percent })
     $finalSpawnCounts = [double[]]@($rows | ForEach-Object {
         1.0 + [Math]::Floor(([Math]::Max([int]$_.completed_turns, 1) - 1) / [double]$condition.Ramp)
@@ -248,6 +268,7 @@ foreach ($condition in $selectedConditions) {
         reached_800_count = $reached800
         game_length = Get-Distribution $lengths
         score = Get-Distribution $scores
+        max_combo = Get-Distribution $maxCombos
         blast = Get-Distribution $blasts
         blast_count_by_level = Get-DynamicSum $rows "blast_count_by_level"
         blast_moved_orb_ratio_by_level = Get-WeightedBlastMovedRatios $rows
@@ -266,6 +287,22 @@ foreach ($condition in $selectedConditions) {
     }
 }
 
+$selectedRamp = $null
+$selectionRequiresQuestion = $false
+if ($Followup3) {
+    $eligible = @($caseReports | Where-Object {
+        [double]$_.game_length.p50 -ge 220.0 -and [double]$_.game_length.p50 -le 280.0
+    })
+    if ($eligible.Count -gt 0) {
+        $selectedRamp = @($eligible | Sort-Object `
+            @{ Expression = { [Math]::Abs([double]$_.game_length.p50 - 250.0) }; Ascending = $true }, `
+            @{ Expression = { [int]$_.spawn_count_ramp_turns }; Descending = $true }
+        )[0]
+    } else {
+        $selectionRequiresQuestion = $true
+    }
+}
+
 $summary = [ordered]@{
     engine = "Godot 4.8-dev3 mono"
     physics_engine = "Jolt Physics"
@@ -274,6 +311,7 @@ $summary = [ordered]@{
     max_turns = 800
     blast_min_level = 4
     blast_push_radius_by_level = @(0, 0, 0, 0.3, 0.55, 1.0, 1.0)
+    combo_multiplier_max = 128.0
     previous_l6_baseline = [ordered]@{ game_length_p50 = 162.0; source = "#60" }
     extra_ramp_trigger = [ordered]@{
         reached_800_count = $baseReached800
@@ -282,9 +320,17 @@ $summary = [ordered]@{
         rule = "reached_800_count > 0 or base_game_length_p50 > 250"
     }
     thresholds = [ordered]@{ wall_limit_px = $wallLimitPx; pair_limit_px = $pairLimitPx }
+    followup3 = $Followup3.IsPresent
+    selected_ramp = $(if ($null -eq $selectedRamp) { $null } else {
+        [int]$selectedRamp.spawn_count_ramp_turns
+    })
+    selection_requires_question = $selectionRequiresQuestion
+    selection_rule = "p50 in 220..280 and nearest 250; tie uses longer interval"
     cases = $caseReports
 }
-$summaryPath = Join-Path $outputDirectory "blast_l4_turn_summary.json"
+$summaryName = if ($Followup3) { "turn_250_combo_summary.json" } else { "blast_l4_turn_summary.json" }
+$summaryPath = Join-Path $outputDirectory $summaryName
 $summary | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $summaryPath -Encoding utf8
 Write-Output ("BLAST_L4_TURN_RESULT {0}" -f ($caseReports | ConvertTo-Json -Compress -Depth 10))
-Write-Output ("BLAST_L4_TURN_SUITE exit=0 trigger={0} report={1}" -f $runExtraRamps, $summaryPath)
+Write-Output ("BLAST_L4_TURN_SUITE exit=0 trigger={0} selected_ramp={1} report={2}" -f `
+    $runExtraRamps, $summary.selected_ramp, $summaryPath)

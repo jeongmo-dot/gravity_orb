@@ -38,6 +38,47 @@
 
 ## 미확인
 
+### [2026-10-11] 대상 #62 — 약 250턴 램프 + TURN 콤보 상한 (추가 요구 3)
+- 상태: 완료 — 후보 기준을 만족해 `spawn_count_ramp_turns=20`을 선택·적용했고 `combo_multiplier_max=128.0`을 추가함. 추가 요구 1·2 회신의 램프 질문은 이 결정으로 해소됨
+- 브랜치 / PR: `m8-turn-250-combo-cap` / [PR #64](https://github.com/jeongmo-dot/gravity_orb/pull/64)
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/{ScoreManager.gd,TurnManager.gd}`, `tests/{test_config.gd,test_score.gd,test_score_popups.gd,test_screen_layout.gd,test_spawner.gd,run_blast_l4_turn_measurement.ps1}`, `tests/scenarios/{test_score_flow.gd,test_turn_manager.gd}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 시드 101~112에서 램프 25·20·15를 게임오버까지 측정. p50 `239·240·203턴` 중 허용 범위 `220~280`에 들고 250과 차이가 가장 작은 램프 **20**(차이 10)을 선택. 램프 25는 차이 11, 램프 15는 허용 범위 밖
+  - [x] TURN 콤보 배수를 `min(2^(combo-1), 128)`로 제한. 콤보 7=`×64`, 8=`×128`, 9·20=`×128`; 점수 팝업 계산식도 실제 `×128`을 표시하도록 자동 검증
+  - [x] 명시적 배수를 넘기는 BLITZ 경로는 변경하지 않아 기존 체인·피버 배수 테스트 통과
+  - [x] 램프 경계 1·20·21·40·41턴 생성 수와 NEXT/THEN `×n`을 자동 검증
+  - [x] 캡처 `12_turn_ramp_next`를 21턴(2개), `13_turn_ramp_uncapped_next`를 101턴(6개) 경계로 갱신하고 직접 확인
+  - [x] 전체 래퍼 `267/267`, 캡처 `13/13`, 시작/TURN/BLITZ 스모크 통과
+
+- TURN 후보 관측 (Godot 4.8-dev3, Jolt, 120Hz, 각 12시드, 콤보 상한 적용):
+
+  | 램프 | 종료 / 800턴 | 길이 min / p50 / max | 점수 min / p50 / max | 최대 콤보 min / p50 / max | BLAST p50 · 레벨별 합계 | 밀려난 비율 L4 / L5 / L6+ | 후반 반응 0 | 종료 생성 min / p50 / max | 벽 / 쌍 최대 |
+  |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+  | 25 | 12 / 0 | 208 / **239** / 326 | 415,286 / 1,004,767 / 2,151,215 | 12 / 16 / 20 | 65 · 817/36/0 | 42.85 / 85.45 / —% | 0.180% | 9 / 10 / 14 | 23.264 / 41.097px |
+  | **20 (선택)** | 12 / 0 | 167 / **240** / 292 | 297,806 / 1,170,088 / 3,039,222 | 11 / 17 / 22 | 83 · 900/46/0 | 41.74 / 86.20 / —% | 0.243% | 9 / 12 / 15 | 22.088 / 40.084px |
+  | 15 | 12 / 0 | 163 / **203** / 222 | 510,237 / 1,862,006 / 2,491,695 | 14 / 18 / 23 | 77 · 844/43/1 | 40.31 / 86.89 / 100% | 0% | 11 / 14 / 15 | 24.651 / 39.508px |
+
+  - 전 36판 게임오버, 800턴 도달 `0`, 이탈·발산 `0/0`, 물리 한도 `34/68px` 안. 종료 점유율 p50은 램프 25/20/15 순서로 `82.26/82.25/82.86%`
+  - 자동 선택 결과 `selected_ramp=20`, `selection_requires_question=false`. 원시·요약 JSON은 `artifacts/measurements/turn_250_combo_summary.json` 등 gitignore 대상
+
+- QA 관측값:
+  - Godot `4.8-dev3 mono` `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` 최종 → 일반 `258/258` 20.890초, 장기 `4/4` 34.225초, 성능 `5/5` 1.858초, 합계 `267/267`; 종료 코드 0, 총 56.973초
+  - 성능 묶음 첫 별도 실행은 근접 탐색 best p95 `1171us`로 `4/5`; 즉시 재실행 `599us`, 최종 전체 래퍼 `643us`로 각각 `5/5`. 코드 변경 없이 실행 편차로 관측됨
+  - `tests/capture_screens.ps1` → `01_start_screen`~`13_turn_ramp_uncapped_next` PNG `13/13`, 종료 코드 0. `12`에서 NEXT·THEN 각각 2개, `13`에서 각각 `×6`과 잘림·겹침 없음 직접 확인. 종료 시 기존 계열 ObjectDB 잔존 경고 2개, 캡처 실패·스크립트 오류 0건
+  - 시작 화면 / TURN / BLITZ 300프레임 스모크 → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 규칙 검사 → `Input`/`InputEvent`는 `InputRouter.gd`·`Haptics.gd` 밖 0건, 전역 난수 호출은 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. TURN 새 게임에서 20턴까지 진행한다 → 한 번에 1개가 생성되고, 21턴부터 2개로 증가하며 NEXT·THEN 미리보기에도 같은 수가 보여야 한다.
+  2. TURN에서 8단계 이상 연쇄 반응을 만든다 → HUD와 점수 팝업 배수가 `×128`에서 더 커지지 않고 계산식에도 실제 `×128`이 보여야 한다.
+  3. BLITZ에서 연속 반응과 피버를 만든다 → 기존 BLITZ 체인·피버 배수와 조작감이 바뀌지 않아야 한다.
+  4. `artifacts/screens/12_turn_ramp_next.png`와 `13_turn_ramp_uncapped_next.png`를 연다 → 21턴 경계의 2개 미리보기와 101턴 경계의 NEXT/THEN `×6`이 잘림 없이 보여야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 대형 정수 저장 회귀 테스트는 콤보 31의 무제한 거듭제곱에 의존하지 않고 저장 계층에 큰 값을 직접 주입하도록 바꿈. 저장 범위 검증 목적은 유지함
+  - 첫 전체 래퍼에서 위 테스트의 이전 전제가 콤보 상한과 충돌해 1건 실패했고, 테스트 전제를 분리한 뒤 최종 래퍼 `267/267` 통과
+  - 제품 수치는 명세의 램프 자동 선택 결과 `20`과 콤보 상한 `128.0` 외에 변경하지 않음
+- 남은 것 · 질문: 없음
+
 ### [2026-10-11] 대상 #62 — 대폭발 L4 통일 + 레벨별 범위 (추가 요구 1·2)
 - 상태: 질문 — 구현·검증·측정은 완료. TURN 기본 램프 50의 게임 길이 p50이 `453턴 > 250턴`이라 지시대로 램프 40·30도 측정했으나 각각 `411·310턴`으로 모두 기준을 넘음. 제품 기본값 50은 바꾸지 않았고 수치 결정을 요청함
 - 브랜치 / PR: `m8-blitz-blast-l6` / [PR #63](https://github.com/jeongmo-dot/gravity_orb/pull/63)

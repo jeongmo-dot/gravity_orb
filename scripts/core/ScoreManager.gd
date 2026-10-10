@@ -96,7 +96,7 @@ static func points_for(reaction: Dictionary, cfg: GameConfig) -> int:
 	var combo: int = maxi(int(reaction.get("combo", 1)), 1)
 	var occupancy: float = float(reaction.get("occupancy", 0.0))
 	var combo_multiplier: float = float(
-		reaction.get("combo_multiplier", pow(cfg.combo_multiplier_base, float(combo - 1)))
+		reaction.get("combo_multiplier", combo_multiplier_for(combo, cfg))
 	)
 	var danger_multiplier: float = danger_multiplier_for(occupancy, cfg)
 	var fever_multiplier: float = (
@@ -119,6 +119,13 @@ static func points_for(reaction: Dictionary, cfg: GameConfig) -> int:
 	reaction["fever_multiplier"] = fever_multiplier
 	reaction["points"] = points
 	return points
+
+
+static func combo_multiplier_for(combo: int, cfg: GameConfig) -> float:
+	return minf(
+		pow(cfg.combo_multiplier_base, float(maxi(combo, 1) - 1)),
+		cfg.combo_multiplier_max
+	)
 
 
 static func danger_multiplier_for(occupancy: float, cfg: GameConfig) -> float:

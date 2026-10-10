@@ -47,7 +47,7 @@ enum GameMode { TURN, BLITZ }
 )
 @export var spawn_count_per_turn: int = 1
 @export var preview_turns: int = 2
-@export var spawn_count_ramp_turns: int = 50
+@export var spawn_count_ramp_turns: int = 20
 @export var spawn_count_max: int = 0
 @export var spawn_position_mode: SpawnPositionMode = SpawnPositionMode.RANDOM
 @export var spawn_margin: float = 4.0
@@ -72,6 +72,7 @@ enum GameMode { TURN, BLITZ }
 @export var annihilation_score_factor: float = 0.5
 @export var max_merge_bonus_factor: float = 5.0
 @export var combo_multiplier_base: float = 2.0
+@export var combo_multiplier_max: float = 128.0
 @export var danger_start: float = 0.30
 @export var danger_doubling: float = 0.20
 @export var shock_impulse: float = 600.0
