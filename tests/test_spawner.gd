@@ -225,11 +225,21 @@ func test_blitz_candidate_order_is_independent_of_batch_grouping() -> void:
 func test_ramp_draws_next_turn_batch_sizes_at_boundaries() -> void:
 	var snapshot: Dictionary = _snapshot_spawn_config()
 	Config.data.spawn_count_per_turn = 1
-	Config.data.spawn_count_ramp_turns = 100
-	Config.data.spawn_count_max = 3
+	Config.data.spawn_count_ramp_turns = 50
+	Config.data.spawn_count_max = 0
 	var spawner: Spawner = Spawner.new()
 	spawner.init_rng(8642)
-	var expected: Dictionary = {100: 1, 101: 2, 200: 2, 201: 3}
+	var expected: Dictionary = {
+		1: 1,
+		50: 1,
+		51: 2,
+		100: 2,
+		101: 3,
+		150: 3,
+		151: 4,
+		201: 5,
+		251: 6,
+	}
 	for turn_value: Variant in expected:
 		var turn_index: int = int(turn_value)
 		assert_eq(
@@ -259,19 +269,19 @@ func test_ramp_preview_batches_use_each_future_turn_number() -> void:
 	var snapshot: Dictionary = _snapshot_spawn_config()
 	Config.data.preview_turns = 2
 	Config.data.spawn_count_per_turn = 1
-	Config.data.spawn_count_ramp_turns = 100
-	Config.data.spawn_count_max = 3
+	Config.data.spawn_count_ramp_turns = 50
+	Config.data.spawn_count_max = 0
 	var spawner: Spawner = Spawner.new()
 	spawner.init_rng(8642)
-	spawner.sync_next_batch_size(100)
+	spawner.sync_next_batch_size(50)
 	var first_boundary: Array = spawner.peek_preview()
 	assert_eq(first_boundary.size(), 2, "two preview turns")
-	assert_eq((first_boundary[0] as Array).size(), 1, "turn 100 preview size")
-	assert_eq((first_boundary[1] as Array).size(), 2, "turn 101 preview size")
-	spawner.sync_next_batch_size(200)
+	assert_eq((first_boundary[0] as Array).size(), 1, "turn 50 preview size")
+	assert_eq((first_boundary[1] as Array).size(), 2, "turn 51 preview size")
+	spawner.sync_next_batch_size(250)
 	var second_boundary: Array = spawner.peek_preview()
-	assert_eq((second_boundary[0] as Array).size(), 2, "turn 200 preview size")
-	assert_eq((second_boundary[1] as Array).size(), 3, "turn 201 preview size")
+	assert_eq((second_boundary[0] as Array).size(), 5, "turn 250 preview size")
+	assert_eq((second_boundary[1] as Array).size(), 6, "turn 251 preview size")
 	spawner.free()
 	_restore_spawn_config(snapshot)
 

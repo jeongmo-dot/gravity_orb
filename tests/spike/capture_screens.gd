@@ -35,6 +35,7 @@ const CAPTURE_FILES: Array[String] = [
 	"10_ranking_blitz.png",
 	"11_result_new_record.png",
 	"12_turn_ramp_next.png",
+	"13_turn_ramp_uncapped_next.png",
 ]
 
 var _failed: bool = false
@@ -105,11 +106,20 @@ func _capture_turn_scenes() -> void:
 	hud._on_combo_changed(4, 8.0, 4)
 	await get_tree().create_timer(0.30).timeout
 	await _capture("03_turn_combo.png")
+	Config.data.spawn_count_ramp_turns = 100
+	Config.data.spawn_count_max = 3
 	manager.turn_index = 100
 	spawner.sync_next_batch_size(101)
 	await get_tree().process_frame
-	_validate_turn_ramp_preview_scene(main)
+	_validate_turn_ramp_preview_scene(main, 2, "turn_ramp_next")
 	await _capture("12_turn_ramp_next.png")
+	Config.data.spawn_count_ramp_turns = 50
+	Config.data.spawn_count_max = 0
+	manager.turn_index = 250
+	spawner.sync_next_batch_size(251)
+	await get_tree().process_frame
+	_validate_turn_ramp_preview_scene(main, 6, "turn_ramp_uncapped_next")
+	await _capture("13_turn_ramp_uncapped_next.png")
 
 	score.score = TURN_CAPTURE_SCORE
 	score.best_score = TURN_CAPTURE_BEST
@@ -308,14 +318,32 @@ func _validate_turn_game_over_scene(main: Main) -> void:
 	print("SCREEN_CAPTURE_CHECK scene=turn_game_over score=%d blocked=LEFT" % TURN_CAPTURE_SCORE)
 
 
-func _validate_turn_ramp_preview_scene(main: Main) -> void:
+func _validate_turn_ramp_preview_scene(main: Main, batch_size: int, scene_name: String) -> void:
 	var next_preview: Node2D = main.get_node("UI/Hud/NextPreview") as Node2D
 	var then_preview: Node2D = main.get_node("UI/Hud/ThenPreview") as Node2D
-	if next_preview.get_child_count() != 2:
-		_fail("TURN 101 NEXT preview must show two orbs")
-	if then_preview.get_child_count() != 2:
-		_fail("TURN 102 THEN preview must show two orbs")
-	print("SCREEN_CAPTURE_CHECK scene=turn_ramp_next turn=101 next=2 then=2")
+	var next_count: Label = main.get_node("UI/Hud/NextCountLabel") as Label
+	var then_count: Label = main.get_node("UI/Hud/ThenCountLabel") as Label
+	var visible_count: int = mini(batch_size, Hud.MAX_PREVIEW_COUNT)
+	if next_preview.get_child_count() != visible_count:
+		_fail("TURN NEXT preview must show %d orbs" % visible_count)
+	if then_preview.get_child_count() != visible_count:
+		_fail("TURN THEN preview must show %d orbs" % visible_count)
+	var expects_count_labels: bool = batch_size > Hud.MAX_PREVIEW_COUNT
+	if next_count.visible != expects_count_labels:
+		_fail("TURN NEXT count label visibility mismatch")
+	if then_count.visible != expects_count_labels:
+		_fail("TURN THEN count label visibility mismatch")
+	if expects_count_labels:
+		_expect_label_text(next_count, "×%d" % batch_size, "TURN NEXT count")
+		_expect_label_text(then_count, "×%d" % batch_size, "TURN THEN count")
+	print(
+		"SCREEN_CAPTURE_CHECK scene=%s batch=%d visible=%d count_labels=%s" % [
+			scene_name,
+			batch_size,
+			visible_count,
+			str(expects_count_labels),
+		]
+	)
 
 
 func _validate_blitz_time_up_scene(main: Main) -> void:

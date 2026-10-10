@@ -375,6 +375,23 @@ modulate = Color(1, 1, 1, 0.5)
 position = Vector2(920, 415)
 scale = Vector2(0.6, 0.6)
 
+[node name="ThenCountLabel" type="Label" parent="Hud"]
+unique_name_in_owner = true
+visible = false
+modulate = Color(1, 1, 1, 0.5)
+layout_mode = 0
+offset_left = 970.0
+offset_top = 435.0
+offset_right = 1060.0
+offset_bottom = 455.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 5
+theme_override_font_sizes/font_size = 16
+text = "×8"
+horizontal_alignment = 1
+
 [node name="BlockedLabel" type="Label" parent="Hud"]
 unique_name_in_owner = true
 visible = false

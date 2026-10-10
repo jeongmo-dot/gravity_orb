@@ -29,6 +29,7 @@ const TIMER_BONUS_COLOR: Color = Color("#30D158")
 @onready var _then_preview: Node2D = %ThenPreview
 @onready var _then_label: Label = %ThenLabel
 @onready var _next_count_label: Label = %NextCountLabel
+@onready var _then_count_label: Label = %ThenCountLabel
 @onready var _score_label: Label = %ScoreLabel
 @onready var _best_label: Label = %BestLabel
 @onready var _max_combo_label: Label = %MaxComboLabel
@@ -184,6 +185,8 @@ func _on_preview_changed(batches: Array) -> void:
 	_then_preview.visible = has_then
 	var then_batch: Array = batches[1] if has_then else []
 	_render_preview(_then_preview, then_batch)
+	_then_count_label.visible = has_then and then_batch.size() > MAX_PREVIEW_COUNT
+	_then_count_label.text = "×%d" % then_batch.size()
 
 
 func _render_preview(preview_root: Node2D, batch: Array) -> void:
