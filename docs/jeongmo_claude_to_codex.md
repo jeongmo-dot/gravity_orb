@@ -30,7 +30,19 @@
 
 ## 대기 중
 
-_(없음)_
+### [2026-10-10 #60] 중력 되돌리기 + 레벨 차등 강화 (1800, 레벨마다 +25%)
+- 상태: 대기 (**다음 차례**)
+- 근거: 기획서 **0.10.13**, [technical_design.md](technical_design.md) §4 `gravity_strength`·`gravity_level_scale`, **§12-B.8**
+- 사용자 (2026-10-10): "중력은 되돌리거나 1.25배 정도로, 공마다·레벨마다 차이를" → 레벨(크기)별 선택
+- 요구:
+  1. `gravity_strength` 3600 → **1800**, `gravity_level_scale` 0.1 → **0.25** (`GameConfig.gd` 선언·`default_config.tres`·config 테스트 — L7 기대값은 설정값에서 계산)
+  2. 테스트 추가: 합체 결과 구슬의 중력 힘이 **새 레벨** 배율을 따른다 (예: L1 둘 → L2의 `constant_force` 크기 = 질량 × 1800 × 1.25, 같은 판의 L1은 × 1.0)
+  3. 측정 — §12-B.8의 A/B/C 세 조건 나란히 (`tests/run_gravity_comparison.ps1`에 레벨 배율 인자 추가): 낙하 시간 L1/L4/L7, 층 지표, 턴제·BLITZ 지표, BLITZ 무작위 ÷ 휴리스틱 점수비
+  4. 물리 한도(§12-B.8 = #58 기준) 확인. 넘으면 `상태: 질문`
+- 화면: 캡처 13장 다시 찍기 → Claude 확인 후 병합
+- 건드리지 말 것: 관통 한도, 충격파·대폭발·색 효과·생성 등 다른 수치, `docs/` (회신 파일 제외)
+- Done-when: 테스트 통과(`.\tests\run_tests.ps1`), 측정 보고, `.\tests\capture_screens.ps1` 통과, 스모크 3종 에러 0
+- 커밋: 항목 단위 브랜치, push까지
 
 ---
 
