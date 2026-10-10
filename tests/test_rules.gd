@@ -155,9 +155,9 @@ func test_new_blitz_colors_merge_and_blast() -> void:
 		assert_eq(merge["result_color"], color, "new color merge result")
 	var blast: Dictionary = ReactionRules.classify(
 		OrbTypes.OrbColor.PURPLE,
-		4,
+		6,
 		OrbTypes.OrbColor.CYAN,
-		4,
+		6,
 		cfg
 	)
 	assert_eq(blast["type"], ReactionRules.Type.BLAST, "new colors BLITZ blast")
@@ -250,13 +250,28 @@ func test_default_blast_minimum_excludes_level_five() -> void:
 	assert_eq(level_six["type"], ReactionRules.Type.BLAST, "default includes L6")
 
 
-func test_blitz_uses_level_four_blast_without_changing_turn_rule() -> void:
+func test_blitz_and_turn_use_level_six_blast_with_lower_same_color_merges() -> void:
 	var cfg: GameConfig = GameConfig.new()
-	var turn_level_four: Dictionary = ReactionRules.classify(0, 4, 1, 4, cfg)
-	assert_eq(turn_level_four["type"], ReactionRules.Type.NONE, "turn L4 remains none")
+	var turn_level_five: Dictionary = ReactionRules.classify(0, 5, 1, 5, cfg)
+	var turn_level_six: Dictionary = ReactionRules.classify(0, 6, 1, 6, cfg)
+	assert_eq(turn_level_five["type"], ReactionRules.Type.NONE, "turn L5 remains none")
+	assert_eq(turn_level_six["type"], ReactionRules.Type.BLAST, "turn L6 still blasts")
 	cfg.game_mode = GameConfig.GameMode.BLITZ
-	var blitz_level_four: Dictionary = ReactionRules.classify(0, 4, 1, 4, cfg)
-	assert_eq(blitz_level_four["type"], ReactionRules.Type.BLAST, "blitz L4 blasts")
+	for level: int in [4, 5]:
+		var different_colors: Dictionary = ReactionRules.classify(0, level, 1, level, cfg)
+		var same_color: Dictionary = ReactionRules.classify(0, level, 0, level, cfg)
+		assert_eq(
+			different_colors["type"],
+			ReactionRules.Type.NONE,
+			"BLITZ different-color L%d does not react" % level
+		)
+		assert_eq(
+			same_color["type"],
+			ReactionRules.Type.MERGE,
+			"BLITZ same-color L%d merges" % level
+		)
+	var blitz_level_six: Dictionary = ReactionRules.classify(0, 6, 1, 6, cfg)
+	assert_eq(blitz_level_six["type"], ReactionRules.Type.BLAST, "BLITZ L6 blasts")
 
 
 func _enable_red_blue(cfg: GameConfig) -> void:

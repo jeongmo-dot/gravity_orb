@@ -138,10 +138,10 @@ enum GameMode { TURN, BLITZ }
 @export var blitz_fever_chain: int = 8
 @export var blitz_fever_duration: float = 3.0
 @export var blitz_fever_multiplier: float = 2.0
-@export var blitz_time_bonus_blast: float = 0.5
+@export var blitz_time_bonus_blast: float = 2.0
 @export var blitz_time_bonus_jackpot: float = 3.0
 @export var blitz_time_bonus_cap: float = 20.0
-@export var blitz_blast_min_level: int = 4
+@export var blitz_blast_min_level: int = 6
 @export var blitz_finale_interval: float = 0.3
 @export var fx_enabled: bool = true
 @export var fx_hitstop_enabled: bool = true

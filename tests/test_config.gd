@@ -291,14 +291,14 @@ func test_blitz_spike_defaults() -> void:
 	assert_eq(config.blitz_fever_chain, 8, "fever chain")
 	assert_near(config.blitz_fever_duration, 3.0, TOLERANCE, "fever duration")
 	assert_near(config.blitz_fever_multiplier, 2.0, TOLERANCE, "fever multiplier")
-	assert_near(config.blitz_time_bonus_blast, 0.5, TOLERANCE, "blast bonus")
+	assert_near(config.blitz_time_bonus_blast, 2.0, TOLERANCE, "blast bonus")
 	assert_near(config.blitz_time_bonus_jackpot, 3.0, TOLERANCE, "jackpot bonus")
 	assert_near(config.blitz_time_bonus_cap, 20.0, TOLERANCE, "bonus cap")
-	assert_eq(config.blitz_blast_min_level, 4, "blitz blast level")
+	assert_eq(config.blitz_blast_min_level, 6, "blitz blast level")
 	assert_near(config.blitz_finale_interval, 0.3, TOLERANCE, "finale interval")
 	assert_eq(config.active_blast_min_level(), 6, "turn blast level")
 	config.game_mode = GameConfig.GameMode.BLITZ
-	assert_eq(config.active_blast_min_level(), 4, "blitz active blast level")
+	assert_eq(config.active_blast_min_level(), 6, "blitz active blast level")
 
 
 func test_m8_feedback_defaults() -> void:

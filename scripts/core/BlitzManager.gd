@@ -529,7 +529,7 @@ func _next_finale_orb() -> Variant:
 	for orb: Variant in _board.get_orbs():
 		if orb.consumed or orb.is_ghost or orb.is_waiting_at_entrance:
 			continue
-		if orb.level >= Config.data.blitz_blast_min_level:
+		if orb.level >= Config.data.active_blast_min_level():
 			candidates.append(orb)
 	candidates.sort_custom(
 		func(first: Variant, second: Variant) -> bool:

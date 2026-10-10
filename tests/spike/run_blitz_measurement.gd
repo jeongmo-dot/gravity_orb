@@ -23,6 +23,7 @@ var _seed_reactions: int = 0
 var _bonus_scale: float = 1.0
 var _seed_merge_count_by_level: Dictionary = {}
 var _seed_first_l4_merge_time: float = -1.0
+var _seed_jackpot_count: int = 0
 
 
 func _ready() -> void:
@@ -97,6 +98,7 @@ func _run_seed(seed: int) -> Dictionary:
 	_seed_reactions = 0
 	_seed_merge_count_by_level.clear()
 	_seed_first_l4_merge_time = -1.0
+	_seed_jackpot_count = 0
 	var fixture: Dictionary = await _create_fixture(seed)
 	var root: Node = fixture["root"] as Node
 	var board: Board3D = fixture["board"] as Board3D
@@ -108,6 +110,7 @@ func _run_seed(seed: int) -> Dictionary:
 	var bot_elapsed: float = 0.0
 	var next_occupancy_sample: float = 10.0
 	var occupancy_timeline: Array[Dictionary] = []
+	var max_occupancy_percent: float = _occupancy(board) * 100.0
 	var max_wall: float = 0.0
 	var max_pair: float = 0.0
 	var departed_ids: Dictionary = {}
@@ -120,6 +123,10 @@ func _run_seed(seed: int) -> Dictionary:
 		await get_tree().physics_frame
 		session_elapsed += tick
 		physics_frame_index += 1
+		max_occupancy_percent = maxf(
+			max_occupancy_percent,
+			_occupancy(board) * 100.0
+		)
 		if manager.state == BlitzManager.State.RUNNING:
 			bot_elapsed += tick
 			while bot_elapsed + 0.000001 >= _bot_interval:
@@ -186,6 +193,7 @@ func _run_seed(seed: int) -> Dictionary:
 			manager.play_time_elapsed
 		),
 		"blast_count": manager.blast_count,
+		"jackpot_count": _seed_jackpot_count,
 		"finale_blast_count": manager.finale_blast_count,
 		"time_bonus_total": manager.time_bonus_total,
 		"time_bonus_by_source": manager.time_bonus_by_source.duplicate(true),
@@ -210,6 +218,7 @@ func _run_seed(seed: int) -> Dictionary:
 		"finale_score": finale_score,
 		"finale_score_percent": _safe_percent(finale_score, score.score),
 		"final_occupancy_percent": _occupancy(board) * 100.0,
+		"max_occupancy_percent": max_occupancy_percent,
 		"occupancy_timeline": occupancy_timeline,
 		"max_wall_penetration_px": max_wall,
 		"max_pair_penetration_px_sampled_10hz": max_pair,
@@ -304,6 +313,8 @@ func _on_reaction_scored(reaction: Dictionary) -> void:
 	var reaction_type: ReactionRules.Type = reaction.get(
 		"type", ReactionRules.Type.NONE
 	) as ReactionRules.Type
+	if reaction_type == ReactionRules.Type.MAX_CLEAR:
+		_seed_jackpot_count += 1
 	if reaction_type != ReactionRules.Type.MERGE:
 		return
 	var result_level: int = int(reaction.get("result_level", 0))
@@ -544,6 +555,17 @@ func _apply_arguments() -> void:
 		elif argument.begins_with("--blitz-drain-ramp="):
 			Config.data.blitz_drain_ramp_per_minute = maxf(
 				argument.trim_prefix("--blitz-drain-ramp=").to_float(),
+				0.0
+			)
+		elif argument.begins_with("--blitz-blast-min-level="):
+			Config.data.blitz_blast_min_level = clampi(
+				argument.trim_prefix("--blitz-blast-min-level=").to_int(),
+				1,
+				Config.data.orb_max_level
+			)
+		elif argument.begins_with("--blitz-time-bonus-blast="):
+			Config.data.blitz_time_bonus_blast = maxf(
+				argument.trim_prefix("--blitz-time-bonus-blast=").to_float(),
 				0.0
 			)
 

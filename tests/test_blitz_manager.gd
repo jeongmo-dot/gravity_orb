@@ -193,7 +193,9 @@ func test_count_debt_measurement_rule_spawns_merge_blast_and_empty_amounts() -> 
 	assert_eq(board.get_orbs().size(), initial_count + 3, "three orbs enter as one batch")
 	assert_eq(manager.refill_debt, 0, "three spawn clears debt")
 	manager._physics_process(Config.data.blitz_swipe_cooldown)
-	manager.on_reaction(_reaction(ReactionRules.Type.BLAST, 4))
+	manager.on_reaction(
+		_reaction(ReactionRules.Type.BLAST, Config.data.active_blast_min_level())
+	)
 	assert_eq(manager.refill_debt, 2, "blast adds two debt")
 	manager.on_swipe(Vector2i.UP)
 	assert_eq(manager.spawn_count, 5, "blast debt spawns two")
@@ -299,7 +301,9 @@ func test_target_density_reactions_do_not_add_refill_debt() -> void:
 	manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 2))
 	assert_eq(manager.refill_debt, 0, "running merge uses density instead of count debt")
 	manager._begin_finale()
-	manager.on_reaction(_reaction(ReactionRules.Type.BLAST, 4))
+	manager.on_reaction(
+		_reaction(ReactionRules.Type.BLAST, Config.data.active_blast_min_level())
+	)
 	manager.on_reaction(_reaction(ReactionRules.Type.MAX_CLEAR, 7))
 	assert_eq(manager.refill_debt, 0, "finale reactions add no debt")
 	await _cleanup_fixture(fixture)
@@ -351,7 +355,9 @@ func test_speed_chain_productive_miss_idle_fever_and_time_bonus_cap() -> void:
 	manager._physics_process(Config.data.blitz_chain_idle)
 	assert_eq(manager.chain, 0, "two seconds without swipe resets chain")
 	for _index: int in range(50):
-		manager.on_reaction(_reaction(ReactionRules.Type.BLAST, 4))
+		manager.on_reaction(
+			_reaction(ReactionRules.Type.BLAST, Config.data.active_blast_min_level())
+		)
 	manager.on_reaction(_reaction(ReactionRules.Type.MAX_CLEAR, 7))
 	assert_near(manager.time_bonus_total, 20.0, TOLERANCE, "time bonus is capped")
 	await _cleanup_fixture(fixture)
@@ -394,15 +400,20 @@ func test_survival_clock_ramp_reaction_bonuses_fever_and_clock_cap() -> void:
 			"merge result L%d bonus" % result_level
 		)
 	var before_blast: float = manager.remaining_time
-	manager.on_reaction(_reaction(ReactionRules.Type.BLAST, 4))
-	assert_near(manager.remaining_time - before_blast, 0.5, TOLERANCE, "blast bonus")
+	manager.on_reaction(_reaction(ReactionRules.Type.BLAST, 6))
+	assert_near(manager.remaining_time - before_blast, 2.0, TOLERANCE, "L6 blast bonus")
 	var before_jackpot: float = manager.remaining_time
 	manager.on_reaction(_reaction(ReactionRules.Type.MAX_CLEAR, 7))
 	assert_near(manager.remaining_time - before_jackpot, 3.0, TOLERANCE, "jackpot bonus")
 	manager.fever_remaining = 1.0
 	var before_fever: float = manager.remaining_time
-	manager.on_reaction(_merge_result_reaction(2))
-	assert_near(manager.remaining_time - before_fever, 0.1, TOLERANCE, "fever doubles bonus")
+	manager.on_reaction(_reaction(ReactionRules.Type.BLAST, 6))
+	assert_near(
+		manager.remaining_time - before_fever,
+		4.0,
+		TOLERANCE,
+		"fever doubles L6 blast bonus"
+	)
 	manager.fever_remaining = 0.0
 	manager.remaining_time = 44.8
 	var before_cap_total: float = manager.time_bonus_total
@@ -425,7 +436,9 @@ func test_survival_disabled_preserves_ninety_seconds_and_legacy_bonus_cap() -> v
 	manager.set_physics_process(false)
 	assert_near(manager.remaining_time, 90.0, TOLERANCE, "legacy clock starts at ninety")
 	for _index: int in range(50):
-		manager.on_reaction(_reaction(ReactionRules.Type.BLAST, 4))
+		manager.on_reaction(
+			_reaction(ReactionRules.Type.BLAST, Config.data.active_blast_min_level())
+		)
 	assert_near(manager.time_bonus_total, 20.0, TOLERANCE, "legacy bonus cap stays twenty")
 	assert_near(manager.remaining_time, 110.0, TOLERANCE, "legacy bonuses extend duration")
 	await _cleanup_fixture(fixture)
@@ -437,8 +450,8 @@ func test_time_up_locks_input_and_finale_blasts_largest_first() -> void:
 	var board: Board = fixture["board"] as Board
 	Config.data.blitz_duration = 0.05
 	Config.data.blitz_finale_interval = 0.1
-	board.spawn_orb(0, 4, Vector2(-180.0, 0.0)).exit_ghost_state()
-	board.spawn_orb(1, 5, Vector2(180.0, 0.0)).exit_ghost_state()
+	board.spawn_orb(0, 6, Vector2(-180.0, 0.0)).exit_ghost_state()
+	board.spawn_orb(1, 7, Vector2(180.0, 0.0)).exit_ghost_state()
 	manager.remaining_time = Config.data.blitz_duration
 	var finale_levels: Array[int] = []
 	manager.finale_blast.connect(func(level: int) -> void: finale_levels.append(level))
@@ -450,7 +463,7 @@ func test_time_up_locks_input_and_finale_blasts_largest_first() -> void:
 	assert_eq(manager.spawn_count, spawn_count_before_finale_swipe, "finale does not spawn")
 	manager._physics_process(0.1)
 	manager._physics_process(0.1)
-	assert_eq(finale_levels, [5, 4], "finale orders large levels first")
+	assert_eq(finale_levels, [7, 6], "finale orders eligible large levels first")
 	manager._physics_process(BlitzManager.FINALE_REACTION_IDLE_TIME + 0.01)
 	assert_eq(manager.state, BlitzManager.State.FINISHED, "settle ends in result state")
 	assert_eq(manager.finale_blast_count, 2, "two finale blasts counted")

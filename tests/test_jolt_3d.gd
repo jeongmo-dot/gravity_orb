@@ -192,14 +192,22 @@ func test_3d_blast_armed_orb_blinks_emission_by_level() -> void:
 	_cleanup(board)
 
 
-func test_3d_blitz_blink_starts_at_level_four() -> void:
+func test_3d_blitz_blink_starts_at_level_six() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	Config.data.game_mode = GameConfig.GameMode.BLITZ
 	var board: Board3D = await _create_board()
-	var level_three: Orb3D = board.spawn_orb(0, 3, Vector2(-100.0, 0.0))
-	var level_four: Orb3D = board.spawn_orb(1, 4, Vector2(100.0, 0.0))
-	assert_true(not level_three.is_blast_armed(), "BLITZ L3 is not armed")
-	assert_true(level_four.is_blast_armed(), "BLITZ L4 is armed")
+	var level_four: Orb3D = board.spawn_orb(0, 4, Vector2(-180.0, 0.0))
+	var level_five: Orb3D = board.spawn_orb(1, 5, Vector2(0.0, 0.0))
+	var level_six: Orb3D = board.spawn_orb(2, 6, Vector2(180.0, 0.0))
+	assert_true(not level_four.is_blast_armed(), "BLITZ L4 is not armed")
+	assert_true(not level_five.is_blast_armed(), "BLITZ L5 is not armed")
+	assert_true(level_six.is_blast_armed(), "BLITZ L6 is armed")
+	var initial_strength: float = level_six.blast_emission_strength()
+	level_six._physics_process(Config.data.blast_blink_period * 0.25)
+	assert_true(
+		not is_equal_approx(level_six.blast_emission_strength(), initial_strength),
+		"BLITZ L6 emission oscillates"
+	)
 	_cleanup(board)
 	Config.data.game_mode = original_mode
 
