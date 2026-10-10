@@ -1,12 +1,14 @@
 param(
     [string]$GodotPath = "",
     [string]$Label = "before",
-    [double]$GravityStrength = 0.0
+    [double]$GravityStrength = 0.0,
+    [double]$GravityLevelScale = -1.0
 )
 
 $ErrorActionPreference = "Stop"
 $repoPath = Split-Path -Parent $PSScriptRoot
 $outputDirectory = Join-Path $repoPath "artifacts\measurements"
+$invariantCulture = [System.Globalization.CultureInfo]::InvariantCulture
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {
     if (-not [string]::IsNullOrWhiteSpace($env:GODOT)) {
         $GodotPath = $env:GODOT
@@ -33,7 +35,16 @@ foreach ($seed in 101..104) {
         ("--seed={0}" -f $seed)
     )
     if ($GravityStrength -gt 0.0) {
-        $arguments += ("--gravity-strength={0}" -f $GravityStrength)
+        $arguments += ("--gravity-strength={0}" -f $GravityStrength.ToString(
+            "0.################",
+            $invariantCulture
+        ))
+    }
+    if ($GravityLevelScale -ge 0.0) {
+        $arguments += ("--gravity-level-scale={0}" -f $GravityLevelScale.ToString(
+            "0.################",
+            $invariantCulture
+        ))
     }
     $previousErrorActionPreference = $ErrorActionPreference
     try {
@@ -82,6 +93,7 @@ foreach ($report in $seedReports) {
 $aggregate = [ordered]@{
     label = $Label
     gravity_strength = [double]$seedReports[0].gravity_strength
+    gravity_level_scale = [double]$seedReports[0].gravity_level_scale
     seeds = @(101, 102, 103, 104)
     renderer = [string]$seedReports[0].renderer
     frame_count = $frames.Count

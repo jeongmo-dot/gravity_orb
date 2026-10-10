@@ -4,6 +4,7 @@ const MAIN_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
 const OUTPUT_PREFIX: String = "--output="
 const SEED_PREFIX: String = "--seed="
 const GRAVITY_STRENGTH_PREFIX: String = "--gravity-strength="
+const GRAVITY_LEVEL_SCALE_PREFIX: String = "--gravity-level-scale="
 const RUN_DURATION_SECONDS: float = 8.0
 const FRAME_WARMUP_SECONDS: float = 0.5
 const BOT_INTERVAL_SECONDS: float = 0.30
@@ -215,6 +216,7 @@ func _build_report() -> Dictionary:
 	return {
 		"seed": _seed,
 		"gravity_strength": Config.data.gravity_strength,
+		"gravity_level_scale": Config.data.gravity_level_scale,
 		"duration_seconds": RUN_DURATION_SECONDS,
 		"frame_samples_ms": _frame_samples_ms,
 		"input_latency_ms": _input_latency_ms,
@@ -252,4 +254,8 @@ func _parse_arguments() -> void:
 		elif argument.begins_with(GRAVITY_STRENGTH_PREFIX):
 			Config.data.gravity_strength = argument.trim_prefix(
 				GRAVITY_STRENGTH_PREFIX
+			).to_float()
+		elif argument.begins_with(GRAVITY_LEVEL_SCALE_PREFIX):
+			Config.data.gravity_level_scale = argument.trim_prefix(
+				GRAVITY_LEVEL_SCALE_PREFIX
 			).to_float()

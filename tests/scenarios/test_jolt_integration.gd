@@ -120,6 +120,8 @@ func test_reaction_ghost_times_out_without_position_correction() -> void:
 			result = orb
 			break
 	assert_true(result != null and result.is_ghost, "overlapped merge result is ghost")
+	blocker.get_physics_body().freeze = true
+	result.get_physics_body().freeze = true
 	assert_true(
 		board.maximum_normal_overlap(result) > Config.data.ghost_exit_overlap,
 		"blocker keeps result above exit overlap"
