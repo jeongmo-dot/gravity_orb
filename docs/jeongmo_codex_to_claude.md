@@ -40,7 +40,7 @@
 
 ### [2026-10-10] 대상 #58 — 중력 2배 + 물리 안전 재측정
 - 상태: 질문 — `gravity_strength=3600`에서 22시드 단기 한도와 BLITZ 장기 한도를 초과함
-- 브랜치 / PR: `m8-gravity-double` / 미생성
+- 브랜치 / PR: `m8-gravity-double` / [Draft PR #59](https://github.com/jeongmo-dot/gravity_orb/pull/59)
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `tests/{test_config.gd,test_feedback.gd,test_color_effect_visuals.gd,run_gravity_comparison.ps1,run_blitz_responsiveness_measurement.ps1}`, `tests/spike/{run_jolt_3d_measurement.gd,run_blitz_measurement.gd,run_blitz_responsiveness_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `gravity_strength` 선언·기본 리소스를 `1800 → 3600`으로 변경. L1·L7 테스트 기대값은 `config.gravity_strength`에서 계산 — `test_m3_turn_defaults`
