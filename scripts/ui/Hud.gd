@@ -61,6 +61,8 @@ var _sfx_bank: SfxBank
 var _board: Variant
 var _active_popups: Array[ScorePopup] = []
 var _popup_pool: Array[ScorePopup] = []
+var _next_preview_pool: Array[OrbVisual] = []
+var _then_preview_pool: Array[OrbVisual] = []
 var _score_tween: Tween
 var _score_punch_tween: Tween
 var _badge_punch_tween: Tween
@@ -92,6 +94,11 @@ func _ready() -> void:
 	_fever_band_base_position = _fever_band.position
 	_configure_fever_vignette()
 	set_process(true)
+
+
+func _exit_tree() -> void:
+	_free_preview_pool(_next_preview_pool)
+	_free_preview_pool(_then_preview_pool)
 
 
 func _process(delta: float) -> void:
@@ -190,11 +197,14 @@ func _on_preview_changed(batches: Array) -> void:
 
 
 func _render_preview(preview_root: Node2D, batch: Array) -> void:
-	for child: Node in preview_root.get_children():
-		preview_root.remove_child(child)
-		child.queue_free()
-
 	var preview_count: int = mini(batch.size(), MAX_PREVIEW_COUNT)
+	while preview_root.get_child_count() > preview_count:
+		var visual_to_pool: OrbVisual = preview_root.get_child(
+			preview_root.get_child_count() - 1
+		) as OrbVisual
+		preview_root.remove_child(visual_to_pool)
+		visual_to_pool.visible = false
+		_preview_pool_for(preview_root).append(visual_to_pool)
 	if preview_count == 0:
 		return
 
@@ -222,8 +232,13 @@ func _render_preview(preview_root: Node2D, batch: Array) -> void:
 	for index: int in range(preview_count):
 		var candidate: Dictionary = batch[index] as Dictionary
 		var radius: float = radii[index]
-		var visual: OrbVisual = OrbVisual.new()
-		preview_root.add_child(visual)
+		var visual: OrbVisual
+		if index < preview_root.get_child_count():
+			visual = preview_root.get_child(index) as OrbVisual
+		else:
+			visual = _acquire_preview_visual(preview_root)
+			preview_root.add_child(visual)
+		visual.visible = true
 		visual.setup(
 			Config.data.color_display[int(candidate["color"])],
 			radius,
@@ -236,6 +251,24 @@ func _render_preview(preview_root: Node2D, batch: Array) -> void:
 			0.0
 		)
 		cursor_x += (radius * 2.0 + PREVIEW_GAP) * preview_scale
+
+
+func _preview_pool_for(preview_root: Node2D) -> Array[OrbVisual]:
+	return _next_preview_pool if preview_root == _next_preview else _then_preview_pool
+
+
+func _acquire_preview_visual(preview_root: Node2D) -> OrbVisual:
+	var pool: Array[OrbVisual] = _preview_pool_for(preview_root)
+	if not pool.is_empty():
+		return pool.pop_back()
+	return OrbVisual.new()
+
+
+func _free_preview_pool(pool: Array[OrbVisual]) -> void:
+	for visual: OrbVisual in pool:
+		if is_instance_valid(visual):
+			visual.free()
+	pool.clear()
 
 
 func _on_score_changed(score: int, best: int) -> void:

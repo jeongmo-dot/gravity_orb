@@ -20,6 +20,7 @@ var _preview_batches: Array[Array] = []
 var _blitz_mode: bool = false
 var _blitz_candidate_queue: Array[Dictionary] = []
 var _blitz_next_batch_size: int = 1
+var _blitz_preview_publish_scheduled: bool = false
 
 
 func init_rng(seed: int) -> int:
@@ -313,6 +314,22 @@ func _batch_size_for_index(turn_index: int) -> int:
 
 
 func _publish_preview() -> void:
+	if _blitz_mode:
+		if _blitz_preview_publish_scheduled:
+			return
+		_blitz_preview_publish_scheduled = true
+		call_deferred("_flush_blitz_preview")
+		return
+	_emit_preview()
+
+
+func _flush_blitz_preview() -> void:
+	_blitz_preview_publish_scheduled = false
+	if _blitz_mode:
+		_emit_preview()
+
+
+func _emit_preview() -> void:
 	next_batch_changed.emit(peek_next())
 	preview_changed.emit(peek_preview())
 

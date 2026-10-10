@@ -7,6 +7,11 @@ const STRETCH_SPEED_MAX: float = 1100.0
 const STRETCH_ALONG_SCALE: float = 1.15
 const STRETCH_PERPENDICULAR_SCALE: float = 0.92
 
+static var _shared_physics_materials: Dictionary = {}
+static var _shared_shapes: Dictionary = {}
+static var _shared_meshes: Dictionary = {}
+static var _shared_visual_materials: Dictionary = {}
+
 @onready var _body: RigidBody3D = %Body
 @onready var _collision_shape: CollisionShape3D = %CollisionShape3D
 @onready var _mesh: MeshInstance3D = %Mesh
@@ -43,6 +48,9 @@ var _visual_punch_scale: Vector3 = Vector3.ONE:
 		_visual_punch_scale = value
 		_update_visual_transform()
 var _render_clamp_enabled: bool = true
+var _visual_material_is_unique: bool = false
+var _radius_resources_are_unique: bool = false
+var _visual_alpha: float = 1.0
 
 var position: Vector2:
 	get:
@@ -104,10 +112,47 @@ static func world_angular_velocity_to_plane(value: float) -> float:
 	return -value
 
 
+static func prewarm_shared_resources(cfg: GameConfig) -> void:
+	_shared_physics_material(cfg)
+	for level_index: int in range(1, cfg.orb_max_level + 1):
+		_shared_shape_for_level(cfg, level_index)
+		_shared_mesh_for_level(cfg, level_index)
+	for color_index: int in range(cfg.color_display.size()):
+		_shared_visual_material_for_color(cfg, color_index)
+
+
+static func clear_shared_resource_cache() -> void:
+	_shared_physics_materials.clear()
+	_shared_shapes.clear()
+	_shared_meshes.clear()
+	_shared_visual_materials.clear()
+
+
+static func shared_resource_counts() -> Dictionary:
+	return {
+		"physics_materials": _shared_physics_materials.size(),
+		"shapes": _shared_shapes.size(),
+		"meshes": _shared_meshes.size(),
+		"visual_materials": _shared_visual_materials.size(),
+	}
+
+
+static func shared_mesh_for_level(cfg: GameConfig, level_index: int) -> SphereMesh:
+	return _shared_mesh_for_level(cfg, level_index)
+
+
+static func shared_visual_material_for_color(
+	cfg: GameConfig,
+	color_index: int
+) -> StandardMaterial3D:
+	return _shared_visual_material_for_color(cfg, color_index)
+
+
 func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	color = p_color
 	level = p_level
 	_display_color = cfg.color_display[color]
+	_visual_alpha = 1.0
 	_blast_armed = cfg.blast_enabled and level >= cfg.active_blast_min_level()
 	_blast_blink_period = maxf(cfg.blast_blink_period, 0.001)
 	_blast_blink_elapsed = 0.0
@@ -134,28 +179,21 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	_body.collision_layer = 2
 	_body.collision_mask = 3
 
-	var material: PhysicsMaterial = PhysicsMaterial.new()
-	material.friction = cfg.orb_friction
-	material.bounce = cfg.orb_bounce
-	_body.physics_material_override = material
-
-	var sphere_shape: SphereShape3D = SphereShape3D.new()
-	sphere_shape.radius = radius_m
-	_collision_shape.shape = sphere_shape
-
-	var sphere_mesh: SphereMesh = SphereMesh.new()
-	sphere_mesh.radius = radius_m
-	sphere_mesh.height = radius_m * 2.0
-	sphere_mesh.radial_segments = 32
-	sphere_mesh.rings = 16
-	_mesh.mesh = sphere_mesh
-	var visual_material: StandardMaterial3D = StandardMaterial3D.new()
-	visual_material.albedo_color = _display_color
-	visual_material.metallic = 0.18
-	visual_material.roughness = 0.24
-	visual_material.emission_enabled = true
-	visual_material.emission = _display_color * blast_emission_strength()
-	_mesh.material_override = visual_material
+	_body.physics_material_override = _shared_physics_material(cfg)
+	_collision_shape.shape = _shared_shape_for_level(cfg, level)
+	_mesh.mesh = _shared_mesh_for_level(cfg, level)
+	_radius_resources_are_unique = false
+	_mesh.material_override = _shared_visual_material_for_color(cfg, color)
+	_visual_material_is_unique = false
+	if _current_radius < _radius:
+		_ensure_unique_radius_resources()
+		_apply_current_radius_to_resources(radius_m)
+	if _blast_armed:
+		_ensure_unique_visual_material()
+		var blast_material: StandardMaterial3D = (
+			_mesh.material_override as StandardMaterial3D
+		)
+		blast_material.emission = _display_color * blast_emission_strength()
 	_symbol_mesh.mesh = OrbSymbols.mesh_for_color(color)
 	_symbol_mesh.visible = cfg.orb_symbols_enabled
 	_symbol_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -363,6 +401,18 @@ func get_physics_body() -> RigidBody3D:
 	return _body
 
 
+func mesh_resource() -> SphereMesh:
+	return _mesh.mesh as SphereMesh
+
+
+func shape_resource() -> SphereShape3D:
+	return _collision_shape.shape as SphereShape3D
+
+
+func visual_material_resource() -> StandardMaterial3D:
+	return _mesh.material_override as StandardMaterial3D
+
+
 func visual_stretch_scale() -> Vector3:
 	return _stretch_scale_for_ratio(_visual_stretch_ratio())
 
@@ -401,6 +451,10 @@ func _set_waiting_visual(waiting: bool) -> void:
 
 
 func _set_visual_alpha(alpha: float) -> void:
+	alpha = clampf(alpha, 0.0, 1.0)
+	if is_equal_approx(alpha, _visual_alpha):
+		return
+	_ensure_unique_visual_material()
 	var material: StandardMaterial3D = _mesh.material_override as StandardMaterial3D
 	if material == null:
 		return
@@ -411,6 +465,7 @@ func _set_visual_alpha(alpha: float) -> void:
 	)
 	var display_color: Color = _display_color
 	display_color.a = alpha
+	_visual_alpha = alpha
 	material.albedo_color = display_color
 	material.emission = _display_color * blast_emission_strength()
 	_symbol_mesh.transparency = 1.0 - clampf(alpha, 0.0, 1.0)
@@ -436,6 +491,12 @@ func _advance_growth(delta: float) -> void:
 func _set_current_radius(radius_px: float) -> void:
 	_current_radius = minf(radius_px, _radius)
 	var radius_m: float = _current_radius / PIXELS_PER_METER
+	_ensure_unique_radius_resources()
+	_apply_current_radius_to_resources(radius_m)
+	_update_visual_transform()
+
+
+func _apply_current_radius_to_resources(radius_m: float) -> void:
 	var sphere_shape: SphereShape3D = _collision_shape.shape as SphereShape3D
 	if sphere_shape != null:
 		sphere_shape.radius = radius_m
@@ -443,7 +504,77 @@ func _set_current_radius(radius_px: float) -> void:
 	if sphere_mesh != null:
 		sphere_mesh.radius = radius_m
 		sphere_mesh.height = radius_m * 2.0
-	_update_visual_transform()
+
+
+func _ensure_unique_visual_material() -> void:
+	if _visual_material_is_unique:
+		return
+	var shared_material: StandardMaterial3D = _mesh.material_override as StandardMaterial3D
+	if shared_material != null:
+		_mesh.material_override = shared_material.duplicate(true) as StandardMaterial3D
+	_visual_material_is_unique = true
+
+
+func _ensure_unique_radius_resources() -> void:
+	if _radius_resources_are_unique:
+		return
+	var shared_shape: SphereShape3D = _collision_shape.shape as SphereShape3D
+	if shared_shape != null:
+		_collision_shape.shape = shared_shape.duplicate(true) as SphereShape3D
+	var shared_mesh: SphereMesh = _mesh.mesh as SphereMesh
+	if shared_mesh != null:
+		_mesh.mesh = shared_mesh.duplicate(true) as SphereMesh
+	_radius_resources_are_unique = true
+
+
+static func _shared_physics_material(cfg: GameConfig) -> PhysicsMaterial:
+	var key: String = "%.6f:%.6f" % [cfg.orb_friction, cfg.orb_bounce]
+	if not _shared_physics_materials.has(key):
+		var material: PhysicsMaterial = PhysicsMaterial.new()
+		material.friction = cfg.orb_friction
+		material.bounce = cfg.orb_bounce
+		_shared_physics_materials[key] = material
+	return _shared_physics_materials[key] as PhysicsMaterial
+
+
+static func _shared_shape_for_level(cfg: GameConfig, level_index: int) -> SphereShape3D:
+	var radius_m: float = cfg.radius_for_level(level_index) / PIXELS_PER_METER
+	var key: String = "%.6f" % radius_m
+	if not _shared_shapes.has(key):
+		var shape: SphereShape3D = SphereShape3D.new()
+		shape.radius = radius_m
+		_shared_shapes[key] = shape
+	return _shared_shapes[key] as SphereShape3D
+
+
+static func _shared_mesh_for_level(cfg: GameConfig, level_index: int) -> SphereMesh:
+	var radius_m: float = cfg.radius_for_level(level_index) / PIXELS_PER_METER
+	var key: String = "%.6f" % radius_m
+	if not _shared_meshes.has(key):
+		var mesh: SphereMesh = SphereMesh.new()
+		mesh.radius = radius_m
+		mesh.height = radius_m * 2.0
+		mesh.radial_segments = 32
+		mesh.rings = 16
+		_shared_meshes[key] = mesh
+	return _shared_meshes[key] as SphereMesh
+
+
+static func _shared_visual_material_for_color(
+	cfg: GameConfig,
+	color_index: int
+) -> StandardMaterial3D:
+	var display_color: Color = cfg.color_display[color_index]
+	var key: String = display_color.to_html(true)
+	if not _shared_visual_materials.has(key):
+		var material: StandardMaterial3D = StandardMaterial3D.new()
+		material.albedo_color = display_color
+		material.metallic = 0.18
+		material.roughness = 0.24
+		material.emission_enabled = true
+		material.emission = display_color * 0.08
+		_shared_visual_materials[key] = material
+	return _shared_visual_materials[key] as StandardMaterial3D
 
 
 func _update_visual_transform() -> void:

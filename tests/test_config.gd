@@ -238,7 +238,9 @@ func test_blitz_spike_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	assert_eq(config.game_mode, GameConfig.GameMode.TURN, "default game mode")
 	assert_near(config.blitz_duration, 90.0, TOLERANCE, "blitz duration")
-	assert_near(config.blitz_swipe_cooldown, 0.12, TOLERANCE, "swipe cooldown")
+	assert_near(config.blitz_swipe_cooldown, 0.08, TOLERANCE, "swipe cooldown")
+	assert_true(config.blitz_swipe_buffer_enabled, "one-slot swipe buffer enabled")
+	assert_true(not config.blitz_hitstop_enabled, "BLITZ hitstop disabled")
 	assert_true(config.blitz_spawn_on_swipe, "spawn on accepted swipe")
 	assert_eq(config.blitz_min_spawn_per_swipe, 1, "minimum swipe spawn count")
 	assert_eq(config.blitz_max_spawn_per_swipe, 8, "maximum swipe spawn count")

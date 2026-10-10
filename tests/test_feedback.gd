@@ -79,6 +79,60 @@ func test_hitstop_uses_real_time_and_disabled_mode_does_not_change_scale() -> vo
 	Engine.time_scale = original_scale
 
 
+func test_blitz_blast_skips_hitstop_while_turn_blast_keeps_it() -> void:
+	var original_enabled: bool = Config.data.fx_hitstop_enabled
+	var original_blitz_enabled: bool = Config.data.blitz_hitstop_enabled
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_scale: float = Engine.time_scale
+	var fixture: Dictionary = await _create_director_fixture()
+	var director: FeedbackDirector = fixture["director"] as FeedbackDirector
+	Config.data.fx_hitstop_enabled = true
+	Config.data.blitz_hitstop_enabled = false
+	Config.data.game_mode = GameConfig.GameMode.BLITZ
+	director.play_reaction_visuals(_blast_reaction())
+	assert_near(Engine.time_scale, 1.0, TOLERANCE, "BLITZ blast keeps real time")
+	Config.data.game_mode = GameConfig.GameMode.TURN
+	director.play_reaction_visuals(_blast_reaction())
+	assert_near(
+		Engine.time_scale,
+		Config.data.fx_hitstop_scale,
+		TOLERANCE,
+		"turn blast keeps hitstop"
+	)
+	await tree.create_timer(0.10, true, false, true).timeout
+	await _cleanup(fixture["root"] as Node)
+	Config.data.fx_hitstop_enabled = original_enabled
+	Config.data.blitz_hitstop_enabled = original_blitz_enabled
+	Config.data.game_mode = original_mode
+	Engine.time_scale = original_scale
+
+
+func test_blast_effect_nodes_return_to_pool_and_are_reused() -> void:
+	var original_fx: bool = Config.data.fx_enabled
+	var original_hitstop: bool = Config.data.fx_hitstop_enabled
+	Config.data.fx_enabled = true
+	Config.data.fx_hitstop_enabled = false
+	var fixture: Dictionary = await _create_director_fixture()
+	var director: FeedbackDirector = fixture["director"] as FeedbackDirector
+	var initial_pool_count: int = director.blast_effect_pool_count()
+	director.play_reaction_visuals(_blast_reaction())
+	var first_ids: Array[int] = _active_blast_effect_ids(director)
+	await tree.create_timer(1.1, true, false, true).timeout
+	assert_eq(
+		director.blast_effect_pool_count(),
+		initial_pool_count,
+		"completed blast returns all prewarmed nodes"
+	)
+	director.play_reaction_visuals(_blast_reaction())
+	var second_ids: Array[int] = _active_blast_effect_ids(director)
+	first_ids.sort()
+	second_ids.sort()
+	assert_eq(second_ids, first_ids, "second blast reuses the same effect nodes")
+	await _cleanup(fixture["root"] as Node)
+	Config.data.fx_enabled = original_fx
+	Config.data.fx_hitstop_enabled = original_hitstop
+
+
 func test_merge_punch_only_scales_visual_and_emits_ten_particles() -> void:
 	var original_fx: bool = Config.data.fx_enabled
 	var original_sfx: bool = Config.data.sfx_enabled
@@ -214,6 +268,26 @@ func test_reaction_signal_calls_sfx_play_synchronously_once() -> void:
 	await _cleanup(fixture["root"] as Node)
 	Config.data.fx_enabled = original_fx
 	Config.data.sfx_enabled = original_sfx
+
+
+func _blast_reaction() -> Dictionary:
+	var levels: Array[int] = [4, 4]
+	var colors: Array[int] = [OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE]
+	return {
+		"type": ReactionRules.Type.BLAST,
+		"levels": levels,
+		"colors": colors,
+		"position": Vector2.ZERO,
+	}
+
+
+func _active_blast_effect_ids(director: FeedbackDirector) -> Array[int]:
+	var result: Array[int] = []
+	for effect: Dictionary in director._effects:
+		var node: Node = effect.get("node") as Node
+		if is_instance_valid(node):
+			result.append(node.get_instance_id())
+	return result
 
 
 func _create_director_fixture() -> Dictionary:

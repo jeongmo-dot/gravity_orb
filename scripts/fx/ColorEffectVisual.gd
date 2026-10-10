@@ -207,6 +207,8 @@ func _update_pull_points(_progress: float) -> void:
 
 func _update_lift_visuals(progress: float) -> void:
 	_line_mesh.clear_surfaces()
+	if _target_positions.is_empty():
+		return
 	_line_mesh.surface_begin(Mesh.PRIMITIVE_LINES, _line_material)
 	var travel_px: float = end_radius_px * progress
 	for target_position: Vector2 in _target_positions:
