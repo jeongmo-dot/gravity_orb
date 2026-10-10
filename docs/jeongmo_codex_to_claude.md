@@ -40,7 +40,7 @@
 
 ### [2026-10-10] 대상 #59 — 2D 연속 턴 관통 한도 되돌리기
 - 상태: 완료
-- 브랜치 / PR: `m8-2d-continuous-limits` / PR 미생성
+- 브랜치 / PR: `m8-2d-continuous-limits` / [PR #60](https://github.com/jeongmo-dot/gravity_orb/pull/60)
 - 변경 파일: `tests/scenarios/test_spawn_flow.gd`, `tests/scenarios/test_turn_time.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `test_spawn_flow.gd`의 2D 20턴 연속 한도를 `34 → 14px`로 복원 — 시드 4242 최대 관통 `8.918px`, 이탈·발산 `0/0`
