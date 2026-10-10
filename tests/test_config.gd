@@ -54,18 +54,17 @@ func test_m2_swipe_defaults() -> void:
 
 func test_m3_turn_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
-	assert_near(config.gravity_strength, 3600.0, TOLERANCE, "gravity strength")
-	assert_near(config.gravity_level_scale, 0.1, TOLERANCE, "gravity level scale")
+	assert_near(config.gravity_strength, 1800.0, TOLERANCE, "gravity strength")
+	assert_near(config.gravity_level_scale, 0.25, TOLERANCE, "gravity level scale")
 	assert_near(
 		config.gravity_for_level(1),
 		config.gravity_strength,
 		TOLERANCE,
 		"level one gravity"
 	)
-	config.gravity_level_scale = 0.1
 	assert_near(
 		config.gravity_for_level(7),
-		config.gravity_strength * 1.6,
+		config.gravity_strength * (1.0 + config.gravity_level_scale * 6.0),
 		TOLERANCE,
 		"level seven gravity"
 	)

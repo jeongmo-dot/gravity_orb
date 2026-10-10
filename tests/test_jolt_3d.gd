@@ -75,8 +75,6 @@ func test_orb_3d_exposes_pixel_plane_api_and_locks_depth() -> void:
 
 
 func test_level_gravity_scale_accelerates_large_orbs() -> void:
-	var original_scale: float = Config.data.gravity_level_scale
-	Config.data.gravity_level_scale = 0.1
 	var board: Board3D = await _create_board()
 	var orb: Orb3D = board.spawn_orb(
 		OrbTypes.OrbColor.RED,
@@ -86,12 +84,69 @@ func test_level_gravity_scale_accelerates_large_orbs() -> void:
 	var body: RigidBody3D = orb.get_physics_body()
 	assert_near(
 		(body.constant_force / body.mass).y,
-		-Config.data.gravity_strength * 1.6 / Orb3D.PIXELS_PER_METER,
+		-Config.data.gravity_for_level(7) / Orb3D.PIXELS_PER_METER,
 		0.001,
 		"level seven scaled gravity"
 	)
 	_cleanup(board)
-	Config.data.gravity_level_scale = original_scale
+
+
+func test_merged_result_uses_new_level_gravity() -> void:
+	var fixture_root: Node = Node.new()
+	fixture_root.name = "JoltMergedGravityFixture"
+	var board: Board3D = BOARD_SCENE.instantiate() as Board3D
+	board.name = "Board"
+	board.unique_name_in_owner = true
+	fixture_root.add_child(board)
+	board.owner = fixture_root
+	var resolver: CollisionResolver = RESOLVER_SCRIPT.new() as CollisionResolver
+	resolver.name = "CollisionResolver"
+	resolver.unique_name_in_owner = true
+	fixture_root.add_child(resolver)
+	resolver.owner = fixture_root
+	tree.root.add_child(fixture_root)
+	await tree.process_frame
+	var control: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		1,
+		Vector2(300.0, -300.0)
+	)
+	var first: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.GREEN,
+		1,
+		Vector2(-25.0, 0.0)
+	)
+	var second: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.GREEN,
+		1,
+		Vector2(25.0, 0.0)
+	)
+	resolver.report_contact(first, second)
+	assert_eq(resolver.flush(), 1, "L1 pair merges once")
+	var merged: Orb3D
+	for orb: Orb3D in board.get_orbs():
+		if orb.level == 2:
+			merged = orb
+	assert_true(merged != null, "merge creates L2 result")
+	if merged != null:
+		var merged_body: RigidBody3D = merged.get_physics_body()
+		assert_near(
+			merged_body.constant_force.length(),
+			merged_body.mass
+			* Config.data.gravity_strength
+			* (1.0 + Config.data.gravity_level_scale)
+			/ Orb3D.PIXELS_PER_METER,
+			0.001,
+			"merged L2 force uses the 1.25 level multiplier"
+		)
+	var control_body: RigidBody3D = control.get_physics_body()
+	assert_near(
+		control_body.constant_force.length(),
+		control_body.mass * Config.data.gravity_strength / Orb3D.PIXELS_PER_METER,
+		0.001,
+		"same-board L1 force uses the 1.0 multiplier"
+	)
+	_cleanup(fixture_root)
 
 
 func test_new_color_3d_materials_match_display_table() -> void:

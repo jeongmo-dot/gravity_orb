@@ -46,6 +46,7 @@ func _run() -> void:
 		"color_count": _color_count,
 		"refill_rule": _refill_rule,
 		"gravity_strength": Config.data.gravity_strength,
+		"gravity_level_scale": Config.data.gravity_level_scale,
 		"seeds": rows,
 		"config": {
 			"duration": Config.data.blitz_duration,
@@ -95,6 +96,8 @@ func _run_seed(seed: int) -> Dictionary:
 	var departed_ids: Dictionary = {}
 	var divergent_ids: Dictionary = {}
 	var physics_frame_index: int = 0
+	var pending_layer_samples: Array[Dictionary] = []
+	var layer_distances: Dictionary = _empty_layer_distances()
 	while manager.state != BlitzManager.State.FINISHED:
 		await get_tree().physics_frame
 		session_elapsed += tick
@@ -103,7 +106,27 @@ func _run_seed(seed: int) -> Dictionary:
 			bot_elapsed += tick
 			while bot_elapsed + 0.000001 >= _bot_interval:
 				bot_elapsed -= _bot_interval
-				manager.on_swipe(_choose_bot_direction(board, spawner, manager.gravity))
+				var direction: Vector2i = _choose_bot_direction(
+					board,
+					spawner,
+					manager.gravity
+				)
+				var accepted_before: int = manager.accepted_swipes
+				manager.on_swipe(direction)
+				if manager.accepted_swipes > accepted_before:
+					pending_layer_samples.append({
+						"due_time": session_elapsed + 1.0,
+					})
+		while (
+			not pending_layer_samples.is_empty()
+			and float(pending_layer_samples[0]["due_time"]) <= session_elapsed
+		):
+			var sample: Dictionary = pending_layer_samples.pop_front() as Dictionary
+			_accumulate_layer_distances(
+				board,
+				manager.gravity,
+				layer_distances
+			)
 		while manager.play_time_elapsed + 0.000001 >= next_occupancy_sample:
 			occupancy_timeline.append({
 				"second": int(next_occupancy_sample),
@@ -170,6 +193,7 @@ func _run_seed(seed: int) -> Dictionary:
 		"max_pair_penetration_px_sampled_10hz": max_pair,
 		"departures": departed_ids.size(),
 		"divergences": divergent_ids.size(),
+		"layer_distance_by_level": _finalize_layer_distances(layer_distances),
 	}
 	print(
 		"BLITZ_SEED rule=%s colors=%d bot=%s interval=%.1f seed=%d score=%d reactions=%d passive=%.1f%% rate=%.2f/s chain=%d productive=%.1f%% fever=%.1f%% blast=%d spawn=%d batch_max=%d debt=%d skipped=%d bonus=%.1f play=%.2f wall=%.3f pair=%.3f departures=%d divergences=%d" % [
@@ -312,6 +336,65 @@ func _record_invalid_motion(
 			divergent_ids[id] = true
 
 
+func _empty_layer_distances() -> Dictionary:
+	var distances: Dictionary = {}
+	for level: int in range(1, 8):
+		distances["L%d" % level] = {"sum": 0.0, "samples": 0}
+	return distances
+
+
+func _accumulate_layer_distances(
+	board: Board3D,
+	gravity: Vector2i,
+	distances: Dictionary
+) -> void:
+	var half: float = board.half_size()
+	for orb: Orb3D in board.get_orbs():
+		if orb.is_ghost or orb.is_waiting_at_entrance:
+			continue
+		var key: String = "L%d" % orb.level
+		if not distances.has(key):
+			distances[key] = {"sum": 0.0, "samples": 0}
+		var values: Dictionary = distances[key] as Dictionary
+		values["sum"] = float(values["sum"]) + _distance_to_gravity_wall(
+			orb.position,
+			gravity,
+			half
+		)
+		values["samples"] = int(values["samples"]) + 1
+
+
+func _distance_to_gravity_wall(
+	position: Vector2,
+	gravity: Vector2i,
+	half: float
+) -> float:
+	if gravity == Vector2i.DOWN:
+		return half - position.y
+	if gravity == Vector2i.UP:
+		return half + position.y
+	if gravity == Vector2i.RIGHT:
+		return half - position.x
+	return half + position.x
+
+
+func _finalize_layer_distances(distances: Dictionary) -> Dictionary:
+	var result: Dictionary = {}
+	for key_value: Variant in distances.keys():
+		var key: String = str(key_value)
+		var values: Dictionary = distances[key] as Dictionary
+		var samples: int = int(values["samples"])
+		result[key] = {
+			"mean_px": (
+				float(values["sum"]) / float(samples)
+				if samples > 0
+				else 0.0
+			),
+			"samples": samples,
+		}
+	return result
+
+
 func _safe_percent(numerator: int, denominator: int) -> float:
 	if denominator <= 0:
 		return 0.0
@@ -408,6 +491,10 @@ func _apply_arguments() -> void:
 		elif argument.begins_with("--gravity-strength="):
 			Config.data.gravity_strength = argument.trim_prefix(
 				"--gravity-strength="
+			).to_float()
+		elif argument.begins_with("--gravity-level-scale="):
+			Config.data.gravity_level_scale = argument.trim_prefix(
+				"--gravity-level-scale="
 			).to_float()
 
 

@@ -38,6 +38,64 @@
 
 ## 미확인
 
+### [2026-10-10] 대상 #60 — 중력 1800 복원 + 레벨당 25% 차등
+- 상태: 완료
+- 브랜치 / PR: `m8-level-gravity-scaling` / PR 미생성
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `tests/{test_config.gd,test_jolt_3d.gd,run_gravity_comparison.ps1,run_blitz_responsiveness_measurement.ps1}`, `tests/scenarios/test_jolt_integration.gd`, `tests/spike/{run_jolt_3d_measurement.gd,run_blitz_measurement.gd,run_blitz_responsiveness_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `gravity_strength=1800`, `gravity_level_scale=0.25`를 선언·기본 리소스·config 테스트에 적용. L7 기대값은 `gravity_strength * (1 + gravity_level_scale * 6)`에서 계산
+  - [x] 같은 판의 L1 두 개를 합쳐 만든 L2의 힘이 `mass × gravity_strength × (1 + gravity_level_scale) / PIXELS_PER_METER`, 별도 L1은 `mass × gravity_strength / PIXELS_PER_METER`인지 자동 검증 — `test_merged_result_uses_new_level_gravity`
+  - [x] A `1800/0.1`, B `3600/0.1`, C `1800/0.25`를 동일 시드로 측정. 낙하 L1/L4/L7, 턴 종료 및 BLITZ 승인 스와이프 1초 후 레벨별 벽 거리, TURN·BLITZ 지표와 무작위/휴리스틱 점수 p50 비율을 `gravity_level_scaling_summary.json`에 집계
+  - [x] 물리 한도 확인 — C의 3D 22시드 `13.143/15.912px ≤ 20/22px`, 장기 TURN `20.115/25.489px ≤ 34/68px`, BLITZ `21.477/59.263px ≤ 34/68px`; 모든 측정 이탈·발산 `0/0`
+  - [x] Godot 4.8 전체 래퍼 일반 `251/251`, 장기 `4/4`, 성능 `5/5`; import·캡처 13장·시작 화면/TURN/BLITZ 스모크 통과
+- A/B/C 관측 (`120Hz`, TURN·BLITZ 시드 101~112):
+
+  | 지표 | A 1800 / 0.1 | B 3600 / 0.1 | C 1800 / 0.25 |
+  |---|---:|---:|---:|
+  | 낙하시간 L1 / L4 / L7 | 1.042 / 0.850 / 0.708초 | 0.733 / 0.600 / 0.500초 | 1.042 / 0.733 / 0.567초 |
+  | TURN 길이 min / p50 / max | 143 / 153 / 174 | 143 / 167 / 192 | 144 / 162 / 179 |
+  | TURN 점수 p50 / BLAST p50 | 15,896 / 0 | 23,733 / 1 | 18,655 / 1 |
+  | TURN 벽 / 쌍 최대 | 21.623 / 35.125px | 27.379 / 36.443px | **20.115 / 25.489px** |
+  | BLITZ 휴리스틱 점수 / 반응 / BLAST p50 | 46,736 / 345 / 33 | 64,491 / 442 / 39 | 63,343 / 406 / 37 |
+  | BLITZ 휴리스틱 피버 p50 | 30.00% | 32.73% | 40.91% |
+  | BLITZ 무작위 점수 / 반응 / BLAST p50 | 24,263 / 206 / 16 | 66,371 / 419 / 39 | 41,445 / 296 / 29 |
+  | BLITZ 무작위 피버 p50 | 14.15% | 42.02% | 27.52% |
+  | 무작위 ÷ 휴리스틱 점수 p50 | 0.519 | 1.029 | **0.654** |
+  | BLITZ 벽 / 쌍 최대 | 21.573 / 58.282px | 28.721 / 60.054px | **21.477 / 59.263px** |
+  | 전체 이탈 / 발산 | 0 / 0 | 0 / 0 | 0 / 0 |
+- 층 지표 관측 — 구슬 중심에서 샘플 시점의 중력 쪽 벽까지 평균 거리, 반응 ghost·입구 대기 구슬 제외 (`L1 / L4 / L6`, px):
+
+  | 표본 | A | B | C |
+  |---|---:|---:|---:|
+  | TURN 매 턴 종료 | 289.90 / 283.84 / 343.37 | 287.03 / 281.56 / 338.94 | 286.39 / 286.46 / 327.27 |
+  | BLITZ 휴리스틱, 승인 스와이프 1초 후 | 501.20 / 489.42 / 475.10 | 414.52 / 385.08 / 표본 없음 | 499.68 / 476.35 / 488.27 (`L6 n=19`) |
+  | BLITZ 무작위, 승인 스와이프 1초 후 | 486.45 / 482.99 / 468.92 | 501.78 / 492.19 / 표본 없음 | 491.46 / 485.97 / 477.03 |
+
+  - C의 BLITZ에서는 L4가 L1보다 휴리스틱 `23.33px`, 무작위 `5.49px` 중력 벽에 가까웠다. TURN에서는 L1/L4가 `0.07px` 차이로 같았고 L6은 더 멀었다. 세 조건 모두 L7 표본은 0이라 층 지표의 L7 비교는 관측하지 못했다.
+- 창 모드 BLITZ 관측 (`540×960`, RTX 4070 Ti SUPER, 시드 101~104):
+
+  | 지표 | A | B | C |
+  |---|---:|---:|---:|
+  | 프레임 p99 / 최대 | 3.328 / 13.268ms | 3.530 / 21.351ms | 3.014 / 17.343ms |
+  | 33.3ms 초과 / 입력 유실 | 0 / 0 | 0 / 0 | 0 / 0 |
+
+- QA 관측값:
+  - Godot `4.8-dev3` `--headless --path . --import` → 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` → 일반 `251/251` 18.685초, 장기 `4/4` 30.455초, 성능 `5/5` 1.572초, 합계 `260/260`; 최종 종료 코드 0
+  - 기본 C의 2D 호환 22시드 → 최대 벽 `7.441px ≤ 14px`, 이탈·발산 `0/0`; 2D 20턴 `6.170px ≤ 14px`, 120턴 `14.625px ≤ 18px`
+  - `tests/capture_screens.ps1` → PNG `13/13`, 종료 코드 0. `02_turn_early`, `03_turn_combo`, `06_blitz_fever_chain`, `07_blitz_danger` 직접 확인: 프레임 밖 구슬·시각적 벽 박힘 없음, 구슬 배치와 HUD·NEXT/THEN 정상
+  - 시작 화면 / `--mode=turn` / `--mode=blitz` 300프레임 스모크 → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - A/B/C 모두 장기 한도 판정 true. 원시 JSON·요약 JSON·PNG는 `artifacts/` gitignore 대상
+- 수동 확인 절차:
+  1. TURN에서 작은 L1과 큰 L4 이상 구슬이 함께 있는 상태로 중력을 좌→상→우→하 순서로 바꾼다 → 큰 구슬이 작은 구슬보다 새 중력 벽으로 빠르게 이동하고, 작은 구슬이 그 위에 쌓이는지 확인한다.
+  2. BLITZ에서 L4 이상 구슬이 있는 고밀도 판을 60초 이상 플레이한다 → 연속 스와이프 뒤 큰 구슬이 중력 벽 쪽 층을 만들며 벽 박힘·이탈·조작 지연이 보이지 않는지 확인한다.
+  3. `artifacts/screens/02_turn_early.png`, `03_turn_combo.png`, `06_blitz_fever_chain.png`, `07_blitz_danger.png`를 연다 → 구슬이 프레임 안에 있고 HUD·보드 경계와 겹쳐 깨지지 않는지 확인한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 층 지표는 물리적 층을 나타내도록 반응 ghost와 입구 대기 구슬을 제외했다. TURN은 완료된 매 턴의 현재 중력, BLITZ는 승인된 각 스와이프 1초 후 시점의 현재 중력을 기준으로 구슬 중심 거리를 표본화했다.
+  - 기본 중력 변경으로 기존 ghost-timeout 통합 테스트의 결과 구슬이 blocker보다 먼저 이동해 timeout 전 겹침을 벗어났다. timeout 자체를 중력값과 분리하기 위해 해당 테스트의 blocker와 결과 물리체만 freeze한 뒤 기존 timeout·무보정 검증을 유지했다.
+  - 관통 한도, Jolt solver, 충격파·대폭발·색 효과·생성 등 다른 제품 수치는 변경하지 않았다.
+- 남은 것 · 질문: 자동 검증 기준의 남은 항목 없음. L7 층 지표는 지정 12시드에서 표본이 없어 수동/추가 강제 배치 측정이 필요하며, 합격·불합격 판단은 Claude에게 맡긴다.
+
 ### [2026-10-10] 대상 #59 — 2D 연속 턴 관통 한도 되돌리기
 - 상태: 완료
 - 브랜치 / PR: `m8-2d-continuous-limits` / [PR #60](https://github.com/jeongmo-dot/gravity_orb/pull/60)

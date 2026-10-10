@@ -228,6 +228,7 @@ func _run_seed(
 	var seed_max_pair_end_turn: int = 0
 	var seed_max_wall: float = 0.0
 	var entrance_blocked_turns: int = 0
+	var layer_distances: Dictionary = _empty_layer_distances()
 	for turn_offset: int in range(max_turns):
 		_turn_shock_events.clear()
 		_current_measurement_turn = turn_offset + 1
@@ -315,6 +316,8 @@ func _run_seed(
 			]
 		if not same_direction:
 			_record_movement(bin_values, before, board, direction)
+		if not bool(frame_metrics["aborted"]):
+			_accumulate_layer_distances(board, manager.gravity, layer_distances)
 		if record_hashes:
 			hashes.append(_state_hash(board))
 		if completed_turns % 10 == 0:
@@ -351,6 +354,7 @@ func _run_seed(
 		"max_turn_end_pair": seed_max_pair_end,
 		"max_turn_end_pair_turn": seed_max_pair_end_turn,
 		"max_wall_penetration_px": seed_max_wall,
+		"layer_distance_by_level": _finalize_layer_distances(layer_distances),
 		"ghost_completed_count": board.ghost_completed_count,
 		"ghost_timeout_count": board.ghost_timeout_count,
 		"ghost_duration_sum": board.ghost_total_duration,
@@ -428,6 +432,7 @@ func _measure_feel_metrics() -> Dictionary:
 	return {
 		"fall_time_seconds": {
 			"L1": await _measure_fall_time(1),
+			"L4": await _measure_fall_time(4),
 			"L7": await _measure_fall_time(7),
 		},
 		"rolling_impact": {
@@ -604,6 +609,61 @@ func _snapshot_orbs(board: Board3D) -> Dictionary:
 			"level": orb.level,
 		}
 	return snapshot
+
+
+func _empty_layer_distances() -> Dictionary:
+	var distances: Dictionary = {}
+	for level: int in range(1, 8):
+		distances["L%d" % level] = {"sum": 0.0, "samples": 0}
+	return distances
+
+
+func _accumulate_layer_distances(
+	board: Board3D,
+	gravity: Vector2i,
+	distances: Dictionary
+) -> void:
+	var half: float = board.half_size()
+	for orb: Orb3D in board.get_orbs():
+		if orb.is_ghost or orb.is_waiting_at_entrance:
+			continue
+		var key: String = "L%d" % orb.level
+		if not distances.has(key):
+			distances[key] = {"sum": 0.0, "samples": 0}
+		var values: Dictionary = distances[key] as Dictionary
+		values["sum"] = float(values["sum"]) + _distance_to_gravity_wall(
+			orb.position,
+			gravity,
+			half
+		)
+		values["samples"] = int(values["samples"]) + 1
+
+
+func _distance_to_gravity_wall(
+	position: Vector2,
+	gravity: Vector2i,
+	half: float
+) -> float:
+	if gravity == Vector2i.DOWN:
+		return half - position.y
+	if gravity == Vector2i.UP:
+		return half + position.y
+	if gravity == Vector2i.RIGHT:
+		return half - position.x
+	return half + position.x
+
+
+func _finalize_layer_distances(distances: Dictionary) -> Dictionary:
+	var result: Dictionary = {}
+	for key_value: Variant in distances.keys():
+		var key: String = str(key_value)
+		var values: Dictionary = distances[key] as Dictionary
+		var samples: int = int(values["samples"])
+		result[key] = {
+			"mean_px": _safe_ratio(float(values["sum"]), samples),
+			"samples": samples,
+		}
+	return result
 
 
 func _snapshot_occupancy(snapshot: Dictionary) -> float:
