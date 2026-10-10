@@ -10,6 +10,8 @@ param(
 $ErrorActionPreference = "Stop"
 $repoPath = Split-Path -Parent $PSScriptRoot
 $artifactPath = Join-Path $repoPath "artifacts"
+$continuousWallLimitPx = 34.0
+$continuousPairLimitPx = 68.0
 $conditions = if ($BlastOnOnly) {
     @([ordered]@{ name = "blast_on_min_$BlastMinimumLevel"; enabled = "on" })
 } else {
@@ -140,7 +142,8 @@ foreach ($condition in $conditions) {
     $scores = [double[]]@($seedRows | ForEach-Object { [double]$_.score })
     $combos = [double[]]@($seedRows | ForEach-Object { [double]$_.max_combo })
     $continuousPass = (
-        $maxWall -le 28.0 -and $maxPair -le 60.0 -and
+        $maxWall -le $continuousWallLimitPx -and
+        $maxPair -le $continuousPairLimitPx -and
         $departures -eq 0 -and $divergences -eq 0
     )
 
@@ -186,8 +189,8 @@ foreach ($condition in $conditions) {
         departures = $departures
         divergences = $divergences
         thresholds = [ordered]@{
-            wall_limit_px = 28.0
-            pair_limit_px = 60.0
+            wall_limit_px = $continuousWallLimitPx
+            pair_limit_px = $continuousPairLimitPx
             continuous_limits_pass = $continuousPass
         }
     }

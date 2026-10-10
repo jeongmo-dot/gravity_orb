@@ -8,6 +8,11 @@ $repoPath = Split-Path -Parent $PSScriptRoot
 $outputDirectory = Join-Path $repoPath "artifacts\measurements"
 $gravities = @(1800, 3600)
 $seeds = "101,102,103,104,105,106,107,108,109,110,111,112"
+$cycle3DWallLimitPx = 20.0
+$cycle3DPairLimitPx = 22.0
+$compatibility2DWallLimitPx = 14.0
+$continuousWallLimitPx = 34.0
+$continuousPairLimitPx = 68.0
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {
     if (-not [string]::IsNullOrWhiteSpace($env:GODOT)) {
         $GodotPath = $env:GODOT
@@ -124,6 +129,12 @@ function Get-TurnSummary([int]$Gravity) {
         max_pair_penetration_px = $maxPair
         departures = $departures
         divergences = $divergences
+        physics_within_limits = (
+            $maxWall -le $continuousWallLimitPx -and
+            $maxPair -le $continuousPairLimitPx -and
+            $departures -eq 0 -and
+            $divergences -eq 0
+        )
         wall_recoveries = 0
         wall_recovery_note = "Board3D has no corrective wall-recovery path; penetration is observed only"
     }
@@ -148,6 +159,12 @@ function Get-BlitzSummary([int]$Gravity, [string]$Bot) {
         max_pair_penetration_px = [double](($rows | Measure-Object -Property max_pair_penetration_px_sampled_10hz -Maximum).Maximum)
         departures = [int](($rows | Measure-Object -Property departures -Sum).Sum)
         divergences = [int](($rows | Measure-Object -Property divergences -Sum).Sum)
+        physics_within_limits = (
+            [double](($rows | Measure-Object -Property max_wall_penetration_px -Maximum).Maximum) -le $continuousWallLimitPx -and
+            [double](($rows | Measure-Object -Property max_pair_penetration_px_sampled_10hz -Maximum).Maximum) -le $continuousPairLimitPx -and
+            [int](($rows | Measure-Object -Property departures -Sum).Sum) -eq 0 -and
+            [int](($rows | Measure-Object -Property divergences -Sum).Sum) -eq 0
+        )
     }
 }
 
@@ -175,6 +192,15 @@ $summary = [ordered]@{
     physics_ticks_per_second = 120
     seeds = @(101..112)
     windowed_seeds = @(101..104)
+    thresholds = [ordered]@{
+        cycle_3d_wall_limit_px = $cycle3DWallLimitPx
+        cycle_3d_pair_limit_px = $cycle3DPairLimitPx
+        compatibility_2d_wall_limit_px = $compatibility2DWallLimitPx
+        continuous_wall_limit_px = $continuousWallLimitPx
+        continuous_pair_limit_px = $continuousPairLimitPx
+        departure_limit = 0
+        divergence_limit = 0
+    }
     cases = $cases
 }
 $summaryPath = Join-Path $outputDirectory "gravity_1800_vs_3600_summary.json"
@@ -188,6 +214,7 @@ $consoleSummary = @($cases | ForEach-Object {
         turn_pair_max = $_.turn.max_pair_penetration_px
         turn_departures = $_.turn.departures
         turn_divergences = $_.turn.divergences
+        turn_physics_pass = $_.turn.physics_within_limits
         blitz_heuristic_score_p50 = $_.blitz_heuristic_0_6.score.p50
         blitz_random_score_p50 = $_.blitz_random_0_3.score.p50
         blitz_wall_max = [Math]::Max(
@@ -197,6 +224,10 @@ $consoleSummary = @($cases | ForEach-Object {
         blitz_pair_max = [Math]::Max(
             $_.blitz_heuristic_0_6.max_pair_penetration_px,
             $_.blitz_random_0_3.max_pair_penetration_px
+        )
+        blitz_physics_pass = (
+            $_.blitz_heuristic_0_6.physics_within_limits -and
+            $_.blitz_random_0_3.physics_within_limits
         )
         windowed_p99_ms = $_.windowed_blitz.frame_p99_ms
         windowed_max_ms = $_.windowed_blitz.frame_max_ms

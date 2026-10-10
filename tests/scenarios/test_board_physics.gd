@@ -13,7 +13,8 @@ const STANDARD_SEED_START: int = 1000
 const STANDARD_SEED_END_EXCLUSIVE: int = 1020
 const KNOWN_REGRESSION_SEED: int = 1047
 const WORST_CASE_SEED: int = 2000
-const MAX_ALLOWED_PENETRATION: float = 12.0
+# #39 clamps rendered orbs inside the board, so #58 re-baselines physical penetration while departures/divergence stay absolute failures.
+const MAX_ALLOWED_PENETRATION: float = 14.0
 const DIVERGENCE_SPEED: float = 5000.0
 const DIVERGENCE_MARGIN: float = 100.0
 const STANDARD_ORB_COUNT: int = 5

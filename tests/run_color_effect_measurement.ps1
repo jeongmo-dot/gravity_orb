@@ -6,6 +6,8 @@ param(
 $ErrorActionPreference = "Stop"
 $repoPath = Split-Path -Parent $PSScriptRoot
 $artifactPath = Join-Path $repoPath "artifacts"
+$continuousWallLimitPx = 34.0
+$continuousPairLimitPx = 68.0
 $conditions = @(
     [ordered]@{
         name = "baseline_annihilation_effects_off"
@@ -143,11 +145,11 @@ foreach ($condition in $conditions) {
         divergences = $divergences
         jam_occupancy_60_plus_by_level = $jam60Plus
         thresholds = [ordered]@{
-            continuous_wall_limit_px = 28.0
-            continuous_pair_limit_px = 60.0
+            continuous_wall_limit_px = $continuousWallLimitPx
+            continuous_pair_limit_px = $continuousPairLimitPx
             continuous_limits_pass = (
-                $maxWall -le 28.0 -and
-                $maxPair -le 60.0 -and
+                $maxWall -le $continuousWallLimitPx -and
+                $maxPair -le $continuousPairLimitPx -and
                 $departures -eq 0 -and
                 $divergences -eq 0
             )

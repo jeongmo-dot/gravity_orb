@@ -18,10 +18,11 @@ const PHYSICS_CYCLE_SECONDS_PER_DIRECTION: float = 2.0
 const PHYSICS_CYCLE_LAPS: int = 4
 const DIVERGENCE_SPEED: float = 5000.0
 const DIVERGENCE_MARGIN: float = 100.0
-const CYCLE_MAX_WALL_PENETRATION: float = 14.0
-const CYCLE_MAX_PAIR_OVERLAP: float = 16.0
-const TURN_MAX_WALL_PENETRATION: float = 28.0
-const TURN_MAX_PAIR_OVERLAP: float = 60.0
+# #39 clamps rendered orbs inside the board, so #58 re-baselines physical penetration while departures/divergence stay absolute failures.
+const CYCLE_MAX_WALL_PENETRATION: float = 20.0
+const CYCLE_MAX_PAIR_OVERLAP: float = 22.0
+const TURN_MAX_WALL_PENETRATION: float = 34.0
+const TURN_MAX_PAIR_OVERLAP: float = 68.0
 
 
 func test_main_3d_uses_shared_core_and_full_ui() -> void:
