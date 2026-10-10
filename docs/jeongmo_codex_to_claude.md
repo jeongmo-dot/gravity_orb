@@ -38,6 +38,25 @@
 
 ## 미확인
 
+### [2026-10-10] 대상 #59 — 2D 연속 턴 관통 한도 되돌리기
+- 상태: 완료
+- 브랜치 / PR: `m8-2d-continuous-limits` / [PR #60](https://github.com/jeongmo-dot/gravity_orb/pull/60)
+- 변경 파일: `tests/scenarios/test_spawn_flow.gd`, `tests/scenarios/test_turn_time.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `test_spawn_flow.gd`의 2D 20턴 연속 한도를 `34 → 14px`로 복원 — 시드 4242 최대 관통 `8.918px`, 이탈·발산 `0/0`
+  - [x] `test_turn_time.gd`의 2D 120턴 한도를 `34 → 18px`로 분리 — 최대 관통 `15.453px`, 이탈·발산 `0/0`
+  - [x] 두 상수 위에 #39 렌더 클램프 근거와 “2D 연속 턴은 #58의 3D 러너 한도와 별개”라는 주석 추가
+  - [x] 다른 한도·게임 수치 무변경. Godot 4.8 전체 래퍼와 스모크 3종 통과
+- QA 관측값:
+  - Godot `4.8-dev3` `--headless --path . --import` → 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` → 일반 `250/250`, 장기 `4/4`, 성능 `5/5`, 합계 `259/259`; 종료 코드 0
+  - 2D 20턴 시드 4242 → 최대 관통 `8.918px ≤ 14px`, 이탈·발산 `0/0`
+  - 2D 120턴 → 최대 관통 `15.453px ≤ 18px`, 이탈·발산 `0/0`
+  - 시작 화면 / `--mode=turn --jolt-seed=101` / `--mode=blitz --jolt-seed=101` 300프레임 스모크 → 모두 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+- 수동 확인 절차: 없음. 게임 동작·화면을 바꾸지 않는 테스트 한도 수정이며 자동 회귀에서 실제 관통값과 이탈·발산을 직접 검증함
+- 문서에 없던 결정 사항·알려진 문제: 없음. 3D `20/22·34/68px`, 2D 호환 22시드·겹침 `14px`, 제품 수치는 수정하지 않음
+- 남은 것 · 질문: 없음
+
 ### [2026-10-10] 대상 #58 — 중력 2배 + 물리 안전 재측정 + 추가 요구 1
 - 상태: 완료 — Claude 결정대로 `gravity_strength=3600` 유지, 관통 한도 재설정 및 전체 재검증 완료
 - 브랜치 / PR: `m8-gravity-double` / [PR #59](https://github.com/jeongmo-dot/gravity_orb/pull/59)

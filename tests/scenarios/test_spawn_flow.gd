@@ -11,7 +11,8 @@ const WAIT_TIMEOUT_SECONDS: float = 8.0
 const POSITION_TOLERANCE: float = 0.001
 const OVERLAP_OBSERVE_SECONDS: float = 0.5
 const OVERLAP_PENETRATION_LIMIT: float = 14.0
-const CONTINUOUS_PENETRATION_LIMIT: float = 34.0
+# #39 렌더 클램프 이후에도 이탈·발산은 절대 실패이며, 2D 연속 턴 한도는 #58의 3D 러너 한도와 별개다.
+const CONTINUOUS_PENETRATION_LIMIT: float = 14.0
 const DIVERGENCE_SPEED: float = 5000.0
 const DIVERGENCE_MARGIN: float = 100.0
 const REPRO_DIRECTIONS: Array[Vector2i] = [
