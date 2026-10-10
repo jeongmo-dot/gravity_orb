@@ -1132,6 +1132,10 @@ func _apply_arguments() -> void:
 			Config.data.gravity_level_scale = argument.trim_prefix(
 				"--gravity-level-scale="
 			).to_float()
+		elif argument.begins_with("--gravity-strength="):
+			Config.data.gravity_strength = argument.trim_prefix(
+				"--gravity-strength="
+			).to_float()
 		elif argument.begins_with("--shock-impulse="):
 			Config.data.shock_impulse = argument.trim_prefix("--shock-impulse=").to_float()
 		elif argument.begins_with("--shock-radius-factor="):

@@ -3,6 +3,7 @@ extends Node
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
 const OUTPUT_PREFIX: String = "--output="
 const SEED_PREFIX: String = "--seed="
+const GRAVITY_STRENGTH_PREFIX: String = "--gravity-strength="
 const RUN_DURATION_SECONDS: float = 8.0
 const FRAME_WARMUP_SECONDS: float = 0.5
 const BOT_INTERVAL_SECONDS: float = 0.30
@@ -213,6 +214,7 @@ func _build_report() -> Dictionary:
 			dropped_inputs += 1
 	return {
 		"seed": _seed,
+		"gravity_strength": Config.data.gravity_strength,
 		"duration_seconds": RUN_DURATION_SECONDS,
 		"frame_samples_ms": _frame_samples_ms,
 		"input_latency_ms": _input_latency_ms,
@@ -247,3 +249,7 @@ func _parse_arguments() -> void:
 			_output_path = argument.trim_prefix(OUTPUT_PREFIX)
 		elif argument.begins_with(SEED_PREFIX):
 			_seed = argument.trim_prefix(SEED_PREFIX).to_int()
+		elif argument.begins_with(GRAVITY_STRENGTH_PREFIX):
+			Config.data.gravity_strength = argument.trim_prefix(
+				GRAVITY_STRENGTH_PREFIX
+			).to_float()

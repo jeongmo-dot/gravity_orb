@@ -45,6 +45,7 @@ func _run() -> void:
 		"bot_kind": _bot_kind,
 		"color_count": _color_count,
 		"refill_rule": _refill_rule,
+		"gravity_strength": Config.data.gravity_strength,
 		"seeds": rows,
 		"config": {
 			"duration": Config.data.blitz_duration,
@@ -404,6 +405,10 @@ func _apply_arguments() -> void:
 				_seeds.append(value.to_int())
 		elif argument.begins_with("--blitz-output="):
 			_output_path = argument.trim_prefix("--blitz-output=")
+		elif argument.begins_with("--gravity-strength="):
+			Config.data.gravity_strength = argument.trim_prefix(
+				"--gravity-strength="
+			).to_float()
 
 
 func _apply_color_count() -> void:

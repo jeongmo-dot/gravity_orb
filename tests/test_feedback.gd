@@ -148,6 +148,7 @@ func test_merge_punch_only_scales_visual_and_emits_ten_particles() -> void:
 	root.add_child(director)
 	tree.root.add_child(root)
 	await tree.process_frame
+	board.set_gravity(Vector2i.ZERO)
 	var orb: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 2, Vector2.ZERO)
 	var collision: SphereShape3D = orb._collision_shape.shape as SphereShape3D
 	var collision_radius: float = collision.radius

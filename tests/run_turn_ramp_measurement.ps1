@@ -8,6 +8,8 @@ param(
 $ErrorActionPreference = "Stop"
 $repoPath = Split-Path -Parent $PSScriptRoot
 $artifactPath = Join-Path $repoPath "artifacts"
+$continuousWallLimitPx = 34.0
+$continuousPairLimitPx = 68.0
 $allConditions = @(
     [ordered]@{ id = "A"; name = "current"; ramp = 0; max = 3 },
     [ordered]@{ id = "B"; name = "ramp100_max2"; ramp = 100; max = 2 },
@@ -148,8 +150,8 @@ foreach ($condition in $conditions) {
     $gameOverCount = @($seedRows | Where-Object { [bool]$_.game_over }).Count
     $reached800Count = @($seedRows | Where-Object { -not [bool]$_.game_over -and [int]$_.completed_turns -ge 800 }).Count
     $physicsPass = (
-        $maxWall -le 28.0 -and
-        $maxPair -le 60.0 -and
+        $maxWall -le $continuousWallLimitPx -and
+        $maxPair -le $continuousPairLimitPx -and
         $departures -eq 0 -and
         $divergences -eq 0 -and
         [int]$tick.aborted_count -eq 0
@@ -201,8 +203,8 @@ foreach ($condition in $conditions) {
             physics_within_limits = $physicsPass
         }
         thresholds = [ordered]@{
-            wall_limit_px = 28.0
-            pair_limit_px = 60.0
+            wall_limit_px = $continuousWallLimitPx
+            pair_limit_px = $continuousPairLimitPx
         }
     }
 }

@@ -1,7 +1,7 @@
 param(
     [string]$GodotPath = "",
-    [ValidateSet("before", "after")]
-    [string]$Label = "before"
+    [string]$Label = "before",
+    [double]$GravityStrength = 0.0
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,6 +32,9 @@ foreach ($seed in 101..104) {
         ("--output=res://artifacts/measurements/{0}" -f $seedFileName),
         ("--seed={0}" -f $seed)
     )
+    if ($GravityStrength -gt 0.0) {
+        $arguments += ("--gravity-strength={0}" -f $GravityStrength)
+    }
     $previousErrorActionPreference = $ErrorActionPreference
     try {
         $ErrorActionPreference = "Continue"
@@ -78,6 +81,7 @@ foreach ($report in $seedReports) {
 
 $aggregate = [ordered]@{
     label = $Label
+    gravity_strength = [double]$seedReports[0].gravity_strength
     seeds = @(101, 102, 103, 104)
     renderer = [string]$seedReports[0].renderer
     frame_count = $frames.Count
