@@ -23,6 +23,9 @@ var _seed_reactions: int = 0
 var _bonus_scale: float = 1.0
 var _seed_merge_count_by_level: Dictionary = {}
 var _seed_first_l4_merge_time: float = -1.0
+var _seed_jackpot_count: int = 0
+var _seed_blast_count_by_level: Dictionary = {}
+var _seed_blast_moved_ratio_sum_by_level: Dictionary = {}
 
 
 func _ready() -> void:
@@ -62,7 +65,9 @@ func _run() -> void:
 			"time_bonus_merge_by_level": Array(
 				Config.data.blitz_time_bonus_merge_by_level
 			),
-			"time_bonus_blast": Config.data.blitz_time_bonus_blast,
+			"time_bonus_blast_by_level": Array(
+				Config.data.blitz_time_bonus_blast_by_level
+			),
 			"time_bonus_jackpot": Config.data.blitz_time_bonus_jackpot,
 			"fever_time_multiplier": Config.data.blitz_fever_time_multiplier,
 			"swipe_cooldown": Config.data.blitz_swipe_cooldown,
@@ -83,7 +88,10 @@ func _run() -> void:
 			"fever_chain": Config.data.blitz_fever_chain,
 			"fever_duration": Config.data.blitz_fever_duration,
 			"fever_multiplier": Config.data.blitz_fever_multiplier,
-			"blast_min_level": Config.data.blitz_blast_min_level,
+			"blast_min_level": Config.data.blast_min_level,
+			"blast_push_radius_by_level": Array(
+				Config.data.blast_push_radius_by_level
+			),
 			"finale_interval": Config.data.blitz_finale_interval,
 		},
 	}
@@ -97,6 +105,9 @@ func _run_seed(seed: int) -> Dictionary:
 	_seed_reactions = 0
 	_seed_merge_count_by_level.clear()
 	_seed_first_l4_merge_time = -1.0
+	_seed_jackpot_count = 0
+	_seed_blast_count_by_level.clear()
+	_seed_blast_moved_ratio_sum_by_level.clear()
 	var fixture: Dictionary = await _create_fixture(seed)
 	var root: Node = fixture["root"] as Node
 	var board: Board3D = fixture["board"] as Board3D
@@ -108,6 +119,7 @@ func _run_seed(seed: int) -> Dictionary:
 	var bot_elapsed: float = 0.0
 	var next_occupancy_sample: float = 10.0
 	var occupancy_timeline: Array[Dictionary] = []
+	var max_occupancy_percent: float = _occupancy(board) * 100.0
 	var max_wall: float = 0.0
 	var max_pair: float = 0.0
 	var departed_ids: Dictionary = {}
@@ -120,6 +132,10 @@ func _run_seed(seed: int) -> Dictionary:
 		await get_tree().physics_frame
 		session_elapsed += tick
 		physics_frame_index += 1
+		max_occupancy_percent = maxf(
+			max_occupancy_percent,
+			_occupancy(board) * 100.0
+		)
 		if manager.state == BlitzManager.State.RUNNING:
 			bot_elapsed += tick
 			while bot_elapsed + 0.000001 >= _bot_interval:
@@ -186,6 +202,9 @@ func _run_seed(seed: int) -> Dictionary:
 			manager.play_time_elapsed
 		),
 		"blast_count": manager.blast_count,
+		"blast_count_by_level": _seed_blast_count_by_level.duplicate(true),
+		"blast_moved_orb_ratio_by_level": _blast_moved_ratio_by_level(),
+		"jackpot_count": _seed_jackpot_count,
 		"finale_blast_count": manager.finale_blast_count,
 		"time_bonus_total": manager.time_bonus_total,
 		"time_bonus_by_source": manager.time_bonus_by_source.duplicate(true),
@@ -210,6 +229,7 @@ func _run_seed(seed: int) -> Dictionary:
 		"finale_score": finale_score,
 		"finale_score_percent": _safe_percent(finale_score, score.score),
 		"final_occupancy_percent": _occupancy(board) * 100.0,
+		"max_occupancy_percent": max_occupancy_percent,
 		"occupancy_timeline": occupancy_timeline,
 		"max_wall_penetration_px": max_wall,
 		"max_pair_penetration_px_sampled_10hz": max_pair,
@@ -304,6 +324,36 @@ func _on_reaction_scored(reaction: Dictionary) -> void:
 	var reaction_type: ReactionRules.Type = reaction.get(
 		"type", ReactionRules.Type.NONE
 	) as ReactionRules.Type
+	if reaction_type == ReactionRules.Type.MAX_CLEAR:
+		_seed_jackpot_count += 1
+	if reaction_type == ReactionRules.Type.BLAST:
+		var levels: Array = reaction.get("levels", []) as Array
+		var blast_level: int = (
+			Config.data.active_blast_min_level()
+			if levels.is_empty()
+			else int(levels[0])
+		)
+		var blast_key: String = "L%d" % blast_level
+		var targets: Array = reaction.get("blast_targets", []) as Array
+		var moved_count: int = 0
+		for target_value: Variant in targets:
+			var target: Dictionary = target_value as Dictionary
+			var velocity_change: Vector2 = target.get(
+				"velocity_change", Vector2.ZERO
+			) as Vector2
+			if not velocity_change.is_zero_approx():
+				moved_count += 1
+		var moved_ratio: float = (
+			float(moved_count) / float(targets.size())
+			if not targets.is_empty()
+			else 0.0
+		)
+		_seed_blast_count_by_level[blast_key] = int(
+			_seed_blast_count_by_level.get(blast_key, 0)
+		) + 1
+		_seed_blast_moved_ratio_sum_by_level[blast_key] = float(
+			_seed_blast_moved_ratio_sum_by_level.get(blast_key, 0.0)
+		) + moved_ratio
 	if reaction_type != ReactionRules.Type.MERGE:
 		return
 	var result_level: int = int(reaction.get("result_level", 0))
@@ -319,6 +369,19 @@ func _current_measurement_play_time() -> float:
 		if manager != null:
 			return manager.play_time_elapsed
 	return 0.0
+
+
+func _blast_moved_ratio_by_level() -> Dictionary:
+	var result: Dictionary = {}
+	for key_value: Variant in _seed_blast_count_by_level.keys():
+		var key: String = str(key_value)
+		var count: int = int(_seed_blast_count_by_level[key])
+		result[key] = (
+			float(_seed_blast_moved_ratio_sum_by_level.get(key, 0.0)) / float(count)
+			if count > 0
+			else 0.0
+		)
+	return result
 
 
 func _occupancy(board: Board3D) -> float:
@@ -546,6 +609,20 @@ func _apply_arguments() -> void:
 				argument.trim_prefix("--blitz-drain-ramp=").to_float(),
 				0.0
 			)
+		elif argument.begins_with("--blast-min-level="):
+			Config.data.blast_min_level = clampi(
+				argument.trim_prefix("--blast-min-level=").to_int(),
+				1,
+				Config.data.orb_max_level
+			)
+		elif argument.begins_with("--blast-push-radius-by-level="):
+			Config.data.blast_push_radius_by_level = _parse_float_array(
+				argument.trim_prefix("--blast-push-radius-by-level=")
+			)
+		elif argument.begins_with("--blitz-time-bonus-blast-by-level="):
+			Config.data.blitz_time_bonus_blast_by_level = _parse_float_array(
+				argument.trim_prefix("--blitz-time-bonus-blast-by-level=")
+			)
 
 
 func _apply_survival_condition() -> void:
@@ -554,8 +631,18 @@ func _apply_survival_condition() -> void:
 	for bonus: float in Config.data.blitz_time_bonus_merge_by_level:
 		scaled_merge_bonuses.append(bonus * _bonus_scale)
 	Config.data.blitz_time_bonus_merge_by_level = scaled_merge_bonuses
-	Config.data.blitz_time_bonus_blast *= _bonus_scale
+	var scaled_blast_bonuses: PackedFloat32Array = PackedFloat32Array()
+	for blast_bonus: float in Config.data.blitz_time_bonus_blast_by_level:
+		scaled_blast_bonuses.append(blast_bonus * _bonus_scale)
+	Config.data.blitz_time_bonus_blast_by_level = scaled_blast_bonuses
 	Config.data.blitz_time_bonus_jackpot *= _bonus_scale
+
+
+func _parse_float_array(value: String) -> PackedFloat32Array:
+	var result: PackedFloat32Array = PackedFloat32Array()
+	for part: String in value.split(",", false):
+		result.append(maxf(part.to_float(), 0.0))
+	return result
 
 
 func _apply_color_count() -> void:

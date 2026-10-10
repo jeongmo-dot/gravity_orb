@@ -44,6 +44,45 @@ func test_blast_feedback_creates_and_cleans_all_effects() -> void:
 	Config.data.sfx_enabled = original_sfx
 
 
+func test_blast_ring_max_radius_matches_level_push_range() -> void:
+	var original_fx: bool = Config.data.fx_enabled
+	var original_hitstop: bool = Config.data.fx_hitstop_enabled
+	Config.data.fx_enabled = true
+	Config.data.fx_hitstop_enabled = false
+	var fixture: Dictionary = await _create_director_fixture()
+	var director: FeedbackDirector = fixture["director"] as FeedbackDirector
+	var expected_by_level: Dictionary = {
+		4: 0.3 * Config.data.board_size / Orb3D.PIXELS_PER_METER,
+		5: 0.55 * Config.data.board_size / Orb3D.PIXELS_PER_METER,
+		6: Config.data.board_size / Orb3D.PIXELS_PER_METER,
+		7: Config.data.board_size / Orb3D.PIXELS_PER_METER,
+	}
+	for level_value: Variant in expected_by_level.keys():
+		var level: int = int(level_value)
+		director.play_reaction_visuals({
+			"type": ReactionRules.Type.BLAST,
+			"levels": [level, level],
+			"colors": [OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE],
+			"position": Vector2.ZERO,
+		})
+		var ring_scales: Array[float] = []
+		for effect: Dictionary in director._effects:
+			if str(effect.get("kind", "")) == "ring":
+				ring_scales.append(float(effect.get("end_scale", 0.0)))
+		assert_eq(ring_scales.size(), 2, "two rings for L%d" % level)
+		for scale: float in ring_scales:
+			assert_near(
+				scale,
+				float(expected_by_level[level]),
+				TOLERANCE,
+				"L%d ring radius matches push range" % level
+			)
+		director.clear_effects()
+	await _cleanup(fixture["root"] as Node)
+	Config.data.fx_enabled = original_fx
+	Config.data.fx_hitstop_enabled = original_hitstop
+
+
 func test_feedback_toggle_preserves_turn_and_blitz_state_hashes() -> void:
 	var original_fx: bool = Config.data.fx_enabled
 	var original_hitstop: bool = Config.data.fx_hitstop_enabled

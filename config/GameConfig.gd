@@ -99,7 +99,10 @@ enum GameMode { TURN, BLITZ }
 @export var green_shake_max_speed: float = 600.0
 @export var chain_reaction_delay: float = 0.2
 @export var blast_enabled: bool = true
-@export var blast_min_level: int = 6
+@export var blast_min_level: int = 4
+@export var blast_push_radius_by_level: PackedFloat32Array = PackedFloat32Array(
+	[0.0, 0.0, 0.0, 0.3, 0.55, 1.0, 1.0]
+)
 @export var blast_speed: float = 900.0
 @export var blast_far_factor: float = 0.4
 @export var blast_score_factor: float = 5.0
@@ -138,10 +141,11 @@ enum GameMode { TURN, BLITZ }
 @export var blitz_fever_chain: int = 8
 @export var blitz_fever_duration: float = 3.0
 @export var blitz_fever_multiplier: float = 2.0
-@export var blitz_time_bonus_blast: float = 0.5
+@export var blitz_time_bonus_blast_by_level: PackedFloat32Array = PackedFloat32Array(
+	[0.0, 0.0, 0.0, 0.5, 1.0, 2.0, 3.0]
+)
 @export var blitz_time_bonus_jackpot: float = 3.0
 @export var blitz_time_bonus_cap: float = 20.0
-@export var blitz_blast_min_level: int = 4
 @export var blitz_finale_interval: float = 0.3
 @export var fx_enabled: bool = true
 @export var fx_hitstop_enabled: bool = true
@@ -186,9 +190,21 @@ func score_for_level(level: int) -> int:
 
 
 func active_blast_min_level() -> int:
-	if game_mode == GameMode.BLITZ:
-		return blitz_blast_min_level
 	return blast_min_level
+
+
+func blast_push_radius_factor_for_level(level: int) -> float:
+	var index: int = level - 1
+	if index < 0 or index >= blast_push_radius_by_level.size():
+		return 0.0
+	return maxf(blast_push_radius_by_level[index], 0.0)
+
+
+func blitz_blast_time_bonus_for_level(level: int) -> float:
+	var index: int = level - 1
+	if index < 0 or index >= blitz_time_bonus_blast_by_level.size():
+		return 0.0
+	return maxf(blitz_time_bonus_blast_by_level[index], 0.0)
 
 
 func spawn_count_for_turn(turn_index: int) -> int:

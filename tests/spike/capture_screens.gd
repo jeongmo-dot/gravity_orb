@@ -143,7 +143,7 @@ func _capture_blitz_scenes() -> void:
 	var hud: Hud = main.get_node("UI/Hud") as Hud
 	var spawner: Spawner = main.get_node("Spawner") as Spawner
 	var score: ScoreManager = main.get_node("ScoreManager") as ScoreManager
-	var board: Variant = main.get_node("Board")
+	var board: Board3D = main.get_node("Board") as Board3D
 	await _capture("05_blitz_ready.png")
 	if not await _wait_for_blitz_running(manager):
 		_fail("BLITZ did not leave READY")
@@ -169,8 +169,41 @@ func _capture_blitz_scenes() -> void:
 	if board.has_method("set_fever_active"):
 		board.call("set_fever_active", true)
 	await get_tree().create_timer(0.35).timeout
+	var level_three: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.PURPLE,
+		3,
+		Vector2(-240.0, -160.0)
+	)
+	var level_four: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.CYAN,
+		4,
+		Vector2(220.0, -140.0)
+	)
+	var level_six: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.YELLOW,
+		6,
+		Vector2(0.0, -280.0)
+	)
+	level_three.disable_physics()
+	level_four.disable_physics()
+	level_six.disable_physics()
+	if level_three.is_blast_armed():
+		_fail("BLITZ L3 capture orb must not blink")
+	if not level_four.is_blast_armed() or not level_six.is_blast_armed():
+		_fail("BLITZ L4 and L6 capture orbs must blink")
+	var feedback: FeedbackDirector = main.get_node("FeedbackDirector") as FeedbackDirector
+	feedback.play_reaction_visuals({
+		"type": ReactionRules.Type.BLAST,
+		"position": Vector2(220.0, -140.0),
+		"levels": [4, 4],
+		"colors": [OrbTypes.OrbColor.PURPLE, OrbTypes.OrbColor.CYAN],
+		"shock_level": 4,
+	})
+	await get_tree().create_timer(0.24).timeout
 	_validate_blitz_survival_hud_scene(main)
+	print("SCREEN_CAPTURE_CHECK scene=blitz_l4_blast radius_factor=0.3")
 	await _capture("06_blitz_fever_chain.png")
+	await get_tree().create_timer(0.40).timeout
 
 	hud._hide_bonus_label()
 	for popup: ScorePopup in hud.active_score_popups():
@@ -181,7 +214,17 @@ func _capture_blitz_scenes() -> void:
 	spawner.sync_blitz_next_batch_size(8)
 	hud._set_danger_badge(0.70, 4.0)
 	hud.set_process(false)
+	feedback.play_reaction_visuals({
+		"type": ReactionRules.Type.BLAST,
+		"position": Vector2(0.0, -140.0),
+		"levels": [6, 6],
+		"colors": [OrbTypes.OrbColor.YELLOW, OrbTypes.OrbColor.CYAN],
+		"shock_level": 6,
+	})
+	await get_tree().create_timer(0.24).timeout
+	print("SCREEN_CAPTURE_CHECK scene=blitz_l6_blast radius_factor=1.0")
 	await _capture("07_blitz_danger.png")
+	await get_tree().create_timer(0.40).timeout
 
 	hud._set_danger_badge(0.0, 1.0)
 	hud._on_combo_changed(0, 1.0, 8)

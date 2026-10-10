@@ -180,27 +180,34 @@ func test_3d_blast_armed_orb_blinks_emission_by_level() -> void:
 	var level_four: Orb3D = board.spawn_orb(0, 4, Vector2(-100.0, 0.0))
 	var level_five: Orb3D = board.spawn_orb(1, 5, Vector2(100.0, 0.0))
 	var level_six: Orb3D = board.spawn_orb(2, 6, Vector2(0.0, 150.0))
-	assert_true(not level_four.is_blast_armed(), "3D L4 is not armed")
-	assert_true(not level_five.is_blast_armed(), "3D L5 is not armed")
+	assert_true(level_four.is_blast_armed(), "3D L4 is armed")
+	assert_true(level_five.is_blast_armed(), "3D L5 is armed")
 	assert_true(level_six.is_blast_armed(), "3D L6 is armed")
-	var initial_strength: float = level_six.blast_emission_strength()
-	level_six._physics_process(Config.data.blast_blink_period * 0.25)
+	var initial_strength: float = level_four.blast_emission_strength()
+	level_four._physics_process(Config.data.blast_blink_period * 0.25)
 	assert_true(
-		not is_equal_approx(level_six.blast_emission_strength(), initial_strength),
+		not is_equal_approx(level_four.blast_emission_strength(), initial_strength),
 		"3D armed emission oscillates"
 	)
 	_cleanup(board)
 
 
-func test_3d_blitz_blink_starts_at_level_four() -> void:
+func test_3d_blast_blink_starts_at_shared_level_four_in_both_modes() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
-	Config.data.game_mode = GameConfig.GameMode.BLITZ
-	var board: Board3D = await _create_board()
-	var level_three: Orb3D = board.spawn_orb(0, 3, Vector2(-100.0, 0.0))
-	var level_four: Orb3D = board.spawn_orb(1, 4, Vector2(100.0, 0.0))
-	assert_true(not level_three.is_blast_armed(), "BLITZ L3 is not armed")
-	assert_true(level_four.is_blast_armed(), "BLITZ L4 is armed")
-	_cleanup(board)
+	for mode: GameConfig.GameMode in [GameConfig.GameMode.TURN, GameConfig.GameMode.BLITZ]:
+		Config.data.game_mode = mode
+		var board: Board3D = await _create_board()
+		var level_three: Orb3D = board.spawn_orb(0, 3, Vector2(-180.0, 0.0))
+		var level_four: Orb3D = board.spawn_orb(1, 4, Vector2(180.0, 0.0))
+		assert_true(not level_three.is_blast_armed(), "L3 is not armed in mode %d" % mode)
+		assert_true(level_four.is_blast_armed(), "L4 is armed in mode %d" % mode)
+		var initial_strength: float = level_four.blast_emission_strength()
+		level_four._physics_process(Config.data.blast_blink_period * 0.25)
+		assert_true(
+			not is_equal_approx(level_four.blast_emission_strength(), initial_strength),
+			"L4 emission oscillates in mode %d" % mode
+		)
+		_cleanup(board)
 	Config.data.game_mode = original_mode
 
 

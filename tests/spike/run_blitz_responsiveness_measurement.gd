@@ -91,8 +91,8 @@ func _run() -> void:
 			blast_forced = true
 			_pending_frame_marker = "first_blast"
 			var blast_levels: Array[int] = [
-				Config.data.blitz_blast_min_level,
-				Config.data.blitz_blast_min_level,
+				Config.data.active_blast_min_level(),
+				Config.data.active_blast_min_level(),
 			]
 			var blast_colors: Array[int] = [
 				OrbTypes.OrbColor.RED,
@@ -103,7 +103,7 @@ func _run() -> void:
 				"position": Vector2.ZERO,
 				"levels": blast_levels,
 				"colors": blast_colors,
-				"shock_level": Config.data.blitz_blast_min_level,
+				"shock_level": Config.data.active_blast_min_level(),
 			})
 		if not large_batch_forced and elapsed >= FORCED_LARGE_BATCH_TIME:
 			large_batch_forced = true

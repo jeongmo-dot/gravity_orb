@@ -396,7 +396,7 @@ func test_2d_blast_reaches_whole_board_with_mass_independent_falloff() -> void:
 	for orb: Orb in [light, heavy, far, waiter]:
 		orb.exit_ghost_state()
 	waiter.enter_entrance_wait(waiter.position, Vector2i.DOWN)
-	var targets: Array[Dictionary] = board.apply_blast(Vector2.ZERO)
+	var targets: Array[Dictionary] = board.apply_blast(Vector2.ZERO, 6)
 	assert_eq(targets.size(), 3, "2D blast excludes ghost and waiter")
 	var expected_near: float = 900.0 * lerpf(1.0, 0.4, 100.0 / 960.0)
 	assert_eq(targets[0]["orb"], light, "light target order")
@@ -440,7 +440,7 @@ func test_3d_blast_uses_screen_plane_directions_and_zero_fallback() -> void:
 	ghost.enter_ghost_state(0.5)
 	var waiter: Orb3D = board.spawn_orb(3, 1, Vector2(0.0, 100.0))
 	waiter.enter_entrance_wait(waiter.position, Vector2i.DOWN)
-	var targets: Array[Dictionary] = board.apply_blast(Vector2.ZERO)
+	var targets: Array[Dictionary] = board.apply_blast(Vector2.ZERO, 7)
 	assert_eq(targets.size(), 3, "3D blast exclusions")
 	var right_change: Vector2 = targets[0]["velocity_change"] as Vector2
 	var up_change: Vector2 = targets[1]["velocity_change"] as Vector2
@@ -456,6 +456,46 @@ func test_3d_blast_uses_screen_plane_directions_and_zero_fallback() -> void:
 	)
 	assert_true(ghost.linear_velocity.is_zero_approx(), "3D ghost excluded")
 	assert_true(waiter.linear_velocity.is_zero_approx(), "3D waiter excluded")
+	board.queue_free()
+	await tree.process_frame
+	_restore_config(snapshot)
+
+
+func test_3d_level_four_blast_only_moves_orbs_inside_scaled_radius() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.blast_speed = 900.0
+	Config.data.blast_far_factor = 0.4
+	Config.data.blast_push_radius_by_level = PackedFloat32Array(
+		[0.0, 0.0, 0.0, 0.3, 0.55, 1.0, 1.0]
+	)
+	var board: Board3D = BOARD_3D_SCENE.instantiate() as Board3D
+	tree.root.add_child(board)
+	await tree.process_frame
+	board.set_gravity(Vector2i.ZERO)
+	var near: Orb3D = board.spawn_orb(0, 1, Vector2(100.0, 0.0))
+	var edge: Orb3D = board.spawn_orb(1, 1, Vector2(280.0, 0.0))
+	var outside: Orb3D = board.spawn_orb(2, 1, Vector2(320.0, 0.0))
+	var targets: Array[Dictionary] = board.apply_blast(Vector2.ZERO, 4)
+	assert_eq(targets.size(), 3, "limited blast reports all eligible targets")
+	var radius: float = Config.data.board_size * 0.3
+	var expected_near: float = 900.0 * lerpf(1.0, 0.4, 100.0 / radius)
+	var expected_edge: float = 900.0 * lerpf(1.0, 0.4, 280.0 / radius)
+	assert_near(
+		(targets[0]["velocity_change"] as Vector2).x,
+		expected_near,
+		TOLERANCE,
+		"near L4 falloff"
+	)
+	assert_near(
+		(targets[1]["velocity_change"] as Vector2).x,
+		expected_edge,
+		TOLERANCE,
+		"edge L4 falloff"
+	)
+	assert_true(
+		(targets[2]["velocity_change"] as Vector2).is_zero_approx(),
+		"outside target records zero delta-v"
+	)
 	board.queue_free()
 	await tree.process_frame
 	_restore_config(snapshot)
@@ -504,6 +544,7 @@ func _snapshot_config() -> Dictionary:
 		"green_shake_max_speed": Config.data.green_shake_max_speed,
 		"blast_speed": Config.data.blast_speed,
 		"blast_far_factor": Config.data.blast_far_factor,
+		"blast_push_radius_by_level": Config.data.blast_push_radius_by_level.duplicate(),
 	}
 
 
@@ -520,3 +561,6 @@ func _restore_config(snapshot: Dictionary) -> void:
 	Config.data.green_shake_max_speed = float(snapshot["green_shake_max_speed"])
 	Config.data.blast_speed = float(snapshot["blast_speed"])
 	Config.data.blast_far_factor = float(snapshot["blast_far_factor"])
+	Config.data.blast_push_radius_by_level = snapshot[
+		"blast_push_radius_by_level"
+	] as PackedFloat32Array
