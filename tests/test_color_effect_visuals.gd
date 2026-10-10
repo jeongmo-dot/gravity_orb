@@ -67,6 +67,7 @@ func test_pull_shrinks_only_result_mesh_before_punching() -> void:
 	var fixture: Dictionary = await _create_fixture()
 	var board: Board3D = fixture["board"] as Board3D
 	var director: FeedbackDirector = fixture["director"] as FeedbackDirector
+	board.set_gravity(Vector2i.ZERO)
 	var orb: Orb3D = board.spawn_orb(OrbTypes.OrbColor.BLUE, 2, Vector2.ZERO)
 	var collision: SphereShape3D = orb._collision_shape.shape as SphereShape3D
 	var collision_radius: float = collision.radius

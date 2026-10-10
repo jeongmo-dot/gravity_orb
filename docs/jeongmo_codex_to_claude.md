@@ -38,6 +38,62 @@
 
 ## 미확인
 
+### [2026-10-10] 대상 #58 — 중력 2배 + 물리 안전 재측정
+- 상태: 질문 — `gravity_strength=3600`에서 22시드 단기 한도와 BLITZ 장기 한도를 초과함
+- 브랜치 / PR: `m8-gravity-double` / 미생성
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `tests/{test_config.gd,test_feedback.gd,test_color_effect_visuals.gd,run_gravity_comparison.ps1,run_blitz_responsiveness_measurement.ps1}`, `tests/spike/{run_jolt_3d_measurement.gd,run_blitz_measurement.gd,run_blitz_responsiveness_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `gravity_strength` 선언·기본 리소스를 `1800 → 3600`으로 변경. L1·L7 테스트 기대값은 `config.gravity_strength`에서 계산 — `test_m3_turn_defaults`
+  - [x] 1800/3600을 동일 러너·동일 시드로 비교하는 `tests/run_gravity_comparison.ps1` 추가. TURN 101~112 게임오버까지, BLITZ 휴리스틱 0.6초·무작위 0.3초 101~112, 창 모드 BLITZ 101~104를 자동 측정
+  - [x] 3600에서 일반 `250/250`, 성능 `5/5`, 임포트·캡처 13장·스모크 3종 통과
+  - [ ] 장기 Jolt `4/4` — `2/4`. 2D 호환 벽 `12.136px > 12px`; 3D 22시드 벽 `17.328px > 14px`, 쌍 `18.825px > 16px`
+  - [ ] BLITZ 장기 한도 — 휴리스틱 벽 `28.721px > 28px`, 쌍 `60.054px > 60px`
+- 1800 대 3600 관측 (`120Hz`, Jolt position steps 4, TURN·BLITZ 시드 101~112):
+
+  | 지표 | 1800 | 3600 |
+  |---|---:|---:|
+  | TURN 게임 길이 min / p50 / max | 143 / 153 / 174턴 | 143 / 167 / 192턴 |
+  | TURN 소요 시간 p50 / p95 | 1.517 / 1.517초 | 1.517 / 1.517초 |
+  | TURN 점수 p50 / BLAST p50 | 15,896 / 0 | 23,733 / 1 |
+  | TURN 벽 / 쌍 최대 | 21.623 / 35.125px | 27.379 / 36.443px |
+  | BLITZ 휴리스틱 점수 / 반응 / BLAST p50 | 46,736 / 345 / 33 | 64,491 / 442 / 39 |
+  | BLITZ 휴리스틱 피버 / 종료 점유율 p50 | 30.00% / 27.71% | 32.73% / 32.62% |
+  | BLITZ 휴리스틱 벽 / 쌍 최대 | 21.573 / 58.282px | **28.721 / 60.054px** |
+  | BLITZ 무작위 점수 / 반응 / BLAST p50 | 24,263 / 206 / 16 | 66,371 / 419 / 39 |
+  | BLITZ 무작위 피버 / 종료 점유율 p50 | 14.15% / 62.65% | 42.02% / 37.33% |
+  | BLITZ 무작위 벽 / 쌍 최대 | 18.855 / 45.984px | 20.375 / 47.539px |
+  | 전체 이탈 / 발산 | 0 / 0 | 0 / 0 |
+
+- 창 모드 BLITZ 관측 (`540×960`, RTX 4070 Ti SUPER, 시드 101~104, 봇 0.3초·강제 BLAST·8개 생성):
+
+  | 지표 | 1800 | 3600 |
+  |---|---:|---:|
+  | 프레임 p99 / 최대 | 8.465 / 10.771ms | 8.663 / 21.353ms |
+  | 33.3ms 초과 / 입력 유실 | 0 / 0 | 0 / 0 |
+  | 첫 8개 생성 프레임 범위 | 8.295~10.273ms | 12.128~16.771ms |
+
+- 대책 후보 관측:
+  - 중력 `2700`, position steps 4: 22시드 이탈·발산 0, 쌍 `14.207px`은 통과하나 벽 `15.734px > 14px`로 실패. 2D 호환 최대 벽 `8.314px`은 통과.
+  - 중력 `3600`, position steps `4 → 6`: 벽 `17.328px`로 변화 없음, 쌍 `18.825 → 17.882px`로 소폭 개선했으나 둘 다 실패. 장기 테스트 wall time `27.2 → 29.9초`(약 +10%), 창 모드 p99 `8.663 → 8.671ms`; 안전 회복 근거가 없어 `project.godot`은 4로 복구.
+  - 속도 상한은 새 밸런스 수치가 필요하고 충격파·대폭발 체감에도 영향을 주므로 임의 구현하지 않음. 2700도 실패했으므로 더 낮은 중력 후보의 정확한 값도 Claude 결정이 필요함.
+- QA 관측값:
+  - Godot `4.8-dev3` `--headless --path . --import` → 종료 코드 0, 프로젝트 `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` → 일반 `250/250`, 장기 `2/4`, 성능 `5/5`; 최종 종료 코드 1. 장기 실패 외 `SCRIPT ERROR`·`Parse Error` 0건
+  - 3600 22시드 3D → 이탈 0, 발산 0, 벽 `17.3276px`, 쌍 `18.8245px`; 2D 호환 벽 `12.136px`
+  - 3600 2D 120턴 관측 → 이탈 0, 발산 0, 벽 복구 2, timeout 보정 7. Jolt `Board3D`에는 보정 경로가 없어 장기 비교의 벽 복구는 0/N/A이며 관통을 그대로 관측함
+  - `tests/capture_screens.ps1` → PNG `13/13`, 종료 코드 0. `02_turn_early`, `03_turn_combo`, `06_blitz_fever_chain`, `07_blitz_danger` 직접 확인: 낙하 방향 정상, 프레임 밖으로 보이는 구체 없음, 고밀도 BLITZ 하단·측면 밀집 증가
+  - 시작 화면 / `--mode=turn` / `--mode=blitz` 300프레임 스모크 → 모두 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 중력이 있는 시각 테스트는 구체 스트레치가 펀치 스케일에 합성되므로 해당 2개 테스트에서만 보드 중력을 0으로 격리. `test_feedback.gd` `8/8`, `test_color_effect_visuals.gd` `8/8`
+- 수동 확인 절차:
+  1. TURN에서 좌→상→우→하 순으로 중력을 바꾼다 → 구체가 기존보다 빠르게 새 바닥으로 떨어지며 입력·합체·NEXT 흐름은 유지되는지 확인한다.
+  2. BLITZ를 60초 이상 플레이하며 DANGER 밀도에서 연속 스와이프한다 → 벽 가까운 구체가 튀거나 과도하게 겹쳐 보이는지, 강해진 중력이 충격파·대폭발을 지나치게 눌러버리는지 확인한다.
+  3. `tests/capture_screens.ps1`의 TURN 2장과 BLITZ 피버·DANGER 2장을 연다 → 낙하 벽과 반대쪽 빈 공간, 하단·측면 구체의 시각적 벽 박힘을 확인한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 측정 CLI에만 `--gravity-strength`를 추가했고 제품 공개 API·다른 게임 수치는 바꾸지 않았다. 원시 JSON과 PNG는 `artifacts/` gitignore 대상이다.
+  - 장기 TURN 표의 벽·쌍은 게임오버 러너 한도(28/60)용이고, 별도 22시드 고정 회귀의 엄격한 한도(14/16)는 실패했다. 두 결과를 섞지 않았다.
+- 남은 것 · 질문:
+  - 3600은 이탈·발산은 없지만 명시된 관통 한도를 세 곳에서 넘었다. 다음 중 어느 방향으로 갈지 결정이 필요하다: (1) 3600 유지 + 별도 속도 상한/물리 대책 수치 지정, (2) 2700보다 낮은 중력 후보 지정 후 재측정, (3) 관통 한도 자체 재검토. Codex는 수치 결정 전 추가 변경·PR 생성을 멈춘다.
+
 ### [2026-10-10] 대상 #57 — BLITZ 끊김·입력 지연 개선
 - 상태: 완료
 - 브랜치 / PR: `m8-blitz-input-latency` / [PR #58](https://github.com/jeongmo-dot/gravity_orb/pull/58)

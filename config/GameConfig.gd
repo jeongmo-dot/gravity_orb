@@ -15,7 +15,7 @@ enum GameMode { TURN, BLITZ }
 @export var orb_max_level: int = 7
 @export var orb_base_mass: float = 1.0
 @export var mass_exponent: float = 2.0
-@export var gravity_strength: float = 1800.0
+@export var gravity_strength: float = 3600.0
 @export var gravity_level_scale: float = 0.1
 @export var orb_friction: float = 0.3
 @export var orb_bounce: float = 0.15
