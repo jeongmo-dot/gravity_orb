@@ -23,6 +23,13 @@ func test_each_scored_reaction_shows_matching_popup_and_conditional_formula() ->
 	var danger_popup: ScorePopup = hud.active_score_popups()[1]
 	assert_eq(danger_popup.score_text(), "+256", "danger popup uses awarded points")
 	assert_eq(danger_popup.formula_text(), "128 ×2", "danger ×2 shows calculation")
+	var capped_reaction: Dictionary = _reaction(Vector2(0.0, 200.0), 1.0, 0.20)
+	capped_reaction.erase("combo_multiplier")
+	capped_reaction["combo"] = 20
+	score.on_reaction(capped_reaction)
+	var capped_popup: ScorePopup = hud.active_score_popups()[2]
+	assert_eq(capped_popup.score_text(), "+16384", "capped combo popup uses awarded points")
+	assert_eq(capped_popup.formula_text(), "128 ×128", "popup shows actual capped multiplier")
 	assert_eq(ScorePopup.popup_font_size(10), 34, "base popup font size")
 	assert_true(
 		ScorePopup.popup_font_size(1000) > ScorePopup.popup_font_size(10),

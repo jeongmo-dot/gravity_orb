@@ -112,6 +112,32 @@ func test_scoring_populates_reaction_dictionary() -> void:
 		assert_true(reaction.has(key), "scored reaction key %s" % key)
 
 
+func test_turn_combo_multiplier_caps_at_one_hundred_twenty_eight() -> void:
+	var cfg: GameConfig = _config()
+	var expected: Dictionary = {
+		7: 64.0,
+		8: 128.0,
+		9: 128.0,
+		20: 128.0,
+	}
+	for combo_value: Variant in expected:
+		var combo: int = int(combo_value)
+		var reaction: Dictionary = _reaction(
+			ReactionRules.Type.MERGE,
+			combo,
+			[1, 1],
+			2,
+			0.20
+		)
+		ScoreManager.points_for(reaction, cfg)
+		assert_near(
+			float(reaction["combo_multiplier"]),
+			float(expected[combo]),
+			TOLERANCE,
+			"combo %d multiplier" % combo
+		)
+
+
 func test_blitz_combo_fever_and_finale_scoring() -> void:
 	var cfg: GameConfig = _config()
 	var reaction: Dictionary = _reaction(

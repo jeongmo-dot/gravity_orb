@@ -109,17 +109,15 @@ func _capture_turn_scenes() -> void:
 	hud._on_combo_changed(4, 8.0, 4)
 	await get_tree().create_timer(0.30).timeout
 	await _capture("03_turn_combo.png")
-	Config.data.spawn_count_ramp_turns = 100
-	Config.data.spawn_count_max = 3
-	manager.turn_index = 100
-	spawner.sync_next_batch_size(101)
+	Config.data.spawn_count_ramp_turns = 20
+	Config.data.spawn_count_max = 0
+	manager.turn_index = 20
+	spawner.sync_next_batch_size(21)
 	await get_tree().process_frame
 	_validate_turn_ramp_preview_scene(main, 2, "turn_ramp_next")
 	await _capture("12_turn_ramp_next.png")
-	Config.data.spawn_count_ramp_turns = 50
-	Config.data.spawn_count_max = 0
-	manager.turn_index = 250
-	spawner.sync_next_batch_size(251)
+	manager.turn_index = 100
+	spawner.sync_next_batch_size(101)
 	await get_tree().process_frame
 	_validate_turn_ramp_preview_scene(main, 6, "turn_ramp_uncapped_next")
 	await _capture("13_turn_ramp_uncapped_next.png")

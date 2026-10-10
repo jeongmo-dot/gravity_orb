@@ -89,7 +89,7 @@ func test_m4_spawn_defaults() -> void:
 	)
 	assert_eq(config.spawn_count_per_turn, 1, "spawn count per turn")
 	assert_eq(config.preview_turns, 2, "preview turns")
-	assert_eq(config.spawn_count_ramp_turns, 50, "spawn count ramp interval")
+	assert_eq(config.spawn_count_ramp_turns, 20, "spawn count ramp interval")
 	assert_eq(config.spawn_count_max, 0, "non-positive spawn count maximum is uncapped")
 	assert_eq(config.spawn_position_mode, GameConfig.SpawnPositionMode.RANDOM, "position mode")
 	assert_near(config.spawn_margin, 4.0, TOLERANCE, "spawn margin")
@@ -102,14 +102,10 @@ func test_spawn_count_ramp_turn_boundaries() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	var expected: Dictionary = {
 		1: 1,
-		50: 1,
-		51: 2,
-		100: 2,
-		101: 3,
-		150: 3,
-		151: 4,
-		201: 5,
-		251: 6,
+		20: 1,
+		21: 2,
+		40: 2,
+		41: 3,
 	}
 	for turn_value: Variant in expected:
 		var turn_index: int = int(turn_value)
@@ -119,11 +115,11 @@ func test_spawn_count_ramp_turn_boundaries() -> void:
 			"spawn count at turn %d" % turn_index
 		)
 	config.spawn_count_max = -1
-	assert_eq(config.spawn_count_for_turn(251), 6, "negative maximum is also uncapped")
+	assert_eq(config.spawn_count_for_turn(41), 3, "negative maximum is also uncapped")
 	config.spawn_count_max = 3
-	assert_eq(config.spawn_count_for_turn(101), 3, "positive maximum permits third orb")
-	assert_eq(config.spawn_count_for_turn(151), 3, "positive maximum caps later turns")
-	assert_eq(config.spawn_count_for_turn(251), 3, "positive maximum remains capped")
+	assert_eq(config.spawn_count_for_turn(41), 3, "positive maximum permits third orb")
+	assert_eq(config.spawn_count_for_turn(61), 3, "positive maximum caps later turns")
+	assert_eq(config.spawn_count_for_turn(101), 3, "positive maximum remains capped")
 
 
 func test_m5_contact_defaults() -> void:
@@ -193,6 +189,7 @@ func test_m7_score_defaults() -> void:
 		"maximum merge bonus factor"
 	)
 	assert_near(config.combo_multiplier_base, 2.0, TOLERANCE, "combo multiplier base")
+	assert_near(config.combo_multiplier_max, 128.0, TOLERANCE, "combo multiplier maximum")
 	assert_near(config.danger_start, 0.30, TOLERANCE, "danger start")
 	assert_near(config.danger_doubling, 0.20, TOLERANCE, "danger doubling")
 	assert_near(config.shock_impulse, 600.0, TOLERANCE, "shock impulse")

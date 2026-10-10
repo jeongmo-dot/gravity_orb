@@ -196,6 +196,27 @@ func test_t8_next_swipe_resets_combo_to_zero() -> void:
 	await _cleanup_fixture(fixture, snapshot)
 
 
+func test_t9_combo_display_multiplier_caps_at_one_hundred_twenty_eight() -> void:
+	var snapshot: Dictionary = _snapshot_m3_config()
+	var fixture: Dictionary = await _create_fixture(FIXTURE_SEED + 9)
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	var expected: Dictionary = {
+		7: 64.0,
+		8: 128.0,
+		9: 128.0,
+		20: 128.0,
+	}
+	for combo_value: Variant in expected:
+		manager.turn_combo = int(combo_value)
+		assert_near(
+			manager.current_combo_multiplier(),
+			float(expected[combo_value]),
+			1.0e-6,
+			"combo %d display multiplier" % int(combo_value)
+		)
+	await _cleanup_fixture(fixture, snapshot)
+
+
 func _create_ready_fixture(seed: int) -> Dictionary:
 	var fixture: Dictionary = await _create_fixture(seed)
 	var manager: TurnManager = fixture["manager"] as TurnManager

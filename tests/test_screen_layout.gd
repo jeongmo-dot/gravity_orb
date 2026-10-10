@@ -115,14 +115,16 @@ func test_then_count_is_readable_and_clear_of_board_top() -> void:
 	var original_max: int = Config.data.spawn_count_max
 	var main: Main = await _create_turn_main()
 	var spawner: Spawner = main.get_node("Spawner") as Spawner
-	Config.data.spawn_count_ramp_turns = 50
+	Config.data.spawn_count_ramp_turns = 20
 	Config.data.spawn_count_max = 0
-	spawner.sync_next_batch_size(251)
+	spawner.sync_next_batch_size(101)
 	await tree.process_frame
 	var next_count: Label = main.get_node("UI/Hud/NextCountLabel") as Label
 	var then_count: Label = main.get_node("UI/Hud/ThenCountLabel") as Label
 	var then_region: Control = main.get_node("UI/Hud/ThenPreviewRegion") as Control
 	assert_true(then_count.visible, "THEN count is visible for six orbs")
+	assert_eq(next_count.text, "×6", "NEXT count follows selected ramp")
+	assert_eq(then_count.text, "×6", "THEN count follows selected ramp")
 	assert_true(
 		then_count.get_theme_font_size("font_size")
 		>= ceili(float(next_count.get_theme_font_size("font_size")) * 0.8),
