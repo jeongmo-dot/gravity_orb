@@ -499,6 +499,8 @@ func _set_danger_badge(occupancy: float, multiplier: float) -> void:
 	_danger_label.visible = occupancy >= Config.data.danger_start
 	if _danger_label.visible:
 		_danger_label.text = "DANGER ×%s" % _format_multiplier(multiplier)
+	if _board != null and _board.has_method("set_danger_state"):
+		_board.call("set_danger_state", occupancy, multiplier)
 
 
 func _punch_multiplier_badge() -> void:

@@ -38,6 +38,52 @@
 
 ## 미확인
 
+### [2026-10-11] 대상 #64 — 비주얼 V2 우주 배경·보드
+- 상태: 완료 — 절차적 우주 배경, 반투명 유리 보드·중력장, 금속/유리 프레임과 중력·BLOCKED·FEVER·DANGER 상태 빛을 구현하고 캡처·대비·창 모드 성능·물리 해시를 관측함
+- 브랜치 / PR: `v2-space-background-board` / PR 생성 후 갱신
+- 변경 파일: `scenes/Main3D.tscn`, `scripts/core/Main.gd`, `scripts/fx/SpaceBackdrop.gd`, `scripts/spike/Board3D.gd`, `scripts/ui/Hud.gd`, `tests/{test_space_board_visuals.gd,capture_screens.ps1}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 어두운 남색→보라 그라데이션, 저채도 성운 3겹, 원·중·근 별 3겹의 느린 반짝임, 중력 전환 시 원거리 `2px`·근거리 `8px` 시차와 `0.3초` 복귀, `30초`마다 `0.6초` 유성을 외부 에셋 없이 절차 셰이더로 구현 — 자동 (`test_space_backdrop_has_three_star_depths_nebula_and_timed_meteor`, `test_space_parallax_moves_toward_gravity_and_returns_in_point_three_seconds`) + 캡처 직접 확인
+  - [x] 보드 안쪽을 배경이 30~40% 비치는 유리로 교체하고 가장자리 감쇠, 불투명도 `0.10` 중력장 선, 금속 레일·안쪽 빛·바깥 상태광·사선 모서리를 구현 — 자동 (`test_board_uses_glass_gravity_field_and_layered_metal_frame`) + 캡처 직접 확인
+  - [x] 중력장 선은 `0.3초`, 중력 벽 빛은 `0.25초`에 새 방향으로 이동하고 정반대 전환도 각도 보간 — 자동 (`test_gravity_wall_light_and_field_move_to_the_new_direction`) + `16_gravity_switch` 직접 확인
+  - [x] BLOCKED 벽 빨강 맥동, FEVER 전체 주황, DANGER 임계 하늘색→호박색→빨강 및 ×4 이상 맥동·성운 붉은 기운을 기존 HUD 점유율/배수 계산에 연결 — 자동 (`test_blocked_fever_and_danger_keep_distinct_frame_states`) + `07`, `17` 직접 확인
+  - [x] 물리 벽·보드 크기·6° 기울기·구슬 V1·2D 회귀 씬·사용자 저장 파일은 유지하고 외부 에셋·후처리는 추가하지 않음 — 전체 회귀 및 물리 해시 동일
+  - [x] 기존 15장 + `16_gravity_switch` + `17_board_danger` 캡처 `17/17`; 대비·#57 창 모드 성능·시작/TURN/BLITZ 스모크 관측
+
+- 대비 관측 (Compatibility, `540×960`):
+  - 구슬 없는 보드 안쪽 평균 휘도 `0.0216` (명세 상한 `0.10`)
+  - 보드 바깥 배경 별·성운 최대 휘도 `0.5477` (명세 상한 `0.60`)
+  - `07_blitz_danger`: 구슬 평균 `0.5068`, 보드 안쪽 평균 `0.0266`, 구슬/보드 휘도 비 `19.05`
+  - 붐비는 장면은 보드 안쪽에서 휘도 `≥0.16`을 구슬, `≤0.10`을 보드로 분류했으며 보고서는 `artifacts/measurements/space_contrast_report.json`에 생성됨
+
+- 창 모드 성능 관측 (RTX 4070 Ti SUPER, Compatibility, BLITZ 시드 101~104, 봇 0.3초):
+
+  | 구분 | 프레임 p50 / p95 / p99 / 최대 | >16.7ms / >33.3ms | 드로콜 p50 / p95 / 최대 |
+  |---|---|---:|---:|
+  | V1 병합 기준 | 1.506 / 2.512 / 3.765 / 7.607ms | 0 / 0 | 487 / 528 / 552 |
+  | V2 | 1.592 / 2.614 / 3.861 / 8.537ms | 0 / 0 | 514 / 546 / 564 |
+
+  - 입력 `120/120` 수락·유실 `0`; 첫 BLAST 프레임 `2.827~5.362ms`, 첫 8개 생성 프레임 `4.228~8.537ms`; 구슬 공유 리소스 머티리얼 `42`, 레벨 메시 `7`, 장식 메시 `2`, Shape `7`, 물리 머티리얼 `1` 유지
+
+- QA 관측값:
+  - Godot `4.8-dev3 mono` `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/test_space_board_visuals.gd` → `5/5`, 종료 코드 0
+  - `tests/run_tests.ps1` 최종 → 일반 `271/271` 19.284초, 장기 `4/4` 32.625초, 성능 `5/5` 2.396초, 합계 `280/280`; 종료 코드 0, 총 54.306초
+  - 물리 상태 해시: TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`; V1 병합 기준과 동일
+  - `tests/capture_screens.ps1` → `01_start_screen`~`17_board_danger` PNG `17/17`, 종료 코드 0. `02`에서 별·성운·유리·중력장, `16`에서 기울기 중 휘어진 선·벽 빛, `17`에서 빨강 테두리·성운, `07`에서 붐비는 구슬 대비를 직접 확인
+  - 시작 화면 / TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 전역 난수 호출 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+
+- 수동 확인 절차:
+  1. `tests/capture_screens.ps1` 실행 후 `02_turn_early.png` 확인 → 화면 전체에 어두운 남색·보라 성운과 깊이가 다른 별이 보이고, 구슬 없는 보드 부분은 배경이 약하게 비치는 유리와 옅게 휜 격자로 보여야 한다.
+  2. `16_gravity_switch.png` 확인 → 스와이프 0.12초 뒤 6° 기울어진 보드 안에서 격자가 새 중력 방향으로 휘며 새 벽 빛으로 이동하는 중간 프레임이어야 한다. 실제 플레이에서 연속 전환하면 별이 새 중력 방향으로 밀렸다 `0.3초` 안에 돌아와야 한다.
+  3. TURN에서 생성 벽을 막기 → 해당 벽만 빨강으로 맥동해야 한다. BLITZ FEVER 진입/종료 → 전체 테두리가 주황으로 달아올랐다 원래 색으로 돌아와야 한다.
+  4. `17_board_danger.png`와 `07_blitz_danger.png` 확인 → `DANGER ×4`일 때 테두리 바깥이 빨강으로 맥동하고 배경 성운에 약한 붉은 기운이 섞이되 구슬 색·문양이 우선 읽혀야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 전역 난수 금지 규칙을 지키기 위해 유성 간격은 명세 범위 안의 고정 `30초`이며, 주기마다 셰이더 해시로 화면 바깥 시작 높이만 바꾼다. 물리·Spawner RNG에는 관여하지 않는다.
+  - 성운·별·유리·중력장·프레임은 모두 코드 셰이더/기본 메시로 만들었고 캡처 PNG와 측정 JSON은 검수 산출물로만 생성되어 커밋에는 포함하지 않는다.
+- 남은 것 · 질문: 없음
+
 ### [2026-10-11] 대상 #63 — 비주얼 V1 추가 요구 1: 그림 품질
 - 상태: 완료 — 구 셰이딩·3D 위치 기반 무늬·레벨별 천체 정체성·통합 림/광채 펄스와 근접 캡처·이음매 수치 검사를 구현함
 - 브랜치 / PR: `v1-celestial-orbs` / [PR #65](https://github.com/jeongmo-dot/gravity_orb/pull/65)

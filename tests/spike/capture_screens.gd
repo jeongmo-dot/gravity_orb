@@ -40,6 +40,8 @@ const CAPTURE_FILES: Array[String] = [
 	"13_turn_ramp_uncapped_next.png",
 	"14_orb_codex.png",
 	"15_orb_closeup.png",
+	"16_gravity_switch.png",
+	"17_board_danger.png",
 ]
 
 var _failed: bool = false
@@ -72,6 +74,8 @@ func _run_capture_suite() -> void:
 		await _capture_orb_codex()
 	if not _failed:
 		await _capture_orb_closeup()
+	if not _failed:
+		await _measure_v2_contrast()
 
 	_verify_capture_files()
 	_verify_user_save_unchanged()
@@ -94,6 +98,7 @@ func _capture_turn_scenes() -> void:
 	var hud: Hud = main.get_node("UI/Hud") as Hud
 	var spawner: Spawner = main.get_node("Spawner") as Spawner
 	var score: ScoreManager = main.get_node("ScoreManager") as ScoreManager
+	var board: Board3D = main.get_node("Board") as Board3D
 	if not await _wait_for_turn_input(manager):
 		_fail("TURN did not reach initial input state")
 		await _destroy_main(main)
@@ -105,6 +110,13 @@ func _capture_turn_scenes() -> void:
 			await _destroy_main(main)
 			return
 	await _capture("02_turn_early.png")
+	manager.on_swipe(Vector2i.RIGHT)
+	await get_tree().create_timer(0.12).timeout
+	await _capture("16_gravity_switch.png")
+	if not await _wait_for_turn_input(manager):
+		_fail("TURN gravity-switch scene did not settle")
+		await _destroy_main(main)
+		return
 
 	for turn_index: int in range(4, 12):
 		manager.on_swipe(DIRECTION_PATTERN[turn_index % DIRECTION_PATTERN.size()])
@@ -117,6 +129,11 @@ func _capture_turn_scenes() -> void:
 	hud._on_combo_changed(4, 8.0, 4)
 	await get_tree().create_timer(0.30).timeout
 	await _capture("03_turn_combo.png")
+	hud.set_process(false)
+	hud._set_danger_badge(0.70, 4.0)
+	await get_tree().create_timer(0.25).timeout
+	await _capture("17_board_danger.png")
+	hud._set_danger_badge(0.0, 1.0)
 	Config.data.spawn_count_ramp_turns = 20
 	Config.data.spawn_count_max = 0
 	manager.turn_index = 20
@@ -216,6 +233,7 @@ func _capture_blitz_scenes() -> void:
 		popup.deactivate()
 	hud._on_fever_changed(false, 0.0)
 	hud._hide_fever_visuals()
+	board.set_fever_active(false)
 	hud._on_combo_changed(3, 1.3, 8)
 	spawner.sync_blitz_next_batch_size(8)
 	hud._set_danger_badge(0.70, 4.0)
@@ -336,6 +354,129 @@ func _capture_orb_closeup() -> void:
 	await _capture("15_orb_closeup.png")
 	print("SCREEN_CAPTURE_CHECK scene=orb_closeup color=CYAN levels=7 scale=3x")
 	await _destroy_main(main)
+
+
+func _measure_v2_contrast() -> void:
+	var main: Main = await _create_main(Main.NO_MODE)
+	(main.get_node("UI") as CanvasLayer).visible = false
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var empty_image: Image = get_viewport().get_texture().get_image()
+	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
+	var board: Board3D = main.get_node("Board") as Board3D
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var image_scale: Vector2 = Vector2(
+		float(empty_image.get_width()) / viewport_size.x,
+		float(empty_image.get_height()) / viewport_size.y
+	)
+	var board_half: float = board.half_size()
+	var board_top_left: Vector2 = camera.unproject_position(
+		Orb3D.plane_position_to_world(Vector2(-board_half, -board_half))
+	) * image_scale
+	var board_bottom_right: Vector2 = camera.unproject_position(
+		Orb3D.plane_position_to_world(Vector2(board_half, board_half))
+	) * image_scale
+	var board_rect: Rect2 = Rect2(
+		Vector2(
+			minf(board_top_left.x, board_bottom_right.x),
+			minf(board_top_left.y, board_bottom_right.y)
+		),
+		Vector2(
+			absf(board_bottom_right.x - board_top_left.x),
+			absf(board_bottom_right.y - board_top_left.y)
+		)
+	)
+	var inner_rect: Rect2 = board_rect.grow(-board_rect.size.x * 0.08)
+	var empty_board_average: float = _average_luminance(empty_image, inner_rect)
+	var background_maximum: float = _maximum_luminance_outside(empty_image, board_rect.grow(6.0))
+	var crowded_image: Image = Image.load_from_file(
+		ProjectSettings.globalize_path(OUTPUT_DIRECTORY.path_join("07_blitz_danger.png"))
+	)
+	var crowded_metrics: Dictionary = _crowded_board_luminance(crowded_image, inner_rect)
+	var orb_average: float = float(crowded_metrics["orb_average"])
+	var crowded_board_average: float = float(crowded_metrics["board_average"])
+	var ratio: float = orb_average / maxf(crowded_board_average, 0.001)
+	print(
+		"SPACE_CONTRAST empty_board_average=%.4f background_maximum=%.4f crowded_orb_average=%.4f crowded_board_average=%.4f orb_board_ratio=%.2f" % [
+			empty_board_average,
+			background_maximum,
+			orb_average,
+			crowded_board_average,
+			ratio,
+		]
+	)
+	if empty_board_average > 0.10:
+		_fail("Empty board average luminance %.4f exceeds 0.10" % empty_board_average)
+	if background_maximum > 0.60:
+		_fail("Space background maximum luminance %.4f exceeds 0.60" % background_maximum)
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(MEASUREMENT_DIRECTORY))
+	var report_path: String = MEASUREMENT_DIRECTORY.path_join("space_contrast_report.json")
+	var report_file: FileAccess = FileAccess.open(report_path, FileAccess.WRITE)
+	if report_file == null:
+		_fail("Could not write space contrast report")
+	else:
+		report_file.store_string(JSON.stringify({
+			"empty_board_average_luminance": empty_board_average,
+			"empty_board_maximum": 0.10,
+			"background_maximum_luminance": background_maximum,
+			"background_maximum": 0.60,
+			"crowded_capture": "07_blitz_danger.png",
+			"crowded_orb_average_luminance": orb_average,
+			"crowded_board_average_luminance": crowded_board_average,
+			"crowded_orb_to_board_ratio": ratio,
+			"crowded_segmentation": "orb>=0.16, board<=0.10",
+		}, "  "))
+	await _destroy_main(main)
+
+
+func _average_luminance(image: Image, region: Rect2) -> float:
+	var min_x: int = clampi(floori(region.position.x), 0, image.get_width() - 1)
+	var max_x: int = clampi(ceili(region.end.x), 0, image.get_width() - 1)
+	var min_y: int = clampi(floori(region.position.y), 0, image.get_height() - 1)
+	var max_y: int = clampi(ceili(region.end.y), 0, image.get_height() - 1)
+	var total: float = 0.0
+	var count: int = 0
+	for y: int in range(min_y, max_y + 1):
+		for x: int in range(min_x, max_x + 1):
+			total += image.get_pixel(x, y).get_luminance()
+			count += 1
+	return total / float(maxi(count, 1))
+
+
+func _maximum_luminance_outside(image: Image, excluded: Rect2) -> float:
+	var maximum: float = 0.0
+	for y: int in range(image.get_height()):
+		for x: int in range(image.get_width()):
+			if excluded.has_point(Vector2(float(x), float(y))):
+				continue
+			maximum = maxf(maximum, image.get_pixel(x, y).get_luminance())
+	return maximum
+
+
+func _crowded_board_luminance(image: Image, region: Rect2) -> Dictionary:
+	var min_x: int = clampi(floori(region.position.x), 0, image.get_width() - 1)
+	var max_x: int = clampi(ceili(region.end.x), 0, image.get_width() - 1)
+	var min_y: int = clampi(floori(region.position.y), 0, image.get_height() - 1)
+	var max_y: int = clampi(ceili(region.end.y), 0, image.get_height() - 1)
+	var orb_total: float = 0.0
+	var orb_count: int = 0
+	var board_total: float = 0.0
+	var board_count: int = 0
+	for y: int in range(min_y, max_y + 1):
+		for x: int in range(min_x, max_x + 1):
+			var luminance: float = image.get_pixel(x, y).get_luminance()
+			if luminance >= 0.16:
+				orb_total += luminance
+				orb_count += 1
+			elif luminance <= 0.10:
+				board_total += luminance
+				board_count += 1
+	return {
+		"orb_average": orb_total / float(maxi(orb_count, 1)),
+		"board_average": board_total / float(maxi(board_count, 1)),
+		"orb_samples": orb_count,
+		"board_samples": board_count,
+	}
 
 
 func _analyze_orb_codex(camera: Camera3D, descriptors: Array[Dictionary]) -> void:
