@@ -38,6 +38,38 @@
 
 ## 미확인
 
+### [2026-10-11] 대상 #70 — 빌드 파일 이름에 버전 넣기
+- 상태: 완료 — 프로젝트 버전 `0.11.1`을 단일 원천으로 두고 Windows 릴리스·디버그 산출물 이름, 빌드 정보 이름과 결과 로그에 같은 버전을 적용함
+- 브랜치 / PR: `v4-versioned-builds` / 미생성
+- 변경 파일: `project.godot`, `export_presets.cfg`, `tools/build_windows.ps1`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `project.godot`의 `application/config/version="0.11.1"`만 버전 값을 보유 — 자동. 내보내기 프리셋의 파일·제품 버전은 빈 값으로 두고 실제 내보낸 PE 메타데이터가 프로젝트 버전을 상속하는지 검사
+  - [x] 릴리스 `build/windows/GravityOrb_v0.11.1.exe`, `GravityOrb_v0.11.1.console.exe`, `GravityOrb_v0.11.1_BUILD.txt` 생성 — 자동. 각각 `111,053,536`·`50,176`·`159`바이트
+  - [x] 디버그 `build/windows-debug/`에 같은 세 이름 생성 — 자동. 본체 `104,923,360`바이트, 래퍼 `50,176`바이트
+  - [x] `WINDOWS_BUILD_RESULT`에 `version=0.11.1`, 모드와 세 실제 경로 출력 — 릴리스·디버그 빌드 로그 확인
+  - [x] 같은 버전 파일만 교체하고 다른 버전·그 밖의 파일 보존 — 가짜 `GravityOrb_v0.11.0.exe` 34바이트와 기존 `GravityOrb.zip`을 둔 릴리스 빌드 후 둘 다 존재·내용 동일
+  - [x] 버전 없는 예전 `GravityOrb.exe`·`GravityOrb.console.exe`·`BUILD.txt` 정리 — 릴리스·디버그 빌드 후 각 경로 존재 `False`
+  - [x] 파일·제품 버전 `0.11.1` — 릴리스·디버그 모두 Windows `VersionInfo`에서 `0.11.1.0` 관측(PE 4자리 정규화)
+  - [x] 내보낸 릴리스 실행 파일 시작 화면·TURN·BLITZ 스모크 — 세 실행 모두 종료 코드 0, 오류 0건
+  - [x] 사용자 `save.cfg` 불변 — 존재 `True → True`, SHA-256 `C28895568856A02CFB50A61F6C0ACB32FB8CD5D50CF61AE0BF944AF7E6EDFC50` 동일
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - `tests/run_tests.ps1` → 일반 `281/281`(`16.003초`), 장기 `5/5`(`41.865초`), 성능 `5/5`(`2.695초`), 합계 `291/291`, 종료 코드 0, 총 `60.563초`
+  - 프로젝트 시작 화면 / TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, 오류 0건
+  - `tools/build_windows.ps1` 릴리스 / `-Debug` → 각각 종료 코드 0; 별도 `.pck` 0개
+  - 물리 상태 해시: TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`; #69와 동일
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 전역 난수 호출 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. 저장소 루트에서 `.\tools\build_windows.ps1`를 실행한다 → 마지막 줄에 `WINDOWS_BUILD_RESULT version=0.11.1 mode=Release exit=0`과 세 실제 경로가 출력되어야 한다.
+  2. `build/windows/`를 연다 → `GravityOrb_v0.11.1.exe`, `GravityOrb_v0.11.1.console.exe`, `GravityOrb_v0.11.1_BUILD.txt`가 있고 버전 없는 예전 세 파일은 없어야 한다.
+  3. `GravityOrb_v0.11.1.exe` 속성의 자세히 탭을 연다 → 파일·제품 버전이 Windows 표기 `0.11.1.0`이고 제품 이름이 `Gravity Orb`여야 한다.
+  4. `GravityOrb_v0.11.1.exe`를 실행한다 → 시작 화면이 열려야 하고, 로그가 필요하면 같은 이름의 `.console.exe`를 실행한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - Windows PE 버전 정보는 4자리라 Godot가 프로젝트의 `0.11.1`을 `0.11.1.0`으로 기록한다. 빌드 파일 이름과 `BUILD.txt`의 `Version:`은 원래 3자리 `0.11.1`을 유지함
+  - 출력 폴더 자체를 지우지 않고 현재 버전의 본체·래퍼·sidecar PCK·빌드 정보와 버전 없는 구형 3개만 정확한 경로로 제거함. 다른 버전과 ZIP 등 별도 파일은 유지함
+  - 화면·게임 코드 변경이 없어 화면 캡처는 대상 아님. `build/` 산출물과 보존 검증용 가짜 파일은 기존 ignore 대상이라 커밋하지 않음
+- 남은 것 · 질문: 없음
+
 ### [2026-10-11] 대상 #69 추가 요구 1 — 원형 파동·초신성 껍질·L7 홍염 보완
 - 상태: 완료 — `origin/main`의 보완 명세 `e0b426d`를 병합한 뒤 고리 투영, 성운 형태·깊이, 혼잡 보드 대비, L7 홍염·광량과 BLITZ 창 측정을 보완함
 - 브랜치 / PR: `v4-reaction-effects` / [PR #71](https://github.com/jeongmo-dot/gravity_orb/pull/71)
