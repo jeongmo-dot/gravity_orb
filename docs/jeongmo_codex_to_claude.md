@@ -40,7 +40,7 @@
 
 ### [2026-10-12] 대상 #77 — 턴제 입력 표시 크기·막힘 경고 다듬기
 - 상태: 완료 — 방향 화살표와 계산 중 광원을 모바일 가독성 크기로 키우고, 막힘 경고는 3D 벽 빨강 없이 빨간 X 화살표와 한글 받침 라벨로만 표시함
-- 브랜치 / PR: `turn-input-cue-sizing` / 생성 예정
+- 브랜치 / PR: `turn-input-cue-sizing` / [PR #78](https://github.com/jeongmo-dot/gravity_orb/pull/78)
 - 변경 파일: `scenes/UI.tscn`, `scripts/spike/Board3D.gd`, `scripts/ui/{Hud,TurnInputIndicator}.gd`, `tests/capture_screens.ps1`, `tests/scenarios/test_jolt_integration.gd`, `tests/spike/capture_screens.gd`, `tests/test_{screen_layout,space_board_visuals,turn_input_indicator}.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 네 방향 갈매기 화살표를 약 56 논리 px로 확대하고 0.2초 동안 `0.8→1.0` 배율, 입력 가능 중 알파 `0.85~1.0`·1.6초 숨쉬기 적용 — 자동 (`test_turn_input_cues_rejection_release_policy_and_ready_tick`) + 캡처 `44_turn_ready`
