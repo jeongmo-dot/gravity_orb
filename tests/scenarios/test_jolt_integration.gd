@@ -423,7 +423,7 @@ func test_down_spawn_projects_near_screen_top_in_3d_and_2d() -> void:
 	await _cleanup_fixture(fixture)
 
 
-func test_down_warning_marks_screen_top_edge_in_3d_and_2d() -> void:
+func test_down_warning_is_stored_without_recoloring_the_3d_frame() -> void:
 	var fixture: Dictionary = await _create_screen_coordinate_fixture()
 	var board_3d: Board3D = fixture["board_3d"] as Board3D
 	var board_2d: Board = fixture["board_2d"] as Board
@@ -441,9 +441,10 @@ func test_down_warning_marks_screen_top_edge_in_3d_and_2d() -> void:
 		< camera_3d.unproject_position(bottom_3d.global_position).y,
 		"3D DOWN warning edge is screen top"
 	)
-	assert_true(
-		top_material.albedo_color.r > top_material.albedo_color.b,
-		"3D screen-top warning edge is red"
+	assert_eq(
+		top_material.albedo_color,
+		Board3D.METAL_FRAME_COLOR,
+		"3D blocked direction leaves the screen-top frame metal-colored"
 	)
 
 	board_2d.set_warning_directions([Vector2i.DOWN])
@@ -489,7 +490,7 @@ func test_down_tilt_projects_toward_screen_bottom_and_2d_axis_matches() -> void:
 	await _cleanup_fixture(fixture)
 
 
-func test_blocked_3d_spawn_reaches_game_over_and_warning_edge_is_red() -> void:
+func test_blocked_3d_spawn_reaches_game_over_without_red_warning_wall() -> void:
 	var snapshot: Dictionary = _snapshot_config()
 	Config.data.initial_orb_count = 0
 	Config.data.spawn_position_mode = GameConfig.SpawnPositionMode.CENTER
@@ -515,7 +516,11 @@ func test_blocked_3d_spawn_reaches_game_over_and_warning_edge_is_red() -> void:
 	board.set_warning_directions([Vector2i.DOWN])
 	var top_wall: MeshInstance3D = board.get_node("VisualTilt/VisualTop") as MeshInstance3D
 	var top_material: StandardMaterial3D = top_wall.material_override as StandardMaterial3D
-	assert_true(top_material.albedo_color.r > top_material.albedo_color.b, "top warning edge is red")
+	assert_eq(
+		top_material.albedo_color,
+		Board3D.METAL_FRAME_COLOR,
+		"blocked spawn keeps the top wall metal-colored"
+	)
 	manager.on_swipe(Vector2i.DOWN)
 	assert_true(
 		await _wait_for_state(manager, TurnManager.State.GAME_OVER),

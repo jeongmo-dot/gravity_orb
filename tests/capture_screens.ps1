@@ -173,6 +173,31 @@ foreach ($captureSpec in $captureSpecs) {
         Width = [double]$boardReport.pixels.width
     }
 
+    $turnCueReportPath = Join-Path $outputPath "turn_input_cue.json"
+    if (-not (Test-Path -LiteralPath $turnCueReportPath)) {
+        throw "Screenshot capture did not create $turnCueReportPath"
+    }
+    $turnCueReport = Get-Content -LiteralPath $turnCueReportPath -Raw | ConvertFrom-Json
+    if ([Math]::Abs([double]$turnCueReport.arrow_size_logical_px - 56.0) -gt 0.01) {
+        throw "Turn arrow size is not 56 logical pixels for $($captureSpec.Name)"
+    }
+    if ([Math]::Abs([double]$turnCueReport.orbit_light_diameter_logical_px - 20.0) -gt 0.01) {
+        throw "Turn orbit light diameter is not 20 logical pixels for $($captureSpec.Name)"
+    }
+    if ([Math]::Abs([double]$turnCueReport.orbit_trail_side_fraction - 0.15) -gt 0.001) {
+        throw "Turn orbit trail is not 15 percent of a side for $($captureSpec.Name)"
+    }
+    if (-not [bool]$turnCueReport.arrows_inside_viewport -or
+        -not [bool]$turnCueReport.arrows_outside_board -or
+        -not [bool]$turnCueReport.top_hud_clear -or
+        -not [bool]$turnCueReport.preview_shelf_clear) {
+        throw "Turn input cue overlaps the board, HUD, shelf, or viewport for $($captureSpec.Name)"
+    }
+    Write-Output ("TURN_INPUT_CUE_RESULT ratio={0} arrow={1:N1}px orbit={2:N1}px trail={3:N1}px" -f `
+        $captureSpec.Name, [double]$turnCueReport.arrow_size_logical_px, `
+        [double]$turnCueReport.orbit_light_diameter_logical_px, `
+        [double]$turnCueReport.orbit_trail_logical_px)
+
     $temporarySave = Join-Path $outputPath "capture_save.tmp.cfg"
     if (Test-Path -LiteralPath $temporarySave) {
         Remove-Item -LiteralPath $temporarySave -Force

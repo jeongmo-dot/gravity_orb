@@ -28,6 +28,42 @@ func test_turn_input_cues_rejection_release_policy_and_ready_tick() -> void:
 	await tree.create_timer(TurnInputIndicator.READY_FADE_DURATION + 0.02).timeout
 	assert_true(indicator.is_ready_cue(), "WAITING_INPUT shows ready cue")
 	assert_near(indicator.arrow_alpha(), 1.0, 0.01, "ready arrows finish 0.2s fade")
+	assert_near(indicator.arrow_size(), 56.0, 0.001, "chevron is 56 logical pixels")
+	assert_near(indicator.orbit_light_diameter(), 20.0, 0.001, "orbit light is 20 logical pixels")
+	var board_rect: Rect2 = indicator._projected_board_rect()
+	assert_near(
+		indicator.orbit_trail_length(board_rect),
+		minf(board_rect.size.x, board_rect.size.y) * 0.15,
+		0.001,
+		"orbit trail is fifteen percent of one board side"
+	)
+	indicator.set("_arrow_alpha", 0.0)
+	assert_near(indicator.arrow_scale(), 0.8, 0.001, "arrow appears at eighty percent scale")
+	indicator.set("_arrow_alpha", 1.0)
+	assert_near(indicator.arrow_scale(), 1.0, 0.001, "arrow finishes at full scale")
+	indicator.set("_breath_elapsed", 0.0)
+	assert_near(indicator.breathing_alpha(), 0.85, 0.001, "breathing starts at 0.85 alpha")
+	indicator.set("_breath_elapsed", TurnInputIndicator.BREATH_DURATION * 0.5)
+	assert_near(indicator.breathing_alpha(), 1.0, 0.001, "breathing peaks at full alpha")
+	for direction: Vector2i in OrbTypes.DIRECTIONS:
+		var bounds: Rect2 = indicator.arrow_bounds(board_rect, direction)
+		assert_true(
+			_not_inside_board(bounds, board_rect, direction),
+			"%s chevron stays outside the board" % OrbTypes.dir_name(direction)
+		)
+		assert_true(
+			Rect2(Vector2.ZERO, indicator.size).encloses(bounds),
+			"%s chevron stays inside the HUD canvas" % OrbTypes.dir_name(direction)
+		)
+		var mark_bounds: Rect2 = indicator.blocked_mark_bounds(board_rect, direction)
+		assert_true(
+			_not_inside_board(mark_bounds, board_rect, direction),
+			"%s blocked X stays outside the board" % OrbTypes.dir_name(direction)
+		)
+		assert_true(
+			Rect2(Vector2.ZERO, indicator.size).encloses(mark_bounds),
+			"%s blocked X stays inside the HUD canvas" % OrbTypes.dir_name(direction)
+		)
 	assert_true(not indicator.orbit_visible(), "ready cue hides orbiting light")
 	assert_near(indicator.border_alpha(), 1.0, 0.001, "ready border is bright")
 	assert_eq(_turn_ready_sound_count, 1, "initial unlock plays one ready tick")
@@ -108,6 +144,16 @@ func test_turn_input_cues_rejection_release_policy_and_ready_tick() -> void:
 	Config.data.game_mode = original_mode
 	Config.data.sfx_enabled = original_sfx_enabled
 	Config.data.haptics_enabled = original_haptics_enabled
+
+
+func _not_inside_board(bounds: Rect2, board_rect: Rect2, direction: Vector2i) -> bool:
+	if direction == Vector2i.LEFT:
+		return bounds.end.x <= board_rect.position.x + 0.001
+	if direction == Vector2i.RIGHT:
+		return bounds.position.x >= board_rect.end.x - 0.001
+	if direction == Vector2i.UP:
+		return bounds.end.y <= board_rect.position.y + 0.001
+	return bounds.position.y >= board_rect.end.y - 0.001
 
 
 func _on_sfx_play_called(

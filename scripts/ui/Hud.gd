@@ -978,12 +978,24 @@ func _format_multiplier(multiplier: float) -> String:
 
 
 func _on_warning_changed(directions: Array[Vector2i]) -> void:
-	var names: Array[String] = []
+	var symbols: Array[String] = []
 	for direction: Vector2i in directions:
-		names.append(OrbTypes.dir_name(direction))
-	_blocked_label.visible = not _blitz_mode and not names.is_empty()
+		symbols.append(_direction_symbol(direction))
+	_blocked_label.visible = not _blitz_mode and not symbols.is_empty()
 	_blocked_panel.visible = _blocked_label.visible
-	_blocked_label.text = "" if names.is_empty() else "BLOCKED: %s" % ", ".join(names)
+	_blocked_label.text = "" if symbols.is_empty() else "%s 막힘" % " ".join(symbols)
+
+
+func _direction_symbol(direction: Vector2i) -> String:
+	if direction == Vector2i.LEFT:
+		return "←"
+	if direction == Vector2i.RIGHT:
+		return "→"
+	if direction == Vector2i.UP:
+		return "↑"
+	if direction == Vector2i.DOWN:
+		return "↓"
+	return "?"
 
 
 func _on_time_changed(remaining: float) -> void:

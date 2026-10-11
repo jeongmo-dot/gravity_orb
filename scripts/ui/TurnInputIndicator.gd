@@ -8,18 +8,32 @@ const READY_FADE_DURATION: float = 0.20
 const BUSY_FADE_DURATION: float = 0.10
 const REJECTED_FLASH_DURATION: float = 0.30
 const ORBIT_DURATION: float = 1.0
+const BREATH_DURATION: float = 1.60
+const BREATH_ALPHA_MIN: float = 0.85
+const BREATH_ALPHA_MAX: float = 1.0
 const BUSY_BORDER_ALPHA: float = 0.40
 const BORDER_WIDTH: float = 5.0
-const ARROW_OFFSET: float = 30.0
-const ARROW_LENGTH: float = 24.0
-const ARROW_HALF_WIDTH: float = 10.0
-const ORBIT_RADIUS: float = 6.0
+const ARROW_SIZE: float = 56.0
+const ARROW_HALF_SPAN: float = 24.0
+const ARROW_DEPTH: float = 18.0
+const ARROW_STROKE_WIDTH: float = 8.0
+const ARROW_HORIZONTAL_OFFSET: float = 13.0
+const ARROW_VERTICAL_OFFSET: float = 34.0
+const BLOCKED_MARK_SIZE: float = 12.0
+const BLOCKED_MARK_SIDE_OFFSET: float = 34.0
+const BLOCKED_MARK_VERTICAL_OFFSET: float = 24.0
+const ORBIT_DIAMETER: float = 20.0
+const ORBIT_RADIUS: float = ORBIT_DIAMETER * 0.5
+const ORBIT_OUTSIDE_GAP: float = 4.0
+const ORBIT_TRAIL_SIDE_FRACTION: float = 0.15
+const ORBIT_TRAIL_SAMPLES: int = 18
 
 var _manager: TurnManager
 var _board: Board3D
 var _ready_state: bool = false
 var _cues_visible: bool = false
 var _arrow_alpha: float = 0.0
+var _breath_elapsed: float = 0.0
 var _orbit_elapsed: float = 0.0
 var _rejected_remaining: float = 0.0
 var _rejected_direction: Vector2i = Vector2i.ZERO
@@ -66,6 +80,8 @@ func _process(delta: float) -> void:
 	var target_alpha: float = 1.0 if _ready_state else 0.0
 	var fade_duration: float = READY_FADE_DURATION if _ready_state else BUSY_FADE_DURATION
 	_arrow_alpha = move_toward(_arrow_alpha, target_alpha, real_delta / fade_duration)
+	if _ready_state:
+		_breath_elapsed = fmod(_breath_elapsed + real_delta, BREATH_DURATION)
 	if not _ready_state:
 		_orbit_elapsed = fmod(_orbit_elapsed + real_delta, ORBIT_DURATION)
 	if _rejected_remaining > 0.0:
@@ -87,14 +103,20 @@ func _draw() -> void:
 	draw_rect(board_rect, border_color, false, BORDER_WIDTH, true)
 	for direction: Vector2i in OrbTypes.DIRECTIONS:
 		var alpha: float = _arrow_alpha
+		var scale_value: float = arrow_scale()
 		var color: Color = arrow_color(direction)
 		if direction == _rejected_direction and _rejected_remaining > 0.0:
 			alpha = _rejected_remaining / REJECTED_FLASH_DURATION
+			scale_value = 1.0
 			color = REJECTED_COLOR
+		elif _ready_state:
+			alpha *= breathing_alpha()
 		if alpha <= 0.001:
 			continue
 		color.a *= alpha
-		_draw_arrow(board_rect, direction, color)
+		_draw_arrow(board_rect, direction, color, scale_value)
+		if direction in _blocked_directions and _ready_state:
+			_draw_blocked_mark(board_rect, direction, color, scale_value)
 	if not _ready_state:
 		_draw_orbit_light(board_rect)
 
@@ -109,7 +131,10 @@ func _on_state_changed(next_state: int) -> void:
 		queue_redraw()
 		return
 	_cues_visible = true
+	var was_ready: bool = _ready_state
 	_ready_state = next_state == int(TurnManager.State.WAITING_INPUT)
+	if _ready_state and not was_ready:
+		_breath_elapsed = 0.0
 	if not _ready_state:
 		_orbit_elapsed = 0.0
 	queue_redraw()
@@ -148,6 +173,27 @@ func is_busy_cue() -> bool:
 
 func arrow_alpha() -> float:
 	return _arrow_alpha
+
+
+func arrow_scale() -> float:
+	return lerpf(0.8, 1.0, _arrow_alpha)
+
+
+func breathing_alpha() -> float:
+	var wave: float = 0.5 - 0.5 * cos(_breath_elapsed * TAU / BREATH_DURATION)
+	return lerpf(BREATH_ALPHA_MIN, BREATH_ALPHA_MAX, wave)
+
+
+func arrow_size() -> float:
+	return ARROW_SIZE
+
+
+func orbit_light_diameter() -> float:
+	return ORBIT_DIAMETER
+
+
+func orbit_trail_length(board_rect: Rect2) -> float:
+	return minf(board_rect.size.x, board_rect.size.y) * ORBIT_TRAIL_SIDE_FRACTION
 
 
 func orbit_visible() -> bool:
@@ -191,34 +237,116 @@ func _projected_board_rect() -> Rect2:
 	return Rect2(minimum, maximum - minimum)
 
 
-func _draw_arrow(board_rect: Rect2, direction: Vector2i, color: Color) -> void:
+func arrow_bounds(board_rect: Rect2, direction: Vector2i, scale_value: float = 1.0) -> Rect2:
+	var center: Vector2 = _arrow_center(board_rect, direction)
 	var direction_vector: Vector2 = Vector2(direction)
-	var center: Vector2 = board_rect.get_center()
-	if direction.x < 0:
-		center.x = board_rect.position.x - ARROW_OFFSET
-	elif direction.x > 0:
-		center.x = board_rect.end.x + ARROW_OFFSET
-	elif direction.y < 0:
-		center.y = board_rect.position.y - ARROW_OFFSET
-	else:
-		center.y = board_rect.end.y + ARROW_OFFSET
 	var perpendicular: Vector2 = Vector2(-direction_vector.y, direction_vector.x)
-	var tip: Vector2 = center + direction_vector * ARROW_LENGTH * 0.55
-	var rear: Vector2 = center - direction_vector * ARROW_LENGTH * 0.45
-	var head_base: Vector2 = center + direction_vector * ARROW_LENGTH * 0.05
-	draw_line(rear, head_base, color, 5.0, true)
-	draw_colored_polygon(
+	var half_depth: float = ARROW_DEPTH * 0.5 * scale_value
+	var half_span: float = ARROW_HALF_SPAN * scale_value
+	var points: PackedVector2Array = PackedVector2Array([
+		center - direction_vector * half_depth + perpendicular * half_span,
+		center + direction_vector * half_depth,
+		center - direction_vector * half_depth - perpendicular * half_span,
+	])
+	var minimum: Vector2 = points[0]
+	var maximum: Vector2 = points[0]
+	for point: Vector2 in points:
+		minimum = minimum.min(point)
+		maximum = maximum.max(point)
+	return Rect2(minimum, maximum - minimum).grow(ARROW_STROKE_WIDTH * 0.5)
+
+
+func orbit_path_rect(board_rect: Rect2) -> Rect2:
+	return board_rect.grow(ORBIT_RADIUS + ORBIT_OUTSIDE_GAP)
+
+
+func blocked_mark_bounds(board_rect: Rect2, direction: Vector2i) -> Rect2:
+	var center: Vector2 = _blocked_mark_center(board_rect, direction)
+	var half_extent: float = BLOCKED_MARK_SIZE * 0.5 + 1.5
+	return Rect2(center - Vector2.ONE * half_extent, Vector2.ONE * half_extent * 2.0)
+
+
+func _draw_arrow(
+	board_rect: Rect2,
+	direction: Vector2i,
+	color: Color,
+	scale_value: float
+) -> void:
+	var direction_vector: Vector2 = Vector2(direction)
+	var center: Vector2 = _arrow_center(board_rect, direction)
+	var perpendicular: Vector2 = Vector2(-direction_vector.y, direction_vector.x)
+	var half_depth: float = ARROW_DEPTH * 0.5 * scale_value
+	var half_span: float = ARROW_HALF_SPAN * scale_value
+	draw_polyline(
 		PackedVector2Array([
-			tip,
-			head_base + perpendicular * ARROW_HALF_WIDTH,
-			head_base - perpendicular * ARROW_HALF_WIDTH,
+			center - direction_vector * half_depth + perpendicular * half_span,
+			center + direction_vector * half_depth,
+			center - direction_vector * half_depth - perpendicular * half_span,
 		]),
-		color
+		color,
+		ARROW_STROKE_WIDTH * scale_value,
+		true
 	)
 
 
+func _draw_blocked_mark(
+	board_rect: Rect2,
+	direction: Vector2i,
+	color: Color,
+	scale_value: float
+) -> void:
+	var center: Vector2 = _blocked_mark_center(board_rect, direction)
+	var half_size: float = BLOCKED_MARK_SIZE * 0.5 * scale_value
+	var stroke_width: float = 3.0 * scale_value
+	draw_line(
+		center - Vector2(half_size, half_size),
+		center + Vector2(half_size, half_size),
+		color,
+		stroke_width,
+		true
+	)
+	draw_line(
+		center + Vector2(-half_size, half_size),
+		center + Vector2(half_size, -half_size),
+		color,
+		stroke_width,
+		true
+	)
+
+
+func _arrow_center(board_rect: Rect2, direction: Vector2i) -> Vector2:
+	var center: Vector2 = board_rect.get_center()
+	if direction.x < 0:
+		center.x = board_rect.position.x - ARROW_HORIZONTAL_OFFSET
+	elif direction.x > 0:
+		center.x = board_rect.end.x + ARROW_HORIZONTAL_OFFSET
+	elif direction.y < 0:
+		center.y = board_rect.position.y - ARROW_VERTICAL_OFFSET
+	else:
+		center.y = board_rect.end.y + ARROW_VERTICAL_OFFSET
+	return center
+
+
+func _blocked_mark_center(board_rect: Rect2, direction: Vector2i) -> Vector2:
+	var offset: float = (
+		BLOCKED_MARK_SIDE_OFFSET
+		if direction.x != 0
+		else BLOCKED_MARK_VERTICAL_OFFSET
+	)
+	return _arrow_center(board_rect, direction) + Vector2.UP * offset
+
+
 func _draw_orbit_light(board_rect: Rect2) -> void:
-	var orbit_rect: Rect2 = board_rect.grow(BORDER_WIDTH * 0.5)
+	var orbit_rect: Rect2 = orbit_path_rect(board_rect)
+	var perimeter: float = 2.0 * (orbit_rect.size.x + orbit_rect.size.y)
+	var trail_progress: float = orbit_trail_length(board_rect) / perimeter
+	for sample_index: int in range(ORBIT_TRAIL_SAMPLES, 0, -1):
+		var trail_ratio: float = float(sample_index) / float(ORBIT_TRAIL_SAMPLES)
+		var sample_progress: float = orbit_progress() - trail_progress * trail_ratio
+		var trail_position: Vector2 = _point_on_rect_perimeter(orbit_rect, sample_progress)
+		var trail_color: Color = READY_COLOR
+		trail_color.a = lerpf(0.03, 0.38, pow(1.0 - trail_ratio, 1.6))
+		draw_circle(trail_position, lerpf(2.0, 5.5, 1.0 - trail_ratio), trail_color)
 	var position_on_border: Vector2 = _point_on_rect_perimeter(
 		orbit_rect,
 		orbit_progress()

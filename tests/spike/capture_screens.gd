@@ -202,6 +202,7 @@ func _capture_turn_scenes() -> void:
 		await _destroy_main(main)
 		return
 	await _write_board_projection_report(main, board)
+	await _write_turn_input_cue_report(main)
 	var ready_blocked: Array[Vector2i] = [Vector2i.LEFT]
 	manager.blocked_directions = ready_blocked.duplicate()
 	manager.warning_changed.emit(ready_blocked)
@@ -260,11 +261,12 @@ func _capture_turn_scenes() -> void:
 	hud._set_danger_badge(0.0, 1.0)
 	manager.blocked_directions.clear()
 	manager.blocked_directions.append(Vector2i.DOWN)
-	hud._on_warning_changed(manager.blocked_directions)
+	manager.warning_changed.emit(manager.blocked_directions)
 	board.set_warning_directions(manager.blocked_directions)
 	await get_tree().create_timer(0.20).timeout
 	_validate_turn_blocked_scene(main)
 	await _capture("18_board_blocked.png")
+	_validate_turn_blocked_pixels(main)
 	manager.blocked_directions.clear()
 	hud._on_warning_changed(manager.blocked_directions)
 	board.set_warning_directions(manager.blocked_directions)
@@ -1099,12 +1101,6 @@ func _measure_v2_contrast() -> void:
 	var blocked_top: Color = _average_side_band_color(
 		blocked_image, board_rect, Vector2i.UP, 4.0, 10.0
 	)
-	var blocked_other_red: float = 0.0
-	for direction: Vector2i in [Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]:
-		blocked_other_red = maxf(
-			blocked_other_red,
-			_average_side_band_color(blocked_image, board_rect, direction, 4.0, 10.0).r
-		)
 	print(
 		"SPACE_CONTRAST empty_board_average=%.4f background_maximum=%.4f crowded_orb_average=%.4f crowded_board_average=%.4f orb_board_ratio=%.2f" % [
 			empty_board_average,
@@ -1123,11 +1119,10 @@ func _measure_v2_contrast() -> void:
 		]
 	)
 	print(
-		"SPACE_BLOCKED_BAND wall=TOP r=%.1f g=%.1f b=%.1f other_max_r=%.1f" % [
+		"SPACE_BLOCKED_BAND wall=TOP r=%.1f g=%.1f b=%.1f expected=normal" % [
 			blocked_top.r * 255.0,
 			blocked_top.g * 255.0,
 			blocked_top.b * 255.0,
-			blocked_other_red * 255.0,
 		]
 	)
 	if empty_board_average > 0.10:
@@ -1140,10 +1135,8 @@ func _measure_v2_contrast() -> void:
 		_fail("Danger outer band is not red-dominant at the pulse minimum")
 	if background_red_gain < 20.0:
 		_fail("Danger nebula red gain %.1f is below 20" % background_red_gain)
-	if blocked_top.r < blocked_top.g * 2.0 or blocked_top.r < blocked_top.b * 2.0:
-		_fail("Blocked top wall band is not red-dominant")
-	if blocked_top.r < blocked_other_red * 1.5:
-		_fail("Blocked top wall is not 1.5x redder than the other walls")
+	if blocked_top.r > maxf(blocked_top.g, blocked_top.b) * 1.5:
+		_fail("Blocked top wall still has a red-dominant warning band")
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(MEASUREMENT_DIRECTORY))
 	var report_path: String = MEASUREMENT_DIRECTORY.path_join("space_contrast_report.json")
 	var report_file: FileAccess = FileAccess.open(report_path, FileAccess.WRITE)
@@ -1166,12 +1159,11 @@ func _measure_v2_contrast() -> void:
 				danger_band.b * 255.0,
 			],
 			"danger_background_red_gain_255": background_red_gain,
-			"blocked_top_band_rgb_255": [
+			"blocked_top_normal_band_rgb_255": [
 				blocked_top.r * 255.0,
 				blocked_top.g * 255.0,
 				blocked_top.b * 255.0,
 			],
-			"blocked_other_wall_max_red_255": blocked_other_red * 255.0,
 		}, "  "))
 	await _destroy_main(main)
 
@@ -1852,11 +1844,122 @@ func _write_board_projection_report(main: Main, board: Board3D) -> void:
 	)
 
 
+func _write_turn_input_cue_report(main: Main) -> void:
+	var indicator: TurnInputIndicator = main.get_node(
+		"UI/Hud/TurnInputIndicator"
+	) as TurnInputIndicator
+	var board_rect: Rect2 = indicator._projected_board_rect()
+	var viewport_rect: Rect2 = get_viewport().get_visible_rect()
+	var top_hud_bottom: float = 0.0
+	for node_path: String in [
+		"UI/Hud/ScorePanel",
+		"UI/Hud/BestPanel",
+		"UI/Hud/DangerPanel",
+		"UI/Hud/MaxComboLabel",
+		"UI/Hud/MultiplierLabel",
+		"UI/Hud/ComboLabel",
+	]:
+		var top_control: Control = main.get_node(node_path) as Control
+		top_hud_bottom = maxf(top_hud_bottom, top_control.get_global_rect().end.y)
+	var shelf: Control = main.get_node("UI/Hud/PreviewShelf") as Control
+	var shelf_top: float = shelf.get_global_rect().position.y
+	var arrow_bounds: Dictionary = {}
+	var arrows_inside_viewport: bool = true
+	var arrows_outside_board: bool = true
+	for direction: Vector2i in OrbTypes.DIRECTIONS:
+		var bounds: Rect2 = indicator.arrow_bounds(board_rect, direction)
+		var mark_bounds: Rect2 = indicator.blocked_mark_bounds(board_rect, direction)
+		arrow_bounds[OrbTypes.dir_name(direction)] = {
+			"left": bounds.position.x,
+			"top": bounds.position.y,
+			"right": bounds.end.x,
+			"bottom": bounds.end.y,
+		}
+		arrows_inside_viewport = (
+			arrows_inside_viewport
+			and viewport_rect.encloses(bounds)
+			and viewport_rect.encloses(mark_bounds)
+		)
+		arrows_outside_board = arrows_outside_board and _cue_bounds_outside_board(
+			bounds, board_rect, direction
+		) and _cue_bounds_outside_board(mark_bounds, board_rect, direction)
+	var top_arrow: Rect2 = indicator.arrow_bounds(board_rect, Vector2i.UP)
+	var bottom_arrow: Rect2 = indicator.arrow_bounds(board_rect, Vector2i.DOWN)
+	var top_mark: Rect2 = indicator.blocked_mark_bounds(board_rect, Vector2i.UP)
+	var bottom_mark: Rect2 = indicator.blocked_mark_bounds(board_rect, Vector2i.DOWN)
+	var top_hud_clear: bool = minf(top_arrow.position.y, top_mark.position.y) >= top_hud_bottom
+	var shelf_clear: bool = bottom_arrow.end.y <= shelf_top
+	shelf_clear = shelf_clear and bottom_mark.end.y <= shelf_top
+	if not arrows_inside_viewport:
+		_fail("Turn input arrows leave the visible HUD canvas")
+	if not arrows_outside_board:
+		_fail("Turn input arrows enter the board interior")
+	if not top_hud_clear:
+		_fail("Turn input top arrow overlaps the multiplier/combo HUD")
+	if not shelf_clear:
+		_fail("Turn input bottom arrow overlaps the preview shelf")
+	var report: Dictionary = {
+		"arrow_size_logical_px": indicator.arrow_size(),
+		"arrow_appear_scale": [0.8, 1.0],
+		"arrow_breath_alpha": [
+			TurnInputIndicator.BREATH_ALPHA_MIN,
+			TurnInputIndicator.BREATH_ALPHA_MAX,
+		],
+		"arrow_breath_seconds": TurnInputIndicator.BREATH_DURATION,
+		"orbit_light_diameter_logical_px": indicator.orbit_light_diameter(),
+		"orbit_trail_logical_px": indicator.orbit_trail_length(board_rect),
+		"orbit_trail_side_fraction": TurnInputIndicator.ORBIT_TRAIL_SIDE_FRACTION,
+		"board": {
+			"left": board_rect.position.x,
+			"top": board_rect.position.y,
+			"right": board_rect.end.x,
+			"bottom": board_rect.end.y,
+		},
+		"arrow_bounds": arrow_bounds,
+		"arrows_inside_viewport": arrows_inside_viewport,
+		"arrows_outside_board": arrows_outside_board,
+		"top_hud_bottom": top_hud_bottom,
+		"preview_shelf_top": shelf_top,
+		"top_hud_clear": top_hud_clear,
+		"preview_shelf_clear": shelf_clear,
+	}
+	var path: String = _output_directory.path_join("turn_input_cue.json")
+	var file: FileAccess = FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		_fail("Could not write turn input cue report")
+		return
+	file.store_string(JSON.stringify(report, "  "))
+	print(
+		"TURN_INPUT_CUE arrow=%.1f orbit=%.1f trail=%.1f top_clear=%s shelf_clear=%s" % [
+			indicator.arrow_size(),
+			indicator.orbit_light_diameter(),
+			indicator.orbit_trail_length(board_rect),
+			str(top_hud_clear),
+			str(shelf_clear),
+		]
+	)
+
+
+func _cue_bounds_outside_board(
+	bounds: Rect2,
+	board_rect: Rect2,
+	direction: Vector2i
+) -> bool:
+	if direction == Vector2i.LEFT:
+		return bounds.end.x <= board_rect.position.x + 0.001
+	if direction == Vector2i.RIGHT:
+		return bounds.position.x >= board_rect.end.x - 0.001
+	if direction == Vector2i.UP:
+		return bounds.end.y <= board_rect.position.y + 0.001
+	return bounds.position.y >= board_rect.end.y - 0.001
+
+
 func _prepare_output_directory() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_output_directory))
 	for file_name: String in CAPTURE_FILES:
 		_remove_file(_output_directory.path_join(file_name))
 	_remove_file(_output_directory.path_join("board_projection.json"))
+	_remove_file(_output_directory.path_join("turn_input_cue.json"))
 	_remove_file(_temp_save_path)
 
 
@@ -1872,7 +1975,7 @@ func _validate_turn_game_over_scene(main: Main) -> void:
 	var blocked: Label = main.get_node("UI/Hud/BlockedLabel") as Label
 	if not blocked.visible:
 		_fail("TURN game-over capture must show blocked direction")
-	_expect_label_text(blocked, "BLOCKED: LEFT", "TURN HUD blocked direction")
+	_expect_label_text(blocked, "← 막힘", "TURN HUD blocked direction")
 	_expect_label_text(
 		main.get_node("UI/Hud/ScoreLabel") as Label,
 		str(TURN_CAPTURE_SCORE),
@@ -1896,10 +1999,76 @@ func _validate_turn_blocked_scene(main: Main) -> void:
 	var game_over_panel: Control = main.get_node("UI/Hud/GameOverPanel") as Control
 	if not blocked.visible:
 		_fail("TURN blocked capture must show the blocked direction")
-	_expect_label_text(blocked, "BLOCKED: DOWN", "TURN blocked-only HUD direction")
+	_expect_label_text(blocked, "↓ 막힘", "TURN blocked-only HUD direction")
 	if game_over_panel.visible:
 		_fail("TURN blocked capture must not show the game-over panel")
 	print("SCREEN_CAPTURE_CHECK scene=board_blocked blocked=DOWN game_over=false")
+
+
+func _validate_turn_blocked_pixels(main: Main) -> void:
+	var image: Image = Image.load_from_file(
+		ProjectSettings.globalize_path(_output_directory.path_join("18_board_blocked.png"))
+	)
+	if image == null or image.is_empty():
+		_fail("TURN blocked capture could not be loaded for pixel validation")
+		return
+	var indicator: TurnInputIndicator = main.get_node(
+		"UI/Hud/TurnInputIndicator"
+	) as TurnInputIndicator
+	var logical_board: Rect2 = indicator._projected_board_rect()
+	var logical_arrow: Rect2 = indicator.arrow_bounds(logical_board, Vector2i.DOWN)
+	var logical_mark: Rect2 = indicator.blocked_mark_bounds(logical_board, Vector2i.DOWN)
+	var logical_size: Vector2 = get_viewport().get_visible_rect().size
+	var image_scale: Vector2 = Vector2(
+		float(image.get_width()) / logical_size.x,
+		float(image.get_height()) / logical_size.y
+	)
+	var board_rect: Rect2 = Rect2(
+		logical_board.position * image_scale,
+		logical_board.size * image_scale
+	)
+	var arrow_rect: Rect2 = Rect2(
+		logical_arrow.position * image_scale,
+		logical_arrow.size * image_scale
+	).grow(2.0)
+	var mark_rect: Rect2 = Rect2(
+		logical_mark.position * image_scale,
+		logical_mark.size * image_scale
+	).grow(1.0)
+	var top_band: Color = _average_side_band_color(
+		image, board_rect, Vector2i.UP, 4.0, 10.0
+	)
+	var red_arrow_pixels: int = _count_red_dominant_pixels(image, arrow_rect)
+	var red_mark_pixels: int = _count_red_dominant_pixels(image, mark_rect)
+	print(
+		"TURN_BLOCKED_PIXEL_CHECK arrow_red_pixels=%d x_red_pixels=%d top_wall_rgb=%.1f,%.1f,%.1f" % [
+			red_arrow_pixels,
+			red_mark_pixels,
+			top_band.r * 255.0,
+			top_band.g * 255.0,
+			top_band.b * 255.0,
+		]
+	)
+	if red_arrow_pixels < 20:
+		_fail("TURN blocked capture does not contain the red chevron")
+	if red_mark_pixels < 6:
+		_fail("TURN blocked capture does not contain the small red X above the chevron")
+	if top_band.r > maxf(top_band.g, top_band.b) * 1.5:
+		_fail("TURN blocked capture still contains a red warning wall")
+
+
+func _count_red_dominant_pixels(image: Image, rect: Rect2) -> int:
+	var min_x: int = maxi(0, floori(rect.position.x))
+	var max_x: int = mini(image.get_width() - 1, ceili(rect.end.x))
+	var min_y: int = maxi(0, floori(rect.position.y))
+	var max_y: int = mini(image.get_height() - 1, ceili(rect.end.y))
+	var count: int = 0
+	for y: int in range(min_y, max_y + 1):
+		for x: int in range(min_x, max_x + 1):
+			var color: Color = image.get_pixel(x, y)
+			if color.r >= 0.55 and color.r > color.g * 1.4 and color.r > color.b * 1.4:
+				count += 1
+	return count
 
 
 func _validate_turn_ramp_preview_scene(main: Main, batch_size: int, scene_name: String) -> void:

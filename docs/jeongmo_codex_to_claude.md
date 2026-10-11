@@ -38,6 +38,45 @@
 
 ## 미확인
 
+### [2026-10-12] 대상 #77 — 턴제 입력 표시 크기·막힘 경고 다듬기
+- 상태: 완료 — 방향 화살표와 계산 중 광원을 모바일 가독성 크기로 키우고, 막힘 경고는 3D 벽 빨강 없이 빨간 X 화살표와 한글 받침 라벨로만 표시함
+- 브랜치 / PR: `turn-input-cue-sizing` / 생성 예정
+- 변경 파일: `scenes/UI.tscn`, `scripts/spike/Board3D.gd`, `scripts/ui/{Hud,TurnInputIndicator}.gd`, `tests/capture_screens.ps1`, `tests/scenarios/test_jolt_integration.gd`, `tests/spike/capture_screens.gd`, `tests/test_{screen_layout,space_board_visuals,turn_input_indicator}.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 네 방향 갈매기 화살표를 약 56 논리 px로 확대하고 0.2초 동안 `0.8→1.0` 배율, 입력 가능 중 알파 `0.85~1.0`·1.6초 숨쉬기 적용 — 자동 (`test_turn_input_cues_rejection_release_policy_and_ready_tick`) + 캡처 `44_turn_ready`
+  - [x] 막힘 빨강과 거절 회색도 같은 56px 형상을 사용하고, 막힘 화살표 위에는 작은 빨간 X를 별도로 표시 — 자동 (색·경계·크기 테스트) + 캡처 `44`, `46`, `18` 화소 검사
+  - [x] 계산 중 광원 본체 지름 20 논리 px, 보드 한 변의 15%인 148.5 논리 px 꼬리를 뒤로 흐리게 표시 — 자동 (수치·진행 테스트 및 캡처 리포트) + `45_turn_busy_a/b`
+  - [x] 두 화면 비율에서 화살표·X가 보드 안이나 화면 밖으로 들어가지 않고 위 HUD·아래 받침과 겹치지 않음 — 자동 (각 방향 `Rect2` 경계, 캡처 리포트) + 직접 확인
+  - [x] `Board3D` 막힘 방향은 벽 금속색·중력 벽 빛을 바꾸지 않으며, 피버 주황과 위험 배수 ×4 빨강 바깥 띠는 유지 — 자동 (`test_blocked_fever_and_danger_keep_distinct_frame_states`, Jolt 통합 테스트)
+  - [x] 받침 라벨은 한 방향 `← 막힘`, 여러 방향 `← ↑ 막힘`; `18_board_blocked`는 `↓ 막힘`·빨간 X 화살표·금속색 벽을 표시 — 자동 (`test_turn_blocked_label_only_shows_for_blocked_directions`, 캡처 장면/화소 검사)
+  - [x] 입력 정책·턴 규칙·BLITZ·물리·점수·사용자 저장은 변경하지 않음 — 전체 회귀, 세 모드 스모크, 상태 해시 확인
+- 캡처·화면 관측 (Godot Standard/Compatibility, 직접 확인):
+  - `tests/capture_screens.ps1 -HudScenesOnly` → 종료 코드 0, `540×960`·`540×1170` 각 17장, 합계 34장; 보드 좌·우·폭 차이 `0.000px`
+  - 두 비율 공통 수치: 화살표 `56.0` 논리 px, 광원 지름 `20.0` 논리 px, 꼬리 `148.5` 논리 px; `arrows_inside_viewport=true`, `arrows_outside_board=true`, `top_hud_clear=true`, `preview_shelf_clear=true`
+  - `44_turn_ready`: 네 갈매기가 이전보다 뚜렷하고 LEFT는 빨간 화살표 위 작은 X, 나머지는 하늘색으로 보임. 상단 배수·콤보와 하단 받침, 보드 내부에 겹치지 않음
+  - `45_turn_busy_a/b`: 지름 20px 광원과 뒤로 흐려지는 짧은 꼬리가 위쪽에서 오른쪽 아래로 이동해 두 시점 위치가 다름
+  - `46_turn_rejected`: 계산 중 LEFT 갈매기 하나가 같은 56px 크기의 회색으로 보이고 막힘 X는 보이지 않음
+  - `18_board_blocked`: 위쪽 입구 벽은 금속 청회색이고 아래쪽 빨간 갈매기 위 X와 `↓ 막힘`만 경고함. 두 비율 화소 관측 각각 갈매기 빨강 `130px`, X 빨강 `24px`, 위 벽 RGB `(6.7, 12.0, 32.2)`
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - 집중 테스트 `test_turn_input_indicator.gd` → `1/1`, 종료 코드 0
+  - `tests/run_tests.ps1` → 일반 `289/289`(`17.025초`), 장기 `5/5`(`43.995초`), 성능 `5/5`(`2.590초`), 합계 `299/299`, 종료 코드 0, 총 `63.610초`
+  - 시작 화면 / TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - 물리 상태 해시: TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`; #76과 동일
+  - 22시드 장기 물리: 최대 벽/쌍 `13.254/14.389px`, 이탈·발산 `0/0`
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 전역 난수 호출 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. TURN을 시작하고 입력 가능 상태를 본다 → 보드 네 변 바깥에 큰 갈매기가 0.2초 동안 살짝 커져 나타나고, 이후 아주 느리게 밝기만 숨쉬어야 한다.
+  2. 입력 가능 상태에서 스와이프한다 → 화살표가 사라지고 지름 20px의 하늘색 광원과 뒤로 흐려지는 꼬리가 약 1초에 테두리 한 바퀴를 돌아야 한다.
+  3. 계산 중 한 방향으로 스와이프한다 → 해당 방향에 같은 크기의 회색 갈매기만 한 번 깜박이고 턴이 추가되지 않아야 한다.
+  4. 생성 입구가 막히는 상태를 만든다 → 위험 방향의 빨간 갈매기 위에 작은 X와 `방향 화살표 + 막힘` 라벨만 보이고, 반대편 입구 벽은 빨갛게 변하지 않아야 한다.
+  5. 피버와 위험 배수 ×4를 각각 만든다 → 피버의 주황 프레임과 ×4의 빨간 바깥 띠, 중력 방향 벽 빛은 기존처럼 보여야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 좌우 화면 여백이 26.55 논리 px뿐이어서 56px는 방향축 길이가 아니라 갈매기의 양 팔 포함 외곽 크기로 잡았다. 좌우는 보드에서 13px, 위아래는 34px 떨어뜨려 전체 형상이 화면 안에 남고, X는 화면 기준 화살표 위에 분리했다.
+  - 꼬리는 보드 한 변 15%를 18개 반투명 원으로 표본화해 코너에서도 끊기지 않고 뒤로 흐려지게 했다.
+  - PNG와 수치 JSON은 기존 `artifacts/` ignore 대상이라 커밋하지 않음.
+- 남은 것 · 질문: 없음
+
 ### [2026-10-12] 대상 #76 — 턴제 입력 가능·잠김 구분
 - 상태: 완료 — TURN의 입력 가능·계산 중·거절 상태를 보드 테두리와 4방향 화살표로 구분하고, 손을 뗄 때 잠금이 풀렸다면 입력을 받도록 변경함. BLITZ 입력 정책은 유지
 - 브랜치 / PR: `turn-input-state-cues` / [PR #77](https://github.com/jeongmo-dot/gravity_orb/pull/77)

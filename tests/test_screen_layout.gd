@@ -588,7 +588,10 @@ func test_turn_blocked_label_only_shows_for_blocked_directions() -> void:
 	assert_true(not blocked_label.visible, "empty blocked directions hide warning")
 	hud._on_warning_changed(left_blocked)
 	assert_true(blocked_label.visible, "blocked direction shows warning")
-	assert_eq(blocked_label.text, "BLOCKED: LEFT", "blocked warning names direction")
+	assert_eq(blocked_label.text, "← 막힘", "blocked warning uses an arrow and Korean label")
+	var two_blocked: Array[Vector2i] = [Vector2i.LEFT, Vector2i.UP]
+	hud._on_warning_changed(two_blocked)
+	assert_eq(blocked_label.text, "← ↑ 막힘", "multiple blocked directions keep arrow order")
 	var warning_color: Color = blocked_label.get_theme_color("font_color")
 	assert_true(warning_color.r > warning_color.g, "blocked warning uses red warning color")
 	hud._on_warning_changed(no_directions)
