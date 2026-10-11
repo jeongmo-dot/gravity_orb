@@ -40,7 +40,7 @@
 
 ### [2026-10-12] 대상 #75 — 행성 컬렉션 ②: 행성 6종 그림
 - 상태: 완료 — 3D 구슬·2D 미리보기·시작 화면을 색별 6행성 체계로 통일하고, 레벨별 디테일·빛과 결정적 캡처 검사를 구현함
-- 브랜치 / PR: `planet-collection-2-art` / 생성 예정
+- 브랜치 / PR: `planet-collection-2-art` / [PR #79](https://github.com/jeongmo-dot/gravity_orb/pull/79)
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/{CelestialOrbArt,OrbVisual}.gd`, `scripts/fx/FeedbackDirector.gd`, `scripts/spike/Board3D.gd`, `scripts/ui/OrbitStage.gd`, `tests/spike/capture_screens.gd`, `tests/test_{celestial_orbs,config,feedback,frontend,screen_layout}.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] RED 화성·BLUE 지구·GREEN 천왕성·YELLOW 금성·PURPLE 해왕성·CYAN 수성을 색별 무늬로 구현하고 공유 셰이더·공유 머티리얼·1.0R 안을 유지 — 자동 (`test_celestial_orbs.gd`) + 캡처 `14`, `15`
