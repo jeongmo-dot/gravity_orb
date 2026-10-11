@@ -40,7 +40,7 @@
 
 ### [2026-10-11] 대상 #64 — 비주얼 V2 우주 배경·보드
 - 상태: 완료 — 절차적 우주 배경, 반투명 유리 보드·중력장, 금속/유리 프레임과 중력·BLOCKED·FEVER·DANGER 상태 빛을 구현하고 캡처·대비·창 모드 성능·물리 해시를 관측함
-- 브랜치 / PR: `v2-space-background-board` / PR 생성 후 갱신
+- 브랜치 / PR: `v2-space-background-board` / [PR #66](https://github.com/jeongmo-dot/gravity_orb/pull/66)
 - 변경 파일: `scenes/Main3D.tscn`, `scripts/core/Main.gd`, `scripts/fx/SpaceBackdrop.gd`, `scripts/spike/Board3D.gd`, `scripts/ui/Hud.gd`, `tests/{test_space_board_visuals.gd,capture_screens.ps1}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 어두운 남색→보라 그라데이션, 저채도 성운 3겹, 원·중·근 별 3겹의 느린 반짝임, 중력 전환 시 원거리 `2px`·근거리 `8px` 시차와 `0.3초` 복귀, `30초`마다 `0.6초` 유성을 외부 에셋 없이 절차 셰이더로 구현 — 자동 (`test_space_backdrop_has_three_star_depths_nebula_and_timed_meteor`, `test_space_parallax_moves_toward_gravity_and_returns_in_point_three_seconds`) + 캡처 직접 확인
