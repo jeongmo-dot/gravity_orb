@@ -45,7 +45,6 @@ var _gravity_visual_to: Vector2i = Vector2i.DOWN
 var _gravity_visual_elapsed: float = GRAVITY_FIELD_DURATION
 var _gravity_light_from_position: float = 2.0
 var _gravity_light_delta: float = 0.0
-var _warning_pulse_elapsed: float = 0.0
 var _danger_active: bool = false
 var _danger_intensity: float = 0.0
 var _danger_pulsing: bool = false
@@ -82,8 +81,6 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
-	if not _warning_directions.is_empty():
-		_warning_pulse_elapsed += delta
 	if _danger_pulsing:
 		_danger_pulse_elapsed += delta
 	_gravity_visual_elapsed = minf(
@@ -463,7 +460,6 @@ func blocked_spawn_directions(batch: Array[Dictionary]) -> Array[Vector2i]:
 func set_warning_directions(directions: Array[Vector2i]) -> void:
 	_warning_directions.clear()
 	_warning_directions.append_array(directions)
-	_warning_pulse_elapsed = 0.0
 	_update_warning_visuals()
 
 
@@ -743,35 +739,23 @@ func _add_visual_wall(wall_name: String, wall_position: Vector3, size: Vector3) 
 
 
 func _update_warning_visuals() -> void:
-	var spawn_direction_by_name: Dictionary = {
-		"VisualTop": Vector2i.DOWN,
-		"VisualBottom": Vector2i.UP,
-		"VisualLeft": Vector2i.RIGHT,
-		"VisualRight": Vector2i.LEFT,
-	}
 	var gravity_direction_by_name: Dictionary = {
 		"VisualTop": Vector2i.UP,
 		"VisualBottom": Vector2i.DOWN,
 		"VisualLeft": Vector2i.LEFT,
 		"VisualRight": Vector2i.RIGHT,
 	}
-	var warning_pulse: float = 0.86 + 0.14 * cos(_warning_pulse_elapsed * TAU * 1.4)
 	var danger_pulse: float = _danger_pulse_strength()
 	var danger_color: Color = _danger_color(_danger_multiplier)
 	var light_position: float = _gravity_light_position()
-	for wall_name: String in spawn_direction_by_name:
+	for wall_name: String in gravity_direction_by_name:
 		var wall: MeshInstance3D = _visual_walls.get(wall_name) as MeshInstance3D
 		if wall == null:
 			continue
-		var spawn_direction: Vector2i = Vector2i(spawn_direction_by_name[wall_name])
 		var wall_gravity_direction: Vector2i = Vector2i(gravity_direction_by_name[wall_name])
-		var warning: bool = _warning_directions.has(spawn_direction)
 		var frame_color: Color = METAL_FRAME_COLOR
 		var emission: float = 0.08
-		if warning:
-			frame_color = WARNING_FRAME_COLOR.lerp(Color.WHITE, 0.08 * warning_pulse)
-			emission = 0.32 + 0.30 * warning_pulse
-		elif _fever_active:
+		if _fever_active:
 			frame_color = METAL_FRAME_COLOR.lerp(FEVER_FRAME_COLOR, 0.70)
 			emission = 0.48
 		var wall_material: StandardMaterial3D = _wall_materials.get(wall_name) as StandardMaterial3D
@@ -795,11 +779,7 @@ func _update_warning_visuals() -> void:
 		)
 		var inner_color: Color = GRAVITY_GLOW_COLOR
 		var inner_strength: float = gravity_weight
-		if warning:
-			inner_color = WARNING_FRAME_COLOR
-			inner_strength = 0.52 + 0.48 * warning_pulse
-			highlight_center = 0.5
-		elif _fever_active:
+		if _fever_active:
 			inner_color = FEVER_FRAME_COLOR
 			inner_strength = maxf(inner_strength, 0.72)
 			highlight_center = 0.5
@@ -818,10 +798,7 @@ func _update_warning_visuals() -> void:
 			else 0.0
 		)
 		var outer_color: Color = danger_color
-		if warning:
-			outer_color = WARNING_FRAME_COLOR
-			outer_strength = maxf(outer_strength, warning_pulse)
-		elif _fever_active:
+		if _fever_active:
 			outer_color = FEVER_FRAME_COLOR
 			outer_strength = maxf(outer_strength, 0.58)
 		_set_outer_glow_material(outer_glow, outer_color, outer_strength)

@@ -164,16 +164,22 @@ func test_blocked_fever_and_danger_keep_distinct_frame_states() -> void:
 	board._process(0.1)
 	var top_wall: MeshInstance3D = board.get_node("VisualTilt/VisualTop") as MeshInstance3D
 	var top_material: StandardMaterial3D = top_wall.material_override as StandardMaterial3D
-	assert_true(top_material.albedo_color.r > top_material.albedo_color.b, "blocked edge is red")
+	assert_eq(
+		top_material.albedo_color,
+		Board3D.METAL_FRAME_COLOR,
+		"blocked direction leaves the frame at its normal metal color"
+	)
 	var blocked_outer: MeshInstance3D = board.get_node(
 		"VisualTilt/VisualTop/OuterGlow"
 	) as MeshInstance3D
 	var blocked_outer_material: StandardMaterial3D = (
 		blocked_outer.material_override as StandardMaterial3D
 	)
-	assert_true(
-		blocked_outer_material.albedo_color.r > blocked_outer_material.albedo_color.b * 2.0,
-		"only the blocked wall receives a strong red outer band"
+	assert_near(
+		blocked_outer_material.emission_energy_multiplier,
+		0.0,
+		0.0001,
+		"blocked direction does not add an outer warning band"
 	)
 	board.set_warning_directions([])
 	board.set_fever_active(true)
