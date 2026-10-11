@@ -3,7 +3,7 @@
 사용자가 실제 창에서 확인할 항목. 자동 검증으로 먼저 병합하고, 사용자 확인 후 체크한다.
 문제가 있으면 Claude에게 알려 인박스 항목으로 만든다.
 
-실행: `C:\work\Godot\Godot_v4.8-dev3_mono_win64.exe --path C:\Workspace\repos\game\gravity_orb` (메인 = 3D, #20부터)
+실행: `C:\work\GodotStandard\Godot_v4.8-dev3_win64.exe --path C:\Workspace\repos\game\gravity_orb` (메인 = 3D, #20부터)
 
 > 2026-10-03 정리: #20(Jolt 3D 정식 통합)부터 메인 실행이 3D다. 2D 물리 전용 항목(점진 성장 모습, 2D 유령 반투명, 2D 벽 박힘)은 **3D에서 대체됨**으로 닫고, 규칙·UI 항목은 3D 빌드에서 확인한다.
 

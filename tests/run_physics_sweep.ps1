@@ -5,7 +5,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoPath = Split-Path -Parent $PSScriptRoot
-$godotPath = 'C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe'
+$godotPath = 'C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe'
 $resultPath = Join-Path $repoPath '.godot\physics-sweep'
 New-Item -ItemType Directory -Force -Path $resultPath | Out-Null
 

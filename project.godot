@@ -32,10 +32,6 @@ window/size/window_height_override=960
 window/stretch/mode="canvas_items"
 window/handheld/orientation=1
 
-[dotnet]
-
-project/assembly_name="Gravity Orb"
-
 [input]
 
 debug_toggle_hud={

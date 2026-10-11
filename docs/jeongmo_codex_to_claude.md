@@ -38,6 +38,27 @@
 
 ## 미확인
 
+### [2026-10-11] 대상 #64 — Standard Godot(.NET 미포함) 사용 기준 전환
+- 상태: 완료 — 프로젝트·검증 스크립트의 기본 실행 기준을 Mono/.NET 빌드에서 Godot 4.8 Standard 빌드로 전환함
+- 브랜치 / PR: `v2-space-background-board` / [PR #66](https://github.com/jeongmo-dot/gravity_orb/pull/66)
+- 변경 파일: `AGENTS.md`, `project.godot`, `docs/manual_qa_pending.md`, `tests/*.ps1` 18개, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 로컬 기본 엔진 경로를 `C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`로 변경하고 `GODOT` 환경변수 우선 동작은 유지 — 자동 (`tests/run_tests.ps1`, `tests/capture_screens.ps1` 및 측정 스크립트 16개)
+  - [x] GUI 수동 QA 경로를 Standard 빌드 `Godot_v4.8-dev3_win64.exe`로 변경 — 문서 확인
+  - [x] C# 소스·프로젝트가 없음을 확인하고 불필요한 `project.godot`의 `[dotnet]`/assembly 설정 제거 — 정적 확인 + import
+  - [x] Standard 엔진으로 import·전체 테스트·시작/TURN/BLITZ 스모크·화면 캡처 실행 — 자동
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 기본 인자 없이 `tests/run_tests.ps1` → 일반 `271/271`, 장기 `4/4`, 성능 `5/5`, 합계 `280/280`; 종료 코드 0, 총 59.803초
+  - 시작 화면 / TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 기본 인자 없이 `tests/capture_screens.ps1` → PNG `17/17`, 종료 코드 0; Standard 버전 문자열과 Compatibility 렌더러 사용 확인
+  - 활성 작업 규칙·테스트·수동 QA 문서에서 `mono_win64` 및 이전 `C:\work\Godot` 경로 잔존 0건
+- 수동 확인 절차:
+  1. `C:\work\GodotStandard\Godot_v4.8-dev3_win64.exe --path C:\Workspace\repos\game\gravity_orb` 실행 → .NET 런타임 오류 없이 시작 화면이 표시되어야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 과거 회신의 `mono` 표기는 당시 실제 검증 기록이므로 소급 변경하지 않고, 현재 사용 기준과 실행 스크립트만 Standard로 전환함.
+- 남은 것 · 질문: 없음
+
 ### [2026-10-11] 대상 #64 — 비주얼 V2 우주 배경·보드
 - 상태: 완료 — 절차적 우주 배경, 반투명 유리 보드·중력장, 금속/유리 프레임과 중력·BLOCKED·FEVER·DANGER 상태 빛을 구현하고 캡처·대비·창 모드 성능·물리 해시를 관측함
 - 브랜치 / PR: `v2-space-background-board` / [PR #66](https://github.com/jeongmo-dot/gravity_orb/pull/66)

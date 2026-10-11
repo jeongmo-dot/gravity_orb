@@ -1,5 +1,5 @@
 param(
-    [string]$GodotPath = "C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe",
+    [string]$GodotPath = "C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe",
     [double]$BlastSpeed = 900.0,
     [int]$BlastMinimumLevel = 5,
     [switch]$BlastOnOnly,

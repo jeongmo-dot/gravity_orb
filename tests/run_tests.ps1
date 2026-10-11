@@ -12,8 +12,8 @@ $repoPath = Split-Path -Parent $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {
     if (-not [string]::IsNullOrWhiteSpace($env:GODOT)) {
         $GodotPath = $env:GODOT
-    } elseif (Test-Path -LiteralPath "C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe") {
-        $GodotPath = "C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe"
+    } elseif (Test-Path -LiteralPath "C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe") {
+        $GodotPath = "C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe"
     } else {
         $GodotPath = "godot"
     }
