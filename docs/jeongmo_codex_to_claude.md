@@ -38,6 +38,38 @@
 
 ## 미확인
 
+### [2026-10-11] 대상 #68 — Windows 테스트 빌드 내보내기 설정·빌드 스크립트
+- 상태: 완료 — Windows x86_64 릴리스·디버그 내보내기, 양쪽 콘솔 래퍼, PCK 내장, 빌드 정보 기록과 템플릿 누락 안내를 구현하고 실제 산출물·스모크를 검증함
+- 브랜치 / PR: `v4-windows-test-build` / 미생성
+- 변경 파일: `export_presets.cfg`, `tools/build_windows.ps1`, `AGENTS.md`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `Windows Desktop` x86_64, PCK 내장, 디버그·릴리스 콘솔 래퍼, 제외 경로, 제품명 `Gravity Orb`, 버전 `0.11.0`, 기본 아이콘 — 실제 릴리스·디버그 내보내기와 Windows 파일 메타데이터 검사
+  - [x] 릴리스 `build/windows/GravityOrb.exe`, `-Debug`는 `build/windows-debug/GravityOrb.exe` 생성 — 자동. 릴리스 `111,038,784`바이트, 디버그 `104,908,608`바이트
+  - [x] 템플릿 누락 시 설치 위치를 안내하고 중단 — 가짜 `%APPDATA%`로 실행해 `stopped=True`, 안내문과 `Godot\\export_templates\\4.8.dev3` 경로 포함 확인
+  - [x] 각 출력 폴더 `BUILD.txt`에 커밋 해시·UTC 빌드 시각·엔진 버전·빌드 모드 기록 — 자동 파일 확인
+  - [x] 릴리스 콘솔 래퍼 스모크 시작 화면·TURN·BLITZ — 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - [x] 스모크 전후 사용자 `save.cfg` 불변 — 존재 상태 `True → True`, SHA-256 `7DAA3947D0BD0840C92EA704E8A339564834E1633A1E7729B5A5B2A715691A89` 동일
+  - [x] PCK 내장·불필요 자원 제외 — 별도 `.pck` 0개; EXE 내부 경로에서 `res://tests/`·`res://artifacts/`·`res://docs/` 각 0건, 양성 대조 `res://scripts/` 검출
+  - [x] `AGENTS.md` 검증 명령에 `.\\tools\\build_windows.ps1` 추가
+  - [x] 기존 래퍼 회귀 — 일반 `275/275`, 장기 `5/5`, 성능 `5/5`, 합계 `285/285`
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - `tests/run_tests.ps1` → 일반 `275/275`(`17.127초`), 장기 `5/5`(`48.347초`), 성능 `5/5`(`2.884초`), 합계 `285/285`, 종료 코드 0, 총 `68.358초`
+  - 프로젝트 시작 화면 / TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - `tools/build_windows.ps1` 릴리스 / 디버그 → 각각 종료 코드 0; 본체·`GravityOrb.console.exe`·`BUILD.txt`만 생성, 각 콘솔 래퍼 `50,176`바이트
+  - 릴리스 산출물 Windows 메타데이터 → 제품명 `Gravity Orb`, 파일 버전 `0.11.0`, 제품 버전 `0.11.0`
+  - 물리 상태 해시: TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`; #67과 동일
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 전역 난수 호출 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. 저장소 루트에서 `.\\tools\\build_windows.ps1`를 실행한다 → `build/windows/GravityOrb.exe`, `GravityOrb.console.exe`, `BUILD.txt`가 생기고 마지막 줄에 `WINDOWS_BUILD_RESULT mode=Release exit=0`이 출력되어야 한다.
+  2. `build/windows/GravityOrb.exe`를 더블클릭한다 → 시작 화면이 열리고 BLITZ·CLASSIC 카드 및 랭킹·소리·설정 버튼이 표시되어야 한다.
+  3. 콘솔 로그가 필요하면 같은 폴더의 `GravityOrb.console.exe`를 실행한다 → 게임과 함께 콘솔 창이 열려 엔진 로그를 볼 수 있어야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - Godot의 `debug/export_console_wrapper=2`를 사용해 명세대로 디버그와 릴리스 모두 래퍼를 생성함. `exe 하나`는 게임 데이터 PCK가 본체에 내장되어 별도 `.pck`가 없다는 뜻으로 적용했고, 명세가 별도로 요구한 콘솔 래퍼는 함께 둠
+  - 빌드 스크립트는 stale 파일 혼입을 막기 위해 `build/windows` 또는 `build/windows-debug`의 정규화된 경로가 `build/` 아래인지 확인한 뒤 해당 출력 폴더만 다시 만듦
+  - `build/` 산출물은 기존 `.gitignore` 대상이라 커밋하지 않음. 보고 경로는 `build/windows/GravityOrb.exe`
+- 남은 것 · 질문: 없음
+
 ### [2026-10-11] 대상 #67 추가 요구 2 — 시작 화면 행성 극축·타원 궤도·세로 균형
 - 상태: 완료 — 최신 `main`의 재검수 명세를 먼저 병합하고, 행성의 로컬 극축을 고리 면 법선에 정렬한 자전, 공전 천체와 궤도선의 동일 타원식, 21.051% 몸통 크기와 두 화면비 세로 균형을 반영함
 - 브랜치 / PR: `codex/v3-orbit-stage-screens` / [PR #69](https://github.com/jeongmo-dot/gravity_orb/pull/69)
