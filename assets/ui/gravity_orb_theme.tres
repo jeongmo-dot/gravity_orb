@@ -7,13 +7,13 @@
 [sub_resource type="FontVariation" id="FontVariation_orbitron_medium"]
 base_font = ExtResource("1_orbitron_variable")
 variation_opentype = {
-"wght": 500.0
+2003265652: 500.0
 }
 
 [sub_resource type="FontVariation" id="FontVariation_orbitron_bold"]
 base_font = ExtResource("1_orbitron_variable")
 variation_opentype = {
-"wght": 700.0
+2003265652: 700.0
 }
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hud_panel"]

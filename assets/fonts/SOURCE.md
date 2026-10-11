@@ -8,7 +8,8 @@ subsets.
   `ofl/orbitron/Orbitron[wght].ttf` from commit
   `bd8f81ddb5c74d5c8897b36ad88b440266245103`; SHA-256
   `f42db2dd16e642258e35782916eceb1dcdbea06fb958d77ad71dc5963587e8fd`.
-  Godot `FontVariation` resources select the `wght` axis at 500 and 700.
+  Godot `FontVariation` resources select the `wght` axis at 500 and 700 using
+  `TextServer.name_to_tag("wght")`'s serialized numeric tag `2003265652`.
 - Noto Sans KR: upstream `notofonts/noto-cjk` commit
   `523d033d6cb47f4a80c58a35753646f5c3608a78`; static 400 and 500 instances.
 

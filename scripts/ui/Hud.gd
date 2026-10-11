@@ -32,7 +32,7 @@ const SCORE_FONT_MAX: int = 54
 const SCORE_FONT_MIN: int = 32
 const BEST_FONT_MAX: int = 40
 const BEST_FONT_MIN: int = 18
-const SCORE_DIGIT_WIDTH_FACTOR: float = 0.72
+const NUMERIC_SIDE_PADDING: float = 8.0
 const HUD_MARGIN: float = 24.0
 const PREVIEW_SHELF_HEIGHT: float = 340.0
 const TIME_BAR_INSET: float = 4.0
@@ -246,7 +246,7 @@ static func hud_layout(viewport_size: Vector2, safe_area: Rect2 = Rect2()) -> Di
 		"score_title": Rect2(center_x - 224.0, top + 12.0, 448.0, 30.0),
 		"score": Rect2(center_x - 224.0, top + 42.0, 448.0, 96.0),
 		"best_panel": Rect2(safe.end.x - HUD_MARGIN - 236.0, top, 236.0, 150.0),
-		"best_title": Rect2(safe.end.x - HUD_MARGIN - 224.0, top + 14.0, 212.0, 26.0),
+		"best_title": Rect2(safe.end.x - HUD_MARGIN - 224.0, top + 12.0, 212.0, 30.0),
 		"best": Rect2(safe.end.x - HUD_MARGIN - 224.0, top + 42.0, 212.0, 94.0),
 		"sound": Rect2(safe.position.x + HUD_MARGIN, top + 8.0, 120.0, 120.0),
 		"danger_panel": Rect2(safe.position.x + HUD_MARGIN, top + 166.0, 256.0, 62.0),
@@ -506,12 +506,14 @@ func _set_displayed_score(value: int) -> void:
 
 
 func _fit_numeric_label(label: Label, value: int, preferred_size: int, minimum_size: int) -> void:
-	var available_width: float = maxf(label.size.x - 16.0, 1.0)
+	var available_width: float = maxf(label.size.x - NUMERIC_SIDE_PADDING * 2.0, 1.0)
+	var font: Font = label.get_theme_font(&"font")
 	var fitted_size: int = numeric_font_size_for_width(
 		value,
 		available_width,
 		preferred_size,
-		minimum_size
+		minimum_size,
+		font
 	)
 	label.add_theme_font_size_override("font_size", fitted_size)
 
@@ -520,13 +522,20 @@ static func numeric_font_size_for_width(
 	value: int,
 	available_width: float,
 	preferred_size: int,
-	minimum_size: int
+	minimum_size: int,
+	font: Font
 ) -> int:
-	var digit_count: int = maxi(str(absi(value)).length(), 1)
-	var width_limited_size: int = floori(
-		available_width / (float(digit_count) * SCORE_DIGIT_WIDTH_FACTOR)
-	)
-	return clampi(width_limited_size, minimum_size, preferred_size)
+	var text: String = str(value)
+	for font_size: int in range(preferred_size, minimum_size - 1, -1):
+		var text_width: float = font.get_string_size(
+			text,
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1.0,
+			font_size
+		).x
+		if text_width <= available_width:
+			return font_size
+	return minimum_size
 
 
 func _on_combo_changed(combo: int, multiplier: float, max_combo: int) -> void:

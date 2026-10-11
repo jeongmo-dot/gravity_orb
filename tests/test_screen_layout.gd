@@ -201,6 +201,7 @@ func test_hud_theme_fonts_panel_tokens_and_extreme_values_fit() -> void:
 	var time_track: Panel = main.get_node("UI/Hud/TimeBarTrack") as Panel
 	var time_fill: ColorRect = main.get_node("UI/Hud/TimeBarFill") as ColorRect
 	var spawner: Spawner = main.get_node("Spawner") as Spawner
+	hud._on_score_changed(0, 9_999_999)
 	hud._set_displayed_score(9_999_999)
 	hud._on_time_changed(45.0)
 	spawner.sync_blitz_next_batch_size(8)
@@ -208,13 +209,39 @@ func test_hud_theme_fonts_panel_tokens_and_extreme_values_fit() -> void:
 	assert_eq(score_title.text, "SCORE", "score title is a separate fixed label")
 	assert_eq(score.text, "9999999", "seven-digit score text")
 	assert_eq(best_title.text, "BEST", "BEST title is a separate fixed label")
-	assert_eq(best.text, "0", "BEST numeric label contains only digits")
+	assert_eq(best.text, "9999999", "BEST numeric label contains only digits")
 	var score_font_size: int = score.get_theme_font_size("font_size")
+	var best_font_size: int = best.get_theme_font_size("font_size")
 	assert_true(score_font_size >= Hud.SCORE_FONT_MIN, "score respects minimum font size")
+	assert_true(best_font_size >= Hud.BEST_FONT_MIN, "BEST respects minimum font size")
+	var score_font: FontVariation = score.get_theme_font("font") as FontVariation
+	var best_font: FontVariation = best.get_theme_font("font") as FontVariation
 	assert_true(
-		7.0 * float(score_font_size) * Hud.SCORE_DIGIT_WIDTH_FACTOR <= score.size.x,
-		"9,999,999 estimate fits score panel"
+		score_font.get_string_size(
+			score.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, score_font_size
+		).x <= score.size.x - Hud.NUMERIC_SIDE_PADDING * 2.0,
+		"9,999,999 measured width fits score panel with eight pixels on each side"
 	)
+	assert_true(
+		best_font.get_string_size(
+			best.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, best_font_size
+		).x <= best.size.x - Hud.NUMERIC_SIDE_PADDING * 2.0,
+		"9,999,999 measured width fits BEST panel with eight pixels on each side"
+	)
+	if score_font_size < Hud.SCORE_FONT_MAX:
+		assert_true(
+			score_font.get_string_size(
+				score.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, score_font_size + 1
+			).x > score.size.x - Hud.NUMERIC_SIDE_PADDING * 2.0,
+			"score uses the largest measured font size that fits"
+		)
+	if best_font_size < Hud.BEST_FONT_MAX:
+		assert_true(
+			best_font.get_string_size(
+				best.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, best_font_size + 1
+			).x > best.size.x - Hud.NUMERIC_SIDE_PADDING * 2.0,
+			"BEST uses the largest measured font size that fits"
+		)
 	assert_eq(timer.text, "45.0", "45-second timer text")
 	assert_near(
 		time_fill.size.x,
@@ -225,28 +252,48 @@ func test_hud_theme_fonts_panel_tokens_and_extreme_values_fit() -> void:
 	var next_count: Label = main.get_node("UI/Hud/NextCountLabel") as Label
 	assert_eq(next_count.text, "×8", "NEXT eight-count text")
 	assert_true(next_count.get_global_rect().size.x >= 80.0, "NEXT count is not clipped")
-	var score_font: FontVariation = score.get_theme_font("font") as FontVariation
 	var score_title_font: FontVariation = score_title.get_theme_font("font") as FontVariation
 	assert_true(score_font != null, "score uses Orbitron FontVariation")
+	assert_true(best_font != null, "BEST uses Orbitron FontVariation")
 	assert_true(score_title_font != null, "score title uses Orbitron FontVariation")
 	assert_true(
 		score_font.base_font.resource_path.ends_with("Orbitron[wght].ttf"),
 		"score uses bundled unmodified Orbitron variable font"
 	)
-	assert_near(float(score_font.variation_opentype.get("wght", 0.0)), 700.0, 0.01,
+	var text_server: TextServer = TextServerManager.get_primary_interface()
+	var weight_tag: int = text_server.name_to_tag("wght")
+	assert_eq(weight_tag, 2003265652, "OpenType wght tag is the serialized numeric key")
+	assert_near(float(score_font.variation_opentype.get(weight_tag, 0.0)), 700.0, 0.01,
 		"score selects Orbitron weight 700")
-	assert_near(float(score_title_font.variation_opentype.get("wght", 0.0)), 500.0, 0.01,
+	assert_near(float(score_title_font.variation_opentype.get(weight_tag, 0.0)), 500.0, 0.01,
 		"score title selects Orbitron weight 500")
+	var medium_rid: RID = score_title_font.get_rids()[0]
+	var bold_rid: RID = score_font.get_rids()[0]
+	var medium_glyph: int = text_server.font_get_glyph_index(
+		medium_rid, 64, "9".unicode_at(0), 0
+	)
+	var bold_glyph: int = text_server.font_get_glyph_index(
+		bold_rid, 64, "9".unicode_at(0), 0
+	)
+	var medium_contours: Dictionary = text_server.font_get_glyph_contours(
+		medium_rid, 64, medium_glyph
+	)
+	var bold_contours: Dictionary = text_server.font_get_glyph_contours(
+		bold_rid, 64, bold_glyph
+	)
+	var medium_points: PackedVector3Array = medium_contours["points"]
+	var bold_points: PackedVector3Array = bold_contours["points"]
+	assert_true(medium_rid != bold_rid, "Orbitron 500 and 700 use distinct font variations")
+	assert_true(medium_points != bold_points, "Orbitron 500 and 700 glyph outlines differ")
 	assert_true(
 		float(score_title.get_theme_font_size("font_size"))
 		<= float(Hud.SCORE_FONT_MAX) * 0.42,
 		"score title is about forty percent of numeric maximum"
 	)
-	assert_true(
-		float(best_title.get_theme_font_size("font_size"))
-		<= float(Hud.BEST_FONT_MAX) * 0.42,
-		"BEST title is about forty percent of numeric maximum"
-	)
+	assert_eq(best_title.get_theme_font_size("font_size"), 22,
+		"BEST title uses the same fixed size as SCORE")
+	assert_eq(best_title.get_theme_font_size("font_size"),
+		score_title.get_theme_font_size("font_size"), "SCORE and BEST title sizes match")
 	assert_true(score_title.get_theme_color("font_color").is_equal_approx(Color("#8EA3C8")),
 		"score title uses opaque secondary color")
 	assert_true(best_title.get_theme_color("font_color").is_equal_approx(Color("#8EA3C8")),

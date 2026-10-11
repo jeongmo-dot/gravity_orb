@@ -38,6 +38,38 @@
 
 ## 미확인
 
+### [2026-10-11] 대상 #66 추가 요구 2 — Orbitron 실제 굵기·실측 숫자 맞춤
+- 상태: 완료 — 문자열로 직렬화되어 무시되던 Orbitron `wght` 키를 TextServer 숫자 태그로 교체해 500/700 윤곽을 분리하고, SCORE/BEST 숫자를 실제 글꼴 폭으로 맞추며 BEST 제목을 SCORE와 같은 22px로 정리함
+- 브랜치 / PR: `v3-font-theme-hud` / [PR #68](https://github.com/jeongmo-dot/gravity_orb/pull/68)
+- 병합: `origin/main` `7df66d7`을 병합 커밋 `61a0fc6`으로 먼저 반영한 뒤 구현함. 충돌 없음
+- 변경 파일: `assets/fonts/SOURCE.md`, `assets/ui/gravity_orb_theme.tres`, `scenes/UI.tscn`, `scripts/ui/Hud.gd`, `tests/test_screen_layout.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] Orbitron 원본 변수 글꼴에 `TextServer.name_to_tag("wght") == 2003265652` 숫자 태그로 500·700 적용 — 자동 (`test_hud_theme_fonts_panel_tokens_and_extreme_values_fit`)
+  - [x] 500·700이 서로 다른 font RID와 서로 다른 `9` 글리프 윤곽 점을 생성 — 헤드리스 자동 검사. 기존 문자열 키 상태에서는 RID·윤곽이 같았고 숫자 태그 반영 뒤 둘 다 달라짐
+  - [x] SCORE/BEST 모두 각 FontVariation의 `get_string_size()`로 최대 크기부터 최소 크기까지 실측하고, 양쪽 8 논리 px를 남기는 가장 큰 크기를 선택하되 최소 크기 아래로 내리지 않음 — 자동
+  - [x] SCORE/BEST `9999999`의 실측 폭이 각 숫자 rect 폭 `-16px` 이내이고, 선택 크기보다 1px 큰 크기는 넘치는 경우까지 검사 — 자동
+  - [x] BEST 제목을 SCORE와 같은 고정 `22px`로 맞추고 제목·숫자 영역 비겹침 유지 — 자동 + 캡처 직접 확인
+  - [x] 원본 Orbitron 경로·고정 커밋·SHA-256 유지 및 숫자 축 태그 기록 — `assets/fonts/SOURCE.md`; SHA-256 `f42db2dd16e642258e35782916eceb1dcdbea06fb958d77ad71dc5963587e8fd`
+  - [x] 규칙·밸런스·물리·구슬·배경·보드를 변경하지 않고 기존 물리 해시 유지 — 전체 회귀 + 상태 해시
+- 캡처 관측 (Standard/Compatibility):
+  - `tests/capture_screens.ps1` → 종료 코드 0, `540×960` 18장 + `540×1170` 8장 = `26장`
+  - 두 비율의 `03_turn_combo`, `06_blitz_fever_chain`, `13_turn_ramp_uncapped_next`, `17_board_danger`를 직접 확대 확인: SCORE/BEST 제목은 같은 크기의 얇은 500, 숫자는 확연히 굵은 700이며 `9999999`가 좌우 여백 안에서 잘림 없이 표시됨
+  - 위 네 장면에서 SCORE/BEST 제목과 숫자, MAX COMBO/CHAIN, 소리·DANGER·배수/CHAIN이 서로 겹치지 않음. 보드 투영 x·폭도 두 비율 간 `0.000px / 0.000%` 차이
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건 (샌드박스 밖 사용자 설정 경로 사용)
+  - `tests/run_tests.ps1` → 일반 `273/273`(`15.921초`), 장기 `5/5`(`56.757초`), 성능 `5/5`(`2.690초`), 합계 `283/283`, 종료 코드 0, 총 `75.368초`
+  - 물리 상태 해시: TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`; #66 추가 요구 1과 동일
+  - TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 난수 호출 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. `tests/capture_screens.ps1` 실행 후 두 비율의 `03`·`06`·`13`·`17` 상단 HUD를 확대한다 → SCORE/BEST 제목은 같은 22px·500 굵기이고 숫자는 더 굵은 700이어야 한다.
+  2. `03`·`13`에서 SCORE/BEST `9999999`를 본다 → 숫자가 각 패널 좌우 안쪽에서 잘리지 않고 제목·MAX COMBO와 겹치지 않아야 한다.
+  3. 실제 플레이에서 점수가 짧은 값에서 긴 값으로 증가하도록 진행한다 → SCORE의 0.3초 롤링 중에도 매 프레임 실제 문자열 폭에 맞춰 축소되고, BEST 경신 반짝임은 숫자에만 적용되어야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - Godot가 인식하는 축 키를 소스 글꼴의 `wght` 이름에서 `TextServer.name_to_tag("wght")`로 변환한 정수 `2003265652`로 직렬화했다. 글꼴 파일은 교체·재생성하지 않음
+  - PNG·JSON은 기존 ignore 대상 검수 산출물이며 커밋에 포함하지 않음
+- 남은 것 · 질문: 없음
+
 ### [2026-10-11] 대상 #66 추가 요구 1 — 긴 화면 카메라·HUD 위계·글꼴 원본 정리
 - 상태: 완료 — `origin/main`의 보완 명세를 먼저 병합하고, 긴 화면의 가로 기준 카메라와 실제 투영 검사, HUD 여백·점수 위계·NEXT/THEN 간격, 원본 변수 글꼴과 이름표를 반영함
 - 브랜치 / PR: `v3-font-theme-hud` / [PR #68](https://github.com/jeongmo-dot/gravity_orb/pull/68)
