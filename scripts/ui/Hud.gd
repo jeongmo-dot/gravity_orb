@@ -10,17 +10,26 @@ const BADGE_PUNCH_DURATION: float = 0.15
 const BEST_FLASH_DURATION: float = 0.42
 const POPUP_MERGE_DISTANCE: float = 40.0
 const GOLD_COLOR: Color = Color("#FFD54A")
-const CALLOUT_POP_DURATION: float = 0.12
 const CALLOUT_TOTAL_DURATION: float = 0.80
+const CALLOUT_COSMIC_DURATION: float = 1.00
+const CALLOUT_RISE_DISTANCE: float = 8.0
 const FEVER_ENTRY_DURATION: float = 0.30
 const FEVER_BAND_HOLD_DURATION: float = 0.50
 const FEVER_EXIT_DURATION: float = 0.30
+const FEVER_STREAK_DURATION: float = 0.40
 const FEVER_VIGNETTE_MAX_ALPHA: float = 0.12
 const TIME_BONUS_TRAVEL_DURATION: float = 0.50
 const TURN_CALLOUT_STEPS: Array[int] = [3, 5, 8, 12]
 const BLITZ_CALLOUT_STEPS: Array[int] = [5, 10, 15, 20, 30]
 const CALLOUT_WORDS: Array[String] = [
 	"NICE!", "GREAT!", "AMAZING!", "INCREDIBLE!", "UNSTOPPABLE!"
+]
+const CALLOUT_COLORS: Array[Color] = [
+	Color("#BFE9FF"),
+	Color("#E8EEFF"),
+	Color("#FFB020"),
+	Color("#FFD54A"),
+	Color("#FFD54A"),
 ]
 const TIMER_NORMAL_COLOR: Color = Color("#E8EEFF")
 const TIMER_DANGER_COLOR: Color = Color("#FF3B30")
@@ -82,6 +91,7 @@ var _blitz_manager: BlitzManager
 var _bonus_tween: Tween
 var _callout_tween: Tween
 var _fever_tween: Tween
+var _fever_streak_tween: Tween
 var _timer_punch_tween: Tween
 var _timer_flash_tween: Tween
 var _time_up_tween: Tween
@@ -122,9 +132,16 @@ var _time_bonus_accumulator: float = 0.0
 var _time_bonus_window_remaining: float = 0.0
 var _last_bonus_target: Vector2 = Vector2.ZERO
 var _time_up_count: int = 0
+var _callout_base_position: Vector2 = Vector2.ZERO
+var _callout_sparkles: Array[CosmicSparkle] = []
+var _fever_sparkles: Array[CosmicSparkle] = []
+var _fever_streak: ColorRect
+var _time_up_ring: CosmicRing2D
 
 
 func _ready() -> void:
+	_create_v4_ui_effects()
+	_prewarm_score_popups()
 	_sound_button.pressed.connect(_on_sound_pressed)
 	_sound_button.text = ""
 	_sound_button.icon = SPEAKER_ON_ICON
@@ -139,8 +156,89 @@ func _ready() -> void:
 func _exit_tree() -> void:
 	if get_viewport().size_changed.is_connected(_apply_responsive_layout):
 		get_viewport().size_changed.disconnect(_apply_responsive_layout)
+	for tween: Tween in [
+		_callout_tween,
+		_fever_tween,
+		_fever_streak_tween,
+		_time_up_tween,
+		_bonus_tween,
+		_timer_punch_tween,
+		_timer_flash_tween,
+	]:
+		if tween != null and tween.is_valid():
+			tween.kill()
+	_stop_sparkles(_callout_sparkles)
+	_stop_sparkles(_fever_sparkles)
+	if is_instance_valid(_time_up_ring):
+		_time_up_ring.stop()
 	_free_preview_pool(_next_preview_pool)
 	_free_preview_pool(_then_preview_pool)
+
+
+func _create_v4_ui_effects() -> void:
+	for index: int in range(5):
+		var callout_sparkle: CosmicSparkle = CosmicSparkle.new()
+		callout_sparkle.name = "CalloutSparkle%d" % index
+		callout_sparkle.z_index = 32
+		add_child(callout_sparkle)
+		_callout_sparkles.append(callout_sparkle)
+	for index: int in range(3):
+		var fever_sparkle: CosmicSparkle = CosmicSparkle.new()
+		fever_sparkle.name = "FeverSparkle%d" % index
+		fever_sparkle.z_index = 30
+		add_child(fever_sparkle)
+		_fever_sparkles.append(fever_sparkle)
+	_time_up_ring = CosmicRing2D.new()
+	_time_up_ring.name = "TimeUpRing"
+	_time_up_ring.z_index = 30
+	add_child(_time_up_ring)
+	_fever_streak = ColorRect.new()
+	_fever_streak.name = "FeverStreak"
+	_fever_streak.z_index = 26
+	_fever_streak.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var streak_shader: Shader = Shader.new()
+	streak_shader.code = "\n".join([
+		"shader_type canvas_item;",
+		"render_mode unshaded;",
+		"void fragment() {",
+		"  float tail = smoothstep(0.0, 0.72, UV.x);",
+		"  float head = 1.0 - smoothstep(0.80, 1.0, UV.x);",
+		"  float core = sin(UV.y * 3.14159265);",
+		"  float alpha = tail * head * core * 0.72;",
+		"  COLOR = vec4(1.0, 0.66, 0.18, alpha);",
+		"}",
+	])
+	var streak_material: ShaderMaterial = ShaderMaterial.new()
+	streak_material.shader = streak_shader
+	_fever_streak.material = streak_material
+	_fever_streak.color = Color.WHITE
+	add_child(_fever_streak)
+	_fever_streak.visible = false
+
+
+func _layout_fever_streak(viewport_size: Vector2) -> void:
+	if not is_instance_valid(_fever_streak):
+		return
+	_fever_streak.size = Vector2(viewport_size.x * 0.72, 12.0)
+	_fever_streak.pivot_offset = _fever_streak.size * 0.5
+	if not _fever_streak.visible:
+		_fever_streak.position = Vector2(
+			-_fever_streak.size.x,
+			viewport_size.y * 0.5 + 48.0
+		)
+
+
+func _prewarm_score_popups() -> void:
+	for index: int in range(maxi(Config.data.fx_popup_max, 0)):
+		_popup_pool.append(_create_score_popup(index))
+
+
+func _create_score_popup(index: int) -> ScorePopup:
+	var popup: ScorePopup = ScorePopup.new()
+	popup.name = "ScorePopup%d" % index
+	popup.finished.connect(_on_score_popup_finished)
+	_score_popup_layer.add_child(popup)
+	return popup
 
 
 func _apply_responsive_layout() -> void:
@@ -175,15 +273,18 @@ func _apply_responsive_layout() -> void:
 	_then_preview.position = (layout["then"] as Rect2).get_center() + Vector2(0.0, 8.0)
 	var center_y: float = viewport_size.y * 0.5
 	_set_control_rect(_fever_band, Rect2(0.0, center_y - 40.0, viewport_size.x, 80.0))
+	_fever_band.pivot_offset = _fever_band.size * 0.5
 	_fever_band_base_position = _fever_band.position
 	_set_control_rect(
 		_callout_label,
 		Rect2(40.0, center_y - 120.0, viewport_size.x - 80.0, 200.0)
 	)
+	_callout_base_position = _callout_label.position
 	_set_control_rect(
 		_time_up_label,
 		Rect2(40.0, center_y - 130.0, viewport_size.x - 80.0, 260.0)
 	)
+	_layout_fever_streak(viewport_size)
 	_score_label.pivot_offset = _score_label.size * 0.5
 	_best_label.pivot_offset = _best_label.size * 0.5
 	_multiplier_label.pivot_offset = _multiplier_label.size * 0.5
@@ -612,6 +713,7 @@ func _show_score_popup(reaction: Dictionary) -> void:
 	var screen_position: Vector2 = _reaction_screen_position(
 		reaction.get("position", Vector2.ZERO) as Vector2
 	)
+	screen_position = _clamp_popup_position(screen_position)
 	var process_frame: int = Engine.get_process_frames()
 	for popup: ScorePopup in _active_popups:
 		if (
@@ -631,7 +733,8 @@ func _show_score_popup(reaction: Dictionary) -> void:
 		appearance["color"] as Color,
 		appearance["outline_color"] as Color,
 		int(appearance["outline_size"]),
-		process_frame
+		process_frame,
+		bool(appearance["cosmic"])
 	)
 	_active_popups.append(popup)
 
@@ -639,11 +742,7 @@ func _show_score_popup(reaction: Dictionary) -> void:
 func _acquire_popup() -> ScorePopup:
 	if not _popup_pool.is_empty():
 		return _popup_pool.pop_back()
-	var popup: ScorePopup = ScorePopup.new()
-	popup.name = "ScorePopup%d" % (_active_popups.size() + _popup_pool.size())
-	popup.finished.connect(_on_score_popup_finished)
-	_score_popup_layer.add_child(popup)
-	return popup
+	return _create_score_popup(_active_popups.size() + _popup_pool.size())
 
 
 func _on_score_popup_finished(popup: ScorePopup) -> void:
@@ -657,7 +756,9 @@ func _popup_formula(reaction: Dictionary) -> String:
 	var danger_multiplier: float = float(reaction.get("danger_multiplier", 1.0))
 	if combo_multiplier < 4.0 and danger_multiplier < 2.0:
 		return ""
-	var factors: Array[String] = [str(int(reaction.get("base_points", 0)))]
+	var factors: Array[String] = [
+		ScorePopup.format_number(int(reaction.get("base_points", 0)))
+	]
 	if combo_multiplier > 1.0:
 		factors.append("×%s" % _format_multiplier(combo_multiplier))
 	if danger_multiplier > 1.0:
@@ -669,13 +770,21 @@ func _popup_formula(reaction: Dictionary) -> String:
 
 
 func _popup_appearance(reaction: Dictionary) -> Dictionary:
-	if bool(reaction.get("finale", false)):
-		return {"color": GOLD_COLOR, "outline_color": GOLD_COLOR, "outline_size": 0}
 	var reaction_type: ReactionRules.Type = reaction.get(
 		"type", ReactionRules.Type.NONE
 	) as ReactionRules.Type
-	if reaction_type in [ReactionRules.Type.BLAST, ReactionRules.Type.MAX_CLEAR]:
-		return {"color": Color.WHITE, "outline_color": GOLD_COLOR, "outline_size": 6}
+	var cosmic: bool = (
+		bool(reaction.get("finale", false))
+		or reaction_type in [ReactionRules.Type.BLAST, ReactionRules.Type.MAX_CLEAR]
+		or float(reaction.get("combo_multiplier", 1.0)) >= 8.0
+	)
+	if cosmic:
+		return {
+			"color": GOLD_COLOR,
+			"outline_color": Color(0.05, 0.025, 0.0, 0.92),
+			"outline_size": 3,
+			"cosmic": true,
+		}
 	if reaction_type == ReactionRules.Type.MERGE:
 		var color_index: int = clampi(
 			int(reaction.get("result_color", OrbTypes.OrbColor.RED)),
@@ -686,8 +795,36 @@ func _popup_appearance(reaction: Dictionary) -> Dictionary:
 		var bright_color: Color = Color.from_hsv(
 			base_color.h, base_color.s, 1.0, base_color.a
 		)
-		return {"color": bright_color, "outline_color": Color.BLACK, "outline_size": 3}
-	return {"color": Color.WHITE, "outline_color": Color.BLACK, "outline_size": 3}
+		return {
+			"color": bright_color,
+			"outline_color": Color(0.02, 0.03, 0.06, 0.92),
+			"outline_size": 3,
+			"cosmic": false,
+		}
+	return {
+		"color": Color.WHITE,
+		"outline_color": Color(0.02, 0.03, 0.06, 0.92),
+		"outline_size": 3,
+		"cosmic": false,
+	}
+
+
+func _clamp_popup_position(screen_position: Vector2) -> Vector2:
+	var viewport_size: Vector2 = get_viewport_rect().size
+	var layout: Dictionary = hud_layout(viewport_size, _logical_safe_area(viewport_size))
+	var half_size: Vector2 = ScorePopup.POPUP_SIZE * 0.5
+	var top_hud_end: float = (layout["time_bar"] as Rect2).end.y
+	var preview_top: float = (layout["preview_shelf"] as Rect2).position.y
+	var minimum_y: float = top_hud_end + half_size.y + ScorePopup.RISE_DISTANCE + 12.0
+	var maximum_y: float = preview_top - half_size.y - 12.0
+	if maximum_y < minimum_y:
+		var fallback_y: float = (top_hud_end + preview_top) * 0.5
+		minimum_y = fallback_y
+		maximum_y = fallback_y
+	return Vector2(
+		clampf(screen_position.x, half_size.x, viewport_size.x - half_size.x),
+		clampf(screen_position.y, minimum_y, maximum_y)
+	)
 
 
 func _reaction_screen_position(local_position: Vector2) -> Vector2:
@@ -967,17 +1104,37 @@ func _on_finale_started() -> void:
 		_sfx_bank.play_time_up_buzzer()
 	if _time_up_tween != null and _time_up_tween.is_valid():
 		_time_up_tween.kill()
+	_time_up_label.add_theme_color_override("font_color", TIMER_DANGER_COLOR)
+	_time_up_label.add_theme_color_override(
+		"font_outline_color",
+		Color(0.08, 0.01, 0.01, 0.92)
+	)
+	_time_up_label.add_theme_color_override(
+		"font_shadow_color",
+		Color(TIMER_DANGER_COLOR.r, TIMER_DANGER_COLOR.g, TIMER_DANGER_COLOR.b, 0.24)
+	)
+	_time_up_label.add_theme_constant_override("outline_size", 4)
+	_time_up_label.add_theme_constant_override("shadow_outline_size", 14)
 	_time_up_label.visible = true
 	_time_up_label.modulate = Color.WHITE
-	_time_up_label.scale = Vector2.ONE * 0.60
+	_time_up_label.scale = Vector2.ONE * 0.90
+	_time_up_ring.play(
+		_time_up_label.position + _time_up_label.size * 0.5,
+		TIMER_DANGER_COLOR,
+		82.0,
+		220.0,
+		0.65,
+		3.0
+	)
 	_time_up_tween = create_tween()
+	_time_up_tween.set_parallel(true)
 	_time_up_tween.tween_property(
-		_time_up_label, "scale", Vector2.ONE * 1.15, CALLOUT_POP_DURATION
-	).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_time_up_tween.tween_property(_time_up_label, "scale", Vector2.ONE, 0.10)
-	_time_up_tween.tween_interval(0.48)
-	_time_up_tween.tween_property(_time_up_label, "modulate:a", 0.0, 0.25)
-	_time_up_tween.tween_callback(_hide_time_up_label)
+		_time_up_label, "scale", Vector2.ONE, 0.28
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_time_up_tween.tween_property(
+		_time_up_label, "modulate:a", 0.0, 0.25
+	).set_delay(0.75)
+	_time_up_tween.chain().tween_callback(_hide_time_up_label)
 
 
 func _update_callout(combo: int) -> void:
@@ -992,45 +1149,100 @@ func _update_callout(combo: int) -> void:
 		return
 	_callout_seen[combo] = true
 	_callout_history.append(combo)
-	_show_callout(CALLOUT_WORDS[stage_index])
+	_show_callout(CALLOUT_WORDS[stage_index], stage_index)
 	if _sfx_bank != null:
 		_sfx_bank.play_callout_chime(stage_index)
 
 
-func _show_callout(text: String) -> void:
+func _show_callout(text: String, stage_index: int = 0) -> void:
 	if _callout_tween != null and _callout_tween.is_valid():
 		_callout_tween.kill()
+	_stop_sparkles(_callout_sparkles)
+	var clamped_stage: int = clampi(stage_index, 0, CALLOUT_WORDS.size() - 1)
+	var cosmic: bool = clamped_stage >= 3
+	var duration: float = CALLOUT_COSMIC_DURATION if cosmic else CALLOUT_TOTAL_DURATION
 	_callout_label.text = text
+	_callout_label.add_theme_color_override("font_color", CALLOUT_COLORS[clamped_stage])
+	_callout_label.add_theme_color_override(
+		"font_outline_color",
+		Color(0.02, 0.035, 0.07, 0.92)
+	)
+	_callout_label.add_theme_constant_override("outline_size", 4)
+	var glow_color: Color = GOLD_COLOR
+	glow_color.a = 0.30 if cosmic else 0.0
+	_callout_label.add_theme_color_override("font_shadow_color", glow_color)
+	_callout_label.add_theme_constant_override("shadow_outline_size", 20 if cosmic else 0)
 	_callout_label.visible = true
 	_callout_label.modulate = Color.WHITE
-	_callout_label.scale = Vector2.ONE * 0.60
+	_callout_label.position = _callout_base_position
+	_callout_label.scale = Vector2.ONE * 0.90
+	if cosmic:
+		_show_callout_sparkles(clamped_stage, duration)
 	_callout_tween = create_tween()
+	_callout_tween.set_parallel(true)
 	_callout_tween.tween_property(
-		_callout_label, "scale", Vector2.ONE * 1.15, CALLOUT_POP_DURATION
-	).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_callout_tween.tween_property(_callout_label, "scale", Vector2.ONE, 0.10)
-	_callout_tween.tween_interval(
-		CALLOUT_TOTAL_DURATION - CALLOUT_POP_DURATION - 0.10 - 0.25
-	)
-	_callout_tween.tween_property(_callout_label, "modulate:a", 0.0, 0.25)
-	_callout_tween.tween_callback(_hide_callout_label)
+		_callout_label, "scale", Vector2.ONE, duration * 0.45
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_callout_tween.tween_property(
+		_callout_label,
+		"position",
+		_callout_base_position + Vector2.UP * CALLOUT_RISE_DISTANCE,
+		duration * 0.72
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_callout_tween.tween_property(
+		_callout_label, "modulate:a", 0.0, 0.25
+	).set_delay(duration - 0.25)
+	_callout_tween.chain().tween_callback(_hide_callout_label)
+
+
+func _show_callout_sparkles(stage_index: int, duration: float) -> void:
+	var center: Vector2 = _callout_label.position + _callout_label.size * 0.5
+	var offsets: Array[Vector2] = [
+		Vector2(-260.0, -42.0),
+		Vector2(-145.0, 70.0),
+		Vector2(18.0, -84.0),
+		Vector2(166.0, 62.0),
+		Vector2(270.0, -28.0),
+	]
+	var count: int = 5 if stage_index >= 4 else 3
+	for index: int in range(count):
+		var turns: float = 1.0 if stage_index >= 4 else 0.0
+		var end_offset: Vector2 = offsets[index] * (1.38 if stage_index >= 4 else 1.10)
+		_callout_sparkles[index].play(
+			center,
+			GOLD_COLOR,
+			duration,
+			offsets[index],
+			end_offset,
+			turns,
+			14.0 + float(index % 2) * 3.0
+		)
 
 
 func _start_fever_presentation() -> void:
 	if _fever_tween != null and _fever_tween.is_valid():
 		_fever_tween.kill()
-	var slide_distance: float = get_viewport_rect().size.x
 	_fever_band_label.text = "FEVER ×%s" % _format_multiplier(
 		Config.data.blitz_fever_multiplier
 	)
-	_fever_band.position = _fever_band_base_position + Vector2(slide_distance, 0.0)
+	_fever_band_label.add_theme_color_override("font_color", HUD_AMBER_COLOR)
+	_fever_band_label.add_theme_color_override(
+		"font_outline_color",
+		Color(0.08, 0.035, 0.0, 0.94)
+	)
+	_fever_band_label.add_theme_constant_override("outline_size", 4)
+	_fever_band.color = Color(0.0, 0.0, 0.0, 0.0)
+	_fever_band.position = _fever_band_base_position
 	_fever_band.modulate = Color.WHITE
+	_fever_band.scale = Vector2.ONE * 0.90
 	_fever_vignette.modulate = Color.WHITE
 	_fever_band.visible = true
 	_fever_vignette.visible = true
+	_play_fever_streak()
+	_show_fever_sparkles()
 	_fever_tween = create_tween()
 	_fever_tween.tween_property(
-		_fever_band, "position", _fever_band_base_position, FEVER_ENTRY_DURATION
+		_fever_band, "scale", Vector2.ONE, FEVER_ENTRY_DURATION
 	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	_fever_tween.tween_interval(FEVER_BAND_HOLD_DURATION)
 	_fever_tween.tween_property(
@@ -1041,13 +1253,64 @@ func _start_fever_presentation() -> void:
 		_sfx_bank.play_fever_sweep(true)
 
 
+func _play_fever_streak() -> void:
+	if _fever_streak_tween != null and _fever_streak_tween.is_valid():
+		_fever_streak_tween.kill()
+	var viewport_size: Vector2 = get_viewport_rect().size
+	_layout_fever_streak(viewport_size)
+	_fever_streak.position = Vector2(
+		-_fever_streak.size.x,
+		viewport_size.y * 0.5 + 48.0
+	)
+	_fever_streak.rotation = -0.045
+	_fever_streak.modulate = Color.WHITE
+	_fever_streak.visible = true
+	_fever_streak_tween = create_tween()
+	_fever_streak_tween.set_parallel(true)
+	_fever_streak_tween.tween_property(
+		_fever_streak,
+		"position:x",
+		viewport_size.x,
+		FEVER_STREAK_DURATION
+	).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_fever_streak_tween.tween_property(
+		_fever_streak, "modulate:a", 0.0, FEVER_STREAK_DURATION
+	).set_delay(FEVER_STREAK_DURATION * 0.55)
+	_fever_streak_tween.chain().tween_callback(func() -> void:
+		_fever_streak.visible = false
+	)
+
+
+func _show_fever_sparkles() -> void:
+	_stop_sparkles(_fever_sparkles)
+	var center: Vector2 = _fever_band.position + _fever_band.size * 0.5
+	var offsets: Array[Vector2] = [
+		Vector2(-150.0, -36.0),
+		Vector2(0.0, 50.0),
+		Vector2(154.0, -30.0),
+	]
+	for index: int in range(_fever_sparkles.size()):
+		_fever_sparkles[index].play(
+			center,
+			HUD_AMBER_COLOR,
+			0.85,
+			offsets[index],
+			offsets[index] * 1.16,
+			0.0,
+			13.0 + float(index)
+		)
+
+
 func _end_fever_presentation() -> void:
 	if _fever_tween != null and _fever_tween.is_valid():
 		_fever_tween.kill()
+	if _fever_streak_tween != null and _fever_streak_tween.is_valid():
+		_fever_streak_tween.kill()
 	_fever_tween = create_tween()
 	_fever_tween.set_parallel(true)
 	_fever_tween.tween_property(_fever_band, "modulate:a", 0.0, FEVER_EXIT_DURATION)
 	_fever_tween.tween_property(_fever_vignette, "modulate:a", 0.0, FEVER_EXIT_DURATION)
+	_fever_tween.tween_property(_fever_streak, "modulate:a", 0.0, FEVER_EXIT_DURATION)
 	_fever_tween.chain().tween_callback(_hide_fever_visuals)
 	if _sfx_bank != null:
 		_sfx_bank.play_fever_sweep(false)
@@ -1056,10 +1319,12 @@ func _end_fever_presentation() -> void:
 func _update_fever_pulse() -> void:
 	if not _fever_active or not Config.data.fx_callouts_enabled:
 		return
-	var pulse: float = 0.74 + 0.26 * (
-		0.5 + 0.5 * sin(_pulse_elapsed * TAU * 2.0)
-	)
-	_fever_vignette.modulate.a = pulse
+	_fever_vignette.modulate.a = 1.0
+
+
+func _stop_sparkles(sparkles: Array[CosmicSparkle]) -> void:
+	for sparkle: CosmicSparkle in sparkles:
+		sparkle.stop()
 
 
 func _record_timer_ticks(previous: float, current: float) -> void:
@@ -1172,11 +1437,26 @@ func _configure_fever_vignette() -> void:
 	shader.code = "\n".join([
 		"shader_type canvas_item;",
 		"render_mode unshaded;",
+		"float hash21(vec2 p) {",
+		"  p = fract(p * vec2(123.34, 456.21));",
+		"  p += dot(p, p + 45.32);",
+		"  return fract(p.x * p.y);",
+		"}",
+		"float noise21(vec2 p) {",
+		"  vec2 i = floor(p);",
+		"  vec2 f = fract(p);",
+		"  f = f * f * (3.0 - 2.0 * f);",
+		"  return mix(mix(hash21(i), hash21(i + vec2(1.0, 0.0)), f.x),",
+		"    mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0)), f.x), f.y);",
+		"}",
 		"void fragment() {",
 		"  vec2 edge_distance = abs(UV - vec2(0.5)) * 2.0;",
-		"  float edge = smoothstep(0.70, 1.0, max(edge_distance.x, edge_distance.y));",
-		"  float alpha = edge * 0.12;",
-		"  COLOR = vec4(1.0, 0.30, 0.015, alpha);",
+		"  float edge = smoothstep(0.66, 1.0, max(edge_distance.x, edge_distance.y));",
+		"  vec2 drift = vec2(TIME * 0.018, -TIME * 0.012);",
+		"  float cloud = noise21(UV * vec2(5.0, 8.0) + drift);",
+		"  cloud = mix(cloud, noise21(UV * vec2(10.0, 16.0) - drift), 0.35);",
+		"  float alpha = edge * (0.045 + cloud * 0.065);",
+		"  COLOR = vec4(1.0, 0.57, 0.12, alpha);",
 		"}",
 	])
 	var shader_material: ShaderMaterial = ShaderMaterial.new()
@@ -1202,8 +1482,8 @@ func _reset_callout_tracking() -> void:
 
 
 func _hide_callout_visuals() -> void:
-	_callout_label.visible = false
-	_time_up_label.visible = false
+	_hide_callout_label()
+	_hide_time_up_label()
 	_bonus_label.visible = false
 	_hide_fever_visuals()
 
@@ -1211,11 +1491,14 @@ func _hide_callout_visuals() -> void:
 func _hide_callout_label() -> void:
 	_callout_label.visible = false
 	_callout_label.scale = Vector2.ONE
+	_callout_label.position = _callout_base_position
+	_stop_sparkles(_callout_sparkles)
 
 
 func _hide_time_up_label() -> void:
 	_time_up_label.visible = false
 	_time_up_label.scale = Vector2.ONE
+	_time_up_ring.stop()
 
 
 func _hide_bonus_label() -> void:
@@ -1226,17 +1509,30 @@ func _hide_bonus_label() -> void:
 func _hide_fever_visuals() -> void:
 	_fever_vignette.visible = false
 	_fever_vignette.modulate = Color.WHITE
+	_fever_streak.visible = false
+	_fever_streak.modulate = Color.WHITE
+	_stop_sparkles(_fever_sparkles)
 	_hide_fever_band()
 
 
 func _hide_fever_band() -> void:
 	_fever_band.visible = false
 	_fever_band.modulate = Color.WHITE
+	_fever_band.scale = Vector2.ONE
 	_fever_band.position = _fever_band_base_position
 
 
 func fever_vignette_max_alpha() -> float:
 	return FEVER_VIGNETTE_MAX_ALPHA
+
+
+func active_ui_sparkle_count() -> int:
+	return CosmicSparkle.visible_count(get_tree())
+
+
+func fever_vignette_shader_code() -> String:
+	var shader_material: ShaderMaterial = _fever_vignette.material as ShaderMaterial
+	return shader_material.shader.code
 
 
 func callout_history() -> Array[int]:

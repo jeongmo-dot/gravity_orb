@@ -57,7 +57,24 @@ $expectedFiles = @(
     "28_blast_l5_crowded_a.png",
     "28_blast_l5_crowded_b.png",
     "29_blast_l6_crowded_a.png",
-    "29_blast_l6_crowded_b.png"
+	"29_blast_l6_crowded_b.png",
+	"30_callout_great_a.png",
+	"30_callout_great_b.png",
+	"31_callout_unstoppable_a.png",
+	"31_callout_unstoppable_b.png",
+	"32_popup_merge.png",
+	"33_popup_blast_big.png",
+	"34_color_push_a.png",
+	"34_color_push_b.png",
+	"35_color_pull_a.png",
+	"35_color_pull_b.png",
+	"36_color_shake_a.png",
+	"36_color_shake_b.png",
+	"37_color_lift_a.png",
+	"37_color_lift_b.png",
+	"38_fever_start_a.png",
+	"38_fever_start_b.png",
+	"39_fever_running.png"
 )
 $hudExpectedFiles = @(
     "02_turn_early.png",

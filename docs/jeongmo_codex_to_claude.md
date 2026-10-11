@@ -38,6 +38,46 @@
 
 ## 미확인
 
+### [2026-10-11] 대상 #71 — 비주얼 V4-2 호령·점수 팝업·색 효과·피버
+- 상태: 완료 — A+C 원칙의 단계별 호령, 쉼표·금색 큰 점수, 단일 고리 별가루 색 효과, 띠 없는 피버 진입·흐르는 가장자리 성운과 빨간 `TIME UP` 고리를 구현함
+- 브랜치 / PR: `v4-2-callouts-effects` / 미생성
+- 변경 파일: `scenes/UI.tscn`, `scripts/ui/{Hud,ScorePopup,CosmicSparkle,CosmicRing2D}.gd`, `scripts/fx/{ColorEffectVisual,FeedbackDirector}.gd`, `tests/{capture_screens,run_blitz_responsiveness_measurement}.ps1`, `tests/spike/{capture_screens,run_blitz_responsiveness_measurement}.gd`, `tests/test_{callouts,color_effect_visuals,feedback,score_popups,screen_layout}.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 1~3단계 호령은 `#BFE9FF`→`#E8EEFF`→`#FFB020`, 얇은 어두운 테두리, 0.9→1.0배·8px 상승·0.8초 — 자동 (`test_callout_stage_treatment_and_time_up_ring`) + 캡처 `30` 두 시점
+  - [x] 4~5단계는 금색·알파 0.3 이하 금빛·별 3~5개·1초, 5단계 별 1회전 후 분산 — 자동 + `31` 두 시점 직접 확인. `TIME UP`은 빨강과 얇은 확장 고리 1개 — 자동 + `08` 직접 확인
+  - [x] 모든 점수·계산식 천 단위 쉼표, 보통 합체 밝은 결과색+얇은 어두운 테두리, 대폭발·잭팟·×8+·피날레 금색+알파 0.28 금빛+별 1~2개, 1,000+ 좌우 흔들림 없음 — 자동 (`test_large_popup_formats_formula_without_horizontal_shake_and_caps_sparkles`) + `32`·`33` 직접 확인
+  - [x] 합체 V4-1 고리를 색 효과 켬 상태에서 제거해 한 겹만 남김. PUSH 외향 별가루·빨강 굵기/밝기, PULL 안쪽 나선, SHAKE 판 끝 얇은 원, LIFT 대상당 위쪽 별가루 3개·빛줄기 없음 — 자동 (`test_push_and_pull_use_one_ring_with_directional_stardust`, `test_lift_direction_opposes_each_gravity_direction`, `test_merge_punch_scales_visual_and_emits_stardust_ring`) + `34`~`37` 직접 확인
+  - [x] 피버 진입은 투명 배경의 호박색 `FEVER ×2`, 0.4초 빛줄기와 별 3개; 지속 중 알파 최대 0.11의 흐르는 가장자리 성운과 기존 주황 판 테두리; 종료 0.3초 페이드 — 자동 + `38` 두 시점·`39` 직접 확인
+  - [x] 호령·팝업 위치를 상단 시간 HUD와 하단 미리보기 사이로 제한, 전체 화면 플래시 추가 없음, UI 별 동시 최대 20개 — 자동 (`test_large_popup_formats_formula_without_horizontal_shake_and_caps_sparkles`, `test_callout_stage_treatment_and_time_up_ring`) + 두 비율 캡처
+  - [x] 별·피버 빛줄기·`TIME UP` 고리·점수 팝업을 미리 만들고 재사용. 피버 포함 창 모드 VSync 끔 p99 기준 충족 — 아래 성능 관측
+  - [x] 규칙·수치·물리·점수 계산·호령 단계·소리·저장 형식 불변 — 전체 회귀 및 TURN/BLITZ 상태 해시 동일
+- 캡처·화면 관측 (Standard/Compatibility):
+  - `tests/capture_screens.ps1` → 종료 코드 0, `540×960`·`540×1170` 각 53장, 합계 106장; 보드 좌·우·폭 비율 간 차이 모두 `0.000px`
+  - `30_callout_great`: 연한 주색 글자가 보드 중앙에서 HUD와 겹치지 않고 두 시점 사이 작게 상승. `31_callout_unstoppable`: 금색 글자와 글자 둘레 별이 두 화면비에서 보드 안에 유지됨
+  - `32_popup_merge`: `+1,280` 청록 글자와 어두운 테두리. `33_popup_blast_big`: `+48,600` 금색 본문, 분리된 보조색 `6,075 ×8`, 작은 별을 직접 확인
+  - `34`~`37`: 빨강 PUSH 외향, 파랑 PULL 안쪽 나선, 초록 SHAKE 판 끝 방향 확장, 노랑 LIFT 짧은 상승 별가루를 각 두 시점에서 확인. 고리는 PUSH/PULL/SHAKE 각 1겹, LIFT 0겹
+  - `38_fever_start`: 배경 띠 없이 호박색 글자·가로 빛줄기·별 3개. `39_fever_running`: 중앙 피버 글자 없이 가장자리 성운과 주황 판 테두리만 유지. `08_blitz_time_up`: 빨강 글자 뒤 얇은 빨강 고리 1개
+- 성능 관측 (RTX 4070 Ti SUPER, Compatibility, 실제 창, VSync 끔):
+  - BLITZ 4시드(101~104), 15,042프레임: p50/p95/p99/최대 `1.737/3.201/4.988/10.224ms`, `>16.7ms` 0, `>33.3ms` 0
+  - 강제 피버 구간 7,818프레임: p50/p95/p99/최대 `1.769/3.332/5.290/9.914ms`, `>16.7ms` 0, `>33.3ms` 0
+  - 입력 120회: 수락 120, 누락 0; 수락→생성 p50/p95/최대 `0.976/2.227/6.561ms`; 최대 생성 묶음 8
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - `tests/run_tests.ps1` → 일반 `283/283`(`17.328초`), 장기 `5/5`(`50.024초`), 성능 `5/5`(`2.997초`), 합계 `293/293`, 종료 코드 0, 총 `70.349초`
+  - 시작 화면 / TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - 물리 상태 해시: TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`; #69와 동일
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 전역 난수 호출 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. `.\tests\capture_screens.ps1`을 실행하고 두 비율의 `30`·`31` `_a`→`_b`를 본다 → GREAT은 8px만 떠오르고, UNSTOPPABLE은 금색 별이 한 바퀴 돌며 퍼지되 위 HUD·아래 미리보기를 가리지 않아야 한다.
+  2. `32_popup_merge`와 `33_popup_blast_big`을 본다 → 각각 결과색 `+1,280`, 금색 `+48,600`과 아래 `6,075 ×8`을 분리해서 읽을 수 있어야 한다.
+  3. `34`~`37`의 두 시점을 비교한다 → PUSH·PULL·SHAKE의 고리는 각 한 겹이고 진행 방향이 서로 맞으며, LIFT는 빛기둥 없이 구슬 근처 짧은 노란 별가루만 중력 반대 방향으로 올라가야 한다.
+  4. `38_fever_start_a/b`→`39_fever_running`→피버 종료를 본다 → 진입 때만 글자·빛줄기·별이 보이고, 지속 중에는 옅게 흐르는 가장자리와 주황 판 테두리만, 종료 뒤에는 0.3초 안에 가장자리 빛이 사라져야 한다.
+  5. `.\tests\run_blitz_responsiveness_measurement.ps1 -Label v4_2`를 실행한다 → `vsync_mode=disabled`, 전체·피버 p99, 33.3ms 초과 0, 입력 누락 0이 출력되어야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 점수 팝업의 세로 공간을 180px로 넓혀 큰 본문과 계산식이 겹치지 않게 했고, 표시 중심은 기존 보드 반응 위치를 유지하되 상·하 HUD 안전 구역 안으로만 제한함
+  - PNG·성능 JSON은 기존 `artifacts/` ignore 대상이라 커밋하지 않음. 외부 애드온·새 밸런스 수치·저장 필드는 추가하지 않음
+- 남은 것 · 질문: 없음
+
 ### [2026-10-11] 대상 #70 — 빌드 파일 이름에 버전 넣기
 - 상태: 완료 — 프로젝트 버전 `0.11.1`을 단일 원천으로 두고 Windows 릴리스·디버그 산출물 이름, 빌드 정보 이름과 결과 로그에 같은 버전을 적용함
 - 브랜치 / PR: `v4-versioned-builds` / 미생성

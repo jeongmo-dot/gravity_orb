@@ -63,6 +63,23 @@ const CAPTURE_FILES: Array[String] = [
 	"28_blast_l5_crowded_b.png",
 	"29_blast_l6_crowded_a.png",
 	"29_blast_l6_crowded_b.png",
+	"30_callout_great_a.png",
+	"30_callout_great_b.png",
+	"31_callout_unstoppable_a.png",
+	"31_callout_unstoppable_b.png",
+	"32_popup_merge.png",
+	"33_popup_blast_big.png",
+	"34_color_push_a.png",
+	"34_color_push_b.png",
+	"35_color_pull_a.png",
+	"35_color_pull_b.png",
+	"36_color_shake_a.png",
+	"36_color_shake_b.png",
+	"37_color_lift_a.png",
+	"37_color_lift_b.png",
+	"38_fever_start_a.png",
+	"38_fever_start_b.png",
+	"39_fever_running.png",
 ]
 const HUD_CAPTURE_FILES: Array[String] = [
 	"02_turn_early.png",
@@ -110,6 +127,8 @@ func _run_capture_suite() -> void:
 		await _capture_orb_closeup()
 	if not _failed and not _hud_scenes_only:
 		await _capture_reaction_effect_scenes()
+	if not _failed and not _hud_scenes_only:
+		await _capture_v4_2_scenes()
 	if not _failed and not _hud_scenes_only:
 		await _measure_v2_contrast()
 	if not _failed and not _hud_scenes_only:
@@ -476,6 +495,116 @@ func _capture_reaction_effect_scenes() -> void:
 	if _failed:
 		return
 	await _measure_same_size_star_luminance()
+
+
+func _capture_v4_2_scenes() -> void:
+	var main: Main = await _create_main(int(GameConfig.GameMode.BLITZ))
+	var manager: BlitzManager = main.get_node("BlitzManager") as BlitzManager
+	var board: Board3D = main.get_node("Board") as Board3D
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	var feedback: FeedbackDirector = main.get_node("FeedbackDirector") as FeedbackDirector
+	manager.set_physics_process(false)
+	board.set_physics_process(false)
+	for orb: Orb3D in board.get_orbs():
+		orb.disable_physics()
+
+	hud._show_callout("GREAT!", 1)
+	await get_tree().create_timer(0.08).timeout
+	await _capture("30_callout_great_a.png")
+	await get_tree().create_timer(0.36).timeout
+	await _capture("30_callout_great_b.png")
+	hud._show_callout("UNSTOPPABLE!", 4)
+	await get_tree().create_timer(0.08).timeout
+	await _capture("31_callout_unstoppable_a.png")
+	await get_tree().create_timer(0.42).timeout
+	await _capture("31_callout_unstoppable_b.png")
+
+	hud._hide_callout_label()
+	hud._on_reaction_scored({
+		"type": ReactionRules.Type.MERGE,
+		"result_color": OrbTypes.OrbColor.CYAN,
+		"position": Vector2(-80.0, -40.0),
+		"points": 1280,
+		"base_points": 1280,
+		"combo_multiplier": 1.0,
+	})
+	await get_tree().create_timer(0.10).timeout
+	await _capture("32_popup_merge.png")
+	for popup: ScorePopup in hud.active_score_popups():
+		popup.deactivate()
+	hud._on_reaction_scored({
+		"type": ReactionRules.Type.BLAST,
+		"position": Vector2(80.0, -40.0),
+		"points": 48600,
+		"base_points": 6075,
+		"combo_multiplier": 8.0,
+	})
+	await get_tree().create_timer(0.10).timeout
+	var big_popup: ScorePopup = hud.active_score_popups()[0]
+	if big_popup.score_text() != "+48,600" or big_popup.formula_text() != "6,075 ×8":
+		_fail("V4-2 big popup comma/formula mismatch")
+	await _capture("33_popup_blast_big.png")
+	for popup: ScorePopup in hud.active_score_popups():
+		popup.deactivate()
+
+	await _capture_color_effect_pair(
+		feedback, "34_color_push", OrbTypes.OrbColor.RED, Vector2(-80.0, -30.0)
+	)
+	await _capture_color_effect_pair(
+		feedback, "35_color_pull", OrbTypes.OrbColor.BLUE, Vector2(80.0, -30.0)
+	)
+	await _capture_color_effect_pair(
+		feedback, "36_color_shake", OrbTypes.OrbColor.GREEN, Vector2.ZERO
+	)
+	await _capture_color_effect_pair(
+		feedback, "37_color_lift", OrbTypes.OrbColor.YELLOW, Vector2.ZERO
+	)
+
+	hud._on_fever_changed(true, 5.0)
+	board.set_fever_active(true)
+	await get_tree().create_timer(0.08).timeout
+	await _capture("38_fever_start_a.png")
+	await get_tree().create_timer(0.22).timeout
+	await _capture("38_fever_start_b.png")
+	await get_tree().create_timer(0.90).timeout
+	if hud.active_ui_sparkle_count() > 20:
+		_fail("V4-2 visible UI sparkle count exceeds twenty")
+	await _capture("39_fever_running.png")
+	hud._on_fever_changed(false, 0.0)
+	board.set_fever_active(false)
+	print("SCREEN_CAPTURE_CHECK scene=v4_2 callouts=4 popups=2 color_pairs=4 fever=3")
+	await _destroy_main(main)
+
+
+func _capture_color_effect_pair(
+	feedback: FeedbackDirector,
+	base_name: String,
+	color_index: int,
+	origin: Vector2
+) -> void:
+	feedback.clear_effects()
+	feedback.play_reaction_visuals({
+		"type": ReactionRules.Type.MERGE,
+		"result_level": 3,
+		"result_color": color_index,
+		"position": origin,
+		"shock_targets": [
+			{"position": origin + Vector2(-150.0, 80.0)},
+			{"position": origin + Vector2(120.0, 110.0)},
+		],
+	})
+	if feedback.active_color_effect_count() != 1:
+		_fail("%s must create exactly one color visual" % base_name)
+		return
+	var effect: ColorEffectVisual = feedback.active_color_effects()[0]
+	var expected_rings: int = 0 if color_index == OrbTypes.OrbColor.YELLOW else 1
+	if effect.ring_layer_count() != expected_rings:
+		_fail("%s ring layer mismatch" % base_name)
+		return
+	await get_tree().create_timer(0.08).timeout
+	await _capture("%s_a.png" % base_name)
+	await get_tree().create_timer(0.14).timeout
+	await _capture("%s_b.png" % base_name)
 
 
 func _capture_reaction_pair(

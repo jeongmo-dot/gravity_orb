@@ -396,14 +396,15 @@ func _play_merge_feedback(reaction: Dictionary) -> void:
 			"MergeStardust",
 			"stardust"
 		)
-		_create_ring(
-			origin,
-			Color(0.58, 0.90, 1.0, 1.0),
-			result_radius_m * 2.0,
-			0.0,
-			MERGE_RING_DURATION,
-			result_radius_m
-		)
+		if not _color_effect_visuals_enabled():
+			_create_ring(
+				origin,
+				Color(0.58, 0.90, 1.0, 1.0),
+				result_radius_m * 2.0,
+				0.0,
+				MERGE_RING_DURATION,
+				result_radius_m
+			)
 	else:
 		_create_birth_feedback(origin, color_value, result_level, result_radius_m)
 	_play_color_effect_visual(reaction)
@@ -444,14 +445,15 @@ func _create_birth_feedback(
 		result_radius_m * 0.48,
 		"BirthNova"
 	)
-	_create_ring(
-		origin,
-		Color(0.66, 0.92, 1.0, 1.0),
-		result_radius_m * 2.5,
-		BIRTH_ACCRETION_DURATION,
-		BIRTH_NOVA_DURATION,
-		result_radius_m
-	)
+	if not _color_effect_visuals_enabled():
+		_create_ring(
+			origin,
+			Color(0.66, 0.92, 1.0, 1.0),
+			result_radius_m * 2.5,
+			BIRTH_ACCRETION_DURATION,
+			BIRTH_NOVA_DURATION,
+			result_radius_m
+		)
 	if level >= 7:
 		var prominence_scales: Array[float] = [1.00, 1.08, 1.16]
 		var prominence_angles: Array[float] = [-2.18, -0.08, 1.72]

@@ -75,6 +75,7 @@ function Get-Percentile([double[]]$Values, [double]$Percentile) {
 }
 
 $frames = [System.Collections.Generic.List[double]]::new()
+$feverFrames = [System.Collections.Generic.List[double]]::new()
 $drawCalls = [System.Collections.Generic.List[double]]::new()
 $inputLatencies = [System.Collections.Generic.List[double]]::new()
 $spawnLatencies = [System.Collections.Generic.List[double]]::new()
@@ -82,6 +83,7 @@ $blastFrames = [System.Collections.Generic.List[double]]::new()
 $largeBatchFrames = [System.Collections.Generic.List[double]]::new()
 foreach ($report in $seedReports) {
     foreach ($value in $report.frame_samples_ms) { $frames.Add([double]$value) }
+	foreach ($value in $report.fever_frame_samples_ms) { $feverFrames.Add([double]$value) }
     foreach ($value in $report.draw_call_samples) { $drawCalls.Add([double]$value) }
     foreach ($value in $report.input_latency_ms) { $inputLatencies.Add([double]$value) }
     foreach ($value in $report.spawn_latency_ms) { $spawnLatencies.Add([double]$value) }
@@ -109,6 +111,13 @@ $aggregate = [ordered]@{
     frame_max_ms = if ($frames.Count -gt 0) { [double](($frames | Measure-Object -Maximum).Maximum) } else { 0.0 }
     frames_over_16_7_ms = @($frames | Where-Object { $_ -gt 16.7 }).Count
     frames_over_33_3_ms = @($frames | Where-Object { $_ -gt 33.3 }).Count
+	fever_frame_count = $feverFrames.Count
+	fever_frame_p50_ms = Get-Percentile $feverFrames.ToArray() 50
+	fever_frame_p95_ms = Get-Percentile $feverFrames.ToArray() 95
+	fever_frame_p99_ms = Get-Percentile $feverFrames.ToArray() 99
+	fever_frame_max_ms = if ($feverFrames.Count -gt 0) { [double](($feverFrames | Measure-Object -Maximum).Maximum) } else { 0.0 }
+	fever_frames_over_16_7_ms = @($feverFrames | Where-Object { $_ -gt 16.7 }).Count
+	fever_frames_over_33_3_ms = @($feverFrames | Where-Object { $_ -gt 33.3 }).Count
     draw_calls_p50 = Get-Percentile $drawCalls.ToArray() 50
     draw_calls_p95 = Get-Percentile $drawCalls.ToArray() 95
     draw_calls_max = if ($drawCalls.Count -gt 0) { [double](($drawCalls | Measure-Object -Maximum).Maximum) } else { 0.0 }

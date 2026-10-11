@@ -10,7 +10,10 @@ const FADE_DURATION: float = 0.25
 const RISE_DISTANCE: float = 60.0
 const POP_IN_DURATION: float = 0.12
 const POP_IN_PEAK_TIME: float = 0.07
-const POPUP_SIZE: Vector2 = Vector2(440.0, 150.0)
+const POPUP_SIZE: Vector2 = Vector2(440.0, 180.0)
+const GOLD_COLOR: Color = Color("#FFD54A")
+const FORMULA_COLOR: Color = Color("#AFC5D8")
+const COSMIC_GLOW_ALPHA: float = 0.28
 const HUD_THEME: Theme = preload("res://assets/ui/gravity_orb_theme.tres")
 
 var started_process_frame: int = -1
@@ -20,9 +23,10 @@ var active: bool = false
 
 var _score_label: Label
 var _formula_label: Label
+var _sparkles: Array[CosmicSparkle] = []
 var _elapsed: float = 0.0
 var _duration: float = POP_DURATION
-var _shake_phase: float = 0.0
+var _cosmic_score: bool = false
 
 
 func _ready() -> void:
@@ -35,7 +39,7 @@ func _ready() -> void:
 	_score_label = Label.new()
 	_score_label.name = "Score"
 	_score_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	_score_label.offset_bottom = 96.0
+	_score_label.offset_bottom = 100.0
 	_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_score_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_score_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -44,15 +48,21 @@ func _ready() -> void:
 	_formula_label = Label.new()
 	_formula_label.name = "Formula"
 	_formula_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	_formula_label.offset_top = 82.0
-	_formula_label.offset_bottom = 132.0
+	_formula_label.offset_top = 112.0
+	_formula_label.offset_bottom = 162.0
 	_formula_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_formula_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_formula_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_formula_label.theme_type_variation = &"HudDisplayMedium"
 	_formula_label.add_theme_font_size_override("font_size", 22)
-	_formula_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.86))
+	_formula_label.add_theme_color_override("font_color", FORMULA_COLOR)
 	add_child(_formula_label)
+	for index: int in range(2):
+		var sparkle: CosmicSparkle = CosmicSparkle.new()
+		sparkle.name = "ScoreSparkle%d" % index
+		sparkle.z_index = 2
+		add_child(sparkle)
+		_sparkles.append(sparkle)
 	deactivate(false)
 
 
@@ -63,24 +73,26 @@ func activate(
 	font_color: Color,
 	outline_color: Color,
 	outline_size: int,
-	process_frame: int
+	process_frame: int,
+	cosmic_score: bool = false
 ) -> void:
 	anchor_position = screen_position
 	points = p_points
 	started_process_frame = process_frame
 	_elapsed = 0.0
 	_duration = POP_DURATION + (LARGE_SCORE_EXTRA_DURATION if points >= 1000 else 0.0)
-	_shake_phase = float((process_frame * 17 + points * 3) % 360) * PI / 180.0
+	_cosmic_score = cosmic_score
 	active = true
 	visible = true
 	modulate = Color.WHITE
 	scale = Vector2.ONE * 0.6
 	position = anchor_position - POPUP_SIZE * 0.5
-	_score_label.text = "+%d" % points
+	_score_label.text = "+%s" % format_number(points)
 	_score_label.add_theme_font_size_override("font_size", popup_font_size(points))
 	_score_label.add_theme_color_override("font_color", font_color)
 	_score_label.add_theme_color_override("font_outline_color", outline_color)
 	_score_label.add_theme_constant_override("outline_size", outline_size)
+	_configure_cosmic_style()
 	_formula_label.text = formula
 	_formula_label.visible = not formula.is_empty()
 	set_process(true)
@@ -89,7 +101,7 @@ func activate(
 func merge_score(additional_points: int) -> void:
 	points += additional_points
 	_duration = POP_DURATION + (LARGE_SCORE_EXTRA_DURATION if points >= 1000 else 0.0)
-	_score_label.text = "+%d" % points
+	_score_label.text = "+%s" % format_number(points)
 	_score_label.add_theme_font_size_override("font_size", popup_font_size(points))
 	_formula_label.text = ""
 	_formula_label.visible = false
@@ -100,6 +112,8 @@ func deactivate(emit_finished: bool = true) -> void:
 	active = false
 	visible = false
 	set_process(false)
+	for sparkle: CosmicSparkle in _sparkles:
+		sparkle.stop()
 	if emit_finished and was_active:
 		finished.emit(self)
 
@@ -116,6 +130,33 @@ func score_color() -> Color:
 	return _score_label.get_theme_color("font_color")
 
 
+func is_cosmic_score() -> bool:
+	return _cosmic_score
+
+
+func active_sparkle_count() -> int:
+	var count: int = 0
+	for sparkle: CosmicSparkle in _sparkles:
+		if sparkle.active:
+			count += 1
+	return count
+
+
+func glow_alpha() -> float:
+	return _score_label.get_theme_color("font_shadow_color").a
+
+
+static func format_number(value: int) -> String:
+	var negative: bool = value < 0
+	var digits: String = str(absi(value))
+	var formatted: String = ""
+	for index: int in range(digits.length()):
+		if index > 0 and (digits.length() - index) % 3 == 0:
+			formatted += ","
+		formatted += digits[index]
+	return ("-" if negative else "") + formatted
+
+
 static func popup_font_size(score: int) -> int:
 	var ratio: float = maxf(float(score) / 10.0, 0.0001)
 	var factor: float = clampf(1.0 + 0.25 * log(ratio) / log(10.0), 1.0, 2.4)
@@ -127,10 +168,7 @@ func _process(delta: float) -> void:
 		return
 	_elapsed += delta
 	var progress: float = clampf(_elapsed / POP_DURATION, 0.0, 1.0)
-	var shake_x: float = 0.0
-	if points >= 1000:
-		shake_x = sin(_elapsed * 44.0 + _shake_phase) * 3.0
-	position = anchor_position - POPUP_SIZE * 0.5 + Vector2(shake_x, -RISE_DISTANCE * progress)
+	position = anchor_position - POPUP_SIZE * 0.5 + Vector2(0.0, -RISE_DISTANCE * progress)
 	if _elapsed < POP_IN_PEAK_TIME:
 		var first_phase: float = _elapsed / POP_IN_PEAK_TIME
 		scale = Vector2.ONE * lerpf(0.6, 1.1, first_phase)
@@ -148,3 +186,29 @@ func _process(delta: float) -> void:
 	)
 	if _elapsed >= _duration:
 		deactivate()
+
+
+func _configure_cosmic_style() -> void:
+	var shadow_color: Color = GOLD_COLOR
+	shadow_color.a = COSMIC_GLOW_ALPHA if _cosmic_score else 0.0
+	_score_label.add_theme_color_override("font_shadow_color", shadow_color)
+	_score_label.add_theme_constant_override(
+		"shadow_outline_size",
+		16 if _cosmic_score else 0
+	)
+	for sparkle: CosmicSparkle in _sparkles:
+		sparkle.stop()
+	if not _cosmic_score:
+		return
+	var sparkle_count: int = 2 if points >= 1000 else 1
+	var offsets: Array[Vector2] = [Vector2(-94.0, -24.0), Vector2(98.0, 14.0)]
+	for index: int in range(sparkle_count):
+		_sparkles[index].play(
+			POPUP_SIZE * 0.5,
+			GOLD_COLOR,
+			_duration,
+			offsets[index],
+			offsets[index] * 1.18,
+			0.0,
+			10.0 + float(index) * 2.0
+		)

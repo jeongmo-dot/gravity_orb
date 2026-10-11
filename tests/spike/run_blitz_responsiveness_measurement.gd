@@ -10,6 +10,8 @@ const FRAME_WARMUP_SECONDS: float = 0.5
 const BOT_INTERVAL_SECONDS: float = 0.30
 const FORCED_BLAST_TIME: float = 2.0
 const FORCED_LARGE_BATCH_TIME: float = 4.05
+const FORCED_FEVER_START_TIME: float = 1.0
+const FORCED_FEVER_END_TIME: float = 5.0
 const BURST_OFFSETS: Array[float] = [1.54, 2.04]
 const DIRECTIONS: Array[Vector2i] = [
 	Vector2i.LEFT,
@@ -23,8 +25,10 @@ var _seed: int = 101
 var _main: Main
 var _manager: BlitzManager
 var _board: Board3D
+var _hud: Hud
 var _requests: Array[Dictionary] = []
 var _frame_samples_ms: Array[float] = []
+var _fever_frame_samples_ms: Array[float] = []
 var _draw_call_samples: Array[int] = []
 var _input_latency_ms: Array[float] = []
 var _spawn_latency_ms: Array[float] = []
@@ -35,6 +39,7 @@ var _marker_frames_ms: Dictionary = {}
 var _direction_index: int = 0
 var _request_id: int = 0
 var _force_large_batch_pending: bool = false
+var _fever_measurement_active: bool = false
 
 
 func _ready() -> void:
@@ -48,6 +53,8 @@ func _process(_delta: float) -> void:
 		var frame_ms: float = float(now_usec - _last_process_usec) / 1000.0
 		if _record_frames:
 			_frame_samples_ms.append(frame_ms)
+			if _fever_measurement_active:
+				_fever_frame_samples_ms.append(frame_ms)
 			_draw_call_samples.append(RenderingServer.get_rendering_info(
 				RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME
 			))
@@ -65,6 +72,7 @@ func _run() -> void:
 	await get_tree().process_frame
 	_manager = _main.get_node("BlitzManager") as BlitzManager
 	_board = _main.get_node("Board") as Board3D
+	_hud = _main.get_node("UI/Hud") as Hud
 	(_main.get_node("ScoreManager") as ScoreManager).save_path = ""
 	(_main.get_node("FeedbackDirector/SfxBank") as SfxBank).save_path = ""
 	_manager.swipe_accepted.connect(_on_swipe_accepted)
@@ -78,6 +86,8 @@ func _run() -> void:
 	var next_bot_time: float = 0.0
 	var blast_forced: bool = false
 	var large_batch_forced: bool = false
+	var fever_forced: bool = false
+	var fever_ended: bool = false
 	var burst_done: Array[bool] = [false, false]
 	while _seconds_since(run_start_usec) < RUN_DURATION_SECONDS:
 		await get_tree().process_frame
@@ -87,6 +97,16 @@ func _run() -> void:
 		while elapsed >= next_bot_time:
 			_record_input(_next_direction())
 			next_bot_time += BOT_INTERVAL_SECONDS
+		if not fever_forced and elapsed >= FORCED_FEVER_START_TIME:
+			fever_forced = true
+			_fever_measurement_active = true
+			_hud._on_fever_changed(true, FORCED_FEVER_END_TIME - elapsed)
+			_board.set_fever_active(true)
+		if not fever_ended and elapsed >= FORCED_FEVER_END_TIME:
+			fever_ended = true
+			_fever_measurement_active = false
+			_hud._on_fever_changed(false, 0.0)
+			_board.set_fever_active(false)
 		for burst_index: int in range(BURST_OFFSETS.size()):
 			if not burst_done[burst_index] and elapsed >= BURST_OFFSETS[burst_index]:
 				burst_done[burst_index] = true
@@ -225,6 +245,7 @@ func _build_report() -> Dictionary:
 		"gravity_level_scale": Config.data.gravity_level_scale,
 		"duration_seconds": RUN_DURATION_SECONDS,
 		"frame_samples_ms": _frame_samples_ms,
+		"fever_frame_samples_ms": _fever_frame_samples_ms,
 		"draw_call_samples": _draw_call_samples,
 		"input_latency_ms": _input_latency_ms,
 		"spawn_latency_ms": _spawn_latency_ms,
@@ -246,6 +267,7 @@ func _build_report() -> Dictionary:
 func _summary_without_samples(report: Dictionary) -> Dictionary:
 	var summary: Dictionary = report.duplicate(true)
 	summary.erase("frame_samples_ms")
+	summary.erase("fever_frame_samples_ms")
 	summary.erase("draw_call_samples")
 	summary.erase("input_latency_ms")
 	summary.erase("spawn_latency_ms")
