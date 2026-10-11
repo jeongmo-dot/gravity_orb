@@ -38,6 +38,31 @@
 
 ## 미확인
 
+### [2026-10-11] 대상 #65 — 테스트·성능 측정 안정화
+- 상태: 완료 — 턴 시간 상한 검사를 장기 묶음의 별도 Godot 프로세스로 분리하고, 근접 탐색 성능 기준과 BLITZ 창 측정 환경 보고를 명세대로 안정화함
+- 브랜치 / PR: `v2-test-measurement-stability` / [PR #67](https://github.com/jeongmo-dot/gravity_orb/pull/67)
+- 변경 파일: `tests/run_tests.gd`, `tests/scenarios/test_reaction_latency.gd`, `tests/run_blitz_responsiveness_measurement.ps1`, `tests/spike/run_blitz_responsiveness_measurement.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `test_all_turns_return_to_input_within_time_cap`을 일반 묶음에서 제외하고 장기 묶음의 새 Godot 프로세스에서 실행 — 자동 (`tests/run_tests.ps1` 일반 `270/270`, 장기 `5/5`)
+  - [x] 200구슬 근접 탐색 검사를 5회 중 최저 p95 `≤ 1.5ms`로 변경하고 검사 이름도 기준에 맞게 변경 — 자동 (3회 연속 최저 p95 `0.626 / 0.639 / 0.695ms`)
+  - [x] BLITZ 창 측정에 `--disable-vsync`를 적용하고 시드별·집계 JSON에 VSync 상태와 화면 주사율을 기록 — 자동 + 창 모드 측정 (`disabled`, `164.836Hz`)
+  - [x] 성능 묶음과 창 측정을 다른 Godot 프로세스와 겹치지 않게 순차 실행 — 실행 절차 관측
+  - [x] 게임 코드·밸런스 수치 변경 없음 — 변경 파일 확인
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` 1회차 → 일반 `270/270`(`13.041초`), 장기 `5/5`(`41.026초`), 성능 `5/5`(`2.693초`), 합계 `280/280`, 종료 코드 0
+  - `tests/run_tests.ps1` 2회차 → 일반 `270/270`(`12.905초`), 장기 `5/5`(`41.173초`), 성능 `5/5`(`2.689초`), 합계 `280/280`, 종료 코드 0
+  - `tests/run_tests.ps1` 3회차 → 일반 `270/270`(`12.909초`), 장기 `5/5`(`41.554초`), 성능 `5/5`(`2.782초`), 합계 `280/280`, 종료 코드 0
+  - 턴 시간 상한 검사의 복구 횟수 → 3회 모두 `1`회 (`≤2`)
+  - `tests/run_blitz_responsiveness_measurement.ps1 -Label v2_test_stability` → 종료 코드 0, 4개 시드 모두 VSync `disabled`, 화면 주사율 `164.836Hz`; 프레임 `15437`, p50/p95/p99/최대 `1.710/2.978/4.197/8.142ms`, `>16.7ms` 0, `>33.3ms` 0, 입력 `120/120`, 유실 0
+  - 시작 화면 / TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 전역 난수 호출 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+- 수동 확인 절차: 없음 — 테스트·측정 도구만 변경했으며 화면에 보이는 게임 요소는 변경하지 않음
+- 문서에 없던 결정 사항·알려진 문제:
+  - 창 측정 시드 102·104 종료 때 기존 계열의 `ObjectDB instances leaked at exit (2 instances)` 경고가 각각 1회 출력됐으나 종료 코드 0이며 `SCRIPT ERROR`·`Parse Error`는 없었음.
+  - 측정 산출물 `artifacts/measurements/blitz_responsiveness_v2_test_stability.json`은 기존 ignore 대상이라 커밋에 포함하지 않음.
+- 남은 것 · 질문: 없음
+
 ### [2026-10-11] 대상 #64 추가 요구 1 — 중력 벽 빛·위험 테두리·BLOCKED 캡처
 - 상태: 완료 — `origin/main`을 먼저 병합하고 중력 벽 빛의 위치·전환, 위험 외곽 띠와 성운 색, BLOCKED 전용 캡처·화소 검사를 구현함
 - 브랜치 / PR: `v2-space-background-board` / [PR #66](https://github.com/jeongmo-dot/gravity_orb/pull/66)

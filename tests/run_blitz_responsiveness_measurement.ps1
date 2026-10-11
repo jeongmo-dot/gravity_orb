@@ -27,6 +27,7 @@ foreach ($seed in 101..104) {
     $arguments = @(
         "--path", $repoPath,
         "--windowed",
+        "--disable-vsync",
         "--resolution", "540x960",
         "--audio-driver", "Dummy",
         "res://tests/spike/RunBlitzResponsivenessMeasurement.tscn",
@@ -98,6 +99,9 @@ $aggregate = [ordered]@{
     gravity_level_scale = [double]$seedReports[0].gravity_level_scale
     seeds = @(101, 102, 103, 104)
     renderer = [string]$seedReports[0].renderer
+    vsync_requested = "disabled"
+    vsync_mode = [string]$seedReports[0].vsync_mode
+    screen_refresh_rate_hz = [double]$seedReports[0].screen_refresh_rate_hz
     frame_count = $frames.Count
     frame_p50_ms = Get-Percentile $frames.ToArray() 50
     frame_p95_ms = Get-Percentile $frames.ToArray() 95
