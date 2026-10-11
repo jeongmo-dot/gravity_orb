@@ -214,6 +214,8 @@ func _next_direction() -> Vector2i:
 
 func _build_report() -> Dictionary:
 	var dropped_inputs: int = 0
+	var current_screen: int = DisplayServer.window_get_current_screen()
+	var vsync_mode: int = int(DisplayServer.window_get_vsync_mode())
 	for request: Dictionary in _requests:
 		if int(request["accepted_usec"]) == 0:
 			dropped_inputs += 1
@@ -235,6 +237,8 @@ func _build_report() -> Dictionary:
 		),
 		"max_spawn_batch": _manager.max_spawn_batch,
 		"renderer": RenderingServer.get_video_adapter_name(),
+		"vsync_mode": _vsync_mode_name(vsync_mode),
+		"screen_refresh_rate_hz": DisplayServer.screen_get_refresh_rate(current_screen),
 		"shared_resources": Orb3D.shared_resource_counts(),
 	}
 
@@ -250,6 +254,19 @@ func _summary_without_samples(report: Dictionary) -> Dictionary:
 
 func _seconds_since(start_usec: int) -> float:
 	return float(Time.get_ticks_usec() - start_usec) / 1_000_000.0
+
+
+func _vsync_mode_name(mode: int) -> String:
+	match mode:
+		DisplayServer.VSYNC_DISABLED:
+			return "disabled"
+		DisplayServer.VSYNC_ENABLED:
+			return "enabled"
+		DisplayServer.VSYNC_ADAPTIVE:
+			return "adaptive"
+		DisplayServer.VSYNC_MAILBOX:
+			return "mailbox"
+	return "unknown_%d" % mode
 
 
 func _parse_arguments() -> void:

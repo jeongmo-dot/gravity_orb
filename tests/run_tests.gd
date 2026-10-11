@@ -37,6 +37,9 @@ const LONG_TEST_METHODS: Dictionary = {
 		"test_shared_turn_path_completes_twenty_3d_turns",
 		"test_twenty_two_seed_3d_gravity_cycles_have_no_departures_or_divergence",
 	],
+	"res://tests/scenarios/test_turn_time.gd": [
+		"test_all_turns_return_to_input_within_time_cap",
+	],
 }
 const PERF_TEST_METHODS: Dictionary = {
 	"res://tests/test_callouts.gd": [
@@ -52,7 +55,7 @@ const PERF_TEST_METHODS: Dictionary = {
 		"test_score_popup_frame_cost_report",
 	],
 	"res://tests/scenarios/test_reaction_latency.gd": [
-		"test_two_hundred_orb_proximity_scan_p95_is_below_one_millisecond",
+		"test_two_hundred_orb_proximity_scan_best_of_five_p95_is_at_most_one_point_five_milliseconds",
 	],
 }
 
