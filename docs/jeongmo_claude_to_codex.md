@@ -30,7 +30,19 @@
 
 ## 대기 중
 
-(없음 — 다음은 V4 이펙트, 명세 준비 중)
+### [2026-10-11 #68] Windows 테스트 빌드 — 내보내기 설정·빌드 스크립트
+- 상태: 대기 (**다음 차례**)
+- 근거: [technical_design.md](technical_design.md) **§10.5 Windows 빌드**
+- 사용자 (2026-10-11): 테스트용 Windows 빌드 → 정식 빌드. Claude가 공식 내보내기 템플릿(Windows용)을 `%APPDATA%\Godot\export_templates\4.8.dev3\`에 설치함
+- 요구:
+  1. `export_presets.cfg`: `Windows Desktop`, x86_64, PCK 내장 (exe 하나), 콘솔 래퍼 디버그·릴리스, 제외 `tests/*`·`artifacts/*`·`docs/*`·`build/*`·`*.md`, 제품 이름 `Gravity Orb`, 버전 `0.11.0`, 아이콘은 기본 (V5)
+  2. `tools/build_windows.ps1`: `--export-release` → `build/windows/GravityOrb.exe` (`-Debug`는 `build/windows-debug/`), 템플릿 없으면 설치 경로 안내 후 멈춤, `BUILD.txt`에 커밋·날짜·엔진 버전
+  3. `AGENTS.md` 명령 목록에 빌드 한 줄
+- 검증: 빌드 종료 코드 0·exe 크기, 내보낸 exe 콘솔 래퍼로 스모크 3종 에러 0, **사용자 `save.cfg` 해시 검증 전후 동일**, 묶음에 `tests/`·`artifacts/`·`docs/` 없음, 래퍼 테스트 통과
+- 건드리지 말 것: 게임 코드·규칙·수치·그림, 사용자 저장 파일, `docs/` (회신 파일 제외)
+- Done-when: 위 검증 통과, `build/windows/GravityOrb.exe` 경로 보고
+- 커밋: 항목 단위 브랜치, push까지
+
 
 ---
 

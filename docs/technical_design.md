@@ -794,6 +794,14 @@ godot --headless --path . --quit-after 300 -- --mode=blitz
 
 ---
 
+### 10.5 Windows 빌드 (#68)
+사용자 (2026-10-11): 테스트용 Windows 빌드 → 정식 빌드 (내보내기 템플릿 + 내보내기 설정)
+- **내보내기 템플릿**: Godot 4.8-dev3 공식 파일 (`godotengine/godot-builds` 릴리스의 `Godot_v4.8-dev3_export_templates.tpz`, SHA512 확인) 중 Windows 템플릿만 `%APPDATA%\Godot\export_templates\4.8.dev3\`에 설치 (Claude, 2026-10-11). 다른 PC에서 빌드하려면 같은 파일을 받아 같은 곳에 둔다
+- **`export_presets.cfg`** (저장소에 커밋): 프리셋 이름 `Windows Desktop`, x86_64, PCK를 exe 안에 넣는다 (파일 하나). 콘솔 래퍼는 디버그·릴리스 모두 (`GravityOrb.console.exe`, 테스트 로그용). 제외: `tests/*`, `artifacts/*`, `docs/*`, `build/*`, `*.md`. 제품 이름 `Gravity Orb`, 파일 버전 `0.11.0` (기획서 버전). 아이콘은 V5에서 (지금은 기본)
+- **빌드 스크립트** `tools/build_windows.ps1`: `GODOT` 환경변수 또는 일반 빌드 기본 경로로 `--headless --export-release "Windows Desktop" build/windows/GravityOrb.exe`. 템플릿이 없으면 설치 경로를 알려 주는 메시지로 멈춘다. `-Debug`는 `--export-debug`로 `build/windows-debug/`. 빌드 뒤 `BUILD.txt`에 커밋 해시·날짜·엔진 버전. 출력 폴더 `build/`는 이미 `.gitignore`에 있다
+- **저장 위치**: 내보낸 게임도 편집기 실행과 같은 `%APPDATA%\Godot\app_userdata\Gravity Orb\save.cfg`를 쓴다 (기록·설정 공유). 빌드 검증은 이 파일을 바꾸면 안 된다
+- **검증**: 빌드 스크립트 종료 코드 0과 exe 크기. 내보낸 exe (콘솔 래퍼)로 스모크 3종 (`--headless --quit-after 300`, `-- --mode=turn`, `-- --mode=blitz`) 종료 코드 0·`SCRIPT ERROR` 0. 검증 전후 사용자 `save.cfg` 해시 동일 (없으면 없는 채로). 내보낸 묶음에 `res://tests/`·`res://artifacts/`·`res://docs/`가 들어가지 않았음을 확인 (방법 자유). 래퍼 테스트 통과. `AGENTS.md` 명령 목록에 빌드 한 줄
+
 ## 11. 설계 해석 (기획서 빈칸을 채운 결정)
 
 기획서에 명시되지 않았거나 모호한 부분에 대한 이 문서의 결정이다. 플레이테스트 후 기획서에 반영하거나 뒤집는다.
