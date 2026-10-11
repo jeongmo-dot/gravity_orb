@@ -38,6 +38,116 @@
 
 ## 미확인
 
+### [2026-10-11] 대상 #66 추가 요구 2 — Orbitron 실제 굵기·실측 숫자 맞춤
+- 상태: 완료 — 문자열로 직렬화되어 무시되던 Orbitron `wght` 키를 TextServer 숫자 태그로 교체해 500/700 윤곽을 분리하고, SCORE/BEST 숫자를 실제 글꼴 폭으로 맞추며 BEST 제목을 SCORE와 같은 22px로 정리함
+- 브랜치 / PR: `v3-font-theme-hud` / [PR #68](https://github.com/jeongmo-dot/gravity_orb/pull/68)
+- 병합: `origin/main` `7df66d7`을 병합 커밋 `61a0fc6`으로 먼저 반영한 뒤 구현함. 충돌 없음
+- 변경 파일: `assets/fonts/SOURCE.md`, `assets/ui/gravity_orb_theme.tres`, `scenes/UI.tscn`, `scripts/ui/Hud.gd`, `tests/test_screen_layout.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] Orbitron 원본 변수 글꼴에 `TextServer.name_to_tag("wght") == 2003265652` 숫자 태그로 500·700 적용 — 자동 (`test_hud_theme_fonts_panel_tokens_and_extreme_values_fit`)
+  - [x] 500·700이 서로 다른 font RID와 서로 다른 `9` 글리프 윤곽 점을 생성 — 헤드리스 자동 검사. 기존 문자열 키 상태에서는 RID·윤곽이 같았고 숫자 태그 반영 뒤 둘 다 달라짐
+  - [x] SCORE/BEST 모두 각 FontVariation의 `get_string_size()`로 최대 크기부터 최소 크기까지 실측하고, 양쪽 8 논리 px를 남기는 가장 큰 크기를 선택하되 최소 크기 아래로 내리지 않음 — 자동
+  - [x] SCORE/BEST `9999999`의 실측 폭이 각 숫자 rect 폭 `-16px` 이내이고, 선택 크기보다 1px 큰 크기는 넘치는 경우까지 검사 — 자동
+  - [x] BEST 제목을 SCORE와 같은 고정 `22px`로 맞추고 제목·숫자 영역 비겹침 유지 — 자동 + 캡처 직접 확인
+  - [x] 원본 Orbitron 경로·고정 커밋·SHA-256 유지 및 숫자 축 태그 기록 — `assets/fonts/SOURCE.md`; SHA-256 `f42db2dd16e642258e35782916eceb1dcdbea06fb958d77ad71dc5963587e8fd`
+  - [x] 규칙·밸런스·물리·구슬·배경·보드를 변경하지 않고 기존 물리 해시 유지 — 전체 회귀 + 상태 해시
+- 캡처 관측 (Standard/Compatibility):
+  - `tests/capture_screens.ps1` → 종료 코드 0, `540×960` 18장 + `540×1170` 8장 = `26장`
+  - 두 비율의 `03_turn_combo`, `06_blitz_fever_chain`, `13_turn_ramp_uncapped_next`, `17_board_danger`를 직접 확대 확인: SCORE/BEST 제목은 같은 크기의 얇은 500, 숫자는 확연히 굵은 700이며 `9999999`가 좌우 여백 안에서 잘림 없이 표시됨
+  - 위 네 장면에서 SCORE/BEST 제목과 숫자, MAX COMBO/CHAIN, 소리·DANGER·배수/CHAIN이 서로 겹치지 않음. 보드 투영 x·폭도 두 비율 간 `0.000px / 0.000%` 차이
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건 (샌드박스 밖 사용자 설정 경로 사용)
+  - `tests/run_tests.ps1` → 일반 `273/273`(`15.921초`), 장기 `5/5`(`56.757초`), 성능 `5/5`(`2.690초`), 합계 `283/283`, 종료 코드 0, 총 `75.368초`
+  - 물리 상태 해시: TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`; #66 추가 요구 1과 동일
+  - TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 난수 호출 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. `tests/capture_screens.ps1` 실행 후 두 비율의 `03`·`06`·`13`·`17` 상단 HUD를 확대한다 → SCORE/BEST 제목은 같은 22px·500 굵기이고 숫자는 더 굵은 700이어야 한다.
+  2. `03`·`13`에서 SCORE/BEST `9999999`를 본다 → 숫자가 각 패널 좌우 안쪽에서 잘리지 않고 제목·MAX COMBO와 겹치지 않아야 한다.
+  3. 실제 플레이에서 점수가 짧은 값에서 긴 값으로 증가하도록 진행한다 → SCORE의 0.3초 롤링 중에도 매 프레임 실제 문자열 폭에 맞춰 축소되고, BEST 경신 반짝임은 숫자에만 적용되어야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - Godot가 인식하는 축 키를 소스 글꼴의 `wght` 이름에서 `TextServer.name_to_tag("wght")`로 변환한 정수 `2003265652`로 직렬화했다. 글꼴 파일은 교체·재생성하지 않음
+  - PNG·JSON은 기존 ignore 대상 검수 산출물이며 커밋에 포함하지 않음
+- 남은 것 · 질문: 없음
+
+### [2026-10-11] 대상 #66 추가 요구 1 — 긴 화면 카메라·HUD 위계·글꼴 원본 정리
+- 상태: 완료 — `origin/main`의 보완 명세를 먼저 병합하고, 긴 화면의 가로 기준 카메라와 실제 투영 검사, HUD 여백·점수 위계·NEXT/THEN 간격, 원본 변수 글꼴과 이름표를 반영함
+- 브랜치 / PR: `v3-font-theme-hud` / [PR #68](https://github.com/jeongmo-dot/gravity_orb/pull/68)
+- 병합: `origin/main` `4246755`를 병합 커밋 `39117d4`로 반영한 뒤 구현함. 충돌 없음
+- 변경 파일: `assets/fonts/{Orbitron[wght].ttf,NotoSansKR-Regular-KSX1001.ttf,NotoSansKR-Medium-KSX1001.ttf,OFL.txt,SOURCE.md}`, `assets/ui/gravity_orb_theme.tres`, `scenes/UI.tscn`, `scripts/core/Main.gd`, `scripts/ui/Hud.gd`, `tests/{capture_screens.ps1,test_screen_layout.gd,test_score_popups.gd}`, `tests/scenarios/test_score_flow.gd`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`; 기존 `Orbitron-Medium.ttf`·`Orbitron-Bold.ttf`와 import 파일 삭제
+- Done-when 대조:
+  - [x] 9:16보다 긴 화면은 `KEEP_WIDTH`와 코드로 계산한 9:16 가로 화각, 9:16·그보다 넓은 화면은 기존 `KEEP_HEIGHT`·세로 `25°`를 사용하고 화면 크기 변경 때 재적용 — 자동 (`test_hud_layout_stays_in_safe_area_and_clear_of_board_at_both_ratios`)
+  - [x] `Main3D` 실제 카메라로 보드 바깥 네 모서리를 투영해 좌우 16 논리 px 이상, 두 비율 보드 폭 차이 1% 이하, 위 HUD/시간 막대·아래 받침 비겹침 검사 — 자동. 캡처 투영 x 차이 `0.000px`, 폭 차이 `0.000%`
+  - [x] 소리·DANGER 왼쪽과 BEST·MAX COMBO/CHAIN 오른쪽에 `HUD_MARGIN=24px`, 가운데 스피커 아이콘 `54px`(`120px` 버튼 높이의 45%) — 자동 + 캡처 직접 확인
+  - [x] SCORE/BEST를 Orbitron 500·보조색의 고정 작은 제목과 Orbitron 700·자동 축소 큰 숫자로 분리하고 점수 튐/BEST 반짝임은 숫자만 변경 — 자동 (`test_hud_theme_fonts_panel_tokens_and_extreme_values_fit`, `test_new_best_flashes_and_large_multiplier_punches_score`) + 캡처 직접 확인
+  - [x] THEN 제목을 불투명 `#8EA3C8`, NEXT/THEN `×n`을 미리보기 구슬 영역에서 4 논리 px 이상 분리 — 자동 + `12`·`13` 직접 확인
+  - [x] Orbitron 원본 `Orbitron[wght].ttf` 하나와 Godot `FontVariation` wght 500·700 사용, Noto 이름표 Regular·Medium, 정확한 Noto 저작권 문구와 출처/고정 커밋/SHA-256 기록 — 자동 글꼴 이름·축·라이선스 검사
+  - [x] 규칙·밸런스·물리·구슬·배경·보드 그림을 변경하지 않고 기존 물리 해시 유지 — 전체 회귀 + 상태 해시
+- 글꼴 관측:
+  - TTF 합계 `1,033,768바이트` (`<3MiB`)
+  - Orbitron 원본 SHA-256 `f42db2dd16e642258e35782916eceb1dcdbea06fb958d77ad71dc5963587e8fd`, google/fonts 커밋 `bd8f81ddb5c74d5c8897b36ad88b440266245103`
+  - Noto 내부 이름: `Noto Sans KR / Regular`, `Noto Sans KR / Medium`; `OFL.txt` 첫머리에 Orbitron·Noto 저작권 두 줄
+- 캡처 관측 (Standard/Compatibility):
+  - `tests/capture_screens.ps1` → 종료 코드 0, `540×960` 18장 + `540×1170` 8장 = `26장`; 화면을 직접 확인함
+  - 보드 바깥 테두리 투영(물리 px): 9:16 `left=13.276, right=526.724, width=513.448`, 9:19.5도 동일; 좌·우 차이 `0.000px`, 폭 차이 `0.000%`
+  - 추가 요구 전/후 9:16 `02_turn_early`의 보드 윗선 화소 스캔은 양쪽 모두 `x=16..523`, 표본 `2,623개`로 위치·폭 동일. 9:16 카메라는 기존 `KEEP_HEIGHT/25°` 유지
+  - 긴 화면 8장에서 좌우 벽과 가장자리 구슬이 모두 화면 안에 있고 위 HUD·보드·아래 받침이 겹치지 않음. 점수/BEST `9,999,999`, NEXT `×8`, THEN `×6`, 불투명 제목과 24px 여백을 확인
+- 성능 관측 (RTX 4070 Ti SUPER, Compatibility, VSync 끔, 164.836Hz, BLITZ 시드 101~104):
+  - 프레임 `17,828`, p50/p95/p99/최대 `1.474/2.536/3.963/9.472ms`, `>16.7ms` 0, `>33.3ms` 0
+  - 드로콜 p50/p95/최대 `402/428/439`; 입력 `120/120`, 유실 `0`; 입력 수락 p95/최대 `18.602/42.308ms`, 수락→생성 p95/최대 `2.668/6.792ms`
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건 (샌드박스 밖 사용자 설정 경로 사용)
+  - `tests/run_tests.ps1` → 일반 `273/273`(`15.165초`), 장기 `5/5`(`39.835초`), 성능 `5/5`(`3.335초`), 합계 `283/283`, 종료 코드 0, 총 `58.335초`
+  - 물리 상태 해시: TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`; #66 1차와 동일
+  - 시작 화면 / TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 전역 난수 호출 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. `tests/capture_screens.ps1` 실행 후 `540x960`과 `540x1170`의 `02`·`03`·`06`·`07`·`12`·`13`·`17`·`18`을 나란히 확인 → 긴 화면의 보드 좌우 벽과 가장자리 구슬이 잘리지 않고 보드 폭·x 위치가 기본 비율과 같아야 한다.
+  2. `03_turn_combo.png` 확인 → 작은 보조색 `SCORE`·`BEST`와 큰 `9999999` 숫자가 분리되어야 하며, 소리/DANGER는 왼쪽 24px, BEST/MAX COMBO는 오른쪽 24px 안쪽이어야 한다.
+  3. `13_turn_ramp_uncapped_next.png` 확인 → THEN 글자는 불투명 보조색, THEN 구슬만 흐리며 NEXT/THEN `×6`이 구슬 테두리에 닿지 않아야 한다.
+  4. 창 크기를 9:16↔9:19.5로 바꿈 → 보드 가로 폭은 유지되고 카메라가 즉시 다시 맞아야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 캡처 도구가 비율별 실제 카메라 투영값을 `board_projection.json`에 기록하고 PowerShell 래퍼가 좌우 ±2px·폭 1%를 비교하도록 보강함. JSON·PNG는 기존 ignore 대상 검수 산출물
+  - 긴 비율 캡처 프로세스 종료 때 기존 `ObjectDB instances leaked at exit (2 instances)` 경고 1회가 있었으나 종료 코드 0이며 `SCRIPT ERROR`·`Parse Error`는 0건
+- 남은 것 · 질문: 없음
+
+### [2026-10-11] 대상 #66 — 비주얼 V3-1 글꼴·테마·HUD
+- 상태: 완료 — Orbitron/Noto Sans KR 서브셋과 공통 Theme을 동봉하고, HUD를 두 세로 비율의 안전 영역에 맞게 재배치했으며 점수 연출·벡터 소리 아이콘·문양 기본 끔을 구현함
+- 브랜치 / PR: `v3-font-theme-hud` / [PR #68](https://github.com/jeongmo-dot/gravity_orb/pull/68)
+- 변경 파일: `assets/fonts/{Orbitron-Medium.ttf,Orbitron-Bold.ttf,NotoSansKR-Regular-KSX1001.ttf,NotoSansKR-Medium-KSX1001.ttf,OFL.txt,SOURCE.md}`, `assets/ui/{gravity_orb_theme.tres,speaker_on.svg,speaker_off.svg}`, `config/{GameConfig.gd,default_config.tres}`, `project.godot`, `scenes/UI.tscn`, `scripts/ui/{Hud.gd,ScorePopup.gd}`, `tests/{capture_screens.ps1,test_config.gd,test_frontend.gd,test_orb_symbols.gd,test_score_popups.gd,test_screen_layout.gd}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] Orbitron 500·700과 Noto Sans KR 400·500을 OFL 1.1과 출처 고정 커밋 기록과 함께 동봉 — 자동 (`test_hud_theme_fonts_panel_tokens_and_extreme_values_fit`), TTF 합계 `1,030,940바이트` (`<3MB`), Noto 두 파일 각각 KS X 1001 한글 `2,350자`
+  - [x] 텍스트·보조·하늘색·호박색·위험·시간·FEVER 토큰과 반투명 남색/하늘색 2px/12px 둥근 패널을 단일 `Theme`에 정의하고 HUD·점수 팝업에 적용 — 자동 + 캡처 직접 확인
+  - [x] 위쪽 점수/BEST/벡터 소리 아이콘, 배수·콤보·DANGER, BLITZ 45초 타이머/막대와 아래쪽 NEXT/THEN/BLOCKED 선반으로 재배치 — 자동 (`test_busy_blitz_hud_regions_do_not_overlap_at_supported_sizes`, `test_hud_layout_stays_in_safe_area_and_clear_of_board_at_both_ratios`) + 캡처 직접 확인
+  - [x] `window/stretch/aspect="expand"`, 논리 안전 영역 기반 HUD 배치, 가운데 같은 크기 보드로 `540×960`과 `540×1170` 지원 — 자동 배치 검사 + 두 비율 렌더 확인
+  - [x] 점수를 `0.30초` 동안 증가시키고 큰 득점/×8에서 점수 튐, BEST 경신 때 색·크기 반짝임 — 자동 (`test_score_rolls_to_target_in_three_tenths_of_a_second`, `test_new_best_flashes_and_large_multiplier_punches_score`)
+  - [x] `orb_symbols_enabled` 기본값을 `false`로 바꾸고 게임판·NEXT/THEN의 문양 숨김 및 명시적으로 켜는 기존 경로를 모두 테스트 — 자동 (`test_disabled_config_hides_2d_and_3d_symbols`, 기존 문양 켬 테스트 5건)
+  - [x] 규칙·밸런스·물리·V1 구슬 그림·V2 배경/보드·시작/결과/랭킹 구조는 변경하지 않고 물리 해시 유지 — 전체 회귀 + 해시 비교
+- 캡처 관측 (Standard/Compatibility):
+  - `tests/capture_screens.ps1` → 종료 코드 0, 기본 `540×960` 18장 + 긴 `540×1170` 요구 장면 `02`·`03`·`06`·`07`·`12`·`13`·`17`·`18` 8장, 합계 `26장`
+  - 두 비율에서 점수·BEST `9,999,999`, BLITZ 타이머 `45.0`, 시간 막대, NEXT `×8`, THEN `×6`, DANGER `×4`, BLOCKED 패널이 잘리지 않고 보드와 겹치지 않음을 직접 확인
+  - 긴 화면에서 배경이 `540×1170` 전체를 채우고 보드는 기본 비율과 같은 가로 크기를 유지하며, 추가 높이는 위 HUD/보드/아래 선반 사이 여백으로 배분됨
+  - FEVER 띠의 반응형 크기 적용 중 양쪽 grow 방향 때문에 X가 `-540`으로 밀리던 결함을 발견해 크기→위치 순으로 적용하도록 수정; 최종 두 비율 X `0.0`, 논리 폭 `1080.0`
+- 성능 관측 (RTX 4070 Ti SUPER, Compatibility, VSync 끔, 164.836Hz, BLITZ 시드 101~104):
+  - 프레임 `17,749`, p50/p95/p99/최대 `1.475/2.603/3.751/13.702ms`, `>16.7ms` 0, `>33.3ms` 0
+  - 드로콜 p50/p95/최대 `411/433/447`; 입력 `120/120` 수락·유실 `0`; 입력 수락 p95 `23.468ms`, 수락→생성 p95 `1.968ms`
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` → 일반 `273/273`(`13.046초`), 장기 `5/5`(`38.518초`), 성능 `5/5`(`2.688초`), 합계 `283/283`, 종료 코드 0, 총 `54.252초`
+  - 물리 상태 해시: TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`; #64·#65와 동일
+  - 시작 화면 / TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 전역 난수 호출 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. `tests/capture_screens.ps1` 실행 후 두 비율 폴더의 `02`·`03`·`06`·`07`·`12`·`13`·`17`·`18` 확인 → 위 HUD와 아래 선반이 화면 밖/보드 안으로 침범하지 않고, 긴 화면의 배경이 빈 띠 없이 채워져야 한다.
+  2. `03_turn_combo.png` 확인 → `SCORE 9999999`, `BEST 9999999`, `×8`, `COMBO 4`가 잘리지 않아야 한다. 실제 플레이에서 큰 점수 증가 시 숫자가 0.3초에 걸쳐 오르고 패널이 튀며 새 BEST가 잠깐 하늘색으로 반짝여야 한다.
+  3. `06_blitz_fever_chain.png` 확인 → `45.0`과 초록 시간 막대, `FEVER ×2` 띠가 가로 전체에서 잘리지 않아야 한다. `07`에서는 `DANGER ×4`, 빨강 테두리, NEXT `×8`을 확인한다.
+  4. 기본 설정으로 게임판과 NEXT/THEN 천체 안에 색각 문양이 없어야 한다. 테스트용으로 `Config.data.orb_symbols_enabled = true`를 지정하면 게임판과 미리보기 문양이 다시 나타나야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 긴 비율 캡처는 명세에 지정된 HUD 8장만 생성·검증하는 `--capture-hud-scenes-only` 인자를 추가해, 화면비에 무관한 도감·근접 화소 검사가 긴 프레이밍 때문에 실패하지 않도록 분리했다.
+  - 캡처 긴 비율 종료 때 `ObjectDB instances leaked at exit (2 instances)` 경고 1회, 창 성능 시드 102·104 종료 때 각각 3개·2개 경고가 있었으나 모든 종료 코드는 0이고 `SCRIPT ERROR`·`Parse Error`는 0건이었다.
+  - PNG·JSON은 기존 ignore 대상 검수 산출물이며 커밋에 포함하지 않는다.
+- 남은 것 · 질문: 없음
+
 ### [2026-10-11] 대상 #65 — 테스트·성능 측정 안정화
 - 상태: 완료 — 턴 시간 상한 검사를 장기 묶음의 별도 Godot 프로세스로 분리하고, 근접 탐색 성능 기준과 BLITZ 창 측정 환경 보고를 명세대로 안정화함
 - 브랜치 / PR: `v2-test-measurement-stability` / [PR #67](https://github.com/jeongmo-dot/gravity_orb/pull/67)

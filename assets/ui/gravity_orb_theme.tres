@@ -1,0 +1,116 @@
+[gd_resource type="Theme" load_steps=11 format=3]
+
+[ext_resource type="FontFile" path="res://assets/fonts/Orbitron[wght].ttf" id="1_orbitron_variable"]
+[ext_resource type="FontFile" path="res://assets/fonts/NotoSansKR-Regular-KSX1001.ttf" id="3_noto_regular"]
+[ext_resource type="FontFile" path="res://assets/fonts/NotoSansKR-Medium-KSX1001.ttf" id="4_noto_medium"]
+
+[sub_resource type="FontVariation" id="FontVariation_orbitron_medium"]
+base_font = ExtResource("1_orbitron_variable")
+variation_opentype = {
+2003265652: 500.0
+}
+
+[sub_resource type="FontVariation" id="FontVariation_orbitron_bold"]
+base_font = ExtResource("1_orbitron_variable")
+variation_opentype = {
+2003265652: 700.0
+}
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hud_panel"]
+bg_color = Color(0.0431373, 0.0941176, 0.2, 0.6)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.74902, 0.913725, 1, 0.72)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hud_panel_hover"]
+bg_color = Color(0.0627451, 0.145098, 0.286275, 0.8)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.74902, 0.913725, 1, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hud_panel_pressed"]
+bg_color = Color(0.0745098, 0.192157, 0.360784, 0.88)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(1, 0.690196, 0.12549, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_danger_panel"]
+bg_color = Color(0.184314, 0.027451, 0.0627451, 0.76)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.231373, 0.188235, 0.92)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_time_track"]
+bg_color = Color(0.0431373, 0.0941176, 0.2, 0.82)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.556863, 0.639216, 0.784314, 0.72)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[resource]
+GravityOrb/colors/text_primary = Color(0.909804, 0.933333, 1, 1)
+GravityOrb/colors/text_secondary = Color(0.556863, 0.639216, 0.784314, 1)
+GravityOrb/colors/accent = Color(0.74902, 0.913725, 1, 1)
+GravityOrb/colors/amber = Color(1, 0.690196, 0.12549, 1)
+GravityOrb/colors/danger = Color(1, 0.231373, 0.188235, 1)
+GravityOrb/colors/time = Color(0.188235, 0.819608, 0.345098, 1)
+GravityOrb/colors/fever = Color(1, 0.623529, 0.0392157, 1)
+HudPanel/base_type = &"PanelContainer"
+HudPanel/styles/panel = SubResource("StyleBoxFlat_hud_panel")
+HudDangerPanel/base_type = &"PanelContainer"
+HudDangerPanel/styles/panel = SubResource("StyleBoxFlat_danger_panel")
+HudTimeTrack/base_type = &"Panel"
+HudTimeTrack/styles/panel = SubResource("StyleBoxFlat_time_track")
+HudIconButton/base_type = &"Button"
+HudIconButton/constants/icon_max_width = 54
+HudIconButton/styles/normal = SubResource("StyleBoxFlat_hud_panel")
+HudIconButton/styles/hover = SubResource("StyleBoxFlat_hud_panel_hover")
+HudIconButton/styles/pressed = SubResource("StyleBoxFlat_hud_panel_pressed")
+HudIconButton/styles/focus = SubResource("StyleBoxFlat_hud_panel_hover")
+HudDisplayMedium/base_type = &"Label"
+HudDisplayMedium/colors/font_color = Color(0.909804, 0.933333, 1, 1)
+HudDisplayMedium/fonts/font = SubResource("FontVariation_orbitron_medium")
+HudDisplayBold/base_type = &"Label"
+HudDisplayBold/colors/font_color = Color(0.909804, 0.933333, 1, 1)
+HudDisplayBold/fonts/font = SubResource("FontVariation_orbitron_bold")
+HudDisplaySecondary/base_type = &"Label"
+HudDisplaySecondary/colors/font_color = Color(0.556863, 0.639216, 0.784314, 1)
+HudDisplaySecondary/fonts/font = SubResource("FontVariation_orbitron_medium")
+HudBody/base_type = &"Label"
+HudBody/colors/font_color = Color(0.909804, 0.933333, 1, 1)
+HudBody/fonts/font = ExtResource("3_noto_regular")
+HudBodyMedium/base_type = &"Label"
+HudBodyMedium/colors/font_color = Color(0.909804, 0.933333, 1, 1)
+HudBodyMedium/fonts/font = ExtResource("4_noto_medium")
+HudDangerLabel/base_type = &"Label"
+HudDangerLabel/colors/font_color = Color(1, 0.231373, 0.188235, 1)
+HudDangerLabel/fonts/font = SubResource("FontVariation_orbitron_bold")

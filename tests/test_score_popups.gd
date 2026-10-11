@@ -115,16 +115,38 @@ func test_popup_colors_follow_merge_blast_and_finale_rules() -> void:
 	await _destroy_main(main)
 
 
-func test_score_rolls_to_target_in_a_quarter_second() -> void:
+func test_score_rolls_to_target_in_three_tenths_of_a_second() -> void:
 	var original_enabled: bool = Config.data.fx_score_popups_enabled
 	Config.data.fx_score_popups_enabled = true
 	var main: Main = await _create_main(GameConfig.GameMode.TURN)
 	var score: ScoreManager = main.get_node("ScoreManager") as ScoreManager
 	var score_label: Label = main.get_node("UI/Hud/ScoreLabel") as Label
 	score.on_reaction(_reaction(Vector2.ZERO, 4.0, 0.20))
-	assert_true(score_label.text != "SCORE\n512", "score does not jump immediately")
-	await tree.create_timer(0.26, true, false, true).timeout
-	assert_eq(score_label.text, "SCORE\n512", "score reaches target after 0.25 seconds")
+	assert_true(score_label.text != "512", "score does not jump immediately")
+	await tree.create_timer(0.31, true, false, true).timeout
+	assert_eq(score_label.text, "512", "score reaches target after 0.3 seconds")
+	await _destroy_main(main)
+	Config.data.fx_score_popups_enabled = original_enabled
+
+
+func test_new_best_flashes_and_large_multiplier_punches_score() -> void:
+	var original_enabled: bool = Config.data.fx_score_popups_enabled
+	Config.data.fx_score_popups_enabled = true
+	var main: Main = await _create_main(GameConfig.GameMode.TURN)
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	var score_label: Label = main.get_node("UI/Hud/ScoreLabel") as Label
+	var score_title: Label = main.get_node("UI/Hud/ScoreTitleLabel") as Label
+	var best_title: Label = main.get_node("UI/Hud/BestTitleLabel") as Label
+	var title_scale_before: Vector2 = score_title.scale
+	var best_title_color_before: Color = best_title.modulate
+	var flash_count_before: int = hud.best_flash_count()
+	hud._on_combo_changed(4, 8.0, 4)
+	hud._on_score_changed(512, 512)
+	await tree.process_frame
+	assert_eq(hud.best_flash_count(), flash_count_before + 1, "new BEST flashes once")
+	assert_true(score_label.scale.x > 1.0, "×8 score gain punches score label")
+	assert_eq(score_title.scale, title_scale_before, "score punch does not animate title")
+	assert_eq(best_title.modulate, best_title_color_before, "BEST flash does not animate title")
 	await _destroy_main(main)
 	Config.data.fx_score_popups_enabled = original_enabled
 
@@ -155,8 +177,19 @@ func test_3d_reaction_position_is_unprojected_to_popup_anchor() -> void:
 	await tree.process_frame
 	var hud: Hud = main.get_node("UI/Hud") as Hud
 	var projected_center: Vector2 = hud._reaction_screen_position(Vector2.ZERO)
-	assert_near(projected_center.x, 540.0, 0.1, "3D board center projects to viewport center x")
-	assert_near(projected_center.y, 960.0, 0.1, "3D board center projects to viewport center y")
+	var viewport_center: Vector2 = main.get_viewport().get_visible_rect().size * 0.5
+	assert_near(
+		projected_center.x,
+		viewport_center.x,
+		0.1,
+		"3D board center projects to viewport center x"
+	)
+	assert_near(
+		projected_center.y,
+		viewport_center.y,
+		0.1,
+		"3D board center projects to viewport center y"
+	)
 	hud._on_reaction_scored(_display_reaction(Vector2.ZERO, 64))
 	assert_eq(hud.active_score_popup_count(), 1, "3D reaction creates popup")
 	var popup: ScorePopup = hud.active_score_popups()[0]

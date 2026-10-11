@@ -180,4 +180,27 @@ func test_disabled_config_hides_2d_and_3d_symbols() -> void:
 	board_2d.queue_free()
 	board_3d.queue_free()
 	await tree.process_frame
+
+	var main: Main = MAIN_SCENE.instantiate() as Main
+	main.launch_immediately(GameConfig.GameMode.TURN)
+	(main.get_node("ScoreManager") as ScoreManager).save_path = ""
+	(main.get_node("FeedbackDirector/SfxBank") as SfxBank).save_path = ""
+	tree.root.add_child(main)
+	await tree.process_frame
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	hud._on_preview_changed([
+		[{"color": OrbTypes.OrbColor.RED, "level": 1}],
+		[{"color": OrbTypes.OrbColor.BLUE, "level": 2}],
+	])
+	assert_true(
+		not (hud._next_preview.get_child(0) as OrbVisual).has_symbol(),
+		"NEXT symbol hidden"
+	)
+	assert_true(
+		not (hud._then_preview.get_child(0) as OrbVisual).has_symbol(),
+		"THEN symbol hidden"
+	)
+	main.queue_free()
+	await tree.process_frame
+	InputRouter.set_locked(false)
 	Config.data.orb_symbols_enabled = original_enabled

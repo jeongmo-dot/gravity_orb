@@ -11,6 +11,7 @@ const RISE_DISTANCE: float = 60.0
 const POP_IN_DURATION: float = 0.12
 const POP_IN_PEAK_TIME: float = 0.07
 const POPUP_SIZE: Vector2 = Vector2(440.0, 150.0)
+const HUD_THEME: Theme = preload("res://assets/ui/gravity_orb_theme.tres")
 
 var started_process_frame: int = -1
 var anchor_position: Vector2 = Vector2.ZERO
@@ -25,6 +26,7 @@ var _shake_phase: float = 0.0
 
 
 func _ready() -> void:
+	theme = HUD_THEME
 	custom_minimum_size = POPUP_SIZE
 	size = POPUP_SIZE
 	pivot_offset = POPUP_SIZE * 0.5
@@ -37,6 +39,7 @@ func _ready() -> void:
 	_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_score_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_score_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_score_label.theme_type_variation = &"HudDisplayBold"
 	add_child(_score_label)
 	_formula_label = Label.new()
 	_formula_label.name = "Formula"
@@ -46,6 +49,7 @@ func _ready() -> void:
 	_formula_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_formula_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_formula_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_formula_label.theme_type_variation = &"HudDisplayMedium"
 	_formula_label.add_theme_font_size_override("font_size", 22)
 	_formula_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.86))
 	add_child(_formula_label)

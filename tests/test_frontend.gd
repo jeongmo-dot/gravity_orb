@@ -118,13 +118,21 @@ func test_sound_buttons_m_key_bus_and_save_share_one_state() -> void:
 	var bus_index: int = AudioServer.get_bus_index(SfxBank.SFX_BUS)
 	assert_true(not bank.is_muted(), "saved unmuted state loads")
 	assert_eq(start_button.text, "🔊", "start sound icon")
-	assert_eq(hud_button.text, "🔊", "HUD sound icon")
+	assert_eq(hud_button.text, "", "HUD sound button does not use emoji text")
+	assert_true(hud_button.icon != null, "HUD sound button uses a vector icon")
+	assert_true(
+		hud_button.icon.resource_path.ends_with("speaker_on.svg"),
+		"HUD sound icon starts on"
+	)
 
 	start_button.pressed.emit()
 	assert_true(bank.is_muted(), "start button mutes bank")
 	assert_true(AudioServer.is_bus_mute(bus_index), "start button mutes SFX bus")
 	assert_eq(start_button.text, "🔇", "start icon updates")
-	assert_eq(hud_button.text, "🔇", "HUD icon updates")
+	assert_true(
+		hud_button.icon.resource_path.ends_with("speaker_off.svg"),
+		"HUD vector icon updates"
+	)
 	InputRouter.debug_toggle_sfx_mute.emit()
 	assert_true(not bank.is_muted(), "M signal unmutes bank")
 	assert_true(not AudioServer.is_bus_mute(bus_index), "M signal unmutes SFX bus")
@@ -149,8 +157,8 @@ func test_sound_buttons_m_key_bus_and_save_share_one_state() -> void:
 		"reloaded start icon"
 	)
 	assert_eq(
-		(reloaded.get_node("UI/Hud/HudSoundButton") as Button).text,
-		"🔇",
+		(reloaded.get_node("UI/Hud/HudSoundButton") as Button).icon.resource_path,
+		"res://assets/ui/speaker_off.svg",
 		"reloaded HUD icon"
 	)
 	await _cleanup_main(reloaded)
