@@ -40,7 +40,7 @@
 
 ### [2026-10-12] 대상 #76 — 턴제 입력 가능·잠김 구분
 - 상태: 완료 — TURN의 입력 가능·계산 중·거절 상태를 보드 테두리와 4방향 화살표로 구분하고, 손을 뗄 때 잠금이 풀렸다면 입력을 받도록 변경함. BLITZ 입력 정책은 유지
-- 브랜치 / PR: `turn-input-state-cues` / 미생성
+- 브랜치 / PR: `turn-input-state-cues` / [PR #77](https://github.com/jeongmo-dot/gravity_orb/pull/77)
 - 변경 파일: `scenes/UI.tscn`, `scripts/autoload/InputRouter.gd`, `scripts/core/Main.gd`, `scripts/fx/{FeedbackDirector,SfxBank}.gd`, `scripts/platform/Haptics.gd`, `scripts/ui/{Hud,TurnInputIndicator}.gd`, `tests/{capture_screens.ps1,test_input_router.gd,test_turn_input_indicator.gd}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `WAITING_INPUT`에서 보드 테두리 `#BFE9FF` 100%, 네 변 바깥 화살표 4개가 0.2초에 나타나고 막힌 방향은 `#FF3B30` — 자동 (`test_turn_input_cues_rejection_release_policy_and_ready_tick`) + 캡처 `44_turn_ready`
