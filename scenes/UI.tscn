@@ -1,4 +1,4 @@
-[gd_scene load_steps=25 format=3]
+[gd_scene load_steps=26 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/DebugHud.gd" id="1_debug_hud"]
 [ext_resource type="Script" path="res://scripts/ui/Hud.gd" id="2_hud"]
@@ -14,6 +14,7 @@
 [ext_resource type="Texture2D" path="res://assets/ui/hourglass.svg" id="12_hourglass"]
 [ext_resource type="Texture2D" path="res://assets/ui/trophy.svg" id="13_trophy"]
 [ext_resource type="Texture2D" path="res://assets/ui/settings.svg" id="14_settings"]
+[ext_resource type="Script" path="res://scripts/ui/BlitzTimeBar.gd" id="15_blitz_time_bar"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_result_panel"]
 bg_color = Color(0.025, 0.05, 0.105, 0.97)
@@ -511,7 +512,7 @@ offset_bottom = 446.0
 mouse_filter = 2
 theme_type_variation = &"HudTimeTrack"
 
-[node name="TimeBarFill" type="ColorRect" parent="Hud"]
+[node name="TimeBarFill" type="Control" parent="Hud"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 0
@@ -520,7 +521,7 @@ offset_top = 424.0
 offset_right = 682.0
 offset_bottom = 442.0
 mouse_filter = 2
-color = Color(0.188235, 0.819608, 0.345098, 1)
+script = ExtResource("15_blitz_time_bar")
 
 [node name="NextLabel" type="Label" parent="Hud"]
 unique_name_in_owner = true

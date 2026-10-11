@@ -38,6 +38,45 @@
 
 ## 미확인
 
+### [2026-10-11] 대상 #72 — BLITZ 시계 단순화·무제한 겹 게이지
+- 상태: 완료 — 감소 속도를 항상 1배로 고정하고 시간 상한을 없앴으며, 45초 단위 겹 게이지·획득 시간 조각·큰 타이머·1시간 이상 결과 형식을 구현함
+- 브랜치 / PR: `v4-3-blitz-clock` / 미생성
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scenes/UI.tscn`, `scripts/core/BlitzManager.gd`, `scripts/ui/{BlitzTimeBar,Hud,GameOverPanel}.gd`, `tests/{capture_screens,run_blitz_clock_measurement}.ps1`, `tests/spike/{capture_screens,run_blitz_measurement}.gd`, `tests/test_{blitz_manager,blitz_time_bar,config,screen_layout}.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `blitz_drain_ramp_per_minute = 0`으로 항상 1초당 1초 감소; 필드·적분 계산 경로는 유지하고 기본 상태의 속도 `×` 표시는 숨김 — 자동 (`test_survival_clock_constant_reaction_bonuses_fever_and_optional_cap`, `test_large_timer_text_uses_measured_width_and_layer_count_replaces_speed`)
+  - [x] `blitz_time_max = 0`이면 보너스를 전부 더하고, 양수 설정이면 기존 상한을 적용 — 44.8초에 +3초가 47.8초가 되는 무상한 경로와 45 양수 상한 경로를 모두 자동 검증
+  - [x] `blitz_time_bar_reference = 45.0`; 초록→청록→보라 반복 겹 게이지와 2겹 이상 `×N`, 10초 이하 빨강 — 0·44.9·45·45.1·90·128.4초의 겹 수·현재 겹 채움 자동 검증 + 캡처 `40`
+  - [x] 획득 시간 조각은 현재 겹 색을 밝힌 빛으로 0.35초 유지 후 0.3초 혼합, 0.5초 창 안에서 성장, 경계 분할, 최소 6px, 피버 호박색 혼합 — 자동 (`test_bonus_segment_position_width_aggregation_boundary_and_fever`) + 캡처 `41`~`43`
+  - [x] `128.4`·`999.9`·`1234.5` 타이머를 실제 글자 폭+여백으로 중앙 맞춤하고 잘림 방지 — 자동 (`test_large_timer_text_uses_measured_width_and_layer_count_replaces_speed`) + `40` 직접 확인
+  - [x] 버틴 시간은 1시간 미만 `m:ss`, 1시간 이상 `h:mm:ss` — `125초 → 2:05`, `3723.9초 → 1:02:03` 자동 검증
+  - [x] 기존 시작 30초·보너스 표·피버·피날레·마지막 10초·점수·생성·물리·TURN·저장 키 불변 — 전체 회귀, 레거시 90초/20초 보너스 상한 테스트와 물리 상태 해시 확인
+- 캡처·화면 관측 (Standard/Compatibility):
+  - `tests/capture_screens.ps1` → 종료 코드 0, `540×960`·`540×1170` 각 58장, 합계 116장; 보드 좌·우·폭 비율 간 차이 `0.000px`
+  - `40_blitz_timer_long`: `128.4`가 잘리지 않고 보라 3겹이 38.4/45만큼 차며, 아래 청록 겹과 오른쪽 보라 `×3`이 두 화면비 모두 보임
+  - `41_blitz_bonus_gauge_a/b`: 20.0→21.6초의 밝은 초록 조각이 기존 채움 끝에 붙은 시점과 0.65초 뒤 평상시 초록으로 섞인 시점을 직접 비교함
+  - `42_blitz_bonus_layer_cross`: 44.0→46.0초 조각이 1겹 오른쪽 끝과 2겹 왼쪽 시작으로 나뉨. `43_blitz_bonus_fever`: 20.0→23.2초 조각에 호박색 빛이 섞임
+- 48판 측정 관측 (`tests/run_blitz_clock_measurement.ps1`, 4봇 × 시드 101~112, 120Hz, 판당 600초 상한):
+  - 기본값 관측: `blitz_time_max=0`, `blitz_time_bar_reference=45`, `blitz_drain_ramp_per_minute=0`; 10분 상한 도달은 네 봇 모두 `0/12`
+  - 휴리스틱 0.3초: 생존 p50/p90/최대 `46.06/57.71/58.31초`, 점수 p50 `12,653`; 분당 보너스 `L4 대폭발 4.44, 합체 L2 4.64 · L3 6.95 · L4 4.90 · L5 0.43, L5 대폭발 0.11초`
+  - 휴리스틱 0.6초: 생존 p50/p90/최대 `92.36/140.11/158.96초`, 점수 p50 `43,984`; 분당 보너스 `L4 대폭발 13.08, L5 대폭발 0.44, 합체 L2 6.19 · L3 10.47 · L4 11.17 · L5 0.81 · L6 0.08초`
+  - 무작위 0.3초: 생존 p50/p90/최대 `60.91/75.76/91.61초`, 점수 p50 `25,584`; 분당 보너스 `L4 대폭발 7.93, L5 대폭발 0.08, 합체 L2 5.47 · L3 8.74 · L4 7.71 · L5 0.33초`
+  - 무작위 0.6초: 생존 p50/p90/최대 `80.26/111.61/121.76초`, 점수 p50 `40,465`; 분당 보너스 `L4 대폭발 11.06, L5 대폭발 0.37, 합체 L2 5.74 · L3 9.51 · L4 10.12 · L5 0.84 · L6 0.05초`
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - `tests/run_tests.ps1` → 일반 `286/286`(`15.615초`), 장기 `5/5`(`43.161초`), 성능 `5/5`(`2.779초`), 합계 `296/296`, 종료 코드 0, 총 `61.554초`
+  - 시작 화면 / TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - 물리 상태 해시: TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`; #71과 동일
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 전역 난수 호출 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. `tests/capture_screens.ps1`을 실행하고 두 비율의 `40_blitz_timer_long`을 본다 → `128.4`가 잘리지 않고 보라 겹이 왼쪽 85.3%, 오른쪽에 청록 이전 겹, 막대 오른쪽에 보라 `×3`이 보여야 한다.
+  2. `41_blitz_bonus_gauge_a`와 `_b`를 비교한다 → `_a`에는 초록 채움 끝의 밝은 1.6초 조각이 있고 `_b`에는 그 조각이 평상시 초록으로 완전히 섞여야 한다.
+  3. `42_blitz_bonus_layer_cross`를 본다 → 밝은 조각이 초록 1겹 오른쪽 끝과 청록 2겹 왼쪽 시작에 각각 보여야 한다. `43_blitz_bonus_fever`에서는 같은 조각이 호박색을 띠어야 한다.
+  4. 실제 BLITZ에서 시간을 45초 이상 쌓은 뒤 기다린다 → 시간은 1배 속도로 계속 줄고 45초에서 잘리지 않으며, 45초 경계를 내려갈 때 `×2`가 사라지고 1겹 초록 막대로 돌아와야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 정확히 45.0초는 1겹 100%, 90.0초는 2겹 100%로 표현하고 경계를 초과한 첫 순간에 다음 겹과 `×N`을 보인다. 경계에서 0%인 빈 새 겹이 표시되는 깜빡임을 피하기 위한 표현 규칙임
+  - 겹·보너스 조각은 새 `BlitzTimeBar`가 그려 기존 트랙과 레이아웃을 재사용한다. PNG·측정 JSON은 기존 `artifacts/` ignore 대상이라 커밋하지 않음
+- 남은 것 · 질문: 없음
+
 ### [2026-10-11] 대상 #71 — 비주얼 V4-2 호령·점수 팝업·색 효과·피버
 - 상태: 완료 — A+C 원칙의 단계별 호령, 쉼표·금색 큰 점수, 단일 고리 별가루 색 효과, 띠 없는 피버 진입·흐르는 가장자리 성운과 빨간 `TIME UP` 고리를 구현함
 - 브랜치 / PR: `v4-2-callouts-effects` / [PR #73](https://github.com/jeongmo-dot/gravity_orb/pull/73)

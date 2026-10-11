@@ -251,7 +251,13 @@ func test_blitz_spike_defaults() -> void:
 	assert_near(config.blitz_duration, 90.0, TOLERANCE, "blitz duration")
 	assert_true(config.blitz_survival_enabled, "survival clock enabled")
 	assert_near(config.blitz_start_time, 30.0, TOLERANCE, "survival start time")
-	assert_near(config.blitz_time_max, 45.0, TOLERANCE, "survival clock maximum")
+	assert_near(config.blitz_time_max, 0.0, TOLERANCE, "survival clock is uncapped")
+	assert_near(
+		config.blitz_time_bar_reference,
+		45.0,
+		TOLERANCE,
+		"one layered time-bar reference"
+	)
 	assert_eq(
 		config.blitz_time_bonus_merge_by_level,
 		PackedFloat32Array([0.0, 0.05, 0.1, 0.2, 0.4, 0.8, 1.6]),
@@ -264,7 +270,7 @@ func test_blitz_spike_defaults() -> void:
 		"time bonus display window"
 	)
 	assert_near(config.blitz_fever_time_multiplier, 2.0, TOLERANCE, "fever time bonus")
-	assert_near(config.blitz_drain_ramp_per_minute, 0.1, TOLERANCE, "clock ramp")
+	assert_near(config.blitz_drain_ramp_per_minute, 0.0, TOLERANCE, "constant clock drain")
 	assert_near(config.blitz_swipe_cooldown, 0.08, TOLERANCE, "swipe cooldown")
 	assert_true(config.blitz_swipe_buffer_enabled, "one-slot swipe buffer enabled")
 	assert_true(not config.blitz_hitstop_enabled, "BLITZ hitstop disabled")

@@ -111,13 +111,14 @@ enum GameMode { TURN, BLITZ }
 @export var blitz_duration: float = 90.0
 @export var blitz_survival_enabled: bool = true
 @export var blitz_start_time: float = 30.0
-@export var blitz_time_max: float = 45.0
+@export var blitz_time_max: float = 0.0
+@export var blitz_time_bar_reference: float = 45.0
 @export var blitz_time_bonus_merge_by_level: PackedFloat32Array = PackedFloat32Array(
 	[0.0, 0.05, 0.1, 0.2, 0.4, 0.8, 1.6]
 )
 @export var blitz_time_bonus_display_window: float = 0.5
 @export var blitz_fever_time_multiplier: float = 2.0
-@export var blitz_drain_ramp_per_minute: float = 0.1
+@export var blitz_drain_ramp_per_minute: float = 0.0
 @export var blitz_swipe_cooldown: float = 0.08
 @export var blitz_swipe_buffer_enabled: bool = true
 @export var blitz_hitstop_enabled: bool = false

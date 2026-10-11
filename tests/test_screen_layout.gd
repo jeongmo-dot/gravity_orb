@@ -413,7 +413,7 @@ func test_hud_theme_fonts_panel_tokens_and_extreme_values_fit() -> void:
 	var sound: Button = main.get_node("UI/Hud/HudSoundButton") as Button
 	var timer: Label = main.get_node("UI/Hud/TimerLabel") as Label
 	var time_track: Panel = main.get_node("UI/Hud/TimeBarTrack") as Panel
-	var time_fill: ColorRect = main.get_node("UI/Hud/TimeBarFill") as ColorRect
+	var time_fill: BlitzTimeBar = main.get_node("UI/Hud/TimeBarFill") as BlitzTimeBar
 	var spawner: Spawner = main.get_node("Spawner") as Spawner
 	hud._on_score_changed(0, 9_999_999)
 	hud._set_displayed_score(9_999_999)

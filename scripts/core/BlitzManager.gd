@@ -491,7 +491,11 @@ func _blast_level(reaction: Dictionary) -> int:
 
 func _award_time_bonus(seconds: float, source: String) -> void:
 	var available: float = (
-		maxf(Config.data.blitz_time_max - remaining_time, 0.0)
+		(
+			maxf(Config.data.blitz_time_max - remaining_time, 0.0)
+			if Config.data.blitz_time_max > 0.0
+			else INF
+		)
 		if Config.data.blitz_survival_enabled
 		else maxf(Config.data.blitz_time_bonus_cap - time_bonus_total, 0.0)
 	)

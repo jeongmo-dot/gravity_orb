@@ -62,6 +62,7 @@ func _run() -> void:
 			"survival_enabled": Config.data.blitz_survival_enabled,
 			"start_time": Config.data.blitz_start_time,
 			"time_max": Config.data.blitz_time_max,
+			"time_bar_reference": Config.data.blitz_time_bar_reference,
 			"time_bonus_merge_by_level": Array(
 				Config.data.blitz_time_bonus_merge_by_level
 			),

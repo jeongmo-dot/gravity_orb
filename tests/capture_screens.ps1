@@ -74,7 +74,12 @@ $expectedFiles = @(
 	"37_color_lift_b.png",
 	"38_fever_start_a.png",
 	"38_fever_start_b.png",
-	"39_fever_running.png"
+	"39_fever_running.png",
+	"40_blitz_timer_long.png",
+	"41_blitz_bonus_gauge_a.png",
+	"41_blitz_bonus_gauge_b.png",
+	"42_blitz_bonus_layer_cross.png",
+	"43_blitz_bonus_fever.png"
 )
 $hudExpectedFiles = @(
     "02_turn_early.png",
@@ -84,7 +89,12 @@ $hudExpectedFiles = @(
     "12_turn_ramp_next.png",
     "13_turn_ramp_uncapped_next.png",
     "17_board_danger.png",
-    "18_board_blocked.png"
+	"18_board_blocked.png",
+	"40_blitz_timer_long.png",
+	"41_blitz_bonus_gauge_a.png",
+	"41_blitz_bonus_gauge_b.png",
+	"42_blitz_bonus_layer_cross.png",
+	"43_blitz_bonus_fever.png"
 )
 $capturedFileCount = 0
 $boardReports = @()

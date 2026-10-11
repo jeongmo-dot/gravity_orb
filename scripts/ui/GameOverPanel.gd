@@ -140,6 +140,12 @@ func _set_animated_score(value: int) -> void:
 
 func _format_survived_time(seconds: float) -> String:
 	var total_seconds: int = maxi(floori(maxf(seconds, 0.0)), 0)
+	if total_seconds >= 3600:
+		return "%d:%02d:%02d" % [
+			total_seconds / 3600,
+			(total_seconds % 3600) / 60,
+			total_seconds % 60,
+		]
 	return "%d:%02d" % [total_seconds / 60, total_seconds % 60]
 
 

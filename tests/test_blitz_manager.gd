@@ -363,7 +363,7 @@ func test_speed_chain_productive_miss_idle_fever_and_time_bonus_cap() -> void:
 	await _cleanup_fixture(fixture)
 
 
-func test_survival_clock_ramp_reaction_bonuses_fever_and_clock_cap() -> void:
+func test_survival_clock_constant_reaction_bonuses_fever_and_optional_cap() -> void:
 	var fixture: Dictionary = await _create_fixture(3161)
 	var manager: BlitzManager = fixture["manager"] as BlitzManager
 	assert_near(manager.remaining_time, 30.0, TOLERANCE, "survival clock starts at thirty")
@@ -424,14 +424,25 @@ func test_survival_clock_ramp_reaction_bonuses_fever_and_clock_cap() -> void:
 	)
 	manager.fever_remaining = 0.0
 	manager.remaining_time = 44.8
+	var before_uncapped_total: float = manager.time_bonus_total
+	manager.on_reaction(_reaction(ReactionRules.Type.MAX_CLEAR, 7))
+	assert_near(manager.remaining_time, 47.8, TOLERANCE, "bonus fully exceeds forty five")
+	assert_near(
+		manager.time_bonus_total - before_uncapped_total,
+		3.0,
+		TOLERANCE,
+		"uncapped clock records the full bonus"
+	)
+	Config.data.blitz_time_max = 45.0
+	manager.remaining_time = 44.8
 	var before_cap_total: float = manager.time_bonus_total
 	manager.on_reaction(_reaction(ReactionRules.Type.MAX_CLEAR, 7))
-	assert_near(manager.remaining_time, 45.0, TOLERANCE, "clock caps at forty five")
+	assert_near(manager.remaining_time, 45.0, TOLERANCE, "positive clock maximum still caps")
 	assert_near(
 		manager.time_bonus_total - before_cap_total,
 		0.2,
 		TOLERANCE,
-		"overflow bonus is discarded"
+		"positive clock maximum discards overflow"
 	)
 	await _cleanup_fixture(fixture)
 
@@ -590,8 +601,7 @@ func test_main_selects_blitz_manager_and_shows_time_up_results() -> void:
 	manager.play_time_elapsed = 120.0
 	hud._on_time_changed(manager.remaining_time)
 	var drain_label: Label = main.get_node("UI/Hud/DrainRateLabel") as Label
-	assert_true(drain_label.visible, "survival ramp appears from 1.1x")
-	assert_eq(drain_label.text, "×1.2", "survival ramp uses one decimal")
+	assert_true(not drain_label.visible, "constant survival clock hides drain multiplier")
 	manager.on_swipe(Vector2i.RIGHT)
 	manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 2))
 	assert_eq(chain_label.text, "CHAIN 1", "blitz HUD uses chain label")
@@ -622,6 +632,7 @@ func test_main_selects_blitz_manager_and_shows_time_up_results() -> void:
 	assert_true(survived.visible, "survival result shows elapsed time")
 	assert_eq(survived.text, "버틴 시간", "survived time label")
 	assert_eq(survived_value.text, "2:00", "survived time uses m:ss")
+	assert_eq(panel._format_survived_time(3723.9), "1:02:03", "hour uses h:mm:ss")
 	main.queue_free()
 	await tree.process_frame
 	InputRouter.set_locked(false)
@@ -734,6 +745,7 @@ func _snapshot_config() -> Dictionary:
 		"game_mode": Config.data.game_mode,
 		"blitz_duration": Config.data.blitz_duration,
 		"blitz_survival_enabled": Config.data.blitz_survival_enabled,
+		"blitz_time_max": Config.data.blitz_time_max,
 		"blitz_drain_ramp_per_minute": Config.data.blitz_drain_ramp_per_minute,
 		"blitz_spawn_on_swipe": Config.data.blitz_spawn_on_swipe,
 		"blitz_min_spawn_per_swipe": Config.data.blitz_min_spawn_per_swipe,
@@ -753,6 +765,7 @@ func _restore_config(snapshot: Dictionary) -> void:
 	Config.data.game_mode = snapshot["game_mode"] as GameConfig.GameMode
 	Config.data.blitz_duration = float(snapshot["blitz_duration"])
 	Config.data.blitz_survival_enabled = bool(snapshot["blitz_survival_enabled"])
+	Config.data.blitz_time_max = float(snapshot["blitz_time_max"])
 	Config.data.blitz_drain_ramp_per_minute = float(
 		snapshot["blitz_drain_ramp_per_minute"]
 	)
