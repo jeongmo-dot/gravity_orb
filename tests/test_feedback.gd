@@ -84,6 +84,83 @@ func test_blast_ring_max_radius_matches_level_push_range() -> void:
 	Config.data.fx_hitstop_enabled = original_hitstop
 
 
+func test_merge_birth_and_blast_rings_project_as_board_circles() -> void:
+	var original_fx: bool = Config.data.fx_enabled
+	var original_hitstop: bool = Config.data.fx_hitstop_enabled
+	Config.data.fx_enabled = true
+	Config.data.fx_hitstop_enabled = false
+	var fixture: Dictionary = await _create_director_fixture()
+	var director: FeedbackDirector = fixture["director"] as FeedbackDirector
+	var camera: Camera3D = fixture["camera"] as Camera3D
+	var reactions: Array[Dictionary] = [
+		{
+			"type": ReactionRules.Type.MERGE,
+			"result_level": 3,
+			"result_color": OrbTypes.OrbColor.CYAN,
+			"position": Vector2.ZERO,
+		},
+		{
+			"type": ReactionRules.Type.MERGE,
+			"result_level": 6,
+			"result_color": OrbTypes.OrbColor.YELLOW,
+			"position": Vector2.ZERO,
+		},
+		_blast_reaction_for_level(6),
+	]
+	for reaction: Dictionary in reactions:
+		director.play_reaction_visuals(reaction)
+		for effect: Dictionary in director._effects:
+			if str(effect.get("kind", "")) != "ring":
+				continue
+			director._update_effect(effect, 0.55)
+			var ring: MeshInstance3D = effect["node"] as MeshInstance3D
+			var horizontal: float = camera.unproject_position(
+				ring.to_global(Vector3(1.0, 0.0, 0.0))
+			).distance_to(camera.unproject_position(
+				ring.to_global(Vector3(-1.0, 0.0, 0.0))
+			))
+			var vertical: float = camera.unproject_position(
+				ring.to_global(Vector3(0.0, 0.0, 1.0))
+			).distance_to(camera.unproject_position(
+				ring.to_global(Vector3(0.0, 0.0, -1.0))
+			))
+			var aspect_ratio: float = horizontal / maxf(vertical, 0.001)
+			assert_true(
+				aspect_ratio >= 0.95 and aspect_ratio <= 1.05,
+				"projected reaction ring aspect %.4f is within 1 +/- 0.05" % aspect_ratio
+			)
+		director.clear_effects()
+	await _cleanup(fixture["root"] as Node)
+	Config.data.fx_enabled = original_fx
+	Config.data.fx_hitstop_enabled = original_hitstop
+
+
+func test_supernova_shell_is_mottled_and_rendered_behind_orbs() -> void:
+	var original_fx: bool = Config.data.fx_enabled
+	var original_hitstop: bool = Config.data.fx_hitstop_enabled
+	Config.data.fx_enabled = true
+	Config.data.fx_hitstop_enabled = false
+	var fixture: Dictionary = await _create_director_fixture()
+	var director: FeedbackDirector = fixture["director"] as FeedbackDirector
+	director.play_reaction_visuals(_blast_reaction_for_level(6))
+	var glow_count: int = 0
+	for effect: Dictionary in director._effects:
+		if str(effect.get("kind", "")) != "glow":
+			continue
+		glow_count += 1
+		var glow: MeshInstance3D = effect["node"] as MeshInstance3D
+		assert_true(glow.position.z < 0.0, "supernova glow is behind the orb plane")
+		assert_true(glow.position.z > -0.31, "supernova glow stays above board glass")
+	var shader_code: String = director._effect_glow_shader.code
+	assert_true(shader_code.contains("mottle"), "supernova shell mixes colors with mottle noise")
+	assert_true(shader_code.contains("float shell"), "supernova has a distinct expanding shell")
+	assert_true(not shader_code.contains("atan("), "supernova has no angle-based pinwheel")
+	assert_eq(glow_count, 2, "L6 has shell and local glow behind orbs")
+	await _cleanup(fixture["root"] as Node)
+	Config.data.fx_enabled = original_fx
+	Config.data.fx_hitstop_enabled = original_hitstop
+
+
 func test_feedback_toggle_preserves_turn_and_blitz_state_hashes() -> void:
 	var original_fx: bool = Config.data.fx_enabled
 	var original_hitstop: bool = Config.data.fx_hitstop_enabled
@@ -239,8 +316,32 @@ func test_l6_l7_birth_effects_and_l7_prominences_are_pooled() -> void:
 		assert_eq(
 			director.active_prominence_count(),
 			3 if level == 7 else 0,
-			"only L7 adds three prominence loops"
+			"only L7 adds three tapered prominence arcs"
 		)
+		if level == 7:
+			var arc_scales: Array[float] = []
+			for effect: Dictionary in director._effects:
+				if str(effect.get("kind", "")) == "arc":
+					arc_scales.append(float(effect["base_scale"]))
+			assert_true(
+				arc_scales.max() > arc_scales.min() * 1.10,
+				"L7 prominence arcs use visibly different sizes"
+			)
+			var arc_node: MeshInstance3D = (
+				tree.get_nodes_in_group(&"feedback_prominence")[0] as MeshInstance3D
+			)
+			var arrays: Array = (arc_node.mesh as ArrayMesh).surface_get_arrays(0)
+			var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array
+			var start_width: float = vertices[0].distance_to(vertices[1])
+			var middle_index: int = (vertices.size() / 4) * 2
+			var middle_width: float = vertices[middle_index].distance_to(
+				vertices[middle_index + 1]
+			)
+			var end_width: float = vertices[-2].distance_to(vertices[-1])
+			assert_true(
+				middle_width > maxf(start_width, end_width) * 5.0,
+				"prominence arc tapers toward both ends"
+			)
 		director.clear_effects()
 	await _cleanup(fixture["root"] as Node)
 	Config.data.fx_enabled = original_fx
@@ -444,6 +545,9 @@ func _create_director_fixture() -> Dictionary:
 	var root: Node3D = Node3D.new()
 	var camera: Camera3D = Camera3D.new()
 	camera.name = "Camera3D"
+	camera.position = Vector3(0.0, 0.0, 42.0)
+	camera.fov = 25.0
+	camera.current = true
 	root.add_child(camera)
 	var director: FeedbackDirector = FeedbackDirector.new()
 	director.name = "FeedbackDirector"

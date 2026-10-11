@@ -59,6 +59,10 @@ const CAPTURE_FILES: Array[String] = [
 	"26_blast_l4_b.png",
 	"27_blast_l6_a.png",
 	"27_blast_l6_b.png",
+	"28_blast_l5_crowded_a.png",
+	"28_blast_l5_crowded_b.png",
+	"29_blast_l6_crowded_a.png",
+	"29_blast_l6_crowded_b.png",
 ]
 const HUD_CAPTURE_FILES: Array[String] = [
 	"02_turn_early.png",
@@ -465,6 +469,12 @@ func _capture_reaction_effect_scenes() -> void:
 	await _capture_reaction_pair("27_blast_l6", ReactionRules.Type.BLAST, 6, 0.18, 0.60)
 	if _failed:
 		return
+	await _capture_crowded_blast_pair("28_blast_l5_crowded", 5, 0.22, 0.58)
+	if _failed:
+		return
+	await _capture_crowded_blast_pair("29_blast_l6_crowded", 6, 0.22, 0.58)
+	if _failed:
+		return
 	await _measure_same_size_star_luminance()
 
 
@@ -556,6 +566,166 @@ func _validate_l4_local_brightness(main: Main, baseline: Image) -> void:
 		_fail("L4 blast outside-radius brightness gain %.5f exceeds 0.03" % gain)
 
 
+func _capture_crowded_blast_pair(
+	base_name: String,
+	level: int,
+	first_time: float,
+	second_time: float
+) -> void:
+	var main: Main = await _create_main(Main.NO_MODE)
+	(main.get_node("UI") as CanvasLayer).visible = false
+	var board: Board3D = main.get_node("Board") as Board3D
+	board.set_process(false)
+	var orb_descriptors: Array[Dictionary] = _populate_crowded_board(board)
+	var feedback: FeedbackDirector = main.get_node("FeedbackDirector") as FeedbackDirector
+	feedback.clear_effects()
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	feedback.play_reaction_visuals({
+		"type": ReactionRules.Type.BLAST,
+		"position": Vector2.ZERO,
+		"levels": [level, level],
+		"colors": [OrbTypes.OrbColor.PURPLE, OrbTypes.OrbColor.CYAN],
+		"shock_level": level,
+	})
+	await get_tree().create_timer(first_time).timeout
+	await _capture("%s_a.png" % base_name)
+	await get_tree().create_timer(maxf(second_time - first_time, 0.01)).timeout
+	await _capture("%s_b.png" % base_name)
+	# Measure after the wave rings have expanded beyond the inner board sample,
+	# so this is specifically orb-versus-nebula contrast rather than ring contrast.
+	await _validate_crowded_nebula_contrast(main, level, orb_descriptors, base_name)
+	print(
+		"REACTION_CAPTURE scene=%s level=%d crowded_orbs=%d time_a=%.2f time_b=%.2f" % [
+			base_name,
+			level,
+			orb_descriptors.size(),
+			first_time,
+			second_time,
+		]
+	)
+	await _destroy_main(main)
+
+
+func _populate_crowded_board(board: Board3D) -> Array[Dictionary]:
+	var descriptors: Array[Dictionary] = []
+	var coordinates: Array[float] = [-320.0, -160.0, 0.0, 160.0, 320.0]
+	var orb_index: int = 0
+	for y: float in coordinates:
+		for x: float in coordinates:
+			var row_index: int = floori(float(orb_index) / float(coordinates.size()))
+			var level: int = 1 + (orb_index * 5 + row_index) % 3
+			var color: int = (orb_index * 7 + level) % Config.data.color_display.size()
+			var position_value: Vector2 = Vector2(x, y)
+			var orb: Orb3D = board.spawn_orb(color, level, position_value)
+			orb.disable_physics()
+			descriptors.append({
+				"position": position_value,
+				"body_radius": (
+					Config.data.radius_for_level(level)
+					* CelestialOrbArt.body_radius_ratio(level)
+				),
+			})
+			orb_index += 1
+	return descriptors
+
+
+func _validate_crowded_nebula_contrast(
+	main: Main,
+	level: int,
+	orb_descriptors: Array[Dictionary],
+	scene_name: String
+) -> void:
+	await RenderingServer.frame_post_draw
+	var image: Image = get_viewport().get_texture().get_image()
+	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
+	var image_scale: Vector2 = Vector2(image.get_size()) / get_viewport().get_visible_rect().size
+	var effect_center: Vector2 = camera.unproject_position(
+		Orb3D.plane_position_to_world(Vector2.ZERO)
+	) * image_scale
+	var sample_radius_px: float = minf(
+		Config.data.board_size * Config.data.blast_push_radius_factor_for_level(level),
+		Config.data.board_size * 0.43
+	)
+	var effect_edge: Vector2 = camera.unproject_position(
+		Orb3D.plane_position_to_world(Vector2(sample_radius_px, 0.0))
+	) * image_scale
+	var effect_radius: float = effect_center.distance_to(effect_edge)
+	var projected_orbs: Array[Dictionary] = []
+	var orb_total: float = 0.0
+	var orb_samples: int = 0
+	for descriptor: Dictionary in orb_descriptors:
+		var position_value: Vector2 = descriptor["position"] as Vector2
+		var body_radius_px: float = float(descriptor["body_radius"])
+		var center: Vector2 = camera.unproject_position(
+			Orb3D.plane_position_to_world(position_value)
+		) * image_scale
+		var edge: Vector2 = camera.unproject_position(
+			Orb3D.plane_position_to_world(position_value + Vector2(body_radius_px, 0.0))
+		) * image_scale
+		var radius: float = center.distance_to(edge)
+		projected_orbs.append({"center": center, "radius": radius})
+		if center.distance_to(effect_center) > effect_radius:
+			continue
+		var core_metrics: Dictionary = _circle_luminance(image, center, radius * 0.52)
+		orb_total += float(core_metrics["total"])
+		orb_samples += int(core_metrics["count"])
+	var background_total: float = 0.0
+	var background_samples: int = 0
+	var min_x: int = maxi(0, floori(effect_center.x - effect_radius))
+	var max_x: int = mini(image.get_width() - 1, ceili(effect_center.x + effect_radius))
+	var min_y: int = maxi(0, floori(effect_center.y - effect_radius))
+	var max_y: int = mini(image.get_height() - 1, ceili(effect_center.y + effect_radius))
+	for y: int in range(min_y, max_y + 1):
+		for x: int in range(min_x, max_x + 1):
+			var point: Vector2 = Vector2(float(x), float(y))
+			if point.distance_to(effect_center) > effect_radius:
+				continue
+			var covered_by_orb: bool = false
+			for projected: Dictionary in projected_orbs:
+				if point.distance_to(projected["center"] as Vector2) <= float(projected["radius"]) * 1.10:
+					covered_by_orb = true
+					break
+			if covered_by_orb:
+				continue
+			background_total += image.get_pixel(x, y).get_luminance()
+			background_samples += 1
+	var orb_average: float = orb_total / float(maxi(orb_samples, 1))
+	var background_average: float = background_total / float(maxi(background_samples, 1))
+	var ratio: float = orb_average / maxf(background_average, 0.001)
+	print(
+		"REACTION_PIXEL_CHECK scene=%s orb=%.5f nebula_background=%.5f ratio=%.2f minimum=4.00 orb_samples=%d background_samples=%d" % [
+			scene_name,
+			orb_average,
+			background_average,
+			ratio,
+			orb_samples,
+			background_samples,
+		]
+	)
+	if orb_samples <= 0 or background_samples <= 0:
+		_fail("%s crowded nebula contrast has no samples" % scene_name)
+	elif ratio < 4.0:
+		_fail("%s orb/background luminance ratio %.2f is below 4.0" % [scene_name, ratio])
+
+
+func _circle_luminance(image: Image, center: Vector2, radius: float) -> Dictionary:
+	var min_x: int = maxi(0, floori(center.x - radius))
+	var max_x: int = mini(image.get_width() - 1, ceili(center.x + radius))
+	var min_y: int = maxi(0, floori(center.y - radius))
+	var max_y: int = mini(image.get_height() - 1, ceili(center.y + radius))
+	var radius_squared: float = radius * radius
+	var total: float = 0.0
+	var count: int = 0
+	for y: int in range(min_y, max_y + 1):
+		for x: int in range(min_x, max_x + 1):
+			if Vector2(float(x), float(y)).distance_squared_to(center) > radius_squared:
+				continue
+			total += image.get_pixel(x, y).get_luminance()
+			count += 1
+	return {"total": total, "count": count}
+
+
 func _measure_same_size_star_luminance() -> void:
 	var main: Main = await _create_main(Main.NO_MODE)
 	(main.get_node("UI") as CanvasLayer).visible = false
@@ -605,8 +775,13 @@ func _measure_same_size_star_luminance() -> void:
 			luminance[1],
 		]
 	)
-	if luminance[1] <= luminance[0]:
-		_fail("Same-size L7 body average luminance must exceed L6")
+	if luminance[1] < luminance[0] * 1.1:
+		_fail(
+			"Same-size L7 body average luminance %.5f must be at least L6 %.5f x 1.1" % [
+				luminance[1],
+				luminance[0],
+			]
+		)
 	await _destroy_main(main)
 
 

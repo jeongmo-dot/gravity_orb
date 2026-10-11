@@ -453,13 +453,16 @@ func _create_birth_feedback(
 		result_radius_m
 	)
 	if level >= 7:
-		for arc_index: int in range(3):
+		var prominence_scales: Array[float] = [1.00, 1.08, 1.16]
+		var prominence_angles: Array[float] = [-2.18, -0.08, 1.72]
+		for arc_index: int in range(prominence_scales.size()):
 			_create_prominence(
 				origin,
-				color_value.lightened(0.34),
-				result_radius_m * (1.12 + float(arc_index) * 0.12),
+				Color.WHITE.lerp(color_value.lightened(0.46), 0.42),
+				result_radius_m * prominence_scales[arc_index],
 				BIRTH_ACCRETION_DURATION,
-				float(arc_index) * TAU / 3.0
+				prominence_angles[arc_index],
+				float(arc_index) * 1.73
 			)
 	_start_reaction_shake(4, 0.5)
 
@@ -858,7 +861,9 @@ func _create_glow(
 ) -> void:
 	var glow: MeshInstance3D = _acquire_blast_effect("glow") as MeshInstance3D
 	glow.name = node_name
-	glow.position = Orb3D.plane_position_to_world(origin, 0.40)
+	# Transparent depth testing keeps this layer behind every opaque orb while
+	# leaving it above the board glass at z=-0.31.
+	glow.position = Orb3D.plane_position_to_world(origin, -0.24)
 	glow.scale = Vector3.ONE * start_radius
 	var material: ShaderMaterial = glow.material_override as ShaderMaterial
 	material.set_shader_parameter("inner_color", inner_color)
@@ -882,11 +887,12 @@ func _create_prominence(
 	color_value: Color,
 	radius: float,
 	delay: float,
-	rotation_value: float
+	rotation_value: float,
+	phase: float
 ) -> void:
 	var arc: MeshInstance3D = _acquire_blast_effect("arc") as MeshInstance3D
 	arc.name = "BirthSolarProminence"
-	arc.position = Orb3D.plane_position_to_world(origin, 0.35)
+	arc.position = Orb3D.plane_position_to_world(origin, 0.02)
 	arc.rotation = Vector3(0.0, 0.0, rotation_value)
 	arc.scale = Vector3.ONE * radius
 	var material: StandardMaterial3D = arc.material_override as StandardMaterial3D
@@ -899,6 +905,8 @@ func _create_prominence(
 		"duration": SOLAR_PROMINENCE_DURATION,
 		"delay": delay,
 		"base_scale": radius,
+		"base_rotation": rotation_value,
+		"phase": phase,
 		"color": color_value,
 		"material": material,
 	})
@@ -1053,15 +1061,37 @@ uniform vec4 inner_color : source_color = vec4(1.0);
 uniform vec4 outer_color : source_color = vec4(0.4, 0.8, 1.0, 1.0);
 uniform float effect_alpha : hint_range(0.0, 1.0) = 1.0;
 uniform float noise_seed = 0.0;
+
+float hash21(vec2 p) {
+	p = fract(p * vec2(123.34, 456.21));
+	p += dot(p, p + 45.32 + noise_seed);
+	return fract(p.x * p.y);
+}
+
+float value_noise2(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(
+		mix(hash21(i), hash21(i + vec2(1.0, 0.0)), f.x),
+		mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), f.x),
+		f.y
+	);
+}
+
 void fragment() {
 	vec2 p = UV * 2.0 - vec2(1.0);
 	float radius = length(p);
-	float angle = atan(p.y, p.x);
-	float wisp = 0.82 + 0.18 * sin(angle * 7.0 + radius * 18.0 + noise_seed);
-	float mask = (1.0 - smoothstep(0.18, 1.0, radius)) * wisp;
-	vec3 color = mix(inner_color.rgb, outer_color.rgb, smoothstep(0.08, 0.88, radius));
+	float coarse = value_noise2(p * 3.1 + vec2(noise_seed, -noise_seed * 0.7));
+	float fine = value_noise2(p * 7.3 + vec2(8.4 - noise_seed, 3.7 + noise_seed));
+	float mottle = coarse * 0.68 + fine * 0.32;
+	float soft_cloud = (1.0 - smoothstep(0.04, 0.96, radius)) * 0.09;
+	float shell = smoothstep(0.48, 0.72, radius) * (1.0 - smoothstep(0.78, 1.0, radius));
+	float rim = smoothstep(0.68, 0.84, radius) * (1.0 - smoothstep(0.86, 1.0, radius));
+	float mask = (soft_cloud + shell * 0.16 + rim * 0.14) * mix(0.72, 1.0, mottle);
+	vec3 color = mix(inner_color.rgb, outer_color.rgb, smoothstep(0.24, 0.76, mottle));
 	ALBEDO = color;
-	EMISSION = color * (0.9 + mask * 0.7);
+	EMISSION = color * (0.62 + shell * 0.38 + rim * 0.62);
 	ALPHA = mask * effect_alpha;
 }
 """
@@ -1100,11 +1130,23 @@ void fragment() {
 func _new_prominence_mesh() -> ArrayMesh:
 	var vertices: PackedVector3Array = PackedVector3Array()
 	var indices: PackedInt32Array = PackedInt32Array()
-	var segment_count: int = 24
+	var segment_count: int = 28
 	for segment: int in range(segment_count + 1):
-		var angle: float = -PI * 0.72 + PI * 1.44 * float(segment) / float(segment_count)
-		var inner: Vector2 = Vector2(cos(angle), sin(angle)) * 0.74
-		var outer: Vector2 = Vector2(cos(angle), sin(angle)) * 1.0
+		var progress: float = float(segment) / float(segment_count)
+		var angle: float = lerpf(-PI * 0.5, PI * 0.5, progress)
+		var centerline: Vector2 = Vector2(
+			0.70 + cos(angle) * 0.47,
+			sin(angle) * 0.15
+		)
+		var tangent: Vector2 = Vector2(
+			-sin(angle) * 0.47,
+			cos(angle) * 0.15
+		).normalized()
+		var normal: Vector2 = tangent.orthogonal()
+		var taper: float = pow(sin(progress * PI), 0.72)
+		var half_width: float = lerpf(0.0015, 0.018, taper)
+		var inner: Vector2 = centerline - normal * half_width
+		var outer: Vector2 = centerline + normal * half_width
 		vertices.append(Vector3(inner.x, inner.y, 0.0))
 		vertices.append(Vector3(outer.x, outer.y, 0.0))
 		if segment < segment_count:
@@ -1305,7 +1347,7 @@ func _update_effect(effect: Dictionary, progress: float) -> void:
 			float(effect["end_scale"]),
 			progress
 		)
-		ring.scale = Vector3(radius, radius, radius * lerpf(1.0, 0.35, progress))
+		ring.scale = Vector3.ONE * radius
 		var material: StandardMaterial3D = effect["material"] as StandardMaterial3D
 		var color_value: Color = effect["color"] as Color
 		color_value.a = 1.0 - progress
@@ -1335,15 +1377,22 @@ func _update_effect(effect: Dictionary, progress: float) -> void:
 		glow_material.set_shader_parameter("effect_alpha", alpha)
 	elif kind == "arc":
 		var arc: MeshInstance3D = effect["node"] as MeshInstance3D
-		var arc_scale: float = float(effect["base_scale"]) * (
-			1.0 + 0.035 * sin(progress * TAU * 2.0)
+		var phase: float = float(effect.get("phase", 0.0))
+		var slow_wave: float = sin(progress * TAU * 0.42 + phase)
+		var arc_scale: float = float(effect["base_scale"])
+		arc.scale = Vector3(
+			arc_scale * (1.0 + slow_wave * 0.018),
+			arc_scale * (1.0 - slow_wave * 0.032),
+			1.0
 		)
-		arc.scale = Vector3.ONE * arc_scale
+		arc.rotation.z = float(effect["base_rotation"]) + slow_wave * 0.045
 		var arc_material: StandardMaterial3D = effect["material"] as StandardMaterial3D
 		var arc_color: Color = effect["color"] as Color
-		arc_color.a = sin(progress * PI) * 0.84
+		arc_color.a = sin(progress * PI) * 0.52
 		arc_material.albedo_color = arc_color
-		arc_material.emission = Color(arc_color.r, arc_color.g, arc_color.b) * arc_color.a
+		arc_material.emission = Color(arc_color.r, arc_color.g, arc_color.b) * (
+			0.72 + arc_color.a * 0.55
+		)
 
 
 func _update_shake(delta: float) -> void:

@@ -262,7 +262,11 @@ func _draw_gas_giant(radius: float, base: Color) -> void:
 
 
 func _draw_star(radius: float, base: Color, solar: bool) -> void:
-	draw_circle(Vector2.ZERO, radius, _with_alpha(base.lightened(0.30 if solar else 0.12), base.a))
+	draw_circle(
+		Vector2.ZERO,
+		radius,
+		_with_alpha(base.lightened(0.46 if solar else 0.12), base.a)
+	)
 	var cell_color: Color = _with_alpha(
 		Color.WHITE.lerp(base.lightened(0.58), 0.34 if solar else 0.58),
 		(0.82 if solar else 0.62) * base.a
@@ -283,8 +287,8 @@ func _draw_star(radius: float, base: Color, solar: bool) -> void:
 		else:
 			draw_circle(cell_position, cell_radius, cell_color)
 	if solar:
-		draw_circle(Vector2(-0.08, -0.10) * radius, radius * 0.42, _with_alpha(Color.WHITE, 0.28 * base.a))
-		draw_circle(Vector2(-0.10, -0.12) * radius, radius * 0.18, _with_alpha(Color.WHITE, 0.30 * base.a))
+		draw_circle(Vector2(-0.08, -0.10) * radius, radius * 0.46, _with_alpha(Color.WHITE, 0.38 * base.a))
+		draw_circle(Vector2(-0.10, -0.12) * radius, radius * 0.20, _with_alpha(Color.WHITE, 0.42 * base.a))
 	else:
 		draw_circle(Vector2(-0.10, -0.12) * radius, radius * 0.52, _with_alpha(Color.WHITE, 0.40 * base.a))
 		draw_circle(Vector2(-0.12, -0.14) * radius, radius * 0.25, _with_alpha(Color.WHITE, 0.34 * base.a))
@@ -319,14 +323,25 @@ func _draw_halo(
 		) * base.a
 		draw_circle(Vector2.ZERO, halo_radius, _with_alpha(base, halo_alpha))
 	if solar:
-		var flare_angles: Array[float] = [-2.36, -0.38, 1.30]
+		var slow_drift: float = _blast_blink_elapsed * 0.22
+		var flare_angles: Array[float] = [
+			-2.36 + sin(slow_drift) * 0.055,
+			-0.38 + cos(slow_drift * 0.83) * 0.045,
+			1.30 + sin(slow_drift * 0.71) * 0.050,
+		]
+		var flare_widths: Array[float] = [0.085, 0.125, 0.100]
+		var flare_heights: Array[float] = [0.16, 0.25, 0.20]
 		for index: int in range(flare_angles.size()):
 			_draw_prominence_loop(
 				body_radius,
 				radius,
 				flare_angles[index],
-				0.12 + float(index) * 0.025,
-				_with_alpha(base.lightened(0.40), (0.70 + pulse * 0.20) * base.a)
+				flare_widths[index],
+				flare_heights[index],
+				_with_alpha(
+					Color.WHITE.lerp(base.lightened(0.54), 0.38),
+					(0.48 + pulse * 0.14) * base.a
+				)
 			)
 	else:
 		var ray_color: Color = _with_alpha(base.lightened(0.38), (0.26 + pulse * 0.22) * base.a)
@@ -350,6 +365,7 @@ func _draw_prominence_loop(
 	halo_radius: float,
 	angle: float,
 	width_ratio: float,
+	height_ratio: float,
 	color_value: Color
 ) -> void:
 	var radial: Vector2 = Vector2(cos(angle), sin(angle))
@@ -358,10 +374,19 @@ func _draw_prominence_loop(
 	for point_index: int in range(25):
 		var t: float = PI * float(point_index) / 24.0
 		points.append(
-			radial * (body_radius * 0.91 + sin(t) * halo_radius * 0.16)
+			radial * (body_radius * 0.91 + sin(t) * halo_radius * height_ratio)
 			+ tangent * cos(t) * halo_radius * width_ratio
 		)
-	draw_polyline(points, color_value, maxf(1.4, halo_radius * 0.026), true)
+	for point_index: int in range(points.size() - 1):
+		var segment_progress: float = (float(point_index) + 0.5) / float(points.size() - 1)
+		var taper: float = pow(sin(segment_progress * PI), 0.72)
+		draw_line(
+			points[point_index],
+			points[point_index + 1],
+			_with_alpha(color_value, color_value.a * taper),
+			maxf(0.7, halo_radius * lerpf(0.008, 0.022, taper)),
+			true
+		)
 
 
 func _draw_spherical_lighting(radius: float, base: Color, luminous: bool) -> void:

@@ -53,7 +53,11 @@ $expectedFiles = @(
     "26_blast_l4_a.png",
     "26_blast_l4_b.png",
     "27_blast_l6_a.png",
-    "27_blast_l6_b.png"
+    "27_blast_l6_b.png",
+    "28_blast_l5_crowded_a.png",
+    "28_blast_l5_crowded_b.png",
+    "29_blast_l6_crowded_a.png",
+    "29_blast_l6_crowded_b.png"
 )
 $hudExpectedFiles = @(
     "02_turn_early.png",

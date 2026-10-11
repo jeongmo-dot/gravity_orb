@@ -195,6 +195,35 @@ float ellipse_ring(vec2 p, vec2 center, vec2 radii, float thickness) {
 	return 1.0 - smoothstep(thickness, thickness * 1.8, abs(normalized_distance - 1.0));
 }
 
+float tapered_ellipse_arc(
+	vec2 p,
+	vec2 center,
+	vec2 radii,
+	float rotation_value,
+	float start_angle,
+	float end_angle
+) {
+	float cosine_value = cos(rotation_value);
+	float sine_value = sin(rotation_value);
+	vec2 delta = p - center;
+	vec2 local = vec2(
+		cosine_value * delta.x + sine_value * delta.y,
+		-sine_value * delta.x + cosine_value * delta.y
+	);
+	vec2 normalized = local / radii;
+	float angle = atan(normalized.y, normalized.x);
+	float progress = clamp((angle - start_angle) / (end_angle - start_angle), 0.0, 1.0);
+	float window = step(start_angle, angle) * step(angle, end_angle);
+	float taper = pow(max(sin(progress * 3.14159265), 0.0), 0.72);
+	float thickness = mix(0.006, 0.050, taper);
+	float line = 1.0 - smoothstep(
+		thickness,
+		thickness + 0.035,
+		abs(length(normalized) - 1.0)
+	);
+	return line * taper * window;
+}
+
 void vertex() {
 	local_surface_position = normalize(VERTEX);
 	if (UV.x < 1.5 && level_id == 1) {
@@ -298,7 +327,8 @@ void fragment() {
 			float edge_darkening = 0.70 + 0.30 * smoothstep(0.02, 0.88, facing);
 			surface = mix(base * 0.88, mix(base * 1.36, vec3(1.0), 0.38), granules) * edge_darkening;
 			surface = mix(surface, vec3(1.0), rice_cells * 0.44);
-			emission_energy = 0.50 + granules * 0.16 + rice_cells * 0.12;
+			surface = mix(surface * 1.12, vec3(1.0), 0.16);
+			emission_energy = 0.92 + granules * 0.20 + rice_cells * 0.14;
 			roughness_value = 0.18;
 		}
 		if (level_id <= 5) {
@@ -318,6 +348,7 @@ void fragment() {
 	} else if (art_layer < 1.5) {
 		float alpha = 0.0;
 		float energy = 0.0;
+		float prominence_mask = 0.0;
 		if (level_id == 4) {
 			float ellipse = length(vec2(p.x / 0.49, p.y / 0.135));
 			float ring = smoothstep(0.78, 0.84, ellipse) * (1.0 - smoothstep(0.94, 1.0, ellipse));
@@ -335,16 +366,42 @@ void fragment() {
 				alpha = max(halo * 0.66, rays * 0.74) * twinkle;
 				energy = 0.58;
 			} else {
-				float prominence_a = ellipse_ring(p, vec2(-0.38, -0.25), vec2(0.13, 0.085), 0.14);
-				float prominence_b = ellipse_ring(p, vec2(0.39, -0.14), vec2(0.10, 0.15), 0.14);
-				float prominence_c = ellipse_ring(p, vec2(0.08, 0.42), vec2(0.15, 0.095), 0.14);
+				float slow_drift = TIME * 0.22;
+				float prominence_a = tapered_ellipse_arc(
+					p,
+					vec2(-0.38, -0.21) + vec2(sin(slow_drift) * 0.008, cos(slow_drift * 0.83) * 0.006),
+					vec2(0.125, 0.072) * (1.0 + sin(slow_drift * 0.71) * 0.035),
+					0.34 + sin(slow_drift * 0.59) * 0.055,
+					-2.72,
+					1.02
+				);
+				float prominence_b = tapered_ellipse_arc(
+					p,
+					vec2(0.39, -0.07) + vec2(cos(slow_drift * 0.77) * 0.006, sin(slow_drift) * 0.009),
+					vec2(0.076, 0.120) * (1.0 + cos(slow_drift * 0.68) * 0.030),
+					-0.22 + cos(slow_drift * 0.63) * 0.045,
+					-1.08,
+					2.55
+				);
+				float prominence_c = tapered_ellipse_arc(
+					p,
+					vec2(0.07, 0.40) + vec2(sin(slow_drift * 0.62) * 0.009, cos(slow_drift * 0.74) * 0.005),
+					vec2(0.108, 0.066) * (1.0 + sin(slow_drift * 0.57) * 0.040),
+					0.12 + sin(slow_drift * 0.66) * 0.050,
+					-2.82,
+					0.66
+				);
 				float prominences = max(prominence_a, max(prominence_b, prominence_c));
-				alpha = max(halo * 0.82, prominences * 0.84) * twinkle;
-				energy = 0.72;
+				prominence_mask = prominences;
+				alpha = max(halo * 0.54, prominences * 0.92) * twinkle;
+				energy = 0.82 + prominences * 0.92;
 			}
 		}
-		ALBEDO = base;
-		EMISSION = base * energy;
+		vec3 adornment_color = level_id == 7
+			? mix(base, vec3(1.0, 0.96, 0.72), 0.36 + prominence_mask * 0.54)
+			: base;
+		ALBEDO = adornment_color;
+		EMISSION = adornment_color * energy;
 		ROUGHNESS = 0.18;
 		ALPHA = alpha;
 	} else {
