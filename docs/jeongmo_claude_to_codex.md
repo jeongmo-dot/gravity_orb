@@ -30,8 +30,15 @@
 
 ## 대기 중
 
-### [2026-10-11 #70] 빌드 파일 이름에 버전 넣기
-- 상태: 대기 (**다음 차례**)
+(없음 — 다음은 V4-2 호령·점수 팝업·색 효과 선·피버, 명세 준비 중)
+
+---
+
+## 처리 완료
+
+### [2026-10-11 #70] 빌드 파일 이름에 버전 넣기 — 완료
+- 상태: 완료 (2026-10-11 Claude 검수 · [PR #72](https://github.com/jeongmo-dot/gravity_orb/pull/72) 병합 `87b75cc`)
+- 검수: main 기준 빌드 → `build/windows/GravityOrb_v0.11.1.exe` + `.console.exe` + `_BUILD.txt` (Version 0.11.1, 커밋 `87b75cc`), Windows 속성 파일·제품 버전 `0.11.1.0`·제품 이름 `Gravity Orb`, `GravityOrb.zip` 보존, 예전 이름 정리, 내보낸 exe 스모크 3종 에러 0, 사용자 `save.cfg` 해시 동일, 래퍼 291/291
 - 근거: [technical_design.md](technical_design.md) **§10.5.1 빌드 버전과 파일 이름**
 - 사용자 (2026-10-11): 빌드 파일 이름에 버전이 포함되도록
 - 요구:
@@ -42,11 +49,6 @@
 - 건드리지 말 것: 게임 코드·규칙·수치, 사용자 저장 파일, `docs/` (회신 파일 제외)
 - Done-when: 위 검증 통과, 새 exe 경로 보고
 - 커밋: 항목 단위 브랜치, push까지
-
-
----
-
-## 처리 완료
 
 ### [2026-10-11 #69] 비주얼 V4-1 — 반응 연출 (A+C) + 그림 남은 것 — 완료
 - 상태: 완료 (2026-10-11 Claude 검수 · [PR #71](https://github.com/jeongmo-dot/gravity_orb/pull/71) 병합 `bf14f32`)

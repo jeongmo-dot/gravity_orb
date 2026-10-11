@@ -810,6 +810,7 @@ godot --headless --path . --quit-after 300 -- --mode=blitz
 - **파일 이름**: `build/windows/GravityOrb_v{버전}.exe` (예: `GravityOrb_v0.11.1.exe`), 콘솔 래퍼 `GravityOrb_v{버전}.console.exe`, 빌드 정보 `GravityOrb_v{버전}_BUILD.txt` (커밋·날짜·엔진·모드). 디버그는 `build/windows-debug/`에 같은 이름
 - **이전 버전은 남긴다**: 빌드 스크립트는 같은 버전의 파일만 지우고 다시 만든다 (다른 버전 파일은 그대로 — 비교 테스트용). 버전 없는 예전 이름 (`GravityOrb.exe`·`GravityOrb.console.exe`·`BUILD.txt`)은 한 번 정리
 - 빌드 결과 줄 (`WINDOWS_BUILD_RESULT`)에 버전과 실제 파일 경로를 적는다
+- **결과 — 병합** ([PR #72](https://github.com/jeongmo-dot/gravity_orb/pull/72) `87b75cc`, 2026-10-11): 프리셋 버전 칸을 비워 프로젝트 버전을 상속 (Windows 속성은 4자리 `0.11.1.0`, 파일 이름·`_BUILD.txt`는 `0.11.1`). Claude 재검수: main 기준 빌드 → `build/windows/GravityOrb_v0.11.1.exe` (111,053,536바이트) + `.console.exe` + `_BUILD.txt` (커밋 `87b75cc`), 다른 파일 (`GravityOrb.zip`) 보존, 버전 없는 예전 파일 정리됨, 내보낸 exe 스모크 3종 에러 0, 사용자 `save.cfg` 해시 전후 동일, 래퍼 291/291
 
 버전 기록
 | 버전 | 날짜 | 내용 |
