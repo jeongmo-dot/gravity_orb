@@ -3,6 +3,7 @@ extends TestCase
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
 const MAIN_3D_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
 const HUD_THEME: Theme = preload("res://assets/ui/gravity_orb_theme.tres")
+const V3_SAVE_PATH: String = "res://tests/test_screen_v3.tmp.cfg"
 const VIEWPORT_CASES: Array[Dictionary] = [
 	{
 		"output": Vector2(540.0, 960.0),
@@ -20,6 +21,219 @@ const FONT_PATHS: Array[String] = [
 	"res://assets/fonts/NotoSansKR-Regular-KSX1001.ttf",
 	"res://assets/fonts/NotoSansKR-Medium-KSX1001.ttf",
 ]
+
+
+func test_v3_screen_layout_safe_area_touch_targets_and_extreme_content() -> void:
+	_remove_v3_save()
+	for index: int in range(10):
+		SaveStore.add_ranking(
+			V3_SAVE_PATH,
+			GameConfig.GameMode.BLITZ,
+			9_999_999 - index * 111_111,
+			{"max_chain": 14 - index, "blasts": 4, "fevers": 2},
+			"2026-10-%02d 12:00" % (index + 1)
+		)
+	for viewport_case: Dictionary in VIEWPORT_CASES:
+		var logical: Vector2 = viewport_case["logical"] as Vector2
+		var safe: Rect2 = viewport_case["safe"] as Rect2
+		var output: Vector2 = viewport_case["output"] as Vector2
+		var layout: Dictionary = StartScreen.layout_for_viewport(logical)
+		for region_name: String in [
+			"hero", "gravity", "orb", "subtitle", "blitz", "classic", "ranking",
+			"sound", "settings",
+		]:
+			assert_true(
+				safe.encloses(layout[region_name] as Rect2),
+				"%dx%d start %s stays in safe area" % [output.x, output.y, region_name]
+			)
+		assert_true(
+			not (layout["blitz"] as Rect2).intersects(layout["classic"] as Rect2),
+			"%dx%d mode cards do not overlap" % [output.x, output.y]
+		)
+		var hero_rect: Rect2 = layout["hero"] as Rect2
+		var orbit_sweep: Rect2 = layout["orbiter_sweep"] as Rect2
+		var gravity_rect: Rect2 = layout["gravity"] as Rect2
+		var screen_scale: float = logical.x / 1080.0
+		var hero_body_diameter: float = float(layout["hero_body_diameter"])
+		assert_true(
+			hero_body_diameter / logical.x >= 0.20
+			and hero_body_diameter / logical.x <= 0.22,
+			"%dx%d hero body is 20-22 percent of screen width" % [output.x, output.y]
+		)
+		assert_true(
+			hero_rect.end.y + 16.0 <= gravity_rect.position.y,
+			"%dx%d hero stays at least 16 logical pixels above logo" % [output.x, output.y]
+		)
+		assert_true(
+			orbit_sweep.end.y <= gravity_rect.position.y,
+			"%dx%d orbiters stay behind and clear of logo for a full orbit" % [output.x, output.y]
+		)
+		for orbiter_index: int in range(2):
+			var orbiter_radius: float = OrbitStage.orbiter_radius(orbiter_index) * screen_scale
+			for sample_index: int in range(OrbitStage.ORBIT_SAMPLE_COUNT):
+				var phase: float = (
+					TAU * float(sample_index) / float(OrbitStage.ORBIT_SAMPLE_COUNT)
+				)
+				var relative_center: Vector2 = OrbitStage.orbiter_center_for_phase(
+					orbiter_index,
+					Vector2.ZERO,
+					phase
+				) * screen_scale
+				var orbiter_center: Vector2 = (layout["orbit"] as Rect2).get_center() + relative_center
+				var orbiter_rect: Rect2 = Rect2(
+					orbiter_center - Vector2.ONE * orbiter_radius,
+					Vector2.ONE * orbiter_radius * 2.0
+				)
+				assert_true(
+					orbiter_rect.end.y + 16.0 <= gravity_rect.position.y,
+					"%dx%d orbiter %d sample %d stays 16px above logo" % [
+						output.x,
+						output.y,
+						orbiter_index,
+						sample_index,
+					]
+				)
+				assert_true(
+					not orbiter_rect.intersects(gravity_rect),
+					"%dx%d orbiter %d sample %d does not overlap logo" % [
+						output.x,
+						output.y,
+						orbiter_index,
+						sample_index,
+					]
+				)
+		var logo_end: float = (layout["subtitle"] as Rect2).end.y
+		var card_top: float = (layout["blitz"] as Rect2).position.y
+		var card_end: float = (layout["blitz"] as Rect2).end.y
+		var icon_top: float = (layout["ranking"] as Rect2).position.y
+		var logo_card_gap: float = card_top - logo_end
+		var card_icon_gap: float = icon_top - card_end
+		assert_true(
+			maxf(logo_card_gap, card_icon_gap) / minf(logo_card_gap, card_icon_gap) <= 1.5,
+			"%dx%d start-screen group gaps differ by at most 1.5x" % [output.x, output.y]
+		)
+		var top_margin: float = orbit_sweep.position.y - safe.position.y
+		var bottom_margin: float = safe.end.y - (layout["settings"] as Rect2).end.y
+		assert_true(
+			top_margin > 0.0 and bottom_margin > 0.0,
+			"%dx%d start-screen outer margins stay inside safe area" % [output.x, output.y]
+		)
+		assert_true(
+			maxf(top_margin, bottom_margin) / minf(top_margin, bottom_margin) <= 1.5,
+			"%dx%d start-screen top and bottom margins differ by at most 1.5x" % [
+				output.x,
+				output.y,
+			]
+		)
+		for touch_name: String in ["blitz", "classic", "ranking", "sound", "settings"]:
+			var touch_rect: Rect2 = layout[touch_name] as Rect2
+			assert_true(
+				touch_rect.size.x >= 88.0 and touch_rect.size.y >= 88.0,
+				"%dx%d %s touch target is at least 88 logical pixels" % [
+					output.x, output.y, touch_name
+				]
+			)
+
+		var setup: Dictionary = await _create_menu_main_in_viewport(logical)
+		var main: Main = setup["main"] as Main
+		var ui: DebugHud = main.get_node("UI") as DebugHud
+		var stage: OrbitStage = ui.start_screen().get_node("Content/OrbitStage") as OrbitStage
+		assert_true(stage.uses_celestial_shader(), "start hero uses V1 celestial shader")
+		stage.set_animation_elapsed(5.0)
+		var hero_mesh: MeshInstance3D = stage.get_node("HeroViewport/HeroBody") as MeshInstance3D
+		var hero_ring: MeshInstance3D = stage.get_node("HeroViewport/HeroRing") as MeshInstance3D
+		var expected_axis: Vector3 = OrbitStage.hero_rotation_axis()
+		var actual_axis: Vector3 = hero_mesh.quaternion * Vector3.UP
+		assert_true(
+			actual_axis.dot(expected_axis) >= 0.999,
+			"hero local polar axis remains aligned to the ring-plane normal while spinning"
+		)
+		assert_true(
+			absf(expected_axis.dot(Vector3.BACK)) < 0.5,
+			"hero polar axis is not the screen z axis"
+		)
+		assert_near(
+			hero_ring.rotation.z,
+			CelestialOrbArt.RING_TILT_RADIANS,
+			0.0001,
+			"ring remains fixed at its designed tilt while the body rotates"
+		)
+		for icon_button_path: String in [
+			"Content/StartRankingButton",
+			"Content/StartSoundButton",
+			"Content/StartSettingsButton",
+		]:
+			var icon_button: Button = ui.start_screen().get_node(icon_button_path) as Button
+			var icon_style: StyleBoxFlat = icon_button.get_theme_stylebox("normal") as StyleBoxFlat
+			assert_true(icon_style != null, "%s uses themed panel style" % icon_button_path)
+			if icon_style != null:
+				assert_eq(icon_style.corner_radius_top_left, 12, "icon panel uses 12px corners")
+		ui.show_ranking(GameConfig.GameMode.BLITZ, 1)
+		await tree.create_timer(0.30).timeout
+		var ranking: RankingPanel = ui.ranking_panel()
+		var ranking_body: PanelContainer = ranking.get_node("Panel") as PanelContainer
+		var last_row: PanelContainer = ranking.get_node(
+			"Panel/Content/Rows/RankingRow10"
+		) as PanelContainer
+		var first_score: Label = ranking.get_node(
+			"Panel/Content/Rows/RankingRow1/Text/Columns/Score"
+		) as Label
+		assert_true(
+			safe.encloses(ranking_body.get_global_rect()),
+			"%dx%d ranking panel stays in safe area" % [output.x, output.y]
+		)
+		assert_true(
+			ranking_body.get_global_rect().encloses(last_row.get_global_rect()),
+			"%dx%d all ten ranking rows fit" % [output.x, output.y]
+		)
+		assert_eq(first_score.text, "9,999,999", "extreme ranking score uses commas")
+		var score_font: FontVariation = first_score.get_theme_font("font") as FontVariation
+		assert_true(score_font != null, "ranking score uses Orbitron")
+		var ranking_title: Label = ranking.get_node("Panel/Content/Title") as Label
+		var ranking_close: Button = ranking.get_node("Panel/Content/RankingCloseButton") as Button
+		assert_true(
+			ranking_title.get_global_rect().position.y - ranking_body.get_global_rect().position.y <= 40.0,
+			"%dx%d ranking top inner padding is at most 40" % [output.x, output.y]
+		)
+		assert_true(
+			ranking_body.get_global_rect().end.y - ranking_close.get_global_rect().end.y <= 40.0,
+			"%dx%d ranking bottom inner padding is at most 40" % [output.x, output.y]
+		)
+		var selected_tab: Button = ranking.get_node(
+			"Panel/Content/Tabs/RankingBlitzTab"
+		) as Button
+		var selected_tab_style: StyleBoxFlat = selected_tab.get_theme_stylebox(
+			"pressed"
+		) as StyleBoxFlat
+		assert_true(
+			selected_tab_style.bg_color.is_equal_approx(Color("#BFE9FF")),
+			"selected ranking tab uses cyan fill"
+		)
+		assert_true(
+			selected_tab.get_theme_color("font_pressed_color").is_equal_approx(
+				Color(0.015, 0.05, 0.09, 1.0)
+			),
+			"selected ranking tab uses navy text"
+		)
+		(ranking.get_node("Panel/Content/RankingCloseButton") as Button).pressed.emit()
+		await tree.create_timer(0.30).timeout
+		ui.show_settings()
+		await tree.create_timer(0.30).timeout
+		var settings: SettingsPanel = ui.settings_panel()
+		var settings_body: PanelContainer = settings.get_node("SettingsPanelBody") as PanelContainer
+		assert_true(
+			safe.encloses(settings_body.get_global_rect()),
+			"%dx%d settings panel stays in safe area" % [output.x, output.y]
+		)
+		for path: String in [
+			"SettingsPanelBody/Margin/Content/SettingsSoundToggle",
+			"SettingsPanelBody/Margin/Content/SettingsSymbolsToggle",
+			"SettingsPanelBody/Margin/Content/SettingsCloseButton",
+		]:
+			var button: Button = settings.get_node(path) as Button
+			assert_true(button.size.y >= 88.0, "%s touch target is at least 88" % path)
+		await _destroy_3d_setup(setup)
+	_remove_v3_save()
 
 
 func test_busy_blitz_hud_regions_do_not_overlap_at_supported_sizes() -> void:
@@ -508,6 +722,22 @@ func _create_3d_main_in_viewport(viewport_size: Vector2) -> Dictionary:
 	return {"viewport": viewport, "main": main}
 
 
+func _create_menu_main_in_viewport(viewport_size: Vector2) -> Dictionary:
+	var viewport: SubViewport = SubViewport.new()
+	viewport.size = Vector2i(roundi(viewport_size.x), roundi(viewport_size.y))
+	viewport.own_world_3d = true
+	viewport.gui_disable_input = true
+	viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	tree.root.add_child(viewport)
+	var main: Main = MAIN_3D_SCENE.instantiate() as Main
+	(main.get_node("ScoreManager") as ScoreManager).save_path = V3_SAVE_PATH
+	(main.get_node("FeedbackDirector/SfxBank") as SfxBank).save_path = V3_SAVE_PATH
+	viewport.add_child(main)
+	await tree.process_frame
+	await tree.process_frame
+	return {"viewport": viewport, "main": main}
+
+
 func _project_board_outer_rect(camera: Camera3D, board: Board3D) -> Rect2:
 	var outer_half_m: float = (
 		board.half_size() / Board3D.PIXELS_PER_METER
@@ -541,3 +771,8 @@ func _destroy_main(main: Main) -> void:
 	main.queue_free()
 	await tree.process_frame
 	InputRouter.set_locked(false)
+
+
+func _remove_v3_save() -> void:
+	if FileAccess.file_exists(V3_SAVE_PATH):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(V3_SAVE_PATH))

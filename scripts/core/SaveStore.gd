@@ -12,6 +12,7 @@ const BLITZ_RANKING_KEY: String = "blitz"
 const BLITZ_SURVIVAL_RANKING_KEY: String = "blitz_survival"
 const LAST_MODE_KEY: String = "last_mode"
 const SFX_MUTED_KEY: String = "sfx_muted"
+const ORB_SYMBOLS_ENABLED_KEY: String = "orb_symbols_enabled"
 const RANKING_LIMIT: int = 10
 
 
@@ -146,6 +147,28 @@ static func load_sfx_muted(path: String) -> bool:
 
 static func save_sfx_muted(path: String, muted: bool) -> Error:
 	return _save_value(path, SETTINGS_SECTION, SFX_MUTED_KEY, muted)
+
+
+static func load_orb_symbols_enabled(path: String, fallback: bool) -> bool:
+	if path.is_empty() or not FileAccess.file_exists(path):
+		return fallback
+	var stored_value: Variant = _read_value_text(
+		FileAccess.get_file_as_string(path),
+		SETTINGS_SECTION,
+		ORB_SYMBOLS_ENABLED_KEY
+	)
+	if stored_value == null:
+		return fallback
+	var value_text: String = str(stored_value).to_lower()
+	if value_text == "true":
+		return true
+	if value_text == "false":
+		return false
+	return fallback
+
+
+static func save_orb_symbols_enabled(path: String, enabled: bool) -> Error:
+	return _save_value(path, SETTINGS_SECTION, ORB_SYMBOLS_ENABLED_KEY, enabled)
 
 
 static func record_key_for_mode(mode: GameConfig.GameMode) -> String:

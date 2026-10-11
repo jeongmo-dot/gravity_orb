@@ -22,6 +22,7 @@ const ANNIHILATION_RULE_NAMES: Array[String] = ["A", "B", "C"]
 @onready var _hud: Hud = %Hud
 @onready var _start_screen: StartScreen = %StartScreen
 @onready var _ranking_panel: RankingPanel = %RankingPanel
+@onready var _settings_panel: SettingsPanel = %SettingsPanel
 @onready var _sfx_bank: SfxBank = %SfxBank
 
 var _game_manager: Variant
@@ -64,19 +65,29 @@ func _ready() -> void:
 func bind_start_screen(save_path: String) -> void:
 	_start_screen.bind(save_path, _sfx_bank)
 	_ranking_panel.bind(save_path)
+	_settings_panel.bind(save_path, _sfx_bank)
+	_on_symbols_changed(_settings_panel.symbols_enabled())
 	if not _ranking_panel.closed.is_connected(_on_ranking_closed):
 		_ranking_panel.closed.connect(_on_ranking_closed)
+	if not _start_screen.settings_requested.is_connected(show_settings):
+		_start_screen.settings_requested.connect(show_settings)
+	if not _settings_panel.symbols_changed.is_connected(_on_symbols_changed):
+		_settings_panel.symbols_changed.connect(_on_symbols_changed)
 
 
 func show_start_screen() -> void:
-	_start_screen.visible = true
+	_start_screen.prepare_to_show()
 	_hud.visible = false
+	if _board != null:
+		_board.set("visible", false)
 	_label.visible = false
 
 
 func show_gameplay() -> void:
 	_start_screen.visible = false
 	_hud.visible = true
+	if _board != null:
+		_board.set("visible", true)
 	_label.visible = OS.is_debug_build() and _debug_visible
 
 
@@ -86,6 +97,15 @@ func start_screen() -> StartScreen:
 
 func ranking_panel() -> RankingPanel:
 	return _ranking_panel
+
+
+func settings_panel() -> SettingsPanel:
+	return _settings_panel
+
+
+func show_settings() -> void:
+	_label.visible = false
+	_settings_panel.open()
 
 
 func show_ranking(mode: GameConfig.GameMode, highlight_rank: int = 0) -> void:
@@ -102,6 +122,16 @@ func _on_ranking_closed() -> void:
 		show_start_screen()
 	else:
 		show_gameplay()
+
+
+func _on_symbols_changed(enabled: bool) -> void:
+	Config.data.orb_symbols_enabled = enabled
+	_start_screen.set_symbols_enabled(enabled)
+	_hud.set_symbols_enabled(enabled)
+	if _board != null and _board.has_method("get_orbs"):
+		for orb: Variant in _board.get_orbs():
+			if orb != null and orb.has_method("set_symbols_enabled"):
+				orb.call("set_symbols_enabled", enabled)
 
 
 func _toggle_debug_hud() -> void:

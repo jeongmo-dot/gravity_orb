@@ -38,6 +38,118 @@
 
 ## 미확인
 
+### [2026-10-11] 대상 #67 추가 요구 2 — 시작 화면 행성 극축·타원 궤도·세로 균형
+- 상태: 완료 — 최신 `main`의 재검수 명세를 먼저 병합하고, 행성의 로컬 극축을 고리 면 법선에 정렬한 자전, 공전 천체와 궤도선의 동일 타원식, 21.051% 몸통 크기와 두 화면비 세로 균형을 반영함
+- 브랜치 / PR: `codex/v3-orbit-stage-screens` / [PR #69](https://github.com/jeongmo-dot/gravity_orb/pull/69)
+- 병합: `origin/main` `f9c063f`을 병합 커밋 `f2d8cf0`으로 먼저 반영한 뒤 구현함. 충돌 없음
+- 변경 파일: `scripts/ui/{OrbitStage,StartScreen}.gd`, `tests/{capture_screens.ps1,test_screen_layout.gd}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 행성 로컬 Y축을 고리 타원의 법선에 먼저 정렬하고 그 로컬 극축으로 자전; 화면 Z축 회전 제거, 고리·화면 기준 광원 고정 — 자동 (`test_v3_screen_layout_safe_area_touch_targets_and_extreme_content`) + 0·2.5·5초 실제 창 캡처 직접 비교
+  - [x] 공전 천체와 그려진 궤도선이 같은 중심·반지름·기울기 타원식을 공유 — 자동. 두 천체 각각 한 바퀴 64개 위치에서 반지름을 포함해 로고와 비겹침·16px 이상 간격 검사
+  - [x] L4 행성 몸통 지름 `227.347` 논리 px, 화면 폭의 `21.051%`; 고리·두 타원도 함께 확대 — 자동 수치 검사 + 캡처
+  - [x] 안전 영역 기준 위/아래 여백 차이 1.5배 이하 — `540×960`: `209.794/258.000px`, 비 `1.230`; `540×1170`: `208.794/294.800px`, 비 `1.412`
+  - [x] 로고·카드·아이콘 사이 기존 간격 비 1.5 이하 유지; 공전 천체의 로고 최소 간격은 `19.794px`(9:16), `32.394px`(9:19.5)
+  - [x] 시작 화면 p99 16.7ms 미만과 기존 물리 해시 유지 — 창 측정 + 전체 회귀
+- 캡처 관측 (Standard/Compatibility):
+  - `tests/capture_screens.ps1` → 종료 코드 0, 각 비율 기존 20장 + `21_start_screen_t2_5`·`22_start_screen_t5_0` = `22장`, 두 비율 합계 `44장`
+  - 두 비율의 `01_start_screen`·`21_start_screen_t2_5`·`22_start_screen_t5_0`을 직접 비교: 행성 띠의 기울기는 고리 방향에 고정되고 표면 굴곡만 극축을 따라 흐르며, 고리와 광원 방향은 고정됨. 파랑 L1·보라 L2 중심은 세 시점 모두 각자 그려진 타원선 위에 있고 로고에 닿지 않음
+  - 두 비율 `20_start_no_record`에서 확대된 행성·타원, 로고·카드·아이콘과 상하 여백이 잘림·겹침 없이 표시됨
+  - 보드 투영은 두 비율 모두 `left=13.276, right=526.724, width=513.448`, 비율 간 차이 `0.000px`; 기존 대비·중력 벽 빛 검사도 통과
+- 성능 관측 (RTX 4070 Ti SUPER, Compatibility, VSync 끔):
+  - 시작 화면 정지 5초: 표본 `4,300`, 프레임 p99/최대 `1.857/3.854ms` (`p99 < 16.7ms`)
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - `tests/run_tests.ps1` 최종 실행 → 일반 `275/275`(`16.387초`), 장기 `5/5`(`47.034초`), 성능 `5/5`(`2.782초`), 합계 `285/285`, 종료 코드 0, 총 `66.202초`
+  - 물리 상태 해시: TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`; #67 추가 요구 1과 동일
+  - 시작 화면 / TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 전역 난수 호출 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. `tests/capture_screens.ps1` 실행 후 각 비율의 `01`·`21`·`22`를 시간순으로 비교한다 → 행성 띠가 바람개비처럼 화면 안에서 회전하지 않고 고리 방향을 유지한 채 표면 굴곡만 이동하며, 고리와 왼쪽 위 광원은 고정되어야 한다.
+  2. 같은 세 장에서 파랑·보라 천체를 따라간다 → 두 천체 중심이 각자 타원선 위를 이동하고 천체 외곽이 어느 시점에도 `GRAVITY` 글자에 닿지 않아야 한다.
+  3. 두 비율의 `20`을 확인한다 → 행성 몸통이 폭의 약 1/5이고, 궤도 위 여백과 아이콘 아래 여백이 비슷하며 로고·카드·아이콘 사이도 한쪽만 크게 비지 않아야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 고리 셰이더의 장·단축비 `0.49:0.135`로 3D 고리 면 법선을 복원해 구체의 로컬 Y축을 정렬함. 이후 자전은 로컬 Y축 회전으로 합성해 띠 방향이 흔들리지 않게 함
+  - `21`·`22` 캡처는 실제 창에서 각각 2.5초를 기다려 찍음. PNG·JSON 산출물은 기존 ignore 대상이라 커밋에 포함하지 않음
+- 남은 것 · 질문: 없음
+
+### [2026-10-11] 대상 #67 추가 요구 1 — 시작·결과·랭킹 화면 위계 보완
+- 상태: 완료 — 최신 `main`의 보완 명세를 먼저 병합하고, 시작 행성을 V1 셀레스티얼 셰이더로 교체했으며 모드 카드·간격·랭킹·결과 통계의 시각 위계를 정리함
+- 브랜치 / PR: `codex/v3-orbit-stage-screens` / [PR #69](https://github.com/jeongmo-dot/gravity_orb/pull/69)
+- 병합: `origin/main` `d930c5c`을 병합 커밋 `0d4c174`으로 먼저 반영한 뒤 구현함. 충돌 없음
+- 변경 파일: `scenes/UI.tscn`, `scripts/ui/{GameOverPanel,OrbitStage,RankingPanel,StartScreen}.gd`, `tests/{test_blitz_manager,test_frontend,test_rankings,test_screen_layout}.gd`, `tests/scenarios/test_score_flow.gd`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 행성·공전 천체가 로고 위 최소 16px를 유지하고 궤도 전체가 로고를 침범하지 않음 — 자동 (`test_v3_screen_layout_safe_area_touch_targets_and_extreme_content`) + 두 비율 캡처 직접 확인
+  - [x] 시작 행성을 게임판 V1과 같은 L4 청록 `CelestialOrbArt` 머티리얼·셰이더·공유 구체 메시·고리·문양으로 렌더링 — 자동 (`test_v3_screen_layout_safe_area_touch_targets_and_extreme_content`, `test_settings_symbol_toggle_saves_and_updates_orbit_stage_immediately`) + 캡처; 공전 천체는 명세 허용 범위대로 2D 유지
+  - [x] 두 모드 카드 모두 아이콘·모드명 색을 유지하고 마지막 모드만 색 테두리·옅은 배경으로 선택 표시; 모드명 Orbitron 700, 설명 Noto, BEST Orbitron 적용 — 자동 (`test_start_screen_shows_records_last_mode_and_touch_targets`) + 캡처
+  - [x] 로고군→카드와 카드→아이콘 행의 세로 간격 비가 두 화면 모두 1.5 이하이고, 하단 아이콘을 V3-1 패널 스타일로 통일 — 자동 (`test_v3_screen_layout_safe_area_touch_targets_and_extreme_content`) + 캡처
+  - [x] 랭킹 패널을 내용 높이에 맞추고 안쪽 여백을 방향별 40px 이하로 제한; 제목 상단·외곽선 닫기·청록 선택 탭/남색 글자·Orbitron 점수 적용 — 자동 (`test_ranking_screen_tabs_rows_highlight_and_touch_filters`) + 캡처
+  - [x] 결과 2×2 값을 라벨의 약 1.6배 Orbitron으로 분리하고 BLITZ 시간만 초록색 적용; `블라스트`를 `대폭발`로 변경하고 신기록을 옅은 호박 배경·테두리 배지로 표시 — 자동 (`test_game_over_panel_shows_scores_direction_and_restart_button`, `test_result_panel_rank_messages_buttons_and_ranking_highlight`) + 캡처
+  - [x] 시작 화면 p99 16.7ms 미만과 기존 물리·게임 흐름 유지 — 성능 측정 + 전체 회귀 + 상태 해시
+- 캡처 관측 (Standard/Compatibility):
+  - `tests/capture_screens.ps1` → 종료 코드 0, `540×960` 20장 + `540×1170` 20장 = `40장`
+  - 두 비율의 `01_start_screen`, `20_start_no_record`에서 셀레스티얼 광원·그림자·림·고리 행성과 공전 궤도가 로고 위에 완전히 분리되고, 두 카드의 상시 모드색·선택 테두리/배경·타이포 위계와 하단 아이콘 간격이 잘림 없이 표시됨
+  - 두 비율의 `04_turn_game_over`, `09_blitz_result`, `10_ranking_blitz`, `11_result_new_record`에서 결과 값 크기·BLITZ 시간 초록색·`대폭발`·호박 신기록 배지, 내용 맞춤 랭킹 패널·청록 탭·외곽선 닫기·10줄이 겹침 없이 표시됨
+  - 보드 투영은 두 비율 모두 `left=13.276, right=526.724, width=513.448`, 비율 간 차이 `0.000px`; 기존 우주 대비·중력 벽 빛 화소 검사도 통과
+- 성능 관측 (RTX 4070 Ti SUPER, Compatibility):
+  - 시작 화면 정지 5초: 표본 `5,035`, 프레임 p99/최대 `1.594/2.283ms` (`p99 < 16.7ms`)
+  - BLITZ 시드 101~104: 프레임 `17,124`, p50/p95/p99/최대 `1.525/2.733/4.138/9.625ms`, `>16.7ms` 0, `>33.3ms` 0; 드로콜 p50/p95/최대 `407/432/442`
+  - BLITZ 입력 `120/120`, 유실 `0`; 입력 수락 p95/최대 `20.859/42.402ms`, 수락→생성 p95/최대 `2.484/6.246ms`; 최대 생성 묶음 `8`
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - `tests/run_tests.ps1` 최종 실행 → 일반 `275/275`(`14.996초`), 장기 `5/5`(`44.745초`), 성능 `5/5`(`2.693초`), 합계 `285/285`, 종료 코드 0, 총 `62.434초`
+  - 물리 상태 해시: TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`; #67과 동일
+  - 시작 화면 / TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 전역 난수 호출 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. `tests/capture_screens.ps1` 실행 후 두 비율의 `01`·`20`을 확인 → 행성의 광원·그림자·림·고리와 공전 천체가 로고 위 16px 이상 떨어지고, 궤도가 로고에 닿지 않아야 한다.
+  2. BLITZ와 CLASSIC을 번갈아 시작 화면으로 돌아온다 → 두 카드의 아이콘·모드명 색은 항상 유지되고 마지막 모드 카드만 색 테두리와 옅은 배경으로 구분되어야 한다.
+  3. `04`·`09`·`11` 결과를 비교한다 → 수치가 라벨보다 크게 보이고 BLITZ의 버틴 시간만 초록색이며 `대폭발` 문구와 호박색 신기록 배지가 보여야 한다.
+  4. `10` 랭킹을 확인하고 탭을 바꾼다 → 패널이 내용에 맞게 짧고, 선택 탭은 청록 배경·남색 글자이며 점수는 Orbitron, 닫기는 외곽선 버튼이어야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 3D 행성은 `320×320` 투명 `SubViewport`에서 V1 공유 메시·머티리얼로 렌더링하고, 시작 화면이 숨겨질 때 프로세싱과 뷰포트 업데이트를 꺼서 게임 중 비용을 제거함
+  - 공전 천체는 명세의 허용 선택지대로 기존 2D 렌더링을 유지함. PNG·JSON 측정 산출물은 기존 ignore 대상이라 커밋에 포함하지 않음
+  - BLITZ 창 측정 종료 시 기존 계열의 ObjectDB 누수 경고가 시드 101에서 2개, 102에서 4개, 104에서 2개 관측되었으나 종료 코드 0, 입력 유실 0, `SCRIPT ERROR`·`Parse Error` 0건
+- 남은 것 · 질문: 없음
+
+### [2026-10-11] 대상 #67 — 비주얼 V3-2 시작·결과·랭킹·설정 화면
+- 상태: 완료 — 궤도 무대 시작 화면, 모드별 결과 카드, 10줄 랭킹, 소리·색각 문양 설정과 공통 버튼 상태·화면 전환을 구현함
+- 브랜치 / PR: `codex/v3-orbit-stage-screens` / [PR #69](https://github.com/jeongmo-dot/gravity_orb/pull/69)
+- 변경 파일: `assets/ui/{lightning,hourglass,trophy,settings}.svg`, `scenes/UI.tscn`, `scripts/core/{Orb,SaveStore}.gd`, `scripts/spike/Orb3D.gd`, `scripts/ui/{ButtonMotion,DebugHud,GameOverPanel,Hud,OrbitStage,RankingPanel,SettingsPanel,StartScreen}.gd`, `tests/{capture_screens.ps1,run_start_screen_measurement.ps1,test_blitz_manager.gd,test_frontend.gd,test_rankings.gd,test_screen_layout.gd}`, `tests/scenarios/test_score_flow.gd`, `tests/spike/{StartScreenMeasurement.tscn,capture_screens.gd,run_start_screen_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] V2 우주 배경 위에 Orbitron 로고·부제, V1 L4 청록 고리 행성·궤도 타원·L1/L2 공전 천체, BLITZ/CLASSIC 카드와 88px 하단 벡터 버튼 배치 — 자동 배치 검사 + 두 비율 캡처 직접 확인
+  - [x] 모드 카드의 아이콘·설명·쉼표 BEST·`BEST —`·마지막 모드 테두리와 시작→게임 0.25초 전환 구현 — 자동 (`test_start_screen_shows_records_last_mode_and_touch_targets`, `test_mode_buttons_emit_modes_and_direct_launch_skips_start_screen`) + 캡처
+  - [x] 결과 점수 0→최종 0.6초, 점수 뒤 기록 배지, 모드별 2×2 기록, 다시 하기·랭킹·모드 선택, 0.2초 딤과 0.25초 패널 튐 구현 — 자동 (`test_result_panel_rank_messages_buttons_and_ranking_highlight`, `test_game_over_panel_shows_scores_direction_and_restart_button`) + 캡처
+  - [x] 하늘색 BLITZ/CLASSIC 탭, 금·은·동 순위, 쉼표 점수·체인/콤보·날짜, 빈 줄과 방금 기록 맥동을 포함한 10줄 랭킹 구현 — 자동 (`test_ranking_screen_tabs_rows_highlight_and_touch_filters`) + 캡처
+  - [x] 기존 `sfx_muted`와 새 설정 키 `orb_symbols_enabled`을 저장하고, 문양 토글을 현재 게임판·NEXT/THEN·시작 행성에 즉시 반영 — 임시 저장 경로 자동 검사 (`test_settings_symbol_toggle_saves_and_updates_orbit_stage_immediately`)
+  - [x] 버튼 눌림 0.96배·0.08초 밝기, hover/focus 테두리, 랭킹·설정 0.25초 상하 전환, 시작·결과 중복 입력 1회 처리 — 자동 (`test_mode_buttons_emit_modes_and_direct_launch_skips_start_screen`, `test_result_panel_rank_messages_buttons_and_ranking_highlight`)
+  - [x] `540×960`·`540×1170` 안전 영역, 88px 누름 영역, 9,999,999와 랭킹 10줄 비잘림 — 자동 (`test_v3_screen_layout_safe_area_touch_targets_and_extreme_content`) + 캡처
+  - [x] 규칙·수치·물리·게임 중 HUD·V1/V2 그림·V4 이펙트를 변경하지 않고 기존 물리 해시 유지 — 전체 회귀 + 상태 해시
+- 캡처 관측 (Standard/Compatibility):
+  - `tests/capture_screens.ps1` → 종료 코드 0, `540×960` 20장 + `540×1170` 20장 = `40장`
+  - 요구 장면 `01_start_screen`, `04_turn_game_over`, `09_blitz_result`, `10_ranking_blitz`, `11_result_new_record`, `19_settings`, `20_start_no_record`를 두 비율에서 직접 확인함. 시작 화면은 불투명 보드 없이 성운·별이 보이고 궤도 무대와 두 카드가 분리됨; 결과의 9,999,999·2×2 기록·세 버튼, 랭킹 10줄, 설정 두 토글, `BEST —`가 잘림·겹침 없이 표시됨
+  - 보드 투영은 두 비율 모두 `left=13.276, right=526.724, width=513.448`, 비율 간 차이 `0.000px`; 기존 우주 대비·중력 벽 빛 화소 검사도 모두 통과
+- 성능 관측 (RTX 4070 Ti SUPER, Compatibility, VSync 끔, 164.836Hz):
+  - 시작 화면 정지 5초: 표본 `4,116`, 프레임 p99/최대 `1.722/3.648ms` (`p99 < 16.7ms`)
+  - BLITZ 시드 101~104: 프레임 `12,649`, p50/p95/p99/최대 `2.194/3.781/5.932/11.222ms`, `>16.7ms` 0, `>33.3ms` 0; 드로콜 p50/p95/최대 `403/429/453`
+  - BLITZ 입력 `120/120`, 유실 `0`; 입력 수락 p95/최대 `15.931/42.966ms`, 수락→생성 p95/최대 `2.941/7.212ms`; 최대 생성 묶음 `8`
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - `tests/run_tests.ps1` 최종 실행 → 일반 `275/275`(`18.611초`), 장기 `5/5`(`50.379초`), 성능 `5/5`(`2.788초`), 합계 `285/285`, 종료 코드 0, 총 `71.779초`
+  - 물리 상태 해시: TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`; #66과 동일
+  - 시작 화면 / TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 전역 난수 호출 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. `tests/capture_screens.ps1` 실행 후 두 비율의 `01`·`20`을 확인 → 성운·별 위 고리 행성과 공전 천체가 움직이고, BLITZ/CLASSIC 카드·BEST·하단 세 아이콘이 안전 영역 안에 있어야 한다.
+  2. BLITZ와 CLASSIC을 각각 선택하고 게임을 종료한다 → 시작 화면은 0.25초 안에 한 번만 닫히고, 결과 점수는 0.6초에 걸쳐 오르며 완료 뒤 기록 배지가 튀고 모드별 2×2 기록이 달라야 한다.
+  3. 결과에서 랭킹을 열고 탭을 바꾼다 → 아래에서 0.25초에 올라오며 10줄·빈 줄·방금 기록 테두리/맥동이 보여야 한다. 닫으면 반대로 내려가야 한다.
+  4. 시작 화면 설정에서 `색각 문양`을 켜고 닫은 뒤 게임을 시작한다 → 시작 행성·게임판·NEXT/THEN 문양이 즉시 보이고 재실행 뒤에도 유지되어야 한다. 소리 토글도 기존 M키·상단 소리 버튼과 같은 상태여야 한다.
+  5. 마우스·키보드·패드로 카드와 버튼을 hover/focus/press한다 → 테두리가 밝아지고 누르는 동안 0.96배가 되며, 빠르게 두 번 눌러도 게임 시작·재시작은 한 번만 처리되어야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 시작 화면에서는 V2 성운·별을 가리지 않도록 게임판 보드 노드만 숨기고, 모드를 선택하면 즉시 다시 표시함. 구슬·배경·보드 리소스 자체는 변경하지 않음
+  - 새 아이콘은 외부 에셋 없이 저장소 SVG로 작성했고, PNG·JSON 측정 산출물은 기존 ignore 대상이라 커밋에 포함하지 않음
+  - BLITZ 창 측정 시 시드 104 종료 뒤 기존 계열의 `ObjectDB instances leaked at exit (2 instances)` 경고 1회가 있었으나 종합 종료 코드 0, 입력 유실 0, `SCRIPT ERROR`·`Parse Error` 0건
+- 남은 것 · 질문: 없음
+
 ### [2026-10-11] 대상 #66 추가 요구 2 — Orbitron 실제 굵기·실측 숫자 맞춤
 - 상태: 완료 — 문자열로 직렬화되어 무시되던 Orbitron `wght` 키를 TextServer 숫자 태그로 교체해 500/700 윤곽을 분리하고, SCORE/BEST 숫자를 실제 글꼴 폭으로 맞추며 BEST 제목을 SCORE와 같은 22px로 정리함
 - 브랜치 / PR: `v3-font-theme-hud` / [PR #68](https://github.com/jeongmo-dot/gravity_orb/pull/68)

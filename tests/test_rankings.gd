@@ -248,10 +248,11 @@ func test_ranking_screen_tabs_rows_highlight_and_touch_filters() -> void:
 	var start: StartScreen = ui.start_screen()
 	var ranking: RankingPanel = ui.ranking_panel()
 	var start_button: Button = start.get_node("Content/StartRankingButton") as Button
-	assert_true(start_button.size.y >= 120.0, "start ranking touch target")
+	assert_true(start_button.size.y >= 88.0, "start ranking touch target")
 	assert_eq(start_button.mouse_filter, Control.MOUSE_FILTER_STOP, "ranking button consumes pointer")
-	assert_eq(ranking.mouse_filter, Control.MOUSE_FILTER_IGNORE, "ranking background passes pointer")
+	assert_eq(ranking.mouse_filter, Control.MOUSE_FILTER_STOP, "ranking modal blocks play input")
 	start_button.pressed.emit()
+	await tree.create_timer(0.30).timeout
 	assert_true(ranking.visible, "start ranking button opens panel")
 	assert_eq(ranking.current_mode(), GameConfig.GameMode.BLITZ, "last selected mode opens first")
 	var first_rank: Label = ranking.get_node(
@@ -269,6 +270,7 @@ func test_ranking_screen_tabs_rows_highlight_and_touch_filters() -> void:
 	_assert_ranking_columns_align(ranking)
 	_assert_mode_selection_styles_match(start, ranking)
 	ui.show_ranking(GameConfig.GameMode.BLITZ, 4)
+	await tree.create_timer(0.30).timeout
 	assert_eq(ranking.highlighted_rank(), 4, "latest ranked row is highlighted")
 	assert_true(
 		fourth_row.get_theme_stylebox("panel") == ranking.highlight_style,
@@ -289,6 +291,7 @@ func test_ranking_screen_tabs_rows_highlight_and_touch_filters() -> void:
 	var close_button: Button = ranking.get_node("Panel/Content/RankingCloseButton") as Button
 	assert_true(close_button.size.y >= 120.0, "close touch target")
 	close_button.pressed.emit()
+	await tree.create_timer(0.30).timeout
 	assert_true(start.visible, "close returns to previous start screen")
 	await _cleanup_main(main)
 	Config.data.game_mode = original_mode
@@ -305,15 +308,28 @@ func test_result_panel_rank_messages_buttons_and_ranking_highlight() -> void:
 	var manager: BlitzManager = main.get_node("BlitzManager") as BlitzManager
 	manager.set_physics_process(false)
 	var panel: GameOverPanel = main.get_node("UI/Hud/GameOverPanel") as GameOverPanel
-	var rank_label: Label = panel.get_node("Margin/Content/RankingResultLabel") as Label
+	var rank_badge: PanelContainer = panel.get_node("Margin/Content/RankingResultBadge") as PanelContainer
+	var rank_label: Label = rank_badge.get_node("RankingResultLabel") as Label
 	var ranking_button: Button = panel.get_node("Margin/Content/ResultRankingButton") as Button
+	var blast_label: Label = panel.get_node("Margin/Content/GameOverBlocked") as Label
+	var survived_value: Label = panel.get_node("Margin/Content/SurvivedTimeValue") as Label
 	manager.game_over_details = {"ranking": {"rank": 1, "record": {}}}
 	manager.game_over.emit()
+	await tree.create_timer(0.30).timeout
 	assert_eq(rank_label.text, "최고 기록!", "first place message")
 	assert_true(rank_label.visible, "ranked result message visible")
+	assert_true(rank_badge.visible, "ranked result uses a visible badge panel")
+	var badge_style: StyleBoxFlat = rank_badge.get_theme_stylebox("panel") as StyleBoxFlat
+	assert_true(badge_style.border_color.is_equal_approx(Color("#FFB020")), "rank badge is amber")
+	assert_eq(blast_label.text, "대폭발", "BLITZ result uses the game term 대폭발")
+	assert_true(
+		survived_value.get_theme_color("font_color").is_equal_approx(Color("#30D16F")),
+		"only BLITZ survived time value is green"
+	)
 	manager.game_over_details = {"ranking": {"rank": 4, "record": {}}}
 	manager.game_over.emit()
-	assert_eq(rank_label.text, "새 기록! 4위", "non-first ranked message")
+	await tree.create_timer(0.30).timeout
+	assert_eq(rank_label.text, "새 기록 · 4위", "non-first ranked message")
 	assert_true(ranking_button.size.y >= 120.0, "result ranking touch target")
 	assert_eq(ranking_button.mouse_filter, Control.MOUSE_FILTER_STOP, "result ranking consumes pointer")
 	ranking_button.pressed.emit()
@@ -322,6 +338,7 @@ func test_result_panel_rank_messages_buttons_and_ranking_highlight() -> void:
 	assert_eq(ranking.current_mode(), GameConfig.GameMode.BLITZ, "result opens matching mode")
 	assert_eq(ranking.highlighted_rank(), 4, "result opens latest rank highlight")
 	(ranking.get_node("Panel/Content/RankingCloseButton") as Button).pressed.emit()
+	await tree.create_timer(0.30).timeout
 	assert_true(panel.visible, "close returns to result panel")
 	manager.game_over_details = {"ranking": {"rank": 0, "record": {}}}
 	manager.game_over.emit()
@@ -385,15 +402,20 @@ func _assert_mode_selection_styles_match(
 	assert_true(ranking_selected.button_pressed, "ranking selected tab is pressed")
 	assert_true(not start_unselected.button_pressed, "start other mode is unselected")
 	assert_true(not ranking_unselected.button_pressed, "ranking other tab is unselected")
-	assert_eq(
-		start_selected.get_theme_color("font_pressed_color"),
-		ranking_selected.get_theme_color("font_pressed_color"),
-		"selected mode text color is shared"
+	assert_true(
+		start_selected.get_theme_color("font_pressed_color")
+		!= ranking_selected.get_theme_color("font_pressed_color"),
+		"BLITZ card keeps amber while ranking tab uses cyan"
 	)
-	assert_eq(
-		start_unselected.get_theme_color("font_color"),
-		ranking_unselected.get_theme_color("font_color"),
-		"unselected mode text color is shared"
+	var start_blitz_name: Label = start.get_node("Content/BlitzNameLabel") as Label
+	var start_classic_name: Label = start.get_node("Content/ClassicNameLabel") as Label
+	assert_true(
+		start_blitz_name.get_theme_color("font_color").is_equal_approx(Color("#FFB020")),
+		"BLITZ name remains amber"
+	)
+	assert_true(
+		start_classic_name.get_theme_color("font_color").is_equal_approx(Color("#BFE9FF")),
+		"unselected CLASSIC name remains cyan instead of looking disabled"
 	)
 	var selected_style: StyleBoxFlat = start_selected.get_theme_stylebox(
 		"pressed"
@@ -407,10 +429,9 @@ func _assert_mode_selection_styles_match(
 	var ranking_unselected_style: StyleBoxFlat = ranking_unselected.get_theme_stylebox(
 		"normal"
 	) as StyleBoxFlat
-	assert_eq(
-		selected_style.bg_color,
-		ranking_selected_style.bg_color,
-		"selected mode background is shared"
+	assert_true(
+		selected_style.bg_color != ranking_selected_style.bg_color,
+		"BLITZ card and ranking tab use mode-specific backgrounds"
 	)
 	assert_eq(
 		unselected_style.bg_color,
@@ -421,10 +442,17 @@ func _assert_mode_selection_styles_match(
 		selected_style.bg_color.get_luminance() > unselected_style.bg_color.get_luminance(),
 		"selected background is brighter"
 	)
-	assert_eq(
-		start_selected.get_theme_color("font_pressed_color"),
-		Color(1.0, 0.85, 0.35, 1.0),
-		"selected text is yellow"
+	assert_true(
+		start_selected.get_theme_color("font_pressed_color").is_equal_approx(
+			Color("#FFB020")
+		),
+		"BLITZ selected text is amber"
+	)
+	assert_true(
+		ranking_selected.get_theme_color("font_pressed_color").is_equal_approx(
+			Color(0.015, 0.05, 0.09, 1.0)
+		),
+		"ranking selected text is navy on cyan fill"
 	)
 
 

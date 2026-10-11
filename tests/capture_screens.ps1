@@ -9,7 +9,7 @@ $repoPath = Split-Path -Parent $PSScriptRoot
 $outputRoot = Join-Path $repoPath "artifacts\screens"
 $captureSpecs = @(
     [ordered]@{ Name = "540x960"; Resolution = "540x960"; HudOnly = $false },
-    [ordered]@{ Name = "540x1170"; Resolution = "540x1170"; HudOnly = $true }
+    [ordered]@{ Name = "540x1170"; Resolution = "540x1170"; HudOnly = $false }
 )
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {
     if (-not [string]::IsNullOrWhiteSpace($env:GODOT)) {
@@ -39,7 +39,11 @@ $expectedFiles = @(
     "15_orb_closeup.png",
     "16_gravity_switch.png",
     "17_board_danger.png",
-    "18_board_blocked.png"
+    "18_board_blocked.png",
+    "19_settings.png",
+    "20_start_no_record.png",
+    "21_start_screen_t2_5.png",
+    "22_start_screen_t5_0.png"
 )
 $hudExpectedFiles = @(
     "02_turn_early.png",
