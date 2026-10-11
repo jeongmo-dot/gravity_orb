@@ -190,6 +190,11 @@ float ellipse_mask(vec2 p, vec2 center, vec2 radii, float softness) {
 	return 1.0 - smoothstep(1.0 - softness, 1.0 + softness, distance_value);
 }
 
+float ellipse_ring(vec2 p, vec2 center, vec2 radii, float thickness) {
+	float normalized_distance = length((p - center) / radii);
+	return 1.0 - smoothstep(thickness, thickness * 1.8, abs(normalized_distance - 1.0));
+}
+
 void vertex() {
 	local_surface_position = normalize(VERTEX);
 	if (UV.x < 1.5 && level_id == 1) {
@@ -289,9 +294,11 @@ void fragment() {
 			float boiling_a = value_noise3(body_position * 11.0 + vec3(TIME * 0.09, -TIME * 0.07, TIME * 0.04));
 			float boiling_b = value_noise3(body_position * 23.0 + vec3(-TIME * 0.05, TIME * 0.08, 4.7));
 			float granules = smoothstep(0.38, 0.72, boiling_a * 0.65 + boiling_b * 0.35);
-			float edge_darkening = 0.58 + 0.42 * smoothstep(0.02, 0.88, facing);
-			surface = mix(base * 0.72, mix(base * 1.20, vec3(1.0), 0.20), granules) * edge_darkening;
-			emission_energy = 0.25 + granules * 0.08;
+			float rice_cells = smoothstep(0.56, 0.70, boiling_b) * (1.0 - smoothstep(0.76, 0.88, boiling_b));
+			float edge_darkening = 0.70 + 0.30 * smoothstep(0.02, 0.88, facing);
+			surface = mix(base * 0.88, mix(base * 1.36, vec3(1.0), 0.38), granules) * edge_darkening;
+			surface = mix(surface, vec3(1.0), rice_cells * 0.44);
+			emission_energy = 0.50 + granules * 0.16 + rice_cells * 0.12;
 			roughness_value = 0.18;
 		}
 		if (level_id <= 5) {
@@ -328,9 +335,9 @@ void fragment() {
 				alpha = max(halo * 0.66, rays * 0.74) * twinkle;
 				energy = 0.58;
 			} else {
-				float prominence_a = ellipse_mask(p, vec2(-0.37, -0.27), vec2(0.10, 0.065), 0.20);
-				float prominence_b = ellipse_mask(p, vec2(0.40, -0.16), vec2(0.085, 0.12), 0.20);
-				float prominence_c = ellipse_mask(p, vec2(0.10, 0.43), vec2(0.12, 0.075), 0.20);
+				float prominence_a = ellipse_ring(p, vec2(-0.38, -0.25), vec2(0.13, 0.085), 0.14);
+				float prominence_b = ellipse_ring(p, vec2(0.39, -0.14), vec2(0.10, 0.15), 0.14);
+				float prominence_c = ellipse_ring(p, vec2(0.08, 0.42), vec2(0.15, 0.095), 0.14);
 				float prominences = max(prominence_a, max(prominence_b, prominence_c));
 				alpha = max(halo * 0.82, prominences * 0.84) * twinkle;
 				energy = 0.72;
@@ -344,7 +351,8 @@ void fragment() {
 		float alpha = 0.0;
 		float energy = 0.0;
 		if (level_id == 4 || level_id == 5) {
-			float distance_to_edge = abs(radial - body_ratio);
+			float rim_center = body_ratio - (level_id == 5 ? 0.025 : 0.0);
+			float distance_to_edge = abs(radial - rim_center);
 			alpha = (1.0 - smoothstep(0.018, 0.090, distance_to_edge)) * 0.72;
 			energy = 0.46;
 		} else if (level_id == 6 || level_id == 7) {
