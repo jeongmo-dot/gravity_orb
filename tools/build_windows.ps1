@@ -34,7 +34,29 @@ function Resolve-GodotExecutable {
     return $command.Source
 }
 
+function Get-ProjectVersion {
+    param([string]$ProjectFile)
+
+    $inApplicationSection = $false
+    foreach ($line in Get-Content -LiteralPath $ProjectFile) {
+        if ($line -match '^\s*\[([^]]+)\]\s*$') {
+            $inApplicationSection = $Matches[1] -eq "application"
+            continue
+        }
+        if ($inApplicationSection -and
+            $line -match '^\s*config/version\s*=\s*"([^"]+)"\s*$') {
+            return $Matches[1]
+        }
+    }
+    throw "application/config/version is missing from $ProjectFile"
+}
+
 $GodotPath = Resolve-GodotExecutable -RequestedPath $GodotPath
+$projectFile = Join-Path $repoPath "project.godot"
+$projectVersion = Get-ProjectVersion -ProjectFile $projectFile
+if ($projectVersion -notmatch '^\d+\.\d+\.\d+$') {
+    throw "application/config/version must use MAJOR.MINOR.PATCH: $projectVersion"
+}
 $engineVersionLines = @(& $GodotPath --version)
 if ($LASTEXITCODE -ne 0 -or $engineVersionLines.Count -eq 0) {
     throw "Could not read the Godot version from $GodotPath"
@@ -67,14 +89,29 @@ $expectedPrefix = $buildRoot.TrimEnd('\') + '\'
 if (-not $outputDirectory.StartsWith($expectedPrefix, [StringComparison]::OrdinalIgnoreCase)) {
     throw "Refusing to clean unexpected output directory: $outputDirectory"
 }
-if (Test-Path -LiteralPath $outputDirectory) {
-    Remove-Item -LiteralPath $outputDirectory -Recurse -Force
-}
 New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
 
-$outputExecutable = Join-Path $outputDirectory "GravityOrb.exe"
-$consoleWrapper = Join-Path $outputDirectory "GravityOrb.console.exe"
-$sidecarPck = Join-Path $outputDirectory "GravityOrb.pck"
+$artifactStem = "GravityOrb_v$projectVersion"
+$outputExecutable = Join-Path $outputDirectory "$artifactStem.exe"
+$consoleWrapper = Join-Path $outputDirectory "$artifactStem.console.exe"
+$sidecarPck = Join-Path $outputDirectory "$artifactStem.pck"
+$buildInfoPath = Join-Path $outputDirectory "${artifactStem}_BUILD.txt"
+$sameVersionPaths = @(
+    $outputExecutable
+    $consoleWrapper
+    $sidecarPck
+    $buildInfoPath
+)
+$legacyPaths = @(
+    (Join-Path $outputDirectory "GravityOrb.exe")
+    (Join-Path $outputDirectory "GravityOrb.console.exe")
+    (Join-Path $outputDirectory "BUILD.txt")
+)
+foreach ($stalePath in @($sameVersionPaths + $legacyPaths)) {
+    if (Test-Path -LiteralPath $stalePath -PathType Leaf) {
+        Remove-Item -LiteralPath $stalePath -Force
+    }
+}
 $previousErrorActionPreference = $ErrorActionPreference
 try {
     $ErrorActionPreference = "Continue"
@@ -100,8 +137,8 @@ $commitHash = (& git -C $repoPath rev-parse HEAD | Out-String).Trim()
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($commitHash)) {
     throw "Could not read the Git commit hash for $repoPath"
 }
-$buildInfoPath = Join-Path $outputDirectory "BUILD.txt"
 $buildInfo = @(
+    "Version: $projectVersion"
     "Commit: $commitHash"
     "BuiltUtc: $([DateTime]::UtcNow.ToString('o'))"
     "Engine: $engineVersion"
@@ -111,7 +148,8 @@ Set-Content -LiteralPath $buildInfoPath -Value $buildInfo -Encoding UTF8
 
 $executableSize = (Get-Item -LiteralPath $outputExecutable).Length
 Write-Output (
-    "WINDOWS_BUILD_RESULT mode={0} exit=0 bytes={1} exe={2} wrapper={3} build_info={4}" -f `
+    "WINDOWS_BUILD_RESULT version={0} mode={1} exit=0 bytes={2} exe={3} wrapper={4} build_info={5}" -f `
+        $projectVersion,
         $modeName,
         $executableSize,
         $outputExecutable,
