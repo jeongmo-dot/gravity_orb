@@ -47,6 +47,8 @@ const CAPTURE_FILES: Array[String] = [
 	"18_board_blocked.png",
 	"19_settings.png",
 	"20_start_no_record.png",
+	"21_start_screen_t2_5.png",
+	"22_start_screen_t5_0.png",
 ]
 const HUD_CAPTURE_FILES: Array[String] = [
 	"02_turn_early.png",
@@ -127,6 +129,10 @@ func _capture_start_screen() -> void:
 	SaveStore.save_last_mode(_temp_save_path, GameConfig.GameMode.BLITZ)
 	main = await _create_main(Main.NO_MODE)
 	await _capture("01_start_screen.png")
+	await get_tree().create_timer(2.5).timeout
+	await _capture("21_start_screen_t2_5.png")
+	await get_tree().create_timer(2.5).timeout
+	await _capture("22_start_screen_t5_0.png")
 	await _destroy_main(main)
 	_remove_file(_temp_save_path)
 

@@ -2,13 +2,21 @@ class_name OrbitStage
 extends Control
 
 const HERO_LEVEL: int = 4
-const HERO_RADIUS: float = 118.0
+const HERO_RADIUS: float = 177.0
 const HERO_DIAMETER: float = HERO_RADIUS * 2.0
 const HERO_ROTATION_SECONDS: float = 20.0
 const ORBIT_SECONDS: float = 12.0
 const ORBIT_COLOR: Color = Color(0.27, 0.91, 1.0, 0.38)
 const HERO_VIEWPORT_SIZE: int = 320
 const HERO_CAMERA_SIZE: float = 1.8
+const OUTER_ORBIT_RADII: Vector2 = Vector2(420.0, 168.0)
+const INNER_ORBIT_RADII: Vector2 = Vector2(309.0, 129.0)
+const OUTER_ORBIT_ROTATION: float = -0.14
+const INNER_ORBIT_ROTATION: float = 0.22
+const OUTER_ORBITER_RADIUS: float = 24.0
+const INNER_ORBITER_RADIUS: float = 34.0
+const ORBIT_SAMPLE_COUNT: int = 64
+const RING_MINOR_TO_MAJOR_RATIO: float = 0.135 / 0.49
 
 var _hero_viewport: SubViewport
 var _hero_texture: TextureRect
@@ -23,10 +31,11 @@ var _elapsed: float = 0.0
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_create_shader_hero()
-	_orbiter_one = _create_orb(1, 24.0, OrbTypes.OrbColor.BLUE)
-	_orbiter_two = _create_orb(2, 34.0, OrbTypes.OrbColor.PURPLE)
+	_orbiter_one = _create_orb(1, OUTER_ORBITER_RADIUS, OrbTypes.OrbColor.BLUE)
+	_orbiter_two = _create_orb(2, INNER_ORBITER_RADIUS, OrbTypes.OrbColor.PURPLE)
 	visibility_changed.connect(_sync_render_activity)
 	_sync_render_activity()
+	_apply_animation_pose()
 	queue_redraw()
 
 
@@ -38,31 +47,55 @@ func set_symbols_enabled(enabled: bool) -> void:
 			visual.set_symbols_enabled(enabled)
 
 
+func set_animation_elapsed(seconds: float) -> void:
+	_elapsed = maxf(seconds, 0.0)
+	_apply_animation_pose()
+	queue_redraw()
+
+
 func _process(delta: float) -> void:
 	_elapsed += delta
+	_apply_animation_pose()
+	queue_redraw()
+
+
+func _apply_animation_pose() -> void:
 	var center: Vector2 = size * 0.5
 	_hero_texture.position = center - Vector2.ONE * HERO_RADIUS
 	_hero_texture.size = Vector2.ONE * HERO_DIAMETER
-	_hero_mesh.rotation.z = TAU * _elapsed / HERO_ROTATION_SECONDS
-	_orbiter_one.position = center + Vector2(245.0, 0.0).rotated(
+	var polar_alignment: Quaternion = Quaternion(Vector3.UP, hero_rotation_axis())
+	var polar_spin: Quaternion = Quaternion(
+		Vector3.UP,
+		TAU * _elapsed / HERO_ROTATION_SECONDS
+	)
+	_hero_mesh.quaternion = polar_alignment * polar_spin
+	_orbiter_one.position = orbiter_center_for_phase(
+		0,
+		center,
 		TAU * _elapsed / ORBIT_SECONDS
 	)
-	_orbiter_two.position = center + Vector2(0.0, 142.0).rotated(
+	_orbiter_two.position = orbiter_center_for_phase(
+		1,
+		center,
 		-TAU * _elapsed / (ORBIT_SECONDS * 1.08)
 	)
-	queue_redraw()
 
 
 func _draw() -> void:
 	var center: Vector2 = size * 0.5
-	_draw_orbit(center, Vector2(280.0, 112.0), -0.14, ORBIT_COLOR)
-	_draw_orbit(center, Vector2(206.0, 86.0), 0.22, Color(0.27, 0.91, 1.0, 0.28))
+	_draw_orbit(center, OUTER_ORBIT_RADII, OUTER_ORBIT_ROTATION, ORBIT_COLOR)
+	_draw_orbit(
+		center,
+		INNER_ORBIT_RADII,
+		INNER_ORBIT_ROTATION,
+		Color(0.27, 0.91, 1.0, 0.28)
+	)
 
 
 func _draw_orbit(center: Vector2, radii: Vector2, rotation_angle: float, color: Color) -> void:
 	var points: PackedVector2Array = PackedVector2Array()
-	for index: int in range(65):
-		var angle: float = TAU * float(index) / 64.0
+	for index: int in range(ORBIT_SAMPLE_COUNT + 1):
+		var angle: float = TAU * float(index) / float(ORBIT_SAMPLE_COUNT)
 		points.append(
 			center + Vector2(cos(angle) * radii.x, sin(angle) * radii.y).rotated(
 				rotation_angle
@@ -82,6 +115,57 @@ func hero_rect() -> Rect2:
 	if _hero_texture == null:
 		return Rect2()
 	return Rect2(_hero_texture.position, _hero_texture.size)
+
+
+static func hero_rotation_axis() -> Vector3:
+	var projected_length: float = sqrt(
+		1.0 - RING_MINOR_TO_MAJOR_RATIO * RING_MINOR_TO_MAJOR_RATIO
+	)
+	return Vector3(
+		-sin(CelestialOrbArt.RING_TILT_RADIANS) * projected_length,
+		cos(CelestialOrbArt.RING_TILT_RADIANS) * projected_length,
+		RING_MINOR_TO_MAJOR_RATIO
+	).normalized()
+
+
+static func hero_body_diameter() -> float:
+	var body_radius_m: float = (
+		Config.data.radius_for_level(HERO_LEVEL)
+		/ Orb3D.PIXELS_PER_METER
+		* CelestialOrbArt.body_radius_ratio(HERO_LEVEL)
+	)
+	return HERO_DIAMETER * body_radius_m * 2.0 / HERO_CAMERA_SIZE
+
+
+static func orbiter_center_for_phase(index: int, center: Vector2, phase: float) -> Vector2:
+	var radii: Vector2 = OUTER_ORBIT_RADII if index == 0 else INNER_ORBIT_RADII
+	var rotation_angle: float = (
+		OUTER_ORBIT_ROTATION if index == 0 else INNER_ORBIT_ROTATION
+	)
+	return center + Vector2(cos(phase) * radii.x, sin(phase) * radii.y).rotated(
+		rotation_angle
+	)
+
+
+static func orbiter_radius(index: int) -> float:
+	return OUTER_ORBITER_RADIUS if index == 0 else INNER_ORBITER_RADIUS
+
+
+static func orbiters_sweep_rect(center: Vector2) -> Rect2:
+	var minimum: Vector2 = Vector2(INF, INF)
+	var maximum: Vector2 = Vector2(-INF, -INF)
+	for orbiter_index: int in range(2):
+		var radius: float = orbiter_radius(orbiter_index)
+		for sample_index: int in range(ORBIT_SAMPLE_COUNT):
+			var phase: float = TAU * float(sample_index) / float(ORBIT_SAMPLE_COUNT)
+			var orbiter_center: Vector2 = orbiter_center_for_phase(
+				orbiter_index,
+				center,
+				phase
+			)
+			minimum = minimum.min(orbiter_center - Vector2.ONE * radius)
+			maximum = maximum.max(orbiter_center + Vector2.ONE * radius)
+	return Rect2(minimum, maximum - minimum)
 
 
 func _sync_render_activity() -> void:

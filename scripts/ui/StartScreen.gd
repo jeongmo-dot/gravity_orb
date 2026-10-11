@@ -99,32 +99,35 @@ static func layout_for_viewport(viewport_size: Vector2) -> Dictionary:
 	var side: float = 72.0 * scale_factor
 	var gap: float = 28.0 * scale_factor
 	var card_width: float = (width - side * 2.0 - gap) * 0.5
-	var card_y: float = 845.0 * scale_factor + extra_height * 0.48
+	var card_y: float = 975.0 * scale_factor + extra_height * 0.48
 	var card_height: float = 480.0 * scale_factor
-	var bottom_y: float = 1420.0 * scale_factor + extra_height * 0.76
+	var bottom_y: float = 1550.0 * scale_factor + extra_height * 0.76
 	var icon_size: float = 112.0 * scale_factor
 	var orbit_rect: Rect2 = Rect2(
 		0.0,
-		130.0 * scale_factor + extra_height * 0.10,
+		185.0 * scale_factor + extra_height * 0.15,
 		width,
-		345.0 * scale_factor
+		450.0 * scale_factor
 	)
 	var hero_size: float = OrbitStage.HERO_DIAMETER * scale_factor
 	var hero_rect: Rect2 = Rect2(
 		orbit_rect.get_center() - Vector2.ONE * hero_size * 0.5,
 		Vector2.ONE * hero_size
 	)
+	var unscaled_sweep: Rect2 = OrbitStage.orbiters_sweep_rect(Vector2.ZERO)
+	var orbiter_sweep: Rect2 = Rect2(
+		orbit_rect.get_center() + unscaled_sweep.position * scale_factor,
+		unscaled_sweep.size * scale_factor
+	)
 	var card_icon_size: float = 100.0 * scale_factor
 	return {
 		"orbit": orbit_rect,
 		"hero": hero_rect,
-		"orbiter_sweep": Rect2(
-			orbit_rect.get_center() - Vector2(280.0, 146.0) * scale_factor,
-			Vector2(560.0, 292.0) * scale_factor
-		),
-		"gravity": Rect2(side, 500.0 * scale_factor + extra_height * 0.18, width - side * 2.0, 92.0 * scale_factor),
-		"orb": Rect2(side, 600.0 * scale_factor + extra_height * 0.18, width - side * 2.0, 92.0 * scale_factor),
-		"subtitle": Rect2(side, 700.0 * scale_factor + extra_height * 0.18, width - side * 2.0, 52.0 * scale_factor),
+		"hero_body_diameter": OrbitStage.hero_body_diameter() * scale_factor,
+		"orbiter_sweep": orbiter_sweep,
+		"gravity": Rect2(side, 630.0 * scale_factor + extra_height * 0.18, width - side * 2.0, 92.0 * scale_factor),
+		"orb": Rect2(side, 730.0 * scale_factor + extra_height * 0.18, width - side * 2.0, 92.0 * scale_factor),
+		"subtitle": Rect2(side, 830.0 * scale_factor + extra_height * 0.18, width - side * 2.0, 52.0 * scale_factor),
 		"blitz": Rect2(side, card_y, card_width, card_height),
 		"classic": Rect2(side + card_width + gap, card_y, card_width, card_height),
 		"blitz_icon": Rect2(side + (card_width - card_icon_size) * 0.5, card_y + 42.0 * scale_factor, card_icon_size, card_icon_size),

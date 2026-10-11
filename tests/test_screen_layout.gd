@@ -53,6 +53,13 @@ func test_v3_screen_layout_safe_area_touch_targets_and_extreme_content() -> void
 		var hero_rect: Rect2 = layout["hero"] as Rect2
 		var orbit_sweep: Rect2 = layout["orbiter_sweep"] as Rect2
 		var gravity_rect: Rect2 = layout["gravity"] as Rect2
+		var screen_scale: float = logical.x / 1080.0
+		var hero_body_diameter: float = float(layout["hero_body_diameter"])
+		assert_true(
+			hero_body_diameter / logical.x >= 0.20
+			and hero_body_diameter / logical.x <= 0.22,
+			"%dx%d hero body is 20-22 percent of screen width" % [output.x, output.y]
+		)
 		assert_true(
 			hero_rect.end.y + 16.0 <= gravity_rect.position.y,
 			"%dx%d hero stays at least 16 logical pixels above logo" % [output.x, output.y]
@@ -61,6 +68,40 @@ func test_v3_screen_layout_safe_area_touch_targets_and_extreme_content() -> void
 			orbit_sweep.end.y <= gravity_rect.position.y,
 			"%dx%d orbiters stay behind and clear of logo for a full orbit" % [output.x, output.y]
 		)
+		for orbiter_index: int in range(2):
+			var orbiter_radius: float = OrbitStage.orbiter_radius(orbiter_index) * screen_scale
+			for sample_index: int in range(OrbitStage.ORBIT_SAMPLE_COUNT):
+				var phase: float = (
+					TAU * float(sample_index) / float(OrbitStage.ORBIT_SAMPLE_COUNT)
+				)
+				var relative_center: Vector2 = OrbitStage.orbiter_center_for_phase(
+					orbiter_index,
+					Vector2.ZERO,
+					phase
+				) * screen_scale
+				var orbiter_center: Vector2 = (layout["orbit"] as Rect2).get_center() + relative_center
+				var orbiter_rect: Rect2 = Rect2(
+					orbiter_center - Vector2.ONE * orbiter_radius,
+					Vector2.ONE * orbiter_radius * 2.0
+				)
+				assert_true(
+					orbiter_rect.end.y + 16.0 <= gravity_rect.position.y,
+					"%dx%d orbiter %d sample %d stays 16px above logo" % [
+						output.x,
+						output.y,
+						orbiter_index,
+						sample_index,
+					]
+				)
+				assert_true(
+					not orbiter_rect.intersects(gravity_rect),
+					"%dx%d orbiter %d sample %d does not overlap logo" % [
+						output.x,
+						output.y,
+						orbiter_index,
+						sample_index,
+					]
+				)
 		var logo_end: float = (layout["subtitle"] as Rect2).end.y
 		var card_top: float = (layout["blitz"] as Rect2).position.y
 		var card_end: float = (layout["blitz"] as Rect2).end.y
@@ -70,6 +111,19 @@ func test_v3_screen_layout_safe_area_touch_targets_and_extreme_content() -> void
 		assert_true(
 			maxf(logo_card_gap, card_icon_gap) / minf(logo_card_gap, card_icon_gap) <= 1.5,
 			"%dx%d start-screen group gaps differ by at most 1.5x" % [output.x, output.y]
+		)
+		var top_margin: float = orbit_sweep.position.y - safe.position.y
+		var bottom_margin: float = safe.end.y - (layout["settings"] as Rect2).end.y
+		assert_true(
+			top_margin > 0.0 and bottom_margin > 0.0,
+			"%dx%d start-screen outer margins stay inside safe area" % [output.x, output.y]
+		)
+		assert_true(
+			maxf(top_margin, bottom_margin) / minf(top_margin, bottom_margin) <= 1.5,
+			"%dx%d start-screen top and bottom margins differ by at most 1.5x" % [
+				output.x,
+				output.y,
+			]
 		)
 		for touch_name: String in ["blitz", "classic", "ranking", "sound", "settings"]:
 			var touch_rect: Rect2 = layout[touch_name] as Rect2
@@ -85,6 +139,25 @@ func test_v3_screen_layout_safe_area_touch_targets_and_extreme_content() -> void
 		var ui: DebugHud = main.get_node("UI") as DebugHud
 		var stage: OrbitStage = ui.start_screen().get_node("Content/OrbitStage") as OrbitStage
 		assert_true(stage.uses_celestial_shader(), "start hero uses V1 celestial shader")
+		stage.set_animation_elapsed(5.0)
+		var hero_mesh: MeshInstance3D = stage.get_node("HeroViewport/HeroBody") as MeshInstance3D
+		var hero_ring: MeshInstance3D = stage.get_node("HeroViewport/HeroRing") as MeshInstance3D
+		var expected_axis: Vector3 = OrbitStage.hero_rotation_axis()
+		var actual_axis: Vector3 = hero_mesh.quaternion * Vector3.UP
+		assert_true(
+			actual_axis.dot(expected_axis) >= 0.999,
+			"hero local polar axis remains aligned to the ring-plane normal while spinning"
+		)
+		assert_true(
+			absf(expected_axis.dot(Vector3.BACK)) < 0.5,
+			"hero polar axis is not the screen z axis"
+		)
+		assert_near(
+			hero_ring.rotation.z,
+			CelestialOrbArt.RING_TILT_RADIANS,
+			0.0001,
+			"ring remains fixed at its designed tilt while the body rotates"
+		)
 		for icon_button_path: String in [
 			"Content/StartRankingButton",
 			"Content/StartSoundButton",
