@@ -6,13 +6,13 @@ const BOARD_SCENE: PackedScene = preload("res://scenes/Board3D.tscn")
 func test_all_levels_keep_celestial_art_inside_collision_radius() -> void:
 	var board: Board3D = await _create_board()
 	var expected_names: Array[String] = [
-		"meteor",
-		"moon",
-		"rocky_planet",
-		"ringed_planet",
-		"gas_giant",
-		"star",
-		"sun",
+		"planet_l1",
+		"planet_l2",
+		"planet_l3",
+		"planet_l4",
+		"planet_l5",
+		"planet_l6",
+		"planet_l7",
 	]
 	for level: int in range(1, Config.data.orb_max_level + 1):
 		var orb: Orb3D = board.spawn_orb(
@@ -26,20 +26,11 @@ func test_all_levels_keep_celestial_art_inside_collision_radius() -> void:
 			orb.mesh_resource().radius <= collision_radius,
 			"L%d body stays inside collision radius" % level
 		)
-		if level == 1:
-			assert_true(
-				CelestialOrbArt.body_radius_ratio(level)
-				* CelestialOrbArt.METEOR_VERTEX_MAX_SCALE <= 1.0,
-				"L1 irregular silhouette maximum stays inside collision radius"
-			)
-			assert_true(
-				CelestialOrbArt.body_radius_ratio(level)
-				* CelestialOrbArt.METEOR_VERTEX_MIN_SCALE >= 0.85,
-				"L1 irregular silhouette minimum remains readable"
-			)
+		var expected_ratio: float = 0.94 if level <= 5 else (0.86 if level == 6 else 0.82)
+		assert_near(CelestialOrbArt.body_radius_ratio(level), expected_ratio, 0.0001, "L%d body ratio" % level)
 		assert_true(
-			orb._adornment.visible == (level == 4 or level >= 6),
-			"L%d camera-fixed ring or halo visibility" % level
+			orb._adornment.visible == (level >= 6),
+			"L%d camera-fixed planet glow visibility" % level
 		)
 		if orb._adornment.visible:
 			assert_true(
@@ -49,7 +40,7 @@ func test_all_levels_keep_celestial_art_inside_collision_radius() -> void:
 	await _cleanup(board)
 
 
-func test_body_shader_uses_seamless_local_3d_patterns() -> void:
+func test_body_shader_uses_six_seamless_planet_patterns() -> void:
 	var board: Board3D = await _create_board()
 	var orb: Orb3D = board.spawn_orb(OrbTypes.OrbColor.BLUE, 5, Vector2.ZERO)
 	var material: ShaderMaterial = orb.visual_material_resource()
@@ -66,47 +57,55 @@ func test_body_shader_uses_seamless_local_3d_patterns() -> void:
 		shader_code.contains("sphere_spot(body_position"),
 		"craters and storms follow the sphere surface"
 	)
+	for color_id: int in range(Config.data.color_display.size()):
+		assert_true(
+			shader_code.contains("color_id == %d" % color_id) or color_id == 5,
+			"planet color %d has a shader branch" % color_id
+		)
 	await _cleanup(board)
 
 
-func test_l7_shader_uses_tapered_drifting_prominence_arcs() -> void:
+func test_l6_l7_shader_uses_deterministic_planet_glow() -> void:
 	var board: Board3D = await _create_board()
 	var orb: Orb3D = board.spawn_orb(OrbTypes.OrbColor.YELLOW, 7, Vector2.ZERO)
 	var shader_code: String = orb.visual_material_resource().shader.code
 	assert_true(
-		shader_code.contains("tapered_ellipse_arc"),
-		"L7 prominences use open tapered arcs"
+		shader_code.contains("uniform float animation_time"),
+		"animated planet patterns use a script-controlled time uniform"
 	)
 	assert_true(
-		shader_code.contains("float slow_drift = TIME * 0.22"),
-		"L7 prominence shape and position drift slowly"
+		not shader_code.contains("TIME"),
+		"planet shader has no nondeterministic engine TIME dependency"
 	)
 	assert_true(
-		not shader_code.contains("prominences * 0.84"),
-		"L7 no longer uses thick opaque handle loops"
+		shader_code.contains("level_id == 7 ? 0.96 : 0.78"),
+		"L7 outline glow is brighter than L6"
 	)
+	CelestialOrbArt.freeze_animation_for_capture()
+	assert_near(
+		float(orb.visual_material_resource().get_shader_parameter("animation_time")),
+		CelestialOrbArt.CAPTURE_ANIMATION_TIME,
+		0.0001,
+		"capture shader time is fixed"
+	)
+	CelestialOrbArt.unfreeze_animation()
 	await _cleanup(board)
 
 
-func test_body_rolls_while_ring_halo_symbol_and_outline_face_camera() -> void:
+func test_body_rolls_while_glow_symbol_and_outline_face_camera() -> void:
 	var board: Board3D = await _create_board()
-	var ringed: Orb3D = board.spawn_orb(OrbTypes.OrbColor.PURPLE, 4, Vector2.ZERO)
-	var body: RigidBody3D = ringed.get_physics_body()
+	var planet: Orb3D = board.spawn_orb(OrbTypes.OrbColor.PURPLE, 4, Vector2.ZERO)
+	var body: RigidBody3D = planet.get_physics_body()
 	body.rotation = Vector3(0.0, 0.0, 1.1)
-	ringed._process(0.0)
-	assert_eq(ringed._mesh.rotation, body.rotation, "body art follows physical roll")
-	assert_near(
-		ringed._adornment.rotation.z,
-		CelestialOrbArt.RING_TILT_RADIANS,
-		0.0001,
-		"L4 ring keeps camera-fixed tilt"
-	)
-	assert_eq(ringed._symbol_mesh.rotation, Vector3.ZERO, "symbol faces camera")
-	assert_eq(ringed._blast_outline.rotation, Vector3.ZERO, "pulse outline faces camera")
+	planet._process(0.0)
+	assert_eq(planet._mesh.rotation, body.rotation, "body art follows physical roll")
+	assert_true(not planet._adornment.visible, "L4 no longer uses a planetary ring adornment")
+	assert_eq(planet._symbol_mesh.rotation, Vector3.ZERO, "symbol faces camera")
+	assert_eq(planet._blast_outline.rotation, Vector3.ZERO, "pulse outline faces camera")
 	var star: Orb3D = board.spawn_orb(OrbTypes.OrbColor.CYAN, 6, Vector2.ZERO)
 	star.get_physics_body().rotation = Vector3(0.0, 0.0, 0.9)
 	star._process(0.0)
-	assert_eq(star._adornment.rotation, Vector3.ZERO, "L6 halo does not roll")
+	assert_eq(star._adornment.rotation, Vector3.ZERO, "L6 planet glow does not roll")
 	await _cleanup(board)
 
 
@@ -194,6 +193,16 @@ func test_visual_layers_preserve_turn_and_blitz_state_hashes() -> void:
 	var blitz_visible: String = await _scripted_state_hash(true, true)
 	assert_eq(turn_visible, turn_hidden, "20-turn celestial visual state hash")
 	assert_eq(blitz_visible, blitz_hidden, "20-second BLITZ celestial visual state hash")
+	assert_eq(
+		turn_visible.sha256_text(),
+		"a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724",
+		"turn state hash remains identical to #74"
+	)
+	assert_eq(
+		blitz_visible.sha256_text(),
+		"92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80",
+		"BLITZ state hash remains identical to #74"
+	)
 	print("CELESTIAL_PHYSICS_HASH turn=%s blitz=%s" % [turn_visible.sha256_text(), blitz_visible.sha256_text()])
 
 

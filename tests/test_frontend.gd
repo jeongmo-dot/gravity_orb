@@ -246,6 +246,18 @@ func test_settings_symbol_toggle_saves_and_updates_orbit_stage_immediately() -> 
 	var stage: OrbitStage = main.get_node("UI/StartScreen/Content/OrbitStage") as OrbitStage
 	var hero_symbol: MeshInstance3D = stage.get_node("HeroViewport/HeroSymbol") as MeshInstance3D
 	assert_true(stage.uses_celestial_shader(), "orbit-stage hero uses CelestialOrbArt shader")
+	assert_eq(OrbitStage.HERO_LEVEL, 5, "start hero uses the L5 Earth detail profile")
+	var hero_body: MeshInstance3D = stage.get_node("HeroViewport/HeroBody") as MeshInstance3D
+	var hero_material: ShaderMaterial = hero_body.material_override as ShaderMaterial
+	assert_eq(
+		int(hero_material.get_shader_parameter("color_id")),
+		OrbTypes.OrbColor.BLUE,
+		"start hero is Earth"
+	)
+	assert_eq(stage._orbiter_one.celestial_level(), 1, "outer orbiter is L1")
+	assert_eq(stage._orbiter_one.symbol_color(), OrbTypes.OrbColor.RED, "outer orbiter is Mars")
+	assert_eq(stage._orbiter_two.celestial_level(), 2, "inner orbiter is L2")
+	assert_eq(stage._orbiter_two.symbol_color(), OrbTypes.OrbColor.CYAN, "inner orbiter is Mercury")
 	assert_true(hero_symbol.visible, "orbit-stage hero initially shows its color symbol")
 	var symbols_button: Button = settings.get_node(
 		"SettingsPanelBody/Margin/Content/SettingsSymbolsToggle"

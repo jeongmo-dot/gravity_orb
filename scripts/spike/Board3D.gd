@@ -81,6 +81,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
+	CelestialOrbArt.advance_animation(delta)
 	if _danger_pulsing:
 		_danger_pulse_elapsed += delta
 	_gravity_visual_elapsed = minf(

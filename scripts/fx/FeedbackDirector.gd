@@ -457,7 +457,16 @@ func _create_birth_feedback(
 		result_radius_m * 0.48,
 		"BirthNova"
 	)
-	if not _color_effect_visuals_enabled():
+	if level >= 7:
+		_create_ring(
+			origin,
+			color_value.lightened(0.34),
+			result_radius_m * 2.5,
+			BIRTH_ACCRETION_DURATION,
+			BIRTH_NOVA_DURATION,
+			result_radius_m
+		)
+	elif not _color_effect_visuals_enabled():
 		_create_ring(
 			origin,
 			Color(0.66, 0.92, 1.0, 1.0),
@@ -466,18 +475,6 @@ func _create_birth_feedback(
 			BIRTH_NOVA_DURATION,
 			result_radius_m
 		)
-	if level >= 7:
-		var prominence_scales: Array[float] = [1.00, 1.08, 1.16]
-		var prominence_angles: Array[float] = [-2.18, -0.08, 1.72]
-		for arc_index: int in range(prominence_scales.size()):
-			_create_prominence(
-				origin,
-				Color.WHITE.lerp(color_value.lightened(0.46), 0.42),
-				result_radius_m * prominence_scales[arc_index],
-				BIRTH_ACCRETION_DURATION,
-				prominence_angles[arc_index],
-				float(arc_index) * 1.73
-			)
 	_start_reaction_shake(4, 0.5)
 
 

@@ -300,7 +300,7 @@ func test_merge_punch_scales_visual_and_emits_stardust_ring() -> void:
 	Config.data.sfx_enabled = original_sfx
 
 
-func test_l6_l7_birth_effects_and_l7_prominences_are_pooled() -> void:
+func test_l6_l7_birth_effects_and_l7_planet_light_ring_are_pooled() -> void:
 	var original_fx: bool = Config.data.fx_enabled
 	var original_hitstop: bool = Config.data.fx_hitstop_enabled
 	var original_sfx: bool = Config.data.sfx_enabled
@@ -317,7 +317,11 @@ func test_l6_l7_birth_effects_and_l7_prominences_are_pooled() -> void:
 			"position": Vector2.ZERO,
 		})
 		assert_eq(director.active_particle_count(), 2, "L%d color+white accretion" % level)
-		assert_eq(director.active_ring_count(), 0, "L%d birth ring is replaced" % level)
+		assert_eq(
+			director.active_ring_count(),
+			1 if level == 7 else 0,
+			"only L7 adds one planet-color birth light ring"
+		)
 		assert_eq(director.active_color_effect_count(), 1, "L%d uses color effect" % level)
 		assert_eq(
 			director.active_color_effects()[0].ring_layer_count(),
@@ -327,32 +331,20 @@ func test_l6_l7_birth_effects_and_l7_prominences_are_pooled() -> void:
 		assert_eq(director.active_glow_count(), 1, "L%d nova" % level)
 		assert_eq(
 			director.active_prominence_count(),
-			3 if level == 7 else 0,
-			"only L7 adds three tapered prominence arcs"
+			0,
+			"planet births no longer use solar prominence arcs"
 		)
 		if level == 7:
-			var arc_scales: Array[float] = []
-			for effect: Dictionary in director._effects:
-				if str(effect.get("kind", "")) == "arc":
-					arc_scales.append(float(effect["base_scale"]))
-			assert_true(
-				arc_scales.max() > arc_scales.min() * 1.10,
-				"L7 prominence arcs use visibly different sizes"
+			var light_ring: MeshInstance3D = (
+				tree.get_nodes_in_group(&"feedback_ring")[0] as MeshInstance3D
 			)
-			var arc_node: MeshInstance3D = (
-				tree.get_nodes_in_group(&"feedback_prominence")[0] as MeshInstance3D
+			var ring_material: StandardMaterial3D = (
+				light_ring.material_override as StandardMaterial3D
 			)
-			var arrays: Array = (arc_node.mesh as ArrayMesh).surface_get_arrays(0)
-			var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array
-			var start_width: float = vertices[0].distance_to(vertices[1])
-			var middle_index: int = (vertices.size() / 4) * 2
-			var middle_width: float = vertices[middle_index].distance_to(
-				vertices[middle_index + 1]
-			)
-			var end_width: float = vertices[-2].distance_to(vertices[-1])
-			assert_true(
-				middle_width > maxf(start_width, end_width) * 5.0,
-				"prominence arc tapers toward both ends"
+			assert_eq(
+				ring_material.emission,
+				Config.data.color_display[OrbTypes.OrbColor.YELLOW].lightened(0.34),
+				"L7 birth ring follows its planet display color"
 			)
 		director.clear_effects()
 	await _cleanup(fixture["root"] as Node)

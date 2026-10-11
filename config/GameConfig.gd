@@ -25,12 +25,12 @@ enum GameMode { TURN, BLITZ }
 @export var orb_angular_damp: float = 1.0
 @export var color_display: PackedColorArray = PackedColorArray(
 	[
-		Color("#E5484D"),
-		Color("#3E7BFA"),
-		Color("#30A46C"),
-		Color("#F5C542"),
-		Color("#A35CF0"),
-		Color("#22C7D9"),
+		Color("#D0503A"),
+		Color("#2F6FD6"),
+		Color("#35B97C"),
+		Color("#E9C46A"),
+		Color("#6C5CE7"),
+		Color("#DCE3EC"),
 	]
 )
 @export var orb_symbols_enabled: bool = false
