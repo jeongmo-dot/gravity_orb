@@ -13,7 +13,7 @@ var _gravity_direction: Vector2i = Vector2i.DOWN
 var _parallax_elapsed: float = PARALLAX_DURATION
 var _danger_intensity: float = 0.0
 var _danger_pulsing: bool = false
-var _elapsed: float = 0.0
+var _danger_pulse_elapsed: float = 0.0
 
 
 func _ready() -> void:
@@ -40,7 +40,6 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	_elapsed += delta
 	_parallax_elapsed = minf(_parallax_elapsed + delta, PARALLAX_DURATION)
 	var transition: float = _parallax_elapsed / PARALLAX_DURATION
 	var return_arc: float = sin(transition * PI)
@@ -52,7 +51,8 @@ func _process(delta: float) -> void:
 	_material.set_shader_parameter("parallax_uv", parallax_uv)
 	var pulse: float = 1.0
 	if _danger_pulsing:
-		pulse = 0.76 + 0.24 * (0.5 + 0.5 * sin(_elapsed * TAU * 0.8))
+		_danger_pulse_elapsed += delta
+		pulse = 0.85 + 0.15 * cos(_danger_pulse_elapsed * TAU * 0.8)
 	_material.set_shader_parameter("danger_tint", _danger_intensity * pulse)
 
 
@@ -64,6 +64,8 @@ func set_gravity_direction(direction: Vector2i) -> void:
 
 
 func set_danger_state(intensity: float, pulsing: bool) -> void:
+	if pulsing and not _danger_pulsing:
+		_danger_pulse_elapsed = 0.0
 	_danger_intensity = clampf(intensity, 0.0, 1.0)
 	_danger_pulsing = pulsing
 
@@ -164,7 +166,7 @@ void fragment() {
 	meteor *= 1.0 - smoothstep(active_span * 0.80, active_span, meteor_phase);
 	color += vec3(0.48, 0.55, 0.58) * meteor;
 
-	color = mix(color, color + vec3(0.075, 0.004, 0.006), danger_tint * 0.55);
+	color += vec3(0.120, 0.0, 0.0) * danger_tint;
 	ALBEDO = clamp(color, vec3(0.0), vec3(0.58));
 	ROUGHNESS = 1.0;
 }

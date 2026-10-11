@@ -42,6 +42,7 @@ const CAPTURE_FILES: Array[String] = [
 	"15_orb_closeup.png",
 	"16_gravity_switch.png",
 	"17_board_danger.png",
+	"18_board_blocked.png",
 ]
 
 var _failed: bool = false
@@ -76,6 +77,8 @@ func _run_capture_suite() -> void:
 		await _capture_orb_closeup()
 	if not _failed:
 		await _measure_v2_contrast()
+	if not _failed:
+		await _measure_gravity_wall_lights()
 
 	_verify_capture_files()
 	_verify_user_save_unchanged()
@@ -131,9 +134,19 @@ func _capture_turn_scenes() -> void:
 	await _capture("03_turn_combo.png")
 	hud.set_process(false)
 	hud._set_danger_badge(0.70, 4.0)
-	await get_tree().create_timer(0.25).timeout
+	await get_tree().create_timer(0.625).timeout
 	await _capture("17_board_danger.png")
 	hud._set_danger_badge(0.0, 1.0)
+	manager.blocked_directions.clear()
+	manager.blocked_directions.append(Vector2i.DOWN)
+	hud._on_warning_changed(manager.blocked_directions)
+	board.set_warning_directions(manager.blocked_directions)
+	await get_tree().create_timer(0.20).timeout
+	_validate_turn_blocked_scene(main)
+	await _capture("18_board_blocked.png")
+	manager.blocked_directions.clear()
+	hud._on_warning_changed(manager.blocked_directions)
+	board.set_warning_directions(manager.blocked_directions)
 	Config.data.spawn_count_ramp_turns = 20
 	Config.data.spawn_count_max = 0
 	manager.turn_index = 20
@@ -392,10 +405,32 @@ func _measure_v2_contrast() -> void:
 	var crowded_image: Image = Image.load_from_file(
 		ProjectSettings.globalize_path(OUTPUT_DIRECTORY.path_join("07_blitz_danger.png"))
 	)
+	var normal_image: Image = Image.load_from_file(
+		ProjectSettings.globalize_path(OUTPUT_DIRECTORY.path_join("02_turn_early.png"))
+	)
+	var danger_image: Image = Image.load_from_file(
+		ProjectSettings.globalize_path(OUTPUT_DIRECTORY.path_join("17_board_danger.png"))
+	)
+	var blocked_image: Image = Image.load_from_file(
+		ProjectSettings.globalize_path(OUTPUT_DIRECTORY.path_join("18_board_blocked.png"))
+	)
 	var crowded_metrics: Dictionary = _crowded_board_luminance(crowded_image, inner_rect)
 	var orb_average: float = float(crowded_metrics["orb_average"])
 	var crowded_board_average: float = float(crowded_metrics["board_average"])
 	var ratio: float = orb_average / maxf(crowded_board_average, 0.001)
+	var danger_band: Color = _average_frame_band_color(danger_image, board_rect, 4.0, 10.0)
+	var normal_background_red: float = _background_red_average(normal_image, board_rect)
+	var danger_background_red: float = _background_red_average(danger_image, board_rect)
+	var background_red_gain: float = (danger_background_red - normal_background_red) * 255.0
+	var blocked_top: Color = _average_side_band_color(
+		blocked_image, board_rect, Vector2i.UP, 4.0, 10.0
+	)
+	var blocked_other_red: float = 0.0
+	for direction: Vector2i in [Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]:
+		blocked_other_red = maxf(
+			blocked_other_red,
+			_average_side_band_color(blocked_image, board_rect, direction, 4.0, 10.0).r
+		)
 	print(
 		"SPACE_CONTRAST empty_board_average=%.4f background_maximum=%.4f crowded_orb_average=%.4f crowded_board_average=%.4f orb_board_ratio=%.2f" % [
 			empty_board_average,
@@ -405,10 +440,36 @@ func _measure_v2_contrast() -> void:
 			ratio,
 		]
 	)
+	print(
+		"SPACE_DANGER_BAND r=%.1f g=%.1f b=%.1f background_red_gain=%.1f" % [
+			danger_band.r * 255.0,
+			danger_band.g * 255.0,
+			danger_band.b * 255.0,
+			background_red_gain,
+		]
+	)
+	print(
+		"SPACE_BLOCKED_BAND wall=TOP r=%.1f g=%.1f b=%.1f other_max_r=%.1f" % [
+			blocked_top.r * 255.0,
+			blocked_top.g * 255.0,
+			blocked_top.b * 255.0,
+			blocked_other_red * 255.0,
+		]
+	)
 	if empty_board_average > 0.10:
 		_fail("Empty board average luminance %.4f exceeds 0.10" % empty_board_average)
 	if background_maximum > 0.60:
 		_fail("Space background maximum luminance %.4f exceeds 0.60" % background_maximum)
+	if danger_band.r * 255.0 < 90.0:
+		_fail("Danger outer band red %.1f is below 90" % (danger_band.r * 255.0))
+	if danger_band.r < danger_band.g * 2.0 or danger_band.r < danger_band.b * 2.0:
+		_fail("Danger outer band is not red-dominant at the pulse minimum")
+	if background_red_gain < 20.0:
+		_fail("Danger nebula red gain %.1f is below 20" % background_red_gain)
+	if blocked_top.r < blocked_top.g * 2.0 or blocked_top.r < blocked_top.b * 2.0:
+		_fail("Blocked top wall band is not red-dominant")
+	if blocked_top.r < blocked_other_red * 1.5:
+		_fail("Blocked top wall is not 1.5x redder than the other walls")
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(MEASUREMENT_DIRECTORY))
 	var report_path: String = MEASUREMENT_DIRECTORY.path_join("space_contrast_report.json")
 	var report_file: FileAccess = FileAccess.open(report_path, FileAccess.WRITE)
@@ -425,8 +486,254 @@ func _measure_v2_contrast() -> void:
 			"crowded_board_average_luminance": crowded_board_average,
 			"crowded_orb_to_board_ratio": ratio,
 			"crowded_segmentation": "orb>=0.16, board<=0.10",
+			"danger_outer_band_rgb_255": [
+				danger_band.r * 255.0,
+				danger_band.g * 255.0,
+				danger_band.b * 255.0,
+			],
+			"danger_background_red_gain_255": background_red_gain,
+			"blocked_top_band_rgb_255": [
+				blocked_top.r * 255.0,
+				blocked_top.g * 255.0,
+				blocked_top.b * 255.0,
+			],
+			"blocked_other_wall_max_red_255": blocked_other_red * 255.0,
 		}, "  "))
 	await _destroy_main(main)
+
+
+func _measure_gravity_wall_lights() -> void:
+	var main: Main = await _create_main(Main.NO_MODE)
+	(main.get_node("UI") as CanvasLayer).visible = false
+	var board: Board3D = main.get_node("Board") as Board3D
+	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
+	board.set_process(false)
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var board_half: float = board.half_size()
+	var measurements: Dictionary = {}
+	for direction: Vector2i in [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]:
+		board.set_gravity(direction)
+		board._process(Board3D.GRAVITY_FIELD_DURATION)
+		await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		var image: Image = get_viewport().get_texture().get_image()
+		var image_scale: Vector2 = Vector2(
+			float(image.get_width()) / viewport_size.x,
+			float(image.get_height()) / viewport_size.y
+		)
+		var center_point: Vector2 = _wall_sample_point(direction, board_half, 0.0)
+		var first_end: Vector2 = _wall_sample_point(direction, board_half, -board_half * 0.72)
+		var second_end: Vector2 = _wall_sample_point(direction, board_half, board_half * 0.72)
+		var center_luminance: float = _point_luminance(
+			image, camera.unproject_position(Orb3D.plane_position_to_world(center_point)) * image_scale
+		)
+		var first_end_luminance: float = _point_luminance(
+			image, camera.unproject_position(Orb3D.plane_position_to_world(first_end)) * image_scale
+		)
+		var second_end_luminance: float = _point_luminance(
+			image, camera.unproject_position(Orb3D.plane_position_to_world(second_end)) * image_scale
+		)
+		var other_maximum: float = 0.0
+		for other_direction: Vector2i in [
+			Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT
+		]:
+			if other_direction == direction:
+				continue
+			var other_point: Vector2 = _wall_sample_point(other_direction, board_half, 0.0)
+			other_maximum = maxf(
+				other_maximum,
+				_point_luminance(
+					image,
+					camera.unproject_position(Orb3D.plane_position_to_world(other_point)) * image_scale
+				)
+			)
+		print(
+			"GRAVITY_WALL_LIGHT direction=%s center=%.4f end_a=%.4f end_b=%.4f other_max=%.4f" % [
+				_direction_name(direction),
+				center_luminance,
+				first_end_luminance,
+				second_end_luminance,
+				other_maximum,
+			]
+		)
+		if center_luminance < first_end_luminance or center_luminance < second_end_luminance:
+			_fail("Gravity wall center must be at least as bright as both ends")
+		if center_luminance < other_maximum * 1.5:
+			_fail("Gravity wall center must be 1.5x brighter than the other wall centers")
+		measurements[_direction_name(direction)] = {
+			"center": center_luminance,
+			"end_a": first_end_luminance,
+			"end_b": second_end_luminance,
+			"other_maximum": other_maximum,
+		}
+	board.set_gravity(Vector2i.DOWN)
+	board._process(Board3D.GRAVITY_LIGHT_DURATION)
+	board.set_gravity(Vector2i.RIGHT)
+	board._process(Board3D.GRAVITY_LIGHT_DURATION * 0.5)
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var transition_image: Image = get_viewport().get_texture().get_image()
+	var transition_scale: Vector2 = Vector2(
+		float(transition_image.get_width()) / viewport_size.x,
+		float(transition_image.get_height()) / viewport_size.y
+	)
+	var corner_offset: float = board_half * 0.84
+	var bottom_right: float = _point_luminance(
+		transition_image,
+		camera.unproject_position(
+			Orb3D.plane_position_to_world(Vector2(corner_offset, board_half))
+		) * transition_scale
+	)
+	var right_bottom: float = _point_luminance(
+		transition_image,
+		camera.unproject_position(
+			Orb3D.plane_position_to_world(Vector2(board_half, corner_offset))
+		) * transition_scale
+	)
+	var bottom_left: float = _point_luminance(
+		transition_image,
+		camera.unproject_position(
+			Orb3D.plane_position_to_world(Vector2(-corner_offset, board_half))
+		) * transition_scale
+	)
+	var left_bottom: float = _point_luminance(
+		transition_image,
+		camera.unproject_position(
+			Orb3D.plane_position_to_world(Vector2(-board_half, corner_offset))
+		) * transition_scale
+	)
+	var target_corner: float = (bottom_right + right_bottom) * 0.5
+	var opposite_corner: float = (bottom_left + left_bottom) * 0.5
+	print(
+		"GRAVITY_WALL_TRANSITION from=DOWN to=RIGHT target_corner=%.4f opposite_corner=%.4f" % [
+			target_corner,
+			opposite_corner,
+		]
+	)
+	if target_corner <= opposite_corner:
+		_fail("DOWN to RIGHT gravity light must travel through the bottom-right corner")
+	measurements["DOWN_TO_RIGHT"] = {
+		"target_corner": target_corner,
+		"opposite_corner": opposite_corner,
+	}
+	var report_path: String = MEASUREMENT_DIRECTORY.path_join("gravity_wall_light_report.json")
+	var report_file: FileAccess = FileAccess.open(report_path, FileAccess.WRITE)
+	if report_file == null:
+		_fail("Could not write gravity wall light report")
+	else:
+		report_file.store_string(JSON.stringify(measurements, "  "))
+	await _destroy_main(main)
+
+
+func _wall_sample_point(direction: Vector2i, half_size: float, along: float) -> Vector2:
+	if direction == Vector2i.UP:
+		return Vector2(along, -half_size)
+	if direction == Vector2i.RIGHT:
+		return Vector2(half_size, along)
+	if direction == Vector2i.DOWN:
+		return Vector2(along, half_size)
+	return Vector2(-half_size, along)
+
+
+func _direction_name(direction: Vector2i) -> String:
+	if direction == Vector2i.UP:
+		return "UP"
+	if direction == Vector2i.RIGHT:
+		return "RIGHT"
+	if direction == Vector2i.DOWN:
+		return "DOWN"
+	return "LEFT"
+
+
+func _point_luminance(image: Image, point: Vector2) -> float:
+	var center_x: int = clampi(roundi(point.x), 0, image.get_width() - 1)
+	var center_y: int = clampi(roundi(point.y), 0, image.get_height() - 1)
+	var total: float = 0.0
+	var count: int = 0
+	for y: int in range(maxi(center_y - 2, 0), mini(center_y + 2, image.get_height() - 1) + 1):
+		for x: int in range(maxi(center_x - 2, 0), mini(center_x + 2, image.get_width() - 1) + 1):
+			total += image.get_pixel(x, y).get_luminance()
+			count += 1
+	return total / float(maxi(count, 1))
+
+
+func _average_frame_band_color(
+	image: Image,
+	board_rect: Rect2,
+	inner_distance: float,
+	outer_distance: float
+) -> Color:
+	var total: Color = Color(0.0, 0.0, 0.0, 0.0)
+	for direction: Vector2i in [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]:
+		total += _average_side_band_color(
+			image, board_rect, direction, inner_distance, outer_distance
+		)
+	return total / 4.0
+
+
+func _average_side_band_color(
+	image: Image,
+	board_rect: Rect2,
+	direction: Vector2i,
+	inner_distance: float,
+	outer_distance: float
+) -> Color:
+	var corner_margin: float = board_rect.size.x * 0.04
+	var region: Rect2
+	if direction == Vector2i.UP:
+		region = Rect2(
+			board_rect.position.x + corner_margin,
+			board_rect.position.y - outer_distance,
+			board_rect.size.x - corner_margin * 2.0,
+			outer_distance - inner_distance
+		)
+	elif direction == Vector2i.RIGHT:
+		region = Rect2(
+			board_rect.end.x + inner_distance,
+			board_rect.position.y + corner_margin,
+			outer_distance - inner_distance,
+			board_rect.size.y - corner_margin * 2.0
+		)
+	elif direction == Vector2i.DOWN:
+		region = Rect2(
+			board_rect.position.x + corner_margin,
+			board_rect.end.y + inner_distance,
+			board_rect.size.x - corner_margin * 2.0,
+			outer_distance - inner_distance
+		)
+	else:
+		region = Rect2(
+			board_rect.position.x - outer_distance,
+			board_rect.position.y + corner_margin,
+			outer_distance - inner_distance,
+			board_rect.size.y - corner_margin * 2.0
+		)
+	return _average_color(image, region)
+
+
+func _average_color(image: Image, region: Rect2) -> Color:
+	var min_x: int = clampi(floori(region.position.x), 0, image.get_width() - 1)
+	var max_x: int = clampi(ceili(region.end.x), 0, image.get_width() - 1)
+	var min_y: int = clampi(floori(region.position.y), 0, image.get_height() - 1)
+	var max_y: int = clampi(ceili(region.end.y), 0, image.get_height() - 1)
+	var total: Color = Color(0.0, 0.0, 0.0, 0.0)
+	var count: int = 0
+	for y: int in range(min_y, max_y + 1):
+		for x: int in range(min_x, max_x + 1):
+			total += image.get_pixel(x, y)
+			count += 1
+	return total / float(maxi(count, 1))
+
+
+func _background_red_average(image: Image, board_rect: Rect2) -> float:
+	var top: float = board_rect.end.y + 18.0
+	var bottom: float = float(image.get_height()) - 110.0
+	if bottom <= top:
+		return 0.0
+	return _average_color(
+		image,
+		Rect2(0.0, top, float(image.get_width()), bottom - top)
+	).r
 
 
 func _average_luminance(image: Image, region: Rect2) -> float:
@@ -847,6 +1154,17 @@ func _validate_turn_game_over_scene(main: Main) -> void:
 		"TURN result blocked direction"
 	)
 	print("SCREEN_CAPTURE_CHECK scene=turn_game_over score=%d blocked=LEFT" % TURN_CAPTURE_SCORE)
+
+
+func _validate_turn_blocked_scene(main: Main) -> void:
+	var blocked: Label = main.get_node("UI/Hud/BlockedLabel") as Label
+	var game_over_panel: Control = main.get_node("UI/Hud/GameOverPanel") as Control
+	if not blocked.visible:
+		_fail("TURN blocked capture must show the blocked direction")
+	_expect_label_text(blocked, "BLOCKED: DOWN", "TURN blocked-only HUD direction")
+	if game_over_panel.visible:
+		_fail("TURN blocked capture must not show the game-over panel")
+	print("SCREEN_CAPTURE_CHECK scene=board_blocked blocked=DOWN game_over=false")
 
 
 func _validate_turn_ramp_preview_scene(main: Main, batch_size: int, scene_name: String) -> void:

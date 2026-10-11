@@ -38,6 +38,50 @@
 
 ## 미확인
 
+### [2026-10-11] 대상 #64 추가 요구 1 — 중력 벽 빛·위험 테두리·BLOCKED 캡처
+- 상태: 완료 — `origin/main`을 먼저 병합하고 중력 벽 빛의 위치·전환, 위험 외곽 띠와 성운 색, BLOCKED 전용 캡처·화소 검사를 구현함
+- 브랜치 / PR: `v2-space-background-board` / [PR #66](https://github.com/jeongmo-dot/gravity_orb/pull/66)
+- 변경 파일: `scripts/spike/Board3D.gd`, `scripts/fx/SpaceBackdrop.gd`, `tests/test_space_board_visuals.gd`, `tests/spike/capture_screens.gd`, `tests/capture_screens.ps1`, `docs/jeongmo_codex_to_claude.md`
+- 병합:
+  - `origin/main` `657cddf`를 병합 커밋 `d1438f7`로 반영함.
+  - 충돌한 `AGENTS.md`, `docs/manual_qa_pending.md`는 사용자 지시대로 양쪽 모두 main 내용을 선택했으며, 현재 두 파일은 `origin/main`과 차이 0건임.
+- Done-when 대조:
+  - [x] 네 방향 정지 상태에서 해당 중력 벽 전체를 밝히고 가운데가 양끝 이상, 해당 벽 가운데가 다른 벽 가운데의 `1.5배` 이상이 되도록 구현 — 자동 단위 검사 + 실제 렌더 화소 검사
+  - [x] 중력 전환 빛이 가까운 모서리를 따라 `0.25초`에 이동하고 정반대 전환 경로도 한 방향으로 일관되게 처리 — 자동 (`test_gravity_wall_light_and_field_move_to_the_new_direction`) + DOWN→RIGHT 렌더 화소 검사
+  - [x] 위험 `×1.5`부터 `#FFB020`, `×4`부터 `#FF3B30`을 사용하고 빨강 외곽 띠를 60~100% 맥동, 성운 빨강 증가를 구현 — 자동 단위·렌더 화소 검사
+  - [x] 게임오버 패널 없이 `BLOCKED: DOWN`과 막힌 벽만 빨강으로 맥동하는 `18_board_blocked.png` 추가 — 캡처 검증 + 직접 확인
+  - [x] 기존 대비 상한과 물리 해시 유지 — 자동 캡처 측정 + 일반 회귀
+  - [x] 변경 직전 병합 상태와 같은 Standard/Compatibility 환경에서 창 모드 성능 비교 — p99 `18.540 → 18.878ms`(+`0.338ms`, 약 `1.8%`), 33.3ms 초과 `0 → 0`, 입력 유실 `0 → 0`. 다만 이 실행 환경에서는 변경 전·후 모두 절대 목표 p99 `<16.7ms`를 넘었으므로 아래에 원시 관측을 남김
+- 렌더 관측 (`540×960`, Compatibility):
+  - 네 방향 중력 벽 `가운데 / 끝 A / 끝 B / 다른 벽 가운데 최대`: UP `0.4973 / 0.3207 / 0.3441 / 0.1308`, RIGHT `0.6691 / 0.5459 / 0.3941 / 0.1308`, DOWN `0.6712 / 0.6627 / 0.3945 / 0.1242`, LEFT `0.4958 / 0.3193 / 0.3817 / 0.1308`
+  - DOWN→RIGHT 전환 중 목표 모서리 휘도 `0.5823`, 반대 모서리 `0.5523`
+  - `17_board_danger` 최저점 바깥 띠 RGB `(95.2, 24.3, 36.1)`; `R ≥ 90`, `R ≥ 2G`, `R ≥ 2B`. 정상 장면 대비 성운 빨강 `+25.1`
+  - `18_board_blocked` 막힌 위쪽 띠 RGB `(134.8, 36.9, 40.3)`, 다른 세 벽 최대 R `8.0`; 게임오버 패널 숨김
+  - 기존 대비: 빈 보드 평균 휘도 `0.0217` (`≤0.10`), 배경 최대 `0.5771` (`≤0.60`), 혼잡 장면 구슬/보드 휘도 비 `16.21`
+- 창 모드 성능 관측 (Standard, Compatibility, BLITZ 시드 101~104, 봇 0.3초):
+
+  | 구분 | 프레임 p50 / p95 / p99 / 최대 | >16.7ms / >33.3ms | 드로콜 p50 / p95 / 최대 | 입력 |
+  |---|---|---:|---:|---:|
+  | 변경 직전 (`d1438f7`) | 8.254 / 16.654 / 18.540 / 23.883ms | 162 / 0 | 514 / 543 / 561 | 120/120, 유실 0 |
+  | 추가 요구 1 | 8.196 / 16.908 / 18.878 / 25.938ms | 193 / 0 | 520 / 551 / 573 | 120/120, 유실 0 |
+
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/test_space_board_visuals.gd` → `5/5`, 종료 코드 0
+  - `tests/run_tests.ps1` → 일반 `271/271`, 장기 `4/4`; 성능 묶음은 전체 래퍼 반복 실행에서 반응 근접 탐색만 `1.090~1.541ms`로 `4/5`(합계 `279/280`, 종료 코드 1), 같은 최종 코드의 성능 묶음 별도 재실행은 `0.996ms`로 `5/5`. 코드 변경과 무관하게 반복 실행에서 흔들리는 기존 시간 기반 검사임
+  - 물리 상태 해시: TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`; #64 1차와 동일
+  - `tests/capture_screens.ps1` → `01_start_screen`~`18_board_blocked` PNG `18/18`, 종료 코드 0; 캡처 화소 검사 전부 통과
+  - 시작 화면 / TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 전역 난수 호출 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. `tests/capture_screens.ps1` 실행 후 `artifacts/screens/16_gravity_switch.png` 확인 → 중력 벽 빛이 아래쪽에서 오른쪽으로 가까운 모서리를 돌아 이동하는 중간 프레임이어야 한다.
+  2. `17_board_danger.png` 확인 → `DANGER ×4`에서 판 바깥 4~10px 띠가 선명한 빨강이고 성운에도 정상 장면보다 붉은 기운이 보여야 한다.
+  3. `18_board_blocked.png` 확인 → `BLOCKED: DOWN`은 보이되 게임오버 패널은 없고, 화면 위쪽 생성 벽만 빨강으로 밝아야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 외곽 상태 띠 폭은 캡처의 4~10px 측정 구간을 덮도록 `0.36m`, 중력 안쪽 빛 폭은 `0.09m`로 구현했다. 게임 밸런스·물리·충돌 수치는 변경하지 않았다.
+  - 전체 래퍼의 반응 근접 탐색 성능 검사는 재실행마다 1ms 경계를 오가며, 별도 실행에서는 통과했지만 전체 래퍼 반복 실행은 종료 코드 1이었다. 합격·불합격 판단을 요청한다.
+- 남은 것 · 질문: 동일 환경 변경 전·후 창 모드 p99 변화는 `+1.8%`이나 둘 다 `<16.7ms` 절대 목표를 넘은 관측을 성능 유지로 볼지 Claude 판정 필요
+
 ### [2026-10-11] 대상 #64 — Standard Godot(.NET 미포함) 사용 기준 전환
 - 상태: 완료 — 프로젝트·검증 스크립트의 기본 실행 기준을 Mono/.NET 빌드에서 Godot 4.8 Standard 빌드로 전환함
 - 브랜치 / PR: `v2-space-background-board` / [PR #66](https://github.com/jeongmo-dot/gravity_orb/pull/66)
