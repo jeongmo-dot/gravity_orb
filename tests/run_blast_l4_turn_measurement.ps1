@@ -2,6 +2,7 @@ param(
     [string]$GodotPath = "",
     [switch]$AggregateOnly,
     [switch]$Followup3,
+    [switch]$PlanetCollection,
     [ValidateRange(1, 24)]
     [int]$Parallelism = 12
 )
@@ -12,8 +13,22 @@ $outputDirectory = Join-Path $repoPath "artifacts\measurements"
 $seedValues = @(101..112)
 $wallLimitPx = 34.0
 $pairLimitPx = 68.0
-$measurementPrefix = if ($Followup3) { "turn_250_combo" } else { "blast_l4_turn" }
-$conditions = if ($Followup3) {
+$measurementMaxTurns = if ($PlanetCollection) { 1200 } else { 800 }
+$measurementPrefix = if ($PlanetCollection) {
+    "planet_collection_turn"
+} elseif ($Followup3) {
+    "turn_250_combo"
+} else {
+    "blast_l4_turn"
+}
+$conditions = if ($PlanetCollection) {
+    @(
+        [ordered]@{ Id = "ramp20"; Ramp = 20 },
+        [ordered]@{ Id = "ramp30"; Ramp = 30 },
+        [ordered]@{ Id = "ramp40"; Ramp = 40 },
+        [ordered]@{ Id = "ramp60"; Ramp = 60 }
+    )
+} elseif ($Followup3) {
     @(
         [ordered]@{ Id = "ramp25"; Ramp = 25 },
         [ordered]@{ Id = "ramp20"; Ramp = 20 },
@@ -118,7 +133,7 @@ function Invoke-Condition([System.Collections.IDictionary]$Condition) {
             Arguments = @(
                 "--headless", "--path", $repoPath, "--fixed-fps", "120",
                 "--audio-driver", "Dummy", "tests/spike/JoltMeasurement.tscn", "--",
-                "--jolt-ticks=120", "--jolt-seeds=$seed", "--jolt-max-turns=800",
+                "--jolt-ticks=120", "--jolt-seeds=$seed", "--jolt-max-turns=$measurementMaxTurns",
                 "--jolt-no-determinism", "--spawn-ramp-turns=$($Condition.Ramp)",
                 "--spawn-count-max=0", "--blast-min-level=4",
                 "--blast-push-radius-by-level=0,0,0,0.3,0.55,1,1",
@@ -133,7 +148,7 @@ function Invoke-Condition([System.Collections.IDictionary]$Condition) {
         foreach ($task in $batch) {
             Remove-Item -LiteralPath $task.Stdout, $task.Stderr -Force -ErrorAction SilentlyContinue
             $process = Start-Process -FilePath $GodotPath -ArgumentList $task.Arguments `
-                -NoNewWindow -PassThru -RedirectStandardOutput $task.Stdout `
+                -WindowStyle Hidden -PassThru -RedirectStandardOutput $task.Stdout `
                 -RedirectStandardError $task.Stderr
             $running += [ordered]@{ Task = $task; Process = $process }
             Write-Output ("BLAST_L4_TURN_START name={0} pid={1}" -f $task.Name, $process.Id)
@@ -201,7 +216,7 @@ function Get-RawRows([System.Collections.IDictionary]$Condition) {
     return @(@($report.ticks)[0].seeds)
 }
 
-if ($Followup3) {
+if ($Followup3 -or $PlanetCollection) {
     if (-not $AggregateOnly) {
         foreach ($condition in $conditions) { Invoke-Condition $condition }
     }
@@ -211,19 +226,19 @@ if ($Followup3) {
 
 $baseRows = @(Get-RawRows $conditions[0])
 $baseLengths = [double[]]@($baseRows | ForEach-Object { [double]$_.completed_turns })
-$baseReached800 = @($baseRows | Where-Object {
-    -not [bool]$_.game_over -and [int]$_.completed_turns -ge 800
+$baseReachedMaxTurns = @($baseRows | Where-Object {
+    -not [bool]$_.game_over -and [int]$_.completed_turns -ge $measurementMaxTurns
 }).Count
 $baseP50 = Get-Percentile $baseLengths 0.50
-$runExtraRamps = $baseReached800 -gt 0 -or $baseP50 -gt 250.0
+$runExtraRamps = $baseReachedMaxTurns -gt 0 -or $baseP50 -gt 250.0
 
-if (-not $Followup3 -and $runExtraRamps -and -not $AggregateOnly) {
+if (-not $Followup3 -and -not $PlanetCollection -and $runExtraRamps -and -not $AggregateOnly) {
     Invoke-Condition $conditions[1]
     Invoke-Condition $conditions[2]
 }
 
-$selectedConditions = if ($Followup3) { @($conditions) } else { @($conditions[0]) }
-if (-not $Followup3 -and $runExtraRamps) {
+$selectedConditions = if ($Followup3 -or $PlanetCollection) { @($conditions) } else { @($conditions[0]) }
+if (-not $Followup3 -and -not $PlanetCollection -and $runExtraRamps) {
     $selectedConditions += @($conditions[1], $conditions[2])
 }
 $caseReports = @()
@@ -252,11 +267,21 @@ foreach ($condition in $selectedConditions) {
     $lengths = [double[]]@($rows | ForEach-Object { [double]$_.completed_turns })
     $scores = [double[]]@($rows | ForEach-Object { [double]$_.score })
     $blasts = [double[]]@($rows | ForEach-Object { [double]$_.blast_count })
+    $merges = [double[]]@($rows | ForEach-Object {
+        $reactionTotal = 0.0
+        foreach ($property in $_.reactions_by_color.PSObject.Properties) {
+            $reactionTotal += [double]$property.Value
+        }
+        [Math]::Max(0.0, $reactionTotal - [double]$_.max_clear_count)
+    })
     $maxCombos = [double[]]@($rows | ForEach-Object { [double]$_.max_combo })
     $occupancies = [double[]]@($rows | ForEach-Object { [double]$_.final_occupancy_percent })
     $finalSpawnCounts = [double[]]@($rows | ForEach-Object {
         1.0 + [Math]::Floor(([Math]::Max([int]$_.completed_turns, 1) - 1) / [double]$condition.Ramp)
     })
+    $reachedMaxTurns = @($rows | Where-Object {
+        -not [bool]$_.game_over -and [int]$_.completed_turns -ge $measurementMaxTurns
+    }).Count
     $reached800 = @($rows | Where-Object {
         -not [bool]$_.game_over -and [int]$_.completed_turns -ge 800
     }).Count
@@ -266,8 +291,10 @@ foreach ($condition in $selectedConditions) {
         seed_count = $rows.Count
         game_over_count = @($rows | Where-Object { [bool]$_.game_over }).Count
         reached_800_count = $reached800
+        reached_max_turns_count = $reachedMaxTurns
         game_length = Get-Distribution $lengths
         score = Get-Distribution $scores
+        merge = Get-Distribution $merges
         max_combo = Get-Distribution $maxCombos
         blast = Get-Distribution $blasts
         blast_count_by_level = Get-DynamicSum $rows "blast_count_by_level"
@@ -301,34 +328,60 @@ if ($Followup3) {
     } else {
         $selectionRequiresQuestion = $true
     }
+} elseif ($PlanetCollection) {
+    $withinQuestionRange = @($caseReports | Where-Object {
+        [double]$_.game_length.p50 -ge 150.0 -and [double]$_.game_length.p50 -le 400.0
+    })
+    if ($withinQuestionRange.Count -eq 0) {
+        $selectionRequiresQuestion = $true
+    } else {
+        $selectedRamp = @($caseReports | Sort-Object `
+            @{ Expression = { [Math]::Abs([double]$_.game_length.p50 - 250.0) }; Ascending = $true }, `
+            @{ Expression = { [int]$_.spawn_count_ramp_turns }; Ascending = $true }
+        )[0]
+    }
 }
 
 $summary = [ordered]@{
-    engine = "Godot 4.8-dev3 mono"
+    engine = "Godot 4.8-dev3 standard"
     physics_engine = "Jolt Physics"
     physics_ticks_per_second = 120
     seeds = @(101..112)
-    max_turns = 800
+    max_turns = $measurementMaxTurns
     blast_min_level = 4
     blast_push_radius_by_level = @(0, 0, 0, 0.3, 0.55, 1.0, 1.0)
     combo_multiplier_max = 128.0
     previous_l6_baseline = [ordered]@{ game_length_p50 = 162.0; source = "#60" }
     extra_ramp_trigger = [ordered]@{
-        reached_800_count = $baseReached800
+        reached_800_count = @($baseRows | Where-Object {
+            -not [bool]$_.game_over -and [int]$_.completed_turns -ge 800
+        }).Count
+        reached_max_turns_count = $baseReachedMaxTurns
         base_game_length_p50 = $baseP50
         triggered = $runExtraRamps
-        rule = "reached_800_count > 0 or base_game_length_p50 > 250"
+        rule = "reached_max_turns_count > 0 or base_game_length_p50 > 250"
     }
     thresholds = [ordered]@{ wall_limit_px = $wallLimitPx; pair_limit_px = $pairLimitPx }
     followup3 = $Followup3.IsPresent
+    planet_collection = $PlanetCollection.IsPresent
     selected_ramp = $(if ($null -eq $selectedRamp) { $null } else {
         [int]$selectedRamp.spawn_count_ramp_turns
     })
     selection_requires_question = $selectionRequiresQuestion
-    selection_rule = "p50 in 220..280 and nearest 250; tie uses longer interval"
+    selection_rule = $(if ($PlanetCollection) {
+        "nearest p50 to 250; tie uses smaller ramp; question only when all p50 outside 150..400"
+    } else {
+        "p50 in 220..280 and nearest 250; tie uses longer interval"
+    })
     cases = $caseReports
 }
-$summaryName = if ($Followup3) { "turn_250_combo_summary.json" } else { "blast_l4_turn_summary.json" }
+$summaryName = if ($PlanetCollection) {
+    "planet_collection_turn_summary.json"
+} elseif ($Followup3) {
+    "turn_250_combo_summary.json"
+} else {
+    "blast_l4_turn_summary.json"
+}
 $summaryPath = Join-Path $outputDirectory $summaryName
 $summary | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $summaryPath -Encoding utf8
 Write-Output ("BLAST_L4_TURN_RESULT {0}" -f ($caseReports | ConvertTo-Json -Compress -Depth 10))

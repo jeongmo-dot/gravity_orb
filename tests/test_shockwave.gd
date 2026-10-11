@@ -123,7 +123,7 @@ func test_color_modes_use_expected_screen_directions_in_2d() -> void:
 		2,
 		excluded,
 		false,
-		OrbTypes.OrbColor.BLUE
+		OrbTypes.OrbColor.PURPLE
 	)
 	var lift_down: Array[Dictionary] = board.apply_shockwave(
 		Vector2.ZERO,
@@ -168,7 +168,7 @@ func test_color_modes_keep_screen_directions_in_3d_plane() -> void:
 		2,
 		excluded,
 		false,
-		OrbTypes.OrbColor.BLUE
+		OrbTypes.OrbColor.PURPLE
 	)
 	var lift: Array[Dictionary] = board.apply_shockwave(
 		Vector2.ZERO,
@@ -185,10 +185,10 @@ func test_color_modes_keep_screen_directions_in_3d_plane() -> void:
 	_restore_config(snapshot)
 
 
-func test_new_colors_use_default_push_impulse_and_radius() -> void:
+func test_configured_push_colors_use_expected_impulse_and_radius() -> void:
 	var snapshot: Dictionary = _snapshot_config()
 	_configure_color_effects()
-	for color: int in [OrbTypes.OrbColor.PURPLE, OrbTypes.OrbColor.CYAN]:
+	for color: int in [OrbTypes.OrbColor.GREEN, OrbTypes.OrbColor.CYAN]:
 		var board: Board = BOARD_2D_SCENE.instantiate() as Board
 		tree.root.add_child(board)
 		await tree.process_frame
@@ -248,7 +248,7 @@ func test_shake_is_global_mass_independent_capped_and_seed_deterministic() -> vo
 		7,
 		null,
 		false,
-		OrbTypes.OrbColor.GREEN,
+		OrbTypes.OrbColor.BLUE,
 		Callable(first_spawner, "next_shake_direction")
 	)
 	assert_eq(targets.size(), 2, "SHAKE reaches all normal orbs beyond radial range")
@@ -303,7 +303,7 @@ func test_radial_color_modes_exclude_non_targets() -> void:
 	_configure_color_effects()
 	for mode_color: int in [
 		OrbTypes.OrbColor.RED,
-		OrbTypes.OrbColor.BLUE,
+		OrbTypes.OrbColor.PURPLE,
 		OrbTypes.OrbColor.YELLOW,
 	]:
 		var board: Board = BOARD_2D_SCENE.instantiate() as Board
@@ -516,17 +516,17 @@ func _configure_color_effects() -> void:
 	Config.data.shock_jackpot_scale = 3.0
 	Config.data.shock_color_modes = PackedInt32Array([
 		GameConfig.ShockMode.PUSH,
-		GameConfig.ShockMode.PULL,
 		GameConfig.ShockMode.SHAKE,
-		GameConfig.ShockMode.LIFT,
 		GameConfig.ShockMode.PUSH,
+		GameConfig.ShockMode.LIFT,
+		GameConfig.ShockMode.PULL,
 		GameConfig.ShockMode.PUSH,
 	])
 	Config.data.shock_color_impulse_scale = PackedFloat32Array(
-		[1.0, 1.0, 0.0, 1.0, 1.0, 1.0]
+		[1.0, 0.0, 1.0, 1.0, 1.0, 1.0]
 	)
 	Config.data.shock_color_radius_factor = PackedFloat32Array(
-		[3.0, 3.0, 0.0, 3.0, 2.5, 2.5]
+		[3.0, 0.0, 2.5, 3.0, 3.0, 2.5]
 	)
 
 

@@ -9,10 +9,10 @@ func test_six_colors_map_to_configured_visual_modes() -> void:
 	var director: FeedbackDirector = fixture["director"] as FeedbackDirector
 	var expected: Array[GameConfig.ShockMode] = [
 		GameConfig.ShockMode.PUSH,
-		GameConfig.ShockMode.PULL,
 		GameConfig.ShockMode.SHAKE,
-		GameConfig.ShockMode.LIFT,
 		GameConfig.ShockMode.PUSH,
+		GameConfig.ShockMode.LIFT,
+		GameConfig.ShockMode.PULL,
 		GameConfig.ShockMode.PUSH,
 	]
 	for color: int in range(expected.size()):
@@ -46,19 +46,19 @@ func test_push_and_pull_use_one_ring_with_directional_stardust() -> void:
 	var red_inner_radius: float = push._ring_mesh.inner_radius
 	director.clear_effects()
 
-	director.play_reaction_visuals(_merge_reaction(OrbTypes.OrbColor.PURPLE))
-	var purple: ColorEffectVisual = director.active_color_effects()[0]
-	assert_true(red_inner_radius < purple._ring_mesh.inner_radius, "red ring is thicker than default PUSH")
+	director.play_reaction_visuals(_merge_reaction(OrbTypes.OrbColor.GREEN))
+	var green: ColorEffectVisual = director.active_color_effects()[0]
+	assert_true(red_inner_radius < green._ring_mesh.inner_radius, "red ring is thicker than default PUSH")
 	director.clear_effects()
 
-	director.play_reaction_visuals(_merge_reaction(OrbTypes.OrbColor.BLUE))
+	director.play_reaction_visuals(_merge_reaction(OrbTypes.OrbColor.PURPLE))
 	var pull: ColorEffectVisual = director.active_color_effects()[0]
 	var pull_start: float = pull.current_radius_px
 	assert_eq(pull.ring_layer_count(), 1, "PULL uses one ring layer")
 	assert_eq(pull.stardust_count(), 12, "PULL has inward spiral stardust")
 	assert_near(
 		pull_start,
-		Config.data.radius_for_level(2) * Config.data.shock_color_radius_factor[OrbTypes.OrbColor.BLUE],
+		Config.data.radius_for_level(2) * Config.data.shock_color_radius_factor[OrbTypes.OrbColor.PURPLE],
 		TOLERANCE,
 		"PULL starts at effect radius"
 	)
@@ -72,10 +72,10 @@ func test_pull_shrinks_only_result_mesh_before_punching() -> void:
 	var board: Board3D = fixture["board"] as Board3D
 	var director: FeedbackDirector = fixture["director"] as FeedbackDirector
 	board.set_gravity(Vector2i.ZERO)
-	var orb: Orb3D = board.spawn_orb(OrbTypes.OrbColor.BLUE, 2, Vector2.ZERO)
+	var orb: Orb3D = board.spawn_orb(OrbTypes.OrbColor.PURPLE, 2, Vector2.ZERO)
 	var collision: SphereShape3D = orb._collision_shape.shape as SphereShape3D
 	var collision_radius: float = collision.radius
-	var reaction: Dictionary = _merge_reaction(OrbTypes.OrbColor.BLUE)
+	var reaction: Dictionary = _merge_reaction(OrbTypes.OrbColor.PURPLE)
 	reaction["result_orb"] = orb
 	director.play_reaction_visuals(reaction)
 	await tree.create_timer(0.05, true, false, true).timeout
@@ -125,9 +125,9 @@ func test_shake_moves_board_visual_frame_not_camera_and_restores() -> void:
 	var director: FeedbackDirector = fixture["director"] as FeedbackDirector
 	var camera: Camera3D = fixture["camera"] as Camera3D
 	var visual_frame: Node3D = board.get_node("VisualTilt") as Node3D
-	director.play_reaction_visuals(_merge_reaction(OrbTypes.OrbColor.GREEN))
+	director.play_reaction_visuals(_merge_reaction(OrbTypes.OrbColor.BLUE))
 	var shake: ColorEffectVisual = director.active_color_effects()[0]
-	assert_eq(shake.ring_layer_count(), 1, "SHAKE uses one thin green ring")
+	assert_eq(shake.ring_layer_count(), 1, "SHAKE uses one thin blue ring")
 	assert_eq(shake.stardust_count(), 0, "SHAKE adds no duplicate particles")
 	assert_eq(director.active_color_frame_shake_count(), 1, "SHAKE starts frame shake")
 	director._process(0.05)

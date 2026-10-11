@@ -7,38 +7,38 @@ const DISTRIBUTION_TOLERANCE: float = 0.02
 const LEGACY_SEQUENCE_TOLERANCE: float = 1.0e-9
 
 
-func test_turn_sequence_matches_pre_six_color_baseline_for_three_seeds() -> void:
+func test_turn_sequence_matches_six_color_baseline_for_three_seeds() -> void:
 	var snapshot: Dictionary = _snapshot_spawn_config()
 	var expected_by_seed: Dictionary = {
 		101: [
-			[1, 2, 0.391725897789],
+			[1, 3, 0.391725897789],
 			[1, 1, 0.46784633398056],
-			[1, 2, 0.41243773698807],
-			[1, 1, 0.08886755257845],
+			[1, 3, 0.41243773698807],
+			[1, 2, 0.08886755257845],
 			[1, 0, 0.40030378103256],
-			[1, 1, 0.18263983726501],
-			[1, 1, 0.32996472716331],
-			[1, 1, 0.04768922179937],
+			[1, 2, 0.18263983726501],
+			[1, 2, 0.32996472716331],
+			[1, 2, 0.04768922179937],
 		],
 		777: [
 			[1, 0, 0.80851691961288],
-			[1, 3, 0.75154829025269],
+			[1, 5, 0.75154829025269],
 			[1, 0, 0.9190845489502],
-			[1, 1, 0.16851322352886],
-			[1, 2, 0.45896261930466],
-			[1, 2, 0.65874481201172],
-			[1, 2, 0.17010578513145],
+			[1, 2, 0.16851322352886],
+			[1, 4, 0.45896261930466],
+			[1, 3, 0.65874481201172],
+			[1, 4, 0.17010578513145],
 			[2, 0, 0.87970560789108],
 		],
 		4242: [
-			[1, 3, 0.31177765130997],
+			[1, 5, 0.31177765130997],
 			[1, 0, 0.31287559866905],
-			[1, 2, 0.48825904726982],
-			[1, 0, 0.06588395684958],
-			[1, 1, 0.20683698356152],
-			[1, 0, 0.91876804828644],
-			[1, 3, 0.10133952647448],
-			[1, 0, 0.609992146492],
+			[1, 3, 0.48825904726982],
+			[1, 1, 0.06588395684958],
+			[1, 2, 0.20683698356152],
+			[1, 1, 0.91876804828644],
+			[1, 5, 0.10133952647448],
+			[1, 1, 0.609992146492],
 		],
 	}
 	for seed_value: Variant in expected_by_seed:
@@ -121,8 +121,8 @@ func test_weighted_distribution_matches_config() -> void:
 			DISTRIBUTION_TOLERANCE,
 			"color %d ratio" % color
 		)
-	assert_eq(color_counts[OrbTypes.OrbColor.PURPLE], 0, "TURN never spawns purple")
-	assert_eq(color_counts[OrbTypes.OrbColor.CYAN], 0, "TURN never spawns cyan")
+	for color: int in range(color_counts.size()):
+		assert_true(color_counts[color] > 0, "TURN spawns color %d" % color)
 	print("TURN Spawner distribution: level1=%.4f colors=%s" % [level_one_ratio, str(color_counts)])
 	spawner.free()
 	_restore_spawn_config(snapshot)
