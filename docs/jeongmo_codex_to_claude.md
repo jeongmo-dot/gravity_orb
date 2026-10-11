@@ -38,6 +38,117 @@
 
 ## 미확인
 
+### [2026-10-11] 대상 #64 추가 요구 1 — 중력 벽 빛·위험 테두리·BLOCKED 캡처
+- 상태: 완료 — `origin/main`을 먼저 병합하고 중력 벽 빛의 위치·전환, 위험 외곽 띠와 성운 색, BLOCKED 전용 캡처·화소 검사를 구현함
+- 브랜치 / PR: `v2-space-background-board` / [PR #66](https://github.com/jeongmo-dot/gravity_orb/pull/66)
+- 변경 파일: `scripts/spike/Board3D.gd`, `scripts/fx/SpaceBackdrop.gd`, `tests/test_space_board_visuals.gd`, `tests/spike/capture_screens.gd`, `tests/capture_screens.ps1`, `docs/jeongmo_codex_to_claude.md`
+- 병합:
+  - `origin/main` `657cddf`를 병합 커밋 `d1438f7`로 반영함.
+  - 충돌한 `AGENTS.md`, `docs/manual_qa_pending.md`는 사용자 지시대로 양쪽 모두 main 내용을 선택했으며, 현재 두 파일은 `origin/main`과 차이 0건임.
+- Done-when 대조:
+  - [x] 네 방향 정지 상태에서 해당 중력 벽 전체를 밝히고 가운데가 양끝 이상, 해당 벽 가운데가 다른 벽 가운데의 `1.5배` 이상이 되도록 구현 — 자동 단위 검사 + 실제 렌더 화소 검사
+  - [x] 중력 전환 빛이 가까운 모서리를 따라 `0.25초`에 이동하고 정반대 전환 경로도 한 방향으로 일관되게 처리 — 자동 (`test_gravity_wall_light_and_field_move_to_the_new_direction`) + DOWN→RIGHT 렌더 화소 검사
+  - [x] 위험 `×1.5`부터 `#FFB020`, `×4`부터 `#FF3B30`을 사용하고 빨강 외곽 띠를 60~100% 맥동, 성운 빨강 증가를 구현 — 자동 단위·렌더 화소 검사
+  - [x] 게임오버 패널 없이 `BLOCKED: DOWN`과 막힌 벽만 빨강으로 맥동하는 `18_board_blocked.png` 추가 — 캡처 검증 + 직접 확인
+  - [x] 기존 대비 상한과 물리 해시 유지 — 자동 캡처 측정 + 일반 회귀
+  - [x] 변경 직전 병합 상태와 같은 Standard/Compatibility 환경에서 창 모드 성능 비교 — p99 `18.540 → 18.878ms`(+`0.338ms`, 약 `1.8%`), 33.3ms 초과 `0 → 0`, 입력 유실 `0 → 0`. 다만 이 실행 환경에서는 변경 전·후 모두 절대 목표 p99 `<16.7ms`를 넘었으므로 아래에 원시 관측을 남김
+- 렌더 관측 (`540×960`, Compatibility):
+  - 네 방향 중력 벽 `가운데 / 끝 A / 끝 B / 다른 벽 가운데 최대`: UP `0.4973 / 0.3207 / 0.3441 / 0.1308`, RIGHT `0.6691 / 0.5459 / 0.3941 / 0.1308`, DOWN `0.6712 / 0.6627 / 0.3945 / 0.1242`, LEFT `0.4958 / 0.3193 / 0.3817 / 0.1308`
+  - DOWN→RIGHT 전환 중 목표 모서리 휘도 `0.5823`, 반대 모서리 `0.5523`
+  - `17_board_danger` 최저점 바깥 띠 RGB `(95.2, 24.3, 36.1)`; `R ≥ 90`, `R ≥ 2G`, `R ≥ 2B`. 정상 장면 대비 성운 빨강 `+25.1`
+  - `18_board_blocked` 막힌 위쪽 띠 RGB `(134.8, 36.9, 40.3)`, 다른 세 벽 최대 R `8.0`; 게임오버 패널 숨김
+  - 기존 대비: 빈 보드 평균 휘도 `0.0217` (`≤0.10`), 배경 최대 `0.5771` (`≤0.60`), 혼잡 장면 구슬/보드 휘도 비 `16.21`
+- 창 모드 성능 관측 (Standard, Compatibility, BLITZ 시드 101~104, 봇 0.3초):
+
+  | 구분 | 프레임 p50 / p95 / p99 / 최대 | >16.7ms / >33.3ms | 드로콜 p50 / p95 / 최대 | 입력 |
+  |---|---|---:|---:|---:|
+  | 변경 직전 (`d1438f7`) | 8.254 / 16.654 / 18.540 / 23.883ms | 162 / 0 | 514 / 543 / 561 | 120/120, 유실 0 |
+  | 추가 요구 1 | 8.196 / 16.908 / 18.878 / 25.938ms | 193 / 0 | 520 / 551 / 573 | 120/120, 유실 0 |
+
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/test_space_board_visuals.gd` → `5/5`, 종료 코드 0
+  - `tests/run_tests.ps1` → 일반 `271/271`, 장기 `4/4`; 성능 묶음은 전체 래퍼 반복 실행에서 반응 근접 탐색만 `1.090~1.541ms`로 `4/5`(합계 `279/280`, 종료 코드 1), 같은 최종 코드의 성능 묶음 별도 재실행은 `0.996ms`로 `5/5`. 코드 변경과 무관하게 반복 실행에서 흔들리는 기존 시간 기반 검사임
+  - 물리 상태 해시: TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`; #64 1차와 동일
+  - `tests/capture_screens.ps1` → `01_start_screen`~`18_board_blocked` PNG `18/18`, 종료 코드 0; 캡처 화소 검사 전부 통과
+  - 시작 화면 / TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 전역 난수 호출 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. `tests/capture_screens.ps1` 실행 후 `artifacts/screens/16_gravity_switch.png` 확인 → 중력 벽 빛이 아래쪽에서 오른쪽으로 가까운 모서리를 돌아 이동하는 중간 프레임이어야 한다.
+  2. `17_board_danger.png` 확인 → `DANGER ×4`에서 판 바깥 4~10px 띠가 선명한 빨강이고 성운에도 정상 장면보다 붉은 기운이 보여야 한다.
+  3. `18_board_blocked.png` 확인 → `BLOCKED: DOWN`은 보이되 게임오버 패널은 없고, 화면 위쪽 생성 벽만 빨강으로 밝아야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 외곽 상태 띠 폭은 캡처의 4~10px 측정 구간을 덮도록 `0.36m`, 중력 안쪽 빛 폭은 `0.09m`로 구현했다. 게임 밸런스·물리·충돌 수치는 변경하지 않았다.
+  - 전체 래퍼의 반응 근접 탐색 성능 검사는 재실행마다 1ms 경계를 오가며, 별도 실행에서는 통과했지만 전체 래퍼 반복 실행은 종료 코드 1이었다. 합격·불합격 판단을 요청한다.
+- 남은 것 · 질문: 동일 환경 변경 전·후 창 모드 p99 변화는 `+1.8%`이나 둘 다 `<16.7ms` 절대 목표를 넘은 관측을 성능 유지로 볼지 Claude 판정 필요
+
+### [2026-10-11] 대상 #64 — Standard Godot(.NET 미포함) 사용 기준 전환
+- 상태: 완료 — 프로젝트·검증 스크립트의 기본 실행 기준을 Mono/.NET 빌드에서 Godot 4.8 Standard 빌드로 전환함
+- 브랜치 / PR: `v2-space-background-board` / [PR #66](https://github.com/jeongmo-dot/gravity_orb/pull/66)
+- 변경 파일: `AGENTS.md`, `project.godot`, `docs/manual_qa_pending.md`, `tests/*.ps1` 18개, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 로컬 기본 엔진 경로를 `C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`로 변경하고 `GODOT` 환경변수 우선 동작은 유지 — 자동 (`tests/run_tests.ps1`, `tests/capture_screens.ps1` 및 측정 스크립트 16개)
+  - [x] GUI 수동 QA 경로를 Standard 빌드 `Godot_v4.8-dev3_win64.exe`로 변경 — 문서 확인
+  - [x] C# 소스·프로젝트가 없음을 확인하고 불필요한 `project.godot`의 `[dotnet]`/assembly 설정 제거 — 정적 확인 + import
+  - [x] Standard 엔진으로 import·전체 테스트·시작/TURN/BLITZ 스모크·화면 캡처 실행 — 자동
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 기본 인자 없이 `tests/run_tests.ps1` → 일반 `271/271`, 장기 `4/4`, 성능 `5/5`, 합계 `280/280`; 종료 코드 0, 총 59.803초
+  - 시작 화면 / TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 기본 인자 없이 `tests/capture_screens.ps1` → PNG `17/17`, 종료 코드 0; Standard 버전 문자열과 Compatibility 렌더러 사용 확인
+  - 활성 작업 규칙·테스트·수동 QA 문서에서 `mono_win64` 및 이전 `C:\work\Godot` 경로 잔존 0건
+- 수동 확인 절차:
+  1. `C:\work\GodotStandard\Godot_v4.8-dev3_win64.exe --path C:\Workspace\repos\game\gravity_orb` 실행 → .NET 런타임 오류 없이 시작 화면이 표시되어야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 과거 회신의 `mono` 표기는 당시 실제 검증 기록이므로 소급 변경하지 않고, 현재 사용 기준과 실행 스크립트만 Standard로 전환함.
+- 남은 것 · 질문: 없음
+
+### [2026-10-11] 대상 #64 — 비주얼 V2 우주 배경·보드
+- 상태: 완료 — 절차적 우주 배경, 반투명 유리 보드·중력장, 금속/유리 프레임과 중력·BLOCKED·FEVER·DANGER 상태 빛을 구현하고 캡처·대비·창 모드 성능·물리 해시를 관측함
+- 브랜치 / PR: `v2-space-background-board` / [PR #66](https://github.com/jeongmo-dot/gravity_orb/pull/66)
+- 변경 파일: `scenes/Main3D.tscn`, `scripts/core/Main.gd`, `scripts/fx/SpaceBackdrop.gd`, `scripts/spike/Board3D.gd`, `scripts/ui/Hud.gd`, `tests/{test_space_board_visuals.gd,capture_screens.ps1}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 어두운 남색→보라 그라데이션, 저채도 성운 3겹, 원·중·근 별 3겹의 느린 반짝임, 중력 전환 시 원거리 `2px`·근거리 `8px` 시차와 `0.3초` 복귀, `30초`마다 `0.6초` 유성을 외부 에셋 없이 절차 셰이더로 구현 — 자동 (`test_space_backdrop_has_three_star_depths_nebula_and_timed_meteor`, `test_space_parallax_moves_toward_gravity_and_returns_in_point_three_seconds`) + 캡처 직접 확인
+  - [x] 보드 안쪽을 배경이 30~40% 비치는 유리로 교체하고 가장자리 감쇠, 불투명도 `0.10` 중력장 선, 금속 레일·안쪽 빛·바깥 상태광·사선 모서리를 구현 — 자동 (`test_board_uses_glass_gravity_field_and_layered_metal_frame`) + 캡처 직접 확인
+  - [x] 중력장 선은 `0.3초`, 중력 벽 빛은 `0.25초`에 새 방향으로 이동하고 정반대 전환도 각도 보간 — 자동 (`test_gravity_wall_light_and_field_move_to_the_new_direction`) + `16_gravity_switch` 직접 확인
+  - [x] BLOCKED 벽 빨강 맥동, FEVER 전체 주황, DANGER 임계 하늘색→호박색→빨강 및 ×4 이상 맥동·성운 붉은 기운을 기존 HUD 점유율/배수 계산에 연결 — 자동 (`test_blocked_fever_and_danger_keep_distinct_frame_states`) + `07`, `17` 직접 확인
+  - [x] 물리 벽·보드 크기·6° 기울기·구슬 V1·2D 회귀 씬·사용자 저장 파일은 유지하고 외부 에셋·후처리는 추가하지 않음 — 전체 회귀 및 물리 해시 동일
+  - [x] 기존 15장 + `16_gravity_switch` + `17_board_danger` 캡처 `17/17`; 대비·#57 창 모드 성능·시작/TURN/BLITZ 스모크 관측
+
+- 대비 관측 (Compatibility, `540×960`):
+  - 구슬 없는 보드 안쪽 평균 휘도 `0.0216` (명세 상한 `0.10`)
+  - 보드 바깥 배경 별·성운 최대 휘도 `0.5477` (명세 상한 `0.60`)
+  - `07_blitz_danger`: 구슬 평균 `0.5068`, 보드 안쪽 평균 `0.0266`, 구슬/보드 휘도 비 `19.05`
+  - 붐비는 장면은 보드 안쪽에서 휘도 `≥0.16`을 구슬, `≤0.10`을 보드로 분류했으며 보고서는 `artifacts/measurements/space_contrast_report.json`에 생성됨
+
+- 창 모드 성능 관측 (RTX 4070 Ti SUPER, Compatibility, BLITZ 시드 101~104, 봇 0.3초):
+
+  | 구분 | 프레임 p50 / p95 / p99 / 최대 | >16.7ms / >33.3ms | 드로콜 p50 / p95 / 최대 |
+  |---|---|---:|---:|
+  | V1 병합 기준 | 1.506 / 2.512 / 3.765 / 7.607ms | 0 / 0 | 487 / 528 / 552 |
+  | V2 | 1.592 / 2.614 / 3.861 / 8.537ms | 0 / 0 | 514 / 546 / 564 |
+
+  - 입력 `120/120` 수락·유실 `0`; 첫 BLAST 프레임 `2.827~5.362ms`, 첫 8개 생성 프레임 `4.228~8.537ms`; 구슬 공유 리소스 머티리얼 `42`, 레벨 메시 `7`, 장식 메시 `2`, Shape `7`, 물리 머티리얼 `1` 유지
+
+- QA 관측값:
+  - Godot `4.8-dev3 mono` `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/test_space_board_visuals.gd` → `5/5`, 종료 코드 0
+  - `tests/run_tests.ps1` 최종 → 일반 `271/271` 19.284초, 장기 `4/4` 32.625초, 성능 `5/5` 2.396초, 합계 `280/280`; 종료 코드 0, 총 54.306초
+  - 물리 상태 해시: TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`; V1 병합 기준과 동일
+  - `tests/capture_screens.ps1` → `01_start_screen`~`17_board_danger` PNG `17/17`, 종료 코드 0. `02`에서 별·성운·유리·중력장, `16`에서 기울기 중 휘어진 선·벽 빛, `17`에서 빨강 테두리·성운, `07`에서 붐비는 구슬 대비를 직접 확인
+  - 시작 화면 / TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 전역 난수 호출 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+
+- 수동 확인 절차:
+  1. `tests/capture_screens.ps1` 실행 후 `02_turn_early.png` 확인 → 화면 전체에 어두운 남색·보라 성운과 깊이가 다른 별이 보이고, 구슬 없는 보드 부분은 배경이 약하게 비치는 유리와 옅게 휜 격자로 보여야 한다.
+  2. `16_gravity_switch.png` 확인 → 스와이프 0.12초 뒤 6° 기울어진 보드 안에서 격자가 새 중력 방향으로 휘며 새 벽 빛으로 이동하는 중간 프레임이어야 한다. 실제 플레이에서 연속 전환하면 별이 새 중력 방향으로 밀렸다 `0.3초` 안에 돌아와야 한다.
+  3. TURN에서 생성 벽을 막기 → 해당 벽만 빨강으로 맥동해야 한다. BLITZ FEVER 진입/종료 → 전체 테두리가 주황으로 달아올랐다 원래 색으로 돌아와야 한다.
+  4. `17_board_danger.png`와 `07_blitz_danger.png` 확인 → `DANGER ×4`일 때 테두리 바깥이 빨강으로 맥동하고 배경 성운에 약한 붉은 기운이 섞이되 구슬 색·문양이 우선 읽혀야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 전역 난수 금지 규칙을 지키기 위해 유성 간격은 명세 범위 안의 고정 `30초`이며, 주기마다 셰이더 해시로 화면 바깥 시작 높이만 바꾼다. 물리·Spawner RNG에는 관여하지 않는다.
+  - 성운·별·유리·중력장·프레임은 모두 코드 셰이더/기본 메시로 만들었고 캡처 PNG와 측정 JSON은 검수 산출물로만 생성되어 커밋에는 포함하지 않는다.
+- 남은 것 · 질문: 없음
+
 ### [2026-10-11] 대상 #63 — 비주얼 V1 추가 요구 1: 그림 품질
 - 상태: 완료 — 구 셰이딩·3D 위치 기반 무늬·레벨별 천체 정체성·통합 림/광채 펄스와 근접 캡처·이음매 수치 검사를 구현함
 - 브랜치 / PR: `v1-celestial-orbs` / [PR #65](https://github.com/jeongmo-dot/gravity_orb/pull/65)

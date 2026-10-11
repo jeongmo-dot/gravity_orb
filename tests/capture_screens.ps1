@@ -10,8 +10,8 @@ $outputPath = Join-Path $repoPath "artifacts\screens"
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {
     if (-not [string]::IsNullOrWhiteSpace($env:GODOT)) {
         $GodotPath = $env:GODOT
-    } elseif (Test-Path -LiteralPath "C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe") {
-        $GodotPath = "C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe"
+    } elseif (Test-Path -LiteralPath "C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe") {
+        $GodotPath = "C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe"
     } else {
         $GodotPath = "godot"
     }
@@ -57,7 +57,10 @@ $expectedFiles = @(
     "12_turn_ramp_next.png",
     "13_turn_ramp_uncapped_next.png",
 	"14_orb_codex.png",
-	"15_orb_closeup.png"
+	"15_orb_closeup.png",
+	"16_gravity_switch.png",
+	"17_board_danger.png",
+	"18_board_blocked.png"
 )
 foreach ($fileName in $expectedFiles) {
     $filePath = Join-Path $outputPath $fileName

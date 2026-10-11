@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://scripts/core/Main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://scenes/Board3D.tscn" id="2_board"]
@@ -10,6 +10,7 @@
 [ext_resource type="Script" path="res://scripts/core/BlitzManager.gd" id="8_blitz"]
 [ext_resource type="Script" path="res://scripts/fx/FeedbackDirector.gd" id="9_feedback"]
 [ext_resource type="Script" path="res://scripts/fx/SfxBank.gd" id="10_sfx"]
+[ext_resource type="Script" path="res://scripts/fx/SpaceBackdrop.gd" id="11_backdrop"]
 
 [sub_resource type="Environment" id="Environment_main"]
 background_mode = 1
@@ -47,6 +48,9 @@ position = Vector3(4.5, 4, 5)
 light_color = Color(1, 0.49, 0.24, 1)
 light_energy = 4.0
 omni_range = 16.0
+
+[node name="SpaceBackdrop" type="MeshInstance3D" parent="."]
+script = ExtResource("11_backdrop")
 
 [node name="Board" parent="." instance=ExtResource("2_board")]
 unique_name_in_owner = true

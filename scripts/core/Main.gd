@@ -17,6 +17,7 @@ static var _force_start_screen: bool = false
 @onready var _score_manager: ScoreManager = %ScoreManager
 @onready var _feedback_director: FeedbackDirector = %FeedbackDirector
 @onready var _ui: DebugHud = $UI
+@onready var _space_backdrop: SpaceBackdrop = get_node_or_null("SpaceBackdrop") as SpaceBackdrop
 
 var _game_manager: Variant
 var _launch_game_on_ready: bool = false
@@ -56,6 +57,7 @@ func _prepare_start_screen() -> void:
 
 func _ready() -> void:
 	RenderingServer.set_default_clear_color(BACKGROUND_COLOR)
+	_bind_space_visuals()
 	_game_manager = (
 		_blitz_manager
 		if Config.data.game_mode == GameConfig.GameMode.BLITZ
@@ -78,6 +80,20 @@ func _ready() -> void:
 		_ui.show_start_screen()
 		return
 	_start_gameplay()
+
+
+func _bind_space_visuals() -> void:
+	if _space_backdrop == null:
+		return
+	var board_3d: Board3D = _board as Board3D
+	if board_3d == null:
+		return
+	if not board_3d.visual_gravity_changed.is_connected(
+		_space_backdrop.set_gravity_direction
+	):
+		board_3d.visual_gravity_changed.connect(_space_backdrop.set_gravity_direction)
+	if not board_3d.danger_visual_changed.is_connected(_space_backdrop.set_danger_state):
+		board_3d.danger_visual_changed.connect(_space_backdrop.set_danger_state)
 
 
 func launch_immediately(mode: GameConfig.GameMode) -> void:

@@ -2,6 +2,8 @@ class_name Board3D
 extends Node3D
 
 signal orb_contact(a: Orb3D, b: Orb3D)
+signal visual_gravity_changed(direction: Vector2i)
+signal danger_visual_changed(intensity: float, pulsing: bool)
 
 const ORB_SCENE: PackedScene = preload("res://scenes/Orb3D.tscn")
 const PIXELS_PER_METER: float = 100.0
@@ -11,6 +13,15 @@ const VISUAL_TILT_DURATION: float = 0.3
 const WARNING_FRAME_COLOR: Color = Color("#FF3B30")
 const NORMAL_FRAME_COLOR: Color = Color("#8ec5ff")
 const FEVER_FRAME_COLOR: Color = Color("#FF9F0A")
+const METAL_FRAME_COLOR: Color = Color("#26384E")
+const GRAVITY_GLOW_COLOR: Color = Color("#D7EEFF")
+const DANGER_AMBER_COLOR: Color = Color("#FFB020")
+const GRAVITY_LIGHT_DURATION: float = 0.25
+const GRAVITY_FIELD_DURATION: float = 0.30
+const GRAVITY_FIELD_MAX_ALPHA: float = 0.10
+const OUTER_GLOW_WIDTH_M: float = 0.36
+const INNER_GLOW_WIDTH_M: float = 0.09
+const PERIMETER_LENGTH: float = 4.0
 
 static var _active_board_count: int = 0
 
@@ -23,8 +34,23 @@ var _next_orb_spawn_id: int = 1
 var _gravity_direction: Vector2i = Vector2i.DOWN
 var _warning_directions: Array[Vector2i] = []
 var _visual_walls: Dictionary = {}
+var _wall_materials: Dictionary = {}
+var _wall_inner_glows: Dictionary = {}
+var _wall_outer_glows: Dictionary = {}
 var _tilt_tween: Tween
 var _fever_active: bool = false
+var _gravity_field_material: ShaderMaterial
+var _gravity_visual_from: Vector2i = Vector2i.DOWN
+var _gravity_visual_to: Vector2i = Vector2i.DOWN
+var _gravity_visual_elapsed: float = GRAVITY_FIELD_DURATION
+var _gravity_light_from_position: float = 2.0
+var _gravity_light_delta: float = 0.0
+var _warning_pulse_elapsed: float = 0.0
+var _danger_active: bool = false
+var _danger_intensity: float = 0.0
+var _danger_pulsing: bool = false
+var _danger_multiplier: float = 1.0
+var _danger_pulse_elapsed: float = 0.0
 var orb_contact_reporting_enabled: bool = true
 var orb_continuous_cd_enabled: bool = true
 var orb_allow_sleep: bool = false
@@ -40,6 +66,8 @@ func _ready() -> void:
 	Orb3D.prewarm_shared_resources(Config.data)
 	_configure_walls()
 	_configure_visuals()
+	set_process(true)
+	_update_warning_visuals()
 
 
 func _exit_tree() -> void:
@@ -53,14 +81,42 @@ func _physics_process(delta: float) -> void:
 	_update_ghost_orbs(delta)
 
 
+func _process(delta: float) -> void:
+	if not _warning_directions.is_empty():
+		_warning_pulse_elapsed += delta
+	if _danger_pulsing:
+		_danger_pulse_elapsed += delta
+	_gravity_visual_elapsed = minf(
+		_gravity_visual_elapsed + delta,
+		GRAVITY_FIELD_DURATION
+	)
+	_update_gravity_field_transition()
+	_update_warning_visuals()
+
+
 func half_size() -> float:
 	return Config.data.board_size * 0.5
 
 
 func set_gravity(direction: Vector2i) -> void:
+	var previous_direction: Vector2i = _gravity_direction
+	var current_light_position: float = _gravity_light_position()
 	_gravity_direction = direction
+	if previous_direction != direction:
+		_gravity_visual_from = previous_direction
+		_gravity_visual_to = direction
+		_gravity_light_from_position = current_light_position
+		_gravity_light_delta = _shortest_perimeter_delta(
+			current_light_position,
+			_gravity_perimeter_position(direction)
+		)
+		_gravity_visual_elapsed = 0.0
 	for orb: Orb3D in _orbs:
 		orb.set_gravity(direction, Config.data.gravity_strength)
+	if previous_direction != direction:
+		visual_gravity_changed.emit(direction)
+	_update_gravity_field_transition()
+	_update_warning_visuals()
 
 
 func play_visual_tilt(direction: Vector2i) -> void:
@@ -407,11 +463,29 @@ func blocked_spawn_directions(batch: Array[Dictionary]) -> Array[Vector2i]:
 func set_warning_directions(directions: Array[Vector2i]) -> void:
 	_warning_directions.clear()
 	_warning_directions.append_array(directions)
+	_warning_pulse_elapsed = 0.0
 	_update_warning_visuals()
 
 
 func set_fever_active(active: bool) -> void:
 	_fever_active = active
+	_update_warning_visuals()
+
+
+func set_danger_state(occupancy: float, multiplier: float) -> void:
+	var active: bool = occupancy >= Config.data.danger_start
+	var was_pulsing: bool = _danger_pulsing
+	_danger_active = active
+	_danger_multiplier = maxf(multiplier, 1.0) if active else 1.0
+	_danger_intensity = (
+		clampf(inverse_lerp(1.0, 4.0, _danger_multiplier), 0.0, 1.0)
+		if active
+		else 0.0
+	)
+	_danger_pulsing = active and _danger_multiplier >= 4.0
+	if _danger_pulsing and not was_pulsing:
+		_danger_pulse_elapsed = 0.0
+	danger_visual_changed.emit(_danger_intensity, _danger_pulsing)
 	_update_warning_visuals()
 
 
@@ -586,11 +660,22 @@ func _configure_visuals() -> void:
 	var backing: MeshInstance3D = MeshInstance3D.new()
 	backing.name = "Backing"
 	backing.position = Vector3(0.0, 0.0, -0.34)
-	var backing_mesh: BoxMesh = BoxMesh.new()
-	backing_mesh.size = Vector3(board_size_m, board_size_m, 0.18)
+	var backing_mesh: QuadMesh = QuadMesh.new()
+	backing_mesh.size = Vector2(board_size_m, board_size_m)
 	backing.mesh = backing_mesh
-	backing.material_override = _visual_material(Color("#10192e"), 0.74, 0.0)
+	backing.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	backing.material_override = _glass_backing_material()
 	_visual_tilt.add_child(backing)
+	var gravity_field: MeshInstance3D = MeshInstance3D.new()
+	gravity_field.name = "GravityField"
+	gravity_field.position = Vector3(0.0, 0.0, -0.31)
+	var field_mesh: QuadMesh = QuadMesh.new()
+	field_mesh.size = Vector2(board_size_m, board_size_m)
+	gravity_field.mesh = field_mesh
+	gravity_field.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_gravity_field_material = _gravity_field_shader_material()
+	gravity_field.material_override = _gravity_field_material
+	_visual_tilt.add_child(gravity_field)
 	_add_visual_wall(
 		"VisualTop",
 		Orb3D.plane_position_to_world(Vector2(0.0, -half)),
@@ -611,6 +696,7 @@ func _configure_visuals() -> void:
 		Orb3D.plane_position_to_world(Vector2(half, 0.0)),
 		Vector3(VISUAL_WALL_WIDTH_M, board_size_m, 0.28)
 	)
+	_add_beveled_corners(board_size_m * 0.5)
 
 
 func _add_visual_wall(wall_name: String, wall_position: Vector3, size: Vector3) -> void:
@@ -620,33 +706,125 @@ func _add_visual_wall(wall_name: String, wall_position: Vector3, size: Vector3) 
 	var wall_mesh: BoxMesh = BoxMesh.new()
 	wall_mesh.size = size
 	wall_mesh_instance.mesh = wall_mesh
-	wall_mesh_instance.material_override = _visual_material(NORMAL_FRAME_COLOR, 0.22, 0.18)
+	var wall_material: StandardMaterial3D = _visual_material(METAL_FRAME_COLOR, 0.22, 0.08)
+	wall_material.metallic = 0.78
+	wall_mesh_instance.material_override = wall_material
 	_visual_tilt.add_child(wall_mesh_instance)
 	_visual_walls[wall_name] = wall_mesh_instance
+	_wall_materials[wall_name] = wall_material
+
+	var outer_glow: MeshInstance3D = MeshInstance3D.new()
+	outer_glow.name = "OuterGlow"
+	outer_glow.position.z = -0.08
+	var outer_mesh: QuadMesh = QuadMesh.new()
+	outer_mesh.size = Vector2(
+		size.x + 0.16 if size.x > size.y else OUTER_GLOW_WIDTH_M,
+		OUTER_GLOW_WIDTH_M if size.x > size.y else size.y + 0.16
+	)
+	outer_glow.mesh = outer_mesh
+	outer_glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	outer_glow.material_override = _transparent_glow_material(Color(0.0, 0.0, 0.0, 0.16))
+	wall_mesh_instance.add_child(outer_glow)
+	_wall_outer_glows[wall_name] = outer_glow
+
+	var inner_glow: MeshInstance3D = MeshInstance3D.new()
+	inner_glow.name = "InnerGlow"
+	inner_glow.position.z = 0.17
+	var inner_mesh: QuadMesh = QuadMesh.new()
+	inner_mesh.size = Vector2(
+		size.x if size.x > size.y else INNER_GLOW_WIDTH_M,
+		INNER_GLOW_WIDTH_M if size.x > size.y else size.y
+	)
+	inner_glow.mesh = inner_mesh
+	inner_glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	inner_glow.material_override = _gravity_glow_material(size.y > size.x)
+	wall_mesh_instance.add_child(inner_glow)
+	_wall_inner_glows[wall_name] = inner_glow
 
 
 func _update_warning_visuals() -> void:
-	var direction_by_name: Dictionary = {
+	var spawn_direction_by_name: Dictionary = {
 		"VisualTop": Vector2i.DOWN,
 		"VisualBottom": Vector2i.UP,
 		"VisualLeft": Vector2i.RIGHT,
 		"VisualRight": Vector2i.LEFT,
 	}
-	for wall_name: String in direction_by_name:
+	var gravity_direction_by_name: Dictionary = {
+		"VisualTop": Vector2i.UP,
+		"VisualBottom": Vector2i.DOWN,
+		"VisualLeft": Vector2i.LEFT,
+		"VisualRight": Vector2i.RIGHT,
+	}
+	var warning_pulse: float = 0.86 + 0.14 * cos(_warning_pulse_elapsed * TAU * 1.4)
+	var danger_pulse: float = _danger_pulse_strength()
+	var danger_color: Color = _danger_color(_danger_multiplier)
+	var light_position: float = _gravity_light_position()
+	for wall_name: String in spawn_direction_by_name:
 		var wall: MeshInstance3D = _visual_walls.get(wall_name) as MeshInstance3D
 		if wall == null:
 			continue
-		var direction: Vector2i = Vector2i(direction_by_name[wall_name])
-		var warning: bool = _warning_directions.has(direction)
-		var frame_color: Color = NORMAL_FRAME_COLOR
-		var emission: float = 0.18
+		var spawn_direction: Vector2i = Vector2i(spawn_direction_by_name[wall_name])
+		var wall_gravity_direction: Vector2i = Vector2i(gravity_direction_by_name[wall_name])
+		var warning: bool = _warning_directions.has(spawn_direction)
+		var frame_color: Color = METAL_FRAME_COLOR
+		var emission: float = 0.08
 		if warning:
-			frame_color = WARNING_FRAME_COLOR
-			emission = 0.35
+			frame_color = WARNING_FRAME_COLOR.lerp(Color.WHITE, 0.08 * warning_pulse)
+			emission = 0.32 + 0.30 * warning_pulse
 		elif _fever_active:
-			frame_color = FEVER_FRAME_COLOR
-			emission = 0.55
-		wall.material_override = _visual_material(frame_color, 0.22, emission)
+			frame_color = METAL_FRAME_COLOR.lerp(FEVER_FRAME_COLOR, 0.70)
+			emission = 0.48
+		var wall_material: StandardMaterial3D = _wall_materials.get(wall_name) as StandardMaterial3D
+		_set_standard_material_color(wall_material, frame_color, emission)
+
+		var wall_position: float = _gravity_perimeter_position(wall_gravity_direction)
+		var wall_distance: float = _signed_perimeter_distance(wall_position, light_position)
+		var gravity_weight: float = pow(
+			clampf(1.0 - absf(wall_distance), 0.0, 1.0),
+			0.16
+		)
+		var axis_direction: float = (
+			-1.0
+			if wall_name == "VisualBottom" or wall_name == "VisualLeft"
+			else 1.0
+		)
+		var highlight_center: float = clampf(
+			0.5 + wall_distance * axis_direction,
+			0.0,
+			1.0
+		)
+		var inner_color: Color = GRAVITY_GLOW_COLOR
+		var inner_strength: float = gravity_weight
+		if warning:
+			inner_color = WARNING_FRAME_COLOR
+			inner_strength = 0.52 + 0.48 * warning_pulse
+			highlight_center = 0.5
+		elif _fever_active:
+			inner_color = FEVER_FRAME_COLOR
+			inner_strength = maxf(inner_strength, 0.72)
+			highlight_center = 0.5
+		var inner_glow: MeshInstance3D = _wall_inner_glows.get(wall_name) as MeshInstance3D
+		_set_gravity_glow_material(
+			inner_glow,
+			inner_color,
+			inner_strength,
+			highlight_center
+		)
+
+		var outer_glow: MeshInstance3D = _wall_outer_glows.get(wall_name) as MeshInstance3D
+		var outer_strength: float = (
+			(0.40 + 0.60 * _danger_intensity) * danger_pulse
+			if _danger_active
+			else 0.0
+		)
+		var outer_color: Color = danger_color
+		if warning:
+			outer_color = WARNING_FRAME_COLOR
+			outer_strength = maxf(outer_strength, warning_pulse)
+		elif _fever_active:
+			outer_color = FEVER_FRAME_COLOR
+			outer_strength = maxf(outer_strength, 0.58)
+		_set_outer_glow_material(outer_glow, outer_color, outer_strength)
 
 
 func _visual_material(color_value: Color, roughness: float, emission_energy: float) -> StandardMaterial3D:
@@ -657,4 +835,244 @@ func _visual_material(color_value: Color, roughness: float, emission_energy: flo
 	if emission_energy > 0.0:
 		material.emission_enabled = true
 		material.emission = color_value * emission_energy
+	return material
+
+
+func _add_beveled_corners(half_size_m: float) -> void:
+	var corners: Node3D = Node3D.new()
+	corners.name = "BeveledCorners"
+	_visual_tilt.add_child(corners)
+	for corner_index: int in range(4):
+		var x_sign: float = -1.0 if corner_index % 2 == 0 else 1.0
+		var y_sign: float = -1.0 if corner_index < 2 else 1.0
+		var corner: MeshInstance3D = MeshInstance3D.new()
+		corner.name = "Corner%d" % corner_index
+		corner.position = Vector3(x_sign * half_size_m, y_sign * half_size_m, 0.03)
+		corner.rotation.z = deg_to_rad(45.0 * x_sign * y_sign)
+		var corner_mesh: BoxMesh = BoxMesh.new()
+		corner_mesh.size = Vector3(0.22, 0.10, 0.31)
+		corner.mesh = corner_mesh
+		var corner_material: StandardMaterial3D = _visual_material(
+			METAL_FRAME_COLOR.lerp(NORMAL_FRAME_COLOR, 0.16),
+			0.20,
+			0.10
+		)
+		corner_material.metallic = 0.84
+		corner.material_override = corner_material
+		corners.add_child(corner)
+
+
+func _update_gravity_field_transition() -> void:
+	if _gravity_field_material == null:
+		return
+	_gravity_field_material.set_shader_parameter(
+		"gravity_from",
+		Vector2(_gravity_visual_from)
+	)
+	_gravity_field_material.set_shader_parameter(
+		"gravity_to",
+		Vector2(_gravity_visual_to)
+	)
+	_gravity_field_material.set_shader_parameter("gravity_mix", _gravity_field_mix())
+
+
+func _gravity_field_mix() -> float:
+	return clampf(
+		_gravity_visual_elapsed / GRAVITY_FIELD_DURATION,
+		0.0,
+		1.0
+	)
+
+
+func _gravity_light_mix() -> float:
+	return clampf(
+		_gravity_visual_elapsed / GRAVITY_LIGHT_DURATION,
+		0.0,
+		1.0
+	)
+
+
+func _gravity_perimeter_position(direction: Vector2i) -> float:
+	if direction == Vector2i.UP:
+		return 0.0
+	if direction == Vector2i.RIGHT:
+		return 1.0
+	if direction == Vector2i.DOWN:
+		return 2.0
+	return 3.0
+
+
+func _shortest_perimeter_delta(from_position: float, to_position: float) -> float:
+	var delta: float = fposmod(
+		to_position - from_position + PERIMETER_LENGTH * 0.5,
+		PERIMETER_LENGTH
+	) - PERIMETER_LENGTH * 0.5
+	if is_equal_approx(delta, -PERIMETER_LENGTH * 0.5):
+		return PERIMETER_LENGTH * 0.5
+	return delta
+
+
+func _gravity_light_position() -> float:
+	return fposmod(
+		_gravity_light_from_position + _gravity_light_delta * _gravity_light_mix(),
+		PERIMETER_LENGTH
+	)
+
+
+func _signed_perimeter_distance(from_position: float, to_position: float) -> float:
+	return _shortest_perimeter_delta(from_position, to_position)
+
+
+func _danger_pulse_strength() -> float:
+	if not _danger_pulsing:
+		return 1.0
+	return 0.80 + 0.20 * cos(_danger_pulse_elapsed * TAU * 0.8)
+
+
+func _danger_color(multiplier: float) -> Color:
+	if multiplier >= 4.0:
+		return WARNING_FRAME_COLOR
+	if multiplier >= 1.5:
+		return DANGER_AMBER_COLOR
+	return NORMAL_FRAME_COLOR
+
+
+func _set_standard_material_color(
+	material: StandardMaterial3D,
+	color_value: Color,
+	emission_energy: float
+) -> void:
+	if material == null:
+		return
+	material.albedo_color = color_value
+	material.emission_enabled = true
+	material.emission = color_value * emission_energy
+
+
+func _transparent_glow_material(color_value: Color) -> StandardMaterial3D:
+	var material: StandardMaterial3D = StandardMaterial3D.new()
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.albedo_color = color_value
+	material.emission_enabled = true
+	material.emission = Color(color_value.r, color_value.g, color_value.b, 1.0)
+	material.emission_energy_multiplier = 0.0
+	return material
+
+
+func _set_outer_glow_material(
+	node: MeshInstance3D,
+	color_value: Color,
+	strength: float
+) -> void:
+	if node == null:
+		return
+	var material: StandardMaterial3D = node.material_override as StandardMaterial3D
+	if material == null:
+		return
+	var safe_strength: float = clampf(strength, 0.0, 1.0)
+	material.albedo_color = Color(color_value.r, color_value.g, color_value.b, safe_strength * 0.78)
+	material.emission = color_value
+	material.emission_energy_multiplier = safe_strength * 1.80
+
+
+func _gravity_glow_material(vertical: bool) -> ShaderMaterial:
+	var material: ShaderMaterial = ShaderMaterial.new()
+	var glow_shader: Shader = Shader.new()
+	glow_shader.code = """
+shader_type spatial;
+render_mode unshaded, blend_mix, cull_disabled, depth_draw_never;
+
+uniform vec3 glow_color = vec3(0.84, 0.93, 1.0);
+uniform float strength : hint_range(0.0, 1.0) = 0.0;
+uniform float highlight_center : hint_range(0.0, 1.0) = 0.5;
+uniform bool vertical = false;
+
+void fragment() {
+	float along = vertical ? UV.y : UV.x;
+	float across = vertical ? UV.x : UV.y;
+	float distance_to_highlight = abs(along - highlight_center);
+	float center_profile = 0.48 + 0.52 * (1.0 - smoothstep(0.0, 0.42, distance_to_highlight));
+	float width_profile = smoothstep(0.0, 0.18, across) * smoothstep(0.0, 0.18, 1.0 - across);
+	ALBEDO = glow_color;
+	ALPHA = strength * center_profile * width_profile;
+}
+"""
+	material.shader = glow_shader
+	material.set_shader_parameter("vertical", vertical)
+	return material
+
+
+func _set_gravity_glow_material(
+	node: MeshInstance3D,
+	color_value: Color,
+	strength: float,
+	highlight_center: float
+) -> void:
+	if node == null:
+		return
+	var material: ShaderMaterial = node.material_override as ShaderMaterial
+	if material == null:
+		return
+	material.set_shader_parameter("glow_color", Vector3(color_value.r, color_value.g, color_value.b))
+	material.set_shader_parameter("strength", clampf(strength, 0.0, 1.0))
+	material.set_shader_parameter("highlight_center", clampf(highlight_center, 0.0, 1.0))
+
+
+func _glass_backing_material() -> ShaderMaterial:
+	var material: ShaderMaterial = ShaderMaterial.new()
+	var glass_shader: Shader = Shader.new()
+	glass_shader.code = """
+shader_type spatial;
+render_mode unshaded, blend_mix, cull_disabled, depth_draw_opaque;
+
+void fragment() {
+	vec2 centered = abs(UV * 2.0 - 1.0);
+	float edge = smoothstep(0.58, 1.0, max(centered.x, centered.y));
+	float center_glow = 1.0 - smoothstep(0.0, 0.92, length((UV - vec2(0.5)) * vec2(0.88, 1.0)));
+	vec3 glass = mix(vec3(0.012, 0.021, 0.046), vec3(0.025, 0.045, 0.082), center_glow * 0.55);
+	glass *= 1.0 - edge * 0.30;
+	ALBEDO = glass;
+	ALPHA = mix(0.65, 0.78, edge);
+	ROUGHNESS = 0.34;
+}
+"""
+	material.shader = glass_shader
+	return material
+
+
+func _gravity_field_shader_material() -> ShaderMaterial:
+	var material: ShaderMaterial = ShaderMaterial.new()
+	var field_shader: Shader = Shader.new()
+	field_shader.code = """
+shader_type spatial;
+render_mode unshaded, blend_add, cull_disabled, depth_draw_never;
+
+uniform vec2 gravity_from = vec2(0.0, 1.0);
+uniform vec2 gravity_to = vec2(0.0, 1.0);
+uniform float gravity_mix : hint_range(0.0, 1.0) = 1.0;
+uniform float maximum_alpha : hint_range(0.0, 0.12) = 0.10;
+
+void fragment() {
+	vec2 point = UV * 2.0 - 1.0;
+	float from_angle = atan(gravity_from.y, gravity_from.x);
+	float to_angle = atan(gravity_to.y, gravity_to.x);
+	float angle_delta = mod(to_angle - from_angle + 3.14159265, 6.28318531) - 3.14159265;
+	float gravity_angle = from_angle + angle_delta * gravity_mix;
+	vec2 gravity = vec2(cos(gravity_angle), sin(gravity_angle));
+	vec2 tangent = vec2(-gravity.y, gravity.x);
+	float along = dot(point, gravity);
+	float across = dot(point, tangent);
+	float well = (along + 1.0) * 0.5;
+	vec2 warped = point - gravity * across * across * (0.15 + 0.18 * well);
+	float line_x = 1.0 - smoothstep(0.025, 0.070, abs(fract(warped.x * 5.0 + 0.5) - 0.5));
+	float line_y = 1.0 - smoothstep(0.025, 0.070, abs(fract(warped.y * 5.0 + 0.5) - 0.5));
+	float edge_fade = smoothstep(1.0, 0.80, max(abs(point.x), abs(point.y)));
+	float alpha = max(line_x, line_y) * edge_fade * maximum_alpha;
+	ALBEDO = vec3(0.48, 0.70, 0.88);
+	ALPHA = min(alpha, 0.12);
+}
+"""
+	material.shader = field_shader
+	material.set_shader_parameter("maximum_alpha", GRAVITY_FIELD_MAX_ALPHA)
 	return material

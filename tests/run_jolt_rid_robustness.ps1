@@ -1,5 +1,5 @@
 param(
-    [string]$GodotPath = "C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe",
+    [string]$GodotPath = "C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe",
     [int]$MaxParallel = 4,
     [string[]]$Modes = @("turn", "blitz"),
     [int[]]$DummyCounts = @(0, 1, 7, 50, 100),
