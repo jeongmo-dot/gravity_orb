@@ -121,6 +121,7 @@ func _capture_turn_scenes() -> void:
 		_fail("TURN did not reach initial input state")
 		await _destroy_main(main)
 		return
+	await _write_board_projection_report(main, board)
 	for turn_index: int in range(4):
 		manager.on_swipe(DIRECTION_PATTERN[turn_index])
 		if not await _wait_for_turn_input(manager):
@@ -1160,10 +1161,69 @@ func _capture(file_name: String) -> void:
 	print("SCREEN_CAPTURE file=%s size=%dx%d" % [path, image.get_width(), image.get_height()])
 
 
+func _write_board_projection_report(main: Main, board: Board3D) -> void:
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
+	var logical_size: Vector2 = get_viewport().get_visible_rect().size
+	var image: Image = get_viewport().get_texture().get_image()
+	var image_scale: Vector2 = Vector2(image.get_size()) / logical_size
+	var outer_half_m: float = (
+		board.half_size() / Board3D.PIXELS_PER_METER
+		+ Board3D.OUTER_GLOW_WIDTH_M * 0.5
+	)
+	var minimum: Vector2 = Vector2(INF, INF)
+	var maximum: Vector2 = Vector2(-INF, -INF)
+	var corners: Array[Vector2] = [
+		Vector2(-outer_half_m, -outer_half_m),
+		Vector2(outer_half_m, -outer_half_m),
+		Vector2(outer_half_m, outer_half_m),
+		Vector2(-outer_half_m, outer_half_m),
+	]
+	for corner: Vector2 in corners:
+		var projected: Vector2 = camera.unproject_position(
+			board.to_global(Vector3(corner.x, corner.y, 0.0))
+		)
+		minimum = minimum.min(projected)
+		maximum = maximum.max(projected)
+	var logical_rect: Rect2 = Rect2(minimum, maximum - minimum)
+	var report: Dictionary = {
+		"logical_size": {"x": logical_size.x, "y": logical_size.y},
+		"image_size": {"x": image.get_width(), "y": image.get_height()},
+		"keep_aspect": camera.keep_aspect,
+		"fov_degrees": camera.fov,
+		"logical": {
+			"left": logical_rect.position.x,
+			"right": logical_rect.end.x,
+			"width": logical_rect.size.x,
+		},
+		"pixels": {
+			"left": logical_rect.position.x * image_scale.x,
+			"right": logical_rect.end.x * image_scale.x,
+			"width": logical_rect.size.x * image_scale.x,
+		},
+	}
+	var path: String = _output_directory.path_join("board_projection.json")
+	var file: FileAccess = FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		_fail("Could not write board projection report")
+		return
+	file.store_string(JSON.stringify(report, "  "))
+	print(
+		"SCREEN_CAPTURE_BOARD ratio=%dx%d left=%.3f right=%.3f width=%.3f" % [
+			image.get_width(), image.get_height(),
+			float((report["pixels"] as Dictionary)["left"]),
+			float((report["pixels"] as Dictionary)["right"]),
+			float((report["pixels"] as Dictionary)["width"]),
+		]
+	)
+
+
 func _prepare_output_directory() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_output_directory))
 	for file_name: String in CAPTURE_FILES:
 		_remove_file(_output_directory.path_join(file_name))
+	_remove_file(_output_directory.path_join("board_projection.json"))
 	_remove_file(_temp_save_path)
 
 
@@ -1182,7 +1242,7 @@ func _validate_turn_game_over_scene(main: Main) -> void:
 	_expect_label_text(blocked, "BLOCKED: LEFT", "TURN HUD blocked direction")
 	_expect_label_text(
 		main.get_node("UI/Hud/ScoreLabel") as Label,
-		"SCORE\n%d" % TURN_CAPTURE_SCORE,
+		str(TURN_CAPTURE_SCORE),
 		"TURN HUD score"
 	)
 	_expect_label_text(
@@ -1245,7 +1305,7 @@ func _validate_blitz_time_up_scene(main: Main) -> void:
 	)
 	_expect_label_text(
 		main.get_node("UI/Hud/ScoreLabel") as Label,
-		"SCORE\n%d" % BLITZ_CAPTURE_SCORE,
+		str(BLITZ_CAPTURE_SCORE),
 		"BLITZ TIME UP HUD score"
 	)
 	print("SCREEN_CAPTURE_CHECK scene=blitz_time_up timer=0.0 score=%d" % BLITZ_CAPTURE_SCORE)
@@ -1259,7 +1319,7 @@ func _validate_blitz_result_scene(main: Main) -> void:
 	)
 	_expect_label_text(
 		main.get_node("UI/Hud/ScoreLabel") as Label,
-		"SCORE\n%d" % BLITZ_CAPTURE_SCORE,
+		str(BLITZ_CAPTURE_SCORE),
 		"BLITZ result HUD score"
 	)
 	_expect_label_text(

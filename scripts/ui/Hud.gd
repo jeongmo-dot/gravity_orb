@@ -30,8 +30,9 @@ const HUD_AMBER_COLOR: Color = Color("#FFB020")
 const HUD_PANEL_COLOR: Color = Color(0.0431373, 0.0941176, 0.2, 0.60)
 const SCORE_FONT_MAX: int = 54
 const SCORE_FONT_MIN: int = 32
+const BEST_FONT_MAX: int = 40
+const BEST_FONT_MIN: int = 18
 const SCORE_DIGIT_WIDTH_FACTOR: float = 0.72
-const HUD_LOGICAL_WIDTH: float = 1080.0
 const HUD_MARGIN: float = 24.0
 const PREVIEW_SHELF_HEIGHT: float = 340.0
 const TIME_BAR_INSET: float = 4.0
@@ -47,7 +48,9 @@ const SPEAKER_OFF_ICON: Texture2D = preload("res://assets/ui/speaker_off.svg")
 @onready var _then_preview_region: Control = %ThenPreviewRegion
 @onready var _next_count_label: Label = %NextCountLabel
 @onready var _then_count_label: Label = %ThenCountLabel
+@onready var _score_title_label: Label = %ScoreTitleLabel
 @onready var _score_label: Label = %ScoreLabel
+@onready var _best_title_label: Label = %BestTitleLabel
 @onready var _best_label: Label = %BestLabel
 @onready var _max_combo_label: Label = %MaxComboLabel
 @onready var _multiplier_label: Label = %MultiplierLabel
@@ -144,8 +147,10 @@ func _apply_responsive_layout() -> void:
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
 	var layout: Dictionary = hud_layout(viewport_size, _logical_safe_area(viewport_size))
 	_set_control_rect(_score_panel, layout["score_panel"] as Rect2)
+	_set_control_rect(_score_title_label, layout["score_title"] as Rect2)
 	_set_control_rect(_score_label, layout["score"] as Rect2)
 	_set_control_rect(_best_panel, layout["best_panel"] as Rect2)
+	_set_control_rect(_best_title_label, layout["best_title"] as Rect2)
 	_set_control_rect(_best_label, layout["best"] as Rect2)
 	_set_control_rect(_sound_button, layout["sound"] as Rect2)
 	_set_control_rect(_danger_panel, layout["danger_panel"] as Rect2)
@@ -186,7 +191,7 @@ func _apply_responsive_layout() -> void:
 	_danger_label.pivot_offset = _danger_label.size * 0.5
 	_timer_label.pivot_offset = _timer_label.size * 0.5
 	_fit_numeric_label(_score_label, _displayed_score, SCORE_FONT_MAX, SCORE_FONT_MIN)
-	_fit_numeric_label(_best_label, _best_target, 27, 18)
+	_fit_numeric_label(_best_label, _best_target, BEST_FONT_MAX, BEST_FONT_MIN)
 	_update_time_bar(_previous_time_remaining if _previous_time_remaining >= 0.0 else 0.0)
 
 
@@ -238,15 +243,17 @@ static func hud_layout(viewport_size: Vector2, safe_area: Rect2 = Rect2()) -> Di
 	return {
 		"safe": safe,
 		"score_panel": Rect2(center_x - 240.0, top, 480.0, 150.0),
-		"score": Rect2(center_x - 224.0, top + 12.0, 448.0, 126.0),
-		"best_panel": Rect2(safe.end.x - 236.0, top, 236.0, 150.0),
-		"best": Rect2(safe.end.x - 224.0, top + 12.0, 212.0, 126.0),
-		"sound": Rect2(safe.position.x, top + 8.0, 120.0, 120.0),
-		"danger_panel": Rect2(safe.position.x, top + 166.0, 256.0, 62.0),
-		"danger": Rect2(safe.position.x + 12.0, top + 172.0, 232.0, 50.0),
+		"score_title": Rect2(center_x - 224.0, top + 12.0, 448.0, 30.0),
+		"score": Rect2(center_x - 224.0, top + 42.0, 448.0, 96.0),
+		"best_panel": Rect2(safe.end.x - HUD_MARGIN - 236.0, top, 236.0, 150.0),
+		"best_title": Rect2(safe.end.x - HUD_MARGIN - 224.0, top + 14.0, 212.0, 26.0),
+		"best": Rect2(safe.end.x - HUD_MARGIN - 224.0, top + 42.0, 212.0, 94.0),
+		"sound": Rect2(safe.position.x + HUD_MARGIN, top + 8.0, 120.0, 120.0),
+		"danger_panel": Rect2(safe.position.x + HUD_MARGIN, top + 166.0, 256.0, 62.0),
+		"danger": Rect2(safe.position.x + HUD_MARGIN + 12.0, top + 172.0, 232.0, 50.0),
 		"multiplier": Rect2(center_x - 220.0, top + 160.0, 440.0, 66.0),
 		"combo": Rect2(center_x - 220.0, top + 226.0, 440.0, 46.0),
-		"max_combo": Rect2(safe.end.x - 236.0, top + 162.0, 236.0, 46.0),
+		"max_combo": Rect2(safe.end.x - HUD_MARGIN - 236.0, top + 162.0, 236.0, 46.0),
 		"timer": Rect2(center_x - 150.0, top + 292.0, 300.0, 80.0),
 		"drain_rate": Rect2(center_x - 320.0, top + 308.0, 150.0, 50.0),
 		"time_bonus": Rect2(center_x + 170.0, top + 308.0, 190.0, 50.0),
@@ -263,13 +270,13 @@ static func hud_layout(viewport_size: Vector2, safe_area: Rect2 = Rect2()) -> Di
 		"next": Rect2(shelf.position.x + 30.0, shelf_top + 116.0, next_width, 194.0),
 		"next_count": Rect2(
 			shelf.position.x + next_width - 50.0,
-			shelf_top + 230.0,
+			shelf_top + 72.0,
 			80.0,
-			50.0
+			40.0
 		),
 		"then_label": Rect2(then_x, shelf_top + 84.0, then_width, 40.0),
 		"then": Rect2(then_x, shelf_top + 124.0, then_width, 176.0),
-		"then_count": Rect2(shelf.end.x - 110.0, shelf_top + 230.0, 80.0, 42.0),
+		"then_count": Rect2(shelf.end.x - 110.0, shelf_top + 80.0, 80.0, 40.0),
 	}
 
 
@@ -458,8 +465,8 @@ func _free_preview_pool(pool: Array[OrbVisual]) -> void:
 
 
 func _on_score_changed(score: int, best: int) -> void:
-	_best_label.text = "BEST\n%d" % best
-	_fit_numeric_label(_best_label, best, 27, 18)
+	_best_label.text = str(best)
+	_fit_numeric_label(_best_label, best, BEST_FONT_MAX, BEST_FONT_MIN)
 	if _best_initialized and best > _best_target:
 		_flash_best_label()
 	_best_target = best
@@ -494,7 +501,7 @@ func _on_score_changed(score: int, best: int) -> void:
 
 func _set_displayed_score(value: int) -> void:
 	_displayed_score = value
-	_score_label.text = "SCORE\n%d" % value
+	_score_label.text = str(value)
 	_fit_numeric_label(_score_label, value, SCORE_FONT_MAX, SCORE_FONT_MIN)
 
 

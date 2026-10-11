@@ -225,8 +225,8 @@ func test_main_scene_binds_score_hud_and_restart() -> void:
 	assert_eq(danger_label.text, "DANGER ×2", "danger multiplier text")
 	assert_true(danger_label.visible, "danger visible at threshold")
 	await tree.create_timer(0.3, true, false, true).timeout
-	assert_eq(score_label.text, "SCORE\n44", "score HUD text")
-	assert_eq(best_label.text, "BEST\n44", "best HUD text")
+	assert_eq(score_label.text, "44", "score HUD numeric text")
+	assert_eq(best_label.text, "44", "best HUD numeric text")
 	assert_true(not danger_label.visible, "periodic board occupancy refresh hides stale danger")
 
 	manager._set_state(TurnManager.State.WAITING_INPUT)
@@ -237,7 +237,7 @@ func test_main_scene_binds_score_hud_and_restart() -> void:
 	manager.on_reaction(_reaction(ReactionRules.Type.MERGE, 0, [1, 1], 2))
 	_assert_combo_labels(main, 1, 3, "x1")
 	await tree.create_timer(0.3, true, false, true).timeout
-	assert_eq(score_label.text, "SCORE\n48", "waiting-input reaction score")
+	assert_eq(score_label.text, "48", "waiting-input reaction score")
 	assert_eq(max_combo_label.text, "MAX COMBO 3", "maximum survives swipe reset")
 	assert_eq(combo_label.text, "COMBO 1", "waiting-input combo text")
 	assert_eq(score_label.mouse_filter, Control.MOUSE_FILTER_IGNORE, "score ignores pointer")
@@ -258,7 +258,7 @@ func test_main_scene_binds_score_hud_and_restart() -> void:
 	assert_near(then_preview.scale.x, 0.6, 0.001, "THEN horizontal scale")
 	assert_near(then_preview.scale.y, 0.6, 0.001, "THEN vertical scale")
 	assert_near(then_preview.modulate.a, 0.5, 0.001, "THEN preview alpha")
-	assert_near(then_label.modulate.a, 0.5, 0.001, "THEN label alpha")
+	assert_near(then_label.modulate.a, 1.0, 0.001, "THEN label alpha")
 	assert_eq(hud.mouse_filter, Control.MOUSE_FILTER_IGNORE, "HUD ignores pointer")
 	assert_eq(next_label.mouse_filter, Control.MOUSE_FILTER_IGNORE, "NEXT ignores pointer")
 	assert_eq(then_label.mouse_filter, Control.MOUSE_FILTER_IGNORE, "THEN ignores pointer")

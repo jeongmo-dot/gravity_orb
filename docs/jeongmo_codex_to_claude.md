@@ -38,6 +38,47 @@
 
 ## 미확인
 
+### [2026-10-11] 대상 #66 추가 요구 1 — 긴 화면 카메라·HUD 위계·글꼴 원본 정리
+- 상태: 완료 — `origin/main`의 보완 명세를 먼저 병합하고, 긴 화면의 가로 기준 카메라와 실제 투영 검사, HUD 여백·점수 위계·NEXT/THEN 간격, 원본 변수 글꼴과 이름표를 반영함
+- 브랜치 / PR: `v3-font-theme-hud` / [PR #68](https://github.com/jeongmo-dot/gravity_orb/pull/68)
+- 병합: `origin/main` `4246755`를 병합 커밋 `39117d4`로 반영한 뒤 구현함. 충돌 없음
+- 변경 파일: `assets/fonts/{Orbitron[wght].ttf,NotoSansKR-Regular-KSX1001.ttf,NotoSansKR-Medium-KSX1001.ttf,OFL.txt,SOURCE.md}`, `assets/ui/gravity_orb_theme.tres`, `scenes/UI.tscn`, `scripts/core/Main.gd`, `scripts/ui/Hud.gd`, `tests/{capture_screens.ps1,test_screen_layout.gd,test_score_popups.gd}`, `tests/scenarios/test_score_flow.gd`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`; 기존 `Orbitron-Medium.ttf`·`Orbitron-Bold.ttf`와 import 파일 삭제
+- Done-when 대조:
+  - [x] 9:16보다 긴 화면은 `KEEP_WIDTH`와 코드로 계산한 9:16 가로 화각, 9:16·그보다 넓은 화면은 기존 `KEEP_HEIGHT`·세로 `25°`를 사용하고 화면 크기 변경 때 재적용 — 자동 (`test_hud_layout_stays_in_safe_area_and_clear_of_board_at_both_ratios`)
+  - [x] `Main3D` 실제 카메라로 보드 바깥 네 모서리를 투영해 좌우 16 논리 px 이상, 두 비율 보드 폭 차이 1% 이하, 위 HUD/시간 막대·아래 받침 비겹침 검사 — 자동. 캡처 투영 x 차이 `0.000px`, 폭 차이 `0.000%`
+  - [x] 소리·DANGER 왼쪽과 BEST·MAX COMBO/CHAIN 오른쪽에 `HUD_MARGIN=24px`, 가운데 스피커 아이콘 `54px`(`120px` 버튼 높이의 45%) — 자동 + 캡처 직접 확인
+  - [x] SCORE/BEST를 Orbitron 500·보조색의 고정 작은 제목과 Orbitron 700·자동 축소 큰 숫자로 분리하고 점수 튐/BEST 반짝임은 숫자만 변경 — 자동 (`test_hud_theme_fonts_panel_tokens_and_extreme_values_fit`, `test_new_best_flashes_and_large_multiplier_punches_score`) + 캡처 직접 확인
+  - [x] THEN 제목을 불투명 `#8EA3C8`, NEXT/THEN `×n`을 미리보기 구슬 영역에서 4 논리 px 이상 분리 — 자동 + `12`·`13` 직접 확인
+  - [x] Orbitron 원본 `Orbitron[wght].ttf` 하나와 Godot `FontVariation` wght 500·700 사용, Noto 이름표 Regular·Medium, 정확한 Noto 저작권 문구와 출처/고정 커밋/SHA-256 기록 — 자동 글꼴 이름·축·라이선스 검사
+  - [x] 규칙·밸런스·물리·구슬·배경·보드 그림을 변경하지 않고 기존 물리 해시 유지 — 전체 회귀 + 상태 해시
+- 글꼴 관측:
+  - TTF 합계 `1,033,768바이트` (`<3MiB`)
+  - Orbitron 원본 SHA-256 `f42db2dd16e642258e35782916eceb1dcdbea06fb958d77ad71dc5963587e8fd`, google/fonts 커밋 `bd8f81ddb5c74d5c8897b36ad88b440266245103`
+  - Noto 내부 이름: `Noto Sans KR / Regular`, `Noto Sans KR / Medium`; `OFL.txt` 첫머리에 Orbitron·Noto 저작권 두 줄
+- 캡처 관측 (Standard/Compatibility):
+  - `tests/capture_screens.ps1` → 종료 코드 0, `540×960` 18장 + `540×1170` 8장 = `26장`; 화면을 직접 확인함
+  - 보드 바깥 테두리 투영(물리 px): 9:16 `left=13.276, right=526.724, width=513.448`, 9:19.5도 동일; 좌·우 차이 `0.000px`, 폭 차이 `0.000%`
+  - 추가 요구 전/후 9:16 `02_turn_early`의 보드 윗선 화소 스캔은 양쪽 모두 `x=16..523`, 표본 `2,623개`로 위치·폭 동일. 9:16 카메라는 기존 `KEEP_HEIGHT/25°` 유지
+  - 긴 화면 8장에서 좌우 벽과 가장자리 구슬이 모두 화면 안에 있고 위 HUD·보드·아래 받침이 겹치지 않음. 점수/BEST `9,999,999`, NEXT `×8`, THEN `×6`, 불투명 제목과 24px 여백을 확인
+- 성능 관측 (RTX 4070 Ti SUPER, Compatibility, VSync 끔, 164.836Hz, BLITZ 시드 101~104):
+  - 프레임 `17,828`, p50/p95/p99/최대 `1.474/2.536/3.963/9.472ms`, `>16.7ms` 0, `>33.3ms` 0
+  - 드로콜 p50/p95/최대 `402/428/439`; 입력 `120/120`, 유실 `0`; 입력 수락 p95/최대 `18.602/42.308ms`, 수락→생성 p95/최대 `2.668/6.792ms`
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건 (샌드박스 밖 사용자 설정 경로 사용)
+  - `tests/run_tests.ps1` → 일반 `273/273`(`15.165초`), 장기 `5/5`(`39.835초`), 성능 `5/5`(`3.335초`), 합계 `283/283`, 종료 코드 0, 총 `58.335초`
+  - 물리 상태 해시: TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`; #66 1차와 동일
+  - 시작 화면 / TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 전역 난수 호출 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. `tests/capture_screens.ps1` 실행 후 `540x960`과 `540x1170`의 `02`·`03`·`06`·`07`·`12`·`13`·`17`·`18`을 나란히 확인 → 긴 화면의 보드 좌우 벽과 가장자리 구슬이 잘리지 않고 보드 폭·x 위치가 기본 비율과 같아야 한다.
+  2. `03_turn_combo.png` 확인 → 작은 보조색 `SCORE`·`BEST`와 큰 `9999999` 숫자가 분리되어야 하며, 소리/DANGER는 왼쪽 24px, BEST/MAX COMBO는 오른쪽 24px 안쪽이어야 한다.
+  3. `13_turn_ramp_uncapped_next.png` 확인 → THEN 글자는 불투명 보조색, THEN 구슬만 흐리며 NEXT/THEN `×6`이 구슬 테두리에 닿지 않아야 한다.
+  4. 창 크기를 9:16↔9:19.5로 바꿈 → 보드 가로 폭은 유지되고 카메라가 즉시 다시 맞아야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 캡처 도구가 비율별 실제 카메라 투영값을 `board_projection.json`에 기록하고 PowerShell 래퍼가 좌우 ±2px·폭 1%를 비교하도록 보강함. JSON·PNG는 기존 ignore 대상 검수 산출물
+  - 긴 비율 캡처 프로세스 종료 때 기존 `ObjectDB instances leaked at exit (2 instances)` 경고 1회가 있었으나 종료 코드 0이며 `SCRIPT ERROR`·`Parse Error`는 0건
+- 남은 것 · 질문: 없음
+
 ### [2026-10-11] 대상 #66 — 비주얼 V3-1 글꼴·테마·HUD
 - 상태: 완료 — Orbitron/Noto Sans KR 서브셋과 공통 Theme을 동봉하고, HUD를 두 세로 비율의 안전 영역에 맞게 재배치했으며 점수 연출·벡터 소리 아이콘·문양 기본 끔을 구현함
 - 브랜치 / PR: `v3-font-theme-hud` / [PR #68](https://github.com/jeongmo-dot/gravity_orb/pull/68)

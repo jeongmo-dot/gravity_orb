@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://bok30ktm4dto5"
-path="res://.godot/imported/Orbitron-Bold.ttf-adcd0270e180784180687505154a3b08.fontdata"
+uid="uid://bgv5qq6kvwllu"
+path="res://.godot/imported/Orbitron[wght].ttf-8fe8d02d8c3c1f688ca70d10649ec741.fontdata"
 
 [deps]
 
-source_file="res://assets/fonts/Orbitron-Bold.ttf"
-dest_files=["res://.godot/imported/Orbitron-Bold.ttf-adcd0270e180784180687505154a3b08.fontdata"]
+source_file="res://assets/fonts/Orbitron[wght].ttf"
+dest_files=["res://.godot/imported/Orbitron[wght].ttf-8fe8d02d8c3c1f688ca70d10649ec741.fontdata"]
 
 [params]
 

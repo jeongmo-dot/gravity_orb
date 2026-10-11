@@ -122,9 +122,9 @@ func test_score_rolls_to_target_in_three_tenths_of_a_second() -> void:
 	var score: ScoreManager = main.get_node("ScoreManager") as ScoreManager
 	var score_label: Label = main.get_node("UI/Hud/ScoreLabel") as Label
 	score.on_reaction(_reaction(Vector2.ZERO, 4.0, 0.20))
-	assert_true(score_label.text != "SCORE\n512", "score does not jump immediately")
+	assert_true(score_label.text != "512", "score does not jump immediately")
 	await tree.create_timer(0.31, true, false, true).timeout
-	assert_eq(score_label.text, "SCORE\n512", "score reaches target after 0.3 seconds")
+	assert_eq(score_label.text, "512", "score reaches target after 0.3 seconds")
 	await _destroy_main(main)
 	Config.data.fx_score_popups_enabled = original_enabled
 
@@ -135,12 +135,18 @@ func test_new_best_flashes_and_large_multiplier_punches_score() -> void:
 	var main: Main = await _create_main(GameConfig.GameMode.TURN)
 	var hud: Hud = main.get_node("UI/Hud") as Hud
 	var score_label: Label = main.get_node("UI/Hud/ScoreLabel") as Label
+	var score_title: Label = main.get_node("UI/Hud/ScoreTitleLabel") as Label
+	var best_title: Label = main.get_node("UI/Hud/BestTitleLabel") as Label
+	var title_scale_before: Vector2 = score_title.scale
+	var best_title_color_before: Color = best_title.modulate
 	var flash_count_before: int = hud.best_flash_count()
 	hud._on_combo_changed(4, 8.0, 4)
 	hud._on_score_changed(512, 512)
 	await tree.process_frame
 	assert_eq(hud.best_flash_count(), flash_count_before + 1, "new BEST flashes once")
 	assert_true(score_label.scale.x > 1.0, "×8 score gain punches score label")
+	assert_eq(score_title.scale, title_scale_before, "score punch does not animate title")
+	assert_eq(best_title.modulate, best_title_color_before, "BEST flash does not animate title")
 	await _destroy_main(main)
 	Config.data.fx_score_popups_enabled = original_enabled
 

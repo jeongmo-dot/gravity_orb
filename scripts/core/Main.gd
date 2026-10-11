@@ -5,6 +5,8 @@ const BACKGROUND_COLOR: Color = Color.BLACK
 const SEED_PREFIX: String = "--jolt-seed="
 const MODE_PREFIX: String = "--mode="
 const NO_MODE: int = -1
+const BASE_VERTICAL_FOV_DEGREES: float = 25.0
+const BASE_ASPECT_WIDTH_OVER_HEIGHT: float = 9.0 / 16.0
 
 static var _queued_mode: int = NO_MODE
 static var _force_start_screen: bool = false
@@ -18,6 +20,7 @@ static var _force_start_screen: bool = false
 @onready var _feedback_director: FeedbackDirector = %FeedbackDirector
 @onready var _ui: DebugHud = $UI
 @onready var _space_backdrop: SpaceBackdrop = get_node_or_null("SpaceBackdrop") as SpaceBackdrop
+@onready var _camera_3d: Camera3D = get_node_or_null("Camera3D") as Camera3D
 
 var _game_manager: Variant
 var _launch_game_on_ready: bool = false
@@ -57,6 +60,10 @@ func _prepare_start_screen() -> void:
 
 func _ready() -> void:
 	RenderingServer.set_default_clear_color(BACKGROUND_COLOR)
+	if _camera_3d != null:
+		if not get_viewport().size_changed.is_connected(_apply_camera_aspect):
+			get_viewport().size_changed.connect(_apply_camera_aspect)
+		_apply_camera_aspect()
 	_bind_space_visuals()
 	_game_manager = (
 		_blitz_manager
@@ -80,6 +87,39 @@ func _ready() -> void:
 		_ui.show_start_screen()
 		return
 	_start_gameplay()
+
+
+func _exit_tree() -> void:
+	if (
+		_camera_3d != null
+		and get_viewport().size_changed.is_connected(_apply_camera_aspect)
+	):
+		get_viewport().size_changed.disconnect(_apply_camera_aspect)
+
+
+func _apply_camera_aspect() -> void:
+	configure_camera_for_viewport(_camera_3d, get_viewport().get_visible_rect().size)
+
+
+static func configure_camera_for_viewport(camera: Camera3D, viewport_size: Vector2) -> void:
+	if camera == null or viewport_size.x <= 0.0 or viewport_size.y <= 0.0:
+		return
+	var aspect: float = viewport_size.x / viewport_size.y
+	if aspect < BASE_ASPECT_WIDTH_OVER_HEIGHT:
+		camera.keep_aspect = Camera3D.KEEP_WIDTH
+		camera.fov = base_horizontal_fov_degrees()
+	else:
+		camera.keep_aspect = Camera3D.KEEP_HEIGHT
+		camera.fov = BASE_VERTICAL_FOV_DEGREES
+
+
+static func base_horizontal_fov_degrees() -> float:
+	return rad_to_deg(
+		2.0 * atan(
+			tan(deg_to_rad(BASE_VERTICAL_FOV_DEGREES) * 0.5)
+			* BASE_ASPECT_WIDTH_OVER_HEIGHT
+		)
+	)
 
 
 func _bind_space_visuals() -> void:
