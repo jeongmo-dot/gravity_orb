@@ -48,23 +48,28 @@ func test_fever_vignette_only_lives_during_fever_and_uses_reusable_nodes() -> vo
 	var hud: Hud = main.get_node("UI/Hud") as Hud
 	var vignette: ColorRect = main.get_node("UI/Hud/FeverVignette") as ColorRect
 	var band: ColorRect = main.get_node("UI/Hud/FeverBand") as ColorRect
+	var streak: ColorRect = main.get_node("UI/Hud/FeverStreak") as ColorRect
 	var band_label: Label = main.get_node("UI/Hud/FeverBand/FeverBandLabel") as Label
 	var combo_label: Label = main.get_node("UI/Hud/ComboLabel") as Label
 	assert_true(not vignette.visible, "vignette starts hidden")
 	hud._on_fever_changed(true, 3.0)
 	assert_true(vignette.visible and band.visible, "fever shows reusable overlay")
+	assert_true(streak.visible, "fever entry shows a thin moving streak")
 	assert_eq(band_label.text, "FEVER ×2", "fever entry band names multiplier")
 	assert_true(band_label.get_theme_constant("outline_size") > 0, "fever band text has outline")
-	assert_true(band.color.a <= 0.55 + TOLERANCE, "fever band alpha cap")
+	assert_near(band.color.a, 0.0, TOLERANCE, "fever has no opaque center band")
 	assert_near(band.size.y, 80.0, TOLERANCE, "fever band uses half-height strip")
 	assert_true(combo_label.text.contains("FEVER ×2  3.0s"), "fever time uses top badge")
 	assert_true(not main.has_node("UI/Hud/FeverLabel"), "legacy centered fever label removed")
 	assert_true(hud.fever_vignette_max_alpha() <= 0.12, "vignette edge alpha cap")
+	assert_true(hud.fever_vignette_shader_code().contains("noise21"), "fever edge uses nebula noise")
+	assert_eq(hud.active_ui_sparkle_count(), 3, "fever entry uses three stars")
 	var first_band_id: int = band.get_instance_id()
 	hud._process(0.125)
 	assert_true(vignette.modulate.a > 0.0, "fever vignette pulses")
 	await tree.create_timer(1.2, true, false, true).timeout
 	assert_true(not band.visible, "fever entry band hides after entry hold and exit")
+	assert_true(not streak.visible, "fever streak ends within the entry beat")
 	assert_true(vignette.visible, "fever vignette remains for active fever")
 	assert_true(combo_label.text.contains("FEVER ×2"), "top fever badge remains after band exits")
 	hud._on_fever_changed(true, 2.0)
@@ -74,6 +79,31 @@ func test_fever_vignette_only_lives_during_fever_and_uses_reusable_nodes() -> vo
 	await tree.create_timer(0.31, true, false, true).timeout
 	assert_true(not vignette.visible and not band.visible, "fever end fades overlay")
 	assert_eq(band.get_instance_id(), first_band_id, "hidden fever node remains pooled")
+	await _destroy_main(main)
+	Config.data.fx_callouts_enabled = original_enabled
+
+
+func test_callout_stage_treatment_and_time_up_ring() -> void:
+	var original_enabled: bool = Config.data.fx_callouts_enabled
+	Config.data.fx_callouts_enabled = true
+	var main: Main = await _create_main(GameConfig.GameMode.BLITZ)
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	var callout: Label = main.get_node("UI/Hud/CalloutLabel") as Label
+	hud._show_callout("GREAT!", 1)
+	assert_eq(callout.get_theme_color("font_color"), Color("#E8EEFF"), "GREAT uses primary pale color")
+	assert_near(callout.scale.x, 0.90, TOLERANCE, "simple callout starts at 0.9 scale")
+	assert_true(callout.get_theme_constant("outline_size") <= 4, "simple callout has thin outline")
+	assert_eq(hud.active_ui_sparkle_count(), 0, "simple callout has no stars")
+	hud._show_callout("UNSTOPPABLE!", 4)
+	assert_eq(callout.get_theme_color("font_color"), Color("#FFD54A"), "stage five uses gold")
+	assert_true(callout.get_theme_color("font_shadow_color").a <= 0.30 + TOLERANCE, "callout glow alpha cap")
+	assert_eq(hud.active_ui_sparkle_count(), 5, "stage five uses five orbiting stars")
+	hud._on_finale_started()
+	var time_up: Label = main.get_node("UI/Hud/TimeUpLabel") as Label
+	var ring: CosmicRing2D = main.get_node("UI/Hud/TimeUpRing") as CosmicRing2D
+	assert_eq(time_up.get_theme_color("font_color"), Color("#FF3B30"), "TIME UP is red")
+	assert_true(ring.active, "TIME UP starts one thin expanding ring")
+	assert_true(hud.active_ui_sparkle_count() <= 20, "all concurrent UI stars stay under cap")
 	await _destroy_main(main)
 	Config.data.fx_callouts_enabled = original_enabled
 

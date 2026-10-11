@@ -24,13 +24,15 @@ func test_six_colors_map_to_configured_visual_modes() -> void:
 	await _cleanup(fixture["root"] as Node)
 
 
-func test_push_expands_pull_contracts_and_push_has_six_rays() -> void:
+func test_push_and_pull_use_one_ring_with_directional_stardust() -> void:
 	var fixture: Dictionary = await _create_fixture()
 	var director: FeedbackDirector = fixture["director"] as FeedbackDirector
 	director.play_reaction_visuals(_merge_reaction(OrbTypes.OrbColor.RED))
 	var push: ColorEffectVisual = director.active_color_effects()[0]
 	var push_start: float = push.current_radius_px
-	assert_eq(push.push_ray_count(), 6, "PUSH has six outward rays")
+	assert_eq(push.push_ray_count(), 0, "PUSH removes the old six rays")
+	assert_eq(push.ring_layer_count(), 1, "PUSH uses one ring layer")
+	assert_eq(push.stardust_count(), 12, "PUSH has outward stardust")
 	assert_near(push_start, Config.data.radius_for_level(2), TOLERANCE, "PUSH starts at result radius")
 	assert_near(
 		push.intensity,
@@ -52,6 +54,8 @@ func test_push_expands_pull_contracts_and_push_has_six_rays() -> void:
 	director.play_reaction_visuals(_merge_reaction(OrbTypes.OrbColor.BLUE))
 	var pull: ColorEffectVisual = director.active_color_effects()[0]
 	var pull_start: float = pull.current_radius_px
+	assert_eq(pull.ring_layer_count(), 1, "PULL uses one ring layer")
+	assert_eq(pull.stardust_count(), 12, "PULL has inward spiral stardust")
 	assert_near(
 		pull_start,
 		Config.data.radius_for_level(2) * Config.data.shock_color_radius_factor[OrbTypes.OrbColor.BLUE],
@@ -108,6 +112,9 @@ func test_lift_direction_opposes_each_gravity_direction() -> void:
 			"%s LIFT y" % OrbTypes.dir_name(direction)
 		)
 		assert_eq(lift.lift_target_count(), 2, "LIFT uses shock target positions")
+		assert_true(not lift.uses_light_beam(), "LIFT has no beam")
+		assert_eq(lift.ring_layer_count(), 0, "LIFT has no ring")
+		assert_eq(lift.stardust_count(), 6, "LIFT has three upward stars per target")
 		director.clear_effects()
 	await _cleanup(fixture["root"] as Node)
 
@@ -119,6 +126,9 @@ func test_shake_moves_board_visual_frame_not_camera_and_restores() -> void:
 	var camera: Camera3D = fixture["camera"] as Camera3D
 	var visual_frame: Node3D = board.get_node("VisualTilt") as Node3D
 	director.play_reaction_visuals(_merge_reaction(OrbTypes.OrbColor.GREEN))
+	var shake: ColorEffectVisual = director.active_color_effects()[0]
+	assert_eq(shake.ring_layer_count(), 1, "SHAKE uses one thin green ring")
+	assert_eq(shake.stardust_count(), 0, "SHAKE adds no duplicate particles")
 	assert_eq(director.active_color_frame_shake_count(), 1, "SHAKE starts frame shake")
 	director._process(0.05)
 	assert_true(visual_frame.position.length() > 0.0, "board visual frame moves")

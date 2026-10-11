@@ -28,7 +28,7 @@ func test_each_scored_reaction_shows_matching_popup_and_conditional_formula() ->
 	capped_reaction["combo"] = 20
 	score.on_reaction(capped_reaction)
 	var capped_popup: ScorePopup = hud.active_score_popups()[2]
-	assert_eq(capped_popup.score_text(), "+16384", "capped combo popup uses awarded points")
+	assert_eq(capped_popup.score_text(), "+16,384", "large popup uses comma separators")
 	assert_eq(capped_popup.formula_text(), "128 ×128", "popup shows actual capped multiplier")
 	assert_eq(ScorePopup.popup_font_size(10), 34, "base popup font size")
 	assert_true(
@@ -104,14 +104,54 @@ func test_popup_colors_follow_merge_blast_and_finale_rules() -> void:
 	)
 	assert_eq(merge["color"], expected_merge, "merge uses bright result-orb color")
 	var blast: Dictionary = hud._popup_appearance({"type": ReactionRules.Type.BLAST})
-	assert_eq(blast["color"], Color.WHITE, "blast uses white text")
-	assert_eq(blast["outline_color"], Hud.GOLD_COLOR, "blast uses gold outline")
-	assert_true(int(blast["outline_size"]) > 0, "blast outline is visible")
+	assert_eq(blast["color"], Hud.GOLD_COLOR, "blast uses gold text")
+	assert_true(bool(blast["cosmic"]), "blast uses cosmic treatment")
+	assert_eq(int(blast["outline_size"]), 3, "blast uses a thin dark outline")
+	assert_true((blast["outline_color"] as Color).get_luminance() < 0.1, "blast outline is dark")
 	var finale: Dictionary = hud._popup_appearance({
 		"type": ReactionRules.Type.BLAST,
 		"finale": true,
 	})
 	assert_eq(finale["color"], Hud.GOLD_COLOR, "finale uses gold text")
+	assert_true(bool(finale["cosmic"]), "finale uses cosmic treatment")
+	await _destroy_main(main)
+
+
+func test_large_popup_formats_formula_without_horizontal_shake_and_caps_sparkles() -> void:
+	var main: Main = await _create_main(GameConfig.GameMode.BLITZ)
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	hud._on_reaction_scored({
+		"type": ReactionRules.Type.BLAST,
+		"position": Vector2.ZERO,
+		"points": 48600,
+		"base_points": 6075,
+		"combo_multiplier": 8.0,
+	})
+	var popup: ScorePopup = hud.active_score_popups()[0]
+	assert_eq(popup.score_text(), "+48,600", "big score has comma separators")
+	assert_eq(popup.formula_text(), "6,075 ×8", "formula base has comma separators")
+	assert_true(popup.is_cosmic_score(), "blast is a cosmic popup")
+	assert_eq(popup.active_sparkle_count(), 2, "large cosmic popup has two stars")
+	assert_true(popup.glow_alpha() <= 0.30 + TOLERANCE, "gold glow respects alpha cap")
+	var initial_x: float = popup.position.x
+	popup._process(0.2)
+	assert_near(popup.position.x, initial_x, TOLERANCE, "large popup has no horizontal shake")
+	assert_eq(ScorePopup.format_number(1_234_567), "1,234,567", "formatter handles millions")
+	hud._show_callout("UNSTOPPABLE!", 4)
+	for index: int in range(25):
+		var extra_sparkle: CosmicSparkle = CosmicSparkle.new()
+		extra_sparkle.name = "CapProbe%d" % index
+		hud.add_child(extra_sparkle)
+		extra_sparkle.play(
+			Vector2(120.0, 240.0),
+			Hud.GOLD_COLOR,
+			1.0,
+			Vector2(float(index), 0.0),
+			Vector2(float(index) + 8.0, 0.0)
+		)
+	assert_eq(hud.active_ui_sparkle_count(), 20, "UI sparkle cap stops at exactly twenty")
+	hud._on_fever_changed(true, 3.0)
+	assert_eq(hud.active_ui_sparkle_count(), 20, "fever cannot exceed the global sparkle cap")
 	await _destroy_main(main)
 
 
@@ -207,7 +247,11 @@ func test_score_popup_nodes_return_to_pool_before_one_point_five_seconds() -> vo
 	assert_eq(hud.active_score_popup_count(), 1, "large popup starts active")
 	await tree.create_timer(1.0, true, false, true).timeout
 	assert_eq(hud.active_score_popup_count(), 0, "large popup cleans within 1.5 seconds")
-	assert_eq(hud._popup_pool.size(), 1, "finished popup remains in reuse pool")
+	assert_eq(
+		hud._popup_pool.size(),
+		Config.data.fx_popup_max,
+		"prewarmed popup pool is retained for reuse"
+	)
 	await _destroy_main(main)
 	Config.data.fx_score_popups_enabled = original_enabled
 

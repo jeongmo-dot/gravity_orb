@@ -278,7 +278,13 @@ func test_merge_punch_scales_visual_and_emits_stardust_ring() -> void:
 		"chain": 1,
 	})
 	assert_eq(director.active_particle_count(), 1, "one stardust merge emitter")
-	assert_eq(director.active_ring_count(), 1, "one thin merge ring")
+	assert_eq(director.active_ring_count(), 0, "V4-1 merge ring is replaced")
+	assert_eq(director.active_color_effect_count(), 1, "one color-mode merge effect")
+	assert_eq(
+		director.active_color_effects()[0].ring_layer_count(),
+		1,
+		"merge has exactly one visible ring layer"
+	)
 	var particles: CPUParticles3D = (
 		tree.get_nodes_in_group(&"feedback_particles")[0] as CPUParticles3D
 	)
@@ -311,7 +317,13 @@ func test_l6_l7_birth_effects_and_l7_prominences_are_pooled() -> void:
 			"position": Vector2.ZERO,
 		})
 		assert_eq(director.active_particle_count(), 2, "L%d color+white accretion" % level)
-		assert_eq(director.active_ring_count(), 1, "L%d birth ring" % level)
+		assert_eq(director.active_ring_count(), 0, "L%d birth ring is replaced" % level)
+		assert_eq(director.active_color_effect_count(), 1, "L%d uses color effect" % level)
+		assert_eq(
+			director.active_color_effects()[0].ring_layer_count(),
+			0,
+			"yellow LIFT birth has no ring or beam"
+		)
 		assert_eq(director.active_glow_count(), 1, "L%d nova" % level)
 		assert_eq(
 			director.active_prominence_count(),

@@ -553,7 +553,10 @@ func test_legacy_fever_label_is_absent_and_time_stays_in_top_badge() -> void:
 	assert_true(hud.fever_vignette_max_alpha() <= 0.12, "vignette alpha cap")
 	var vignette: ColorRect = main.get_node("UI/Hud/FeverVignette") as ColorRect
 	var material: ShaderMaterial = vignette.material as ShaderMaterial
-	assert_true(material.shader.code.contains("edge * 0.12"), "shader uses capped edge alpha")
+	assert_true(
+		material.shader.code.contains("0.045 + cloud * 0.065"),
+		"shader keeps flowing edge nebula below the 0.12 alpha cap"
+	)
 
 	await _destroy_main(main)
 	Config.data.game_mode = original_mode
