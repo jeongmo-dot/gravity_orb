@@ -105,6 +105,10 @@ func is_blast_armed() -> bool:
 	return _visual.is_blast_armed()
 
 
+func set_symbols_enabled(enabled: bool) -> void:
+	_visual.set_symbols_enabled(enabled)
+
+
 func blast_brightness() -> float:
 	return _visual.blast_brightness()
 

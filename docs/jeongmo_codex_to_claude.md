@@ -38,6 +38,45 @@
 
 ## 미확인
 
+### [2026-10-11] 대상 #67 — 비주얼 V3-2 시작·결과·랭킹·설정 화면
+- 상태: 완료 — 궤도 무대 시작 화면, 모드별 결과 카드, 10줄 랭킹, 소리·색각 문양 설정과 공통 버튼 상태·화면 전환을 구현함
+- 브랜치 / PR: `codex/v3-orbit-stage-screens` / PR 미생성
+- 변경 파일: `assets/ui/{lightning,hourglass,trophy,settings}.svg`, `scenes/UI.tscn`, `scripts/core/{Orb,SaveStore}.gd`, `scripts/spike/Orb3D.gd`, `scripts/ui/{ButtonMotion,DebugHud,GameOverPanel,Hud,OrbitStage,RankingPanel,SettingsPanel,StartScreen}.gd`, `tests/{capture_screens.ps1,run_start_screen_measurement.ps1,test_blitz_manager.gd,test_frontend.gd,test_rankings.gd,test_screen_layout.gd}`, `tests/scenarios/test_score_flow.gd`, `tests/spike/{StartScreenMeasurement.tscn,capture_screens.gd,run_start_screen_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] V2 우주 배경 위에 Orbitron 로고·부제, V1 L4 청록 고리 행성·궤도 타원·L1/L2 공전 천체, BLITZ/CLASSIC 카드와 88px 하단 벡터 버튼 배치 — 자동 배치 검사 + 두 비율 캡처 직접 확인
+  - [x] 모드 카드의 아이콘·설명·쉼표 BEST·`BEST —`·마지막 모드 테두리와 시작→게임 0.25초 전환 구현 — 자동 (`test_start_screen_shows_records_last_mode_and_touch_targets`, `test_mode_buttons_emit_modes_and_direct_launch_skips_start_screen`) + 캡처
+  - [x] 결과 점수 0→최종 0.6초, 점수 뒤 기록 배지, 모드별 2×2 기록, 다시 하기·랭킹·모드 선택, 0.2초 딤과 0.25초 패널 튐 구현 — 자동 (`test_result_panel_rank_messages_buttons_and_ranking_highlight`, `test_game_over_panel_shows_scores_direction_and_restart_button`) + 캡처
+  - [x] 하늘색 BLITZ/CLASSIC 탭, 금·은·동 순위, 쉼표 점수·체인/콤보·날짜, 빈 줄과 방금 기록 맥동을 포함한 10줄 랭킹 구현 — 자동 (`test_ranking_screen_tabs_rows_highlight_and_touch_filters`) + 캡처
+  - [x] 기존 `sfx_muted`와 새 설정 키 `orb_symbols_enabled`을 저장하고, 문양 토글을 현재 게임판·NEXT/THEN·시작 행성에 즉시 반영 — 임시 저장 경로 자동 검사 (`test_settings_symbol_toggle_saves_and_updates_orbit_stage_immediately`)
+  - [x] 버튼 눌림 0.96배·0.08초 밝기, hover/focus 테두리, 랭킹·설정 0.25초 상하 전환, 시작·결과 중복 입력 1회 처리 — 자동 (`test_mode_buttons_emit_modes_and_direct_launch_skips_start_screen`, `test_result_panel_rank_messages_buttons_and_ranking_highlight`)
+  - [x] `540×960`·`540×1170` 안전 영역, 88px 누름 영역, 9,999,999와 랭킹 10줄 비잘림 — 자동 (`test_v3_screen_layout_safe_area_touch_targets_and_extreme_content`) + 캡처
+  - [x] 규칙·수치·물리·게임 중 HUD·V1/V2 그림·V4 이펙트를 변경하지 않고 기존 물리 해시 유지 — 전체 회귀 + 상태 해시
+- 캡처 관측 (Standard/Compatibility):
+  - `tests/capture_screens.ps1` → 종료 코드 0, `540×960` 20장 + `540×1170` 20장 = `40장`
+  - 요구 장면 `01_start_screen`, `04_turn_game_over`, `09_blitz_result`, `10_ranking_blitz`, `11_result_new_record`, `19_settings`, `20_start_no_record`를 두 비율에서 직접 확인함. 시작 화면은 불투명 보드 없이 성운·별이 보이고 궤도 무대와 두 카드가 분리됨; 결과의 9,999,999·2×2 기록·세 버튼, 랭킹 10줄, 설정 두 토글, `BEST —`가 잘림·겹침 없이 표시됨
+  - 보드 투영은 두 비율 모두 `left=13.276, right=526.724, width=513.448`, 비율 간 차이 `0.000px`; 기존 우주 대비·중력 벽 빛 화소 검사도 모두 통과
+- 성능 관측 (RTX 4070 Ti SUPER, Compatibility, VSync 끔, 164.836Hz):
+  - 시작 화면 정지 5초: 표본 `4,116`, 프레임 p99/최대 `1.722/3.648ms` (`p99 < 16.7ms`)
+  - BLITZ 시드 101~104: 프레임 `12,649`, p50/p95/p99/최대 `2.194/3.781/5.932/11.222ms`, `>16.7ms` 0, `>33.3ms` 0; 드로콜 p50/p95/최대 `403/429/453`
+  - BLITZ 입력 `120/120`, 유실 `0`; 입력 수락 p95/최대 `15.931/42.966ms`, 수락→생성 p95/최대 `2.941/7.212ms`; 최대 생성 묶음 `8`
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - `tests/run_tests.ps1` 최종 실행 → 일반 `275/275`(`18.611초`), 장기 `5/5`(`50.379초`), 성능 `5/5`(`2.788초`), 합계 `285/285`, 종료 코드 0, 총 `71.779초`
+  - 물리 상태 해시: TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`; #66과 동일
+  - 시작 화면 / TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 전역 난수 호출 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. `tests/capture_screens.ps1` 실행 후 두 비율의 `01`·`20`을 확인 → 성운·별 위 고리 행성과 공전 천체가 움직이고, BLITZ/CLASSIC 카드·BEST·하단 세 아이콘이 안전 영역 안에 있어야 한다.
+  2. BLITZ와 CLASSIC을 각각 선택하고 게임을 종료한다 → 시작 화면은 0.25초 안에 한 번만 닫히고, 결과 점수는 0.6초에 걸쳐 오르며 완료 뒤 기록 배지가 튀고 모드별 2×2 기록이 달라야 한다.
+  3. 결과에서 랭킹을 열고 탭을 바꾼다 → 아래에서 0.25초에 올라오며 10줄·빈 줄·방금 기록 테두리/맥동이 보여야 한다. 닫으면 반대로 내려가야 한다.
+  4. 시작 화면 설정에서 `색각 문양`을 켜고 닫은 뒤 게임을 시작한다 → 시작 행성·게임판·NEXT/THEN 문양이 즉시 보이고 재실행 뒤에도 유지되어야 한다. 소리 토글도 기존 M키·상단 소리 버튼과 같은 상태여야 한다.
+  5. 마우스·키보드·패드로 카드와 버튼을 hover/focus/press한다 → 테두리가 밝아지고 누르는 동안 0.96배가 되며, 빠르게 두 번 눌러도 게임 시작·재시작은 한 번만 처리되어야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 시작 화면에서는 V2 성운·별을 가리지 않도록 게임판 보드 노드만 숨기고, 모드를 선택하면 즉시 다시 표시함. 구슬·배경·보드 리소스 자체는 변경하지 않음
+  - 새 아이콘은 외부 에셋 없이 저장소 SVG로 작성했고, PNG·JSON 측정 산출물은 기존 ignore 대상이라 커밋에 포함하지 않음
+  - BLITZ 창 측정 시 시드 104 종료 뒤 기존 계열의 `ObjectDB instances leaked at exit (2 instances)` 경고 1회가 있었으나 종합 종료 코드 0, 입력 유실 0, `SCRIPT ERROR`·`Parse Error` 0건
+- 남은 것 · 질문: 없음
+
 ### [2026-10-11] 대상 #66 추가 요구 2 — Orbitron 실제 굵기·실측 숫자 맞춤
 - 상태: 완료 — 문자열로 직렬화되어 무시되던 Orbitron `wght` 키를 TextServer 숫자 태그로 교체해 500/700 윤곽을 분리하고, SCORE/BEST 숫자를 실제 글꼴 폭으로 맞추며 BEST 제목을 SCORE와 같은 22px로 정리함
 - 브랜치 / PR: `v3-font-theme-hud` / [PR #68](https://github.com/jeongmo-dot/gravity_orb/pull/68)

@@ -282,12 +282,14 @@ func test_game_over_panel_shows_scores_direction_and_restart_button() -> void:
 	manager.gravity = Vector2i.LEFT
 	manager._set_state(TurnManager.State.GAME_OVER)
 	manager.game_over.emit()
+	await tree.create_timer(0.65).timeout
 
 	var panel: GameOverPanel = main.get_node("UI/Hud/GameOverPanel") as GameOverPanel
 	var score_label: Label = panel.get_node("Margin/Content/GameOverScore") as Label
 	var best_label: Label = panel.get_node("Margin/Content/GameOverBest") as Label
 	var combo_label: Label = panel.get_node("Margin/Content/GameOverMaxCombo") as Label
 	var blocked_label: Label = panel.get_node("Margin/Content/GameOverBlocked") as Label
+	var direction_label: Label = panel.get_node("Margin/Content/ResultExtraLabel") as Label
 	var restart_button: Button = panel.get_node("Margin/Content/RestartButton") as Button
 	var dimmer: ColorRect = main.get_node("UI/Hud/ResultDimmer") as ColorRect
 	var panel_style: StyleBoxFlat = panel.get_theme_stylebox("panel") as StyleBoxFlat
@@ -297,10 +299,11 @@ func test_game_over_panel_shows_scores_direction_and_restart_button() -> void:
 	assert_true(panel_style != null, "game-over panel has a flat opaque style")
 	if panel_style != null:
 		assert_true(panel_style.bg_color.a >= 0.92, "game-over panel opacity")
-	assert_eq(score_label.text, "SCORE  48", "game-over score")
-	assert_eq(best_label.text, "BEST  48", "game-over best")
-	assert_eq(combo_label.text, "MAX COMBO 2", "game-over max combo")
-	assert_eq(blocked_label.text, "BLOCKED: LEFT", "game-over blocked direction")
+	assert_eq(score_label.text, "48", "game-over score")
+	assert_eq(best_label.text, "BEST 48", "game-over best")
+	assert_eq(combo_label.text, "최대 콤보\n2", "game-over max combo")
+	assert_eq(blocked_label.text, "최고 천체\nL4 고리 행성", "game-over highest celestial")
+	assert_eq(direction_label.text, "막힌 방향\nLEFT", "game-over blocked direction")
 	assert_eq(panel.mouse_filter, Control.MOUSE_FILTER_IGNORE, "panel ignores pointer")
 	assert_eq(restart_button.mouse_filter, Control.MOUSE_FILTER_STOP, "restart consumes pointer")
 

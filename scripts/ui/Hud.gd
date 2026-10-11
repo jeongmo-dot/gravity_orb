@@ -446,6 +446,14 @@ func _render_preview(preview_root: Node2D, batch: Array) -> void:
 		cursor_x += (radius * 2.0 + PREVIEW_GAP) * preview_scale
 
 
+func set_symbols_enabled(enabled: bool) -> void:
+	for preview_root: Node2D in [_next_preview, _then_preview]:
+		for child: Node in preview_root.get_children():
+			var visual: OrbVisual = child as OrbVisual
+			if visual != null:
+				visual.set_symbols_enabled(enabled)
+
+
 func _preview_pool_for(preview_root: Node2D) -> Array[OrbVisual]:
 	return _next_preview_pool if preview_root == _next_preview else _then_preview_pool
 

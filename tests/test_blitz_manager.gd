@@ -597,7 +597,7 @@ func test_main_selects_blitz_manager_and_shows_time_up_results() -> void:
 	assert_eq(chain_label.text, "CHAIN 1", "blitz HUD uses chain label")
 	assert_eq(multiplier_label.text, "×1.25", "blitz HUD uses large multiplier")
 	manager._finish_game()
-	await tree.process_frame
+	await tree.create_timer(0.65).timeout
 	var panel: GameOverPanel = main.get_node("UI/Hud/GameOverPanel") as GameOverPanel
 	var title: Label = panel.get_node("Margin/Content/ResultTitle") as Label
 	var detail: Label = panel.get_node("Margin/Content/GameOverBlocked") as Label
@@ -612,10 +612,10 @@ func test_main_selects_blitz_manager_and_shows_time_up_results() -> void:
 	if panel_style != null:
 		assert_true(panel_style.bg_color.a >= 0.92, "time-up panel opacity")
 	assert_eq(title.text, "TIME UP", "blitz result title")
-	assert_eq(result_chain.text, "MAX CHAIN 1", "result uses maximum chain label")
-	assert_eq(detail.text, "BLAST 0   FEVER 0", "blitz result counters")
+	assert_eq(result_chain.text, "최대 체인\n1", "result uses maximum chain label")
+	assert_eq(detail.text, "블라스트\n0", "blitz result counter")
 	assert_true(survived.visible, "survival result shows elapsed time")
-	assert_eq(survived.text, "버틴 시간 2:00", "survived time uses m:ss")
+	assert_eq(survived.text, "버틴 시간\n2:00", "survived time uses m:ss")
 	main.queue_free()
 	await tree.process_frame
 	InputRouter.set_locked(false)

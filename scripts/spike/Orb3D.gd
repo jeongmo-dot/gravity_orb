@@ -202,6 +202,10 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	_update_visual_transform()
 
 
+func set_symbols_enabled(enabled: bool) -> void:
+	_symbol_mesh.visible = enabled
+
+
 func _physics_process(delta: float) -> void:
 	_advance_growth(delta)
 	_advance_blast_blink(delta)

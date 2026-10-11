@@ -21,14 +21,14 @@ func test_start_screen_shows_records_last_mode_and_touch_targets() -> void:
 	var classic_best: Label = start_screen.get_node("Content/ClassicBestLabel") as Label
 	assert_true(start_screen.visible, "start screen is shown without --mode")
 	assert_true(not hud.visible, "game HUD stays hidden on start screen")
-	assert_eq(blitz_best.text, "BEST  6789", "survival BLITZ record text")
-	assert_eq(classic_best.text, "BEST  1234", "CLASSIC record text")
-	assert_eq(blitz_button.text, "BLITZ\n버티기 타임어택", "survival subtitle")
+	assert_eq(blitz_best.text, "BEST 6,789", "survival BLITZ record text")
+	assert_eq(classic_best.text, "BEST 1,234", "CLASSIC record text")
+	assert_eq(blitz_button.text, "BLITZ\n시간 버티기", "survival subtitle")
 	assert_true(blitz_button.button_pressed, "last BLITZ mode is highlighted")
 	assert_true(not classic_button.button_pressed, "other mode is not highlighted")
 	assert_true(blitz_button.size.y >= 120.0, "BLITZ touch target height")
 	assert_true(classic_button.size.y >= 120.0, "CLASSIC touch target height")
-	assert_true(sound_button.size.y >= 120.0, "sound touch target height")
+	assert_true(sound_button.size.y >= 88.0, "sound touch target height")
 	assert_eq(start_screen.mouse_filter, Control.MOUSE_FILTER_STOP, "start screen blocks play input")
 	assert_true(not (main.get_node("TurnManager") as TurnManager).is_physics_processing(), "turn manager waits")
 	assert_true(not (main.get_node("BlitzManager") as BlitzManager).is_physics_processing(), "BLITZ waits")
@@ -51,7 +51,11 @@ func test_mode_buttons_emit_modes_and_direct_launch_skips_start_screen() -> void
 		selected_modes.append(mode)
 	start_screen.mode_selected.connect(recorder)
 	(start_screen.get_node("Content/BlitzButton") as Button).pressed.emit()
+	(start_screen.get_node("Content/BlitzButton") as Button).pressed.emit()
+	await tree.create_timer(0.30).timeout
+	start_screen.prepare_to_show()
 	(start_screen.get_node("Content/ClassicButton") as Button).pressed.emit()
+	await tree.create_timer(0.30).timeout
 	assert_eq(selected_modes.size(), 2, "both mode buttons emit")
 	if selected_modes.size() == 2:
 		assert_eq(selected_modes[0], GameConfig.GameMode.BLITZ, "BLITZ button mode")
@@ -117,7 +121,8 @@ func test_sound_buttons_m_key_bus_and_save_share_one_state() -> void:
 	var hud_button: Button = main.get_node("UI/Hud/HudSoundButton") as Button
 	var bus_index: int = AudioServer.get_bus_index(SfxBank.SFX_BUS)
 	assert_true(not bank.is_muted(), "saved unmuted state loads")
-	assert_eq(start_button.text, "🔊", "start sound icon")
+	assert_eq(start_button.text, "", "start sound button uses no emoji text")
+	assert_true(start_button.icon.resource_path.ends_with("speaker_on.svg"), "start vector sound icon")
 	assert_eq(hud_button.text, "", "HUD sound button does not use emoji text")
 	assert_true(hud_button.icon != null, "HUD sound button uses a vector icon")
 	assert_true(
@@ -128,7 +133,7 @@ func test_sound_buttons_m_key_bus_and_save_share_one_state() -> void:
 	start_button.pressed.emit()
 	assert_true(bank.is_muted(), "start button mutes bank")
 	assert_true(AudioServer.is_bus_mute(bus_index), "start button mutes SFX bus")
-	assert_eq(start_button.text, "🔇", "start icon updates")
+	assert_true(start_button.icon.resource_path.ends_with("speaker_off.svg"), "start icon updates")
 	assert_true(
 		hud_button.icon.resource_path.ends_with("speaker_off.svg"),
 		"HUD vector icon updates"
@@ -151,9 +156,10 @@ func test_sound_buttons_m_key_bus_and_save_share_one_state() -> void:
 	await tree.process_frame
 	var reloaded_bank: SfxBank = reloaded.get_node("FeedbackDirector/SfxBank") as SfxBank
 	assert_true(reloaded_bank.is_muted(), "muted state survives scene recreation")
-	assert_eq(
-		(reloaded.get_node("UI/StartScreen/Content/StartSoundButton") as Button).text,
-		"🔇",
+	assert_true(
+		(reloaded.get_node("UI/StartScreen/Content/StartSoundButton") as Button).icon.resource_path.ends_with(
+			"speaker_off.svg"
+		),
 		"reloaded start icon"
 	)
 	assert_eq(
@@ -202,11 +208,49 @@ func test_gameplay_hud_only_stops_pointer_on_sound_and_result_buttons() -> void:
 	result_panel.mode_select_requested.connect(mode_recorder)
 	retry_button.pressed.emit()
 	mode_button.pressed.emit()
-	assert_eq(actions, ["retry", "mode"], "result buttons emit separate actions")
+	assert_eq(actions, ["retry"], "result panel accepts only the first duplicate action")
 	InputRouter.restart_requested.disconnect(retry_recorder)
 	result_panel.mode_select_requested.disconnect(mode_recorder)
 	await _cleanup_main(main)
 	Config.data.game_mode = original_mode
+
+
+func test_settings_symbol_toggle_saves_and_updates_orbit_stage_immediately() -> void:
+	var original_symbols: bool = Config.data.orb_symbols_enabled
+	Config.data.orb_symbols_enabled = true
+	_remove_save()
+	_write_save(0, 0, "turn", false)
+	var main: Main = _new_main(SAVE_PATH)
+	tree.root.add_child(main)
+	await tree.process_frame
+	var settings_button: Button = main.get_node(
+		"UI/StartScreen/Content/StartSettingsButton"
+	) as Button
+	settings_button.pressed.emit()
+	await tree.create_timer(0.30).timeout
+	var settings: SettingsPanel = main.get_node("UI/SettingsPanel") as SettingsPanel
+	assert_true(settings.visible, "settings opens over the start screen")
+	var stage: OrbitStage = main.get_node("UI/StartScreen/Content/OrbitStage") as OrbitStage
+	var hero: OrbVisual = stage.get_child(0) as OrbVisual
+	assert_true(hero.has_symbol(), "orbit-stage hero initially shows its color symbol")
+	var symbols_button: Button = settings.get_node(
+		"SettingsPanelBody/Margin/Content/SettingsSymbolsToggle"
+	) as Button
+	symbols_button.pressed.emit()
+	assert_true(not Config.data.orb_symbols_enabled, "symbol setting applies immediately")
+	assert_true(not hero.has_symbol(), "orbit-stage hero updates immediately")
+	var saved: ConfigFile = ConfigFile.new()
+	assert_eq(saved.load(SAVE_PATH), OK, "symbol setting save reloads")
+	assert_true(
+		not bool(saved.get_value("settings", "orb_symbols_enabled", true)),
+		"symbol setting is persisted under the one new settings key"
+	)
+	(settings.get_node("SettingsPanelBody/Margin/Content/SettingsCloseButton") as Button).pressed.emit()
+	await tree.create_timer(0.30).timeout
+	assert_true(not settings.visible, "settings slides closed")
+	await _cleanup_main(main)
+	Config.data.orb_symbols_enabled = original_symbols
+	_remove_save()
 
 
 func _new_main(save_path: String) -> Main:

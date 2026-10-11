@@ -3,6 +3,7 @@ extends TestCase
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
 const MAIN_3D_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
 const HUD_THEME: Theme = preload("res://assets/ui/gravity_orb_theme.tres")
+const V3_SAVE_PATH: String = "res://tests/test_screen_v3.tmp.cfg"
 const VIEWPORT_CASES: Array[Dictionary] = [
 	{
 		"output": Vector2(540.0, 960.0),
@@ -20,6 +21,85 @@ const FONT_PATHS: Array[String] = [
 	"res://assets/fonts/NotoSansKR-Regular-KSX1001.ttf",
 	"res://assets/fonts/NotoSansKR-Medium-KSX1001.ttf",
 ]
+
+
+func test_v3_screen_layout_safe_area_touch_targets_and_extreme_content() -> void:
+	_remove_v3_save()
+	for index: int in range(10):
+		SaveStore.add_ranking(
+			V3_SAVE_PATH,
+			GameConfig.GameMode.BLITZ,
+			9_999_999 - index * 111_111,
+			{"max_chain": 14 - index, "blasts": 4, "fevers": 2},
+			"2026-10-%02d 12:00" % (index + 1)
+		)
+	for viewport_case: Dictionary in VIEWPORT_CASES:
+		var logical: Vector2 = viewport_case["logical"] as Vector2
+		var safe: Rect2 = viewport_case["safe"] as Rect2
+		var output: Vector2 = viewport_case["output"] as Vector2
+		var layout: Dictionary = StartScreen.layout_for_viewport(logical)
+		for region_name: String in [
+			"gravity", "orb", "subtitle", "blitz", "classic", "ranking", "sound",
+			"settings",
+		]:
+			assert_true(
+				safe.encloses(layout[region_name] as Rect2),
+				"%dx%d start %s stays in safe area" % [output.x, output.y, region_name]
+			)
+		assert_true(
+			not (layout["blitz"] as Rect2).intersects(layout["classic"] as Rect2),
+			"%dx%d mode cards do not overlap" % [output.x, output.y]
+		)
+		for touch_name: String in ["blitz", "classic", "ranking", "sound", "settings"]:
+			var touch_rect: Rect2 = layout[touch_name] as Rect2
+			assert_true(
+				touch_rect.size.x >= 88.0 and touch_rect.size.y >= 88.0,
+				"%dx%d %s touch target is at least 88 logical pixels" % [
+					output.x, output.y, touch_name
+				]
+			)
+
+		var setup: Dictionary = await _create_menu_main_in_viewport(logical)
+		var main: Main = setup["main"] as Main
+		var ui: DebugHud = main.get_node("UI") as DebugHud
+		ui.show_ranking(GameConfig.GameMode.BLITZ, 1)
+		await tree.create_timer(0.30).timeout
+		var ranking: RankingPanel = ui.ranking_panel()
+		var ranking_body: PanelContainer = ranking.get_node("Panel") as PanelContainer
+		var last_row: PanelContainer = ranking.get_node(
+			"Panel/Content/Rows/RankingRow10"
+		) as PanelContainer
+		var first_score: Label = ranking.get_node(
+			"Panel/Content/Rows/RankingRow1/Text/Columns/Score"
+		) as Label
+		assert_true(
+			safe.encloses(ranking_body.get_global_rect()),
+			"%dx%d ranking panel stays in safe area" % [output.x, output.y]
+		)
+		assert_true(
+			ranking_body.get_global_rect().encloses(last_row.get_global_rect()),
+			"%dx%d all ten ranking rows fit" % [output.x, output.y]
+		)
+		assert_eq(first_score.text, "9,999,999", "extreme ranking score uses commas")
+		(ranking.get_node("Panel/Content/RankingCloseButton") as Button).pressed.emit()
+		await tree.create_timer(0.30).timeout
+		ui.show_settings()
+		await tree.create_timer(0.30).timeout
+		var settings: SettingsPanel = ui.settings_panel()
+		var settings_body: PanelContainer = settings.get_node("SettingsPanelBody") as PanelContainer
+		assert_true(
+			safe.encloses(settings_body.get_global_rect()),
+			"%dx%d settings panel stays in safe area" % [output.x, output.y]
+		)
+		for path: String in [
+			"SettingsPanelBody/Margin/Content/SettingsSoundToggle",
+			"SettingsPanelBody/Margin/Content/SettingsSymbolsToggle",
+			"SettingsPanelBody/Margin/Content/SettingsCloseButton",
+		]:
+			var button: Button = settings.get_node(path) as Button
+			assert_true(button.size.y >= 88.0, "%s touch target is at least 88" % path)
+		await _destroy_3d_setup(setup)
+	_remove_v3_save()
 
 
 func test_busy_blitz_hud_regions_do_not_overlap_at_supported_sizes() -> void:
@@ -508,6 +588,22 @@ func _create_3d_main_in_viewport(viewport_size: Vector2) -> Dictionary:
 	return {"viewport": viewport, "main": main}
 
 
+func _create_menu_main_in_viewport(viewport_size: Vector2) -> Dictionary:
+	var viewport: SubViewport = SubViewport.new()
+	viewport.size = Vector2i(roundi(viewport_size.x), roundi(viewport_size.y))
+	viewport.own_world_3d = true
+	viewport.gui_disable_input = true
+	viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	tree.root.add_child(viewport)
+	var main: Main = MAIN_3D_SCENE.instantiate() as Main
+	(main.get_node("ScoreManager") as ScoreManager).save_path = V3_SAVE_PATH
+	(main.get_node("FeedbackDirector/SfxBank") as SfxBank).save_path = V3_SAVE_PATH
+	viewport.add_child(main)
+	await tree.process_frame
+	await tree.process_frame
+	return {"viewport": viewport, "main": main}
+
+
 func _project_board_outer_rect(camera: Camera3D, board: Board3D) -> Rect2:
 	var outer_half_m: float = (
 		board.half_size() / Board3D.PIXELS_PER_METER
@@ -541,3 +637,8 @@ func _destroy_main(main: Main) -> void:
 	main.queue_free()
 	await tree.process_frame
 	InputRouter.set_locked(false)
+
+
+func _remove_v3_save() -> void:
+	if FileAccess.file_exists(V3_SAVE_PATH):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(V3_SAVE_PATH))

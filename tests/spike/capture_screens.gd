@@ -45,6 +45,8 @@ const CAPTURE_FILES: Array[String] = [
 	"16_gravity_switch.png",
 	"17_board_danger.png",
 	"18_board_blocked.png",
+	"19_settings.png",
+	"20_start_no_record.png",
 ]
 const HUD_CAPTURE_FILES: Array[String] = [
 	"02_turn_early.png",
@@ -104,10 +106,26 @@ func _run_capture_suite() -> void:
 func _capture_start_screen() -> void:
 	var main: Main = await _create_main(Main.NO_MODE)
 	var blitz_button: Button = main.get_node("UI/StartScreen/Content/BlitzButton") as Button
-	if blitz_button.text != "BLITZ\n버티기 타임어택":
+	if blitz_button.text != "BLITZ\n시간 버티기":
 		_fail("BLITZ start subtitle mismatch")
+	var no_record_label: Label = main.get_node(
+		"UI/StartScreen/Content/BlitzBestLabel"
+	) as Label
+	_expect_label_text(no_record_label, "BEST —", "BLITZ no-record start label")
+	await _capture("20_start_no_record.png")
+	(main.get_node("UI") as DebugHud).show_settings()
+	await get_tree().create_timer(0.30).timeout
+	await _capture("19_settings.png")
+	(main.get_node("UI/SettingsPanel/SettingsPanelBody/Margin/Content/SettingsCloseButton") as Button).pressed.emit()
+	await get_tree().create_timer(0.30).timeout
+	await _destroy_main(main)
+	SaveStore.save_best_score(_temp_save_path, GameConfig.GameMode.TURN, 1234)
+	SaveStore.save_best_score(_temp_save_path, GameConfig.GameMode.BLITZ, 6789)
+	SaveStore.save_last_mode(_temp_save_path, GameConfig.GameMode.BLITZ)
+	main = await _create_main(Main.NO_MODE)
 	await _capture("01_start_screen.png")
 	await _destroy_main(main)
+	_remove_file(_temp_save_path)
 
 
 func _capture_turn_scenes() -> void:
@@ -188,6 +206,7 @@ func _capture_turn_scenes() -> void:
 	manager.blocked_directions.append(TURN_GAME_OVER_DIRECTION)
 	hud._on_warning_changed(manager.blocked_directions)
 	manager.game_over.emit()
+	await get_tree().create_timer(0.65).timeout
 	_validate_turn_game_over_scene(main)
 	await _capture("04_turn_game_over.png")
 	await _destroy_main(main)
@@ -314,6 +333,7 @@ func _capture_blitz_scenes() -> void:
 	manager.fever_count = 2
 	manager.game_over_details["survived_time"] = 125.0
 	manager.game_over.emit()
+	await get_tree().create_timer(0.65).timeout
 	_validate_blitz_result_scene(main)
 	await _capture("09_blitz_result.png")
 
@@ -324,9 +344,11 @@ func _capture_blitz_scenes() -> void:
 	manager.game_over.emit()
 	var ui: DebugHud = main.get_node("UI") as DebugHud
 	ui.show_ranking(GameConfig.GameMode.BLITZ, int(ranking_result["rank"]))
+	await get_tree().create_timer(0.30).timeout
 	_validate_blitz_ranking_scene(main)
 	await _capture("10_ranking_blitz.png")
 	(main.get_node("UI/RankingPanel/Panel/Content/RankingCloseButton") as Button).pressed.emit()
+	await get_tree().create_timer(0.60).timeout
 	_validate_new_record_result_scene(main)
 	await _capture("11_result_new_record.png")
 	await _destroy_main(main)
@@ -407,11 +429,12 @@ func _capture_orb_closeup() -> void:
 func _measure_v2_contrast() -> void:
 	var main: Main = await _create_main(Main.NO_MODE)
 	(main.get_node("UI") as CanvasLayer).visible = false
+	var board: Board3D = main.get_node("Board") as Board3D
+	board.visible = true
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 	var empty_image: Image = get_viewport().get_texture().get_image()
 	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
-	var board: Board3D = main.get_node("Board") as Board3D
 	var backdrop: SpaceBackdrop = main.get_node("SpaceBackdrop") as SpaceBackdrop
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
 	var image_scale: Vector2 = Vector2(
@@ -548,6 +571,7 @@ func _measure_gravity_wall_lights() -> void:
 	var main: Main = await _create_main(Main.NO_MODE)
 	(main.get_node("UI") as CanvasLayer).visible = false
 	var board: Board3D = main.get_node("Board") as Board3D
+	board.visible = true
 	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
 	board.set_process(false)
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
@@ -1247,12 +1271,12 @@ func _validate_turn_game_over_scene(main: Main) -> void:
 	)
 	_expect_label_text(
 		main.get_node("UI/Hud/GameOverPanel/Margin/Content/GameOverScore") as Label,
-		"SCORE  %d" % TURN_CAPTURE_SCORE,
+		"9,999,999",
 		"TURN result score"
 	)
 	_expect_label_text(
-		main.get_node("UI/Hud/GameOverPanel/Margin/Content/GameOverBlocked") as Label,
-		"BLOCKED: LEFT",
+		main.get_node("UI/Hud/GameOverPanel/Margin/Content/ResultExtraLabel") as Label,
+		"막힌 방향\nLEFT",
 		"TURN result blocked direction"
 	)
 	print("SCREEN_CAPTURE_CHECK scene=turn_game_over score=%d blocked=LEFT" % TURN_CAPTURE_SCORE)
@@ -1324,17 +1348,17 @@ func _validate_blitz_result_scene(main: Main) -> void:
 	)
 	_expect_label_text(
 		main.get_node("UI/Hud/GameOverPanel/Margin/Content/GameOverScore") as Label,
-		"SCORE  %d" % BLITZ_CAPTURE_SCORE,
+		"18,760",
 		"BLITZ result panel score"
 	)
 	_expect_label_text(
 		main.get_node("UI/Hud/GameOverPanel/Margin/Content/GameOverBest") as Label,
-		"BEST  %d" % BLITZ_CAPTURE_BEST,
+		"BEST 18,760",
 		"BLITZ result panel best"
 	)
 	_expect_label_text(
 		main.get_node("UI/Hud/GameOverPanel/Margin/Content/SurvivedTimeLabel") as Label,
-		"버틴 시간 2:05",
+		"버틴 시간\n2:05",
 		"BLITZ survived time"
 	)
 	print("SCREEN_CAPTURE_CHECK scene=blitz_result timer=0.0 score=%d" % BLITZ_CAPTURE_SCORE)
@@ -1384,14 +1408,11 @@ func _validate_new_record_result_scene(main: Main) -> void:
 	var content_path: String = "UI/Hud/GameOverPanel/Margin/Content/"
 	_expect_label_text(
 		main.get_node(content_path + "RankingResultLabel") as Label,
-		"새 기록! 3위",
+		"새 기록 · 3위",
 		"BLITZ result ranking message"
 	)
-	_expect_label_text(
-		main.get_node(content_path + "GameOverBest") as Label,
-		"BEST  %d" % RANKING_CAPTURE_BEST,
-		"BLITZ ranked result BEST"
-	)
+	if (main.get_node(content_path + "GameOverBest") as Label).visible:
+		_fail("BLITZ ranked result must hide BEST in favor of the rank badge")
 	for button_name: String in ["RestartButton", "ResultRankingButton", "ModeSelectButton"]:
 		var button: Button = main.get_node(content_path + button_name) as Button
 		if not button.visible or button.size.y < 120.0:
