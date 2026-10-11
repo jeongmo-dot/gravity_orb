@@ -83,7 +83,7 @@ const SPEAKER_OFF_ICON: Texture2D = preload("res://assets/ui/speaker_off.svg")
 @onready var _preview_shelf: PanelContainer = %PreviewShelf
 @onready var _blocked_panel: PanelContainer = %BlockedPanel
 @onready var _time_bar_track: Panel = %TimeBarTrack
-@onready var _time_bar_fill: ColorRect = %TimeBarFill
+@onready var _time_bar_fill: BlitzTimeBar = %TimeBarFill
 
 var _spawner: Spawner
 var _score_manager: ScoreManager
@@ -130,6 +130,7 @@ var _timer_tick_seen: Dictionary = {}
 var _pending_time_bonuses: Array[Dictionary] = []
 var _time_bonus_accumulator: float = 0.0
 var _time_bonus_window_remaining: float = 0.0
+var _time_bonus_segment_start: float = 0.0
 var _last_bonus_target: Vector2 = Vector2.ZERO
 var _time_up_count: int = 0
 var _callout_base_position: Vector2 = Vector2.ZERO
@@ -260,6 +261,7 @@ func _apply_responsive_layout() -> void:
 	_set_control_rect(_drain_rate_label, layout["drain_rate"] as Rect2)
 	_set_control_rect(_bonus_label, layout["time_bonus"] as Rect2)
 	_set_control_rect(_time_bar_track, layout["time_bar"] as Rect2)
+	_layout_time_bar_fill()
 	_set_control_rect(_preview_shelf, layout["preview_shelf"] as Rect2)
 	_set_control_rect(_blocked_panel, layout["blocked_panel"] as Rect2)
 	_set_control_rect(_blocked_label, layout["blocked"] as Rect2)
@@ -291,6 +293,7 @@ func _apply_responsive_layout() -> void:
 	_combo_label.pivot_offset = _combo_label.size * 0.5
 	_danger_label.pivot_offset = _danger_label.size * 0.5
 	_timer_label.pivot_offset = _timer_label.size * 0.5
+	_fit_timer_label_to_text()
 	_fit_numeric_label(_score_label, _displayed_score, SCORE_FONT_MAX, SCORE_FONT_MIN)
 	_fit_numeric_label(_best_label, _best_target, BEST_FONT_MAX, BEST_FONT_MIN)
 	_update_time_bar(_previous_time_remaining if _previous_time_remaining >= 0.0 else 0.0)
@@ -356,7 +359,7 @@ static func hud_layout(viewport_size: Vector2, safe_area: Rect2 = Rect2()) -> Di
 		"combo": Rect2(center_x - 220.0, top + 226.0, 440.0, 46.0),
 		"max_combo": Rect2(safe.end.x - HUD_MARGIN - 236.0, top + 162.0, 236.0, 46.0),
 		"timer": Rect2(center_x - 150.0, top + 292.0, 300.0, 80.0),
-		"drain_rate": Rect2(center_x - 320.0, top + 308.0, 150.0, 50.0),
+		"drain_rate": Rect2(safe.end.x - 88.0, top + 386.0, 72.0, 36.0),
 		"time_bonus": Rect2(center_x + 170.0, top + 308.0, 190.0, 50.0),
 		"time_bar": Rect2(
 			safe.position.x + 96.0,
@@ -385,6 +388,7 @@ func _process(delta: float) -> void:
 	_danger_refresh_elapsed += delta
 	_pulse_elapsed += delta
 	_advance_time_bonus_display(delta)
+	_time_bar_fill.advance_bonus(maxf(delta, 0.0) / maxf(Engine.time_scale, 0.001))
 	_update_fever_pulse()
 	if not Config.data.fx_callouts_enabled:
 		_hide_callout_visuals()
@@ -982,6 +986,7 @@ func _on_warning_changed(directions: Array[Vector2i]) -> void:
 func _on_time_changed(remaining: float) -> void:
 	var clamped_remaining: float = maxf(remaining, 0.0)
 	_timer_label.text = "%.1f" % clamped_remaining
+	_fit_timer_label_to_text()
 	_update_time_bar(clamped_remaining)
 	if not _timer_flashing:
 		_timer_label.modulate = _timer_color_for(clamped_remaining)
@@ -994,6 +999,7 @@ func _on_ready_changed(active: bool, remaining: float) -> void:
 	if active:
 		_drain_rate_label.visible = false
 		_timer_label.text = "READY %.1f" % remaining
+		_fit_timer_label_to_text()
 		if not _timer_flashing:
 			_timer_label.modulate = TIMER_NORMAL_COLOR
 
@@ -1001,18 +1007,42 @@ func _on_ready_changed(active: bool, remaining: float) -> void:
 func _update_time_bar(remaining: float) -> void:
 	if not is_instance_valid(_time_bar_track) or not is_instance_valid(_time_bar_fill):
 		return
-	var capacity: float = maxf(Config.data.blitz_time_max, 0.001)
-	var ratio: float = clampf(remaining / capacity, 0.0, 1.0)
-	var inner_width: float = maxf(_time_bar_track.size.x - TIME_BAR_INSET * 2.0, 0.0)
-	_time_bar_fill.position = _time_bar_track.position + Vector2(
-		TIME_BAR_INSET,
-		TIME_BAR_INSET
+	_layout_time_bar_fill()
+	_time_bar_fill.set_time(remaining, Config.data.blitz_time_bar_reference)
+	_update_drain_rate_label()
+
+
+func _layout_time_bar_fill() -> void:
+	if not is_instance_valid(_time_bar_track) or not is_instance_valid(_time_bar_fill):
+		return
+	_set_control_rect(
+		_time_bar_fill,
+		Rect2(
+			_time_bar_track.position + Vector2(TIME_BAR_INSET, TIME_BAR_INSET),
+			Vector2(
+				maxf(_time_bar_track.size.x - TIME_BAR_INSET * 2.0, 0.0),
+				maxf(_time_bar_track.size.y - TIME_BAR_INSET * 2.0, 0.0)
+			)
+		)
 	)
-	_time_bar_fill.size = Vector2(
-		inner_width * ratio,
-		maxf(_time_bar_track.size.y - TIME_BAR_INSET * 2.0, 0.0)
-	)
-	_time_bar_fill.color = TIMER_DANGER_COLOR if remaining <= 10.0 else TIMER_BONUS_COLOR
+
+
+func _fit_timer_label_to_text() -> void:
+	if not is_instance_valid(_timer_label):
+		return
+	var font: Font = _timer_label.get_theme_font("font")
+	var font_size: int = _timer_label.get_theme_font_size("font_size")
+	var text_width: float = font.get_string_size(
+		_timer_label.text,
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1.0,
+		font_size
+	).x
+	var center_x: float = _timer_label.position.x + _timer_label.size.x * 0.5
+	var fitted_width: float = maxf(180.0, ceilf(text_width + NUMERIC_SIDE_PADDING * 4.0))
+	_timer_label.size.x = fitted_width
+	_timer_label.position.x = center_x - fitted_width * 0.5
+	_timer_label.pivot_offset = _timer_label.size * 0.5
 
 
 func _on_fever_changed(active: bool, remaining: float) -> void:
@@ -1037,7 +1067,17 @@ func _on_time_bonus_awarded(seconds: float, source: String) -> void:
 	if not Config.data.fx_callouts_enabled:
 		return
 	if Config.data.blitz_survival_enabled:
-		_time_bonus_accumulator += maxf(seconds, 0.0)
+		var added_seconds: float = maxf(seconds, 0.0)
+		if added_seconds <= 0.0:
+			return
+		if _time_bonus_window_remaining <= 0.0:
+			_time_bonus_segment_start = maxf(_previous_time_remaining - added_seconds, 0.0)
+		_time_bonus_accumulator += added_seconds
+		_time_bar_fill.show_bonus(
+			_time_bonus_segment_start,
+			_previous_time_remaining,
+			_fever_active
+		)
 		if _time_bonus_window_remaining <= 0.0:
 			_time_bonus_window_remaining = maxf(
 				Config.data.blitz_time_bonus_display_window,
@@ -1090,10 +1130,20 @@ func _update_drain_rate_label() -> void:
 	):
 		_drain_rate_label.visible = false
 		return
+	var layers: int = _time_bar_fill.layer_count()
+	if layers >= 2:
+		_drain_rate_label.visible = true
+		_drain_rate_label.text = "×%d" % layers
+		_drain_rate_label.add_theme_color_override(
+			"font_color",
+			BlitzTimeBar.color_for_layer(layers - 1)
+		)
+		return
 	var multiplier: float = _blitz_manager.current_drain_multiplier()
 	_drain_rate_label.visible = multiplier >= 1.1
 	if _drain_rate_label.visible:
 		_drain_rate_label.text = "×%.1f" % multiplier
+		_drain_rate_label.add_theme_color_override("font_color", TIMER_NORMAL_COLOR)
 
 
 func _on_finale_started() -> void:

@@ -80,6 +80,11 @@ const CAPTURE_FILES: Array[String] = [
 	"38_fever_start_a.png",
 	"38_fever_start_b.png",
 	"39_fever_running.png",
+	"40_blitz_timer_long.png",
+	"41_blitz_bonus_gauge_a.png",
+	"41_blitz_bonus_gauge_b.png",
+	"42_blitz_bonus_layer_cross.png",
+	"43_blitz_bonus_fever.png",
 ]
 const HUD_CAPTURE_FILES: Array[String] = [
 	"02_turn_early.png",
@@ -90,6 +95,11 @@ const HUD_CAPTURE_FILES: Array[String] = [
 	"13_turn_ramp_uncapped_next.png",
 	"17_board_danger.png",
 	"18_board_blocked.png",
+	"40_blitz_timer_long.png",
+	"41_blitz_bonus_gauge_a.png",
+	"41_blitz_bonus_gauge_b.png",
+	"42_blitz_bonus_layer_cross.png",
+	"43_blitz_bonus_fever.png",
 ]
 
 var _failed: bool = false
@@ -281,7 +291,7 @@ func _capture_blitz_scenes() -> void:
 	hud._on_score_changed(BLITZ_CAPTURE_SCORE, BLITZ_CAPTURE_BEST)
 	hud._reset_callout_tracking()
 	manager.play_time_elapsed = 120.0
-	manager.remaining_time = Config.data.blitz_time_max
+	manager.remaining_time = Config.data.blitz_time_bar_reference
 	hud._on_time_changed(manager.remaining_time)
 	hud._on_time_bonus_awarded(0.1, "MERGE_L3")
 	hud._on_time_bonus_awarded(0.2, "MERGE_L4")
@@ -337,6 +347,51 @@ func _capture_blitz_scenes() -> void:
 	print("SCREEN_CAPTURE_CHECK scene=blitz_l4_blast radius_factor=0.3")
 	await _capture("06_blitz_fever_chain.png")
 	await get_tree().create_timer(0.40).timeout
+
+	hud._hide_bonus_label()
+	hud._on_fever_changed(false, 0.0)
+	hud._hide_fever_visuals()
+	board.set_fever_active(false)
+	var time_bar: BlitzTimeBar = main.get_node("UI/Hud/TimeBarFill") as BlitzTimeBar
+	time_bar.clear_bonus()
+	manager.remaining_time = 128.4
+	hud._on_time_changed(manager.remaining_time)
+	_validate_blitz_long_timer_scene(main, 3, 38.4 / 45.0)
+	await _capture("40_blitz_timer_long.png")
+
+	manager.remaining_time = 20.0
+	hud._on_time_changed(manager.remaining_time)
+	manager.remaining_time = 21.6
+	hud._on_time_changed(manager.remaining_time)
+	hud._on_time_bonus_awarded(1.6, "MERGE_L7")
+	_validate_blitz_bonus_segment_scene(main, 1, false)
+	await _capture("41_blitz_bonus_gauge_a.png")
+	await get_tree().create_timer(0.68).timeout
+	if time_bar.bonus_is_active():
+		_fail("BLITZ bonus gauge must mix into the normal fill after 0.65 seconds")
+	await _capture("41_blitz_bonus_gauge_b.png")
+
+	hud._hide_bonus_label()
+	time_bar.clear_bonus()
+	manager.remaining_time = 44.0
+	hud._on_time_changed(manager.remaining_time)
+	manager.remaining_time = 46.0
+	hud._on_time_changed(manager.remaining_time)
+	hud._on_time_bonus_awarded(2.0, "BLAST_L6")
+	_validate_blitz_bonus_segment_scene(main, 2, false)
+	await _capture("42_blitz_bonus_layer_cross.png")
+
+	hud._hide_bonus_label()
+	time_bar.clear_bonus()
+	hud._on_fever_changed(true, 3.0)
+	board.set_fever_active(true)
+	manager.remaining_time = 20.0
+	hud._on_time_changed(manager.remaining_time)
+	manager.remaining_time = 23.2
+	hud._on_time_changed(manager.remaining_time)
+	hud._on_time_bonus_awarded(3.2, "MERGE_L7")
+	_validate_blitz_bonus_segment_scene(main, 1, true)
+	await _capture("43_blitz_bonus_fever.png")
 
 	hud._hide_bonus_label()
 	for popup: ScorePopup in hud.active_score_popups():
@@ -1920,12 +1975,53 @@ func _validate_blitz_survival_hud_scene(main: Main) -> void:
 		"+0.3s",
 		"BLITZ aggregated time bonus"
 	)
+	var drain_rate: Label = main.get_node("UI/Hud/DrainRateLabel") as Label
+	if drain_rate.visible:
+		_fail("BLITZ constant-speed clock must hide the drain multiplier at one layer")
+	print("SCREEN_CAPTURE_CHECK scene=blitz_survival_hud bonus=+0.3s drain=constant")
+
+
+func _validate_blitz_long_timer_scene(
+	main: Main,
+	expected_layers: int,
+	expected_fill: float
+) -> void:
+	_expect_label_text(
+		main.get_node("UI/Hud/TimerLabel") as Label,
+		"128.4",
+		"BLITZ long timer"
+	)
 	_expect_label_text(
 		main.get_node("UI/Hud/DrainRateLabel") as Label,
-		"×1.2",
-		"BLITZ drain multiplier"
+		"×3",
+		"BLITZ layered timer count"
 	)
-	print("SCREEN_CAPTURE_CHECK scene=blitz_survival_hud bonus=+0.3s drain=1.2")
+	var time_bar: BlitzTimeBar = main.get_node("UI/Hud/TimeBarFill") as BlitzTimeBar
+	if time_bar.layer_count() != expected_layers:
+		_fail("BLITZ long timer layer count mismatch")
+	if not is_equal_approx(time_bar.layer_fill_ratio(), expected_fill):
+		_fail("BLITZ long timer layer fill mismatch")
+	print("SCREEN_CAPTURE_CHECK scene=blitz_timer_long layers=3 fill=%.3f" % expected_fill)
+
+
+func _validate_blitz_bonus_segment_scene(
+	main: Main,
+	expected_pieces: int,
+	expected_fever: bool
+) -> void:
+	var time_bar: BlitzTimeBar = main.get_node("UI/Hud/TimeBarFill") as BlitzTimeBar
+	if not time_bar.bonus_is_active():
+		_fail("BLITZ bonus segment must be visible")
+	if time_bar.bonus_piece_rects().size() != expected_pieces:
+		_fail("BLITZ bonus segment piece count mismatch")
+	if time_bar.bonus_is_fever() != expected_fever:
+		_fail("BLITZ bonus segment fever tint mismatch")
+	print(
+		"SCREEN_CAPTURE_CHECK scene=blitz_bonus pieces=%d fever=%s" % [
+			expected_pieces,
+			str(expected_fever),
+		]
+	)
 
 
 func _validate_blitz_ranking_scene(main: Main) -> void:
