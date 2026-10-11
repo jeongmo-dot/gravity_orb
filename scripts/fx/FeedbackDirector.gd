@@ -104,6 +104,11 @@ func bind(game_manager: Variant, board: Variant) -> void:
 		game_manager.reaction_ready.connect(_on_reaction_ready)
 	if not game_manager.turn_started.is_connected(_on_turn_started):
 		game_manager.turn_started.connect(_on_turn_started)
+	if (
+		game_manager is TurnManager
+		and not game_manager.state_changed.is_connected(_on_turn_state_changed)
+	):
+		game_manager.state_changed.connect(_on_turn_state_changed)
 
 
 func _on_reaction_ready(reaction: Dictionary) -> void:
@@ -130,6 +135,13 @@ func _on_turn_started(_turn_index: int, direction: Vector2i) -> void:
 	var trail: SwipeTrail = _acquire_swipe_trail()
 	trail.play(direction, Config.data.board_size)
 	_active_swipe_trails.append(trail)
+
+
+func _on_turn_state_changed(next_state: int) -> void:
+	if next_state != int(TurnManager.State.WAITING_INPUT):
+		return
+	_sfx_bank.play_turn_ready()
+	_haptics.play_turn_ready()
 
 
 func play_reaction_visuals(reaction: Dictionary) -> void:

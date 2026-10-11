@@ -3,6 +3,7 @@ extends Node
 
 const SWIPE_DURATION_MS: int = 8
 const BLAST_DURATION_MS: int = 25
+const TURN_READY_DURATION_MS: int = 5
 
 var _request_count: int = 0
 var _platform_vibration_count: int = 0
@@ -15,6 +16,10 @@ func play_swipe() -> void:
 
 func play_blast() -> void:
 	_vibrate(BLAST_DURATION_MS)
+
+
+func play_turn_ready() -> void:
+	_vibrate(TURN_READY_DURATION_MS)
 
 
 func request_count() -> int:

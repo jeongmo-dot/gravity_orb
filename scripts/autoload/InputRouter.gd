@@ -1,6 +1,7 @@
 extends Node
 
 signal swipe(direction: Vector2i)
+signal swipe_rejected(direction: Vector2i)
 signal restart_requested
 signal debug_toggle_hud
 signal debug_cycle_annihilation_rule
@@ -14,6 +15,7 @@ var _locked: bool = false
 var _active_source: PointerSource = PointerSource.NONE
 var _start_position: Vector2 = Vector2.ZERO
 var _started_locked: bool = false
+var _accept_release_after_unlock: bool = false
 
 
 func set_locked(locked: bool) -> void:
@@ -22,6 +24,10 @@ func set_locked(locked: bool) -> void:
 
 func is_locked() -> bool:
 	return _locked
+
+
+func set_accept_release_after_unlock(enabled: bool) -> void:
+	_accept_release_after_unlock = enabled
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -64,21 +70,26 @@ func _handle_keyboard(event: InputEvent) -> bool:
 	if OS.is_debug_build() and event.is_action_pressed(&"debug_toggle_sfx_mute", false):
 		debug_toggle_sfx_mute.emit()
 		return true
-	if _locked:
+	var direction: Vector2i = _direction_from_event(event)
+	if direction == Vector2i.ZERO:
 		return false
+	if _locked:
+		swipe_rejected.emit(direction)
+		return true
+	swipe.emit(direction)
+	return true
+
+
+func _direction_from_event(event: InputEvent) -> Vector2i:
 	if event.is_action_pressed(&"gravity_up", false):
-		swipe.emit(Vector2i.UP)
-		return true
+		return Vector2i.UP
 	if event.is_action_pressed(&"gravity_down", false):
-		swipe.emit(Vector2i.DOWN)
-		return true
+		return Vector2i.DOWN
 	if event.is_action_pressed(&"gravity_left", false):
-		swipe.emit(Vector2i.LEFT)
-		return true
+		return Vector2i.LEFT
 	if event.is_action_pressed(&"gravity_right", false):
-		swipe.emit(Vector2i.RIGHT)
-		return true
-	return false
+		return Vector2i.RIGHT
+	return Vector2i.ZERO
 
 
 func _handle_mouse_button(event: InputEventMouseButton) -> void:
@@ -112,17 +123,19 @@ func _end_pointer_gesture(source: PointerSource, position: Vector2) -> void:
 		return
 
 	var delta: Vector2 = position - _start_position
-	var should_ignore: bool = _started_locked or _locked
+	var started_locked: bool = _started_locked
 	_active_source = PointerSource.NONE
 	_start_position = Vector2.ZERO
 	_started_locked = false
-	if should_ignore:
-		return
 
 	var direction: Vector2i = SwipeDetector.classify(
 		delta,
 		Config.data.swipe_min_distance,
 		Config.data.swipe_dominance_ratio
 	)
-	if direction != Vector2i.ZERO:
-		swipe.emit(direction)
+	if direction == Vector2i.ZERO:
+		return
+	if _locked or (started_locked and not _accept_release_after_unlock):
+		swipe_rejected.emit(direction)
+		return
+	swipe.emit(direction)

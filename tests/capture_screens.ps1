@@ -1,15 +1,24 @@
 param(
     [string]$GodotPath = "",
     [ValidateRange(1, [int]::MaxValue)]
-    [int]$FixedFps = 120
+    [int]$FixedFps = 120,
+    [switch]$HudScenesOnly
 )
 
 $ErrorActionPreference = "Stop"
 $repoPath = Split-Path -Parent $PSScriptRoot
 $outputRoot = Join-Path $repoPath "artifacts\screens"
 $captureSpecs = @(
-    [ordered]@{ Name = "540x960"; Resolution = "540x960"; HudOnly = $false },
-    [ordered]@{ Name = "540x1170"; Resolution = "540x1170"; HudOnly = $false }
+    [ordered]@{
+        Name = "540x960"
+        Resolution = "540x960"
+        HudOnly = $HudScenesOnly.IsPresent
+    },
+    [ordered]@{
+        Name = "540x1170"
+        Resolution = "540x1170"
+        HudOnly = $HudScenesOnly.IsPresent
+    }
 )
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {
     if (-not [string]::IsNullOrWhiteSpace($env:GODOT)) {
@@ -79,7 +88,11 @@ $expectedFiles = @(
 	"41_blitz_bonus_gauge_a.png",
 	"41_blitz_bonus_gauge_b.png",
 	"42_blitz_bonus_layer_cross.png",
-	"43_blitz_bonus_fever.png"
+	"43_blitz_bonus_fever.png",
+	"44_turn_ready.png",
+	"45_turn_busy_a.png",
+	"45_turn_busy_b.png",
+	"46_turn_rejected.png"
 )
 $hudExpectedFiles = @(
     "02_turn_early.png",
@@ -94,7 +107,11 @@ $hudExpectedFiles = @(
 	"41_blitz_bonus_gauge_a.png",
 	"41_blitz_bonus_gauge_b.png",
 	"42_blitz_bonus_layer_cross.png",
-	"43_blitz_bonus_fever.png"
+	"43_blitz_bonus_fever.png",
+	"44_turn_ready.png",
+	"45_turn_busy_a.png",
+	"45_turn_busy_b.png",
+	"46_turn_rejected.png"
 )
 $capturedFileCount = 0
 $boardReports = @()
