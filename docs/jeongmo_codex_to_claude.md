@@ -38,6 +38,31 @@
 
 ## 미확인
 
+### [2026-10-11] 대상 #73 — 결과 → 랭킹 복귀 후 버튼 잠금 해제
+- 상태: 완료 — 결과 화면에서 랭킹을 닫아 돌아온 경우에만 결과 버튼 잠금을 풀어, 세 버튼을 다시 사용할 수 있게 함
+- 브랜치 / PR: `bug-73-ranking-return-buttons` / 미생성
+- 변경 파일: `scripts/ui/{DebugHud,GameOverPanel}.gd`, `tests/test_rankings.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 결과 → 랭킹 → 닫기 뒤 `다시 하기`·`랭킹`·`모드 선택`의 `disabled == false` — 자동 (`test_result_actions_restore_after_two_ranking_round_trips`)
+  - [x] 결과 → 랭킹 → 탭 전환 → 닫기와 랭킹 왕복 2회 뒤에도 세 버튼 활성 — 자동 (같은 테스트에서 첫 왕복 중 CLASSIC 탭 전환, 총 2회 왕복)
+  - [x] 랭킹이 열리는 전환 중 연속 두 입력은 요청 1회만 발생 — 자동 (왕복마다 `ranking_requested` 증가량 1)
+  - [x] 복귀 뒤 랭킹을 다시 열 수 있고, `다시 하기`·`모드 선택`은 각각 신호 1회만 발생 — 자동 (랭킹 2회 열림, 각 종료 동작을 두 번 호출해 신호 수 1 확인)
+  - [x] 시작 화면 랭킹·설정 복귀와 소리 토글 회귀 — 기존 `test_ranking_screen_tabs_rows_highlight_and_touch_filters`, `test_settings_symbol_toggle_saves_and_updates_orbit_stage_immediately`, `test_sound_buttons_m_key_bus_and_save_share_one_state` 포함 전체 래퍼 통과
+- QA 관측값:
+  - 집중 테스트 `--test-file=res://tests/test_rankings.gd` → `8/8`, 종료 코드 0
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - `tests/run_tests.ps1` → 일반 `287/287`(`16.181초`), 장기 `5/5`(`39.728초`), 성능 `5/5`(`2.593초`), 합계 `297/297`, 종료 코드 0, 총 `58.503초`
+  - 시작 화면 / TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 전역 난수 호출 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. TURN 또는 BLITZ 한 판을 끝내고 결과 화면의 `랭킹`을 누른 뒤 닫는다 → 결과 화면으로 돌아오며 `다시 하기`·`랭킹`·`모드 선택` 세 버튼이 모두 밝은 활성 상태이고 눌려야 한다.
+  2. 결과 → 랭킹에서 다른 모드 탭을 누르고 닫는다 → 결과 화면 세 버튼이 모두 활성 상태여야 한다.
+  3. 결과 → 랭킹 → 닫기를 두 번 반복한 뒤 `다시 하기`를 누른다 → 같은 모드의 새 판이 한 번만 시작되어야 한다.
+  4. 시작 화면에서 랭킹과 설정을 각각 열었다 닫는다 → 시작 화면 버튼이 계속 눌려야 한다.
+  5. 결과에서 랭킹을 연 상태로 `M`을 두 번 누른다 → 소리가 음소거됐다가 복구되고, 랭킹을 닫으면 결과 버튼이 모두 활성 상태여야 한다.
+- 결정 사항: `GameOverPanel.restore_actions_after_ranking()`은 패널 자체가 보일 때만 잠금과 세 버튼을 복구한다. 시작 화면에서 연 랭킹을 닫을 때 숨겨진 이전 결과 패널을 잘못 해제하지 않기 위한 조건이다.
+- 남은 것 · 질문: 없음
+
 ### [2026-10-11] 대상 #72 — BLITZ 시계 단순화·무제한 겹 게이지
 - 상태: 완료 — 감소 속도를 항상 1배로 고정하고 시간 상한을 없앴으며, 45초 단위 겹 게이지·획득 시간 조각·큰 타이머·1시간 이상 결과 형식을 구현함
 - 브랜치 / PR: `v4-3-blitz-clock` / 미생성

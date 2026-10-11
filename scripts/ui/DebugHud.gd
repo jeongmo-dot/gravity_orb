@@ -20,6 +20,7 @@ const ANNIHILATION_RULE_NAMES: Array[String] = ["A", "B", "C"]
 @onready var _board: Variant = %Board
 @onready var _label: Label = %DebugLabel
 @onready var _hud: Hud = %Hud
+@onready var _game_over_panel: GameOverPanel = %GameOverPanel
 @onready var _start_screen: StartScreen = %StartScreen
 @onready var _ranking_panel: RankingPanel = %RankingPanel
 @onready var _settings_panel: SettingsPanel = %SettingsPanel
@@ -122,6 +123,7 @@ func _on_ranking_closed() -> void:
 		show_start_screen()
 	else:
 		show_gameplay()
+		_game_over_panel.restore_actions_after_ranking()
 
 
 func _on_symbols_changed(enabled: bool) -> void:

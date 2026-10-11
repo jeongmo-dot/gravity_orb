@@ -165,6 +165,13 @@ func _set_actions_enabled(enabled: bool) -> void:
 	_mode_select_button.disabled = not enabled
 
 
+func restore_actions_after_ranking() -> void:
+	if not visible:
+		return
+	_action_taken = false
+	_set_actions_enabled(true)
+
+
 func _take_action() -> bool:
 	if _action_taken or _restart_button.disabled:
 		return false

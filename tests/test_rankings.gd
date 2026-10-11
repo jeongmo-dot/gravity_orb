@@ -348,6 +348,94 @@ func test_result_panel_rank_messages_buttons_and_ranking_highlight() -> void:
 	_remove_save()
 
 
+func test_result_actions_restore_after_two_ranking_round_trips() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	_remove_save()
+	var main: Main = _new_main(SAVE_PATH)
+	main.launch_immediately(GameConfig.GameMode.BLITZ)
+	tree.root.add_child(main)
+	await tree.process_frame
+	var manager: BlitzManager = main.get_node("BlitzManager") as BlitzManager
+	manager.set_physics_process(false)
+	var panel: GameOverPanel = main.get_node("UI/Hud/GameOverPanel") as GameOverPanel
+	var ranking: RankingPanel = (main.get_node("UI") as DebugHud).ranking_panel()
+	var restart_button: Button = panel.get_node("Margin/Content/RestartButton") as Button
+	var ranking_button: Button = panel.get_node(
+		"Margin/Content/ResultRankingButton"
+	) as Button
+	var mode_select_button: Button = panel.get_node("Margin/Content/ModeSelectButton") as Button
+	manager.game_over_details = {"ranking": {"rank": 2, "record": {}}}
+	manager.game_over.emit()
+	await tree.create_timer(0.30).timeout
+
+	var ranking_requests: Array[int] = [0]
+	var ranking_recorder: Callable = func(
+		_mode: GameConfig.GameMode,
+		_highlight_rank: int
+	) -> void:
+		ranking_requests[0] += 1
+	panel.ranking_requested.connect(ranking_recorder)
+	for visit: int in range(2):
+		ranking_button.pressed.emit()
+		ranking_button.pressed.emit()
+		assert_eq(
+			ranking_requests[0],
+			visit + 1,
+			"ranking transition accepts only one action"
+		)
+		await tree.create_timer(0.30).timeout
+		assert_true(ranking.visible, "ranking visit %d opens" % (visit + 1))
+		if visit == 0:
+			(ranking.get_node("Panel/Content/Tabs/RankingClassicTab") as Button).pressed.emit()
+			assert_eq(
+				ranking.current_mode(),
+				GameConfig.GameMode.TURN,
+				"ranking tab can change before returning"
+			)
+		(ranking.get_node("Panel/Content/RankingCloseButton") as Button).pressed.emit()
+		await tree.create_timer(0.30).timeout
+		assert_true(panel.visible, "ranking visit %d returns to result" % (visit + 1))
+		for button: Button in [restart_button, ranking_button, mode_select_button]:
+			assert_true(
+				not button.disabled,
+				"result action %s restores after ranking visit %d" % [
+					button.name,
+					visit + 1,
+				]
+			)
+	panel.ranking_requested.disconnect(ranking_recorder)
+
+	var main_mode_select: Callable = Callable(main, "_show_mode_selection")
+	if panel.mode_select_requested.is_connected(main_mode_select):
+		panel.mode_select_requested.disconnect(main_mode_select)
+	var mode_select_requests: Array[int] = [0]
+	var mode_select_recorder: Callable = func() -> void:
+		mode_select_requests[0] += 1
+	panel.mode_select_requested.connect(mode_select_recorder)
+	mode_select_button.pressed.emit()
+	mode_select_button.pressed.emit()
+	assert_eq(mode_select_requests[0], 1, "mode select remains a one-shot action")
+	panel.mode_select_requested.disconnect(mode_select_recorder)
+
+	manager.game_over.emit()
+	await tree.create_timer(0.30).timeout
+	var main_restart: Callable = Callable(main, "restart")
+	if InputRouter.restart_requested.is_connected(main_restart):
+		InputRouter.restart_requested.disconnect(main_restart)
+	var restart_requests: Array[int] = [0]
+	var restart_recorder: Callable = func() -> void:
+		restart_requests[0] += 1
+	InputRouter.restart_requested.connect(restart_recorder)
+	restart_button.pressed.emit()
+	restart_button.pressed.emit()
+	assert_eq(restart_requests[0], 1, "restart remains a one-shot action")
+	InputRouter.restart_requested.disconnect(restart_recorder)
+
+	await _cleanup_main(main)
+	Config.data.game_mode = original_mode
+	_remove_save()
+
+
 func _ranking_scores(rankings: Array[Dictionary]) -> Array[int]:
 	var scores: Array[int] = []
 	for ranking: Dictionary in rankings:
