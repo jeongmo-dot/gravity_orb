@@ -49,6 +49,20 @@ const CAPTURE_FILES: Array[String] = [
 	"20_start_no_record.png",
 	"21_start_screen_t2_5.png",
 	"22_start_screen_t5_0.png",
+	"23_merge_stardust_a.png",
+	"23_merge_stardust_b.png",
+	"24_birth_l6_a.png",
+	"24_birth_l6_b.png",
+	"25_birth_l7_a.png",
+	"25_birth_l7_b.png",
+	"26_blast_l4_a.png",
+	"26_blast_l4_b.png",
+	"27_blast_l6_a.png",
+	"27_blast_l6_b.png",
+	"28_blast_l5_crowded_a.png",
+	"28_blast_l5_crowded_b.png",
+	"29_blast_l6_crowded_a.png",
+	"29_blast_l6_crowded_b.png",
 ]
 const HUD_CAPTURE_FILES: Array[String] = [
 	"02_turn_early.png",
@@ -94,6 +108,8 @@ func _run_capture_suite() -> void:
 		await _capture_orb_codex()
 	if not _failed and not _hud_scenes_only:
 		await _capture_orb_closeup()
+	if not _failed and not _hud_scenes_only:
+		await _capture_reaction_effect_scenes()
 	if not _failed and not _hud_scenes_only:
 		await _measure_v2_contrast()
 	if not _failed and not _hud_scenes_only:
@@ -195,11 +211,13 @@ func _capture_turn_scenes() -> void:
 	Config.data.spawn_count_max = 0
 	manager.turn_index = 20
 	spawner.sync_next_batch_size(21)
+	_force_l1_preview(spawner)
 	await get_tree().process_frame
 	_validate_turn_ramp_preview_scene(main, 2, "turn_ramp_next")
 	await _capture("12_turn_ramp_next.png")
 	manager.turn_index = 100
 	spawner.sync_next_batch_size(101)
+	_force_l1_preview(spawner)
 	await get_tree().process_frame
 	_validate_turn_ramp_preview_scene(main, 6, "turn_ramp_uncapped_next")
 	await _capture("13_turn_ramp_uncapped_next.png")
@@ -433,6 +451,372 @@ func _capture_orb_closeup() -> void:
 	await _capture("15_orb_closeup.png")
 	print("SCREEN_CAPTURE_CHECK scene=orb_closeup color=CYAN levels=7 scale=3x")
 	await _destroy_main(main)
+
+
+func _capture_reaction_effect_scenes() -> void:
+	await _capture_reaction_pair("23_merge_stardust", ReactionRules.Type.MERGE, 3, 0.18, 0.42)
+	if _failed:
+		return
+	await _capture_reaction_pair("24_birth_l6", ReactionRules.Type.MERGE, 6, 0.13, 0.52)
+	if _failed:
+		return
+	await _capture_reaction_pair("25_birth_l7", ReactionRules.Type.MERGE, 7, 0.13, 0.58)
+	if _failed:
+		return
+	await _capture_reaction_pair("26_blast_l4", ReactionRules.Type.BLAST, 4, 0.18, 0.42)
+	if _failed:
+		return
+	await _capture_reaction_pair("27_blast_l6", ReactionRules.Type.BLAST, 6, 0.18, 0.60)
+	if _failed:
+		return
+	await _capture_crowded_blast_pair("28_blast_l5_crowded", 5, 0.22, 0.58)
+	if _failed:
+		return
+	await _capture_crowded_blast_pair("29_blast_l6_crowded", 6, 0.22, 0.58)
+	if _failed:
+		return
+	await _measure_same_size_star_luminance()
+
+
+func _capture_reaction_pair(
+	base_name: String,
+	reaction_type: ReactionRules.Type,
+	level: int,
+	first_time: float,
+	second_time: float
+) -> void:
+	var main: Main = await _create_main(Main.NO_MODE)
+	(main.get_node("UI") as CanvasLayer).visible = false
+	var board: Board3D = main.get_node("Board") as Board3D
+	board.set_process(false)
+	var feedback: FeedbackDirector = main.get_node("FeedbackDirector") as FeedbackDirector
+	feedback.clear_effects()
+	var origin: Vector2 = Vector2.ZERO
+	var reaction: Dictionary = {
+		"type": reaction_type,
+		"position": origin,
+	}
+	if reaction_type == ReactionRules.Type.MERGE:
+		var result_orb: Orb3D = board.spawn_orb(
+			OrbTypes.OrbColor.YELLOW,
+			level,
+			origin
+		)
+		result_orb.disable_physics()
+		reaction["result_orb"] = result_orb
+		reaction["result_level"] = level
+		reaction["result_color"] = OrbTypes.OrbColor.YELLOW
+		reaction["chain"] = 1
+	else:
+		reaction["levels"] = [level, level]
+		reaction["colors"] = [OrbTypes.OrbColor.PURPLE, OrbTypes.OrbColor.CYAN]
+		reaction["shock_level"] = level
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var baseline: Image = get_viewport().get_texture().get_image()
+	feedback.play_reaction_visuals(reaction)
+	await get_tree().create_timer(first_time).timeout
+	await _capture("%s_a.png" % base_name)
+	if reaction_type == ReactionRules.Type.BLAST and level == 4:
+		_validate_l4_local_brightness(main, baseline)
+	await get_tree().create_timer(maxf(second_time - first_time, 0.01)).timeout
+	await _capture("%s_b.png" % base_name)
+	print(
+		"REACTION_CAPTURE scene=%s level=%d time_a=%.2f time_b=%.2f" % [
+			base_name,
+			level,
+			first_time,
+			second_time,
+		]
+	)
+	await _destroy_main(main)
+
+
+func _validate_l4_local_brightness(main: Main, baseline: Image) -> void:
+	await RenderingServer.frame_post_draw
+	var effect_image: Image = get_viewport().get_texture().get_image()
+	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var image_scale: Vector2 = Vector2(effect_image.get_size()) / viewport_size
+	var center: Vector2 = camera.unproject_position(
+		Orb3D.plane_position_to_world(Vector2.ZERO)
+	) * image_scale
+	var push_radius_px: float = (
+		Config.data.board_size * Config.data.blast_push_radius_factor_for_level(4)
+	)
+	var edge: Vector2 = camera.unproject_position(
+		Orb3D.plane_position_to_world(Vector2(push_radius_px, 0.0))
+	) * image_scale
+	var radius: float = center.distance_to(edge) + 4.0
+	var baseline_outside: float = _average_luminance_outside_circle(
+		baseline,
+		center,
+		radius
+	)
+	var effect_outside: float = _average_luminance_outside_circle(
+		effect_image,
+		center,
+		radius
+	)
+	var gain: float = effect_outside - baseline_outside
+	print(
+		"REACTION_PIXEL_CHECK scene=blast_l4 outside_gain=%.5f maximum=0.03000" % gain
+	)
+	if gain > 0.03:
+		_fail("L4 blast outside-radius brightness gain %.5f exceeds 0.03" % gain)
+
+
+func _capture_crowded_blast_pair(
+	base_name: String,
+	level: int,
+	first_time: float,
+	second_time: float
+) -> void:
+	var main: Main = await _create_main(Main.NO_MODE)
+	(main.get_node("UI") as CanvasLayer).visible = false
+	var board: Board3D = main.get_node("Board") as Board3D
+	board.set_process(false)
+	var orb_descriptors: Array[Dictionary] = _populate_crowded_board(board)
+	var feedback: FeedbackDirector = main.get_node("FeedbackDirector") as FeedbackDirector
+	feedback.clear_effects()
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	feedback.play_reaction_visuals({
+		"type": ReactionRules.Type.BLAST,
+		"position": Vector2.ZERO,
+		"levels": [level, level],
+		"colors": [OrbTypes.OrbColor.PURPLE, OrbTypes.OrbColor.CYAN],
+		"shock_level": level,
+	})
+	await get_tree().create_timer(first_time).timeout
+	await _capture("%s_a.png" % base_name)
+	await get_tree().create_timer(maxf(second_time - first_time, 0.01)).timeout
+	await _capture("%s_b.png" % base_name)
+	# Measure after the wave rings have expanded beyond the inner board sample,
+	# so this is specifically orb-versus-nebula contrast rather than ring contrast.
+	await _validate_crowded_nebula_contrast(main, level, orb_descriptors, base_name)
+	print(
+		"REACTION_CAPTURE scene=%s level=%d crowded_orbs=%d time_a=%.2f time_b=%.2f" % [
+			base_name,
+			level,
+			orb_descriptors.size(),
+			first_time,
+			second_time,
+		]
+	)
+	await _destroy_main(main)
+
+
+func _populate_crowded_board(board: Board3D) -> Array[Dictionary]:
+	var descriptors: Array[Dictionary] = []
+	var coordinates: Array[float] = [-320.0, -160.0, 0.0, 160.0, 320.0]
+	var orb_index: int = 0
+	for y: float in coordinates:
+		for x: float in coordinates:
+			var row_index: int = floori(float(orb_index) / float(coordinates.size()))
+			var level: int = 1 + (orb_index * 5 + row_index) % 3
+			var color: int = (orb_index * 7 + level) % Config.data.color_display.size()
+			var position_value: Vector2 = Vector2(x, y)
+			var orb: Orb3D = board.spawn_orb(color, level, position_value)
+			orb.disable_physics()
+			descriptors.append({
+				"position": position_value,
+				"body_radius": (
+					Config.data.radius_for_level(level)
+					* CelestialOrbArt.body_radius_ratio(level)
+				),
+			})
+			orb_index += 1
+	return descriptors
+
+
+func _validate_crowded_nebula_contrast(
+	main: Main,
+	level: int,
+	orb_descriptors: Array[Dictionary],
+	scene_name: String
+) -> void:
+	await RenderingServer.frame_post_draw
+	var image: Image = get_viewport().get_texture().get_image()
+	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
+	var image_scale: Vector2 = Vector2(image.get_size()) / get_viewport().get_visible_rect().size
+	var effect_center: Vector2 = camera.unproject_position(
+		Orb3D.plane_position_to_world(Vector2.ZERO)
+	) * image_scale
+	var sample_radius_px: float = minf(
+		Config.data.board_size * Config.data.blast_push_radius_factor_for_level(level),
+		Config.data.board_size * 0.43
+	)
+	var effect_edge: Vector2 = camera.unproject_position(
+		Orb3D.plane_position_to_world(Vector2(sample_radius_px, 0.0))
+	) * image_scale
+	var effect_radius: float = effect_center.distance_to(effect_edge)
+	var projected_orbs: Array[Dictionary] = []
+	var orb_total: float = 0.0
+	var orb_samples: int = 0
+	for descriptor: Dictionary in orb_descriptors:
+		var position_value: Vector2 = descriptor["position"] as Vector2
+		var body_radius_px: float = float(descriptor["body_radius"])
+		var center: Vector2 = camera.unproject_position(
+			Orb3D.plane_position_to_world(position_value)
+		) * image_scale
+		var edge: Vector2 = camera.unproject_position(
+			Orb3D.plane_position_to_world(position_value + Vector2(body_radius_px, 0.0))
+		) * image_scale
+		var radius: float = center.distance_to(edge)
+		projected_orbs.append({"center": center, "radius": radius})
+		if center.distance_to(effect_center) > effect_radius:
+			continue
+		var core_metrics: Dictionary = _circle_luminance(image, center, radius * 0.52)
+		orb_total += float(core_metrics["total"])
+		orb_samples += int(core_metrics["count"])
+	var background_total: float = 0.0
+	var background_samples: int = 0
+	var min_x: int = maxi(0, floori(effect_center.x - effect_radius))
+	var max_x: int = mini(image.get_width() - 1, ceili(effect_center.x + effect_radius))
+	var min_y: int = maxi(0, floori(effect_center.y - effect_radius))
+	var max_y: int = mini(image.get_height() - 1, ceili(effect_center.y + effect_radius))
+	for y: int in range(min_y, max_y + 1):
+		for x: int in range(min_x, max_x + 1):
+			var point: Vector2 = Vector2(float(x), float(y))
+			if point.distance_to(effect_center) > effect_radius:
+				continue
+			var covered_by_orb: bool = false
+			for projected: Dictionary in projected_orbs:
+				if point.distance_to(projected["center"] as Vector2) <= float(projected["radius"]) * 1.10:
+					covered_by_orb = true
+					break
+			if covered_by_orb:
+				continue
+			background_total += image.get_pixel(x, y).get_luminance()
+			background_samples += 1
+	var orb_average: float = orb_total / float(maxi(orb_samples, 1))
+	var background_average: float = background_total / float(maxi(background_samples, 1))
+	var ratio: float = orb_average / maxf(background_average, 0.001)
+	print(
+		"REACTION_PIXEL_CHECK scene=%s orb=%.5f nebula_background=%.5f ratio=%.2f minimum=4.00 orb_samples=%d background_samples=%d" % [
+			scene_name,
+			orb_average,
+			background_average,
+			ratio,
+			orb_samples,
+			background_samples,
+		]
+	)
+	if orb_samples <= 0 or background_samples <= 0:
+		_fail("%s crowded nebula contrast has no samples" % scene_name)
+	elif ratio < 4.0:
+		_fail("%s orb/background luminance ratio %.2f is below 4.0" % [scene_name, ratio])
+
+
+func _circle_luminance(image: Image, center: Vector2, radius: float) -> Dictionary:
+	var min_x: int = maxi(0, floori(center.x - radius))
+	var max_x: int = mini(image.get_width() - 1, ceili(center.x + radius))
+	var min_y: int = maxi(0, floori(center.y - radius))
+	var max_y: int = mini(image.get_height() - 1, ceili(center.y + radius))
+	var radius_squared: float = radius * radius
+	var total: float = 0.0
+	var count: int = 0
+	for y: int in range(min_y, max_y + 1):
+		for x: int in range(min_x, max_x + 1):
+			if Vector2(float(x), float(y)).distance_squared_to(center) > radius_squared:
+				continue
+			total += image.get_pixel(x, y).get_luminance()
+			count += 1
+	return {"total": total, "count": count}
+
+
+func _measure_same_size_star_luminance() -> void:
+	var main: Main = await _create_main(Main.NO_MODE)
+	(main.get_node("UI") as CanvasLayer).visible = false
+	(main.get_node("Board") as Board3D).visible = false
+	var target_body_radius_px: float = 92.0
+	var centers: Array[Vector2] = [Vector2(-130.0, 0.0), Vector2(130.0, 0.0)]
+	var levels: Array[int] = [6, 7]
+	for index: int in range(levels.size()):
+		var level: int = levels[index]
+		var orb: Orb3D = ORB_3D_SCENE.instantiate() as Orb3D
+		main.add_child(orb)
+		orb.setup(OrbTypes.OrbColor.YELLOW, level, Config.data)
+		orb.disable_physics()
+		orb.set_process(false)
+		orb.set_physics_process(false)
+		orb.set_render_clamp_enabled(false)
+		orb.position = centers[index]
+		var source_body_radius: float = (
+			Config.data.radius_for_level(level) * CelestialOrbArt.body_radius_ratio(level)
+		)
+		var body_scale: float = target_body_radius_px / source_body_radius
+		orb._mesh.scale = Vector3.ONE * body_scale
+		orb._adornment.scale = Vector3.ONE * (
+			target_body_radius_px
+			/ CelestialOrbArt.body_radius_ratio(level)
+			/ Orb3D.PIXELS_PER_METER
+		)
+		orb._blast_outline.visible = false
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var image: Image = get_viewport().get_texture().get_image()
+	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
+	var image_scale: Vector2 = Vector2(image.get_size()) / get_viewport().get_visible_rect().size
+	var projected_radius: float = absf(
+		(camera.unproject_position(Orb3D.plane_position_to_world(Vector2(target_body_radius_px, 0.0))) * image_scale).x
+		- (camera.unproject_position(Orb3D.plane_position_to_world(Vector2.ZERO)) * image_scale).x
+	)
+	var luminance: Array[float] = []
+	for center_position: Vector2 in centers:
+		var center: Vector2 = camera.unproject_position(
+			Orb3D.plane_position_to_world(center_position)
+		) * image_scale
+		luminance.append(_disk_average_luminance(image, center, projected_radius * 0.78))
+	print(
+		"REACTION_PIXEL_CHECK scene=same_size_stars l6=%.5f l7=%.5f" % [
+			luminance[0],
+			luminance[1],
+		]
+	)
+	if luminance[1] < luminance[0] * 1.1:
+		_fail(
+			"Same-size L7 body average luminance %.5f must be at least L6 %.5f x 1.1" % [
+				luminance[1],
+				luminance[0],
+			]
+		)
+	await _destroy_main(main)
+
+
+func _average_luminance_outside_circle(
+	image: Image,
+	center: Vector2,
+	radius: float
+) -> float:
+	var total: float = 0.0
+	var count: int = 0
+	var radius_squared: float = radius * radius
+	for y: int in range(image.get_height()):
+		for x: int in range(image.get_width()):
+			if Vector2(float(x), float(y)).distance_squared_to(center) <= radius_squared:
+				continue
+			total += image.get_pixel(x, y).get_luminance()
+			count += 1
+	return total / float(maxi(count, 1))
+
+
+func _disk_average_luminance(image: Image, center: Vector2, radius: float) -> float:
+	var min_x: int = maxi(0, floori(center.x - radius))
+	var max_x: int = mini(image.get_width() - 1, ceili(center.x + radius))
+	var min_y: int = maxi(0, floori(center.y - radius))
+	var max_y: int = mini(image.get_height() - 1, ceili(center.y + radius))
+	var radius_squared: float = radius * radius
+	var total: float = 0.0
+	var count: int = 0
+	for y: int in range(min_y, max_y + 1):
+		for x: int in range(min_x, max_x + 1):
+			if Vector2(float(x), float(y)).distance_squared_to(center) > radius_squared:
+				continue
+			total += image.get_pixel(x, y).get_luminance()
+			count += 1
+	return total / float(maxi(count, 1))
 
 
 func _measure_v2_contrast() -> void:
@@ -1312,6 +1696,16 @@ func _validate_turn_ramp_preview_scene(main: Main, batch_size: int, scene_name: 
 		_fail("TURN NEXT preview must show %d orbs" % visible_count)
 	if then_preview.get_child_count() != visible_count:
 		_fail("TURN THEN preview must show %d orbs" % visible_count)
+	var next_has_l1: bool = false
+	var then_has_l1: bool = false
+	for child: Node in next_preview.get_children():
+		if child is OrbVisual and (child as OrbVisual).celestial_level() == 1:
+			next_has_l1 = true
+	for child: Node in then_preview.get_children():
+		if child is OrbVisual and (child as OrbVisual).celestial_level() == 1:
+			then_has_l1 = true
+	if not next_has_l1 or not then_has_l1:
+		_fail("TURN NEXT/THEN capture must visibly include an L1 meteor")
 	var expects_count_labels: bool = batch_size > Hud.MAX_PREVIEW_COUNT
 	if next_count.visible != expects_count_labels:
 		_fail("TURN NEXT count label visibility mismatch")
@@ -1328,6 +1722,14 @@ func _validate_turn_ramp_preview_scene(main: Main, batch_size: int, scene_name: 
 			str(expects_count_labels),
 		]
 	)
+
+
+func _force_l1_preview(spawner: Spawner) -> void:
+	for batch: Array in spawner._preview_batches:
+		if not batch.is_empty():
+			var candidate: Dictionary = batch[0] as Dictionary
+			candidate["level"] = 1
+	spawner._publish_preview()
 
 
 func _validate_blitz_time_up_scene(main: Main) -> void:

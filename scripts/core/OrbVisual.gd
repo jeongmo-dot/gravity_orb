@@ -178,7 +178,7 @@ func _draw_celestial() -> void:
 
 	draw_arc(
 		Vector2.ZERO,
-		body_radius * 0.98,
+		body_radius if _celestial_level == 5 else body_radius * 0.98,
 		0.0,
 		TAU,
 		64,
@@ -198,19 +198,26 @@ func _draw_meteor(radius: float, base: Color) -> void:
 		var angle: float = -PI * 0.5 + TAU * float(index) / float(factors.size())
 		points.append(Vector2(cos(angle), sin(angle)) * radius * factors[index])
 	draw_colored_polygon(points, _with_alpha(base.darkened(0.54), base.a))
-	var vein_color: Color = _with_alpha(base.lightened(0.34), 0.94 * base.a)
-	draw_polyline(PackedVector2Array([
-		Vector2(-0.58, -0.45) * radius,
-		Vector2(-0.18, -0.10) * radius,
-		Vector2(-0.34, 0.42) * radius,
-		Vector2(0.10, 0.18) * radius,
-		Vector2(0.52, 0.56) * radius,
-	]), vein_color, maxf(1.4, radius * 0.075), true)
-	draw_polyline(PackedVector2Array([
-		Vector2(0.15, -0.68) * radius,
-		Vector2(0.02, -0.23) * radius,
-		Vector2(0.43, 0.02) * radius,
-	]), vein_color, maxf(1.0, radius * 0.055), true)
+	var spot_color: Color = _with_alpha(base.darkened(0.72), 0.70 * base.a)
+	draw_circle(Vector2(-0.34, -0.22) * radius, radius * 0.19, spot_color)
+	draw_circle(Vector2(0.35, 0.25) * radius, radius * 0.14, spot_color)
+	draw_circle(Vector2(0.18, -0.48) * radius, radius * 0.09, spot_color)
+	draw_circle(Vector2(-0.46, 0.42) * radius, radius * 0.08, spot_color)
+	var scratch_color: Color = _with_alpha(base.lightened(0.18), 0.34 * base.a)
+	draw_line(
+		Vector2(-0.10, -0.14) * radius,
+		Vector2(0.20, 0.04) * radius,
+		scratch_color,
+		maxf(0.8, radius * 0.026),
+		true
+	)
+	draw_line(
+		Vector2(-0.48, 0.16) * radius,
+		Vector2(-0.30, 0.34) * radius,
+		scratch_color,
+		maxf(0.7, radius * 0.022),
+		true
+	)
 
 
 func _draw_moon(radius: float, base: Color) -> void:
@@ -255,15 +262,34 @@ func _draw_gas_giant(radius: float, base: Color) -> void:
 
 
 func _draw_star(radius: float, base: Color, solar: bool) -> void:
-	draw_circle(Vector2.ZERO, radius, _with_alpha(base.lightened(0.16 if solar else 0.12), base.a))
-	var cell_color: Color = _with_alpha(base.lightened(0.52), 0.62 * base.a)
-	var cell_count: int = 10 if solar else 7
+	draw_circle(
+		Vector2.ZERO,
+		radius,
+		_with_alpha(base.lightened(0.46 if solar else 0.12), base.a)
+	)
+	var cell_color: Color = _with_alpha(
+		Color.WHITE.lerp(base.lightened(0.58), 0.34 if solar else 0.58),
+		(0.82 if solar else 0.62) * base.a
+	)
+	var cell_count: int = 13 if solar else 7
 	for index: int in range(cell_count):
 		var angle: float = TAU * float(index) / float(cell_count) + float(index % 3) * 0.21
 		var distance: float = radius * (0.28 + 0.36 * float((index * 7) % 5) / 4.0)
 		var cell_radius: float = radius * (0.07 + 0.025 * float(index % 3))
-		draw_circle(Vector2(cos(angle), sin(angle)) * distance, cell_radius, cell_color)
-	if not solar:
+		var cell_position: Vector2 = Vector2(cos(angle), sin(angle)) * distance
+		if solar:
+			_draw_elliptic_cell(
+				cell_position,
+				cell_radius,
+				angle + PI * 0.32,
+				cell_color
+			)
+		else:
+			draw_circle(cell_position, cell_radius, cell_color)
+	if solar:
+		draw_circle(Vector2(-0.08, -0.10) * radius, radius * 0.46, _with_alpha(Color.WHITE, 0.38 * base.a))
+		draw_circle(Vector2(-0.10, -0.12) * radius, radius * 0.20, _with_alpha(Color.WHITE, 0.42 * base.a))
+	else:
 		draw_circle(Vector2(-0.10, -0.12) * radius, radius * 0.52, _with_alpha(Color.WHITE, 0.40 * base.a))
 		draw_circle(Vector2(-0.12, -0.14) * radius, radius * 0.25, _with_alpha(Color.WHITE, 0.34 * base.a))
 
@@ -297,21 +323,70 @@ func _draw_halo(
 		) * base.a
 		draw_circle(Vector2.ZERO, halo_radius, _with_alpha(base, halo_alpha))
 	if solar:
-		var flare_angles: Array[float] = [-2.36, -0.38, 1.30]
+		var slow_drift: float = _blast_blink_elapsed * 0.22
+		var flare_angles: Array[float] = [
+			-2.36 + sin(slow_drift) * 0.055,
+			-0.38 + cos(slow_drift * 0.83) * 0.045,
+			1.30 + sin(slow_drift * 0.71) * 0.050,
+		]
+		var flare_widths: Array[float] = [0.085, 0.125, 0.100]
+		var flare_heights: Array[float] = [0.16, 0.25, 0.20]
 		for index: int in range(flare_angles.size()):
-			var angle: float = flare_angles[index]
-			var tangent: Vector2 = Vector2(cos(angle), sin(angle))
-			var perpendicular: Vector2 = tangent.orthogonal()
-			var flare: PackedVector2Array = PackedVector2Array([
-				tangent * body_radius * 0.90 + perpendicular * radius * 0.045,
-				tangent * radius * (0.98 - float(index) * 0.035),
-				tangent * body_radius * 0.90 - perpendicular * radius * 0.045,
-			])
-			draw_colored_polygon(flare, _with_alpha(base.lightened(0.28), (0.52 + pulse * 0.24) * base.a))
+			_draw_prominence_loop(
+				body_radius,
+				radius,
+				flare_angles[index],
+				flare_widths[index],
+				flare_heights[index],
+				_with_alpha(
+					Color.WHITE.lerp(base.lightened(0.54), 0.38),
+					(0.48 + pulse * 0.14) * base.a
+				)
+			)
 	else:
 		var ray_color: Color = _with_alpha(base.lightened(0.38), (0.26 + pulse * 0.22) * base.a)
 		draw_line(Vector2(-radius * pulse_scale, 0.0), Vector2(radius * pulse_scale, 0.0), ray_color, maxf(1.0, radius * 0.022), true)
 		draw_line(Vector2(0.0, -radius * pulse_scale), Vector2(0.0, radius * pulse_scale), ray_color, maxf(1.0, radius * 0.022), true)
+
+
+func _draw_elliptic_cell(
+	position_value: Vector2,
+	radius: float,
+	rotation_value: float,
+	color_value: Color
+) -> void:
+	draw_set_transform(position_value, rotation_value, Vector2(1.65, 0.62))
+	draw_circle(Vector2.ZERO, radius, color_value)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func _draw_prominence_loop(
+	body_radius: float,
+	halo_radius: float,
+	angle: float,
+	width_ratio: float,
+	height_ratio: float,
+	color_value: Color
+) -> void:
+	var radial: Vector2 = Vector2(cos(angle), sin(angle))
+	var tangent: Vector2 = radial.orthogonal()
+	var points: PackedVector2Array = PackedVector2Array()
+	for point_index: int in range(25):
+		var t: float = PI * float(point_index) / 24.0
+		points.append(
+			radial * (body_radius * 0.91 + sin(t) * halo_radius * height_ratio)
+			+ tangent * cos(t) * halo_radius * width_ratio
+		)
+	for point_index: int in range(points.size() - 1):
+		var segment_progress: float = (float(point_index) + 0.5) / float(points.size() - 1)
+		var taper: float = pow(sin(segment_progress * PI), 0.72)
+		draw_line(
+			points[point_index],
+			points[point_index + 1],
+			_with_alpha(color_value, color_value.a * taper),
+			maxf(0.7, halo_radius * lerpf(0.008, 0.022, taper)),
+			true
+		)
 
 
 func _draw_spherical_lighting(radius: float, base: Color, luminous: bool) -> void:

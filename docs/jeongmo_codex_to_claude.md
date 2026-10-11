@@ -38,6 +38,83 @@
 
 ## 미확인
 
+### [2026-10-11] 대상 #69 추가 요구 1 — 원형 파동·초신성 껍질·L7 홍염 보완
+- 상태: 완료 — `origin/main`의 보완 명세 `e0b426d`를 병합한 뒤 고리 투영, 성운 형태·깊이, 혼잡 보드 대비, L7 홍염·광량과 BLITZ 창 측정을 보완함
+- 브랜치 / PR: `v4-reaction-effects` / [PR #71](https://github.com/jeongmo-dot/gravity_orb/pull/71)
+- 병합: `origin/main` `e0b426d`를 병합 커밋 `8eed961`로 먼저 반영함. 충돌 없음
+- 변경 파일: `scripts/core/{CelestialOrbArt,OrbVisual}.gd`, `scripts/fx/FeedbackDirector.gd`, `tests/{capture_screens.ps1,test_celestial_orbs.gd,test_feedback.gd}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 합체·탄생·대폭발 고리의 축별 눌림을 제거하고 판 위 원으로 투영 — 자동 (`test_merge_birth_and_blast_rings_project_as_board_circles`: 세 경로 모든 고리 가로:세로 `0.95~1.05`) + `23`~`27` 직접 확인
+  - [x] 각도 기반 7팔 소용돌이를 제거하고 부드러운 둥근 빛무리·밝은 껍질·비회전 얼룩 잡음의 두 색 초신성으로 교체; L4도 같은 형태 — 자동 (`test_supernova_shell_is_mottled_and_rendered_behind_orbs`) + 캡처 직접 확인
+  - [x] 성운·국소 빛무리를 구슬 평면 뒤 `z=-0.24`, 보드 유리 `z=-0.31` 앞에 배치 — 자동 깊이 검사 + 혼잡 보드 캡처 `28`·`29` 각 두 시점
+  - [x] 혼잡 보드 성운 영역 구슬/배경 평균 휘도 비 4 이상 — `540×960`: L5 `4.65`, L6 `7.55`; `540×1170`: L5 `4.66`, L6 `7.57`
+  - [x] L7 홍염을 크기가 다른 얇은 반투명 호 3개로 교체하고 양 끝 테이퍼·느린 크기/위치 변화 적용 — 자동 메시 폭·셰이더 검사 + `15`·`25` 직접 확인
+  - [x] 같은 크기 L7 몸통 휘도 ≥ L6 × 1.1 — L6 `0.77879`, L7 `0.88514`, 비 `1.137`
+  - [x] BLITZ 창 모드 VSync 끔 측정에서 p99·33.3ms 초과·입력 보고 — 아래 성능 관측
+  - [x] 물리·규칙·저장 형식 불변 — 전체 회귀 및 TURN/BLITZ 상태 해시 동일
+- 캡처·화소 관측 (Standard/Compatibility):
+  - `tests/capture_screens.ps1` → 종료 코드 0, 각 비율 `36장`, 두 비율 합계 `72장`; `23`~`29`는 각 두 시점, 보드 투영 비율 간 차이 `0.000px`
+  - `26_blast_l4`·`27_blast_l6`: 고리가 찌그러지지 않은 원으로 확장하고, 성운은 날카로운 중심이나 회전 팔 없이 두 색 얼룩의 둥근 껍질로 보임. L4 반경 밖 평균 휘도 상승은 두 비율 모두 `0.00006` (한도 `0.03`)
+  - `28_blast_l5_crowded`·`29_blast_l6_crowded`: 25개 구슬이 성운 앞에서 외곽·표면 무늬·색을 유지함. 성운 대비 수치는 위와 같음
+  - `15_orb_closeup`: L7에 크기와 방향이 다른 가는 홍염 호 3개가 보이고 L6보다 몸통이 밝음. L7 색 구분 최소 Delta E `26.15`로 기존 기준 25 이상 유지
+- 성능 관측 (RTX 4070 Ti SUPER, Compatibility, 실제 창, VSync 끔):
+  - BLITZ 4시드(101~104), 16,511프레임: p50/p95/p99/최대 `1.562/2.966/4.307/10.212ms`, `>16.7ms` 0, `>33.3ms` 0
+  - 입력 120회: 수락 120, 누락 0; 입력→수락 p50/p95/최대 `0.010/23.718/44.211ms`, 수락→생성 p50/p95/최대 `0.946/2.329/7.905ms`
+  - 대폭발 3 + 합체 10 동시, 180프레임: p50/p95/p99/최대 `0.574/0.722/0.844/2.077ms`, `>16.7ms` 0, `>33.3ms` 0
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - `tests/run_tests.ps1` → 일반 `281/281`(`17.866초`), 장기 `5/5`(`42.248초`), 성능 `5/5`(`3.632초`), 합계 `291/291`, 종료 코드 0, 총 `63.746초`
+  - 시작 화면 / TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - 물리 상태 해시: TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`; 1차와 동일
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 전역 난수 호출 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. `.\tests\capture_screens.ps1` 실행 후 두 비율의 `23`~`27` `_a`→`_b`를 본다 → 모든 파동 고리가 타원이 아닌 원으로 커지고, 두 색 성운은 바람개비가 아닌 부드러운 껍질로 퍼져야 한다.
+  2. `28_blast_l5_crowded`·`29_blast_l6_crowded` 두 시점을 본다 → 25개 구슬이 성운 위에 선명하게 남고 표면 무늬와 색을 읽을 수 있어야 한다.
+  3. `15_orb_closeup`과 `25_birth_l7` 두 시점을 본다 → L7 몸통이 L6보다 확실히 밝고, 같은 크기의 굵은 손잡이 대신 크기·방향이 다른 가는 홍염 호 3개가 보여야 한다.
+  4. `.\tests\run_blitz_responsiveness_measurement.ps1 -Label v4_followup1`을 실행한다 → `vsync_mode=disabled`, 입력 누락 0, p99·33.3ms 초과 수가 위 관측과 함께 출력되어야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 혼잡 보드 대비는 확장 고리가 성운 표본을 가로지르지 않는 두 번째 시점에서, 구슬 중심부와 구슬 외 영역을 기하학적으로 분리해 측정함
+  - PNG·성능 JSON 산출물은 기존 `artifacts/` ignore 대상으로 커밋하지 않음
+- 남은 것 · 질문: 없음
+
+### [2026-10-11] 대상 #69 — 비주얼 V4-1 반응 연출 (A+C) + 그림 보완
+- 상태: 완료 — 작은 합체 별가루·고리, L6/L7 탄생 흡입·신성·홍염, 레벨별 대폭발 성운·중력파·플래시 제한을 구현하고 L7/L5/L1 그림 잔여 항목을 보완함
+- 브랜치 / PR: `v4-reaction-effects` / [PR #71](https://github.com/jeongmo-dot/gravity_orb/pull/71)
+- 변경 파일: `scripts/core/{CelestialOrbArt,OrbVisual}.gd`, `scripts/fx/FeedbackDirector.gd`, `tests/{capture_screens.ps1,test_feedback.gd}`, `tests/spike/{capture_screens,run_feedback_measurement}.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] L2~L5 합체: 색 별가루 12개·0.72초와 결과 반지름→2배의 얇은 하늘색 고리·0.5초로 기존 10입자를 교체 — 자동 (`test_merge_punch_scales_visual_and_emits_stardust_ring`) + 캡처 `23` 두 시점
+  - [x] L6/L7 탄생: 색+흰색 14입자·0.25초 나선 흡입, 흰 중심/색 빛무리 2.5배·0.8초, 얇은 고리; L7만 고리형 홍염 3개·1초와 L4 절반 강도 흔들림 — 자동 (`test_l6_l7_birth_effects_and_l7_prominences_are_pooled`) + 캡처 `24`·`25` 두 시점
+  - [x] L4 대폭발: 밀어내기 반경까지 흰색/하늘색 얇은 고리 2겹·0.6초, 두 색 작은 성운·0.4초, 파편, 전체 플래시 0회, 흔들림 기존 절반 — 자동 + 캡처 `26` 두 시점
+  - [x] L5+: 국소 흰 번쩍임, 두 색 초신성 성운·1.2초, 고리·반짝 별 10개; 전체 플래시는 L6+만 알파 최대 0.15 — 자동 (`test_blast_flash_levels_and_rolling_rate_limit`) + 캡처 `27` 두 시점
+  - [x] 전체 플래시 최근 1초 3회 제한·초과 생략 — 자동. 같은 시각 5회 요청에서 수락 3·생략 2
+  - [x] 최대 부하의 새 효과 노드 전체 사전 풀링 — 고리 16, 입자 23, 빛 3, 화면 플래시 3, 성운 7, 홍염 3; `3 대폭발 + 10 합체` 동시 테스트에서 런타임 노드 추가 0 (`test_maximum_reaction_burst_uses_only_prewarmed_nodes`)
+  - [x] L7 쌀알 셀·고리 홍염 3개·광량, L5 바깥 테 겹침, NEXT/THEN L1 불규칙 외곽·점무늬 운석 보완 — 자동 화소 검사 + `12`·`13`·`14`·`15` 캡처 직접 확인
+  - [x] 규칙·물리·HUD·V4-2·소리·저장 형식은 변경하지 않고 물리 해시 유지 — 전체 회귀 + 상태 해시
+- 캡처·화소 관측 (Standard/Compatibility):
+  - `tests/capture_screens.ps1` → 종료 코드 0, 각 비율 기존 22장 + `23`~`27` 두 시점 10장 = `32장`, 두 비율 합계 `64장`; 보드 투영 비율 간 차이 `0.000px`
+  - `23_merge_stardust`: 노란 별빛 입자가 결과 천체 둘레로 퍼지고 얇은 하늘색 고리가 확장함. `24_birth_l6`: 흡입 뒤 흰 중심·노란 빛무리와 고리. `25_birth_l7`: 더 밝은 끓는 표면과 고리형 홍염 3개. `26_blast_l4`: 작은 성운·얇은 2중 고리·파편. `27_blast_l6`: 보드 전역 반경 초신성 성운·2중 고리·별빛으로 직접 확인
+  - 같은 크기 별 몸통 평균 휘도: L6 `0.79135`, L7 `0.79557` (L7가 `+0.00422`)
+  - L4 대폭발 반경 밖 평균 휘도 상승: 두 비율 모두 `0.00006` (한도 `0.03`)
+  - NEXT/THEN 첫 항목을 L1로 고정한 `12`·`13`: 흰 별/균열 문양 대신 불규칙 외곽·어두운 점 4개·짧고 약한 흠집으로 직접 확인
+  - `14_orb_codex`: 레벨별 최소 Delta E `26.62~34.65`, 최대 색상각 오차 `8.76°`, 전체 이음매 비 `1.06`; `15_orb_closeup`에서 L5 림이 몸통과 겹치고 L7 셀·홍염이 L6보다 화려하게 보임
+- 성능 관측 (RTX 4070 Ti SUPER, Compatibility, 창 모드, VSync 끔, 고정 120fps):
+  - 대폭발 3 + 합체 10 동시, 표본 180프레임: p50/p95/p99/최대 `0.476/0.771/0.993/2.410ms`, `>16.7ms` 0, `>33.3ms` 0
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - `tests/run_tests.ps1` → 일반 `278/278`(`21.673초`), 장기 `5/5`(`59.556초`), 성능 `5/5`(`4.626초`), 합계 `288/288`, 종료 코드 0, 총 `85.855초`
+  - 시작 화면 / TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - 물리 상태 해시: TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`; #68 전과 동일
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 전역 난수 호출 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. `.\tests\capture_screens.ps1` 실행 후 각 비율의 `23`~`27`에서 `_a`→`_b`를 비교한다 → 작은 합체 고리가 약 2배까지, 탄생 신성은 약 2.5배까지, 대폭발 고리는 각 밀어내기 반경까지 확장하며 모든 연출이 사라져야 한다.
+  2. `24_birth_l6_b`와 `25_birth_l7_b`를 비교한다 → L7 표면이 더 밝고 밝은 쌀알 셀이 끓어 보이며 몸통 밖 고리형 홍염 3개가 보여야 한다.
+  3. `26_blast_l4_a`와 `27_blast_l6_a`를 비교한다 → L4는 화면 전체 흰 번쩍임 없이 국소 성운만, L6는 더 큰 초신성·반짝 별과 제한된 전체 플래시가 보여야 한다.
+  4. `12_turn_ramp_next`와 `13_turn_ramp_uncapped_next`의 NEXT/THEN 첫 천체를 본다 → 불규칙 가장자리와 점무늬로 운석처럼 읽히고 흰 균열 별표처럼 보이지 않아야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 별가루·파편은 외부 텍스처 없이 작은 발광 십자 셰이더로 만들고, 성운은 두 색을 섞는 절차적 소용돌이 셰이더로 구현함. PNG·성능 JSON 산출물은 기존 `artifacts/` ignore 대상으로 커밋하지 않음
+  - 한 동시 최대 부하에 필요한 수량을 정확히 사전 생성했으며, 기존 색 효과 선 풀은 변경하지 않음
+- 남은 것 · 질문: 없음
+
 ### [2026-10-11] 대상 #68 — Windows 테스트 빌드 내보내기 설정·빌드 스크립트
 - 상태: 완료 — Windows x86_64 릴리스·디버그 내보내기, 양쪽 콘솔 래퍼, PCK 내장, 빌드 정보 기록과 템플릿 누락 안내를 구현하고 실제 산출물·스모크를 검증함
 - 브랜치 / PR: `v4-windows-test-build` / 미생성

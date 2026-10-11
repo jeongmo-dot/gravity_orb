@@ -43,7 +43,21 @@ $expectedFiles = @(
     "19_settings.png",
     "20_start_no_record.png",
     "21_start_screen_t2_5.png",
-    "22_start_screen_t5_0.png"
+    "22_start_screen_t5_0.png",
+    "23_merge_stardust_a.png",
+    "23_merge_stardust_b.png",
+    "24_birth_l6_a.png",
+    "24_birth_l6_b.png",
+    "25_birth_l7_a.png",
+    "25_birth_l7_b.png",
+    "26_blast_l4_a.png",
+    "26_blast_l4_b.png",
+    "27_blast_l6_a.png",
+    "27_blast_l6_b.png",
+    "28_blast_l5_crowded_a.png",
+    "28_blast_l5_crowded_b.png",
+    "29_blast_l6_crowded_a.png",
+    "29_blast_l6_crowded_b.png"
 )
 $hudExpectedFiles = @(
     "02_turn_early.png",

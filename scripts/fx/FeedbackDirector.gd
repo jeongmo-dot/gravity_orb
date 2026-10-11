@@ -1,12 +1,30 @@
 class_name FeedbackDirector
 extends Node
 
-const BLAST_RING_DURATION: float = 0.35
+const BLAST_RING_DURATION: float = 0.60
 const SECOND_RING_DELAY: float = 0.08
 const BLAST_LIGHT_DURATION: float = 0.20
 const DEBRIS_LIFETIME: float = 0.72
 const WHITE_SPARK_COUNT: int = 16
-const MERGE_PARTICLE_COUNT: int = 10
+const MERGE_STARDUST_COUNT: int = 12
+const BIRTH_ACCRETION_COUNT: int = 14
+const SUPERNOVA_STAR_COUNT: int = 10
+const MERGE_RING_DURATION: float = 0.50
+const BIRTH_ACCRETION_DURATION: float = 0.25
+const BIRTH_NOVA_DURATION: float = 0.80
+const SOLAR_PROMINENCE_DURATION: float = 1.00
+const LOCAL_FLASH_DURATION: float = 0.18
+const L4_NEBULA_DURATION: float = 0.40
+const SUPERNOVA_DURATION: float = 1.20
+const FULL_FLASH_WINDOW_MSEC: int = 1000
+const FULL_FLASH_LIMIT: int = 3
+const FULL_FLASH_MAX_ALPHA: float = 0.15
+const PREWARM_RING_COUNT: int = 16
+const PREWARM_PARTICLE_COUNT: int = 23
+const PREWARM_LIGHT_COUNT: int = 3
+const PREWARM_FLASH_COUNT: int = 3
+const PREWARM_GLOW_COUNT: int = 7
+const PREWARM_ARC_COUNT: int = 3
 const FINALE_INTENSITY: float = 0.6
 const COLOR_JACKPOT_INTENSITY: float = 1.5
 const COLOR_SHAKE_DURATION: float = 0.25
@@ -25,8 +43,14 @@ var _blast_effect_pools: Dictionary = {
 	"particles": [],
 	"light": [],
 	"flash": [],
+	"glow": [],
+	"arc": [],
 }
 var _blast_ring_mesh: TorusMesh
+var _effect_quad_mesh: QuadMesh
+var _prominence_mesh: ArrayMesh
+var _effect_glow_shader: Shader
+var _effect_particle_shader: Shader
 var _resources_prewarmed: bool = false
 var _active_color_effects: Array[ColorEffectVisual] = []
 var _color_effect_pool: Array[ColorEffectVisual] = []
@@ -38,6 +62,9 @@ var _shake_duration: float = 0.0
 var _shake_strength_m: float = 0.0
 var _hitstop_generation: int = 0
 var _finale_sfx_index: int = 0
+var _full_flash_times_msec: Array[int] = []
+var _full_flash_accepted_total: int = 0
+var _full_flash_skipped_total: int = 0
 
 
 func _ready() -> void:
@@ -213,6 +240,27 @@ func active_flash_count() -> int:
 	return _active_effect_count("flash")
 
 
+func active_glow_count() -> int:
+	return _active_effect_count("glow")
+
+
+func active_prominence_count() -> int:
+	return _active_effect_count("arc")
+
+
+func full_screen_flash_count_last_second() -> int:
+	_prune_full_flash_history(Time.get_ticks_msec())
+	return _full_flash_times_msec.size()
+
+
+func full_screen_flash_accepted_total() -> int:
+	return _full_flash_accepted_total
+
+
+func full_screen_flash_skipped_total() -> int:
+	return _full_flash_skipped_total
+
+
 func blast_effect_pool_count(kind: String = "") -> int:
 	if not kind.is_empty():
 		return _effect_pool(kind).size()
@@ -330,14 +378,93 @@ func _play_merge_feedback(reaction: Dictionary) -> void:
 		return
 	var color_index: int = int(reaction.get("result_color", 0))
 	var color_value: Color = Config.data.color_display[color_index]
-	_create_particles(
-		reaction.get("position", Vector2.ZERO) as Vector2,
-		color_value,
-		MERGE_PARTICLE_COUNT,
-		1.0,
-		"MergeDebris"
+	var origin: Vector2 = reaction.get("position", Vector2.ZERO) as Vector2
+	var result_level: int = clampi(
+		int(reaction.get("result_level", 2)),
+		1,
+		Config.data.orb_max_level
 	)
+	var result_radius_m: float = (
+		Config.data.radius_for_level(result_level) / Orb3D.PIXELS_PER_METER
+	)
+	if result_level <= 5:
+		_create_particles(
+			origin,
+			color_value,
+			MERGE_STARDUST_COUNT,
+			1.0,
+			"MergeStardust",
+			"stardust"
+		)
+		_create_ring(
+			origin,
+			Color(0.58, 0.90, 1.0, 1.0),
+			result_radius_m * 2.0,
+			0.0,
+			MERGE_RING_DURATION,
+			result_radius_m
+		)
+	else:
+		_create_birth_feedback(origin, color_value, result_level, result_radius_m)
 	_play_color_effect_visual(reaction)
+
+
+func _create_birth_feedback(
+	origin: Vector2,
+	color_value: Color,
+	level: int,
+	result_radius_m: float
+) -> void:
+	var half_count: int = BIRTH_ACCRETION_COUNT / 2
+	_create_particles(
+		origin,
+		color_value,
+		half_count,
+		1.0,
+		"BirthAccretionColor",
+		"accretion",
+		result_radius_m
+	)
+	_create_particles(
+		origin,
+		Color.WHITE,
+		BIRTH_ACCRETION_COUNT - half_count,
+		1.0,
+		"BirthAccretionWhite",
+		"accretion",
+		result_radius_m
+	)
+	_create_glow(
+		origin,
+		Color.WHITE,
+		color_value,
+		result_radius_m * 2.5,
+		BIRTH_ACCRETION_DURATION,
+		BIRTH_NOVA_DURATION,
+		result_radius_m * 0.48,
+		"BirthNova"
+	)
+	_create_ring(
+		origin,
+		Color(0.66, 0.92, 1.0, 1.0),
+		result_radius_m * 2.5,
+		BIRTH_ACCRETION_DURATION,
+		BIRTH_NOVA_DURATION,
+		result_radius_m
+	)
+	if level >= 7:
+		var prominence_scales: Array[float] = [1.00, 1.08, 1.16]
+		var prominence_angles: Array[float] = [-2.18, -0.08, 1.72]
+		for arc_index: int in range(prominence_scales.size()):
+			_create_prominence(
+				origin,
+				Color.WHITE.lerp(color_value.lightened(0.46), 0.42),
+				result_radius_m * prominence_scales[arc_index],
+				BIRTH_ACCRETION_DURATION,
+				prominence_angles[arc_index],
+				float(arc_index) * 1.73
+			)
+	_start_reaction_shake(4, 0.5)
 
 
 func _play_color_effect_visual(
@@ -515,8 +642,20 @@ func _play_blast_feedback(
 	)
 	var colors: Array = reaction.get("colors", []) as Array
 	var mixed_color: Color = _mixed_color(colors)
-	_create_ring(origin, Color.WHITE, radius_m, 0.0)
-	_create_ring(origin, mixed_color, radius_m, SECOND_RING_DELAY)
+	var nebula_inner: Color = mixed_color
+	var nebula_outer: Color = mixed_color
+	if not colors.is_empty():
+		nebula_inner = Config.data.color_display[int(colors[0])]
+	if colors.size() > 1:
+		nebula_outer = Config.data.color_display[int(colors[1])]
+	_create_ring(origin, Color.WHITE, radius_m, 0.0, BLAST_RING_DURATION)
+	_create_ring(
+		origin,
+		Color(0.55, 0.88, 1.0, 1.0) if level == 4 else mixed_color,
+		radius_m,
+		SECOND_RING_DELAY,
+		BLAST_RING_DURATION
+	)
 	for color_value: Variant in colors:
 		var color_index: int = int(color_value)
 		_create_particles(
@@ -524,17 +663,65 @@ func _play_blast_feedback(
 			Config.data.color_display[color_index],
 			maxi(roundi(float(Config.data.fx_debris_per_orb) * intensity), 1),
 			level_scale,
-			"BlastDebris"
+			"BlastDebris",
+			"debris"
 		)
 	_create_particles(
 		origin,
 		Color.WHITE,
 		maxi(roundi(float(WHITE_SPARK_COUNT) * intensity), 1),
 		level_scale,
-		"BlastSparks"
+		"BlastSparks",
+		"debris"
 	)
+	if level == 4:
+		_create_glow(
+			origin,
+			nebula_inner,
+			nebula_outer,
+			radius_m,
+			0.0,
+			L4_NEBULA_DURATION,
+			radius_m * 0.24,
+			"BlastNebulaL4"
+		)
+	else:
+		_create_glow(
+			origin,
+			nebula_inner,
+			nebula_outer,
+			radius_m,
+			0.0,
+			SUPERNOVA_DURATION,
+			radius_m * 0.18,
+			"BlastSupernova"
+		)
+		_create_glow(
+			origin,
+			Color.WHITE,
+			Color.WHITE,
+			radius_m * 0.34,
+			0.0,
+			LOCAL_FLASH_DURATION,
+			radius_m * 0.08,
+			"BlastLocalFlash"
+		)
+		_create_particles(
+			origin,
+			Color.WHITE,
+			SUPERNOVA_STAR_COUNT,
+			level_scale,
+			"BlastTwinklingStars",
+			"stars"
+		)
 	_create_light(origin, level_scale * intensity)
-	_create_flash(intensity)
+	if level >= 6:
+		_create_flash(intensity)
+	_start_reaction_shake(level, intensity * (0.5 if level == 4 else 1.0))
+
+
+func _start_reaction_shake(level: int, intensity: float) -> void:
+	var level_scale: float = maxf(1.0, 1.0 + 0.25 * float(level - 4))
 	_shake_elapsed = 0.0
 	_shake_duration = maxf(Config.data.fx_shake_time * intensity, 0.001)
 	_shake_strength_m = (
@@ -546,7 +733,9 @@ func _create_ring(
 	origin: Vector2,
 	color_value: Color,
 	final_radius: float,
-	delay: float
+	delay: float,
+	duration: float = BLAST_RING_DURATION,
+	start_radius: float = 0.01
 ) -> void:
 	var ring: MeshInstance3D = _acquire_blast_effect("ring") as MeshInstance3D
 	ring.name = "BlastRing"
@@ -556,13 +745,14 @@ func _create_ring(
 	material.emission = color_value
 	ring.position = Orb3D.plane_position_to_world(origin, 0.45)
 	ring.rotation_degrees.x = 90.0
-	ring.scale = Vector3.ONE * 0.01
+	ring.scale = Vector3.ONE * start_radius
 	_effects.append({
 		"node": ring,
 		"kind": "ring",
 		"elapsed": 0.0,
-		"duration": BLAST_RING_DURATION,
+		"duration": duration,
 		"delay": delay,
+		"start_scale": start_radius,
 		"end_scale": final_radius,
 		"color": color_value,
 		"material": material,
@@ -574,7 +764,9 @@ func _create_particles(
 	color_value: Color,
 	amount: int,
 	level_scale: float,
-	node_name: String
+	node_name: String,
+	style: String = "debris",
+	emission_radius: float = 0.0
 ) -> void:
 	var particles: CPUParticles3D = _acquire_blast_effect("particles") as CPUParticles3D
 	particles.name = node_name
@@ -584,26 +776,60 @@ func _create_particles(
 	particles.one_shot = true
 	particles.explosiveness = 1.0
 	particles.position = Orb3D.plane_position_to_world(origin, 0.55)
+	particles.emission_shape = CPUParticles3D.EMISSION_SHAPE_POINT
+	particles.emission_sphere_radius = 0.0
 	particles.direction = Vector3.RIGHT
 	particles.spread = 180.0
-	particles.flatness = 1.0
+	particles.flatness = 0.0
 	particles.initial_velocity_min = 6.0 * level_scale
 	particles.initial_velocity_max = 14.0 * level_scale
+	particles.radial_accel_min = 0.0
+	particles.radial_accel_max = 0.0
+	particles.orbit_velocity_min = 0.0
+	particles.orbit_velocity_max = 0.0
 	particles.gravity = _particle_gravity()
 	particles.scale_amount_min = 0.45
 	particles.scale_amount_max = 1.0
+	if style == "stardust":
+		particles.lifetime = 0.72
+		particles.lifetime_randomness = 0.18
+		particles.initial_velocity_min = 2.5
+		particles.initial_velocity_max = 6.0
+		particles.gravity = Vector3.ZERO
+		particles.scale_amount_min = 0.22
+		particles.scale_amount_max = 0.62
+	elif style == "accretion":
+		particles.lifetime = BIRTH_ACCRETION_DURATION
+		particles.lifetime_randomness = 0.05
+		particles.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+		particles.emission_sphere_radius = emission_radius * 2.0
+		particles.initial_velocity_min = 0.0
+		particles.initial_velocity_max = 0.2
+		particles.radial_accel_min = -80.0
+		particles.radial_accel_max = -58.0
+		particles.orbit_velocity_min = 0.75
+		particles.orbit_velocity_max = 1.15
+		particles.gravity = Vector3.ZERO
+		particles.scale_amount_min = 0.30
+		particles.scale_amount_max = 0.65
+	elif style == "stars":
+		particles.lifetime = SUPERNOVA_DURATION
+		particles.lifetime_randomness = 0.28
+		particles.initial_velocity_min = 1.2 * level_scale
+		particles.initial_velocity_max = 4.0 * level_scale
+		particles.gravity = Vector3.ZERO
+		particles.scale_amount_min = 0.18
+		particles.scale_amount_max = 0.72
 	var quad: QuadMesh = particles.mesh as QuadMesh
-	var material: StandardMaterial3D = quad.material as StandardMaterial3D
-	material.albedo_color = color_value
-	material.emission_enabled = true
-	material.emission = color_value
+	var material: ShaderMaterial = quad.material as ShaderMaterial
+	material.set_shader_parameter("particle_color", color_value)
 	particles.restart()
 	particles.emitting = true
 	_effects.append({
 		"node": particles,
 		"kind": "particles",
 		"elapsed": 0.0,
-		"duration": DEBRIS_LIFETIME + 0.20,
+		"duration": particles.lifetime + 0.20,
 	})
 
 
@@ -623,12 +849,87 @@ func _create_light(origin: Vector2, intensity: float) -> void:
 	})
 
 
+func _create_glow(
+	origin: Vector2,
+	inner_color: Color,
+	outer_color: Color,
+	final_radius: float,
+	delay: float,
+	duration: float,
+	start_radius: float,
+	node_name: String
+) -> void:
+	var glow: MeshInstance3D = _acquire_blast_effect("glow") as MeshInstance3D
+	glow.name = node_name
+	# Transparent depth testing keeps this layer behind every opaque orb while
+	# leaving it above the board glass at z=-0.31.
+	glow.position = Orb3D.plane_position_to_world(origin, -0.24)
+	glow.scale = Vector3.ONE * start_radius
+	var material: ShaderMaterial = glow.material_override as ShaderMaterial
+	material.set_shader_parameter("inner_color", inner_color)
+	material.set_shader_parameter("outer_color", outer_color)
+	material.set_shader_parameter("effect_alpha", 0.0 if delay > 0.0 else 1.0)
+	material.set_shader_parameter("noise_seed", float(_effects.size() % 11) * 0.37)
+	_effects.append({
+		"node": glow,
+		"kind": "glow",
+		"elapsed": 0.0,
+		"duration": duration,
+		"delay": delay,
+		"start_scale": start_radius,
+		"end_scale": final_radius,
+		"material": material,
+	})
+
+
+func _create_prominence(
+	origin: Vector2,
+	color_value: Color,
+	radius: float,
+	delay: float,
+	rotation_value: float,
+	phase: float
+) -> void:
+	var arc: MeshInstance3D = _acquire_blast_effect("arc") as MeshInstance3D
+	arc.name = "BirthSolarProminence"
+	arc.position = Orb3D.plane_position_to_world(origin, 0.02)
+	arc.rotation = Vector3(0.0, 0.0, rotation_value)
+	arc.scale = Vector3.ONE * radius
+	var material: StandardMaterial3D = arc.material_override as StandardMaterial3D
+	material.albedo_color = color_value
+	material.emission = color_value
+	_effects.append({
+		"node": arc,
+		"kind": "arc",
+		"elapsed": 0.0,
+		"duration": SOLAR_PROMINENCE_DURATION,
+		"delay": delay,
+		"base_scale": radius,
+		"base_rotation": rotation_value,
+		"phase": phase,
+		"color": color_value,
+		"material": material,
+	})
+
+
 func _create_flash(intensity: float) -> void:
 	if _overlay == null:
 		return
+	var now_msec: int = Time.get_ticks_msec()
+	_prune_full_flash_history(now_msec)
+	if _full_flash_times_msec.size() >= FULL_FLASH_LIMIT:
+		_full_flash_skipped_total += 1
+		return
+	_full_flash_times_msec.append(now_msec)
+	_full_flash_accepted_total += 1
 	var flash: ColorRect = _acquire_blast_effect("flash") as ColorRect
 	flash.name = "BlastScreenFlash"
-	flash.color = Color(1.0, 1.0, 1.0, Config.data.fx_flash_alpha * intensity)
+	flash.color = Color(
+		1.0,
+		1.0,
+		1.0,
+		minf(Config.data.fx_flash_alpha * intensity, FULL_FLASH_MAX_ALPHA)
+	)
 	flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_effects.append({
 		"node": flash,
@@ -639,19 +940,38 @@ func _create_flash(intensity: float) -> void:
 	})
 
 
+func _prune_full_flash_history(now_msec: int) -> void:
+	while (
+		not _full_flash_times_msec.is_empty()
+		and now_msec - _full_flash_times_msec[0] >= FULL_FLASH_WINDOW_MSEC
+	):
+		_full_flash_times_msec.pop_front()
+
+
 func _initialize_blast_effect_pool() -> void:
 	_blast_ring_mesh = TorusMesh.new()
-	_blast_ring_mesh.inner_radius = 0.86
+	_blast_ring_mesh.inner_radius = 0.96
 	_blast_ring_mesh.outer_radius = 1.0
 	_blast_ring_mesh.rings = 48
 	_blast_ring_mesh.ring_segments = 8
-	for _index: int in range(2):
+	_effect_quad_mesh = QuadMesh.new()
+	_effect_quad_mesh.size = Vector2(2.0, 2.0)
+	_effect_glow_shader = _new_effect_glow_shader()
+	_effect_particle_shader = _new_effect_particle_shader()
+	_prominence_mesh = _new_prominence_mesh()
+	for _index: int in range(PREWARM_RING_COUNT):
 		_pool_blast_node("ring", _new_ring_node())
-	for _index: int in range(3):
+	for _index: int in range(PREWARM_PARTICLE_COUNT):
 		_pool_blast_node("particles", _new_particle_node())
-	_pool_blast_node("light", _new_light_node())
+	for _index: int in range(PREWARM_LIGHT_COUNT):
+		_pool_blast_node("light", _new_light_node())
 	if _overlay != null:
-		_pool_blast_node("flash", _new_flash_node())
+		for _index: int in range(PREWARM_FLASH_COUNT):
+			_pool_blast_node("flash", _new_flash_node())
+	for _index: int in range(PREWARM_GLOW_COUNT):
+		_pool_blast_node("glow", _new_glow_node())
+	for _index: int in range(PREWARM_ARC_COUNT):
+		_pool_blast_node("arc", _new_prominence_node())
 
 
 func _new_ring_node() -> MeshInstance3D:
@@ -676,7 +996,7 @@ func _new_particle_node() -> CPUParticles3D:
 	particles.explosiveness = 1.0
 	particles.direction = Vector3.RIGHT
 	particles.spread = 180.0
-	particles.flatness = 1.0
+	particles.flatness = 0.0
 	particles.scale_amount_min = 0.45
 	particles.scale_amount_max = 1.0
 	var scale_curve: Curve = Curve.new()
@@ -685,11 +1005,8 @@ func _new_particle_node() -> CPUParticles3D:
 	particles.scale_amount_curve = scale_curve
 	var quad: QuadMesh = QuadMesh.new()
 	quad.size = Vector2(0.12, 0.12)
-	var material: StandardMaterial3D = StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-	material.emission_enabled = true
+	var material: ShaderMaterial = ShaderMaterial.new()
+	material.shader = _effect_particle_shader
 	quad.material = material
 	particles.mesh = quad
 	_effects_root.add_child(particles)
@@ -712,6 +1029,141 @@ func _new_flash_node() -> ColorRect:
 	return flash
 
 
+func _new_glow_node() -> MeshInstance3D:
+	var glow: MeshInstance3D = MeshInstance3D.new()
+	glow.mesh = _effect_quad_mesh
+	var material: ShaderMaterial = ShaderMaterial.new()
+	material.shader = _effect_glow_shader
+	glow.material_override = material
+	_effects_root.add_child(glow)
+	return glow
+
+
+func _new_prominence_node() -> MeshInstance3D:
+	var arc: MeshInstance3D = MeshInstance3D.new()
+	arc.mesh = _prominence_mesh
+	var material: StandardMaterial3D = StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	material.emission_enabled = true
+	arc.material_override = material
+	_effects_root.add_child(arc)
+	return arc
+
+
+func _new_effect_glow_shader() -> Shader:
+	var shader: Shader = Shader.new()
+	shader.code = """
+shader_type spatial;
+render_mode unshaded, blend_add, depth_draw_never, cull_disabled;
+uniform vec4 inner_color : source_color = vec4(1.0);
+uniform vec4 outer_color : source_color = vec4(0.4, 0.8, 1.0, 1.0);
+uniform float effect_alpha : hint_range(0.0, 1.0) = 1.0;
+uniform float noise_seed = 0.0;
+
+float hash21(vec2 p) {
+	p = fract(p * vec2(123.34, 456.21));
+	p += dot(p, p + 45.32 + noise_seed);
+	return fract(p.x * p.y);
+}
+
+float value_noise2(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(
+		mix(hash21(i), hash21(i + vec2(1.0, 0.0)), f.x),
+		mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), f.x),
+		f.y
+	);
+}
+
+void fragment() {
+	vec2 p = UV * 2.0 - vec2(1.0);
+	float radius = length(p);
+	float coarse = value_noise2(p * 3.1 + vec2(noise_seed, -noise_seed * 0.7));
+	float fine = value_noise2(p * 7.3 + vec2(8.4 - noise_seed, 3.7 + noise_seed));
+	float mottle = coarse * 0.68 + fine * 0.32;
+	float soft_cloud = (1.0 - smoothstep(0.04, 0.96, radius)) * 0.09;
+	float shell = smoothstep(0.48, 0.72, radius) * (1.0 - smoothstep(0.78, 1.0, radius));
+	float rim = smoothstep(0.68, 0.84, radius) * (1.0 - smoothstep(0.86, 1.0, radius));
+	float mask = (soft_cloud + shell * 0.16 + rim * 0.14) * mix(0.72, 1.0, mottle);
+	vec3 color = mix(inner_color.rgb, outer_color.rgb, smoothstep(0.24, 0.76, mottle));
+	ALBEDO = color;
+	EMISSION = color * (0.62 + shell * 0.38 + rim * 0.62);
+	ALPHA = mask * effect_alpha;
+}
+"""
+	return shader
+
+
+func _new_effect_particle_shader() -> Shader:
+	var shader: Shader = Shader.new()
+	shader.code = """
+shader_type spatial;
+render_mode unshaded, blend_add, depth_draw_never, cull_disabled;
+uniform vec4 particle_color : source_color = vec4(1.0);
+void vertex() {
+	MODELVIEW_MATRIX = VIEW_MATRIX * mat4(
+		INV_VIEW_MATRIX[0],
+		INV_VIEW_MATRIX[1],
+		INV_VIEW_MATRIX[2],
+		MODEL_MATRIX[3]
+	);
+}
+void fragment() {
+	vec2 p = abs(UV * 2.0 - vec2(1.0));
+	float radius = length(p);
+	float core = 1.0 - smoothstep(0.18, 0.66, radius);
+	float ray_x = (1.0 - smoothstep(0.05, 0.18, p.y)) * (1.0 - smoothstep(0.35, 1.0, p.x));
+	float ray_y = (1.0 - smoothstep(0.05, 0.18, p.x)) * (1.0 - smoothstep(0.35, 1.0, p.y));
+	float mask = max(core, max(ray_x, ray_y) * 0.82);
+	ALBEDO = particle_color.rgb;
+	EMISSION = particle_color.rgb * (1.2 + core);
+	ALPHA = mask * particle_color.a;
+}
+"""
+	return shader
+
+
+func _new_prominence_mesh() -> ArrayMesh:
+	var vertices: PackedVector3Array = PackedVector3Array()
+	var indices: PackedInt32Array = PackedInt32Array()
+	var segment_count: int = 28
+	for segment: int in range(segment_count + 1):
+		var progress: float = float(segment) / float(segment_count)
+		var angle: float = lerpf(-PI * 0.5, PI * 0.5, progress)
+		var centerline: Vector2 = Vector2(
+			0.70 + cos(angle) * 0.47,
+			sin(angle) * 0.15
+		)
+		var tangent: Vector2 = Vector2(
+			-sin(angle) * 0.47,
+			cos(angle) * 0.15
+		).normalized()
+		var normal: Vector2 = tangent.orthogonal()
+		var taper: float = pow(sin(progress * PI), 0.72)
+		var half_width: float = lerpf(0.0015, 0.018, taper)
+		var inner: Vector2 = centerline - normal * half_width
+		var outer: Vector2 = centerline + normal * half_width
+		vertices.append(Vector3(inner.x, inner.y, 0.0))
+		vertices.append(Vector3(outer.x, outer.y, 0.0))
+		if segment < segment_count:
+			var base: int = segment * 2
+			indices.append_array(PackedInt32Array([
+				base, base + 1, base + 2,
+				base + 1, base + 3, base + 2,
+			]))
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh: ArrayMesh = ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
+
+
 func _acquire_blast_effect(kind: String) -> Node:
 	var pool: Array = _effect_pool(kind)
 	var node: Node
@@ -727,6 +1179,10 @@ func _acquire_blast_effect(kind: String) -> Node:
 				node = _new_light_node()
 			"flash":
 				node = _new_flash_node()
+			"glow":
+				node = _new_glow_node()
+			"arc":
+				node = _new_prominence_node()
 	_set_effect_node_visible(node, true)
 	var group_name: StringName = _effect_group(kind)
 	if not node.is_in_group(group_name):
@@ -773,8 +1229,12 @@ func _effect_group(kind: String) -> StringName:
 			return &"feedback_particles"
 		"light":
 			return &"feedback_light"
-		_:
+		"flash":
 			return &"feedback_flash"
+		"glow":
+			return &"feedback_glow"
+		_:
+			return &"feedback_prominence"
 
 
 func _active_effect_count(kind: String) -> int:
@@ -838,6 +1298,22 @@ func _prewarm_visual_resources_offscreen() -> void:
 		particle_sample.mesh = pooled_particles.mesh
 		particle_sample.position = Vector3(4.0, 4.0, 0.0)
 		prewarm_root.add_child(particle_sample)
+	var glow_pool: Array = _effect_pool("glow")
+	if not glow_pool.is_empty():
+		var pooled_glow: MeshInstance3D = glow_pool[0] as MeshInstance3D
+		var glow_sample: MeshInstance3D = MeshInstance3D.new()
+		glow_sample.mesh = pooled_glow.mesh
+		glow_sample.material_override = pooled_glow.material_override
+		glow_sample.position = Vector3(0.0, 4.0, 0.0)
+		prewarm_root.add_child(glow_sample)
+	var arc_pool: Array = _effect_pool("arc")
+	if not arc_pool.is_empty():
+		var pooled_arc: MeshInstance3D = arc_pool[0] as MeshInstance3D
+		var arc_sample: MeshInstance3D = MeshInstance3D.new()
+		arc_sample.mesh = pooled_arc.mesh
+		arc_sample.material_override = pooled_arc.material_override
+		arc_sample.position = Vector3(0.0, 3.5, 0.0)
+		prewarm_root.add_child(arc_sample)
 	var color_effects: Array[ColorEffectVisual] = []
 	for mode_value: int in range(4):
 		var color_effect: ColorEffectVisual = ColorEffectVisual.new()
@@ -866,8 +1342,12 @@ func _update_effect(effect: Dictionary, progress: float) -> void:
 	var kind: String = str(effect["kind"])
 	if kind == "ring":
 		var ring: MeshInstance3D = effect["node"] as MeshInstance3D
-		var radius: float = lerpf(0.01, float(effect["end_scale"]), progress)
-		ring.scale = Vector3(radius, radius, radius * lerpf(1.0, 0.35, progress))
+		var radius: float = lerpf(
+			float(effect.get("start_scale", 0.01)),
+			float(effect["end_scale"]),
+			progress
+		)
+		ring.scale = Vector3.ONE * radius
 		var material: StandardMaterial3D = effect["material"] as StandardMaterial3D
 		var color_value: Color = effect["color"] as Color
 		color_value.a = 1.0 - progress
@@ -881,6 +1361,38 @@ func _update_effect(effect: Dictionary, progress: float) -> void:
 		var flash_color: Color = flash.color
 		flash_color.a = float(effect["start_alpha"]) * (1.0 - progress)
 		flash.color = flash_color
+	elif kind == "glow":
+		var glow: MeshInstance3D = effect["node"] as MeshInstance3D
+		var glow_radius: float = lerpf(
+			float(effect["start_scale"]),
+			float(effect["end_scale"]),
+			1.0 - pow(1.0 - progress, 2.0)
+		)
+		glow.scale = Vector3.ONE * glow_radius
+		var glow_material: ShaderMaterial = effect["material"] as ShaderMaterial
+		var alpha: float = (
+			smoothstep(0.0, 0.12, progress)
+			* (1.0 - smoothstep(0.42, 1.0, progress))
+		)
+		glow_material.set_shader_parameter("effect_alpha", alpha)
+	elif kind == "arc":
+		var arc: MeshInstance3D = effect["node"] as MeshInstance3D
+		var phase: float = float(effect.get("phase", 0.0))
+		var slow_wave: float = sin(progress * TAU * 0.42 + phase)
+		var arc_scale: float = float(effect["base_scale"])
+		arc.scale = Vector3(
+			arc_scale * (1.0 + slow_wave * 0.018),
+			arc_scale * (1.0 - slow_wave * 0.032),
+			1.0
+		)
+		arc.rotation.z = float(effect["base_rotation"]) + slow_wave * 0.045
+		var arc_material: StandardMaterial3D = effect["material"] as StandardMaterial3D
+		var arc_color: Color = effect["color"] as Color
+		arc_color.a = sin(progress * PI) * 0.52
+		arc_material.albedo_color = arc_color
+		arc_material.emission = Color(arc_color.r, arc_color.g, arc_color.b) * (
+			0.72 + arc_color.a * 0.55
+		)
 
 
 func _update_shake(delta: float) -> void:

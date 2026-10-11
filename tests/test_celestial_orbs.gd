@@ -69,6 +69,25 @@ func test_body_shader_uses_seamless_local_3d_patterns() -> void:
 	await _cleanup(board)
 
 
+func test_l7_shader_uses_tapered_drifting_prominence_arcs() -> void:
+	var board: Board3D = await _create_board()
+	var orb: Orb3D = board.spawn_orb(OrbTypes.OrbColor.YELLOW, 7, Vector2.ZERO)
+	var shader_code: String = orb.visual_material_resource().shader.code
+	assert_true(
+		shader_code.contains("tapered_ellipse_arc"),
+		"L7 prominences use open tapered arcs"
+	)
+	assert_true(
+		shader_code.contains("float slow_drift = TIME * 0.22"),
+		"L7 prominence shape and position drift slowly"
+	)
+	assert_true(
+		not shader_code.contains("prominences * 0.84"),
+		"L7 no longer uses thick opaque handle loops"
+	)
+	await _cleanup(board)
+
+
 func test_body_rolls_while_ring_halo_symbol_and_outline_face_camera() -> void:
 	var board: Board3D = await _create_board()
 	var ringed: Orb3D = board.spawn_orb(OrbTypes.OrbColor.PURPLE, 4, Vector2.ZERO)
