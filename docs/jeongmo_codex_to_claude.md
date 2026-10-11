@@ -40,7 +40,7 @@
 
 ### [2026-10-11] 대상 #65 — 테스트·성능 측정 안정화
 - 상태: 완료 — 턴 시간 상한 검사를 장기 묶음의 별도 Godot 프로세스로 분리하고, 근접 탐색 성능 기준과 BLITZ 창 측정 환경 보고를 명세대로 안정화함
-- 브랜치 / PR: `v2-test-measurement-stability` / 미생성 (지시 범위: push까지)
+- 브랜치 / PR: `v2-test-measurement-stability` / [PR #67](https://github.com/jeongmo-dot/gravity_orb/pull/67)
 - 변경 파일: `tests/run_tests.gd`, `tests/scenarios/test_reaction_latency.gd`, `tests/run_blitz_responsiveness_measurement.ps1`, `tests/spike/run_blitz_responsiveness_measurement.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `test_all_turns_return_to_input_within_time_cap`을 일반 묶음에서 제외하고 장기 묶음의 새 Godot 프로세스에서 실행 — 자동 (`tests/run_tests.ps1` 일반 `270/270`, 장기 `5/5`)
