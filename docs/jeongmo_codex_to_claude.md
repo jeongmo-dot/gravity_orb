@@ -40,7 +40,7 @@
 
 ### [2026-10-11] 대상 #66 — 비주얼 V3-1 글꼴·테마·HUD
 - 상태: 완료 — Orbitron/Noto Sans KR 서브셋과 공통 Theme을 동봉하고, HUD를 두 세로 비율의 안전 영역에 맞게 재배치했으며 점수 연출·벡터 소리 아이콘·문양 기본 끔을 구현함
-- 브랜치 / PR: `v3-font-theme-hud` / PR 미생성 (push까지 요청)
+- 브랜치 / PR: `v3-font-theme-hud` / [PR #68](https://github.com/jeongmo-dot/gravity_orb/pull/68)
 - 변경 파일: `assets/fonts/{Orbitron-Medium.ttf,Orbitron-Bold.ttf,NotoSansKR-Regular-KSX1001.ttf,NotoSansKR-Medium-KSX1001.ttf,OFL.txt,SOURCE.md}`, `assets/ui/{gravity_orb_theme.tres,speaker_on.svg,speaker_off.svg}`, `config/{GameConfig.gd,default_config.tres}`, `project.godot`, `scenes/UI.tscn`, `scripts/ui/{Hud.gd,ScorePopup.gd}`, `tests/{capture_screens.ps1,test_config.gd,test_frontend.gd,test_orb_symbols.gd,test_score_popups.gd,test_screen_layout.gd}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] Orbitron 500·700과 Noto Sans KR 400·500을 OFL 1.1과 출처 고정 커밋 기록과 함께 동봉 — 자동 (`test_hud_theme_fonts_panel_tokens_and_extreme_values_fit`), TTF 합계 `1,030,940바이트` (`<3MB`), Noto 두 파일 각각 KS X 1001 한글 `2,350자`
