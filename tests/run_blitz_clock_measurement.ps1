@@ -1,5 +1,6 @@
 param(
     [string]$GodotPath = "",
+    [string]$MeasurementPrefix = "blitz_clock_default",
     [switch]$AggregateOnly,
     [ValidateRange(1, 32)]
     [int]$Parallelism = 16
@@ -35,7 +36,7 @@ if (-not $AggregateOnly) {
     $tasks = @()
     foreach ($bot in $bots) {
         foreach ($seed in $seedValues) {
-            $name = "blitz_clock_default_$($bot.Id)_seed${seed}"
+            $name = "$($MeasurementPrefix)_$($bot.Id)_seed${seed}"
             $path = Join-Path $outputDirectory "${name}.json"
             if (Test-Path -LiteralPath $path) { continue }
             $tasks += [ordered]@{
@@ -121,7 +122,7 @@ $sampleReport = $null
 foreach ($bot in $bots) {
     $rows = @()
     foreach ($seed in $seedValues) {
-        $path = Join-Path $outputDirectory "blitz_clock_default_$($bot.Id)_seed${seed}.json"
+        $path = Join-Path $outputDirectory "$($MeasurementPrefix)_$($bot.Id)_seed${seed}.json"
         if (-not (Test-Path -LiteralPath $path)) { throw "Missing measurement report $path" }
         $report = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
         if ($null -eq $sampleReport) { $sampleReport = $report }
@@ -151,7 +152,7 @@ $summary = [ordered]@{
     }
     bots = $botReports
 }
-$summaryPath = Join-Path $outputDirectory "blitz_clock_summary.json"
+$summaryPath = Join-Path $outputDirectory "$($MeasurementPrefix)_summary.json"
 $summary | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $summaryPath -Encoding utf8
 Write-Output ("BLITZ_CLOCK_RESULT {0}" -f ($summary | ConvertTo-Json -Compress -Depth 20))
 Write-Output ("BLITZ_CLOCK_SUITE exit=0 report={0}" -f $summaryPath)

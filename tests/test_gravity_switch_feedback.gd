@@ -118,7 +118,7 @@ func test_orb_stretch_smoothly_interpolates_only_the_mesh() -> void:
 	Config.data.fx_orb_stretch_enabled = original_stretch
 
 
-func test_tilt_rotation_and_green_frame_shake_position_coexist_and_restore() -> void:
+func test_tilt_rotation_and_blue_frame_shake_position_coexist_and_restore() -> void:
 	var original_fx: bool = Config.data.fx_enabled
 	var original_hitstop: bool = Config.data.fx_hitstop_enabled
 	Config.data.fx_enabled = true
@@ -128,7 +128,7 @@ func test_tilt_rotation_and_green_frame_shake_position_coexist_and_restore() -> 
 	var director: FeedbackDirector = fixture["director"] as FeedbackDirector
 	var frame: Node3D = board.get_node("VisualTilt") as Node3D
 	board.play_visual_tilt(Vector2i.RIGHT)
-	director.play_reaction_visuals(_green_merge_reaction())
+	director.play_reaction_visuals(_blue_merge_reaction())
 	await tree.create_timer(0.12, true, false, true).timeout
 	assert_true(frame.rotation_degrees.length() > 0.0, "tilt owns frame rotation")
 	assert_true(frame.position.length() > 0.0, "SHAKE owns frame position")
@@ -216,11 +216,11 @@ func test_gravity_switch_feedback_frame_cost_report() -> void:
 	await _cleanup(fixture["root"] as Node)
 
 
-func _green_merge_reaction() -> Dictionary:
+func _blue_merge_reaction() -> Dictionary:
 	return {
 		"type": ReactionRules.Type.MERGE,
 		"result_level": 2,
-		"result_color": OrbTypes.OrbColor.GREEN,
+		"result_color": OrbTypes.OrbColor.BLUE,
 		"position": Vector2.ZERO,
 		"shock_targets": [],
 	}

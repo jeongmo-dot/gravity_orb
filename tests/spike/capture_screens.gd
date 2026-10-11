@@ -606,10 +606,10 @@ func _capture_v4_2_scenes() -> void:
 		feedback, "34_color_push", OrbTypes.OrbColor.RED, Vector2(-80.0, -30.0)
 	)
 	await _capture_color_effect_pair(
-		feedback, "35_color_pull", OrbTypes.OrbColor.BLUE, Vector2(80.0, -30.0)
+		feedback, "35_color_pull", OrbTypes.OrbColor.PURPLE, Vector2(80.0, -30.0)
 	)
 	await _capture_color_effect_pair(
-		feedback, "36_color_shake", OrbTypes.OrbColor.GREEN, Vector2.ZERO
+		feedback, "36_color_shake", OrbTypes.OrbColor.BLUE, Vector2.ZERO
 	)
 	await _capture_color_effect_pair(
 		feedback, "37_color_lift", OrbTypes.OrbColor.YELLOW, Vector2.ZERO

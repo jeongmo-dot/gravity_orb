@@ -84,12 +84,12 @@ func test_m4_spawn_defaults() -> void:
 	assert_eq(config.spawn_level_weights, PackedFloat32Array([0.9, 0.1]), "level weights")
 	assert_eq(
 		config.spawn_color_weights,
-		PackedFloat32Array([1.0, 1.0, 1.0, 1.0, 0.0, 0.0]),
+		PackedFloat32Array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0]),
 		"turn color weights"
 	)
 	assert_eq(config.spawn_count_per_turn, 1, "spawn count per turn")
 	assert_eq(config.preview_turns, 2, "preview turns")
-	assert_eq(config.spawn_count_ramp_turns, 20, "spawn count ramp interval")
+	assert_eq(config.spawn_count_ramp_turns, 40, "spawn count ramp interval")
 	assert_eq(config.spawn_count_max, 0, "non-positive spawn count maximum is uncapped")
 	assert_eq(config.spawn_position_mode, GameConfig.SpawnPositionMode.RANDOM, "position mode")
 	assert_near(config.spawn_margin, 4.0, TOLERANCE, "spawn margin")
@@ -102,10 +102,11 @@ func test_spawn_count_ramp_turn_boundaries() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	var expected: Dictionary = {
 		1: 1,
-		20: 1,
-		21: 2,
-		40: 2,
-		41: 3,
+		39: 1,
+		40: 1,
+		41: 2,
+		80: 2,
+		81: 3,
 	}
 	for turn_value: Variant in expected:
 		var turn_index: int = int(turn_value)
@@ -115,11 +116,11 @@ func test_spawn_count_ramp_turn_boundaries() -> void:
 			"spawn count at turn %d" % turn_index
 		)
 	config.spawn_count_max = -1
-	assert_eq(config.spawn_count_for_turn(41), 3, "negative maximum is also uncapped")
+	assert_eq(config.spawn_count_for_turn(81), 3, "negative maximum is also uncapped")
 	config.spawn_count_max = 3
-	assert_eq(config.spawn_count_for_turn(41), 3, "positive maximum permits third orb")
-	assert_eq(config.spawn_count_for_turn(61), 3, "positive maximum caps later turns")
-	assert_eq(config.spawn_count_for_turn(101), 3, "positive maximum remains capped")
+	assert_eq(config.spawn_count_for_turn(81), 3, "positive maximum permits third orb")
+	assert_eq(config.spawn_count_for_turn(121), 3, "positive maximum caps later turns")
+	assert_eq(config.spawn_count_for_turn(201), 3, "positive maximum remains capped")
 
 
 func test_m5_contact_defaults() -> void:
@@ -201,22 +202,22 @@ func test_m7_score_defaults() -> void:
 		config.shock_color_modes,
 		PackedInt32Array([
 			GameConfig.ShockMode.PUSH,
-			GameConfig.ShockMode.PULL,
 			GameConfig.ShockMode.SHAKE,
-			GameConfig.ShockMode.LIFT,
 			GameConfig.ShockMode.PUSH,
+			GameConfig.ShockMode.LIFT,
+			GameConfig.ShockMode.PULL,
 			GameConfig.ShockMode.PUSH,
 		]),
 		"color effect modes"
 	)
 	assert_eq(
 		config.shock_color_impulse_scale,
-		PackedFloat32Array([1.5, 0.8, 0.0, 1.0, 1.0, 1.0]),
+		PackedFloat32Array([1.5, 0.0, 1.0, 1.0, 0.8, 1.0]),
 		"color impulse scales"
 	)
 	assert_eq(
 		config.shock_color_radius_factor,
-		PackedFloat32Array([3.0, 3.0, 0.0, 3.0, 2.5, 2.5]),
+		PackedFloat32Array([3.0, 0.0, 2.5, 3.0, 3.0, 2.5]),
 		"color radius factors"
 	)
 	assert_near(config.green_shake_speed, 150.0, TOLERANCE, "green shake speed")

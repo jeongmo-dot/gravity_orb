@@ -43,11 +43,11 @@ enum GameMode { TURN, BLITZ }
 @export var allow_same_direction_swipe: bool = true
 @export var spawn_level_weights: PackedFloat32Array = PackedFloat32Array([0.9, 0.1])
 @export var spawn_color_weights: PackedFloat32Array = PackedFloat32Array(
-	[1.0, 1.0, 1.0, 1.0, 0.0, 0.0]
+	[1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 )
 @export var spawn_count_per_turn: int = 1
 @export var preview_turns: int = 2
-@export var spawn_count_ramp_turns: int = 20
+@export var spawn_count_ramp_turns: int = 40
 @export var spawn_count_max: int = 0
 @export var spawn_position_mode: SpawnPositionMode = SpawnPositionMode.RANDOM
 @export var spawn_margin: float = 4.0
@@ -83,18 +83,18 @@ enum GameMode { TURN, BLITZ }
 @export var shock_color_modes: PackedInt32Array = PackedInt32Array(
 	[
 		ShockMode.PUSH,
-		ShockMode.PULL,
 		ShockMode.SHAKE,
-		ShockMode.LIFT,
 		ShockMode.PUSH,
+		ShockMode.LIFT,
+		ShockMode.PULL,
 		ShockMode.PUSH,
 	]
 )
 @export var shock_color_impulse_scale: PackedFloat32Array = PackedFloat32Array(
-	[1.5, 0.8, 0.0, 1.0, 1.0, 1.0]
+	[1.5, 0.0, 1.0, 1.0, 0.8, 1.0]
 )
 @export var shock_color_radius_factor: PackedFloat32Array = PackedFloat32Array(
-	[3.0, 3.0, 0.0, 3.0, 2.5, 2.5]
+	[3.0, 0.0, 2.5, 3.0, 3.0, 2.5]
 )
 @export var green_shake_speed: float = 150.0
 @export var green_shake_max_speed: float = 600.0
