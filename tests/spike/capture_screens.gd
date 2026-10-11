@@ -2,13 +2,15 @@ extends Node
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
 const ORB_3D_SCENE: PackedScene = preload("res://scenes/Orb3D.tscn")
-const OUTPUT_DIRECTORY: String = "res://artifacts/screens"
+const DEFAULT_OUTPUT_DIRECTORY: String = "res://artifacts/screens"
 const MEASUREMENT_DIRECTORY: String = "res://artifacts/measurements"
 const DEFAULT_USER_SAVE: String = "user://save.cfg"
 const TEMP_SAVE_PREFIX: String = "--capture-save-path="
+const OUTPUT_DIRECTORY_PREFIX: String = "--capture-output-directory="
+const HUD_SCENES_ONLY_ARGUMENT: String = "--capture-hud-scenes-only"
 const CAPTURE_SEED: int = 5050
-const TURN_CAPTURE_SCORE: int = 2048
-const TURN_CAPTURE_BEST: int = 3764
+const TURN_CAPTURE_SCORE: int = 9_999_999
+const TURN_CAPTURE_BEST: int = 9_999_999
 const BLITZ_CAPTURE_SCORE: int = 18760
 const BLITZ_CAPTURE_BEST: int = 18760
 const RANKING_CAPTURE_BEST: int = 25000
@@ -44,9 +46,21 @@ const CAPTURE_FILES: Array[String] = [
 	"17_board_danger.png",
 	"18_board_blocked.png",
 ]
+const HUD_CAPTURE_FILES: Array[String] = [
+	"02_turn_early.png",
+	"03_turn_combo.png",
+	"06_blitz_fever_chain.png",
+	"07_blitz_danger.png",
+	"12_turn_ramp_next.png",
+	"13_turn_ramp_uncapped_next.png",
+	"17_board_danger.png",
+	"18_board_blocked.png",
+]
 
 var _failed: bool = false
+var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
 var _temp_save_path: String = "res://artifacts/screens/capture_save.tmp.cfg"
+var _hud_scenes_only: bool = false
 var _user_save_existed: bool = false
 var _user_save_bytes: PackedByteArray = PackedByteArray()
 
@@ -66,18 +80,19 @@ func _run_capture_suite() -> void:
 	Config.data.rng_seed = CAPTURE_SEED
 	Config.data.fx_hitstop_enabled = false
 
-	await _capture_start_screen()
+	if not _hud_scenes_only:
+		await _capture_start_screen()
 	if not _failed:
 		await _capture_turn_scenes()
 	if not _failed:
 		await _capture_blitz_scenes()
-	if not _failed:
+	if not _failed and not _hud_scenes_only:
 		await _capture_orb_codex()
-	if not _failed:
+	if not _failed and not _hud_scenes_only:
 		await _capture_orb_closeup()
-	if not _failed:
+	if not _failed and not _hud_scenes_only:
 		await _measure_v2_contrast()
-	if not _failed:
+	if not _failed and not _hud_scenes_only:
 		await _measure_gravity_wall_lights()
 
 	_verify_capture_files()
@@ -115,7 +130,8 @@ func _capture_turn_scenes() -> void:
 	await _capture("02_turn_early.png")
 	manager.on_swipe(Vector2i.RIGHT)
 	await get_tree().create_timer(0.12).timeout
-	await _capture("16_gravity_switch.png")
+	if not _hud_scenes_only:
+		await _capture("16_gravity_switch.png")
 	if not await _wait_for_turn_input(manager):
 		_fail("TURN gravity-switch scene did not settle")
 		await _destroy_main(main)
@@ -159,6 +175,9 @@ func _capture_turn_scenes() -> void:
 	await get_tree().process_frame
 	_validate_turn_ramp_preview_scene(main, 6, "turn_ramp_uncapped_next")
 	await _capture("13_turn_ramp_uncapped_next.png")
+	if _hud_scenes_only:
+		await _destroy_main(main)
+		return
 
 	score.score = TURN_CAPTURE_SCORE
 	score.best_score = TURN_CAPTURE_BEST
@@ -180,7 +199,8 @@ func _capture_blitz_scenes() -> void:
 	var spawner: Spawner = main.get_node("Spawner") as Spawner
 	var score: ScoreManager = main.get_node("ScoreManager") as ScoreManager
 	var board: Board3D = main.get_node("Board") as Board3D
-	await _capture("05_blitz_ready.png")
+	if not _hud_scenes_only:
+		await _capture("05_blitz_ready.png")
 	if not await _wait_for_blitz_running(manager):
 		_fail("BLITZ did not leave READY")
 		await _destroy_main(main)
@@ -195,7 +215,7 @@ func _capture_blitz_scenes() -> void:
 	hud._on_score_changed(BLITZ_CAPTURE_SCORE, BLITZ_CAPTURE_BEST)
 	hud._reset_callout_tracking()
 	manager.play_time_elapsed = 120.0
-	manager.remaining_time = Config.data.blitz_start_time
+	manager.remaining_time = Config.data.blitz_time_max
 	hud._on_time_changed(manager.remaining_time)
 	hud._on_time_bonus_awarded(0.1, "MERGE_L3")
 	hud._on_time_bonus_awarded(0.2, "MERGE_L4")
@@ -237,6 +257,17 @@ func _capture_blitz_scenes() -> void:
 	})
 	await get_tree().create_timer(0.24).timeout
 	_validate_blitz_survival_hud_scene(main)
+	var fever_band: ColorRect = main.get_node("UI/Hud/FeverBand") as ColorRect
+	print(
+		"SCREEN_CAPTURE_CHECK scene=blitz_fever_band position=(%.1f,%.1f) size=(%.1f,%.1f)" % [
+			fever_band.position.x,
+			fever_band.position.y,
+			fever_band.size.x,
+			fever_band.size.y,
+		]
+	)
+	if absf(fever_band.position.x) > 0.5:
+		_fail("BLITZ FEVER band must span the viewport without horizontal clipping")
 	print("SCREEN_CAPTURE_CHECK scene=blitz_l4_blast radius_factor=0.3")
 	await _capture("06_blitz_fever_chain.png")
 	await get_tree().create_timer(0.40).timeout
@@ -261,6 +292,9 @@ func _capture_blitz_scenes() -> void:
 	await get_tree().create_timer(0.24).timeout
 	print("SCREEN_CAPTURE_CHECK scene=blitz_l6_blast radius_factor=1.0")
 	await _capture("07_blitz_danger.png")
+	if _hud_scenes_only:
+		await _destroy_main(main)
+		return
 	await get_tree().create_timer(0.40).timeout
 
 	hud._set_danger_badge(0.0, 1.0)
@@ -336,7 +370,7 @@ func _capture_orb_codex() -> void:
 	await get_tree().process_frame
 	await _capture("14_orb_codex.png")
 	_analyze_orb_codex(camera, descriptors)
-	print("SCREEN_CAPTURE_CHECK scene=orb_codex colors=6 levels=7 symbols=on")
+	print("SCREEN_CAPTURE_CHECK scene=orb_codex colors=6 levels=7 symbols=off")
 	await _destroy_main(main)
 
 
@@ -377,6 +411,7 @@ func _measure_v2_contrast() -> void:
 	var empty_image: Image = get_viewport().get_texture().get_image()
 	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
 	var board: Board3D = main.get_node("Board") as Board3D
+	var backdrop: SpaceBackdrop = main.get_node("SpaceBackdrop") as SpaceBackdrop
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
 	var image_scale: Vector2 = Vector2(
 		float(empty_image.get_width()) / viewport_size.x,
@@ -402,25 +437,31 @@ func _measure_v2_contrast() -> void:
 	var inner_rect: Rect2 = board_rect.grow(-board_rect.size.x * 0.08)
 	var empty_board_average: float = _average_luminance(empty_image, inner_rect)
 	var background_maximum: float = _maximum_luminance_outside(empty_image, board_rect.grow(6.0))
+	board.set_danger_state(0.70, 4.0)
+	board._process(0.625)
+	backdrop._process(0.625)
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var danger_background_image: Image = get_viewport().get_texture().get_image()
+	board.set_danger_state(0.0, 1.0)
+	board._process(0.0)
+	backdrop._process(0.0)
 	var crowded_image: Image = Image.load_from_file(
-		ProjectSettings.globalize_path(OUTPUT_DIRECTORY.path_join("07_blitz_danger.png"))
-	)
-	var normal_image: Image = Image.load_from_file(
-		ProjectSettings.globalize_path(OUTPUT_DIRECTORY.path_join("02_turn_early.png"))
+		ProjectSettings.globalize_path(_output_directory.path_join("07_blitz_danger.png"))
 	)
 	var danger_image: Image = Image.load_from_file(
-		ProjectSettings.globalize_path(OUTPUT_DIRECTORY.path_join("17_board_danger.png"))
+		ProjectSettings.globalize_path(_output_directory.path_join("17_board_danger.png"))
 	)
 	var blocked_image: Image = Image.load_from_file(
-		ProjectSettings.globalize_path(OUTPUT_DIRECTORY.path_join("18_board_blocked.png"))
+		ProjectSettings.globalize_path(_output_directory.path_join("18_board_blocked.png"))
 	)
 	var crowded_metrics: Dictionary = _crowded_board_luminance(crowded_image, inner_rect)
 	var orb_average: float = float(crowded_metrics["orb_average"])
 	var crowded_board_average: float = float(crowded_metrics["board_average"])
 	var ratio: float = orb_average / maxf(crowded_board_average, 0.001)
 	var danger_band: Color = _average_frame_band_color(danger_image, board_rect, 4.0, 10.0)
-	var normal_background_red: float = _background_red_average(normal_image, board_rect)
-	var danger_background_red: float = _background_red_average(danger_image, board_rect)
+	var normal_background_red: float = _background_red_average(empty_image, board_rect)
+	var danger_background_red: float = _background_red_average(danger_background_image, board_rect)
 	var background_red_gain: float = (danger_background_red - normal_background_red) * 255.0
 	var blocked_top: Color = _average_side_band_color(
 		blocked_image, board_rect, Vector2i.UP, 4.0, 10.0
@@ -727,7 +768,7 @@ func _average_color(image: Image, region: Rect2) -> Color:
 
 func _background_red_average(image: Image, board_rect: Rect2) -> float:
 	var top: float = board_rect.end.y + 18.0
-	var bottom: float = float(image.get_height()) - 110.0
+	var bottom: float = minf(board_rect.end.y + 80.0, float(image.get_height()))
 	if bottom <= top:
 		return 0.0
 	return _average_color(
@@ -787,7 +828,7 @@ func _crowded_board_luminance(image: Image, region: Rect2) -> Dictionary:
 
 
 func _analyze_orb_codex(camera: Camera3D, descriptors: Array[Dictionary]) -> void:
-	var image_path: String = OUTPUT_DIRECTORY.path_join("14_orb_codex.png")
+	var image_path: String = _output_directory.path_join("14_orb_codex.png")
 	var image: Image = Image.load_from_file(ProjectSettings.globalize_path(image_path))
 	if image == null or image.is_empty():
 		_fail("Could not load orb codex for color analysis")
@@ -1111,7 +1152,7 @@ func _capture(file_name: String) -> void:
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 	var image: Image = get_viewport().get_texture().get_image()
-	var path: String = OUTPUT_DIRECTORY.path_join(file_name)
+	var path: String = _output_directory.path_join(file_name)
 	var error: Error = image.save_png(path)
 	if error != OK:
 		_fail("Could not save %s: %s" % [path, error_string(error)])
@@ -1120,15 +1161,16 @@ func _capture(file_name: String) -> void:
 
 
 func _prepare_output_directory() -> void:
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUTPUT_DIRECTORY))
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_output_directory))
 	for file_name: String in CAPTURE_FILES:
-		_remove_file(OUTPUT_DIRECTORY.path_join(file_name))
+		_remove_file(_output_directory.path_join(file_name))
 	_remove_file(_temp_save_path)
 
 
 func _verify_capture_files() -> void:
-	for file_name: String in CAPTURE_FILES:
-		var path: String = OUTPUT_DIRECTORY.path_join(file_name)
+	var expected_files: Array[String] = HUD_CAPTURE_FILES if _hud_scenes_only else CAPTURE_FILES
+	for file_name: String in expected_files:
+		var path: String = _output_directory.path_join(file_name)
 		if not FileAccess.file_exists(path):
 			_fail("Missing capture %s" % path)
 
@@ -1241,8 +1283,8 @@ func _validate_blitz_result_scene(main: Main) -> void:
 func _validate_blitz_survival_hud_scene(main: Main) -> void:
 	_expect_label_text(
 		main.get_node("UI/Hud/TimerLabel") as Label,
-		"30.0",
-		"BLITZ survival start clock"
+		"45.0",
+		"BLITZ maximum clock"
 	)
 	_expect_label_text(
 		main.get_node("UI/Hud/BonusLabel") as Label,
@@ -1324,8 +1366,12 @@ func _remove_file(path: String) -> void:
 
 func _parse_arguments() -> void:
 	for argument: String in OS.get_cmdline_user_args():
-		if argument.begins_with(TEMP_SAVE_PREFIX):
+		if argument == HUD_SCENES_ONLY_ARGUMENT:
+			_hud_scenes_only = true
+		elif argument.begins_with(TEMP_SAVE_PREFIX):
 			_temp_save_path = argument.trim_prefix(TEMP_SAVE_PREFIX)
+		elif argument.begins_with(OUTPUT_DIRECTORY_PREFIX):
+			_output_directory = argument.trim_prefix(OUTPUT_DIRECTORY_PREFIX)
 
 
 func _fail(message: String) -> void:

@@ -2,11 +2,12 @@ class_name Hud
 extends Control
 
 const MAX_PREVIEW_COUNT: int = 5
-const PREVIEW_REGION_SIZE: Vector2 = Vector2(280.0, 150.0)
+const PREVIEW_REGION_SIZE: Vector2 = Vector2(480.0, 180.0)
 const PREVIEW_GAP: float = 16.0
 const DANGER_REFRESH_INTERVAL: float = 0.25
-const SCORE_ROLL_DURATION: float = 0.25
+const SCORE_ROLL_DURATION: float = 0.30
 const BADGE_PUNCH_DURATION: float = 0.15
+const BEST_FLASH_DURATION: float = 0.42
 const POPUP_MERGE_DISTANCE: float = 40.0
 const GOLD_COLOR: Color = Color("#FFD54A")
 const CALLOUT_POP_DURATION: float = 0.12
@@ -21,13 +22,29 @@ const BLITZ_CALLOUT_STEPS: Array[int] = [5, 10, 15, 20, 30]
 const CALLOUT_WORDS: Array[String] = [
 	"NICE!", "GREAT!", "AMAZING!", "INCREDIBLE!", "UNSTOPPABLE!"
 ]
-const TIMER_NORMAL_COLOR: Color = Color.WHITE
+const TIMER_NORMAL_COLOR: Color = Color("#E8EEFF")
 const TIMER_DANGER_COLOR: Color = Color("#FF3B30")
 const TIMER_BONUS_COLOR: Color = Color("#30D158")
+const HUD_ACCENT_COLOR: Color = Color("#BFE9FF")
+const HUD_AMBER_COLOR: Color = Color("#FFB020")
+const HUD_PANEL_COLOR: Color = Color(0.0431373, 0.0941176, 0.2, 0.60)
+const SCORE_FONT_MAX: int = 54
+const SCORE_FONT_MIN: int = 32
+const SCORE_DIGIT_WIDTH_FACTOR: float = 0.72
+const HUD_LOGICAL_WIDTH: float = 1080.0
+const HUD_MARGIN: float = 24.0
+const PREVIEW_SHELF_HEIGHT: float = 340.0
+const TIME_BAR_INSET: float = 4.0
+const HUD_THEME: Theme = preload("res://assets/ui/gravity_orb_theme.tres")
+const SPEAKER_ON_ICON: Texture2D = preload("res://assets/ui/speaker_on.svg")
+const SPEAKER_OFF_ICON: Texture2D = preload("res://assets/ui/speaker_off.svg")
 
 @onready var _next_preview: Node2D = %NextPreview
 @onready var _then_preview: Node2D = %ThenPreview
+@onready var _next_label: Label = %NextLabel
 @onready var _then_label: Label = %ThenLabel
+@onready var _next_preview_region: Control = %NextPreviewRegion
+@onready var _then_preview_region: Control = %ThenPreviewRegion
 @onready var _next_count_label: Label = %NextCountLabel
 @onready var _then_count_label: Label = %ThenCountLabel
 @onready var _score_label: Label = %ScoreLabel
@@ -48,6 +65,13 @@ const TIMER_BONUS_COLOR: Color = Color("#30D158")
 @onready var _bonus_label: Label = %BonusLabel
 @onready var _game_over_panel: GameOverPanel = %GameOverPanel
 @onready var _sound_button: Button = %HudSoundButton
+@onready var _score_panel: PanelContainer = %ScorePanel
+@onready var _best_panel: PanelContainer = %BestPanel
+@onready var _danger_panel: PanelContainer = %DangerPanel
+@onready var _preview_shelf: PanelContainer = %PreviewShelf
+@onready var _blocked_panel: PanelContainer = %BlockedPanel
+@onready var _time_bar_track: Panel = %TimeBarTrack
+@onready var _time_bar_fill: ColorRect = %TimeBarFill
 
 var _spawner: Spawner
 var _score_manager: ScoreManager
@@ -67,9 +91,13 @@ var _next_preview_pool: Array[OrbVisual] = []
 var _then_preview_pool: Array[OrbVisual] = []
 var _score_tween: Tween
 var _score_punch_tween: Tween
+var _best_flash_tween: Tween
 var _badge_punch_tween: Tween
 var _displayed_score: int = 0
 var _score_target: int = 0
+var _best_target: int = 0
+var _best_initialized: bool = false
+var _best_flash_count: int = 0
 var _current_multiplier: float = 1.0
 var _danger_multiplier: float = 1.0
 var _danger_refresh_elapsed: float = 0.0
@@ -95,14 +123,154 @@ var _time_up_count: int = 0
 
 func _ready() -> void:
 	_sound_button.pressed.connect(_on_sound_pressed)
+	_sound_button.text = ""
+	_sound_button.icon = SPEAKER_ON_ICON
 	_fever_band_base_position = _fever_band.position
 	_configure_fever_vignette()
+	if not get_viewport().size_changed.is_connected(_apply_responsive_layout):
+		get_viewport().size_changed.connect(_apply_responsive_layout)
+	_apply_responsive_layout()
 	set_process(true)
 
 
 func _exit_tree() -> void:
+	if get_viewport().size_changed.is_connected(_apply_responsive_layout):
+		get_viewport().size_changed.disconnect(_apply_responsive_layout)
 	_free_preview_pool(_next_preview_pool)
 	_free_preview_pool(_then_preview_pool)
+
+
+func _apply_responsive_layout() -> void:
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var layout: Dictionary = hud_layout(viewport_size, _logical_safe_area(viewport_size))
+	_set_control_rect(_score_panel, layout["score_panel"] as Rect2)
+	_set_control_rect(_score_label, layout["score"] as Rect2)
+	_set_control_rect(_best_panel, layout["best_panel"] as Rect2)
+	_set_control_rect(_best_label, layout["best"] as Rect2)
+	_set_control_rect(_sound_button, layout["sound"] as Rect2)
+	_set_control_rect(_danger_panel, layout["danger_panel"] as Rect2)
+	_set_control_rect(_danger_label, layout["danger"] as Rect2)
+	_set_control_rect(_multiplier_label, layout["multiplier"] as Rect2)
+	_set_control_rect(_combo_label, layout["combo"] as Rect2)
+	_set_control_rect(_max_combo_label, layout["max_combo"] as Rect2)
+	_set_control_rect(_timer_label, layout["timer"] as Rect2)
+	_set_control_rect(_drain_rate_label, layout["drain_rate"] as Rect2)
+	_set_control_rect(_bonus_label, layout["time_bonus"] as Rect2)
+	_set_control_rect(_time_bar_track, layout["time_bar"] as Rect2)
+	_set_control_rect(_preview_shelf, layout["preview_shelf"] as Rect2)
+	_set_control_rect(_blocked_panel, layout["blocked_panel"] as Rect2)
+	_set_control_rect(_blocked_label, layout["blocked"] as Rect2)
+	_set_control_rect(_next_label, layout["next_label"] as Rect2)
+	_set_control_rect(_next_preview_region, layout["next"] as Rect2)
+	_set_control_rect(_next_count_label, layout["next_count"] as Rect2)
+	_set_control_rect(_then_label, layout["then_label"] as Rect2)
+	_set_control_rect(_then_preview_region, layout["then"] as Rect2)
+	_set_control_rect(_then_count_label, layout["then_count"] as Rect2)
+	_next_preview.position = (layout["next"] as Rect2).get_center() + Vector2(0.0, 8.0)
+	_then_preview.position = (layout["then"] as Rect2).get_center() + Vector2(0.0, 8.0)
+	var center_y: float = viewport_size.y * 0.5
+	_set_control_rect(_fever_band, Rect2(0.0, center_y - 40.0, viewport_size.x, 80.0))
+	_fever_band_base_position = _fever_band.position
+	_set_control_rect(
+		_callout_label,
+		Rect2(40.0, center_y - 120.0, viewport_size.x - 80.0, 200.0)
+	)
+	_set_control_rect(
+		_time_up_label,
+		Rect2(40.0, center_y - 130.0, viewport_size.x - 80.0, 260.0)
+	)
+	_score_label.pivot_offset = _score_label.size * 0.5
+	_best_label.pivot_offset = _best_label.size * 0.5
+	_multiplier_label.pivot_offset = _multiplier_label.size * 0.5
+	_combo_label.pivot_offset = _combo_label.size * 0.5
+	_danger_label.pivot_offset = _danger_label.size * 0.5
+	_timer_label.pivot_offset = _timer_label.size * 0.5
+	_fit_numeric_label(_score_label, _displayed_score, SCORE_FONT_MAX, SCORE_FONT_MIN)
+	_fit_numeric_label(_best_label, _best_target, 27, 18)
+	_update_time_bar(_previous_time_remaining if _previous_time_remaining >= 0.0 else 0.0)
+
+
+func _set_control_rect(control: Control, rect: Rect2) -> void:
+	control.anchor_left = 0.0
+	control.anchor_top = 0.0
+	control.anchor_right = 0.0
+	control.anchor_bottom = 0.0
+	control.size = rect.size
+	# Some full-width controls grow from both sides. Set the final position after size so
+	# their grow direction cannot shift a responsive rect away from its requested origin.
+	control.position = rect.position
+
+
+func _logical_safe_area(viewport_size: Vector2) -> Rect2:
+	var viewport_rect: Rect2 = Rect2(Vector2.ZERO, viewport_size)
+	if not OS.has_feature("mobile"):
+		return viewport_rect
+	var window_size: Vector2i = DisplayServer.window_get_size()
+	var pixel_safe_area: Rect2i = DisplayServer.get_display_safe_area()
+	if window_size.x <= 0 or window_size.y <= 0 or pixel_safe_area.size == Vector2i.ZERO:
+		return viewport_rect
+	var scale: Vector2 = viewport_size / Vector2(window_size)
+	var logical_safe_area: Rect2 = Rect2(
+		Vector2(pixel_safe_area.position) * scale,
+		Vector2(pixel_safe_area.size) * scale
+	)
+	return logical_safe_area.intersection(viewport_rect)
+
+
+static func hud_layout(viewport_size: Vector2, safe_area: Rect2 = Rect2()) -> Dictionary:
+	var viewport_rect: Rect2 = Rect2(Vector2.ZERO, viewport_size)
+	var safe: Rect2 = safe_area.intersection(viewport_rect)
+	if safe.size.x <= 0.0 or safe.size.y <= 0.0:
+		safe = viewport_rect
+	var center_x: float = safe.get_center().x
+	var top: float = safe.position.y + HUD_MARGIN
+	var bottom: float = safe.end.y - 40.0
+	var shelf_top: float = bottom - PREVIEW_SHELF_HEIGHT
+	var shelf: Rect2 = Rect2(
+		safe.position.x + 40.0,
+		shelf_top,
+		maxf(safe.size.x - 80.0, 1.0),
+		PREVIEW_SHELF_HEIGHT
+	)
+	var next_width: float = shelf.size.x * 0.55
+	var then_x: float = shelf.position.x + shelf.size.x * 0.60
+	var then_width: float = shelf.end.x - 30.0 - then_x
+	return {
+		"safe": safe,
+		"score_panel": Rect2(center_x - 240.0, top, 480.0, 150.0),
+		"score": Rect2(center_x - 224.0, top + 12.0, 448.0, 126.0),
+		"best_panel": Rect2(safe.end.x - 236.0, top, 236.0, 150.0),
+		"best": Rect2(safe.end.x - 224.0, top + 12.0, 212.0, 126.0),
+		"sound": Rect2(safe.position.x, top + 8.0, 120.0, 120.0),
+		"danger_panel": Rect2(safe.position.x, top + 166.0, 256.0, 62.0),
+		"danger": Rect2(safe.position.x + 12.0, top + 172.0, 232.0, 50.0),
+		"multiplier": Rect2(center_x - 220.0, top + 160.0, 440.0, 66.0),
+		"combo": Rect2(center_x - 220.0, top + 226.0, 440.0, 46.0),
+		"max_combo": Rect2(safe.end.x - 236.0, top + 162.0, 236.0, 46.0),
+		"timer": Rect2(center_x - 150.0, top + 292.0, 300.0, 80.0),
+		"drain_rate": Rect2(center_x - 320.0, top + 308.0, 150.0, 50.0),
+		"time_bonus": Rect2(center_x + 170.0, top + 308.0, 190.0, 50.0),
+		"time_bar": Rect2(
+			safe.position.x + 96.0,
+			top + 396.0,
+			maxf(safe.size.x - 192.0, 1.0),
+			26.0
+		),
+		"preview_shelf": shelf,
+		"blocked_panel": Rect2(center_x - 210.0, shelf_top + 8.0, 420.0, 56.0),
+		"blocked": Rect2(center_x - 198.0, shelf_top + 12.0, 396.0, 48.0),
+		"next_label": Rect2(shelf.position.x + 30.0, shelf_top + 76.0, next_width, 40.0),
+		"next": Rect2(shelf.position.x + 30.0, shelf_top + 116.0, next_width, 194.0),
+		"next_count": Rect2(
+			shelf.position.x + next_width - 50.0,
+			shelf_top + 230.0,
+			80.0,
+			50.0
+		),
+		"then_label": Rect2(then_x, shelf_top + 84.0, then_width, 40.0),
+		"then": Rect2(then_x, shelf_top + 124.0, then_width, 176.0),
+		"then_count": Rect2(shelf.end.x - 110.0, shelf_top + 230.0, 80.0, 42.0),
+	}
 
 
 func _process(delta: float) -> void:
@@ -175,6 +343,8 @@ func bind_game_state(
 	)
 	board.set_warning_directions(game_manager.blocked_directions)
 	_timer_label.visible = _blitz_mode
+	_time_bar_track.visible = _blitz_mode
+	_time_bar_fill.visible = _blitz_mode
 	_drain_rate_label.visible = false
 	_bonus_label.visible = false
 	if _blitz_mode:
@@ -186,6 +356,8 @@ func bind_game_state(
 		_on_time_changed(game_manager.remaining_time)
 		if game_manager.state == BlitzManager.State.READY:
 			_on_ready_changed(true, game_manager.ready_remaining)
+	else:
+		_update_time_bar(0.0)
 	_refresh_danger_badge()
 
 
@@ -229,7 +401,7 @@ func _render_preview(preview_root: Node2D, batch: Array) -> void:
 		natural_width += PREVIEW_GAP * float(preview_count - 1)
 
 	var preview_scale: float = minf(
-		1.0,
+		2.0,
 		minf(
 			PREVIEW_REGION_SIZE.x / natural_width,
 			PREVIEW_REGION_SIZE.y / natural_height
@@ -287,6 +459,11 @@ func _free_preview_pool(pool: Array[OrbVisual]) -> void:
 
 func _on_score_changed(score: int, best: int) -> void:
 	_best_label.text = "BEST\n%d" % best
+	_fit_numeric_label(_best_label, best, 27, 18)
+	if _best_initialized and best > _best_target:
+		_flash_best_label()
+	_best_target = best
+	_best_initialized = true
 	var gained: int = score - _score_target
 	_score_target = score
 	if (
@@ -308,13 +485,41 @@ func _on_score_changed(score: int, best: int) -> void:
 			score,
 			SCORE_ROLL_DURATION
 		).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	if gained >= 1000 and Config.data.fx_score_popups_enabled:
+	if (
+		(gained >= 1000 or _current_multiplier >= 8.0)
+		and Config.data.fx_score_popups_enabled
+	):
 		_punch_score_label()
 
 
 func _set_displayed_score(value: int) -> void:
 	_displayed_score = value
 	_score_label.text = "SCORE\n%d" % value
+	_fit_numeric_label(_score_label, value, SCORE_FONT_MAX, SCORE_FONT_MIN)
+
+
+func _fit_numeric_label(label: Label, value: int, preferred_size: int, minimum_size: int) -> void:
+	var available_width: float = maxf(label.size.x - 16.0, 1.0)
+	var fitted_size: int = numeric_font_size_for_width(
+		value,
+		available_width,
+		preferred_size,
+		minimum_size
+	)
+	label.add_theme_font_size_override("font_size", fitted_size)
+
+
+static func numeric_font_size_for_width(
+	value: int,
+	available_width: float,
+	preferred_size: int,
+	minimum_size: int
+) -> int:
+	var digit_count: int = maxi(str(absi(value)).length(), 1)
+	var width_limited_size: int = floori(
+		available_width / (float(digit_count) * SCORE_DIGIT_WIDTH_FACTOR)
+	)
+	return clampi(width_limited_size, minimum_size, preferred_size)
 
 
 func _on_combo_changed(combo: int, multiplier: float, max_combo: int) -> void:
@@ -497,10 +702,25 @@ func _board_occupancy() -> float:
 func _set_danger_badge(occupancy: float, multiplier: float) -> void:
 	_danger_multiplier = multiplier
 	_danger_label.visible = occupancy >= Config.data.danger_start
+	_danger_panel.visible = _danger_label.visible
 	if _danger_label.visible:
 		_danger_label.text = "DANGER ×%s" % _format_multiplier(multiplier)
+		var danger_color: Color = (
+			TIMER_DANGER_COLOR if multiplier >= 4.0 else HUD_AMBER_COLOR
+		)
+		_danger_label.add_theme_color_override("font_color", danger_color)
+		_apply_danger_panel_color(danger_color)
 	if _board != null and _board.has_method("set_danger_state"):
 		_board.call("set_danger_state", occupancy, multiplier)
+
+
+func _apply_danger_panel_color(border_color: Color) -> void:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = HUD_PANEL_COLOR
+	style.border_color = border_color
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(12)
+	_danger_panel.add_theme_stylebox_override("panel", style)
 
 
 func _punch_multiplier_badge() -> void:
@@ -532,6 +752,39 @@ func _punch_score_label() -> void:
 	)
 
 
+func _flash_best_label() -> void:
+	if _best_flash_tween != null and _best_flash_tween.is_valid():
+		_best_flash_tween.kill()
+	_best_flash_count += 1
+	_best_label.pivot_offset = _best_label.size * 0.5
+	_best_label.scale = Vector2.ONE
+	_best_label.modulate = HUD_ACCENT_COLOR
+	_best_flash_tween = create_tween()
+	_best_flash_tween.set_parallel(true)
+	_best_flash_tween.tween_property(
+		_best_label,
+		"scale",
+		Vector2.ONE * 1.10,
+		BEST_FLASH_DURATION * 0.45
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_best_flash_tween.tween_property(
+		_best_label,
+		"modulate",
+		Color.WHITE,
+		BEST_FLASH_DURATION
+	)
+	_best_flash_tween.chain().tween_property(
+		_best_label,
+		"scale",
+		Vector2.ONE,
+		BEST_FLASH_DURATION * 0.55
+	).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+func best_flash_count() -> int:
+	return _best_flash_count
+
+
 func active_score_popup_count() -> int:
 	return _active_popups.size()
 
@@ -561,12 +814,14 @@ func _on_warning_changed(directions: Array[Vector2i]) -> void:
 	for direction: Vector2i in directions:
 		names.append(OrbTypes.dir_name(direction))
 	_blocked_label.visible = not _blitz_mode and not names.is_empty()
+	_blocked_panel.visible = _blocked_label.visible
 	_blocked_label.text = "" if names.is_empty() else "BLOCKED: %s" % ", ".join(names)
 
 
 func _on_time_changed(remaining: float) -> void:
 	var clamped_remaining: float = maxf(remaining, 0.0)
 	_timer_label.text = "%.1f" % clamped_remaining
+	_update_time_bar(clamped_remaining)
 	if not _timer_flashing:
 		_timer_label.modulate = _timer_color_for(clamped_remaining)
 	_record_timer_ticks(_previous_time_remaining, clamped_remaining)
@@ -580,6 +835,23 @@ func _on_ready_changed(active: bool, remaining: float) -> void:
 		_timer_label.text = "READY %.1f" % remaining
 		if not _timer_flashing:
 			_timer_label.modulate = TIMER_NORMAL_COLOR
+
+
+func _update_time_bar(remaining: float) -> void:
+	if not is_instance_valid(_time_bar_track) or not is_instance_valid(_time_bar_fill):
+		return
+	var capacity: float = maxf(Config.data.blitz_time_max, 0.001)
+	var ratio: float = clampf(remaining / capacity, 0.0, 1.0)
+	var inner_width: float = maxf(_time_bar_track.size.x - TIME_BAR_INSET * 2.0, 0.0)
+	_time_bar_fill.position = _time_bar_track.position + Vector2(
+		TIME_BAR_INSET,
+		TIME_BAR_INSET
+	)
+	_time_bar_fill.size = Vector2(
+		inner_width * ratio,
+		maxf(_time_bar_track.size.y - TIME_BAR_INSET * 2.0, 0.0)
+	)
+	_time_bar_fill.color = TIMER_DANGER_COLOR if remaining <= 10.0 else TIMER_BONUS_COLOR
 
 
 func _on_fever_changed(active: bool, remaining: float) -> void:
@@ -973,5 +1245,6 @@ func _on_sound_pressed() -> void:
 
 
 func _on_mute_changed(muted: bool) -> void:
-	_sound_button.text = "🔇" if muted else "🔊"
+	_sound_button.text = ""
+	_sound_button.icon = SPEAKER_OFF_ICON if muted else SPEAKER_ON_ICON
 	_sound_button.tooltip_text = "소리 켜기" if muted else "소리 끄기"

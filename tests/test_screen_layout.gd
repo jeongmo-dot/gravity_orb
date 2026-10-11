@@ -1,10 +1,24 @@
 extends TestCase
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
-const BASE_VIEWPORT_SIZE: Vector2 = Vector2(1080.0, 1920.0)
-const OUTPUT_SIZES: Array[Vector2] = [
-	Vector2(1080.0, 1920.0),
-	Vector2(540.0, 960.0),
+const HUD_THEME: Theme = preload("res://assets/ui/gravity_orb_theme.tres")
+const VIEWPORT_CASES: Array[Dictionary] = [
+	{
+		"output": Vector2(540.0, 960.0),
+		"logical": Vector2(1080.0, 1920.0),
+		"safe": Rect2(0.0, 0.0, 1080.0, 1920.0),
+	},
+	{
+		"output": Vector2(540.0, 1170.0),
+		"logical": Vector2(1080.0, 2340.0),
+		"safe": Rect2(24.0, 64.0, 1032.0, 2212.0),
+	},
+]
+const FONT_PATHS: Array[String] = [
+	"res://assets/fonts/Orbitron-Medium.ttf",
+	"res://assets/fonts/Orbitron-Bold.ttf",
+	"res://assets/fonts/NotoSansKR-Regular-KSX1001.ttf",
+	"res://assets/fonts/NotoSansKR-Medium-KSX1001.ttf",
 ]
 
 
@@ -43,13 +57,107 @@ func test_busy_blitz_hud_regions_do_not_overlap_at_supported_sizes() -> void:
 		"next": main.get_node("UI/Hud/NextPreviewRegion") as Control,
 		"then": main.get_node("UI/Hud/ThenPreviewRegion") as Control,
 		"timer": timer,
+		"time_bar": main.get_node("UI/Hud/TimeBarTrack") as Control,
 		"drain_rate": main.get_node("UI/Hud/DrainRateLabel") as Control,
 		"time_bonus": main.get_node("UI/Hud/BonusLabel") as Control,
 		"sound": main.get_node("UI/Hud/HudSoundButton") as Control,
 	}
-	for output_size: Vector2 in OUTPUT_SIZES:
-		_assert_regions_do_not_overlap(regions, output_size)
+	_assert_regions_do_not_overlap(regions, "540x960")
 
+	await _destroy_main(main)
+	Config.data.game_mode = original_mode
+
+
+func test_hud_layout_stays_in_safe_area_and_clear_of_board_at_both_ratios() -> void:
+	for viewport_case: Dictionary in VIEWPORT_CASES:
+		var output: Vector2 = viewport_case["output"] as Vector2
+		var logical: Vector2 = viewport_case["logical"] as Vector2
+		var safe: Rect2 = viewport_case["safe"] as Rect2
+		var layout: Dictionary = Hud.hud_layout(logical, safe)
+		var region_names: Array[String] = [
+			"score", "best", "sound", "danger", "multiplier", "combo",
+			"max_combo", "timer", "time_bar", "drain_rate", "time_bonus",
+			"blocked", "next_label", "next", "then_label", "then",
+		]
+		for region_name: String in region_names:
+			var rect: Rect2 = layout[region_name] as Rect2
+			assert_true(
+				safe.encloses(rect),
+				"%dx%d %s stays inside safe area (%s / %s)" % [
+					roundi(output.x), output.y, region_name, str(rect), str(safe)
+				]
+			)
+		_assert_layout_rects_do_not_overlap(layout, region_names, output)
+		var board_top: float = logical.y * 0.5 - 480.0
+		var board_bottom: float = logical.y * 0.5 + 480.0
+		assert_true(
+			(layout["time_bar"] as Rect2).end.y < board_top,
+			"%dx%d top HUD stays above board" % [roundi(output.x), roundi(output.y)]
+		)
+		assert_true(
+			(layout["preview_shelf"] as Rect2).position.y > board_bottom,
+			"%dx%d preview shelf stays below board" % [roundi(output.x), roundi(output.y)]
+		)
+
+
+func test_hud_theme_fonts_panel_tokens_and_extreme_values_fit() -> void:
+	var total_font_bytes: int = 0
+	for path: String in FONT_PATHS:
+		assert_true(FileAccess.file_exists(path), "%s exists" % path)
+		total_font_bytes += FileAccess.get_file_as_bytes(path).size()
+	assert_true(total_font_bytes <= 3 * 1024 * 1024, "font bundle stays within 3 MiB")
+	assert_true(
+		HUD_THEME.get_color(&"text_primary", &"GravityOrb").is_equal_approx(
+			Color("#E8EEFF")
+		),
+		"primary text token"
+	)
+	assert_true(
+		HUD_THEME.get_color(&"danger", &"GravityOrb").is_equal_approx(
+			Color("#FF3B30")
+		),
+		"danger token"
+	)
+	var panel_style: StyleBoxFlat = HUD_THEME.get_stylebox(
+		&"panel", &"HudPanel"
+	) as StyleBoxFlat
+	assert_true(panel_style != null, "shared HUD panel style exists")
+	assert_eq(panel_style.corner_radius_top_left, 12, "HUD panel radius")
+	assert_eq(panel_style.border_width_left, 2, "HUD panel border")
+
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var main: Main = await _create_blitz_main()
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	var score: Label = main.get_node("UI/Hud/ScoreLabel") as Label
+	var timer: Label = main.get_node("UI/Hud/TimerLabel") as Label
+	var time_track: Panel = main.get_node("UI/Hud/TimeBarTrack") as Panel
+	var time_fill: ColorRect = main.get_node("UI/Hud/TimeBarFill") as ColorRect
+	var spawner: Spawner = main.get_node("Spawner") as Spawner
+	hud._set_displayed_score(9_999_999)
+	hud._on_time_changed(45.0)
+	spawner.sync_blitz_next_batch_size(8)
+	await tree.process_frame
+	assert_eq(score.text, "SCORE\n9999999", "seven-digit score text")
+	var score_font_size: int = score.get_theme_font_size("font_size")
+	assert_true(score_font_size >= Hud.SCORE_FONT_MIN, "score respects minimum font size")
+	assert_true(
+		7.0 * float(score_font_size) * Hud.SCORE_DIGIT_WIDTH_FACTOR <= score.size.x,
+		"9,999,999 estimate fits score panel"
+	)
+	assert_eq(timer.text, "45.0", "45-second timer text")
+	assert_near(
+		time_fill.size.x,
+		time_track.size.x - Hud.TIME_BAR_INSET * 2.0,
+		0.01,
+		"45 seconds fills the complete time bar"
+	)
+	var next_count: Label = main.get_node("UI/Hud/NextCountLabel") as Label
+	assert_eq(next_count.text, "×8", "NEXT eight-count text")
+	assert_true(next_count.get_global_rect().size.x >= 80.0, "NEXT count is not clipped")
+	assert_true(
+		score.get_theme_font("font").resource_path.ends_with("Orbitron-Bold.ttf"),
+		"score uses bundled Orbitron bold"
+	)
 	await _destroy_main(main)
 	Config.data.game_mode = original_mode
 
@@ -109,7 +217,7 @@ func test_turn_blocked_label_only_shows_for_blocked_directions() -> void:
 	Config.data.game_mode = original_mode
 
 
-func test_then_count_is_readable_and_clear_of_board_top() -> void:
+func test_then_count_is_readable_and_contained_in_lower_preview_shelf() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_ramp: int = Config.data.spawn_count_ramp_turns
 	var original_max: int = Config.data.spawn_count_max
@@ -122,6 +230,7 @@ func test_then_count_is_readable_and_clear_of_board_top() -> void:
 	var next_count: Label = main.get_node("UI/Hud/NextCountLabel") as Label
 	var then_count: Label = main.get_node("UI/Hud/ThenCountLabel") as Label
 	var then_region: Control = main.get_node("UI/Hud/ThenPreviewRegion") as Control
+	var preview_shelf: PanelContainer = main.get_node("UI/Hud/PreviewShelf") as PanelContainer
 	assert_true(then_count.visible, "THEN count is visible for six orbs")
 	assert_eq(next_count.text, "×6", "NEXT count follows selected ramp")
 	assert_eq(then_count.text, "×6", "THEN count follows selected ramp")
@@ -131,8 +240,8 @@ func test_then_count_is_readable_and_clear_of_board_top() -> void:
 		"THEN count font is at least 80 percent of NEXT"
 	)
 	assert_true(
-		then_region.get_global_rect().end.y <= 480.0 - 8.0,
-		"THEN region keeps at least eight pixels above board top"
+		preview_shelf.get_global_rect().encloses(then_region.get_global_rect()),
+		"THEN region stays inside the lower preview shelf"
 	)
 	await _destroy_main(main)
 	Config.data.game_mode = original_mode
@@ -140,7 +249,7 @@ func test_then_count_is_readable_and_clear_of_board_top() -> void:
 	Config.data.spawn_count_max = original_max
 
 
-func _assert_regions_do_not_overlap(regions: Dictionary, output_size: Vector2) -> void:
+func _assert_regions_do_not_overlap(regions: Dictionary, output_label: String) -> void:
 	var names: Array = regions.keys()
 	for first_index: int in range(names.size()):
 		for second_index: int in range(first_index + 1, names.size()):
@@ -148,8 +257,33 @@ func _assert_regions_do_not_overlap(regions: Dictionary, output_size: Vector2) -
 			var second_name: String = str(names[second_index])
 			var first_control: Control = regions[first_name] as Control
 			var second_control: Control = regions[second_name] as Control
-			var first_rect: Rect2 = _scaled_rect(first_control, output_size)
-			var second_rect: Rect2 = _scaled_rect(second_control, output_size)
+			if not first_control.visible or not second_control.visible:
+				continue
+			var first_rect: Rect2 = first_control.get_global_rect()
+			var second_rect: Rect2 = second_control.get_global_rect()
+			assert_true(
+				not first_rect.intersects(second_rect),
+				"%s %s %s do not overlap (%s / %s)" % [
+					output_label,
+					first_name,
+					second_name,
+					str(first_rect),
+					str(second_rect),
+				]
+			)
+
+
+func _assert_layout_rects_do_not_overlap(
+	layout: Dictionary,
+	region_names: Array[String],
+	output_size: Vector2
+) -> void:
+	for first_index: int in range(region_names.size()):
+		for second_index: int in range(first_index + 1, region_names.size()):
+			var first_name: String = region_names[first_index]
+			var second_name: String = region_names[second_index]
+			var first_rect: Rect2 = layout[first_name] as Rect2
+			var second_rect: Rect2 = layout[second_name] as Rect2
 			assert_true(
 				not first_rect.intersects(second_rect),
 				"%dx%d %s %s do not overlap (%s / %s)" % [
@@ -161,12 +295,6 @@ func _assert_regions_do_not_overlap(regions: Dictionary, output_size: Vector2) -
 					str(second_rect),
 				]
 			)
-
-
-func _scaled_rect(control: Control, output_size: Vector2) -> Rect2:
-	var logical_rect: Rect2 = control.get_global_rect()
-	var output_scale: Vector2 = output_size / BASE_VIEWPORT_SIZE
-	return Rect2(logical_rect.position * output_scale, logical_rect.size * output_scale)
 
 
 func _create_blitz_main() -> Main:

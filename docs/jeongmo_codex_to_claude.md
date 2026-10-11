@@ -38,6 +38,43 @@
 
 ## 미확인
 
+### [2026-10-11] 대상 #66 — 비주얼 V3-1 글꼴·테마·HUD
+- 상태: 완료 — Orbitron/Noto Sans KR 서브셋과 공통 Theme을 동봉하고, HUD를 두 세로 비율의 안전 영역에 맞게 재배치했으며 점수 연출·벡터 소리 아이콘·문양 기본 끔을 구현함
+- 브랜치 / PR: `v3-font-theme-hud` / PR 미생성 (push까지 요청)
+- 변경 파일: `assets/fonts/{Orbitron-Medium.ttf,Orbitron-Bold.ttf,NotoSansKR-Regular-KSX1001.ttf,NotoSansKR-Medium-KSX1001.ttf,OFL.txt,SOURCE.md}`, `assets/ui/{gravity_orb_theme.tres,speaker_on.svg,speaker_off.svg}`, `config/{GameConfig.gd,default_config.tres}`, `project.godot`, `scenes/UI.tscn`, `scripts/ui/{Hud.gd,ScorePopup.gd}`, `tests/{capture_screens.ps1,test_config.gd,test_frontend.gd,test_orb_symbols.gd,test_score_popups.gd,test_screen_layout.gd}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] Orbitron 500·700과 Noto Sans KR 400·500을 OFL 1.1과 출처 고정 커밋 기록과 함께 동봉 — 자동 (`test_hud_theme_fonts_panel_tokens_and_extreme_values_fit`), TTF 합계 `1,030,940바이트` (`<3MB`), Noto 두 파일 각각 KS X 1001 한글 `2,350자`
+  - [x] 텍스트·보조·하늘색·호박색·위험·시간·FEVER 토큰과 반투명 남색/하늘색 2px/12px 둥근 패널을 단일 `Theme`에 정의하고 HUD·점수 팝업에 적용 — 자동 + 캡처 직접 확인
+  - [x] 위쪽 점수/BEST/벡터 소리 아이콘, 배수·콤보·DANGER, BLITZ 45초 타이머/막대와 아래쪽 NEXT/THEN/BLOCKED 선반으로 재배치 — 자동 (`test_busy_blitz_hud_regions_do_not_overlap_at_supported_sizes`, `test_hud_layout_stays_in_safe_area_and_clear_of_board_at_both_ratios`) + 캡처 직접 확인
+  - [x] `window/stretch/aspect="expand"`, 논리 안전 영역 기반 HUD 배치, 가운데 같은 크기 보드로 `540×960`과 `540×1170` 지원 — 자동 배치 검사 + 두 비율 렌더 확인
+  - [x] 점수를 `0.30초` 동안 증가시키고 큰 득점/×8에서 점수 튐, BEST 경신 때 색·크기 반짝임 — 자동 (`test_score_rolls_to_target_in_three_tenths_of_a_second`, `test_new_best_flashes_and_large_multiplier_punches_score`)
+  - [x] `orb_symbols_enabled` 기본값을 `false`로 바꾸고 게임판·NEXT/THEN의 문양 숨김 및 명시적으로 켜는 기존 경로를 모두 테스트 — 자동 (`test_disabled_config_hides_2d_and_3d_symbols`, 기존 문양 켬 테스트 5건)
+  - [x] 규칙·밸런스·물리·V1 구슬 그림·V2 배경/보드·시작/결과/랭킹 구조는 변경하지 않고 물리 해시 유지 — 전체 회귀 + 해시 비교
+- 캡처 관측 (Standard/Compatibility):
+  - `tests/capture_screens.ps1` → 종료 코드 0, 기본 `540×960` 18장 + 긴 `540×1170` 요구 장면 `02`·`03`·`06`·`07`·`12`·`13`·`17`·`18` 8장, 합계 `26장`
+  - 두 비율에서 점수·BEST `9,999,999`, BLITZ 타이머 `45.0`, 시간 막대, NEXT `×8`, THEN `×6`, DANGER `×4`, BLOCKED 패널이 잘리지 않고 보드와 겹치지 않음을 직접 확인
+  - 긴 화면에서 배경이 `540×1170` 전체를 채우고 보드는 기본 비율과 같은 가로 크기를 유지하며, 추가 높이는 위 HUD/보드/아래 선반 사이 여백으로 배분됨
+  - FEVER 띠의 반응형 크기 적용 중 양쪽 grow 방향 때문에 X가 `-540`으로 밀리던 결함을 발견해 크기→위치 순으로 적용하도록 수정; 최종 두 비율 X `0.0`, 논리 폭 `1080.0`
+- 성능 관측 (RTX 4070 Ti SUPER, Compatibility, VSync 끔, 164.836Hz, BLITZ 시드 101~104):
+  - 프레임 `17,749`, p50/p95/p99/최대 `1.475/2.603/3.751/13.702ms`, `>16.7ms` 0, `>33.3ms` 0
+  - 드로콜 p50/p95/최대 `411/433/447`; 입력 `120/120` 수락·유실 `0`; 입력 수락 p95 `23.468ms`, 수락→생성 p95 `1.968ms`
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` → 일반 `273/273`(`13.046초`), 장기 `5/5`(`38.518초`), 성능 `5/5`(`2.688초`), 합계 `283/283`, 종료 코드 0, 총 `54.252초`
+  - 물리 상태 해시: TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`; #64·#65와 동일
+  - 시작 화면 / TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 전역 난수 호출 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. `tests/capture_screens.ps1` 실행 후 두 비율 폴더의 `02`·`03`·`06`·`07`·`12`·`13`·`17`·`18` 확인 → 위 HUD와 아래 선반이 화면 밖/보드 안으로 침범하지 않고, 긴 화면의 배경이 빈 띠 없이 채워져야 한다.
+  2. `03_turn_combo.png` 확인 → `SCORE 9999999`, `BEST 9999999`, `×8`, `COMBO 4`가 잘리지 않아야 한다. 실제 플레이에서 큰 점수 증가 시 숫자가 0.3초에 걸쳐 오르고 패널이 튀며 새 BEST가 잠깐 하늘색으로 반짝여야 한다.
+  3. `06_blitz_fever_chain.png` 확인 → `45.0`과 초록 시간 막대, `FEVER ×2` 띠가 가로 전체에서 잘리지 않아야 한다. `07`에서는 `DANGER ×4`, 빨강 테두리, NEXT `×8`을 확인한다.
+  4. 기본 설정으로 게임판과 NEXT/THEN 천체 안에 색각 문양이 없어야 한다. 테스트용으로 `Config.data.orb_symbols_enabled = true`를 지정하면 게임판과 미리보기 문양이 다시 나타나야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 긴 비율 캡처는 명세에 지정된 HUD 8장만 생성·검증하는 `--capture-hud-scenes-only` 인자를 추가해, 화면비에 무관한 도감·근접 화소 검사가 긴 프레이밍 때문에 실패하지 않도록 분리했다.
+  - 캡처 긴 비율 종료 때 `ObjectDB instances leaked at exit (2 instances)` 경고 1회, 창 성능 시드 102·104 종료 때 각각 3개·2개 경고가 있었으나 모든 종료 코드는 0이고 `SCRIPT ERROR`·`Parse Error`는 0건이었다.
+  - PNG·JSON은 기존 ignore 대상 검수 산출물이며 커밋에 포함하지 않는다.
+- 남은 것 · 질문: 없음
+
 ### [2026-10-11] 대상 #65 — 테스트·성능 측정 안정화
 - 상태: 완료 — 턴 시간 상한 검사를 장기 묶음의 별도 Godot 프로세스로 분리하고, 근접 탐색 성능 기준과 BLITZ 창 측정 환경 보고를 명세대로 안정화함
 - 브랜치 / PR: `v2-test-measurement-stability` / [PR #67](https://github.com/jeongmo-dot/gravity_orb/pull/67)
