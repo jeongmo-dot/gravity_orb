@@ -39,8 +39,8 @@ func test_v3_screen_layout_safe_area_touch_targets_and_extreme_content() -> void
 		var output: Vector2 = viewport_case["output"] as Vector2
 		var layout: Dictionary = StartScreen.layout_for_viewport(logical)
 		for region_name: String in [
-			"gravity", "orb", "subtitle", "blitz", "classic", "ranking", "sound",
-			"settings",
+			"hero", "gravity", "orb", "subtitle", "blitz", "classic", "ranking",
+			"sound", "settings",
 		]:
 			assert_true(
 				safe.encloses(layout[region_name] as Rect2),
@@ -49,6 +49,27 @@ func test_v3_screen_layout_safe_area_touch_targets_and_extreme_content() -> void
 		assert_true(
 			not (layout["blitz"] as Rect2).intersects(layout["classic"] as Rect2),
 			"%dx%d mode cards do not overlap" % [output.x, output.y]
+		)
+		var hero_rect: Rect2 = layout["hero"] as Rect2
+		var orbit_sweep: Rect2 = layout["orbiter_sweep"] as Rect2
+		var gravity_rect: Rect2 = layout["gravity"] as Rect2
+		assert_true(
+			hero_rect.end.y + 16.0 <= gravity_rect.position.y,
+			"%dx%d hero stays at least 16 logical pixels above logo" % [output.x, output.y]
+		)
+		assert_true(
+			orbit_sweep.end.y <= gravity_rect.position.y,
+			"%dx%d orbiters stay behind and clear of logo for a full orbit" % [output.x, output.y]
+		)
+		var logo_end: float = (layout["subtitle"] as Rect2).end.y
+		var card_top: float = (layout["blitz"] as Rect2).position.y
+		var card_end: float = (layout["blitz"] as Rect2).end.y
+		var icon_top: float = (layout["ranking"] as Rect2).position.y
+		var logo_card_gap: float = card_top - logo_end
+		var card_icon_gap: float = icon_top - card_end
+		assert_true(
+			maxf(logo_card_gap, card_icon_gap) / minf(logo_card_gap, card_icon_gap) <= 1.5,
+			"%dx%d start-screen group gaps differ by at most 1.5x" % [output.x, output.y]
 		)
 		for touch_name: String in ["blitz", "classic", "ranking", "sound", "settings"]:
 			var touch_rect: Rect2 = layout[touch_name] as Rect2
@@ -62,6 +83,18 @@ func test_v3_screen_layout_safe_area_touch_targets_and_extreme_content() -> void
 		var setup: Dictionary = await _create_menu_main_in_viewport(logical)
 		var main: Main = setup["main"] as Main
 		var ui: DebugHud = main.get_node("UI") as DebugHud
+		var stage: OrbitStage = ui.start_screen().get_node("Content/OrbitStage") as OrbitStage
+		assert_true(stage.uses_celestial_shader(), "start hero uses V1 celestial shader")
+		for icon_button_path: String in [
+			"Content/StartRankingButton",
+			"Content/StartSoundButton",
+			"Content/StartSettingsButton",
+		]:
+			var icon_button: Button = ui.start_screen().get_node(icon_button_path) as Button
+			var icon_style: StyleBoxFlat = icon_button.get_theme_stylebox("normal") as StyleBoxFlat
+			assert_true(icon_style != null, "%s uses themed panel style" % icon_button_path)
+			if icon_style != null:
+				assert_eq(icon_style.corner_radius_top_left, 12, "icon panel uses 12px corners")
 		ui.show_ranking(GameConfig.GameMode.BLITZ, 1)
 		await tree.create_timer(0.30).timeout
 		var ranking: RankingPanel = ui.ranking_panel()
@@ -81,6 +114,34 @@ func test_v3_screen_layout_safe_area_touch_targets_and_extreme_content() -> void
 			"%dx%d all ten ranking rows fit" % [output.x, output.y]
 		)
 		assert_eq(first_score.text, "9,999,999", "extreme ranking score uses commas")
+		var score_font: FontVariation = first_score.get_theme_font("font") as FontVariation
+		assert_true(score_font != null, "ranking score uses Orbitron")
+		var ranking_title: Label = ranking.get_node("Panel/Content/Title") as Label
+		var ranking_close: Button = ranking.get_node("Panel/Content/RankingCloseButton") as Button
+		assert_true(
+			ranking_title.get_global_rect().position.y - ranking_body.get_global_rect().position.y <= 40.0,
+			"%dx%d ranking top inner padding is at most 40" % [output.x, output.y]
+		)
+		assert_true(
+			ranking_body.get_global_rect().end.y - ranking_close.get_global_rect().end.y <= 40.0,
+			"%dx%d ranking bottom inner padding is at most 40" % [output.x, output.y]
+		)
+		var selected_tab: Button = ranking.get_node(
+			"Panel/Content/Tabs/RankingBlitzTab"
+		) as Button
+		var selected_tab_style: StyleBoxFlat = selected_tab.get_theme_stylebox(
+			"pressed"
+		) as StyleBoxFlat
+		assert_true(
+			selected_tab_style.bg_color.is_equal_approx(Color("#BFE9FF")),
+			"selected ranking tab uses cyan fill"
+		)
+		assert_true(
+			selected_tab.get_theme_color("font_pressed_color").is_equal_approx(
+				Color(0.015, 0.05, 0.09, 1.0)
+			),
+			"selected ranking tab uses navy text"
+		)
 		(ranking.get_node("Panel/Content/RankingCloseButton") as Button).pressed.emit()
 		await tree.create_timer(0.30).timeout
 		ui.show_settings()

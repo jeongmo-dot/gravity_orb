@@ -15,9 +15,14 @@ const LEVEL_NAMES_KO: Array[String] = [
 @onready var _score_label: Label = %GameOverScore
 @onready var _best_label: Label = %GameOverBest
 @onready var _survived_time_label: Label = %SurvivedTimeLabel
+@onready var _survived_time_value: Label = %SurvivedTimeValue
 @onready var _max_combo_label: Label = %GameOverMaxCombo
+@onready var _max_combo_value: Label = %GameOverMaxComboValue
 @onready var _blocked_label: Label = %GameOverBlocked
+@onready var _blocked_value: Label = %GameOverBlockedValue
 @onready var _extra_label: Label = %ResultExtraLabel
+@onready var _extra_value: Label = %ResultExtraValue
+@onready var _ranking_result_badge: PanelContainer = %RankingResultBadge
 @onready var _ranking_result_label: Label = %RankingResultLabel
 @onready var _restart_button: Button = %RestartButton
 @onready var _ranking_button: Button = %ResultRankingButton
@@ -51,6 +56,7 @@ func _on_game_over() -> void:
 	_set_stat_text(blitz_mode)
 	var ranking: Dictionary = _game_manager.game_over_details.get("ranking", {}) as Dictionary
 	var rank: int = int(ranking.get("rank", 0))
+	_ranking_result_badge.visible = rank > 0
 	_ranking_result_label.visible = rank > 0
 	_ranking_result_label.text = "최고 기록!" if rank == 1 else "새 기록 · %d위" % rank
 	_best_label.visible = rank <= 0
@@ -71,13 +77,13 @@ func _on_game_over() -> void:
 	score_tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	score_tween.tween_method(_set_animated_score, 0, _score_manager.score, SCORE_ANIMATION_SECONDS)
 	if rank > 0:
-		_ranking_result_label.scale = Vector2(0.72, 0.72)
-		_ranking_result_label.pivot_offset = _ranking_result_label.size * 0.5
-		var badge_tween: Tween = _ranking_result_label.create_tween()
+		_ranking_result_badge.scale = Vector2(0.72, 0.72)
+		_ranking_result_badge.pivot_offset = _ranking_result_badge.size * 0.5
+		var badge_tween: Tween = _ranking_result_badge.create_tween()
 		badge_tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		badge_tween.tween_interval(SCORE_ANIMATION_SECONDS)
 		badge_tween.tween_property(
-			_ranking_result_label,
+			_ranking_result_badge,
 			"scale",
 			Vector2.ONE,
 			PANEL_ANIMATION_SECONDS
@@ -88,25 +94,42 @@ func _on_game_over() -> void:
 
 func _set_stat_text(blitz_mode: bool) -> void:
 	if blitz_mode:
-		_survived_time_label.text = "버틴 시간\n%s" % _format_survived_time(
+		_survived_time_label.text = "버틴 시간"
+		_survived_time_value.text = _format_survived_time(
 			float(_game_manager.game_over_details.get(
 				"survived_time", _game_manager.play_time_elapsed
 			))
 		)
-		_max_combo_label.text = "최대 체인\n%d" % _game_manager.max_combo
-		_blocked_label.text = "블라스트\n%d" % _game_manager.blast_count
-		_extra_label.text = "피버\n%d" % _game_manager.fever_count
+		_survived_time_value.add_theme_color_override("font_color", Color("#30D16F"))
+		_max_combo_label.text = "최대 체인"
+		_max_combo_value.text = str(_game_manager.max_combo)
+		_blocked_label.text = "대폭발"
+		_blocked_value.text = str(_game_manager.blast_count)
+		_extra_label.text = "피버"
+		_extra_value.text = str(_game_manager.fever_count)
 	else:
 		var level: int = clampi(_score_manager.max_level_reached, 0, LEVEL_NAMES_KO.size() - 1)
-		_survived_time_label.text = "턴 수\n%d" % _game_manager.turn_index
-		_max_combo_label.text = "최대 콤보\n%d" % _game_manager.max_combo
-		_blocked_label.text = "최고 천체\nL%d %s" % [level, LEVEL_NAMES_KO[level]]
+		_survived_time_label.text = "턴 수"
+		_survived_time_value.text = str(_game_manager.turn_index)
+		_survived_time_value.add_theme_color_override("font_color", Color("#E8EEFF"))
+		_max_combo_label.text = "최대 콤보"
+		_max_combo_value.text = str(_game_manager.max_combo)
+		_blocked_label.text = "최고 천체"
+		_blocked_value.text = "L%d %s" % [level, LEVEL_NAMES_KO[level]]
 		var blocked_direction: Vector2i = _game_manager.game_over_details.get(
 			"direction", _game_manager.gravity
 		) as Vector2i
-		_extra_label.text = "막힌 방향\n%s" % OrbTypes.dir_name(blocked_direction)
+		_extra_label.text = "막힌 방향"
+		_extra_value.text = OrbTypes.dir_name(blocked_direction)
 	for label: Label in [
-		_survived_time_label, _max_combo_label, _blocked_label, _extra_label
+		_survived_time_label,
+		_survived_time_value,
+		_max_combo_label,
+		_max_combo_value,
+		_blocked_label,
+		_blocked_value,
+		_extra_label,
+		_extra_value,
 	]:
 		label.visible = true
 

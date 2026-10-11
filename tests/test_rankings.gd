@@ -308,13 +308,24 @@ func test_result_panel_rank_messages_buttons_and_ranking_highlight() -> void:
 	var manager: BlitzManager = main.get_node("BlitzManager") as BlitzManager
 	manager.set_physics_process(false)
 	var panel: GameOverPanel = main.get_node("UI/Hud/GameOverPanel") as GameOverPanel
-	var rank_label: Label = panel.get_node("Margin/Content/RankingResultLabel") as Label
+	var rank_badge: PanelContainer = panel.get_node("Margin/Content/RankingResultBadge") as PanelContainer
+	var rank_label: Label = rank_badge.get_node("RankingResultLabel") as Label
 	var ranking_button: Button = panel.get_node("Margin/Content/ResultRankingButton") as Button
+	var blast_label: Label = panel.get_node("Margin/Content/GameOverBlocked") as Label
+	var survived_value: Label = panel.get_node("Margin/Content/SurvivedTimeValue") as Label
 	manager.game_over_details = {"ranking": {"rank": 1, "record": {}}}
 	manager.game_over.emit()
 	await tree.create_timer(0.30).timeout
 	assert_eq(rank_label.text, "최고 기록!", "first place message")
 	assert_true(rank_label.visible, "ranked result message visible")
+	assert_true(rank_badge.visible, "ranked result uses a visible badge panel")
+	var badge_style: StyleBoxFlat = rank_badge.get_theme_stylebox("panel") as StyleBoxFlat
+	assert_true(badge_style.border_color.is_equal_approx(Color("#FFB020")), "rank badge is amber")
+	assert_eq(blast_label.text, "대폭발", "BLITZ result uses the game term 대폭발")
+	assert_true(
+		survived_value.get_theme_color("font_color").is_equal_approx(Color("#30D16F")),
+		"only BLITZ survived time value is green"
+	)
 	manager.game_over_details = {"ranking": {"rank": 4, "record": {}}}
 	manager.game_over.emit()
 	await tree.create_timer(0.30).timeout
@@ -396,10 +407,15 @@ func _assert_mode_selection_styles_match(
 		!= ranking_selected.get_theme_color("font_pressed_color"),
 		"BLITZ card keeps amber while ranking tab uses cyan"
 	)
-	assert_eq(
-		start_unselected.get_theme_color("font_color"),
-		ranking_unselected.get_theme_color("font_color"),
-		"unselected mode text color is shared"
+	var start_blitz_name: Label = start.get_node("Content/BlitzNameLabel") as Label
+	var start_classic_name: Label = start.get_node("Content/ClassicNameLabel") as Label
+	assert_true(
+		start_blitz_name.get_theme_color("font_color").is_equal_approx(Color("#FFB020")),
+		"BLITZ name remains amber"
+	)
+	assert_true(
+		start_classic_name.get_theme_color("font_color").is_equal_approx(Color("#BFE9FF")),
+		"unselected CLASSIC name remains cyan instead of looking disabled"
 	)
 	var selected_style: StyleBoxFlat = start_selected.get_theme_stylebox(
 		"pressed"
@@ -433,9 +449,10 @@ func _assert_mode_selection_styles_match(
 		"BLITZ selected text is amber"
 	)
 	assert_true(
-		ranking_selected.get_theme_color("font_pressed_color").b
-		> ranking_selected.get_theme_color("font_pressed_color").r,
-		"ranking selected text is cyan"
+		ranking_selected.get_theme_color("font_pressed_color").is_equal_approx(
+			Color(0.015, 0.05, 0.09, 1.0)
+		),
+		"ranking selected text is navy on cyan fill"
 	)
 
 

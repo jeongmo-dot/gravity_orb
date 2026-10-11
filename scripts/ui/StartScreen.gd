@@ -16,6 +16,12 @@ const SPEAKER_OFF: Texture2D = preload("res://assets/ui/speaker_off.svg")
 @onready var _subtitle_label: Label = $Content/Prompt
 @onready var _blitz_button: Button = %BlitzButton
 @onready var _classic_button: Button = %ClassicButton
+@onready var _blitz_icon: TextureRect = %BlitzIcon
+@onready var _classic_icon: TextureRect = %ClassicIcon
+@onready var _blitz_name_label: Label = %BlitzNameLabel
+@onready var _classic_name_label: Label = %ClassicNameLabel
+@onready var _blitz_description_label: Label = %BlitzDescriptionLabel
+@onready var _classic_description_label: Label = %ClassicDescriptionLabel
 @onready var _blitz_best_label: Label = %BlitzBestLabel
 @onready var _classic_best_label: Label = %ClassicBestLabel
 @onready var _ranking_button: Button = %StartRankingButton
@@ -53,8 +59,8 @@ func _ready() -> void:
 
 func bind(save_path: String, sfx_bank: SfxBank) -> void:
 	_sfx_bank = sfx_bank
-	_blitz_button.text = "BLITZ\n시간 버티기"
-	_classic_button.text = "CLASSIC\n턴제 퍼즐"
+	_blitz_button.tooltip_text = "BLITZ — 시간 버티기"
+	_classic_button.tooltip_text = "CLASSIC — 턴제 퍼즐"
 	_blitz_best_label.text = _best_text(
 		SaveStore.load_best_score(save_path, GameConfig.GameMode.BLITZ)
 	)
@@ -93,19 +99,42 @@ static func layout_for_viewport(viewport_size: Vector2) -> Dictionary:
 	var side: float = 72.0 * scale_factor
 	var gap: float = 28.0 * scale_factor
 	var card_width: float = (width - side * 2.0 - gap) * 0.5
-	var card_y: float = 780.0 * scale_factor + extra_height * 0.36
-	var card_height: float = 350.0 * scale_factor
-	var bottom_y: float = height - 170.0 * scale_factor
-	var icon_size: float = 104.0 * scale_factor
+	var card_y: float = 845.0 * scale_factor + extra_height * 0.48
+	var card_height: float = 480.0 * scale_factor
+	var bottom_y: float = 1420.0 * scale_factor + extra_height * 0.76
+	var icon_size: float = 112.0 * scale_factor
+	var orbit_rect: Rect2 = Rect2(
+		0.0,
+		130.0 * scale_factor + extra_height * 0.10,
+		width,
+		345.0 * scale_factor
+	)
+	var hero_size: float = OrbitStage.HERO_DIAMETER * scale_factor
+	var hero_rect: Rect2 = Rect2(
+		orbit_rect.get_center() - Vector2.ONE * hero_size * 0.5,
+		Vector2.ONE * hero_size
+	)
+	var card_icon_size: float = 100.0 * scale_factor
 	return {
-		"orbit": Rect2(0.0, 75.0 * scale_factor + extra_height * 0.04, width, 520.0 * scale_factor),
-		"gravity": Rect2(side, 355.0 * scale_factor + extra_height * 0.10, width - side * 2.0, 112.0 * scale_factor),
-		"orb": Rect2(side, 450.0 * scale_factor + extra_height * 0.10, width - side * 2.0, 112.0 * scale_factor),
-		"subtitle": Rect2(side, 575.0 * scale_factor + extra_height * 0.14, width - side * 2.0, 60.0 * scale_factor),
+		"orbit": orbit_rect,
+		"hero": hero_rect,
+		"orbiter_sweep": Rect2(
+			orbit_rect.get_center() - Vector2(280.0, 146.0) * scale_factor,
+			Vector2(560.0, 292.0) * scale_factor
+		),
+		"gravity": Rect2(side, 500.0 * scale_factor + extra_height * 0.18, width - side * 2.0, 92.0 * scale_factor),
+		"orb": Rect2(side, 600.0 * scale_factor + extra_height * 0.18, width - side * 2.0, 92.0 * scale_factor),
+		"subtitle": Rect2(side, 700.0 * scale_factor + extra_height * 0.18, width - side * 2.0, 52.0 * scale_factor),
 		"blitz": Rect2(side, card_y, card_width, card_height),
 		"classic": Rect2(side + card_width + gap, card_y, card_width, card_height),
-		"blitz_best": Rect2(side + 20.0 * scale_factor, card_y + card_height - 76.0 * scale_factor, card_width - 40.0 * scale_factor, 48.0 * scale_factor),
-		"classic_best": Rect2(side + card_width + gap + 20.0 * scale_factor, card_y + card_height - 76.0 * scale_factor, card_width - 40.0 * scale_factor, 48.0 * scale_factor),
+		"blitz_icon": Rect2(side + (card_width - card_icon_size) * 0.5, card_y + 42.0 * scale_factor, card_icon_size, card_icon_size),
+		"classic_icon": Rect2(side + card_width + gap + (card_width - card_icon_size) * 0.5, card_y + 42.0 * scale_factor, card_icon_size, card_icon_size),
+		"blitz_name": Rect2(side + 18.0 * scale_factor, card_y + 158.0 * scale_factor, card_width - 36.0 * scale_factor, 66.0 * scale_factor),
+		"classic_name": Rect2(side + card_width + gap + 18.0 * scale_factor, card_y + 158.0 * scale_factor, card_width - 36.0 * scale_factor, 66.0 * scale_factor),
+		"blitz_description": Rect2(side + 18.0 * scale_factor, card_y + 230.0 * scale_factor, card_width - 36.0 * scale_factor, 48.0 * scale_factor),
+		"classic_description": Rect2(side + card_width + gap + 18.0 * scale_factor, card_y + 230.0 * scale_factor, card_width - 36.0 * scale_factor, 48.0 * scale_factor),
+		"blitz_best": Rect2(side + 20.0 * scale_factor, card_y + card_height - 92.0 * scale_factor, card_width - 40.0 * scale_factor, 54.0 * scale_factor),
+		"classic_best": Rect2(side + card_width + gap + 20.0 * scale_factor, card_y + card_height - 92.0 * scale_factor, card_width - 40.0 * scale_factor, 54.0 * scale_factor),
 		"ranking": Rect2(width * 0.5 - icon_size * 1.75, bottom_y, icon_size, icon_size),
 		"sound": Rect2(width * 0.5 - icon_size * 0.5, bottom_y, icon_size, icon_size),
 		"settings": Rect2(width * 0.5 + icon_size * 0.75, bottom_y, icon_size, icon_size),
@@ -120,6 +149,12 @@ func _apply_layout() -> void:
 	_set_rect(_subtitle_label, layout["subtitle"] as Rect2)
 	_set_rect(_blitz_button, layout["blitz"] as Rect2)
 	_set_rect(_classic_button, layout["classic"] as Rect2)
+	_set_rect(_blitz_icon, layout["blitz_icon"] as Rect2)
+	_set_rect(_classic_icon, layout["classic_icon"] as Rect2)
+	_set_rect(_blitz_name_label, layout["blitz_name"] as Rect2)
+	_set_rect(_classic_name_label, layout["classic_name"] as Rect2)
+	_set_rect(_blitz_description_label, layout["blitz_description"] as Rect2)
+	_set_rect(_classic_description_label, layout["classic_description"] as Rect2)
 	_set_rect(_blitz_best_label, layout["blitz_best"] as Rect2)
 	_set_rect(_classic_best_label, layout["classic_best"] as Rect2)
 	_set_rect(_ranking_button, layout["ranking"] as Rect2)

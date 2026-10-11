@@ -19,11 +19,24 @@ func test_start_screen_shows_records_last_mode_and_touch_targets() -> void:
 	var sound_button: Button = start_screen.get_node("Content/StartSoundButton") as Button
 	var blitz_best: Label = start_screen.get_node("Content/BlitzBestLabel") as Label
 	var classic_best: Label = start_screen.get_node("Content/ClassicBestLabel") as Label
+	var blitz_name: Label = start_screen.get_node("Content/BlitzNameLabel") as Label
+	var classic_name: Label = start_screen.get_node("Content/ClassicNameLabel") as Label
+	var blitz_description: Label = start_screen.get_node("Content/BlitzDescriptionLabel") as Label
 	assert_true(start_screen.visible, "start screen is shown without --mode")
 	assert_true(not hud.visible, "game HUD stays hidden on start screen")
 	assert_eq(blitz_best.text, "BEST 6,789", "survival BLITZ record text")
 	assert_eq(classic_best.text, "BEST 1,234", "CLASSIC record text")
-	assert_eq(blitz_button.text, "BLITZ\n시간 버티기", "survival subtitle")
+	assert_eq(blitz_name.text, "BLITZ", "BLITZ name is separate from description")
+	assert_eq(classic_name.text, "CLASSIC", "CLASSIC name is separate from description")
+	assert_eq(blitz_description.text, "시간 버티기", "survival subtitle")
+	assert_true(
+		blitz_name.get_theme_color("font_color").is_equal_approx(Color("#FFB020")),
+		"BLITZ name stays amber even when not selected"
+	)
+	assert_true(
+		classic_name.get_theme_color("font_color").is_equal_approx(Color("#BFE9FF")),
+		"CLASSIC name stays cyan even when not selected"
+	)
 	assert_true(blitz_button.button_pressed, "last BLITZ mode is highlighted")
 	assert_true(not classic_button.button_pressed, "other mode is not highlighted")
 	assert_true(blitz_button.size.y >= 120.0, "BLITZ touch target height")
@@ -231,14 +244,15 @@ func test_settings_symbol_toggle_saves_and_updates_orbit_stage_immediately() -> 
 	var settings: SettingsPanel = main.get_node("UI/SettingsPanel") as SettingsPanel
 	assert_true(settings.visible, "settings opens over the start screen")
 	var stage: OrbitStage = main.get_node("UI/StartScreen/Content/OrbitStage") as OrbitStage
-	var hero: OrbVisual = stage.get_child(0) as OrbVisual
-	assert_true(hero.has_symbol(), "orbit-stage hero initially shows its color symbol")
+	var hero_symbol: MeshInstance3D = stage.get_node("HeroViewport/HeroSymbol") as MeshInstance3D
+	assert_true(stage.uses_celestial_shader(), "orbit-stage hero uses CelestialOrbArt shader")
+	assert_true(hero_symbol.visible, "orbit-stage hero initially shows its color symbol")
 	var symbols_button: Button = settings.get_node(
 		"SettingsPanelBody/Margin/Content/SettingsSymbolsToggle"
 	) as Button
 	symbols_button.pressed.emit()
 	assert_true(not Config.data.orb_symbols_enabled, "symbol setting applies immediately")
-	assert_true(not hero.has_symbol(), "orbit-stage hero updates immediately")
+	assert_true(not hero_symbol.visible, "orbit-stage hero updates immediately")
 	var saved: ConfigFile = ConfigFile.new()
 	assert_eq(saved.load(SAVE_PATH), OK, "symbol setting save reloads")
 	assert_true(

@@ -105,8 +105,11 @@ func _run_capture_suite() -> void:
 
 func _capture_start_screen() -> void:
 	var main: Main = await _create_main(Main.NO_MODE)
-	var blitz_button: Button = main.get_node("UI/StartScreen/Content/BlitzButton") as Button
-	if blitz_button.text != "BLITZ\n시간 버티기":
+	var blitz_name: Label = main.get_node("UI/StartScreen/Content/BlitzNameLabel") as Label
+	var blitz_description: Label = main.get_node(
+		"UI/StartScreen/Content/BlitzDescriptionLabel"
+	) as Label
+	if blitz_name.text != "BLITZ" or blitz_description.text != "시간 버티기":
 		_fail("BLITZ start subtitle mismatch")
 	var no_record_label: Label = main.get_node(
 		"UI/StartScreen/Content/BlitzBestLabel"
@@ -1275,8 +1278,8 @@ func _validate_turn_game_over_scene(main: Main) -> void:
 		"TURN result score"
 	)
 	_expect_label_text(
-		main.get_node("UI/Hud/GameOverPanel/Margin/Content/ResultExtraLabel") as Label,
-		"막힌 방향\nLEFT",
+		main.get_node("UI/Hud/GameOverPanel/Margin/Content/ResultExtraValue") as Label,
+		"LEFT",
 		"TURN result blocked direction"
 	)
 	print("SCREEN_CAPTURE_CHECK scene=turn_game_over score=%d blocked=LEFT" % TURN_CAPTURE_SCORE)
@@ -1358,7 +1361,12 @@ func _validate_blitz_result_scene(main: Main) -> void:
 	)
 	_expect_label_text(
 		main.get_node("UI/Hud/GameOverPanel/Margin/Content/SurvivedTimeLabel") as Label,
-		"버틴 시간\n2:05",
+		"버틴 시간",
+		"BLITZ survived time label"
+	)
+	_expect_label_text(
+		main.get_node("UI/Hud/GameOverPanel/Margin/Content/SurvivedTimeValue") as Label,
+		"2:05",
 		"BLITZ survived time"
 	)
 	print("SCREEN_CAPTURE_CHECK scene=blitz_result timer=0.0 score=%d" % BLITZ_CAPTURE_SCORE)
@@ -1407,7 +1415,7 @@ func _validate_blitz_ranking_scene(main: Main) -> void:
 func _validate_new_record_result_scene(main: Main) -> void:
 	var content_path: String = "UI/Hud/GameOverPanel/Margin/Content/"
 	_expect_label_text(
-		main.get_node(content_path + "RankingResultLabel") as Label,
+		main.get_node(content_path + "RankingResultBadge/RankingResultLabel") as Label,
 		"새 기록 · 3위",
 		"BLITZ result ranking message"
 	)

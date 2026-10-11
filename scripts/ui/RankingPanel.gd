@@ -12,6 +12,7 @@ const COLUMN_NAMES: Array[String] = ["Rank", "Score", "Stat", "Date"]
 const COLUMN_WIDTHS: Array[float] = [100.0, 250.0, 250.0, 300.0]
 const TRANSITION_SECONDS: float = 0.25
 const SLIDE_OFFSET: float = 180.0
+const PANEL_VERTICAL_CONTENT_MARGIN: float = 56.0
 
 @export var row_style: StyleBoxFlat
 @export var highlight_style: StyleBoxFlat
@@ -21,6 +22,7 @@ const SLIDE_OFFSET: float = 180.0
 @onready var _header: Label = %RankingHeader
 @onready var _close_button: Button = %RankingCloseButton
 @onready var _panel: PanelContainer = $Panel
+@onready var _content: VBoxContainer = $Panel/Content
 
 var _save_path: String = ""
 var _mode: GameConfig.GameMode = GameConfig.GameMode.TURN
@@ -169,7 +171,19 @@ func _create_columns(host: Control, header: bool) -> Dictionary:
 			if COLUMN_NAMES[index] == "Score"
 			else HORIZONTAL_ALIGNMENT_CENTER
 		)
-		label.add_theme_font_size_override("font_size", 25 if header else 30)
+		var font_size: int = 25
+		if not header:
+			match COLUMN_NAMES[index]:
+				"Score":
+					font_size = 32
+					label.theme_type_variation = &"HudDisplayBold"
+				"Date":
+					font_size = 24
+				"Stat":
+					font_size = 26
+				_:
+					font_size = 30
+		label.add_theme_font_size_override("font_size", font_size)
 		if header:
 			label.add_theme_color_override("font_color", HEADER_COLOR)
 		columns_container.add_child(label)
@@ -204,11 +218,17 @@ func _apply_layout() -> void:
 	if viewport_size.x <= 0.0 or viewport_size.y <= 0.0:
 		return
 	var margin_x: float = maxf(32.0, viewport_size.x * 0.05)
-	var margin_y: float = maxf(48.0, viewport_size.y * 0.036)
+	var scale_factor: float = viewport_size.x / 1080.0
+	var content_height: float = _content.get_combined_minimum_size().y
+	var panel_height: float = minf(
+		maxf(content_height + PANEL_VERTICAL_CONTENT_MARGIN * scale_factor, 1280.0 * scale_factor),
+		viewport_size.y - 96.0 * scale_factor
+	)
+	var margin_y: float = (viewport_size.y - panel_height) * 0.5
 	_panel.position = Vector2(margin_x, margin_y)
 	_panel.size = Vector2(
 		viewport_size.x - margin_x * 2.0,
-		viewport_size.y - margin_y * 2.0
+		panel_height
 	)
 	_rest_position = _panel.position
 

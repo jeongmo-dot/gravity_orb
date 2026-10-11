@@ -1,4 +1,4 @@
-[gd_scene load_steps=22 format=3]
+[gd_scene load_steps=25 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/DebugHud.gd" id="1_debug_hud"]
 [ext_resource type="Script" path="res://scripts/ui/Hud.gd" id="2_hud"]
@@ -47,19 +47,19 @@ corner_radius_bottom_right = 10
 corner_radius_bottom_left = 10
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_mode_unselected"]
-bg_color = Color(0.035, 0.05, 0.08, 0.96)
+bg_color = Color(0.0431373, 0.0941176, 0.2, 0.78)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.16, 0.23, 0.34, 1)
+border_color = Color(0.74902, 0.913725, 1, 0.58)
 corner_radius_top_left = 14
 corner_radius_top_right = 14
 corner_radius_bottom_right = 14
 corner_radius_bottom_left = 14
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_mode_selected"]
-bg_color = Color(0.23, 0.19, 0.055, 1)
+bg_color = Color(0.16, 0.105, 0.025, 0.88)
 border_width_left = 3
 border_width_top = 3
 border_width_right = 3
@@ -71,7 +71,7 @@ corner_radius_bottom_right = 14
 corner_radius_bottom_left = 14
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_mode_selected_cyan"]
-bg_color = Color(0.04, 0.16, 0.22, 1)
+bg_color = Color(0.03, 0.13, 0.19, 0.88)
 border_width_left = 3
 border_width_top = 3
 border_width_right = 3
@@ -81,6 +81,46 @@ corner_radius_top_left = 14
 corner_radius_top_right = 14
 corner_radius_bottom_right = 14
 corner_radius_bottom_left = 14
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ranking_selected"]
+bg_color = Color(0.74902, 0.913725, 1, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 5
+border_color = Color(0.88, 0.97, 1, 1)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ranking_panel"]
+content_margin_left = 28.0
+content_margin_top = 28.0
+content_margin_right = 28.0
+content_margin_bottom = 28.0
+bg_color = Color(0.025, 0.05, 0.105, 0.97)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.27, 0.91, 1, 0.78)
+corner_radius_top_left = 24
+corner_radius_top_right = 24
+corner_radius_bottom_right = 24
+corner_radius_bottom_left = 24
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_record_badge"]
+bg_color = Color(0.22, 0.13, 0.02, 0.9)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(1, 0.690196, 0.12549, 1)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_primary_cyan"]
 bg_color = Color(0.18, 0.74, 0.9, 1)
@@ -699,11 +739,26 @@ layout_mode = 0
 offset_left = 12.0
 offset_top = 320.0
 offset_right = 334.0
+offset_bottom = 364.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.557, 0.639, 0.784, 1)
+theme_override_font_sizes/font_size = 26
+theme_type_variation = &"HudBody"
+text = "버틴 시간"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="SurvivedTimeValue" type="Label" parent="Hud/GameOverPanel/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 12.0
+offset_top = 364.0
+offset_right = 334.0
 offset_bottom = 430.0
 mouse_filter = 2
-theme_override_colors/font_color = Color(0.188235, 0.643137, 0.423529, 1)
-theme_override_font_sizes/font_size = 28
-text = "버틴 시간\n0:30"
+theme_override_font_sizes/font_size = 44
+theme_type_variation = &"HudDisplayBold"
+text = "0:30"
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -713,10 +768,26 @@ layout_mode = 0
 offset_left = 358.0
 offset_top = 320.0
 offset_right = 680.0
+offset_bottom = 364.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.557, 0.639, 0.784, 1)
+theme_override_font_sizes/font_size = 26
+theme_type_variation = &"HudBody"
+text = "최대 콤보"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="GameOverMaxComboValue" type="Label" parent="Hud/GameOverPanel/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 358.0
+offset_top = 364.0
+offset_right = 680.0
 offset_bottom = 430.0
 mouse_filter = 2
-theme_override_font_sizes/font_size = 28
-text = "최대 콤보\n0"
+theme_override_font_sizes/font_size = 44
+theme_type_variation = &"HudDisplayBold"
+text = "0"
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -726,10 +797,26 @@ layout_mode = 0
 offset_left = 12.0
 offset_top = 440.0
 offset_right = 334.0
+offset_bottom = 484.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.557, 0.639, 0.784, 1)
+theme_override_font_sizes/font_size = 26
+theme_type_variation = &"HudBody"
+text = "최고 천체"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="GameOverBlockedValue" type="Label" parent="Hud/GameOverPanel/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 12.0
+offset_top = 484.0
+offset_right = 334.0
 offset_bottom = 550.0
 mouse_filter = 2
-theme_override_font_sizes/font_size = 28
-text = "최고 천체\nL0"
+theme_override_font_sizes/font_size = 42
+theme_type_variation = &"HudDisplayBold"
+text = "L0"
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -739,27 +826,52 @@ layout_mode = 0
 offset_left = 358.0
 offset_top = 440.0
 offset_right = 680.0
-offset_bottom = 550.0
+offset_bottom = 484.0
 mouse_filter = 2
-theme_override_font_sizes/font_size = 28
-text = "막힌 방향\nUNKNOWN"
+theme_override_colors/font_color = Color(0.557, 0.639, 0.784, 1)
+theme_override_font_sizes/font_size = 26
+theme_type_variation = &"HudBody"
+text = "막힌 방향"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="RankingResultLabel" type="Label" parent="Hud/GameOverPanel/Margin/Content"]
+[node name="ResultExtraValue" type="Label" parent="Hud/GameOverPanel/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 358.0
+offset_top = 484.0
+offset_right = 680.0
+offset_bottom = 550.0
+mouse_filter = 2
+theme_override_font_sizes/font_size = 44
+theme_type_variation = &"HudDisplayBold"
+text = "UNKNOWN"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RankingResultBadge" type="PanelContainer" parent="Hud/GameOverPanel/Margin/Content"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 0
-offset_top = 236.0
-offset_right = 692.0
+offset_left = 126.0
+offset_top = 238.0
+offset_right = 566.0
 offset_bottom = 296.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_record_badge")
+
+[node name="RankingResultLabel" type="Label" parent="Hud/GameOverPanel/Margin/Content/RankingResultBadge"]
+unique_name_in_owner = true
+layout_mode = 2
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 0.690196, 0.12549, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 0.85)
 theme_override_constants/outline_size = 4
-theme_override_font_sizes/font_size = 38
+theme_override_font_sizes/font_size = 34
+theme_type_variation = &"HudBodyMedium"
 text = "최고 기록!"
 horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="RestartButton" type="Button" parent="Hud/GameOverPanel/Margin/Content"]
 unique_name_in_owner = true
@@ -904,19 +1016,41 @@ offset_top = 780.0
 offset_right = 526.0
 offset_bottom = 1130.0
 mouse_filter = 0
-theme_override_colors/font_color = Color(0.48, 0.57, 0.68, 1)
-theme_override_colors/font_hover_color = Color(0.68, 0.76, 0.86, 1)
-theme_override_colors/font_pressed_color = Color(0.74902, 0.913725, 1, 1)
-theme_override_colors/font_hover_pressed_color = Color(0.84, 0.95, 1, 1)
-theme_override_constants/icon_max_width = 86
-theme_override_font_sizes/font_size = 46
 theme_override_styles/normal = SubResource("StyleBoxFlat_mode_unselected")
 theme_override_styles/hover = SubResource("StyleBoxFlat_mode_unselected")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_mode_selected")
 theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_mode_selected")
 toggle_mode = true
-icon = ExtResource("11_lightning")
-text = "BLITZ\n시간 버티기"
+
+[node name="BlitzIcon" type="TextureRect" parent="StartScreen/Content"]
+unique_name_in_owner = true
+layout_mode = 0
+mouse_filter = 2
+texture = ExtResource("11_lightning")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="BlitzNameLabel" type="Label" parent="StartScreen/Content"]
+unique_name_in_owner = true
+layout_mode = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.690196, 0.12549, 1)
+theme_override_font_sizes/font_size = 48
+theme_type_variation = &"HudDisplayBold"
+text = "BLITZ"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BlitzDescriptionLabel" type="Label" parent="StartScreen/Content"]
+unique_name_in_owner = true
+layout_mode = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.557, 0.639, 0.784, 1)
+theme_override_font_sizes/font_size = 28
+theme_type_variation = &"HudBody"
+text = "시간 버티기"
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="BlitzBestLabel" type="Label" parent="StartScreen/Content"]
 unique_name_in_owner = true
@@ -927,7 +1061,8 @@ offset_right = 506.0
 offset_bottom = 1102.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.75, 0.82, 0.92, 1)
-theme_override_font_sizes/font_size = 30
+theme_override_font_sizes/font_size = 32
+theme_type_variation = &"HudDisplayBold"
 text = "BEST —"
 horizontal_alignment = 1
 
@@ -945,12 +1080,6 @@ offset_top = 780.0
 offset_right = 1008.0
 offset_bottom = 1130.0
 mouse_filter = 0
-theme_override_colors/font_color = Color(0.48, 0.57, 0.68, 1)
-theme_override_colors/font_hover_color = Color(0.68, 0.76, 0.86, 1)
-theme_override_colors/font_pressed_color = Color(0.74902, 0.913725, 1, 1)
-theme_override_colors/font_hover_pressed_color = Color(0.84, 0.95, 1, 1)
-theme_override_constants/icon_max_width = 86
-theme_override_font_sizes/font_size = 46
 theme_override_styles/normal = SubResource("StyleBoxFlat_mode_unselected")
 theme_override_styles/hover = SubResource("StyleBoxFlat_mode_unselected")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_mode_selected")
@@ -958,8 +1087,36 @@ theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_mode_selected")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_mode_selected_cyan")
 theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_mode_selected_cyan")
 toggle_mode = true
-icon = ExtResource("12_hourglass")
-text = "CLASSIC\n턴제 퍼즐"
+
+[node name="ClassicIcon" type="TextureRect" parent="StartScreen/Content"]
+unique_name_in_owner = true
+layout_mode = 0
+mouse_filter = 2
+texture = ExtResource("12_hourglass")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="ClassicNameLabel" type="Label" parent="StartScreen/Content"]
+unique_name_in_owner = true
+layout_mode = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.74902, 0.913725, 1, 1)
+theme_override_font_sizes/font_size = 48
+theme_type_variation = &"HudDisplayBold"
+text = "CLASSIC"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ClassicDescriptionLabel" type="Label" parent="StartScreen/Content"]
+unique_name_in_owner = true
+layout_mode = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.557, 0.639, 0.784, 1)
+theme_override_font_sizes/font_size = 28
+theme_type_variation = &"HudBody"
+text = "턴제 퍼즐"
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="ClassicBestLabel" type="Label" parent="StartScreen/Content"]
 unique_name_in_owner = true
@@ -970,7 +1127,8 @@ offset_right = 988.0
 offset_bottom = 1102.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.75, 0.82, 0.92, 1)
-theme_override_font_sizes/font_size = 30
+theme_override_font_sizes/font_size = 32
+theme_type_variation = &"HudDisplayBold"
 text = "BEST —"
 horizontal_alignment = 1
 
@@ -985,6 +1143,7 @@ offset_bottom = 1854.0
 mouse_filter = 0
 theme_override_colors/font_color = Color(1, 0.85, 0.35, 1)
 theme_override_constants/icon_max_width = 54
+theme_type_variation = &"HudIconButton"
 icon = ExtResource("13_trophy")
 icon_alignment = 1
 expand_icon = true
@@ -1005,6 +1164,7 @@ offset_right = 592.0
 offset_bottom = 1854.0
 mouse_filter = 0
 theme_override_constants/icon_max_width = 54
+theme_type_variation = &"HudIconButton"
 icon = ExtResource("7_speaker_on")
 icon_alignment = 1
 expand_icon = true
@@ -1019,6 +1179,7 @@ offset_right = 722.0
 offset_bottom = 1854.0
 mouse_filter = 0
 theme_override_constants/icon_max_width = 54
+theme_type_variation = &"HudIconButton"
 icon = ExtResource("14_settings")
 icon_alignment = 1
 expand_icon = true
@@ -1055,13 +1216,13 @@ offset_top = 70.0
 offset_right = 1026.0
 offset_bottom = 1850.0
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_result_panel")
+theme_override_styles/panel = SubResource("StyleBoxFlat_ranking_panel")
 
 [node name="Content" type="VBoxContainer" parent="RankingPanel/Panel"]
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 16
-alignment = 1
+alignment = 0
 
 [node name="Title" type="Label" parent="RankingPanel/Panel/Content"]
 layout_mode = 2
@@ -1085,13 +1246,13 @@ layout_mode = 2
 mouse_filter = 0
 theme_override_colors/font_color = Color(0.48, 0.57, 0.68, 1)
 theme_override_colors/font_hover_color = Color(0.68, 0.76, 0.86, 1)
-theme_override_colors/font_pressed_color = Color(0.74902, 0.913725, 1, 1)
-theme_override_colors/font_hover_pressed_color = Color(0.84, 0.95, 1, 1)
+theme_override_colors/font_pressed_color = Color(0.015, 0.05, 0.09, 1)
+theme_override_colors/font_hover_pressed_color = Color(0.015, 0.05, 0.09, 1)
 theme_override_font_sizes/font_size = 38
 theme_override_styles/normal = SubResource("StyleBoxFlat_mode_unselected")
 theme_override_styles/hover = SubResource("StyleBoxFlat_mode_unselected")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_mode_selected_cyan")
-theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_mode_selected_cyan")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_ranking_selected")
+theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_ranking_selected")
 toggle_mode = true
 text = "BLITZ"
 
@@ -1102,13 +1263,13 @@ layout_mode = 2
 mouse_filter = 0
 theme_override_colors/font_color = Color(0.48, 0.57, 0.68, 1)
 theme_override_colors/font_hover_color = Color(0.68, 0.76, 0.86, 1)
-theme_override_colors/font_pressed_color = Color(0.74902, 0.913725, 1, 1)
-theme_override_colors/font_hover_pressed_color = Color(0.84, 0.95, 1, 1)
+theme_override_colors/font_pressed_color = Color(0.015, 0.05, 0.09, 1)
+theme_override_colors/font_hover_pressed_color = Color(0.015, 0.05, 0.09, 1)
 theme_override_font_sizes/font_size = 38
 theme_override_styles/normal = SubResource("StyleBoxFlat_mode_unselected")
 theme_override_styles/hover = SubResource("StyleBoxFlat_mode_unselected")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_mode_selected_cyan")
-theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_mode_selected_cyan")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_ranking_selected")
+theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_ranking_selected")
 toggle_mode = true
 text = "CLASSIC"
 
@@ -1273,6 +1434,9 @@ custom_minimum_size = Vector2(0, 120)
 layout_mode = 2
 mouse_filter = 0
 theme_override_font_sizes/font_size = 38
+theme_override_styles/normal = SubResource("StyleBoxFlat_outline_cyan")
+theme_override_styles/hover = SubResource("StyleBoxFlat_outline_cyan")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_outline_cyan")
 text = "닫기"
 
 [node name="SettingsPanel" type="Control" parent="."]

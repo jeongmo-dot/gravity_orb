@@ -288,8 +288,12 @@ func test_game_over_panel_shows_scores_direction_and_restart_button() -> void:
 	var score_label: Label = panel.get_node("Margin/Content/GameOverScore") as Label
 	var best_label: Label = panel.get_node("Margin/Content/GameOverBest") as Label
 	var combo_label: Label = panel.get_node("Margin/Content/GameOverMaxCombo") as Label
+	var combo_value: Label = panel.get_node("Margin/Content/GameOverMaxComboValue") as Label
 	var blocked_label: Label = panel.get_node("Margin/Content/GameOverBlocked") as Label
+	var blocked_value: Label = panel.get_node("Margin/Content/GameOverBlockedValue") as Label
 	var direction_label: Label = panel.get_node("Margin/Content/ResultExtraLabel") as Label
+	var direction_value: Label = panel.get_node("Margin/Content/ResultExtraValue") as Label
+	var turn_value: Label = panel.get_node("Margin/Content/SurvivedTimeValue") as Label
 	var restart_button: Button = panel.get_node("Margin/Content/RestartButton") as Button
 	var dimmer: ColorRect = main.get_node("UI/Hud/ResultDimmer") as ColorRect
 	var panel_style: StyleBoxFlat = panel.get_theme_stylebox("panel") as StyleBoxFlat
@@ -301,9 +305,21 @@ func test_game_over_panel_shows_scores_direction_and_restart_button() -> void:
 		assert_true(panel_style.bg_color.a >= 0.92, "game-over panel opacity")
 	assert_eq(score_label.text, "48", "game-over score")
 	assert_eq(best_label.text, "BEST 48", "game-over best")
-	assert_eq(combo_label.text, "최대 콤보\n2", "game-over max combo")
-	assert_eq(blocked_label.text, "최고 천체\nL4 고리 행성", "game-over highest celestial")
-	assert_eq(direction_label.text, "막힌 방향\nLEFT", "game-over blocked direction")
+	assert_eq(combo_label.text, "최대 콤보", "game-over max combo label")
+	assert_eq(combo_value.text, "2", "game-over max combo value")
+	assert_eq(blocked_label.text, "최고 천체", "game-over highest celestial label")
+	assert_eq(blocked_value.text, "L4 고리 행성", "game-over highest celestial value")
+	assert_eq(direction_label.text, "막힌 방향", "game-over blocked direction label")
+	assert_eq(direction_value.text, "LEFT", "game-over blocked direction value")
+	assert_true(
+		combo_value.get_theme_font_size("font_size")
+		>= roundi(float(combo_label.get_theme_font_size("font_size")) * 1.6),
+		"result values are about 1.6x their labels"
+	)
+	assert_true(
+		turn_value.get_theme_color("font_color").is_equal_approx(Color("#E8EEFF")),
+		"turn count does not use BLITZ green"
+	)
 	assert_eq(panel.mouse_filter, Control.MOUSE_FILTER_IGNORE, "panel ignores pointer")
 	assert_eq(restart_button.mouse_filter, Control.MOUSE_FILTER_STOP, "restart consumes pointer")
 

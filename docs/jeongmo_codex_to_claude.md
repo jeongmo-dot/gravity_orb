@@ -38,6 +38,45 @@
 
 ## 미확인
 
+### [2026-10-11] 대상 #67 추가 요구 1 — 시작·결과·랭킹 화면 위계 보완
+- 상태: 완료 — 최신 `main`의 보완 명세를 먼저 병합하고, 시작 행성을 V1 셀레스티얼 셰이더로 교체했으며 모드 카드·간격·랭킹·결과 통계의 시각 위계를 정리함
+- 브랜치 / PR: `codex/v3-orbit-stage-screens` / [PR #69](https://github.com/jeongmo-dot/gravity_orb/pull/69)
+- 병합: `origin/main` `d930c5c`을 병합 커밋 `0d4c174`으로 먼저 반영한 뒤 구현함. 충돌 없음
+- 변경 파일: `scenes/UI.tscn`, `scripts/ui/{GameOverPanel,OrbitStage,RankingPanel,StartScreen}.gd`, `tests/{test_blitz_manager,test_frontend,test_rankings,test_screen_layout}.gd`, `tests/scenarios/test_score_flow.gd`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 행성·공전 천체가 로고 위 최소 16px를 유지하고 궤도 전체가 로고를 침범하지 않음 — 자동 (`test_v3_screen_layout_safe_area_touch_targets_and_extreme_content`) + 두 비율 캡처 직접 확인
+  - [x] 시작 행성을 게임판 V1과 같은 L4 청록 `CelestialOrbArt` 머티리얼·셰이더·공유 구체 메시·고리·문양으로 렌더링 — 자동 (`test_v3_screen_layout_safe_area_touch_targets_and_extreme_content`, `test_settings_symbol_toggle_saves_and_updates_orbit_stage_immediately`) + 캡처; 공전 천체는 명세 허용 범위대로 2D 유지
+  - [x] 두 모드 카드 모두 아이콘·모드명 색을 유지하고 마지막 모드만 색 테두리·옅은 배경으로 선택 표시; 모드명 Orbitron 700, 설명 Noto, BEST Orbitron 적용 — 자동 (`test_start_screen_shows_records_last_mode_and_touch_targets`) + 캡처
+  - [x] 로고군→카드와 카드→아이콘 행의 세로 간격 비가 두 화면 모두 1.5 이하이고, 하단 아이콘을 V3-1 패널 스타일로 통일 — 자동 (`test_v3_screen_layout_safe_area_touch_targets_and_extreme_content`) + 캡처
+  - [x] 랭킹 패널을 내용 높이에 맞추고 안쪽 여백을 방향별 40px 이하로 제한; 제목 상단·외곽선 닫기·청록 선택 탭/남색 글자·Orbitron 점수 적용 — 자동 (`test_ranking_screen_tabs_rows_highlight_and_touch_filters`) + 캡처
+  - [x] 결과 2×2 값을 라벨의 약 1.6배 Orbitron으로 분리하고 BLITZ 시간만 초록색 적용; `블라스트`를 `대폭발`로 변경하고 신기록을 옅은 호박 배경·테두리 배지로 표시 — 자동 (`test_game_over_panel_shows_scores_direction_and_restart_button`, `test_result_panel_rank_messages_buttons_and_ranking_highlight`) + 캡처
+  - [x] 시작 화면 p99 16.7ms 미만과 기존 물리·게임 흐름 유지 — 성능 측정 + 전체 회귀 + 상태 해시
+- 캡처 관측 (Standard/Compatibility):
+  - `tests/capture_screens.ps1` → 종료 코드 0, `540×960` 20장 + `540×1170` 20장 = `40장`
+  - 두 비율의 `01_start_screen`, `20_start_no_record`에서 셀레스티얼 광원·그림자·림·고리 행성과 공전 궤도가 로고 위에 완전히 분리되고, 두 카드의 상시 모드색·선택 테두리/배경·타이포 위계와 하단 아이콘 간격이 잘림 없이 표시됨
+  - 두 비율의 `04_turn_game_over`, `09_blitz_result`, `10_ranking_blitz`, `11_result_new_record`에서 결과 값 크기·BLITZ 시간 초록색·`대폭발`·호박 신기록 배지, 내용 맞춤 랭킹 패널·청록 탭·외곽선 닫기·10줄이 겹침 없이 표시됨
+  - 보드 투영은 두 비율 모두 `left=13.276, right=526.724, width=513.448`, 비율 간 차이 `0.000px`; 기존 우주 대비·중력 벽 빛 화소 검사도 통과
+- 성능 관측 (RTX 4070 Ti SUPER, Compatibility):
+  - 시작 화면 정지 5초: 표본 `5,035`, 프레임 p99/최대 `1.594/2.283ms` (`p99 < 16.7ms`)
+  - BLITZ 시드 101~104: 프레임 `17,124`, p50/p95/p99/최대 `1.525/2.733/4.138/9.625ms`, `>16.7ms` 0, `>33.3ms` 0; 드로콜 p50/p95/최대 `407/432/442`
+  - BLITZ 입력 `120/120`, 유실 `0`; 입력 수락 p95/최대 `20.859/42.402ms`, 수락→생성 p95/최대 `2.484/6.246ms`; 최대 생성 묶음 `8`
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - `tests/run_tests.ps1` 최종 실행 → 일반 `275/275`(`14.996초`), 장기 `5/5`(`44.745초`), 성능 `5/5`(`2.693초`), 합계 `285/285`, 종료 코드 0, 총 `62.434초`
+  - 물리 상태 해시: TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`; #67과 동일
+  - 시작 화면 / TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 전역 난수 호출 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. `tests/capture_screens.ps1` 실행 후 두 비율의 `01`·`20`을 확인 → 행성의 광원·그림자·림·고리와 공전 천체가 로고 위 16px 이상 떨어지고, 궤도가 로고에 닿지 않아야 한다.
+  2. BLITZ와 CLASSIC을 번갈아 시작 화면으로 돌아온다 → 두 카드의 아이콘·모드명 색은 항상 유지되고 마지막 모드 카드만 색 테두리와 옅은 배경으로 구분되어야 한다.
+  3. `04`·`09`·`11` 결과를 비교한다 → 수치가 라벨보다 크게 보이고 BLITZ의 버틴 시간만 초록색이며 `대폭발` 문구와 호박색 신기록 배지가 보여야 한다.
+  4. `10` 랭킹을 확인하고 탭을 바꾼다 → 패널이 내용에 맞게 짧고, 선택 탭은 청록 배경·남색 글자이며 점수는 Orbitron, 닫기는 외곽선 버튼이어야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 3D 행성은 `320×320` 투명 `SubViewport`에서 V1 공유 메시·머티리얼로 렌더링하고, 시작 화면이 숨겨질 때 프로세싱과 뷰포트 업데이트를 꺼서 게임 중 비용을 제거함
+  - 공전 천체는 명세의 허용 선택지대로 기존 2D 렌더링을 유지함. PNG·JSON 측정 산출물은 기존 ignore 대상이라 커밋에 포함하지 않음
+  - BLITZ 창 측정 종료 시 기존 계열의 ObjectDB 누수 경고가 시드 101에서 2개, 102에서 4개, 104에서 2개 관측되었으나 종료 코드 0, 입력 유실 0, `SCRIPT ERROR`·`Parse Error` 0건
+- 남은 것 · 질문: 없음
+
 ### [2026-10-11] 대상 #67 — 비주얼 V3-2 시작·결과·랭킹·설정 화면
 - 상태: 완료 — 궤도 무대 시작 화면, 모드별 결과 카드, 10줄 랭킹, 소리·색각 문양 설정과 공통 버튼 상태·화면 전환을 구현함
 - 브랜치 / PR: `codex/v3-orbit-stage-screens` / [PR #69](https://github.com/jeongmo-dot/gravity_orb/pull/69)
