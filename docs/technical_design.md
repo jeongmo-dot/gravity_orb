@@ -803,6 +803,20 @@ godot --headless --path . --quit-after 300 -- --mode=blitz
 - **검증**: 빌드 스크립트 종료 코드 0과 exe 크기. 내보낸 exe (콘솔 래퍼)로 스모크 3종 (`--headless --quit-after 300`, `-- --mode=turn`, `-- --mode=blitz`) 종료 코드 0·`SCRIPT ERROR` 0. 검증 전후 사용자 `save.cfg` 해시 동일 (없으면 없는 채로). 내보낸 묶음에 `res://tests/`·`res://artifacts/`·`res://docs/`가 들어가지 않았음을 확인 (방법 자유). 래퍼 테스트 통과. `AGENTS.md` 명령 목록에 빌드 한 줄
 - **결과 — 병합** ([PR #70](https://github.com/jeongmo-dot/gravity_orb/pull/70) `ec02c6e`, 2026-10-11): `.\tools\build_windows.ps1` → `build/windows/GravityOrb.exe` (111,038,784바이트, PCK 내장) + `GravityOrb.console.exe` + `BUILD.txt`. Claude 재검수: main 기준 다시 빌드, 내보낸 exe 스모크 3종 에러 0, 창 실행 6초 정상 (창 제목 `Gravity Orb`), 사용자 `save.cfg` 해시 전후 동일, exe 안에 `run_tests`·`capture_screens`·문서 이름 0건 / `OrbitStage`·`CelestialOrbArt` 있음, 래퍼 285/285. `script_export_mode=2` (압축 바이트코드)
 
+#### 10.5.1 빌드 버전과 파일 이름 (#70)
+사용자 (2026-10-11): 빌드 파일 이름에 버전이 들어가게
+- **버전 한 곳**: `project.godot`의 `application/config/version` (예: `0.11.1`). 내보내기 프리셋의 파일·제품 버전 칸은 이 값을 따른다 (비워 두어 프로젝트 버전을 쓰거나, 빌드 스크립트가 같은 값인지 검사). 버전 값은 Claude가 정하고 이 절의 버전 기록에 적는다 (수치와 같은 원칙)
+- **번호 규칙** `MAJOR.MINOR.PATCH`: `MAJOR.MINOR`는 기획서 버전 (지금 0.11), `PATCH`는 병합된 변경이 있는 상태에서 테스트 빌드를 새로 낼 때마다 +1. 기획서 버전이 오르면 `PATCH`는 0부터
+- **파일 이름**: `build/windows/GravityOrb_v{버전}.exe` (예: `GravityOrb_v0.11.1.exe`), 콘솔 래퍼 `GravityOrb_v{버전}.console.exe`, 빌드 정보 `GravityOrb_v{버전}_BUILD.txt` (커밋·날짜·엔진·모드). 디버그는 `build/windows-debug/`에 같은 이름
+- **이전 버전은 남긴다**: 빌드 스크립트는 같은 버전의 파일만 지우고 다시 만든다 (다른 버전 파일은 그대로 — 비교 테스트용). 버전 없는 예전 이름 (`GravityOrb.exe`·`GravityOrb.console.exe`·`BUILD.txt`)은 한 번 정리
+- 빌드 결과 줄 (`WINDOWS_BUILD_RESULT`)에 버전과 실제 파일 경로를 적는다
+
+버전 기록
+| 버전 | 날짜 | 내용 |
+|---|---|---|
+| 0.11.0 | 2026-10-11 | 첫 Windows 테스트 빌드 (#68, V3-2까지) |
+| 0.11.1 | 2026-10-11 | V4-1 반응 연출 A+C (#69) 포함 — 파일 이름 규칙 적용 첫 빌드 (#70) |
+
 ## 11. 설계 해석 (기획서 빈칸을 채운 결정)
 
 기획서에 명시되지 않았거나 모호한 부분에 대한 이 문서의 결정이다. 플레이테스트 후 기획서에 반영하거나 뒤집는다.
