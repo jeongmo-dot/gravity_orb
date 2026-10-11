@@ -34,7 +34,7 @@
 
 | 항목 | 값 |
 |---|---|
-| 엔진 | **Godot 4.8 일반 빌드** (현재 `4.8.dev3.official`, 로컬 `C:\work\Godot\Godot_v4.8-dev3_win64_console.exe`, 4.8 정식판 출시 시 교체). C#은 쓰지 않는다 — 2026-10-11 .NET 빌드(`4.8.dev3.mono`)에서 일반 빌드로 바꿨다 (Codex가 창을 띄우는 실행에서 .NET 폴더 확인 경고 창이 사용자 화면에 떴다). 네트워크 랭킹 등도 GDScript(`HTTPRequest`·`WebSocketPeer`)로 충분하고, C#이 필요해지면 그때 .NET 빌드로 바꿀 수 있다. 예전 mono 에디터가 남긴 `[dotnet]` 섹션은 그대로 둔다 (일반 빌드는 무시) |
+| 엔진 | **Godot 4.8 일반 빌드** (현재 `4.8.dev3.official`, 로컬 `C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`, 4.8 정식판 출시 시 교체). C#은 쓰지 않는다 — 2026-10-11 .NET 빌드(`4.8.dev3.mono`)에서 일반 빌드로 바꿨다 (Codex가 창을 띄우는 실행에서 .NET 폴더 확인 경고 창이 사용자 화면에 떴다). 네트워크 랭킹 등도 GDScript(`HTTPRequest`·`WebSocketPeer`)로 충분하고, C#이 필요해지면 그때 .NET 빌드로 바꿀 수 있다. 예전 mono 에디터가 남긴 `[dotnet]` 섹션은 그대로 둔다 (일반 빌드는 무시) |
 | 언어 | GDScript, **모든 변수·인자·반환값 타입 명시** |
 | 렌더러 | `gl_compatibility` (저사양 Android 대응) |
 | 물리 | 기본 GodotPhysics2D, **240 tick/s** (13장 "벽 관통" 참조) |
