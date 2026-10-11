@@ -40,7 +40,7 @@
 
 ### [2026-10-11] 대상 #67 — 비주얼 V3-2 시작·결과·랭킹·설정 화면
 - 상태: 완료 — 궤도 무대 시작 화면, 모드별 결과 카드, 10줄 랭킹, 소리·색각 문양 설정과 공통 버튼 상태·화면 전환을 구현함
-- 브랜치 / PR: `codex/v3-orbit-stage-screens` / PR 미생성
+- 브랜치 / PR: `codex/v3-orbit-stage-screens` / [PR #69](https://github.com/jeongmo-dot/gravity_orb/pull/69)
 - 변경 파일: `assets/ui/{lightning,hourglass,trophy,settings}.svg`, `scenes/UI.tscn`, `scripts/core/{Orb,SaveStore}.gd`, `scripts/spike/Orb3D.gd`, `scripts/ui/{ButtonMotion,DebugHud,GameOverPanel,Hud,OrbitStage,RankingPanel,SettingsPanel,StartScreen}.gd`, `tests/{capture_screens.ps1,run_start_screen_measurement.ps1,test_blitz_manager.gd,test_frontend.gd,test_rankings.gd,test_screen_layout.gd}`, `tests/scenarios/test_score_flow.gd`, `tests/spike/{StartScreenMeasurement.tscn,capture_screens.gd,run_start_screen_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] V2 우주 배경 위에 Orbitron 로고·부제, V1 L4 청록 고리 행성·궤도 타원·L1/L2 공전 천체, BLITZ/CLASSIC 카드와 88px 하단 벡터 버튼 배치 — 자동 배치 검사 + 두 비율 캡처 직접 확인
