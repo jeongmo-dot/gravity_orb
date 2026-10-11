@@ -40,7 +40,7 @@
 
 ### [2026-10-11] 대상 #69 — 비주얼 V4-1 반응 연출 (A+C) + 그림 보완
 - 상태: 완료 — 작은 합체 별가루·고리, L6/L7 탄생 흡입·신성·홍염, 레벨별 대폭발 성운·중력파·플래시 제한을 구현하고 L7/L5/L1 그림 잔여 항목을 보완함
-- 브랜치 / PR: `v4-reaction-effects` / 미생성
+- 브랜치 / PR: `v4-reaction-effects` / [PR #71](https://github.com/jeongmo-dot/gravity_orb/pull/71)
 - 변경 파일: `scripts/core/{CelestialOrbArt,OrbVisual}.gd`, `scripts/fx/FeedbackDirector.gd`, `tests/{capture_screens.ps1,test_feedback.gd}`, `tests/spike/{capture_screens,run_feedback_measurement}.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] L2~L5 합체: 색 별가루 12개·0.72초와 결과 반지름→2배의 얇은 하늘색 고리·0.5초로 기존 10입자를 교체 — 자동 (`test_merge_punch_scales_visual_and_emits_stardust_ring`) + 캡처 `23` 두 시점
