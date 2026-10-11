@@ -30,8 +30,15 @@
 
 ## 대기 중
 
-### [2026-10-11 #68] Windows 테스트 빌드 — 내보내기 설정·빌드 스크립트
-- 상태: 대기 (**다음 차례**)
+(없음 — V4 이펙트 시안 선택 대기: A 우주 물리 · B 네온 아케이드 · C 천체 현상)
+
+---
+
+## 처리 완료
+
+### [2026-10-11 #68] Windows 테스트 빌드 — 내보내기 설정·빌드 스크립트 — 완료
+- 상태: 완료 (2026-10-11 Claude 검수 · [PR #70](https://github.com/jeongmo-dot/gravity_orb/pull/70) 병합 `ec02c6e`)
+- 검수: main 기준 다시 빌드 → `build/windows/GravityOrb.exe` 111,038,784바이트 (PCK 내장) + 콘솔 래퍼 + `BUILD.txt` (커밋 `ec02c6e`). 내보낸 exe 스모크 3종 에러 0, 창 실행 6초 정상, 사용자 `save.cfg` 해시 전후 동일, exe 안에 테스트·문서 이름 0건, 래퍼 285/285
 - 근거: [technical_design.md](technical_design.md) **§10.5 Windows 빌드**
 - 사용자 (2026-10-11): 테스트용 Windows 빌드 → 정식 빌드. Claude가 공식 내보내기 템플릿(Windows용)을 `%APPDATA%\Godot\export_templates\4.8.dev3\`에 설치함
 - 요구:
@@ -42,11 +49,6 @@
 - 건드리지 말 것: 게임 코드·규칙·수치·그림, 사용자 저장 파일, `docs/` (회신 파일 제외)
 - Done-when: 위 검증 통과, `build/windows/GravityOrb.exe` 경로 보고
 - 커밋: 항목 단위 브랜치, push까지
-
-
----
-
-## 처리 완료
 
 ### [2026-10-11 #67] 비주얼 V3-2 — 시작·결과·랭킹·설정 화면 — 완료
 - 상태: 완료 (2026-10-11 Claude 검수 · [PR #69](https://github.com/jeongmo-dot/gravity_orb/pull/69) 병합 `9921ef6`)

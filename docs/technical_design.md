@@ -801,6 +801,7 @@ godot --headless --path . --quit-after 300 -- --mode=blitz
 - **빌드 스크립트** `tools/build_windows.ps1`: `GODOT` 환경변수 또는 일반 빌드 기본 경로로 `--headless --export-release "Windows Desktop" build/windows/GravityOrb.exe`. 템플릿이 없으면 설치 경로를 알려 주는 메시지로 멈춘다. `-Debug`는 `--export-debug`로 `build/windows-debug/`. 빌드 뒤 `BUILD.txt`에 커밋 해시·날짜·엔진 버전. 출력 폴더 `build/`는 이미 `.gitignore`에 있다
 - **저장 위치**: 내보낸 게임도 편집기 실행과 같은 `%APPDATA%\Godot\app_userdata\Gravity Orb\save.cfg`를 쓴다 (기록·설정 공유). 빌드 검증은 이 파일을 바꾸면 안 된다
 - **검증**: 빌드 스크립트 종료 코드 0과 exe 크기. 내보낸 exe (콘솔 래퍼)로 스모크 3종 (`--headless --quit-after 300`, `-- --mode=turn`, `-- --mode=blitz`) 종료 코드 0·`SCRIPT ERROR` 0. 검증 전후 사용자 `save.cfg` 해시 동일 (없으면 없는 채로). 내보낸 묶음에 `res://tests/`·`res://artifacts/`·`res://docs/`가 들어가지 않았음을 확인 (방법 자유). 래퍼 테스트 통과. `AGENTS.md` 명령 목록에 빌드 한 줄
+- **결과 — 병합** ([PR #70](https://github.com/jeongmo-dot/gravity_orb/pull/70) `ec02c6e`, 2026-10-11): `.\tools\build_windows.ps1` → `build/windows/GravityOrb.exe` (111,038,784바이트, PCK 내장) + `GravityOrb.console.exe` + `BUILD.txt`. Claude 재검수: main 기준 다시 빌드, 내보낸 exe 스모크 3종 에러 0, 창 실행 6초 정상 (창 제목 `Gravity Orb`), 사용자 `save.cfg` 해시 전후 동일, exe 안에 `run_tests`·`capture_screens`·문서 이름 0건 / `OrbitStage`·`CelestialOrbArt` 있음, 래퍼 285/285. `script_export_mode=2` (압축 바이트코드)
 
 ## 11. 설계 해석 (기획서 빈칸을 채운 결정)
 
