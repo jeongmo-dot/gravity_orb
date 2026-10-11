@@ -20,6 +20,7 @@ const FEVER_SWEEP_DURATION: float = 0.400
 const TIMER_TICK_DURATION: float = 0.060
 const TIME_UP_DURATION: float = 0.520
 const SWIPE_DURATION: float = 0.120
+const TURN_READY_DURATION: float = 0.050
 const VOICE_COUNT: int = 12
 const SFX_BUS: StringName = &"SFX"
 const POP_ASSET_PATHS: Array[String] = [
@@ -54,6 +55,10 @@ const SWIPE_ASSET_PATHS: Array[String] = [
 	"res://assets/sfx/swipe.wav",
 	"res://assets/sfx/swipe.ogg",
 ]
+const TURN_READY_ASSET_PATHS: Array[String] = [
+	"res://assets/sfx/turn_ready.wav",
+	"res://assets/sfx/turn_ready.ogg",
+]
 const BLAST_POP_OFFSETS: Array[float] = [
 	0.000,
 	0.012,
@@ -84,6 +89,7 @@ var _fever_end_stream: AudioStream
 var _timer_tick_stream: AudioStream
 var _time_up_stream: AudioStream
 var _swipe_stream: AudioStream
+var _turn_ready_stream: AudioStream
 var _voices: Array[AudioStreamPlayer] = []
 var _next_voice: int = 0
 var _muted: bool = false
@@ -117,6 +123,9 @@ func _ready() -> void:
 	_swipe_stream = _load_first(SWIPE_ASSET_PATHS)
 	if _swipe_stream == null:
 		_swipe_stream = _synthesize_swipe()
+	_turn_ready_stream = _load_first(TURN_READY_ASSET_PATHS)
+	if _turn_ready_stream == null:
+		_turn_ready_stream = _synthesize_turn_ready()
 	for voice_index: int in range(VOICE_COUNT):
 		var voice: AudioStreamPlayer = AudioStreamPlayer.new()
 		voice.name = "Voice%d" % voice_index
@@ -143,6 +152,7 @@ func _exit_tree() -> void:
 	_timer_tick_stream = null
 	_time_up_stream = null
 	_swipe_stream = null
+	_turn_ready_stream = null
 
 
 func play_merge(
@@ -236,6 +246,20 @@ func play_swipe() -> void:
 	if not Config.data.sfx_enabled:
 		return
 	_play(_swipe_stream, 1.0, Config.data.sfx_volume_db, "swipe", 0, -1, -1)
+
+
+func play_turn_ready() -> void:
+	if not Config.data.sfx_enabled:
+		return
+	_play(
+		_turn_ready_stream,
+		1.0,
+		Config.data.sfx_volume_db - 12.0,
+		"turn_ready",
+		0,
+		-1,
+		-1
+	)
 
 
 func merge_pitch(result_level: int, chain: int, stable_spawn_id: int) -> float:
@@ -499,6 +523,22 @@ func _synthesize_swipe() -> AudioStreamWAV:
 		var frequency: float = lerpf(760.0, 260.0, progress)
 		phase += TAU * frequency / float(SAMPLE_RATE)
 		var value: float = (filtered_noise * 0.72 + sin(phase) * 0.16) * envelope
+		samples[index] = clampf(value, -1.0, 1.0)
+	return _make_wav(samples)
+
+
+func _synthesize_turn_ready() -> AudioStreamWAV:
+	var sample_count: int = ceili(TURN_READY_DURATION * float(SAMPLE_RATE))
+	var samples: PackedFloat32Array = PackedFloat32Array()
+	samples.resize(sample_count)
+	for index: int in range(sample_count):
+		var time: float = float(index) / float(SAMPLE_RATE)
+		var attack: float = minf(time / 0.002, 1.0)
+		var envelope: float = attack * exp(-time / 0.012)
+		var value: float = (
+			sin(TAU * 1180.0 * time)
+			+ 0.30 * sin(TAU * 1770.0 * time)
+		) * envelope * 0.34
 		samples[index] = clampf(value, -1.0, 1.0)
 	return _make_wav(samples)
 

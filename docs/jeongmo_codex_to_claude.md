@@ -38,6 +38,42 @@
 
 ## 미확인
 
+### [2026-10-12] 대상 #76 — 턴제 입력 가능·잠김 구분
+- 상태: 완료 — TURN의 입력 가능·계산 중·거절 상태를 보드 테두리와 4방향 화살표로 구분하고, 손을 뗄 때 잠금이 풀렸다면 입력을 받도록 변경함. BLITZ 입력 정책은 유지
+- 브랜치 / PR: `turn-input-state-cues` / [PR #77](https://github.com/jeongmo-dot/gravity_orb/pull/77)
+- 변경 파일: `scenes/UI.tscn`, `scripts/autoload/InputRouter.gd`, `scripts/core/Main.gd`, `scripts/fx/{FeedbackDirector,SfxBank}.gd`, `scripts/platform/Haptics.gd`, `scripts/ui/{Hud,TurnInputIndicator}.gd`, `tests/{capture_screens.ps1,test_input_router.gd,test_turn_input_indicator.gd}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `WAITING_INPUT`에서 보드 테두리 `#BFE9FF` 100%, 네 변 바깥 화살표 4개가 0.2초에 나타나고 막힌 방향은 `#FF3B30` — 자동 (`test_turn_input_cues_rejection_release_policy_and_ready_tick`) + 캡처 `44_turn_ready`
+  - [x] `SPAWNING`·`SIMULATING`에서 화살표가 0.1초에 사라지고 테두리 알파 0.40, 1초 주기의 점광원 1개가 테두리를 순회 — 자동 (같은 테스트) + `45_turn_busy_a/b` 두 시점
+  - [x] 잠긴 중 키·스와이프는 턴을 시작하지 않고 해당 방향 `#8EA3C8` 화살표를 0.3초 한 번 표시 — 자동 (`test_locked_drag_is_ignored`, `test_locked_keyboard_action_is_ignored`, 통합 테스트) + `46_turn_rejected`
+  - [x] TURN은 잠긴 중 시작한 제스처도 손을 뗄 때 잠금이 풀려 있으면 정확히 한 턴 수락; 기본/BLITZ 정책은 기존처럼 거절 — 자동 (`test_turn_policy_accepts_drag_released_after_unlock`, 통합 테스트)
+  - [x] 잠금 해제마다 아주 작은 합성 틱 1회와 5ms 진동 요청 1회; 초기 정지 완료도 같은 처리, SFX 버스·음소거 공유 — 자동 (초기/두 턴 틱 누계 `1→2→3`, 진동 종류 확인)
+  - [x] 게임오버에서 내부 표시 상태를 끄고, 결과 패널·랭킹에서는 HUD 계층과 함께 숨김 — 자동 (통합 테스트)
+  - [x] 턴 규칙 0.33초·1.5초, 물리·점수·저장·BLITZ 상태 불변 — 전체 회귀와 상태 해시 확인
+- 캡처·화면 관측 (Godot Standard/Compatibility, 직접 확인):
+  - `tests/capture_screens.ps1 -HudScenesOnly` → 종료 코드 0, `540×960`·`540×1170` 각 17장, 합계 34장; 보드 좌·우·폭 비율 간 차이 `0.000px`
+  - `44_turn_ready`: 네 방향 화살표와 밝은 하늘색 테두리가 보이며 LEFT 화살표는 빨강, HUD·NEXT/THEN과 겹치지 않음
+  - `45_turn_busy_a/b`: 화살표가 없고 어두운 테두리 위 작은 하늘색 점이 위쪽→아래쪽으로 이동해 서로 다른 위치가 보임
+  - `46_turn_rejected`: 계산 중 LEFT 화살표 하나만 회색으로 보이며 턴 인덱스는 증가하지 않음
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - 집중 테스트: `test_input_router.gd` `18/18`, `test_turn_input_indicator.gd` `1/1`, 각각 종료 코드 0
+  - `tests/run_tests.ps1` → 일반 `289/289`(`20.070초`), 장기 `5/5`(`48.613초`), 성능 `5/5`(`3.337초`), 합계 `299/299`, 종료 코드 0, 총 `72.020초`
+  - 시작 화면 / TURN / BLITZ `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - 물리 상태 해시: TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`; #74와 동일
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 전역 난수 호출 `Spawner.gd` 밖 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. TURN 시작 직후 첫 생성이 멈출 때까지 본다 → 어두운 테두리와 도는 점만 보이다가 잠금 해제 순간 밝은 테두리·화살표가 0.2초에 나타나고 작은 틱·짧은 진동이 한 번 발생해야 한다.
+  2. 입력 가능 상태에서 스와이프한다 → 화살표가 0.1초 안에 사라지고 점광원이 약 1초에 테두리 한 바퀴를 돌아야 한다.
+  3. 계산 중 네 방향으로 각각 스와이프한다 → 턴이 추가로 시작되지 않고 시도한 방향의 회색 화살표만 0.3초 보여야 한다.
+  4. 계산 중 화면을 누른 채 기다렸다가 화살표가 나타난 뒤 손을 뗀다 → TURN에서는 손을 뗀 방향으로 새 턴이 정확히 한 번 시작해야 한다. BLITZ에서는 기존 입력 동작이 유지돼야 한다.
+  5. 게임오버 결과와 랭킹을 연다 → 방향 화살표와 도는 점이 모두 없어야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 틱은 외부 파일이 없을 때 50ms 합성음, 기존 SFX 기본 볼륨보다 12dB 작게 재생한다. 진동은 기존 8ms 스와이프보다 짧은 5ms로 구현했다.
+  - 전체 캡처도 시도했으나 #76 장면 생성 뒤 기존 `same_size_stars`의 L7 밝기 관측 `0.88228`이 요구치 `L6 0.80869 × 1.1 = 0.88956`보다 낮아 #75 행성 검사에서 중단됐다. #76 범위는 새 `-HudScenesOnly` 경로로 두 비율을 완료했으며 행성 그림·검사 수치는 변경하지 않았다.
+  - PNG는 기존 `artifacts/` ignore 대상이라 커밋하지 않음.
+- 남은 것 · 질문: 없음
+
 ### [2026-10-12] 대상 #74 — 행성 컬렉션 ①: 두 모드 6색·색 효과 재배치·턴제 밸런스
 - 상태: 완료 — TURN을 BLITZ와 같은 균등 6색으로 바꾸고 색 효과를 행성 역할에 맞춰 재배치했으며, 4조건 측정 규칙에 따라 `spawn_count_ramp_turns = 40`을 선택함
 - 브랜치 / PR: `planet-collection-1-rules-balance` / [PR #76](https://github.com/jeongmo-dot/gravity_orb/pull/76)

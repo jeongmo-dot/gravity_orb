@@ -85,6 +85,10 @@ const CAPTURE_FILES: Array[String] = [
 	"41_blitz_bonus_gauge_b.png",
 	"42_blitz_bonus_layer_cross.png",
 	"43_blitz_bonus_fever.png",
+	"44_turn_ready.png",
+	"45_turn_busy_a.png",
+	"45_turn_busy_b.png",
+	"46_turn_rejected.png",
 ]
 const HUD_CAPTURE_FILES: Array[String] = [
 	"02_turn_early.png",
@@ -100,6 +104,10 @@ const HUD_CAPTURE_FILES: Array[String] = [
 	"41_blitz_bonus_gauge_b.png",
 	"42_blitz_bonus_layer_cross.png",
 	"43_blitz_bonus_fever.png",
+	"44_turn_ready.png",
+	"45_turn_busy_a.png",
+	"45_turn_busy_b.png",
+	"46_turn_rejected.png",
 ]
 
 var _failed: bool = false
@@ -194,6 +202,30 @@ func _capture_turn_scenes() -> void:
 		await _destroy_main(main)
 		return
 	await _write_board_projection_report(main, board)
+	var ready_blocked: Array[Vector2i] = [Vector2i.LEFT]
+	manager.blocked_directions = ready_blocked.duplicate()
+	manager.warning_changed.emit(ready_blocked)
+	board.set_warning_directions(ready_blocked)
+	await get_tree().create_timer(TurnInputIndicator.READY_FADE_DURATION + 0.02).timeout
+	await _capture("44_turn_ready.png")
+	manager.on_swipe(Vector2i.RIGHT)
+	manager.set_physics_process(false)
+	await get_tree().create_timer(TurnInputIndicator.BUSY_FADE_DURATION + 0.02).timeout
+	await _capture("45_turn_busy_a.png")
+	await get_tree().create_timer(0.40).timeout
+	await _capture("45_turn_busy_b.png")
+	InputRouter.swipe_rejected.emit(Vector2i.LEFT)
+	await get_tree().create_timer(0.04).timeout
+	await _capture("46_turn_rejected.png")
+	manager.set_physics_process(true)
+	if not await _wait_for_turn_input(manager):
+		_fail("TURN cue capture did not settle")
+		await _destroy_main(main)
+		return
+	var no_blocked: Array[Vector2i] = []
+	manager.blocked_directions.clear()
+	manager.warning_changed.emit(no_blocked)
+	board.set_warning_directions(no_blocked)
 	for turn_index: int in range(4):
 		manager.on_swipe(DIRECTION_PATTERN[turn_index])
 		if not await _wait_for_turn_input(manager):

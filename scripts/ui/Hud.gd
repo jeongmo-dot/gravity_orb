@@ -84,6 +84,7 @@ const SPEAKER_OFF_ICON: Texture2D = preload("res://assets/ui/speaker_off.svg")
 @onready var _blocked_panel: PanelContainer = %BlockedPanel
 @onready var _time_bar_track: Panel = %TimeBarTrack
 @onready var _time_bar_fill: BlitzTimeBar = %TimeBarFill
+@onready var _turn_input_indicator: TurnInputIndicator = %TurnInputIndicator
 
 var _spawner: Spawner
 var _score_manager: ScoreManager
@@ -444,6 +445,8 @@ func bind_game_state(
 	_reset_callout_tracking()
 	_blitz_mode = game_manager is BlitzManager
 	_blitz_manager = game_manager as BlitzManager if _blitz_mode else null
+	if not _blitz_mode:
+		_turn_input_indicator.bind(game_manager, board)
 	game_manager.warning_changed.connect(_on_warning_changed)
 	game_manager.combo_changed.connect(_on_combo_changed)
 	_game_over_panel.bind(game_manager, score_manager)

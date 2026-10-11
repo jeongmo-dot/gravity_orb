@@ -56,6 +56,7 @@ func _prepare_start_screen() -> void:
 		Config.data.game_mode
 	)
 	_launch_game_on_ready = false
+	InputRouter.set_accept_release_after_unlock(false)
 
 
 func _ready() -> void:
@@ -90,6 +91,7 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	InputRouter.set_accept_release_after_unlock(false)
 	if (
 		_camera_3d != null
 		and get_viewport().size_changed.is_connected(_apply_camera_aspect)
@@ -142,6 +144,7 @@ func launch_immediately(mode: GameConfig.GameMode) -> void:
 
 func _start_gameplay() -> void:
 	var blitz_mode: bool = Config.data.game_mode == GameConfig.GameMode.BLITZ
+	InputRouter.set_accept_release_after_unlock(not blitz_mode)
 	_game_manager = _blitz_manager if blitz_mode else _turn_manager
 	_turn_manager.set_physics_process(not blitz_mode)
 	if blitz_mode:
