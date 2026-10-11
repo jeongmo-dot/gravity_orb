@@ -29,6 +29,25 @@ func test_color_symbol_mapping_has_six_distinct_polygon_shapes() -> void:
 	assert_eq(point_counts, [3, 24, 4, 4, 10, 12], "six symbol geometries")
 
 
+func test_3d_symbol_texture_has_white_fill_and_dark_outline() -> void:
+	for color: int in range(OrbSymbols.SYMBOL_COUNT):
+		var texture: ImageTexture = OrbSymbols.material_for_color(color).albedo_texture as ImageTexture
+		var image: Image = texture.get_image()
+		var white_pixels: int = 0
+		var outline_pixels: int = 0
+		for y: int in range(image.get_height()):
+			for x: int in range(image.get_width()):
+				var pixel: Color = image.get_pixel(x, y)
+				if pixel.a <= 0.0:
+					continue
+				if pixel.r > 0.9 and pixel.g > 0.9 and pixel.b > 0.9:
+					white_pixels += 1
+				elif pixel.get_luminance() < 0.1:
+					outline_pixels += 1
+		assert_true(white_pixels > 0, "color %d has white symbol fill" % color)
+		assert_true(outline_pixels > 0, "color %d has dark symbol outline" % color)
+
+
 func test_2d_orbs_and_preview_use_color_symbols_and_toggle() -> void:
 	var original_enabled: bool = Config.data.orb_symbols_enabled
 	Config.data.orb_symbols_enabled = true
@@ -136,9 +155,10 @@ func test_3d_symbol_follows_position_without_inheriting_roll_and_keeps_blink() -
 	assert_eq(symbol.rotation, Vector3.ZERO, "symbol does not inherit body roll")
 	assert_near(symbol.position.x, body.position.x, 0.0001, "symbol follows body x")
 	assert_near(symbol.position.y, body.position.y, 0.0001, "symbol follows body y")
-	var orb_material: StandardMaterial3D = orb._mesh.material_override as StandardMaterial3D
-	assert_true(orb_material.emission_enabled, "orb emission remains enabled")
-	assert_true(orb_material.emission != Color.BLACK, "armed blink emission remains visible")
+	var orb_material: ShaderMaterial = orb._mesh.material_override as ShaderMaterial
+	assert_true(orb_material != null, "orb keeps celestial body material")
+	assert_true(orb._blast_outline.visible, "armed pulse outline remains visible")
+	assert_true(orb.blast_outline_strength() > 0.0, "armed pulse strength remains visible")
 	board.queue_free()
 	await tree.process_frame
 	Config.data.orb_symbols_enabled = original_enabled

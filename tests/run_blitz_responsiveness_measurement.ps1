@@ -74,12 +74,14 @@ function Get-Percentile([double[]]$Values, [double]$Percentile) {
 }
 
 $frames = [System.Collections.Generic.List[double]]::new()
+$drawCalls = [System.Collections.Generic.List[double]]::new()
 $inputLatencies = [System.Collections.Generic.List[double]]::new()
 $spawnLatencies = [System.Collections.Generic.List[double]]::new()
 $blastFrames = [System.Collections.Generic.List[double]]::new()
 $largeBatchFrames = [System.Collections.Generic.List[double]]::new()
 foreach ($report in $seedReports) {
     foreach ($value in $report.frame_samples_ms) { $frames.Add([double]$value) }
+    foreach ($value in $report.draw_call_samples) { $drawCalls.Add([double]$value) }
     foreach ($value in $report.input_latency_ms) { $inputLatencies.Add([double]$value) }
     foreach ($value in $report.spawn_latency_ms) { $spawnLatencies.Add([double]$value) }
     if ([double]$report.first_blast_frame_ms -ge 0.0) {
@@ -103,6 +105,10 @@ $aggregate = [ordered]@{
     frame_max_ms = if ($frames.Count -gt 0) { [double](($frames | Measure-Object -Maximum).Maximum) } else { 0.0 }
     frames_over_16_7_ms = @($frames | Where-Object { $_ -gt 16.7 }).Count
     frames_over_33_3_ms = @($frames | Where-Object { $_ -gt 33.3 }).Count
+    draw_calls_p50 = Get-Percentile $drawCalls.ToArray() 50
+    draw_calls_p95 = Get-Percentile $drawCalls.ToArray() 95
+    draw_calls_max = if ($drawCalls.Count -gt 0) { [double](($drawCalls | Measure-Object -Maximum).Maximum) } else { 0.0 }
+    shared_resources = $seedReports[0].shared_resources
     input_accept_p50_ms = Get-Percentile $inputLatencies.ToArray() 50
     input_accept_p95_ms = Get-Percentile $inputLatencies.ToArray() 95
     input_accept_max_ms = if ($inputLatencies.Count -gt 0) { [double](($inputLatencies | Measure-Object -Maximum).Maximum) } else { 0.0 }

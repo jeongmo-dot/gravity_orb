@@ -1,7 +1,9 @@
 extends Node
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
+const ORB_3D_SCENE: PackedScene = preload("res://scenes/Orb3D.tscn")
 const OUTPUT_DIRECTORY: String = "res://artifacts/screens"
+const MEASUREMENT_DIRECTORY: String = "res://artifacts/measurements"
 const DEFAULT_USER_SAVE: String = "user://save.cfg"
 const TEMP_SAVE_PREFIX: String = "--capture-save-path="
 const CAPTURE_SEED: int = 5050
@@ -36,6 +38,8 @@ const CAPTURE_FILES: Array[String] = [
 	"11_result_new_record.png",
 	"12_turn_ramp_next.png",
 	"13_turn_ramp_uncapped_next.png",
+	"14_orb_codex.png",
+	"15_orb_closeup.png",
 ]
 
 var _failed: bool = false
@@ -64,6 +68,10 @@ func _run_capture_suite() -> void:
 		await _capture_turn_scenes()
 	if not _failed:
 		await _capture_blitz_scenes()
+	if not _failed:
+		await _capture_orb_codex()
+	if not _failed:
+		await _capture_orb_closeup()
 
 	_verify_capture_files()
 	_verify_user_save_unchanged()
@@ -256,6 +264,331 @@ func _capture_blitz_scenes() -> void:
 	_validate_new_record_result_scene(main)
 	await _capture("11_result_new_record.png")
 	await _destroy_main(main)
+
+
+func _capture_orb_codex() -> void:
+	var main: Main = await _create_main(Main.NO_MODE)
+	(main.get_node("UI") as CanvasLayer).visible = false
+	(main.get_node("Board") as Board3D).visible = false
+	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
+	camera.position.z = 55.0
+	var level_radii: Array[float] = []
+	for level: int in range(1, Config.data.orb_max_level + 1):
+		level_radii.append(Config.data.radius_for_level(level))
+	var total_width: float = 0.0
+	for radius: float in level_radii:
+		total_width += radius * 2.0
+	total_width += float(level_radii.size() - 1) * 20.0
+	var level_centers: Array[float] = []
+	var cursor: float = -total_width * 0.5
+	for radius: float in level_radii:
+		level_centers.append(cursor + radius)
+		cursor += radius * 2.0 + 20.0
+	var descriptors: Array[Dictionary] = []
+	for color: int in range(Config.data.color_display.size()):
+		var row_y: float = -750.0 + float(color) * 300.0
+		for level: int in range(1, Config.data.orb_max_level + 1):
+			var orb: Orb3D = ORB_3D_SCENE.instantiate() as Orb3D
+			main.add_child(orb)
+			orb.setup(color, level, Config.data)
+			orb.disable_physics()
+			orb.set_render_clamp_enabled(false)
+			var plane_position: Vector2 = Vector2(level_centers[level - 1], row_y)
+			orb.position = plane_position
+			descriptors.append({
+				"color": color,
+				"level": level,
+				"plane_position": plane_position,
+				"radius": Config.data.radius_for_level(level),
+			})
+	await get_tree().process_frame
+	await get_tree().process_frame
+	await _capture("14_orb_codex.png")
+	_analyze_orb_codex(camera, descriptors)
+	print("SCREEN_CAPTURE_CHECK scene=orb_codex colors=6 levels=7 symbols=on")
+	await _destroy_main(main)
+
+
+func _capture_orb_closeup() -> void:
+	var main: Main = await _create_main(Main.NO_MODE)
+	(main.get_node("UI") as CanvasLayer).visible = false
+	(main.get_node("Board") as Board3D).visible = false
+	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
+	camera.position.z = 55.0 / 3.0
+	var positions: Array[Vector2] = [
+		Vector2(-200.0, -295.0),
+		Vector2(-125.0, -295.0),
+		Vector2(-15.0, -295.0),
+		Vector2(140.0, -295.0),
+		Vector2(-127.5, -70.0),
+		Vector2(107.5, -70.0),
+		Vector2(0.0, 220.0),
+	]
+	for level: int in range(1, Config.data.orb_max_level + 1):
+		var orb: Orb3D = ORB_3D_SCENE.instantiate() as Orb3D
+		main.add_child(orb)
+		orb.setup(OrbTypes.OrbColor.CYAN, level, Config.data)
+		orb.disable_physics()
+		orb.set_render_clamp_enabled(false)
+		orb.position = positions[level - 1]
+	await get_tree().process_frame
+	await get_tree().process_frame
+	await _capture("15_orb_closeup.png")
+	print("SCREEN_CAPTURE_CHECK scene=orb_closeup color=CYAN levels=7 scale=3x")
+	await _destroy_main(main)
+
+
+func _analyze_orb_codex(camera: Camera3D, descriptors: Array[Dictionary]) -> void:
+	var image_path: String = OUTPUT_DIRECTORY.path_join("14_orb_codex.png")
+	var image: Image = Image.load_from_file(ProjectSettings.globalize_path(image_path))
+	if image == null or image.is_empty():
+		_fail("Could not load orb codex for color analysis")
+		return
+	var samples: Dictionary = {}
+	var seam_center_sum: float = 0.0
+	var seam_surrounding_sum: float = 0.0
+	var seam_sample_count: int = 0
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var image_scale: Vector2 = Vector2(
+		float(image.get_width()) / viewport_size.x,
+		float(image.get_height()) / viewport_size.y
+	)
+	for descriptor: Dictionary in descriptors:
+		var plane_position: Vector2 = descriptor["plane_position"] as Vector2
+		var radius_px: float = float(descriptor["radius"])
+		var world_center: Vector3 = Orb3D.plane_position_to_world(plane_position)
+		var world_edge: Vector3 = Orb3D.plane_position_to_world(
+			plane_position + Vector2(radius_px, 0.0)
+		)
+		var screen_center: Vector2 = camera.unproject_position(world_center) * image_scale
+		var screen_edge: Vector2 = camera.unproject_position(world_edge) * image_scale
+		var screen_radius: float = absf(screen_edge.x - screen_center.x)
+		var average: Color = _bright_average(image, screen_center, screen_radius)
+		var body_radius: float = (
+			screen_radius * CelestialOrbArt.body_radius_ratio(int(descriptor["level"]))
+		)
+		var seam_metrics: Dictionary = _seam_column_metrics(image, screen_center, body_radius)
+		var lab: Vector3 = _color_to_lab(average)
+		var reference: Color = Config.data.color_display[int(descriptor["color"])]
+		var reference_lab: Vector3 = _color_to_lab(reference)
+		var hue_error: float = _hue_angle_difference(lab, reference_lab)
+		var key: String = "%d:%d" % [int(descriptor["level"]), int(descriptor["color"])]
+		samples[key] = {
+			"rgb": [average.r, average.g, average.b],
+			"lab": [lab.x, lab.y, lab.z],
+			"hue_error_deg": hue_error,
+			"seam_center_difference": seam_metrics["center_difference"],
+			"seam_surrounding_difference": seam_metrics["surrounding_difference"],
+			"seam_ratio": seam_metrics["ratio"],
+		}
+		seam_center_sum += float(seam_metrics["center_difference"])
+		seam_surrounding_sum += float(seam_metrics["surrounding_difference"])
+		seam_sample_count += 1
+	var seam_center_average: float = seam_center_sum / float(seam_sample_count)
+	var seam_surrounding_average: float = seam_surrounding_sum / float(seam_sample_count)
+	var seam_ratio: float = seam_center_average / maxf(seam_surrounding_average, 0.002)
+	print(
+		"ORB_CODEX_SEAM center_average=%.5f surrounding_average=%.5f ratio=%.2f" % [
+			seam_center_average,
+			seam_surrounding_average,
+			seam_ratio,
+		]
+	)
+	if seam_ratio > 2.0:
+		_fail("Orb codex aggregate seam ratio %.2f exceeds 2.0" % seam_ratio)
+	var reference_min_delta_e: float = INF
+	for first_color: int in range(Config.data.color_display.size()):
+		for second_color: int in range(first_color + 1, Config.data.color_display.size()):
+			reference_min_delta_e = minf(
+				reference_min_delta_e,
+				_color_to_lab(Config.data.color_display[first_color]).distance_to(
+					_color_to_lab(Config.data.color_display[second_color])
+				)
+			)
+	var levels: Array[Dictionary] = []
+	for level: int in range(1, Config.data.orb_max_level + 1):
+		var minimum_delta_e: float = INF
+		var maximum_hue_error: float = 0.0
+		var maximum_seam_ratio: float = 0.0
+		var color_samples: Array[Dictionary] = []
+		for color: int in range(Config.data.color_display.size()):
+			var sample: Dictionary = samples["%d:%d" % [level, color]] as Dictionary
+			maximum_hue_error = maxf(maximum_hue_error, float(sample["hue_error_deg"]))
+			maximum_seam_ratio = maxf(maximum_seam_ratio, float(sample["seam_ratio"]))
+			color_samples.append({
+				"color": color,
+				"rgb": sample["rgb"],
+				"lab": sample["lab"],
+				"hue_error_deg": sample["hue_error_deg"],
+				"seam_center_difference": sample["seam_center_difference"],
+				"seam_surrounding_difference": sample["seam_surrounding_difference"],
+				"seam_ratio": sample["seam_ratio"],
+			})
+			var first_lab_values: Array = sample["lab"] as Array
+			var first_lab: Vector3 = Vector3(
+				float(first_lab_values[0]),
+				float(first_lab_values[1]),
+				float(first_lab_values[2])
+			)
+			for second_color: int in range(color + 1, Config.data.color_display.size()):
+				var second_sample: Dictionary = samples["%d:%d" % [level, second_color]] as Dictionary
+				var second_values: Array = second_sample["lab"] as Array
+				var second_lab: Vector3 = Vector3(
+					float(second_values[0]),
+					float(second_values[1]),
+					float(second_values[2])
+				)
+				minimum_delta_e = minf(minimum_delta_e, first_lab.distance_to(second_lab))
+		levels.append({
+			"level": level,
+			"minimum_delta_e_76": minimum_delta_e,
+			"maximum_hue_error_deg": maximum_hue_error,
+			"maximum_seam_ratio": maximum_seam_ratio,
+			"colors": color_samples,
+		})
+		print(
+			"ORB_CODEX_COLOR level=%d min_delta_e=%.2f max_hue_error=%.2f max_seam_ratio=%.2f" % [
+				level,
+				minimum_delta_e,
+				maximum_hue_error,
+				maximum_seam_ratio,
+			]
+		)
+		if minimum_delta_e < 25.0:
+			_fail("Orb codex L%d minimum Delta E %.2f is below 25" % [level, minimum_delta_e])
+		if maximum_hue_error > 25.0:
+			_fail("Orb codex L%d hue error %.2f exceeds 25 degrees" % [level, maximum_hue_error])
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(MEASUREMENT_DIRECTORY))
+	var report_path: String = MEASUREMENT_DIRECTORY.path_join("orb_codex_color_report.json")
+	var report_file: FileAccess = FileAccess.open(report_path, FileAccess.WRITE)
+	if report_file == null:
+		_fail("Could not write orb codex color report")
+		return
+	report_file.store_string(JSON.stringify({
+		"bright_pixel_fraction": 0.4,
+		"reference_minimum_delta_e_76": reference_min_delta_e,
+		"seam_check": {
+			"center_average": seam_center_average,
+			"surrounding_average": seam_surrounding_average,
+			"ratio": seam_ratio,
+			"maximum_ratio": 2.0,
+		},
+		"levels": levels,
+	}, "  "))
+	print("ORB_CODEX_REFERENCE min_delta_e=%.2f report=%s" % [reference_min_delta_e, report_path])
+
+
+func _bright_average(image: Image, center: Vector2, radius: float) -> Color:
+	var colors: Array[Color] = []
+	var min_x: int = maxi(0, floori(center.x - radius))
+	var max_x: int = mini(image.get_width() - 1, ceili(center.x + radius))
+	var min_y: int = maxi(0, floori(center.y - radius))
+	var max_y: int = mini(image.get_height() - 1, ceili(center.y + radius))
+	for y: int in range(min_y, max_y + 1):
+		for x: int in range(min_x, max_x + 1):
+			if Vector2(float(x) + 0.5, float(y) + 0.5).distance_to(center) <= radius:
+				colors.append(image.get_pixel(x, y))
+	colors.sort_custom(_is_color_brighter)
+	var sample_count: int = maxi(1, ceili(float(colors.size()) * 0.4))
+	var sum: Vector3 = Vector3.ZERO
+	for index: int in range(sample_count):
+		sum += Vector3(colors[index].r, colors[index].g, colors[index].b)
+	var average: Vector3 = sum / float(sample_count)
+	return Color(average.x, average.y, average.z, 1.0)
+
+
+func _seam_column_metrics(image: Image, center: Vector2, radius: float) -> Dictionary:
+	var left_center_x: int = floori(center.x - 0.5)
+	var right_center_x: int = left_center_x + 1
+	var center_difference: float = _body_column_pair_difference(
+		image,
+		left_center_x,
+		right_center_x,
+		center.y,
+		radius
+	)
+	var surrounding_sum: float = 0.0
+	var surrounding_count: int = 0
+	for left_x: int in range(left_center_x - 7, right_center_x + 7):
+		if left_x == left_center_x:
+			continue
+		surrounding_sum += _body_column_pair_difference(
+			image,
+			left_x,
+			left_x + 1,
+			center.y,
+			radius
+		)
+		surrounding_count += 1
+	var surrounding_difference: float = surrounding_sum / float(surrounding_count)
+	return {
+		"center_difference": center_difference,
+		"surrounding_difference": surrounding_difference,
+		"ratio": center_difference / maxf(surrounding_difference, 0.002),
+	}
+
+
+func _body_column_pair_difference(
+	image: Image,
+	left_x: int,
+	right_x: int,
+	center_y: float,
+	radius: float
+) -> float:
+	var min_y: int = maxi(0, floori(center_y - radius * 0.72))
+	var max_y: int = mini(image.get_height() - 1, ceili(center_y + radius * 0.72))
+	var safe_left_x: int = clampi(left_x, 0, image.get_width() - 1)
+	var safe_right_x: int = clampi(right_x, 0, image.get_width() - 1)
+	var difference_sum: float = 0.0
+	var sample_count: int = 0
+	for y: int in range(min_y, max_y + 1):
+		if absf(float(y) + 0.5 - center_y) < radius * 0.34:
+			continue
+		difference_sum += _rgb_distance(
+			image.get_pixel(safe_left_x, y),
+			image.get_pixel(safe_right_x, y)
+		)
+		sample_count += 1
+	if sample_count <= 0:
+		return 0.0
+	return difference_sum / float(sample_count)
+
+
+func _rgb_distance(first: Color, second: Color) -> float:
+	return Vector3(first.r, first.g, first.b).distance_to(
+		Vector3(second.r, second.g, second.b)
+	)
+
+
+func _is_color_brighter(first: Color, second: Color) -> bool:
+	return first.get_luminance() > second.get_luminance()
+
+
+func _color_to_lab(color_value: Color) -> Vector3:
+	var red: float = _srgb_to_linear(color_value.r)
+	var green: float = _srgb_to_linear(color_value.g)
+	var blue: float = _srgb_to_linear(color_value.b)
+	var x: float = (red * 0.4124564 + green * 0.3575761 + blue * 0.1804375) / 0.95047
+	var y: float = red * 0.2126729 + green * 0.7151522 + blue * 0.0721750
+	var z: float = (red * 0.0193339 + green * 0.1191920 + blue * 0.9503041) / 1.08883
+	var fx: float = _lab_component(x)
+	var fy: float = _lab_component(y)
+	var fz: float = _lab_component(z)
+	return Vector3(116.0 * fy - 16.0, 500.0 * (fx - fy), 200.0 * (fy - fz))
+
+
+func _srgb_to_linear(value: float) -> float:
+	return value / 12.92 if value <= 0.04045 else pow((value + 0.055) / 1.055, 2.4)
+
+
+func _lab_component(value: float) -> float:
+	return pow(value, 1.0 / 3.0) if value > 0.008856 else 7.787 * value + 16.0 / 116.0
+
+
+func _hue_angle_difference(first: Vector3, second: Vector3) -> float:
+	var first_angle: float = rad_to_deg(atan2(first.z, first.y))
+	var second_angle: float = rad_to_deg(atan2(second.z, second.y))
+	return absf(wrapf(first_angle - second_angle + 180.0, 0.0, 360.0) - 180.0)
 
 
 func _prepare_blitz_ranking_capture() -> Dictionary:

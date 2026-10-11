@@ -55,7 +55,9 @@ $expectedFiles = @(
     "10_ranking_blitz.png",
     "11_result_new_record.png",
     "12_turn_ramp_next.png",
-    "13_turn_ramp_uncapped_next.png"
+    "13_turn_ramp_uncapped_next.png",
+	"14_orb_codex.png",
+	"15_orb_closeup.png"
 )
 foreach ($fileName in $expectedFiles) {
     $filePath = Join-Path $outputPath $fileName

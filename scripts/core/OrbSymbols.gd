@@ -2,9 +2,11 @@ class_name OrbSymbols
 extends RefCounted
 
 const SYMBOL_COUNT: int = 6
-const SYMBOL_ALPHA: float = 0.55
+const SYMBOL_ALPHA: float = 0.92
 const SYMBOL_SIZE_FACTOR: float = 0.45
 const TEXTURE_SIZE: int = 128
+const OUTLINE_RADIUS_PX: int = 6
+const OUTLINE_COLOR: Color = Color(0.015, 0.025, 0.065, 0.96)
 const SYMBOL_NAMES: Array[String] = [
 	"triangle",
 	"circle",
@@ -99,6 +101,10 @@ static func shared_texture_count() -> int:
 	return _symbol_textures.size()
 
 
+static func prewarm_shared_resources() -> void:
+	_ensure_shared_resources()
+
+
 static func _ensure_shared_resources() -> void:
 	if _symbol_meshes.size() == SYMBOL_COUNT:
 		return
@@ -136,17 +142,45 @@ static func _create_texture(color: int) -> ImageTexture:
 	)
 	image.fill(Color.TRANSPARENT)
 	var polygons: Array[PackedVector2Array] = polygons_for_color(color)
+	var inside_mask: PackedByteArray = PackedByteArray()
+	inside_mask.resize(TEXTURE_SIZE * TEXTURE_SIZE)
 	for y: int in range(TEXTURE_SIZE):
 		for x: int in range(TEXTURE_SIZE):
 			var point: Vector2 = Vector2(
 				(float(x) + 0.5) / float(TEXTURE_SIZE) - 0.5,
 				(float(y) + 0.5) / float(TEXTURE_SIZE) - 0.5
 			)
-			if _is_inside_any_polygon(point, polygons):
+			inside_mask[y * TEXTURE_SIZE + x] = (
+				1 if _is_inside_any_polygon(point, polygons) else 0
+			)
+	for y: int in range(TEXTURE_SIZE):
+		for x: int in range(TEXTURE_SIZE):
+			if inside_mask[y * TEXTURE_SIZE + x] == 1:
 				image.set_pixel(x, y, Color.WHITE)
+				continue
+			if _has_inside_neighbor(inside_mask, x, y):
+				image.set_pixel(x, y, OUTLINE_COLOR)
 	var texture: ImageTexture = ImageTexture.create_from_image(image)
 	texture.resource_name = "orb_symbol_%s_texture" % symbol_name_for_color(color)
 	return texture
+
+
+static func _has_inside_neighbor(mask: PackedByteArray, x: int, y: int) -> bool:
+	for offset_y: int in range(-OUTLINE_RADIUS_PX, OUTLINE_RADIUS_PX + 1):
+		for offset_x: int in range(-OUTLINE_RADIUS_PX, OUTLINE_RADIUS_PX + 1):
+			if offset_x * offset_x + offset_y * offset_y > OUTLINE_RADIUS_PX * OUTLINE_RADIUS_PX:
+				continue
+			var sample_x: int = x + offset_x
+			var sample_y: int = y + offset_y
+			if (
+				sample_x >= 0
+				and sample_x < TEXTURE_SIZE
+				and sample_y >= 0
+				and sample_y < TEXTURE_SIZE
+				and mask[sample_y * TEXTURE_SIZE + sample_x] == 1
+			):
+				return true
+	return false
 
 
 static func _is_inside_any_polygon(
