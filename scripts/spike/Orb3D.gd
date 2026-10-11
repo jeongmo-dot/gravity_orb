@@ -426,6 +426,12 @@ func blast_outline_strength() -> float:
 	return blast_emission_strength() if _blast_armed else 0.0
 
 
+func blast_pulse_scale() -> float:
+	if not _blast_armed or level < 6:
+		return 1.0
+	return lerpf(0.94, 1.0, blast_emission_strength())
+
+
 func visual_stretch_scale() -> Vector3:
 	return _stretch_scale_for_ratio(_visual_stretch_ratio())
 
@@ -606,7 +612,11 @@ func _update_visual_transform() -> void:
 		maxf(_visual_punch_scale.y, _visual_punch_scale.z)
 	)
 	_adornment.scale = Vector3(radius_m, radius_m, 1.0) * punch_scale
-	_blast_outline.scale = Vector3(radius_m, radius_m, 1.0) * punch_scale
+	_blast_outline.scale = (
+		Vector3(radius_m, radius_m, 1.0)
+		* punch_scale
+		* blast_pulse_scale()
+	)
 	_symbol_mesh.position = render_world_position + Vector3(0.0, 0.0, radius_m + 0.002)
 	_symbol_mesh.rotation = Vector3.ZERO
 	var symbol_size_m: float = radius_m * OrbSymbols.SYMBOL_SIZE_FACTOR

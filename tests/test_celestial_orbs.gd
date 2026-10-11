@@ -26,6 +26,17 @@ func test_all_levels_keep_celestial_art_inside_collision_radius() -> void:
 			orb.mesh_resource().radius <= collision_radius,
 			"L%d body stays inside collision radius" % level
 		)
+		if level == 1:
+			assert_true(
+				CelestialOrbArt.body_radius_ratio(level)
+				* CelestialOrbArt.METEOR_VERTEX_MAX_SCALE <= 1.0,
+				"L1 irregular silhouette maximum stays inside collision radius"
+			)
+			assert_true(
+				CelestialOrbArt.body_radius_ratio(level)
+				* CelestialOrbArt.METEOR_VERTEX_MIN_SCALE >= 0.85,
+				"L1 irregular silhouette minimum remains readable"
+			)
 		assert_true(
 			orb._adornment.visible == (level == 4 or level >= 6),
 			"L%d camera-fixed ring or halo visibility" % level
@@ -35,6 +46,26 @@ func test_all_levels_keep_celestial_art_inside_collision_radius() -> void:
 				orb._adornment.scale.x <= collision_radius,
 				"L%d adornment stays inside collision radius" % level
 			)
+	await _cleanup(board)
+
+
+func test_body_shader_uses_seamless_local_3d_patterns() -> void:
+	var board: Board3D = await _create_board()
+	var orb: Orb3D = board.spawn_orb(OrbTypes.OrbColor.BLUE, 5, Vector2.ZERO)
+	var material: ShaderMaterial = orb.visual_material_resource()
+	var shader_code: String = material.shader.code
+	assert_true(
+		shader_code.contains("value_noise3(body_position"),
+		"body patterns sample local 3D surface position"
+	)
+	assert_true(
+		not shader_code.contains("value_noise(art_uv"),
+		"body patterns do not sample the UV seam"
+	)
+	assert_true(
+		shader_code.contains("sphere_spot(body_position"),
+		"craters and storms follow the sphere surface"
+	)
 	await _cleanup(board)
 
 
@@ -114,13 +145,26 @@ func test_pulse_outline_is_only_visible_for_level_four_and_above() -> void:
 			orb._blast_outline.visible == (level >= Config.data.active_blast_min_level()),
 			"L%d outline visibility" % level
 		)
+		assert_eq(
+			CelestialOrbArt.blast_pulse_style(level),
+			"" if level < 4 else ("rim" if level <= 5 else "glow"),
+			"L%d uses the specified integrated pulse style" % level
+		)
 		if orb._blast_outline.visible:
 			var before: float = orb.blast_outline_strength()
+			var scale_before: float = orb.blast_pulse_scale()
 			orb._physics_process(Config.data.blast_blink_period * 0.25)
 			assert_true(
 				not is_equal_approx(orb.blast_outline_strength(), before),
 				"L%d outline pulses" % level
 			)
+			if level >= 6:
+				assert_true(
+					not is_equal_approx(orb.blast_pulse_scale(), scale_before),
+					"L%d glow size pulses" % level
+				)
+			else:
+				assert_eq(orb.blast_pulse_scale(), 1.0, "L%d rim does not detach" % level)
 	await _cleanup(board)
 
 

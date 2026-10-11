@@ -147,9 +147,15 @@ func _draw_celestial() -> void:
 	base.a = alpha
 	var body_radius: float = _radius * CelestialOrbArt.body_radius_ratio(_celestial_level)
 	if _celestial_level == 4:
-		_draw_planet_ring(_radius, base)
+		_draw_planet_ring(_radius, base, false)
 	elif _celestial_level >= 6:
-		_draw_halo(_radius, body_radius, base, _celestial_level == 7)
+		_draw_halo(
+			_radius,
+			body_radius,
+			base,
+			_celestial_level == 7,
+			blast_brightness() if _blast_armed else 0.0
+		)
 
 	match _celestial_level:
 		1:
@@ -166,6 +172,9 @@ func _draw_celestial() -> void:
 			_draw_star(body_radius, base, false)
 		7:
 			_draw_star(body_radius, base, true)
+	_draw_spherical_lighting(body_radius, base, _celestial_level >= 6)
+	if _celestial_level == 4:
+		_draw_planet_ring(_radius, base, true)
 
 	draw_arc(
 		Vector2.ZERO,
@@ -178,22 +187,13 @@ func _draw_celestial() -> void:
 		true
 	)
 	if _blast_armed:
-		var pulse_alpha: float = clampf(blast_brightness() * 1.7, 0.28, 0.95) * alpha
-		draw_arc(
-			Vector2.ZERO,
-			_radius * 0.94,
-			0.0,
-			TAU,
-			72,
-			_with_alpha(base.lightened(0.22), pulse_alpha),
-			maxf(2.0, _radius * 0.045),
-			true
-		)
+		if _celestial_level == 4 or _celestial_level == 5:
+			_draw_blast_rim(body_radius, base)
 
 
 func _draw_meteor(radius: float, base: Color) -> void:
 	var points: PackedVector2Array = PackedVector2Array()
-	var factors: Array[float] = [0.92, 0.98, 0.91, 0.96, 0.89, 0.97, 0.93, 1.0, 0.90, 0.96, 0.91, 0.99]
+	var factors: Array[float] = [0.92, 1.04, 0.91, 1.01, 0.93, 1.05, 0.94, 1.06, 0.91, 1.02, 0.92, 1.04]
 	for index: int in range(factors.size()):
 		var angle: float = -PI * 0.5 + TAU * float(index) / float(factors.size())
 		points.append(Vector2(cos(angle), sin(angle)) * radius * factors[index])
@@ -219,8 +219,10 @@ func _draw_moon(radius: float, base: Color) -> void:
 	draw_circle(Vector2(-0.30, -0.22) * radius, radius * 0.22, crater_color)
 	draw_circle(Vector2(0.34, 0.18) * radius, radius * 0.16, crater_color)
 	draw_circle(Vector2(-0.02, 0.48) * radius, radius * 0.11, crater_color)
+	draw_circle(Vector2(0.14, -0.51) * radius, radius * 0.08, crater_color)
 	var crater_rim: Color = _with_alpha(base.lightened(0.28), 0.45 * base.a)
 	draw_arc(Vector2(-0.30, -0.22) * radius, radius * 0.22, 0.0, TAU, 28, crater_rim, maxf(1.0, radius * 0.025), true)
+	draw_arc(Vector2(0.34, 0.18) * radius, radius * 0.16, PI, TAU, 20, crater_rim, maxf(1.0, radius * 0.022), true)
 
 
 func _draw_rocky_planet(radius: float, base: Color) -> void:
@@ -253,7 +255,7 @@ func _draw_gas_giant(radius: float, base: Color) -> void:
 
 
 func _draw_star(radius: float, base: Color, solar: bool) -> void:
-	draw_circle(Vector2.ZERO, radius, _with_alpha(base.lightened(0.22 if solar else 0.14), base.a))
+	draw_circle(Vector2.ZERO, radius, _with_alpha(base.lightened(0.16 if solar else 0.12), base.a))
 	var cell_color: Color = _with_alpha(base.lightened(0.52), 0.62 * base.a)
 	var cell_count: int = 10 if solar else 7
 	for index: int in range(cell_count):
@@ -261,36 +263,113 @@ func _draw_star(radius: float, base: Color, solar: bool) -> void:
 		var distance: float = radius * (0.28 + 0.36 * float((index * 7) % 5) / 4.0)
 		var cell_radius: float = radius * (0.07 + 0.025 * float(index % 3))
 		draw_circle(Vector2(cos(angle), sin(angle)) * distance, cell_radius, cell_color)
+	if not solar:
+		draw_circle(Vector2(-0.10, -0.12) * radius, radius * 0.52, _with_alpha(Color.WHITE, 0.40 * base.a))
+		draw_circle(Vector2(-0.12, -0.14) * radius, radius * 0.25, _with_alpha(Color.WHITE, 0.34 * base.a))
 
 
-func _draw_planet_ring(radius: float, base: Color) -> void:
+func _draw_planet_ring(radius: float, base: Color, front: bool) -> void:
 	var points: PackedVector2Array = PackedVector2Array()
-	for index: int in range(65):
-		var angle: float = TAU * float(index) / 64.0
-		var point: Vector2 = Vector2(cos(angle) * radius * 0.94, sin(angle) * radius * 0.30)
+	var start_angle: float = 0.0 if front else PI
+	for index: int in range(34):
+		var angle: float = start_angle + PI * float(index) / 33.0
+		var point: Vector2 = Vector2(cos(angle) * radius * 0.98, sin(angle) * radius * 0.27)
 		points.append(point.rotated(CelestialOrbArt.RING_TILT_RADIANS))
-	draw_polyline(points, _with_alpha(base.lightened(0.30), 0.86 * base.a), maxf(2.0, radius * 0.075), true)
-	draw_polyline(points, _with_alpha(base.darkened(0.22), 0.56 * base.a), maxf(1.0, radius * 0.025), true)
+	var layer_alpha: float = 0.96 if front else 0.48
+	draw_polyline(points, _with_alpha(base.darkened(0.28), layer_alpha * base.a), maxf(2.0, radius * 0.085), true)
+	draw_polyline(points, _with_alpha(base.lightened(0.35), layer_alpha * base.a), maxf(1.0, radius * 0.038), true)
 
 
-func _draw_halo(radius: float, body_radius: float, base: Color, solar: bool) -> void:
+func _draw_halo(
+	radius: float,
+	body_radius: float,
+	base: Color,
+	solar: bool,
+	pulse: float
+) -> void:
 	var ring_count: int = 5 if solar else 4
+	var pulse_scale: float = lerpf(0.94, 1.0, pulse) if pulse > 0.0 else 0.96
 	for index: int in range(ring_count, 0, -1):
 		var progress: float = float(index) / float(ring_count)
-		var halo_radius: float = lerpf(body_radius, radius * 0.98, progress)
-		var halo_alpha: float = (0.08 + 0.10 * (1.0 - progress)) * base.a
+		var halo_radius: float = lerpf(body_radius, radius * pulse_scale, progress)
+		var halo_alpha: float = (
+			0.07 + 0.10 * (1.0 - progress) + pulse * 0.10 * (1.0 - progress * 0.45)
+		) * base.a
 		draw_circle(Vector2.ZERO, halo_radius, _with_alpha(base, halo_alpha))
 	if solar:
-		for index: int in range(12):
-			var angle: float = TAU * float(index) / 12.0
+		var flare_angles: Array[float] = [-2.36, -0.38, 1.30]
+		for index: int in range(flare_angles.size()):
+			var angle: float = flare_angles[index]
 			var tangent: Vector2 = Vector2(cos(angle), sin(angle))
 			var perpendicular: Vector2 = tangent.orthogonal()
 			var flare: PackedVector2Array = PackedVector2Array([
-				tangent * body_radius * 0.88 + perpendicular * radius * 0.035,
-				tangent * radius * (0.94 if index % 3 == 0 else 0.86),
-				tangent * body_radius * 0.88 - perpendicular * radius * 0.035,
+				tangent * body_radius * 0.90 + perpendicular * radius * 0.045,
+				tangent * radius * (0.98 - float(index) * 0.035),
+				tangent * body_radius * 0.90 - perpendicular * radius * 0.045,
 			])
-			draw_colored_polygon(flare, _with_alpha(base.lightened(0.22), 0.55 * base.a))
+			draw_colored_polygon(flare, _with_alpha(base.lightened(0.28), (0.52 + pulse * 0.24) * base.a))
+	else:
+		var ray_color: Color = _with_alpha(base.lightened(0.38), (0.26 + pulse * 0.22) * base.a)
+		draw_line(Vector2(-radius * pulse_scale, 0.0), Vector2(radius * pulse_scale, 0.0), ray_color, maxf(1.0, radius * 0.022), true)
+		draw_line(Vector2(0.0, -radius * pulse_scale), Vector2(0.0, radius * pulse_scale), ray_color, maxf(1.0, radius * 0.022), true)
+
+
+func _draw_spherical_lighting(radius: float, base: Color, luminous: bool) -> void:
+	if luminous:
+		draw_arc(
+			Vector2.ZERO,
+			radius * 0.86,
+			-0.20,
+			PI * 0.82,
+			32,
+			_with_alpha(base.darkened(0.36), 0.28 * base.a),
+			maxf(1.5, radius * 0.13),
+			true
+		)
+		return
+	draw_arc(
+		Vector2.ZERO,
+		radius * 0.84,
+		-0.18,
+		PI * 0.82,
+		32,
+		_with_alpha(Color.BLACK, 0.30 * base.a),
+		maxf(2.0, radius * 0.20),
+		true
+	)
+	draw_arc(
+		Vector2.ZERO,
+		radius * 0.92,
+		PI * 0.92,
+		PI * 1.65,
+		26,
+		_with_alpha(base.lightened(0.44), 0.52 * base.a),
+		maxf(1.5, radius * 0.055),
+		true
+	)
+	if _celestial_level >= 2:
+		draw_circle(
+			Vector2(-0.34, -0.36) * radius,
+			radius * 0.11,
+			_with_alpha(Color.WHITE, 0.20 * base.a)
+		)
+
+
+func _draw_blast_rim(radius: float, base: Color) -> void:
+	var pulse: float = blast_brightness()
+	for index: int in range(3):
+		var inset: float = float(index) * radius * 0.025
+		var alpha: float = pulse * (0.34 - float(index) * 0.08) * base.a
+		draw_arc(
+			Vector2.ZERO,
+			radius - inset,
+			0.0,
+			TAU,
+			64,
+			_with_alpha(base.lightened(0.40), alpha),
+			maxf(1.0, radius * (0.055 + float(index) * 0.02)),
+			true
+		)
 
 
 func _draw_body_band(
@@ -302,13 +381,14 @@ func _draw_body_band(
 	var half_width: float = sqrt(maxf(radius * radius - y * y, 0.0)) * 0.96
 	var color_value: Color = base.lightened(0.25) if bright else base.darkened(0.28)
 	color_value.a = 0.78 * base.a
-	draw_line(
-		Vector2(-half_width, y),
-		Vector2(half_width, y),
-		color_value,
-		maxf(2.0, radius * 0.105),
-		true
-	)
+	var points: PackedVector2Array = PackedVector2Array()
+	for index: int in range(17):
+		var ratio: float = -1.0 + 2.0 * float(index) / 16.0
+		var curve_direction: float = 1.0 if y >= 0.0 else -1.0
+		var curve: float = (1.0 - ratio * ratio) * radius * 0.055 * curve_direction
+		var turbulence: float = sin(ratio * 8.0 + y * 0.11) * radius * 0.012
+		points.append(Vector2(ratio * half_width, y + curve + turbulence))
+	draw_polyline(points, color_value, maxf(2.0, radius * 0.105), true)
 
 
 func _draw_waiting_outline() -> void:
