@@ -30,8 +30,22 @@
 
 ## 대기 중
 
+### [2026-10-11 #65] 엔진을 일반 Godot 빌드로 — 스크립트 기본 경로, 흔들리는 테스트 분리
+- 상태: 대기 (#64 다음)
+- 근거: [technical_design.md](technical_design.md) §1 "엔진", `AGENTS.md` 검증 절
+- 배경: Codex가 창을 띄우는 실행(캡처·창 모드 측정)을 할 때 .NET 빌드가 `.NET assemblies not found` 경고 창을 사용자 화면에 띄웠다 (폴더는 있음 — 실행 환경에서 작업 폴더 밖 `GodotSharp`를 못 읽는 것으로 보임). 프로젝트는 C#을 쓰지 않으므로 사용자 승인으로 **일반 빌드** `C:\work\Godot\Godot_v4.8-dev3_win64_console.exe`를 설치했다 (공식 GitHub 배포본, SHA-512·서명 확인). Claude가 이 빌드로 main에서 import 0 오류, 일반 묶음 266/266 (2회), 장기 4/4, 성능 5/5, 캡처 15/15, 스모크 3종 0, .NET 메시지 0을 확인
+- 요구:
+  1. `tests/*.ps1`의 Godot 기본 경로를 일반 빌드로 — 우선순위 `-GodotPath` → `$env:GODOT` → `C:\work\Godot\Godot_v4.8-dev3_win64_console.exe` → (없으면) 예전 .NET 빌드 → `godot`. 지금 20여 개 스크립트에 복사된 경로 결정을 **한 곳**(예: `tests/godot_path.ps1`을 dot-source)으로 모은다
+  2. `tests/scenarios/test_turn_time.gd`를 일반 묶음에서 빼 별도 프로세스로 (장기 묶음 등) — 일반 묶음에서는 앞선 테스트 영향으로 2D 120턴 벽 복구가 0·1·4로 흔들려 한도 2를 가끔 넘는다 (Claude 관측: 일반 묶음 4 → 실패 1회, 같은 파일 단독 실행은 일반·.NET 빌드 모두 6회 연속 1). #42에서 장기 Jolt 테스트를 분리한 것과 같은 이유
+  3. `project.godot`의 빈 `[dotnet]` 섹션은 그대로 둔다
+- 검증: 새 기본 경로로 `.\tests\run_tests.ps1` (일반 묶음 3회 연속 통과 확인), `.\tests\capture_screens.ps1`, 스모크 3종 — 출력에 `.NET`/`assemblies` 메시지 0
+- 건드리지 말 것: 게임 코드·수치, `docs/` (회신 파일 제외)
+- Done-when: 위 검증 통과, 회신에 엔진 버전 문자열(`--version`) 기록
+- 커밋: 항목 단위 브랜치, push까지
+
 ### [2026-10-11 #64] 비주얼 V2 — 우주 배경·보드
 - 상태: 대기 — **추가 요구 1** (2026-10-11, 같은 PR #66에서)
+- 참고 (2026-10-11): **일반 Godot 빌드 설치됨** — 창을 띄우는 캡처·측정은 `-GodotPath C:\work\Godot\Godot_v4.8-dev3_win64_console.exe` 또는 `$env:GODOT`로 실행 (.NET 빌드는 `.NET assemblies not found` 경고 창을 사용자 화면에 띄움). 스크립트 기본 경로 변경은 #65
 - 추가 요구 1: [technical_design.md](technical_design.md) §12-V "V2 1차 결과"·"V2 추가 요구 1"
   - Claude 검수: 래퍼 280/280, 대비·성능·물리 해시 통과. 우주 배경·유리 보드·중력장 격자 좋음. 화소 측정으로 두 가지 결함 — 중력 벽 빛이 왼쪽 아래 모서리에 몰림(아래 중력일 때 아래 벽 가운데가 아니라 모서리), 위험 ×4 테두리 빨강이 거의 안 보임(바깥 띠 R +10)
   1. 중력 벽 빛: 그 벽 전체가 고르게(가운데 가장 밝게), 전환은 가까운 모서리를 돌아 0.25초 — 네 방향 정지 상태 밝기 검사

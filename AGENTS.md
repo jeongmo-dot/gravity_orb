@@ -62,7 +62,7 @@ Godot 4 / GDScript 기반 턴제 물리 퍼즐 프로토타입. 이 파일은 �
 
 ## 검증 명령
 
-엔진은 **Godot 4.8**이다 (로컬: `C:\work\Godot\Godot_v4.8-dev3_mono_win64_console.exe`). 다른 버전으로 검증했다면 회신에 버전을 적는다.
+엔진은 **Godot 4.8 일반 빌드**다 (로컬: `C:\work\Godot\Godot_v4.8-dev3_win64_console.exe`, .NET 없음). `..._mono_win64...` .NET 빌드는 쓰지 않는다 — 창을 띄우는 실행(캡처·창 모드 측정)에서 .NET 폴더 확인 경고 창이 사용자 화면에 떠서 작업이 멈춘다. 다른 버전으로 검증했다면 회신에 버전을 적는다.
 `godot` 실행 파일 경로가 다르면 `GODOT` 환경변수를 사용한다.
 
 ```bash
