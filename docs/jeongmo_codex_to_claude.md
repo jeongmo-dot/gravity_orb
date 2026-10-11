@@ -40,7 +40,7 @@
 
 ### [2026-10-11] 대상 #71 — 비주얼 V4-2 호령·점수 팝업·색 효과·피버
 - 상태: 완료 — A+C 원칙의 단계별 호령, 쉼표·금색 큰 점수, 단일 고리 별가루 색 효과, 띠 없는 피버 진입·흐르는 가장자리 성운과 빨간 `TIME UP` 고리를 구현함
-- 브랜치 / PR: `v4-2-callouts-effects` / 미생성
+- 브랜치 / PR: `v4-2-callouts-effects` / [PR #73](https://github.com/jeongmo-dot/gravity_orb/pull/73)
 - 변경 파일: `scenes/UI.tscn`, `scripts/ui/{Hud,ScorePopup,CosmicSparkle,CosmicRing2D}.gd`, `scripts/fx/{ColorEffectVisual,FeedbackDirector}.gd`, `tests/{capture_screens,run_blitz_responsiveness_measurement}.ps1`, `tests/spike/{capture_screens,run_blitz_responsiveness_measurement}.gd`, `tests/test_{callouts,color_effect_visuals,feedback,score_popups,screen_layout}.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 1~3단계 호령은 `#BFE9FF`→`#E8EEFF`→`#FFB020`, 얇은 어두운 테두리, 0.9→1.0배·8px 상승·0.8초 — 자동 (`test_callout_stage_treatment_and_time_up_ring`) + 캡처 `30` 두 시점
