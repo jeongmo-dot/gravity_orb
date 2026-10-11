@@ -40,7 +40,7 @@
 
 ### [2026-10-12] 대상 #74 — 행성 컬렉션 ①: 두 모드 6색·색 효과 재배치·턴제 밸런스
 - 상태: 완료 — TURN을 BLITZ와 같은 균등 6색으로 바꾸고 색 효과를 행성 역할에 맞춰 재배치했으며, 4조건 측정 규칙에 따라 `spawn_count_ramp_turns = 40`을 선택함
-- 브랜치 / PR: `planet-collection-1-rules-balance` / 생성 예정
+- 브랜치 / PR: `planet-collection-1-rules-balance` / [PR #76](https://github.com/jeongmo-dot/gravity_orb/pull/76)
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `tests/{run_blast_l4_turn_measurement.ps1,run_blitz_clock_measurement.ps1,test_color_effect_visuals.gd,test_config.gd,test_gravity_switch_feedback.gd,test_shockwave.gd,test_spawner.gd}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] TURN `spawn_color_weights = [1,1,1,1,1,1]`, BLITZ 기존 6색 유지 — 자동 (`test_m4_spawn_defaults`, `test_weighted_distribution_matches_config`, 10,000회에서 여섯 색 각각 1,626~1,714회)
