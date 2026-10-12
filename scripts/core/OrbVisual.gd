@@ -190,48 +190,158 @@ func _draw_planet_body(radius: float, base: Color) -> void:
 
 
 func _draw_mars(radius: float, base: Color, detail: bool, phase: float) -> void:
+	var dust_shift: float = sin(phase * 0.22) * radius * 0.04
+	if detail:
+		_draw_soft_ellipse(
+			Vector2(-0.27, 0.18) * radius + Vector2(dust_shift, 0.0),
+			Vector2(0.36, 0.20) * radius,
+			-0.24,
+			_with_alpha(base.darkened(0.30), 0.42 * base.a)
+		)
+		_draw_soft_ellipse(
+			Vector2(0.34, -0.30) * radius + Vector2(dust_shift * 0.6, 0.0),
+			Vector2(0.23, 0.15) * radius,
+			0.38,
+			_with_alpha(Color("#7D3025"), 0.38 * base.a)
+		)
+		var canyon: Color = _with_alpha(Color("#77281F"), 0.82 * base.a)
+		var canyon_points: PackedVector2Array = PackedVector2Array([
+			Vector2(-0.68, 0.02) * radius,
+			Vector2(-0.47, -0.03) * radius,
+			Vector2(-0.22, 0.01) * radius,
+			Vector2(0.02, -0.07) * radius,
+			Vector2(0.24, -0.03) * radius,
+			Vector2(0.48, 0.05) * radius,
+			Vector2(0.67, 0.01) * radius,
+		])
+		draw_polyline(canyon_points, canyon, maxf(1.2, radius * 0.060), true)
+		var crater_centers: Array[Vector2] = [
+			Vector2(-0.43, -0.30),
+			Vector2(0.39, 0.31),
+			Vector2(0.12, 0.49),
+		]
+		var crater_radii: Array[Vector2] = [
+			Vector2(0.075, 0.055),
+			Vector2(0.060, 0.046),
+			Vector2(0.048, 0.038),
+		]
+		for crater_index: int in range(crater_centers.size()):
+			_draw_soft_ellipse(
+				crater_centers[crater_index] * radius,
+				crater_radii[crater_index] * radius,
+				0.0,
+				_with_alpha(base.darkened(0.42), 0.58 * base.a)
+			)
 	var cap_color: Color = _with_alpha(Color("#F2ECE4"), 0.86 * base.a)
 	draw_arc(Vector2(0.0, -radius * 0.77), radius * 0.36, 0.12, PI - 0.12, 20, cap_color, maxf(2.0, radius * 0.18), true)
-	if detail:
-		var canyon: Color = _with_alpha(base.darkened(0.58), 0.74 * base.a)
-		var offset: float = sin(phase * 0.35) * radius * 0.035
-		var canyon_points: PackedVector2Array = PackedVector2Array([
-			Vector2(-0.58, -0.08) * radius + Vector2(offset, 0.0),
-			Vector2(-0.24, 0.02) * radius + Vector2(offset, 0.0),
-			Vector2(0.02, -0.12) * radius + Vector2(offset, 0.0),
-			Vector2(0.30, 0.12) * radius + Vector2(offset, 0.0),
-			Vector2(0.58, 0.20) * radius + Vector2(offset, 0.0),
-		])
-		draw_polyline(canyon_points, canyon, maxf(1.2, radius * 0.075), true)
 
 
 func _draw_earth(radius: float, base: Color, detail: bool, phase: float) -> void:
 	var land: Color = _with_alpha(Color("#287A50"), 0.90 * base.a)
-	draw_colored_polygon(PackedVector2Array([
-		Vector2(-0.62, -0.36) * radius,
-		Vector2(-0.18, -0.58) * radius,
-		Vector2(0.05, -0.22) * radius,
-		Vector2(-0.12, 0.08) * radius,
-		Vector2(0.17, 0.42) * radius,
-		Vector2(-0.25, 0.66) * radius,
-		Vector2(-0.53, 0.30) * radius,
-	]), land)
+	_draw_organic_blob(
+		Vector2(-0.24, -0.04) * radius,
+		Vector2(0.40, 0.50) * radius,
+		-0.28,
+		land,
+		0.4
+	)
+	if detail:
+		_draw_organic_blob(
+			Vector2(0.36, 0.17) * radius,
+			Vector2(0.28, 0.25) * radius,
+			0.34,
+			land,
+			2.1
+		)
+		_draw_organic_blob(
+			Vector2(0.19, -0.48) * radius,
+			Vector2(0.16, 0.12) * radius,
+			-0.16,
+			land,
+			4.3
+		)
 	var cloud: Color = _with_alpha(Color("#F4FAFF"), 0.70 * base.a)
 	var cloud_shift: float = sin(phase * 0.32) * radius * 0.09
-	draw_arc(Vector2(cloud_shift, -radius * 0.18), radius * 0.72, 3.48, 5.62, 24, cloud, maxf(1.2, radius * 0.075), true)
+	draw_arc(Vector2(cloud_shift, -radius * 0.18), radius * 0.72, 3.48, 5.62, 32, cloud, maxf(1.2, radius * 0.060), true)
 	if detail:
-		draw_arc(Vector2(-cloud_shift, radius * 0.24), radius * 0.60, 0.34, 2.72, 22, cloud, maxf(1.0, radius * 0.055), true)
+		draw_arc(Vector2(-cloud_shift, radius * 0.24), radius * 0.60, 0.34, 2.72, 30, cloud, maxf(1.0, radius * 0.045), true)
+		draw_arc(Vector2(radius * 0.17 + cloud_shift * 0.4, -radius * 0.02), radius * 0.34, -1.34, 1.28, 22, _with_alpha(cloud, 0.56 * base.a), maxf(0.8, radius * 0.032), true)
 
 
 func _draw_uranus(radius: float, base: Color, detail: bool, phase: float) -> void:
-	var band_color: Color = _with_alpha(base.lightened(0.30), 0.58 * base.a)
-	var shift: float = sin(phase * 0.26) * radius * 0.04
-	for band: int in range(-2, 3):
-		var x: float = float(band) * radius * 0.30 + shift
-		var half_height: float = sqrt(maxf(radius * radius - x * x, 0.0)) * 0.86
-		draw_line(Vector2(x, -half_height), Vector2(x, half_height), band_color, maxf(1.0, radius * 0.055), true)
+	var band_color: Color = _with_alpha(base.lightened(0.05), 0.34 * base.a)
+	var shift: float = sin(phase * 0.26) * radius * 0.025
+	for band: int in range(-1, 2):
+		var y: float = float(band) * radius * 0.32 + shift
+		var half_width: float = sqrt(maxf(radius * radius - y * y, 0.0)) * 0.84
+		_draw_soft_ellipse(
+			Vector2(0.0, y),
+			Vector2(half_width, radius * 0.105),
+			0.0,
+			band_color
+		)
+	draw_arc(
+		Vector2.ZERO,
+		radius * 0.93,
+		0.0,
+		TAU,
+		48,
+		_with_alpha(base.lightened(0.12), 0.44 * base.a),
+		maxf(1.0, radius * 0.045),
+		true
+	)
 	if detail:
-		draw_line(Vector2(-radius * 0.82, radius * 0.18), Vector2(radius * 0.82, -radius * 0.18), _with_alpha(Color("#E3FFF3"), 0.68 * base.a), maxf(1.0, radius * 0.035), true)
+		_draw_tilted_atmosphere_ring(
+			radius,
+			_with_alpha(Color("#E3FFF3"), 0.72 * base.a)
+		)
+
+
+func _draw_soft_ellipse(
+	center: Vector2,
+	radii: Vector2,
+	rotation_value: float,
+	color_value: Color
+) -> void:
+	draw_set_transform(center, rotation_value, radii)
+	draw_circle(Vector2.ZERO, 1.0, color_value)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func _draw_organic_blob(
+	center: Vector2,
+	radii: Vector2,
+	rotation_value: float,
+	color_value: Color,
+	seed_phase: float
+) -> void:
+	var points: PackedVector2Array = PackedVector2Array()
+	for point_index: int in range(32):
+		var angle: float = TAU * float(point_index) / 32.0
+		var coast: float = (
+			1.0
+			+ sin(angle * 3.0 + seed_phase) * 0.075
+			+ sin(angle * 5.0 - seed_phase * 0.7) * 0.045
+			+ sin(angle * 7.0 + seed_phase * 1.3) * 0.024
+		)
+		var local_point: Vector2 = Vector2(
+			cos(angle) * radii.x,
+			sin(angle) * radii.y
+		) * coast
+		points.append(center + local_point.rotated(rotation_value))
+	draw_colored_polygon(points, color_value)
+
+
+func _draw_tilted_atmosphere_ring(radius: float, color_value: Color) -> void:
+	var points: PackedVector2Array = PackedVector2Array()
+	for point_index: int in range(49):
+		var angle: float = TAU * float(point_index) / 48.0
+		var point: Vector2 = Vector2(
+			cos(angle) * radius * 0.79,
+			sin(angle) * radius * 0.30
+		).rotated(-CelestialOrbArt.RING_TILT_RADIANS)
+		points.append(point)
+	draw_polyline(points, color_value, maxf(1.0, radius * 0.035), true)
 
 
 func _draw_venus(radius: float, base: Color, detail: bool, phase: float) -> void:

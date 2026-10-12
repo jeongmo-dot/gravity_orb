@@ -65,6 +65,35 @@ func test_body_shader_uses_six_seamless_planet_patterns() -> void:
 	await _cleanup(board)
 
 
+func test_reviewed_planets_use_soft_surface_landmarks() -> void:
+	var board: Board3D = await _create_board()
+	var orb: Orb3D = board.spawn_orb(OrbTypes.OrbColor.BLUE, 5, Vector2.ZERO)
+	var shader_code: String = orb.visual_material_resource().shader.code
+	assert_true(
+		shader_code.contains("float fractal_noise3(vec3 p)"),
+		"reviewed surfaces blend multiple scales of smoothly interpolated 3D noise"
+	)
+	assert_true(
+		shader_code.contains("continent_primary")
+		and shader_code.contains("continent_secondary")
+		and shader_code.contains("cloud_filament"),
+		"Earth uses large continent masses and flowing cloud filaments"
+	)
+	assert_true(
+		shader_code.contains("dust_zone")
+		and shader_code.contains("canyon_path")
+		and not shader_code.contains("abs(n2 - 0.52)"),
+		"Mars uses soft dust regions and one canyon instead of a noise contour net"
+	)
+	assert_true(
+		shader_code.contains("uranus_band_contrast = 0.05")
+		and shader_code.contains("ring_radius - 0.78")
+		and not shader_code.contains("vertical_bands"),
+		"Uranus uses subtle atmosphere bands and a tilted ellipse ring"
+	)
+	await _cleanup(board)
+
+
 func test_l6_l7_shader_uses_deterministic_planet_glow() -> void:
 	var board: Board3D = await _create_board()
 	var orb: Orb3D = board.spawn_orb(OrbTypes.OrbColor.YELLOW, 7, Vector2.ZERO)

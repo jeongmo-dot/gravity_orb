@@ -214,6 +214,20 @@ float value_noise3(vec3 p) {
 	return mix(mix(nx00, nx10, f.y), mix(nx01, nx11, f.y), f.z);
 }
 
+float fractal_noise3(vec3 p) {
+	float value = value_noise3(p) * 0.52;
+	p = vec3(p.y + p.z * 0.37, p.z - p.x * 0.29, p.x + p.y * 0.21) * 1.93
+		+ vec3(1.7, 4.3, 2.1);
+	value += value_noise3(p) * 0.27;
+	p = vec3(p.z + p.x * 0.31, p.x - p.y * 0.23, p.y + p.z * 0.19) * 1.89
+		+ vec3(3.2, 0.8, 5.4);
+	value += value_noise3(p) * 0.14;
+	p = vec3(p.y - p.z * 0.26, p.z + p.x * 0.33, p.x - p.y * 0.17) * 1.87
+		+ vec3(0.6, 6.1, 2.8);
+	value += value_noise3(p) * 0.07;
+	return value;
+}
+
 float sphere_spot(vec3 position, vec3 direction, float inner, float outer) {
 	return 1.0 - smoothstep(inner, outer, length(position - normalize(direction)));
 }
@@ -257,7 +271,6 @@ void fragment() {
 		float n1 = value_noise3(body_position * 4.9 + vec3(float(color_id) * 2.17));
 		float n2 = value_noise3(body_position * 12.7 + vec3(7.2, 3.1, float(color_id) * 1.73));
 		vec3 moving_position = body_position + vec3(drift * 0.028, -drift * 0.018, drift * 0.011);
-		float moving_noise = value_noise3(moving_position * 9.7 + vec3(float(color_id) * 3.11));
 		vec3 view_normal = normalize(NORMAL);
 		vec3 view_direction = normalize(VIEW);
 		float facing = clamp(dot(view_normal, view_direction), 0.0, 1.0);
@@ -269,23 +282,91 @@ void fragment() {
 		vec3 surface = base * (0.90 + n1 * 0.16);
 
 		if (color_id == 0) {
+			float rust_grain = fractal_noise3(body_position * 3.2 + vec3(2.4, 7.1, 1.3));
+			float static_dust = fractal_noise3(body_position * 2.15 + vec3(5.2, 1.8, 4.6));
+			float moving_dust = fractal_noise3(moving_position * 2.15 + vec3(5.2, 1.8, 4.6));
+			float dust_field = mix(static_dust, moving_dust, animated);
+			float dust_zone = smoothstep(0.46, 0.69, dust_field) * detail;
+			float canyon_path = body_position.y + 0.10
+				+ sin(body_position.x * 4.2) * 0.034
+				+ (fractal_noise3(body_position * 5.3 + vec3(9.1, 2.7, 3.8)) - 0.5) * 0.045;
+			float canyon_length = 1.0 - smoothstep(0.58, 0.88, abs(body_position.x));
+			float canyon = (1.0 - smoothstep(0.026, 0.082, abs(canyon_path)))
+				* canyon_length * detail;
+			float crater_a = sphere_spot(body_position, vec3(-0.43, 0.18, 0.88), 0.035, 0.095);
+			float crater_b = sphere_spot(body_position, vec3(0.39, 0.37, 0.84), 0.028, 0.074);
+			float crater_c = sphere_spot(body_position, vec3(0.16, -0.48, 0.86), 0.024, 0.066);
+			float crater = max(crater_a, max(crater_b, crater_c)) * detail;
 			float polar_cap = smoothstep(0.67, 0.84, body_position.y);
-			float canyon = (1.0 - smoothstep(0.030, 0.105, abs(n2 - 0.52))) * detail;
-			float dust = smoothstep(0.48, 0.72, moving_noise) * animated;
+			surface = base * (0.82 + rust_grain * 0.24);
+			surface = mix(surface, mix(base * 0.58, vec3(0.34, 0.13, 0.08), 0.32), dust_zone * 0.46);
+			surface = mix(surface, mix(base * 0.36, vec3(0.27, 0.085, 0.055), 0.24), canyon * 0.82);
+			surface = mix(surface, base * 0.46, crater * 0.52);
 			surface = mix(surface, vec3(0.96, 0.93, 0.88), polar_cap * 0.82);
-			surface = mix(surface, base * 0.35, canyon * 0.72);
-			surface = mix(surface, base * 1.24, dust * 0.20);
 		} else if (color_id == 1) {
-			float continent = smoothstep(0.49, 0.65, n1 + body_position.y * 0.035);
-			float cloud = smoothstep(0.62, 0.77, moving_noise + sin(body_position.y * 18.0) * 0.055);
-			vec3 land_color = mix(base * 0.48, vec3(0.16, 0.52, 0.30), 0.62);
-			surface = mix(base * (0.80 + n2 * 0.20), land_color, continent * 0.88);
-			surface = mix(surface, vec3(0.94, 0.98, 1.0), cloud * (0.34 + detail * 0.16));
+			float coast_noise = fractal_noise3(body_position * 5.4 + vec3(3.7, 8.2, 1.4));
+			float continent_primary_core = sphere_ellipse_spot(
+				body_position, vec3(-0.42, 0.04, 0.91), 0.44, 0.32
+			);
+			float continent_primary_east = sphere_ellipse_spot(
+				body_position, vec3(-0.11, -0.17, 0.98), 0.36, 0.27
+			);
+			float continent_primary_north = sphere_ellipse_spot(
+				body_position, vec3(-0.28, 0.34, 0.90), 0.29, 0.22
+			);
+			float continent_primary = max(
+				continent_primary_core,
+				max(continent_primary_east, continent_primary_north)
+			);
+			float continent_secondary_core = sphere_ellipse_spot(
+				body_position, vec3(0.43, -0.28, 0.86), 0.34, 0.25
+			);
+			float continent_secondary_north = sphere_ellipse_spot(
+				body_position, vec3(0.50, 0.01, 0.87), 0.25, 0.19
+			);
+			float continent_secondary = max(
+				continent_secondary_core, continent_secondary_north
+			);
+			float continent_island = sphere_ellipse_spot(
+				body_position, vec3(0.13, 0.54, 0.83), 0.28, 0.20
+			);
+			float continent_shape = mix(
+				continent_primary,
+				max(continent_primary, max(continent_secondary, continent_island)),
+				detail
+			);
+			float continent = smoothstep(
+				0.22, 0.58, continent_shape + (coast_noise - 0.5) * 0.44
+			);
+			vec3 cloud_position = mix(
+				body_position,
+				body_position + vec3(drift * 0.020, -drift * 0.008, drift * 0.013),
+				animated
+			);
+			float cloud_noise = fractal_noise3(cloud_position * 6.4 + vec3(8.6, 2.3, 5.1));
+			float cloud_phase = body_position.y * 10.5 + body_position.x * 3.2
+				+ (cloud_noise - 0.5) * 5.2 + drift * 0.16;
+			float cloud_filament = 1.0 - smoothstep(0.10, 0.34, abs(sin(cloud_phase)));
+			float cloud_mass = mix(0.52, smoothstep(0.38, 0.72, cloud_noise), detail);
+			float cloud = cloud_filament * cloud_mass;
+			vec3 land_color = mix(base * 0.46, vec3(0.15, 0.50, 0.29), 0.68);
+			surface = base * (0.84 + fractal_noise3(body_position * 7.1 + vec3(1.9)) * 0.12);
+			surface = mix(surface, land_color, continent * 0.90);
+			surface = mix(surface, vec3(0.94, 0.98, 1.0), cloud * (0.24 + detail * 0.12));
 		} else if (color_id == 2) {
-			float vertical_bands = 0.5 + 0.5 * sin((body_position.x + n1 * 0.045) * 24.0 + drift * 0.26);
-			float ring_line = (1.0 - smoothstep(0.018, 0.052, abs(body_position.x * 0.18 + body_position.y))) * detail;
-			surface = mix(base * 0.72, base * 1.18, smoothstep(0.18, 0.84, vertical_bands));
-			surface = mix(surface, vec3(0.90, 1.0, 0.96), ring_line * 0.66);
+			float atmosphere_noise = fractal_noise3(body_position * 2.2 + vec3(4.8, 1.6, 7.3));
+			float broad_band = 0.5 + 0.5 * sin(
+				body_position.y * 4.1 + (atmosphere_noise - 0.5) * 0.52 + drift * 0.12
+			);
+			float uranus_band_contrast = 0.05;
+			surface = base * (1.0 - uranus_band_contrast * 0.5 + broad_band * uranus_band_contrast);
+			float ring_x = body_position.x * 0.94 + body_position.y * 0.342;
+			float ring_y = -body_position.x * 0.342 + body_position.y * 0.94;
+			float ring_radius = length(vec2(ring_x, ring_y / 0.30));
+			float ring_line = (1.0 - smoothstep(0.018, 0.050, abs(ring_radius - 0.78))) * detail;
+			vec3 atmosphere_color = mix(base, vec3(0.78, 1.0, 0.92), 0.42);
+			surface += atmosphere_color * atmosphere * 0.18;
+			surface = mix(surface, vec3(0.88, 1.0, 0.95), ring_line * 0.72);
 		} else if (color_id == 3) {
 			float cloud_a = 0.5 + 0.5 * sin(body_position.y * 16.0 + n1 * 2.4 + drift * 0.32);
 			float cloud_b = 0.5 + 0.5 * sin(body_position.y * 31.0 - n2 * 3.1 - drift * 0.20);
@@ -308,7 +389,10 @@ void fragment() {
 			surface = mix(surface, vec3(1.0), reflection * 0.28);
 		}
 
-		float fine_detail = (n2 - 0.5) * 0.10 * detail;
+		float fine_source = color_id == 1
+			? fractal_noise3(body_position * 12.7 + vec3(7.2, 3.1, 1.73))
+			: n2;
+		float fine_detail = (fine_source - 0.5) * 0.10 * detail;
 		surface *= 1.0 + fine_detail;
 		surface *= sphere_shade;
 		surface += vec3(1.0) * highlight * 0.13;
