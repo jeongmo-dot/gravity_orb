@@ -78,9 +78,16 @@ func test_m3_turn_defaults() -> void:
 func test_m4_spawn_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	assert_eq(config.color_display.size(), 6, "display color count")
-	assert_eq(config.color_display[OrbTypes.OrbColor.YELLOW], Color("#F5C542"), "yellow display")
-	assert_eq(config.color_display[OrbTypes.OrbColor.PURPLE], Color("#A35CF0"), "purple display")
-	assert_eq(config.color_display[OrbTypes.OrbColor.CYAN], Color("#22C7D9"), "cyan display")
+	var planet_colors: Array[Color] = [
+		Color("#D0503A"),
+		Color("#2F6FD6"),
+		Color("#35B97C"),
+		Color("#E9C46A"),
+		Color("#6C5CE7"),
+		Color("#DCE3EC"),
+	]
+	for color_index: int in range(planet_colors.size()):
+		assert_eq(config.color_display[color_index], planet_colors[color_index], "planet display %d" % color_index)
 	assert_eq(config.spawn_level_weights, PackedFloat32Array([0.9, 0.1]), "level weights")
 	assert_eq(
 		config.spawn_color_weights,

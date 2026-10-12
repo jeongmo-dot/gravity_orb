@@ -132,6 +132,7 @@ func _run_capture_suite() -> void:
 	_prepare_output_directory()
 	Config.data.rng_seed = CAPTURE_SEED
 	Config.data.fx_hitstop_enabled = false
+	CelestialOrbArt.freeze_animation_for_capture()
 
 	if not _hud_scenes_only:
 		await _capture_start_screen()
@@ -155,6 +156,7 @@ func _run_capture_suite() -> void:
 	_verify_capture_files()
 	_verify_user_save_unchanged()
 	_remove_file(_temp_save_path)
+	CelestialOrbArt.unfreeze_animation()
 	get_tree().quit(1 if _failed else 0)
 
 
@@ -437,6 +439,13 @@ func _capture_blitz_scenes() -> void:
 	spawner.sync_blitz_next_batch_size(8)
 	hud._set_danger_badge(0.70, 4.0)
 	hud.set_process(false)
+	for color: int in range(Config.data.color_display.size()):
+		var small_planet: Orb3D = board.spawn_orb(
+			color,
+			1,
+			Vector2(-300.0 + float(color) * 120.0, 250.0)
+		)
+		small_planet.disable_physics()
 	feedback.play_reaction_visuals({
 		"type": ReactionRules.Type.BLAST,
 		"position": Vector2(0.0, -140.0),
@@ -446,6 +455,7 @@ func _capture_blitz_scenes() -> void:
 	})
 	await get_tree().create_timer(0.24).timeout
 	print("SCREEN_CAPTURE_CHECK scene=blitz_l6_blast radius_factor=1.0")
+	print("SCREEN_CAPTURE_CHECK scene=blitz_danger small_planets=6 level=1")
 	await _capture("07_blitz_danger.png")
 	if _hud_scenes_only:
 		await _destroy_main(main)
@@ -493,6 +503,7 @@ func _capture_orb_codex() -> void:
 	var main: Main = await _create_main(Main.NO_MODE)
 	(main.get_node("UI") as CanvasLayer).visible = false
 	(main.get_node("Board") as Board3D).visible = false
+	(main.get_node("SpaceBackdrop") as SpaceBackdrop).visible = false
 	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
 	camera.position.z = 55.0
 	var level_radii: Array[float] = []
@@ -515,6 +526,7 @@ func _capture_orb_codex() -> void:
 			main.add_child(orb)
 			orb.setup(color, level, Config.data)
 			orb.disable_physics()
+			orb.set_physics_process(false)
 			orb.set_render_clamp_enabled(false)
 			var plane_position: Vector2 = Vector2(level_centers[level - 1], row_y)
 			orb.position = plane_position
@@ -527,6 +539,8 @@ func _capture_orb_codex() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	await _capture("14_orb_codex.png")
+	await _capture("14_orb_codex_repeat.png")
+	_verify_deterministic_orb_capture()
 	_analyze_orb_codex(camera, descriptors)
 	print("SCREEN_CAPTURE_CHECK scene=orb_codex colors=6 levels=7 symbols=off")
 	await _destroy_main(main)
@@ -536,29 +550,67 @@ func _capture_orb_closeup() -> void:
 	var main: Main = await _create_main(Main.NO_MODE)
 	(main.get_node("UI") as CanvasLayer).visible = false
 	(main.get_node("Board") as Board3D).visible = false
+	(main.get_node("SpaceBackdrop") as SpaceBackdrop).visible = false
 	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
-	camera.position.z = 55.0 / 3.0
-	var positions: Array[Vector2] = [
-		Vector2(-200.0, -295.0),
-		Vector2(-125.0, -295.0),
-		Vector2(-15.0, -295.0),
-		Vector2(140.0, -295.0),
-		Vector2(-127.5, -70.0),
-		Vector2(107.5, -70.0),
-		Vector2(0.0, 220.0),
-	]
-	for level: int in range(1, Config.data.orb_max_level + 1):
+	camera.position.z = 55.0 / 2.2
+	var positions: Array[Vector2] = []
+	for color: int in range(Config.data.color_display.size()):
+		var column: int = color % 3
+		var row: int = color / 3
+		positions.append(Vector2(-205.0 + float(column) * 205.0, -190.0 + float(row) * 205.0))
 		var orb: Orb3D = ORB_3D_SCENE.instantiate() as Orb3D
 		main.add_child(orb)
-		orb.setup(OrbTypes.OrbColor.CYAN, level, Config.data)
+		orb.setup(color, 5, Config.data)
 		orb.disable_physics()
+		orb.set_physics_process(false)
 		orb.set_render_clamp_enabled(false)
-		orb.position = positions[level - 1]
+		orb.position = positions[color]
+	var comparison_levels: Array[int] = [1, 7]
+	for index: int in range(comparison_levels.size()):
+		var comparison: Orb3D = ORB_3D_SCENE.instantiate() as Orb3D
+		main.add_child(comparison)
+		comparison.setup(OrbTypes.OrbColor.BLUE, comparison_levels[index], Config.data)
+		comparison.disable_physics()
+		comparison.set_physics_process(false)
+		comparison.set_render_clamp_enabled(false)
+		comparison.position = Vector2(-115.0 + float(index) * 210.0, 245.0)
 	await get_tree().process_frame
 	await get_tree().process_frame
 	await _capture("15_orb_closeup.png")
-	print("SCREEN_CAPTURE_CHECK scene=orb_closeup color=CYAN levels=7 scale=3x")
+	print("SCREEN_CAPTURE_CHECK scene=orb_closeup planets=6 level=5 earth_compare=L1,L7 scale=2.2x")
 	await _destroy_main(main)
+
+
+func _verify_deterministic_orb_capture() -> void:
+	var first_path: String = _output_directory.path_join("14_orb_codex.png")
+	var repeat_path: String = _output_directory.path_join("14_orb_codex_repeat.png")
+	var first: Image = Image.load_from_file(ProjectSettings.globalize_path(first_path))
+	var repeat: Image = Image.load_from_file(ProjectSettings.globalize_path(repeat_path))
+	if first == null or first.is_empty() or repeat == null or repeat.is_empty():
+		_fail("Could not load repeated orb codex captures")
+	elif first.get_data() != repeat.get_data():
+		var changed_pixels: int = 0
+		var maximum_difference: float = 0.0
+		for y: int in range(first.get_height()):
+			for x: int in range(first.get_width()):
+				var difference: float = _rgb_distance(first.get_pixel(x, y), repeat.get_pixel(x, y))
+				if difference > 0.0:
+					changed_pixels += 1
+					maximum_difference = maxf(maximum_difference, difference)
+		_fail(
+			"Orb codex repeated capture pixels differ at fixed animation time: pixels=%d max=%.6f" % [
+				changed_pixels,
+				maximum_difference,
+			]
+		)
+	else:
+		print(
+			"ORB_CODEX_DETERMINISM fixed_time=%.2f bytes=%d equal=true" % [
+				CelestialOrbArt.animation_time(),
+				first.get_data().size(),
+			]
+		)
+		_remove_file(repeat_path)
 
 
 func _capture_reaction_effect_scenes() -> void:
@@ -583,7 +635,7 @@ func _capture_reaction_effect_scenes() -> void:
 	await _capture_crowded_blast_pair("29_blast_l6_crowded", 6, 0.22, 0.58)
 	if _failed:
 		return
-	await _measure_same_size_star_luminance()
+	await _measure_same_size_planet_glow()
 
 
 func _capture_v4_2_scenes() -> void:
@@ -944,63 +996,90 @@ func _circle_luminance(image: Image, center: Vector2, radius: float) -> Dictiona
 	return {"total": total, "count": count}
 
 
-func _measure_same_size_star_luminance() -> void:
+func _measure_same_size_planet_glow() -> void:
 	var main: Main = await _create_main(Main.NO_MODE)
 	(main.get_node("UI") as CanvasLayer).visible = false
 	(main.get_node("Board") as Board3D).visible = false
-	var target_body_radius_px: float = 92.0
+	(main.get_node("SpaceBackdrop") as SpaceBackdrop).visible = false
+	var target_outer_radius_px: float = 120.0
 	var centers: Array[Vector2] = [Vector2(-130.0, 0.0), Vector2(130.0, 0.0)]
 	var levels: Array[int] = [6, 7]
 	for index: int in range(levels.size()):
 		var level: int = levels[index]
 		var orb: Orb3D = ORB_3D_SCENE.instantiate() as Orb3D
 		main.add_child(orb)
-		orb.setup(OrbTypes.OrbColor.YELLOW, level, Config.data)
+		orb.setup(OrbTypes.OrbColor.BLUE, level, Config.data)
 		orb.disable_physics()
 		orb.set_process(false)
 		orb.set_physics_process(false)
 		orb.set_render_clamp_enabled(false)
 		orb.position = centers[index]
-		var source_body_radius: float = (
-			Config.data.radius_for_level(level) * CelestialOrbArt.body_radius_ratio(level)
-		)
-		var body_scale: float = target_body_radius_px / source_body_radius
-		orb._mesh.scale = Vector3.ONE * body_scale
-		orb._adornment.scale = Vector3.ONE * (
-			target_body_radius_px
-			/ CelestialOrbArt.body_radius_ratio(level)
-			/ Orb3D.PIXELS_PER_METER
-		)
+		var outer_scale: float = target_outer_radius_px / Config.data.radius_for_level(level)
+		orb._mesh.scale = Vector3.ONE * outer_scale
+		orb._adornment.scale = Vector3.ONE * (target_outer_radius_px / Orb3D.PIXELS_PER_METER)
 		orb._blast_outline.visible = false
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 	var image: Image = get_viewport().get_texture().get_image()
 	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
 	var image_scale: Vector2 = Vector2(image.get_size()) / get_viewport().get_visible_rect().size
-	var projected_radius: float = absf(
-		(camera.unproject_position(Orb3D.plane_position_to_world(Vector2(target_body_radius_px, 0.0))) * image_scale).x
+	var projected_outer_radius: float = absf(
+		(camera.unproject_position(Orb3D.plane_position_to_world(Vector2(target_outer_radius_px, 0.0))) * image_scale).x
 		- (camera.unproject_position(Orb3D.plane_position_to_world(Vector2.ZERO)) * image_scale).x
 	)
 	var luminance: Array[float] = []
-	for center_position: Vector2 in centers:
+	for index: int in range(centers.size()):
+		var center_position: Vector2 = centers[index]
 		var center: Vector2 = camera.unproject_position(
 			Orb3D.plane_position_to_world(center_position)
 		) * image_scale
-		luminance.append(_disk_average_luminance(image, center, projected_radius * 0.78))
+		var body_ratio: float = CelestialOrbArt.body_radius_ratio(levels[index])
+		luminance.append(
+			_annulus_average_luminance(
+				image,
+				center,
+				projected_outer_radius * (body_ratio + 0.015),
+				projected_outer_radius * 0.975
+			)
+		)
 	print(
-		"REACTION_PIXEL_CHECK scene=same_size_stars l6=%.5f l7=%.5f" % [
+		"REACTION_PIXEL_CHECK scene=same_size_planet_glow l6=%.5f l7=%.5f" % [
 			luminance[0],
 			luminance[1],
 		]
 	)
-	if luminance[1] < luminance[0] * 1.1:
+	if luminance[1] <= luminance[0]:
 		_fail(
-			"Same-size L7 body average luminance %.5f must be at least L6 %.5f x 1.1" % [
+			"Same-size L7 outline luminance %.5f must exceed L6 %.5f" % [
 				luminance[1],
 				luminance[0],
 			]
 		)
 	await _destroy_main(main)
+
+
+func _annulus_average_luminance(
+	image: Image,
+	center: Vector2,
+	inner_radius: float,
+	outer_radius: float
+) -> float:
+	var min_x: int = maxi(0, floori(center.x - outer_radius))
+	var max_x: int = mini(image.get_width() - 1, ceili(center.x + outer_radius))
+	var min_y: int = maxi(0, floori(center.y - outer_radius))
+	var max_y: int = mini(image.get_height() - 1, ceili(center.y + outer_radius))
+	var inner_squared: float = inner_radius * inner_radius
+	var outer_squared: float = outer_radius * outer_radius
+	var total: float = 0.0
+	var count: int = 0
+	for y: int in range(min_y, max_y + 1):
+		for x: int in range(min_x, max_x + 1):
+			var distance_squared: float = Vector2(float(x), float(y)).distance_squared_to(center)
+			if distance_squared < inner_squared or distance_squared > outer_squared:
+				continue
+			total += image.get_pixel(x, y).get_luminance()
+			count += 1
+	return total / float(maxi(count, 1))
 
 
 func _average_luminance_outside_circle(
@@ -1490,6 +1569,7 @@ func _analyze_orb_codex(camera: Camera3D, descriptors: Array[Dictionary]) -> voi
 		var key: String = "%d:%d" % [int(descriptor["level"]), int(descriptor["color"])]
 		samples[key] = {
 			"rgb": [average.r, average.g, average.b],
+			"luminance": average.get_luminance(),
 			"lab": [lab.x, lab.y, lab.z],
 			"hue_error_deg": hue_error,
 			"seam_center_difference": seam_metrics["center_difference"],
@@ -1512,6 +1592,8 @@ func _analyze_orb_codex(camera: Camera3D, descriptors: Array[Dictionary]) -> voi
 	if seam_ratio > 2.0:
 		_fail("Orb codex aggregate seam ratio %.2f exceeds 2.0" % seam_ratio)
 	var reference_min_delta_e: float = INF
+	var reference_min_gray_difference: float = INF
+	var reference_closest_gray_pair: Array[int] = [-1, -1]
 	for first_color: int in range(Config.data.color_display.size()):
 		for second_color: int in range(first_color + 1, Config.data.color_display.size()):
 			reference_min_delta_e = minf(
@@ -1520,11 +1602,20 @@ func _analyze_orb_codex(camera: Camera3D, descriptors: Array[Dictionary]) -> voi
 					_color_to_lab(Config.data.color_display[second_color])
 				)
 			)
+			var gray_difference: float = absf(
+				Config.data.color_display[first_color].get_luminance()
+				- Config.data.color_display[second_color].get_luminance()
+			)
+			if gray_difference < reference_min_gray_difference:
+				reference_min_gray_difference = gray_difference
+				reference_closest_gray_pair = [first_color, second_color]
 	var levels: Array[Dictionary] = []
 	for level: int in range(1, Config.data.orb_max_level + 1):
 		var minimum_delta_e: float = INF
 		var maximum_hue_error: float = 0.0
 		var maximum_seam_ratio: float = 0.0
+		var minimum_gray_difference: float = INF
+		var closest_gray_pair: Array[int] = [-1, -1]
 		var color_samples: Array[Dictionary] = []
 		for color: int in range(Config.data.color_display.size()):
 			var sample: Dictionary = samples["%d:%d" % [level, color]] as Dictionary
@@ -1533,6 +1624,7 @@ func _analyze_orb_codex(camera: Camera3D, descriptors: Array[Dictionary]) -> voi
 			color_samples.append({
 				"color": color,
 				"rgb": sample["rgb"],
+				"luminance": sample["luminance"],
 				"lab": sample["lab"],
 				"hue_error_deg": sample["hue_error_deg"],
 				"seam_center_difference": sample["seam_center_difference"],
@@ -1547,6 +1639,12 @@ func _analyze_orb_codex(camera: Camera3D, descriptors: Array[Dictionary]) -> voi
 			)
 			for second_color: int in range(color + 1, Config.data.color_display.size()):
 				var second_sample: Dictionary = samples["%d:%d" % [level, second_color]] as Dictionary
+				var gray_difference: float = absf(
+					float(sample["luminance"]) - float(second_sample["luminance"])
+				)
+				if gray_difference < minimum_gray_difference:
+					minimum_gray_difference = gray_difference
+					closest_gray_pair = [color, second_color]
 				var second_values: Array = second_sample["lab"] as Array
 				var second_lab: Vector3 = Vector3(
 					float(second_values[0]),
@@ -1559,14 +1657,18 @@ func _analyze_orb_codex(camera: Camera3D, descriptors: Array[Dictionary]) -> voi
 			"minimum_delta_e_76": minimum_delta_e,
 			"maximum_hue_error_deg": maximum_hue_error,
 			"maximum_seam_ratio": maximum_seam_ratio,
+			"minimum_grayscale_luminance_difference": minimum_gray_difference,
+			"closest_grayscale_color_pair": closest_gray_pair,
 			"colors": color_samples,
 		})
 		print(
-			"ORB_CODEX_COLOR level=%d min_delta_e=%.2f max_hue_error=%.2f max_seam_ratio=%.2f" % [
+			"ORB_CODEX_COLOR level=%d min_delta_e=%.2f max_hue_error=%.2f max_seam_ratio=%.2f min_gray=%.5f gray_pair=%s" % [
 				level,
 				minimum_delta_e,
 				maximum_hue_error,
 				maximum_seam_ratio,
+				minimum_gray_difference,
+				str(closest_gray_pair),
 			]
 		)
 		if minimum_delta_e < 25.0:
@@ -1582,6 +1684,8 @@ func _analyze_orb_codex(camera: Camera3D, descriptors: Array[Dictionary]) -> voi
 	report_file.store_string(JSON.stringify({
 		"bright_pixel_fraction": 0.4,
 		"reference_minimum_delta_e_76": reference_min_delta_e,
+		"reference_minimum_grayscale_luminance_difference": reference_min_gray_difference,
+		"reference_closest_grayscale_color_pair": reference_closest_gray_pair,
 		"seam_check": {
 			"center_average": seam_center_average,
 			"surrounding_average": seam_surrounding_average,
@@ -1590,7 +1694,14 @@ func _analyze_orb_codex(camera: Camera3D, descriptors: Array[Dictionary]) -> voi
 		},
 		"levels": levels,
 	}, "  "))
-	print("ORB_CODEX_REFERENCE min_delta_e=%.2f report=%s" % [reference_min_delta_e, report_path])
+	print(
+		"ORB_CODEX_REFERENCE min_delta_e=%.2f min_gray=%.5f gray_pair=%s report=%s" % [
+			reference_min_delta_e,
+			reference_min_gray_difference,
+			str(reference_closest_gray_pair),
+			report_path,
+		]
+	)
 
 
 func _bright_average(image: Image, center: Vector2, radius: float) -> Color:

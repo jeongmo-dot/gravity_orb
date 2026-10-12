@@ -1,14 +1,14 @@
 class_name OrbitStage
 extends Control
 
-const HERO_LEVEL: int = 4
+const HERO_LEVEL: int = 5
 const HERO_RADIUS: float = 177.0
 const HERO_DIAMETER: float = HERO_RADIUS * 2.0
 const HERO_ROTATION_SECONDS: float = 20.0
 const ORBIT_SECONDS: float = 12.0
 const ORBIT_COLOR: Color = Color(0.27, 0.91, 1.0, 0.38)
 const HERO_VIEWPORT_SIZE: int = 320
-const HERO_CAMERA_SIZE: float = 1.8
+const HERO_CAMERA_SIZE: float = 2.93
 const OUTER_ORBIT_RADII: Vector2 = Vector2(420.0, 168.0)
 const INNER_ORBIT_RADII: Vector2 = Vector2(309.0, 129.0)
 const OUTER_ORBIT_ROTATION: float = -0.14
@@ -31,8 +31,8 @@ var _elapsed: float = 0.0
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_create_shader_hero()
-	_orbiter_one = _create_orb(1, OUTER_ORBITER_RADIUS, OrbTypes.OrbColor.BLUE)
-	_orbiter_two = _create_orb(2, INNER_ORBITER_RADIUS, OrbTypes.OrbColor.PURPLE)
+	_orbiter_one = _create_orb(1, OUTER_ORBITER_RADIUS, OrbTypes.OrbColor.RED)
+	_orbiter_two = _create_orb(2, INNER_ORBITER_RADIUS, OrbTypes.OrbColor.CYAN)
 	visibility_changed.connect(_sync_render_activity)
 	_sync_render_activity()
 	_apply_animation_pose()
@@ -196,7 +196,7 @@ func _create_shader_hero() -> void:
 
 	var material: ShaderMaterial = CelestialOrbArt.material_for(
 		Config.data,
-		OrbTypes.OrbColor.CYAN,
+		OrbTypes.OrbColor.BLUE,
 		HERO_LEVEL
 	)
 	_hero_mesh = MeshInstance3D.new()
@@ -215,11 +215,12 @@ func _create_shader_hero() -> void:
 	_hero_adornment.rotation.z = CelestialOrbArt.RING_TILT_RADIANS
 	_hero_adornment.scale = Vector3(radius_m, radius_m, 1.0)
 	_hero_adornment.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_hero_adornment.visible = CelestialOrbArt.has_adornment(HERO_LEVEL)
 	_hero_viewport.add_child(_hero_adornment)
 
 	_hero_symbol = MeshInstance3D.new()
 	_hero_symbol.name = "HeroSymbol"
-	_hero_symbol.mesh = OrbSymbols.mesh_for_color(OrbTypes.OrbColor.CYAN)
+	_hero_symbol.mesh = OrbSymbols.mesh_for_color(OrbTypes.OrbColor.BLUE)
 	_hero_symbol.position = Vector3(0.0, 0.0, radius_m + 0.002)
 	var symbol_size_m: float = radius_m * OrbSymbols.SYMBOL_SIZE_FACTOR
 	_hero_symbol.scale = Vector3(symbol_size_m, symbol_size_m, 1.0)

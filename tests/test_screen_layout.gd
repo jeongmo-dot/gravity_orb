@@ -152,12 +152,7 @@ func test_v3_screen_layout_safe_area_touch_targets_and_extreme_content() -> void
 			absf(expected_axis.dot(Vector3.BACK)) < 0.5,
 			"hero polar axis is not the screen z axis"
 		)
-		assert_near(
-			hero_ring.rotation.z,
-			CelestialOrbArt.RING_TILT_RADIANS,
-			0.0001,
-			"ring remains fixed at its designed tilt while the body rotates"
-		)
+		assert_true(not hero_ring.visible, "Earth L5 hero has no legacy ring adornment")
 		for icon_button_path: String in [
 			"Content/StartRankingButton",
 			"Content/StartSoundButton",

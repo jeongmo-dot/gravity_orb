@@ -12,6 +12,7 @@ var _symbol_color: int = -1
 var _symbols_enabled: bool = true
 var _symbol_polygons: Array[PackedVector2Array] = []
 var _celestial_level: int = 0
+var _planet_animation_elapsed: float = 0.0
 
 
 func setup(
@@ -37,6 +38,7 @@ func setup_celestial_preview(
 	symbols_enabled: bool = true
 ) -> void:
 	_celestial_level = clampi(level, 1, 7)
+	_planet_animation_elapsed = 0.0
 	_display_color = display_color
 	_symbol_color = symbol_color
 	_symbols_enabled = symbols_enabled
@@ -114,6 +116,8 @@ func blast_brightness() -> float:
 
 
 func _process(delta: float) -> void:
+	if _celestial_level >= 6:
+		_planet_animation_elapsed += delta
 	if _waiting_at_entrance:
 		_waiting_blink_elapsed += delta
 	if _blast_armed:
@@ -146,39 +150,14 @@ func _draw_celestial() -> void:
 	var base: Color = _display_color
 	base.a = alpha
 	var body_radius: float = _radius * CelestialOrbArt.body_radius_ratio(_celestial_level)
-	if _celestial_level == 4:
-		_draw_planet_ring(_radius, base, false)
-	elif _celestial_level >= 6:
-		_draw_halo(
-			_radius,
-			body_radius,
-			base,
-			_celestial_level == 7,
-			blast_brightness() if _blast_armed else 0.0
-		)
-
-	match _celestial_level:
-		1:
-			_draw_meteor(body_radius, base)
-		2:
-			_draw_moon(body_radius, base)
-		3:
-			_draw_rocky_planet(body_radius, base)
-		4:
-			_draw_ringed_planet(body_radius, base)
-		5:
-			_draw_gas_giant(body_radius, base)
-		6:
-			_draw_star(body_radius, base, false)
-		7:
-			_draw_star(body_radius, base, true)
-	_draw_spherical_lighting(body_radius, base, _celestial_level >= 6)
-	if _celestial_level == 4:
-		_draw_planet_ring(_radius, base, true)
+	if _celestial_level >= 6:
+		_draw_planet_halo(_radius, body_radius, base, _celestial_level == 7)
+	_draw_planet_body(body_radius, base)
+	_draw_spherical_lighting(body_radius, base, false)
 
 	draw_arc(
 		Vector2.ZERO,
-		body_radius if _celestial_level == 5 else body_radius * 0.98,
+		body_radius * 0.98,
 		0.0,
 		TAU,
 		64,
@@ -189,6 +168,224 @@ func _draw_celestial() -> void:
 	if _blast_armed:
 		if _celestial_level == 4 or _celestial_level == 5:
 			_draw_blast_rim(body_radius, base)
+
+
+func _draw_planet_body(radius: float, base: Color) -> void:
+	draw_circle(Vector2.ZERO, radius, _with_alpha(base.darkened(0.08), base.a))
+	var detail: bool = _celestial_level >= 3
+	var phase: float = _planet_animation_elapsed if _celestial_level >= 6 else 0.0
+	match _symbol_color:
+		OrbTypes.OrbColor.RED:
+			_draw_mars(radius, base, detail, phase)
+		OrbTypes.OrbColor.BLUE:
+			_draw_earth(radius, base, detail, phase)
+		OrbTypes.OrbColor.GREEN:
+			_draw_uranus(radius, base, detail, phase)
+		OrbTypes.OrbColor.YELLOW:
+			_draw_venus(radius, base, detail, phase)
+		OrbTypes.OrbColor.PURPLE:
+			_draw_neptune(radius, base, detail, phase)
+		OrbTypes.OrbColor.CYAN:
+			_draw_mercury(radius, base, detail, phase)
+
+
+func _draw_mars(radius: float, base: Color, detail: bool, phase: float) -> void:
+	var dust_shift: float = sin(phase * 0.22) * radius * 0.04
+	if detail:
+		_draw_soft_ellipse(
+			Vector2(-0.27, 0.18) * radius + Vector2(dust_shift, 0.0),
+			Vector2(0.36, 0.20) * radius,
+			-0.24,
+			_with_alpha(base.darkened(0.30), 0.42 * base.a)
+		)
+		_draw_soft_ellipse(
+			Vector2(0.34, -0.30) * radius + Vector2(dust_shift * 0.6, 0.0),
+			Vector2(0.23, 0.15) * radius,
+			0.38,
+			_with_alpha(Color("#7D3025"), 0.38 * base.a)
+		)
+		var canyon: Color = _with_alpha(Color("#77281F"), 0.82 * base.a)
+		var canyon_points: PackedVector2Array = PackedVector2Array([
+			Vector2(-0.68, 0.02) * radius,
+			Vector2(-0.47, -0.03) * radius,
+			Vector2(-0.22, 0.01) * radius,
+			Vector2(0.02, -0.07) * radius,
+			Vector2(0.24, -0.03) * radius,
+			Vector2(0.48, 0.05) * radius,
+			Vector2(0.67, 0.01) * radius,
+		])
+		draw_polyline(canyon_points, canyon, maxf(1.2, radius * 0.060), true)
+		var crater_centers: Array[Vector2] = [
+			Vector2(-0.43, -0.30),
+			Vector2(0.39, 0.31),
+			Vector2(0.12, 0.49),
+		]
+		var crater_radii: Array[Vector2] = [
+			Vector2(0.075, 0.055),
+			Vector2(0.060, 0.046),
+			Vector2(0.048, 0.038),
+		]
+		for crater_index: int in range(crater_centers.size()):
+			_draw_soft_ellipse(
+				crater_centers[crater_index] * radius,
+				crater_radii[crater_index] * radius,
+				0.0,
+				_with_alpha(base.darkened(0.42), 0.58 * base.a)
+			)
+	var cap_color: Color = _with_alpha(Color("#F2ECE4"), 0.86 * base.a)
+	draw_arc(Vector2(0.0, -radius * 0.77), radius * 0.36, 0.12, PI - 0.12, 20, cap_color, maxf(2.0, radius * 0.18), true)
+
+
+func _draw_earth(radius: float, base: Color, detail: bool, phase: float) -> void:
+	var land: Color = _with_alpha(Color("#287A50"), 0.90 * base.a)
+	_draw_organic_blob(
+		Vector2(-0.24, -0.04) * radius,
+		Vector2(0.40, 0.50) * radius,
+		-0.28,
+		land,
+		0.4
+	)
+	if detail:
+		_draw_organic_blob(
+			Vector2(0.36, 0.17) * radius,
+			Vector2(0.28, 0.25) * radius,
+			0.34,
+			land,
+			2.1
+		)
+		_draw_organic_blob(
+			Vector2(0.19, -0.48) * radius,
+			Vector2(0.16, 0.12) * radius,
+			-0.16,
+			land,
+			4.3
+		)
+	var cloud: Color = _with_alpha(Color("#F4FAFF"), 0.70 * base.a)
+	var cloud_shift: float = sin(phase * 0.32) * radius * 0.09
+	draw_arc(Vector2(cloud_shift, -radius * 0.18), radius * 0.72, 3.48, 5.62, 32, cloud, maxf(1.2, radius * 0.060), true)
+	if detail:
+		draw_arc(Vector2(-cloud_shift, radius * 0.24), radius * 0.60, 0.34, 2.72, 30, cloud, maxf(1.0, radius * 0.045), true)
+		draw_arc(Vector2(radius * 0.17 + cloud_shift * 0.4, -radius * 0.02), radius * 0.34, -1.34, 1.28, 22, _with_alpha(cloud, 0.56 * base.a), maxf(0.8, radius * 0.032), true)
+
+
+func _draw_uranus(radius: float, base: Color, detail: bool, phase: float) -> void:
+	var band_color: Color = _with_alpha(base.lightened(0.05), 0.34 * base.a)
+	var shift: float = sin(phase * 0.26) * radius * 0.025
+	for band: int in range(-1, 2):
+		var y: float = float(band) * radius * 0.32 + shift
+		var half_width: float = sqrt(maxf(radius * radius - y * y, 0.0)) * 0.84
+		_draw_soft_ellipse(
+			Vector2(0.0, y),
+			Vector2(half_width, radius * 0.105),
+			0.0,
+			band_color
+		)
+	draw_arc(
+		Vector2.ZERO,
+		radius * 0.93,
+		0.0,
+		TAU,
+		48,
+		_with_alpha(base.lightened(0.12), 0.44 * base.a),
+		maxf(1.0, radius * 0.045),
+		true
+	)
+	if detail:
+		_draw_tilted_atmosphere_ring(
+			radius,
+			_with_alpha(Color("#E3FFF3"), 0.72 * base.a)
+		)
+
+
+func _draw_soft_ellipse(
+	center: Vector2,
+	radii: Vector2,
+	rotation_value: float,
+	color_value: Color
+) -> void:
+	draw_set_transform(center, rotation_value, radii)
+	draw_circle(Vector2.ZERO, 1.0, color_value)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func _draw_organic_blob(
+	center: Vector2,
+	radii: Vector2,
+	rotation_value: float,
+	color_value: Color,
+	seed_phase: float
+) -> void:
+	var points: PackedVector2Array = PackedVector2Array()
+	for point_index: int in range(32):
+		var angle: float = TAU * float(point_index) / 32.0
+		var coast: float = (
+			1.0
+			+ sin(angle * 3.0 + seed_phase) * 0.075
+			+ sin(angle * 5.0 - seed_phase * 0.7) * 0.045
+			+ sin(angle * 7.0 + seed_phase * 1.3) * 0.024
+		)
+		var local_point: Vector2 = Vector2(
+			cos(angle) * radii.x,
+			sin(angle) * radii.y
+		) * coast
+		points.append(center + local_point.rotated(rotation_value))
+	draw_colored_polygon(points, color_value)
+
+
+func _draw_tilted_atmosphere_ring(radius: float, color_value: Color) -> void:
+	var points: PackedVector2Array = PackedVector2Array()
+	for point_index: int in range(49):
+		var angle: float = TAU * float(point_index) / 48.0
+		var point: Vector2 = Vector2(
+			cos(angle) * radius * 0.79,
+			sin(angle) * radius * 0.30
+		).rotated(-CelestialOrbArt.RING_TILT_RADIANS)
+		points.append(point)
+	draw_polyline(points, color_value, maxf(1.0, radius * 0.035), true)
+
+
+func _draw_venus(radius: float, base: Color, detail: bool, phase: float) -> void:
+	var cloud: Color = _with_alpha(base.lightened(0.34), 0.76 * base.a)
+	var shift: float = sin(phase * 0.30) * radius * 0.05
+	for band: int in [-1, 1]:
+		_draw_body_band(radius, float(band) * radius * 0.28 + shift, cloud, true)
+	if detail:
+		_draw_body_band(radius, -shift, base, false)
+		draw_arc(Vector2(radius * 0.14, 0.0), radius * 0.55, -1.10, 1.52, 22, cloud, maxf(1.0, radius * 0.055), true)
+
+
+func _draw_neptune(radius: float, base: Color, detail: bool, phase: float) -> void:
+	var wind: Color = _with_alpha(base.lightened(0.34), 0.72 * base.a)
+	var y: float = sin(phase * 0.25) * radius * 0.06
+	_draw_body_band(radius, y - radius * 0.18, base, true)
+	if detail:
+		_draw_body_band(radius, y + radius * 0.24, base, false)
+		draw_circle(Vector2(0.39, 0.15) * radius, radius * 0.17, _with_alpha(base.darkened(0.62), 0.90 * base.a))
+		draw_arc(Vector2(0.39, 0.15) * radius, radius * 0.17, 0.0, TAU, 22, wind, maxf(1.0, radius * 0.028), true)
+
+
+func _draw_mercury(radius: float, base: Color, detail: bool, phase: float) -> void:
+	var reflection: float = 0.10 + 0.06 * sin(phase * 0.62)
+	draw_circle(Vector2(-0.30, -0.22) * radius, radius * 0.22, _with_alpha(base.darkened(0.38), 0.78 * base.a))
+	draw_circle(Vector2(0.34, 0.18) * radius, radius * 0.16, _with_alpha(base.darkened(0.46), 0.76 * base.a))
+	draw_circle(Vector2(-0.02, 0.48) * radius, radius * 0.11, _with_alpha(base.darkened(0.34), 0.72 * base.a))
+	if detail:
+		draw_circle(Vector2(0.18, -0.52) * radius, radius * 0.08, _with_alpha(base.darkened(0.44), 0.70 * base.a))
+	draw_circle(Vector2(-0.28, -0.31) * radius, radius * 0.24, _with_alpha(Color.WHITE, reflection * base.a))
+
+
+func _draw_planet_halo(radius: float, body_radius: float, base: Color, legendary: bool) -> void:
+	var ring_count: int = 5 if legendary else 3
+	var twinkle: float = 0.88 + 0.12 * sin(_planet_animation_elapsed * (1.24 if legendary else 0.62))
+	for index: int in range(ring_count, 0, -1):
+		var progress: float = float(index) / float(ring_count)
+		var halo_radius: float = lerpf(body_radius, radius * 0.98, progress)
+		var halo_alpha: float = (0.09 if legendary else 0.045) * (1.15 - progress * 0.42) * twinkle
+		draw_circle(Vector2.ZERO, halo_radius, _with_alpha(base.lightened(0.26 if legendary else 0.12), halo_alpha * base.a))
+	if legendary:
+		var ray_color: Color = _with_alpha(base.lightened(0.48), 0.34 * twinkle * base.a)
+		draw_line(Vector2(-radius * 0.98, 0.0), Vector2(radius * 0.98, 0.0), ray_color, maxf(1.0, radius * 0.022), true)
+		draw_line(Vector2(0.0, -radius * 0.98), Vector2(0.0, radius * 0.98), ray_color, maxf(1.0, radius * 0.022), true)
 
 
 func _draw_meteor(radius: float, base: Color) -> void:
@@ -515,4 +712,4 @@ func _with_alpha(color_value: Color, alpha: float) -> Color:
 
 
 func _update_processing() -> void:
-	set_process(_waiting_at_entrance or _blast_armed)
+	set_process(_waiting_at_entrance or _blast_armed or _celestial_level >= 6)
