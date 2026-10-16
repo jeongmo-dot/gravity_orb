@@ -204,32 +204,68 @@ func _draw_mars(radius: float, base: Color, detail: bool, phase: float) -> void:
 			0.38,
 			_with_alpha(Color("#7D3025"), 0.38 * base.a)
 		)
-		var canyon: Color = _with_alpha(Color("#77281F"), 0.82 * base.a)
+		var canyon: Color = _with_alpha(Color("#873B30"), 0.62 * base.a)
 		var canyon_points: PackedVector2Array = PackedVector2Array([
-			Vector2(-0.68, 0.02) * radius,
-			Vector2(-0.47, -0.03) * radius,
-			Vector2(-0.22, 0.01) * radius,
-			Vector2(0.02, -0.07) * radius,
-			Vector2(0.24, -0.03) * radius,
-			Vector2(0.48, 0.05) * radius,
-			Vector2(0.67, 0.01) * radius,
+			Vector2(-0.50, 0.05) * radius,
+			Vector2(-0.35, 0.09) * radius,
+			Vector2(-0.18, 0.12) * radius,
+			Vector2(-0.02, 0.17) * radius,
+			Vector2(0.17, 0.20) * radius,
+			Vector2(0.34, 0.25) * radius,
+			Vector2(0.50, 0.31) * radius,
 		])
-		draw_polyline(canyon_points, canyon, maxf(1.2, radius * 0.060), true)
+		var canyon_widths: Array[float] = [0.032, 0.052, 0.043, 0.064, 0.048, 0.026]
+		var canyon_alphas: Array[float] = [0.30, 0.72, 1.0, 0.88, 0.62, 0.26]
+		for segment_index: int in range(canyon_points.size() - 1):
+			draw_line(
+				canyon_points[segment_index],
+				canyon_points[segment_index + 1],
+				_with_alpha(canyon, canyon.a * canyon_alphas[segment_index]),
+				maxf(1.0, radius * canyon_widths[segment_index]),
+				true
+			)
+		var canyon_branch: PackedVector2Array = PackedVector2Array([
+			Vector2(-0.15, 0.13) * radius,
+			Vector2(-0.25, 0.01) * radius,
+			Vector2(-0.36, -0.06) * radius,
+		])
+		draw_line(
+			canyon_branch[0],
+			canyon_branch[1],
+			_with_alpha(canyon, canyon.a * 0.72),
+			maxf(1.0, radius * 0.040),
+			true
+		)
+		draw_line(
+			canyon_branch[1],
+			canyon_branch[2],
+			_with_alpha(canyon, canyon.a * 0.28),
+			maxf(1.0, radius * 0.024),
+			true
+		)
 		var crater_centers: Array[Vector2] = [
-			Vector2(-0.43, -0.30),
-			Vector2(0.39, 0.31),
-			Vector2(0.12, 0.49),
+			Vector2(-0.50, -0.34),
+			Vector2(0.18, -0.51),
+			Vector2(0.44, 0.08),
+			Vector2(-0.13, 0.52),
 		]
 		var crater_radii: Array[Vector2] = [
-			Vector2(0.075, 0.055),
-			Vector2(0.060, 0.046),
-			Vector2(0.048, 0.038),
+			Vector2(0.052, 0.040),
+			Vector2(0.078, 0.054),
+			Vector2(0.043, 0.032),
+			Vector2(0.064, 0.046),
+		]
+		var crater_rotations: Array[float] = [
+			0.18,
+			-0.27,
+			0.42,
+			-0.12,
 		]
 		for crater_index: int in range(crater_centers.size()):
 			_draw_soft_ellipse(
 				crater_centers[crater_index] * radius,
 				crater_radii[crater_index] * radius,
-				0.0,
+				crater_rotations[crater_index],
 				_with_alpha(base.darkened(0.42), 0.58 * base.a)
 			)
 	var cap_color: Color = _with_alpha(Color("#F2ECE4"), 0.86 * base.a)

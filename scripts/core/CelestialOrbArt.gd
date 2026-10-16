@@ -287,20 +287,33 @@ void fragment() {
 			float moving_dust = fractal_noise3(moving_position * 2.15 + vec3(5.2, 1.8, 4.6));
 			float dust_field = mix(static_dust, moving_dust, animated);
 			float dust_zone = smoothstep(0.46, 0.69, dust_field) * detail;
-			float canyon_path = body_position.y + 0.10
-				+ sin(body_position.x * 4.2) * 0.034
-				+ (fractal_noise3(body_position * 5.3 + vec3(9.1, 2.7, 3.8)) - 0.5) * 0.045;
-			float canyon_length = 1.0 - smoothstep(0.58, 0.88, abs(body_position.x));
-			float canyon = (1.0 - smoothstep(0.026, 0.082, abs(canyon_path)))
-				* canyon_length * detail;
-			float crater_a = sphere_spot(body_position, vec3(-0.43, 0.18, 0.88), 0.035, 0.095);
-			float crater_b = sphere_spot(body_position, vec3(0.39, 0.37, 0.84), 0.028, 0.074);
-			float crater_c = sphere_spot(body_position, vec3(0.16, -0.48, 0.86), 0.024, 0.066);
-			float crater = max(crater_a, max(crater_b, crater_c)) * detail;
+			float canyon_tilt = 0.268;
+			float canyon_center = -0.18;
+			float canyon_noise = fractal_noise3(body_position * 5.3 + vec3(9.1, 2.7, 3.8));
+			float canyon_path = body_position.y - canyon_center
+				- body_position.x * canyon_tilt + (canyon_noise - 0.5) * 0.040;
+			float canyon_half_width = 0.024 + canyon_noise * 0.020;
+			float canyon_end_fade = 1.0 - smoothstep(0.42, 0.56, abs(body_position.x));
+			float canyon_main = (1.0 - smoothstep(
+				canyon_half_width * 0.55, canyon_half_width * 1.55, abs(canyon_path)
+			)) * canyon_end_fade;
+			float canyon_branch_path = canyon_path + (body_position.x + 0.12) * 0.58 - 0.012;
+			float canyon_branch_fade = 1.0 - smoothstep(
+				0.13, 0.25, abs(body_position.x + 0.17)
+			);
+			float canyon_branch = (1.0 - smoothstep(
+				0.014, 0.050, abs(canyon_branch_path)
+			)) * canyon_branch_fade;
+			float canyon = max(canyon_main, canyon_branch * 0.72) * detail;
+			float crater_a = sphere_spot(body_position, vec3(-0.58, 0.34, 0.74), 0.018, 0.068);
+			float crater_b = sphere_spot(body_position, vec3(0.20, 0.52, 0.83), 0.030, 0.090);
+			float crater_c = sphere_spot(body_position, vec3(0.49, -0.27, 0.83), 0.014, 0.056);
+			float crater_d = sphere_spot(body_position, vec3(-0.10, -0.57, 0.81), 0.024, 0.078);
+			float crater = max(max(crater_a, crater_b), max(crater_c, crater_d)) * detail;
 			float polar_cap = smoothstep(0.67, 0.84, body_position.y);
 			surface = base * (0.82 + rust_grain * 0.24);
 			surface = mix(surface, mix(base * 0.58, vec3(0.34, 0.13, 0.08), 0.32), dust_zone * 0.46);
-			surface = mix(surface, mix(base * 0.36, vec3(0.27, 0.085, 0.055), 0.24), canyon * 0.82);
+			surface = mix(surface, mix(base * 0.52, vec3(0.34, 0.13, 0.09), 0.20), canyon * 0.58);
 			surface = mix(surface, base * 0.46, crater * 0.52);
 			surface = mix(surface, vec3(0.96, 0.93, 0.88), polar_cap * 0.82);
 		} else if (color_id == 1) {

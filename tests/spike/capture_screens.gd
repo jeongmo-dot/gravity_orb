@@ -89,6 +89,7 @@ const CAPTURE_FILES: Array[String] = [
 	"45_turn_busy_a.png",
 	"45_turn_busy_b.png",
 	"46_turn_rejected.png",
+	"47_mars_rotations.png",
 ]
 const HUD_CAPTURE_FILES: Array[String] = [
 	"02_turn_early.png",
@@ -144,6 +145,8 @@ func _run_capture_suite() -> void:
 		await _capture_orb_codex()
 	if not _failed and not _hud_scenes_only:
 		await _capture_orb_closeup()
+	if not _failed and not _hud_scenes_only:
+		await _capture_mars_rotations()
 	if not _failed and not _hud_scenes_only:
 		await _capture_reaction_effect_scenes()
 	if not _failed and not _hud_scenes_only:
@@ -578,6 +581,41 @@ func _capture_orb_closeup() -> void:
 	await get_tree().process_frame
 	await _capture("15_orb_closeup.png")
 	print("SCREEN_CAPTURE_CHECK scene=orb_closeup planets=6 level=5 earth_compare=L1,L7 scale=2.2x")
+	await _destroy_main(main)
+
+
+func _capture_mars_rotations() -> void:
+	var main: Main = await _create_main(Main.NO_MODE)
+	(main.get_node("UI") as CanvasLayer).visible = false
+	(main.get_node("Board") as Board3D).visible = false
+	(main.get_node("SpaceBackdrop") as SpaceBackdrop).visible = false
+	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
+	camera.position.z = 55.0 / 2.2
+	var positions: Array[Vector2] = [
+		Vector2(-115.0, -120.0),
+		Vector2(115.0, -120.0),
+		Vector2(-115.0, 120.0),
+		Vector2(115.0, 120.0),
+	]
+	var angles_degrees: Array[float] = [0.0, 90.0, 180.0, 270.0]
+	for index: int in range(angles_degrees.size()):
+		var orb: Orb3D = ORB_3D_SCENE.instantiate() as Orb3D
+		main.add_child(orb)
+		orb.setup(OrbTypes.OrbColor.RED, 5, Config.data)
+		orb.disable_physics()
+		orb.set_physics_process(false)
+		orb.set_render_clamp_enabled(false)
+		orb.position = positions[index]
+		orb.get_physics_body().rotation = Vector3(
+			0.0,
+			0.0,
+			deg_to_rad(angles_degrees[index])
+		)
+		orb._process(0.0)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	await _capture("47_mars_rotations.png")
+	print("SCREEN_CAPTURE_CHECK scene=mars_rotations planet=mars level=5 angles=0,90,180,270 scale=2.2x")
 	await _destroy_main(main)
 
 
