@@ -40,7 +40,7 @@
 
 ### [2026-10-16] 대상 #78 — 화성 무늬가 얼굴처럼 보이지 않게
 - 상태: 완료 — 3D 화성과 2D 미리보기의 중앙 수평 협곡·좌우 짝 크레이터 구성을 없애고, 비대칭 협곡·크레이터로 교체함
-- 브랜치 / PR: `v6-mars-pattern-fix` / 미생성
+- 브랜치 / PR: `v6-mars-pattern-fix` / [PR #80](https://github.com/jeongmo-dot/gravity_orb/pull/80)
 - 변경 파일: `scripts/core/CelestialOrbArt.gd`, `scripts/core/OrbVisual.gd`, `tests/test_celestial_orbs.gd`, `tests/spike/capture_screens.gd`, `tests/capture_screens.ps1`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 3D 협곡을 적도 아래 중심, 15° 기울기, 몸통 지름 약 50% 길이로 이동하고 잡음 기반 가변 폭·가지 1개·양 끝 감쇠 적용; 기존보다 대비를 낮춤 — 자동 (셰이더 구조 검사) + 캡처 `14`, `15`, `47`
