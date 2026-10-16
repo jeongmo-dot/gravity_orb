@@ -82,8 +82,12 @@ func test_reviewed_planets_use_soft_surface_landmarks() -> void:
 	assert_true(
 		shader_code.contains("dust_zone")
 		and shader_code.contains("canyon_path")
+		and shader_code.contains("canyon_tilt = 0.268")
+		and shader_code.contains("canyon_end_fade")
+		and shader_code.contains("canyon_branch")
+		and shader_code.contains("crater_d")
 		and not shader_code.contains("abs(n2 - 0.52)"),
-		"Mars uses soft dust regions and one canyon instead of a noise contour net"
+		"Mars uses an offset tilted, tapered canyon and asymmetric scattered craters"
 	)
 	assert_true(
 		shader_code.contains("uranus_band_contrast = 0.05")
