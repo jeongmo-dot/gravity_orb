@@ -92,6 +92,7 @@ const CAPTURE_FILES: Array[String] = [
 	"46_turn_rejected.png",
 	"47_mars_rotations.png",
 	"48_slime_core.png",
+	"49_slime_states.png",
 ]
 const HUD_CAPTURE_FILES: Array[String] = [
 	"02_turn_early.png",
@@ -151,6 +152,8 @@ func _run_capture_suite() -> void:
 		await _capture_mars_rotations()
 	if not _failed and not _hud_scenes_only:
 		await _capture_slime_core()
+	if not _failed and not _hud_scenes_only:
+		await _capture_slime_states()
 	if not _failed and not _hud_scenes_only:
 		await _capture_reaction_effect_scenes()
 	if not _failed and not _hud_scenes_only:
@@ -644,14 +647,12 @@ func _capture_slime_core() -> void:
 	var admission: SlimeSim = games[0].get_sim()
 	for tick: int in range(13):
 		admission.step(1.0 / 60.0)
-	admission.message = "첫 입장 중"
 	games[0].refresh_presentation()
 
 	var ready: SlimeSim = games[1].get_sim()
 	ready.clear_slimes()
 	ready.intro_queue.clear()
 	ready.moving = false
-	ready.message = "입구 막대: 위험 · 주의 · 안전"
 	var radius: float = ready.radius_for_level(0)
 	var down_entry: Vector2 = ready.entry_position_for(Vector2i.DOWN, radius)
 	ready.add_slime(
@@ -666,33 +667,30 @@ func _capture_slime_core() -> void:
 		1
 	)
 	ready.set_next_slimes([{"level": 0, "color": 2}, {"level": 1, "color": 0}])
+	ready.moving = true
+	ready.finish_turn()
 	games[1].refresh_presentation()
 
 	var final_move: SlimeSim = games[2].get_sim()
 	final_move.clear_slimes()
 	final_move.intro_queue.clear()
-	final_move.moving = false
-	for index: int in range(8):
-		final_move.add_slime(
-			Vector2(125.0 + float(index % 4) * 130.0, 420.0 + float(index / 4) * 150.0),
-			index % 3,
-			index % 4
-		)
+	_add_slime_entry_blockers(final_move)
 	final_move.turn = 18
 	final_move.score = 54250
-	final_move.final_move_pending = true
-	final_move.message = "한 번의 중력 이동으로 공간을 만드세요"
+	final_move.moving = true
+	final_move.finish_turn()
 	games[2].refresh_presentation()
 
 	var result: SlimeSim = games[3].get_sim()
 	result.clear_slimes()
 	result.intro_queue.clear()
-	result.moving = false
-	result.game_over = true
+	_add_slime_entry_blockers(result)
 	result.turn = 27
 	result.score = 128750
 	result.run_best_chain = 6
-	result.message = "보드가 가득 찼습니다"
+	result.final_move_active = true
+	result.moving = true
+	result.finish_turn()
 	games[3].refresh_presentation()
 
 	await get_tree().process_frame
@@ -702,6 +700,100 @@ func _capture_slime_core() -> void:
 	for game: Variant in games:
 		game.queue_free()
 	await get_tree().process_frame
+
+
+func _capture_slime_states() -> void:
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var games: Array[Variant] = []
+	var positions: Array[Vector2] = [Vector2.ZERO, Vector2(viewport_size.x * 0.5, 0.0), Vector2(0.0, viewport_size.y * 0.5), viewport_size * 0.5]
+	for index: int in range(4):
+		var game: Variant = SLIME_MAIN_SCENE.instantiate()
+		add_child(game)
+		await get_tree().process_frame
+		game.process_mode = Node.PROCESS_MODE_DISABLED
+		game.scale = Vector2.ONE * 0.5
+		game.position = positions[index]
+		games.append(game)
+
+	var moving: SlimeSim = games[0].get_sim()
+	for tick: int in range(34):
+		moving.step(1.0 / 60.0)
+	for index: int in range(moving.slimes.size()):
+		moving.slimes[index].velocity = Vector2(520.0 + float(index) * 80.0, 90.0 - float(index) * 30.0)
+	for tick: int in range(4):
+		moving.step(1.0 / 60.0)
+	games[0].refresh_presentation()
+
+	var waiting: SlimeSim = games[1].get_sim()
+	waiting.clear_slimes()
+	waiting.intro_queue.clear()
+	waiting.moving = false
+	var radius: float = waiting.radius_for_level(0)
+	var down_entry: Vector2 = waiting.entry_position_for(Vector2i.DOWN, radius)
+	waiting.add_slime(down_entry + Vector2(0.0, radius * 2.0 + waiting.config.entry_margin + 14.9), 0, 0).visual_scale = 1.0
+	var left_entry: Vector2 = waiting.entry_position_for(Vector2i.LEFT, radius)
+	waiting.add_slime(left_entry + Vector2(-radius * 2.0 - waiting.config.entry_margin - 50.0, 0.0), 0, 1).visual_scale = 1.0
+	var blinking: SlimeSim.SlimeBody = waiting.add_slime(Vector2(250.0, 500.0), 2, 0)
+	blinking.visual_scale = 1.0
+	blinking.idle_phase = PI * 0.5 / 0.73
+	var max_face: SlimeSim.SlimeBody = waiting.add_slime(Vector2(380.0, 680.0), 6, 2, Vector2.ZERO, 64)
+	max_face.visual_scale = 1.0
+	waiting.set_next_slimes([{"level": 0, "color": 2}, {"level": 1, "color": 0}])
+	waiting.moving = true
+	waiting.finish_turn()
+	games[1].refresh_presentation()
+
+	var merging: SlimeSim = games[2].get_sim()
+	merging.clear_slimes()
+	merging.intro_queue.clear()
+	merging.moving = false
+	merging.turn = 7
+	var merge_radius: float = merging.radius_for_mass(4)
+	merging.add_slime(Vector2(280.0 - merge_radius, 520.0), 2, 1, Vector2.ZERO, 4).visual_scale = 1.0
+	merging.add_slime(Vector2(280.0 + merge_radius, 520.0), 2, 1, Vector2.ZERO, 4).visual_scale = 1.0
+	merging.resolve_pairs()
+	games[2].refresh_presentation()
+	(games[2].get_node("Content/SlimeView") as SlimeView).advance_visuals(0.18)
+	games[2].refresh_presentation()
+
+	var clearing: SlimeSim = games[3].get_sim()
+	clearing.clear_slimes()
+	clearing.intro_queue.clear()
+	_add_slime_entry_blockers(clearing)
+	clearing.turn = 18
+	clearing.score = 54250
+	var max_radius: float = clearing.radius_for_mass(64)
+	clearing.add_slime(Vector2(320.0 - max_radius, 560.0), 6, 0, Vector2.ZERO, 64).visual_scale = 1.0
+	clearing.add_slime(Vector2(320.0 + max_radius, 560.0), 6, 1, Vector2.ZERO, 64).visual_scale = 1.0
+	clearing.resolve_pairs()
+	clearing.moving = true
+	clearing.finish_turn()
+	games[3].refresh_presentation()
+	(games[3].get_node("Content/SlimeView") as SlimeView).advance_visuals(0.22)
+	games[3].refresh_presentation()
+
+	await get_tree().process_frame
+	await get_tree().process_frame
+	await _capture("49_slime_states.png")
+	print(
+		"SCREEN_CAPTURE_CHECK scene=slime_states panels=initial-moving-trails,waiting-bars-faces,absorb,max-clear-final stages=%d,%d,%d,%d"
+		% [
+			waiting.entry_stage_for(Vector2i.DOWN),
+			waiting.entry_stage_for(Vector2i.LEFT),
+			waiting.entry_stage_for(Vector2i.UP),
+			waiting.entry_stage_for(Vector2i.RIGHT),
+		]
+	)
+	for game: Variant in games:
+		game.queue_free()
+	await get_tree().process_frame
+
+
+func _add_slime_entry_blockers(sim: SlimeSim) -> void:
+	var radius: float = sim.radius_for_level(0)
+	for direction: Vector2i in SlimeSim.DIRECTIONS:
+		var blocker: SlimeSim.SlimeBody = sim.add_slime(sim.entry_position_for(direction, radius), 0, direction.x + direction.y + 2)
+		blocker.visual_scale = 1.0
 
 
 func _verify_deterministic_orb_capture() -> void:
