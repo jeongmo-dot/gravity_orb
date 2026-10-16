@@ -40,7 +40,7 @@
 
 ### [2026-10-16] 대상 #79 — GRAVITY SLIME ① 규칙·물리 코어 + 최소 화면
 - 상태: 완료 — 원본 규칙·물리를 독립 `SlimeSim`으로 옮기고 `--mode=slime` 직접 실행, 최소 2D 화면, 자동 검증·패리티·300판 관측까지 구현함
-- 브랜치 / PR: `gravity-slime-core` / PR 미생성
+- 브랜치 / PR: `gravity-slime-core` / [PR #81](https://github.com/jeongmo-dot/gravity_orb/pull/81)
 - 변경 파일: `config/{GameConfig.gd,SlimeConfig.gd,slime_config.tres}`, `scenes/SlimeMain.tscn`, `scripts/core/Main.gd`, `scripts/slime/{SlimeGame,SlimeHud,SlimeSim,SlimeView}.gd`, `tests/{test_frontend,test_slime_config,test_slime_game,test_slime_sim}.gd`, `tests/tools/{run_slime_bot_measurement.gd,run_slime_bot_measurement.ps1,run_slime_parity.ps1,slime_parity_candidate.gd,slime_parity_original_driver.gd,slime_parity_original_game.gd}`, `tests/{capture_screens.ps1,spike/capture_screens.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `SlimeConfig`·`slime_config.tres`에 §12-G.2 보드·물리·생성·점수·해금·입장 수치를 분리하고 기존 `default_config.tres` 값은 변경하지 않음 — 자동 (`test_slime_config.gd`)
