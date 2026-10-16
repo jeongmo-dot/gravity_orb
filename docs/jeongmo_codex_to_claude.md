@@ -40,8 +40,9 @@
 
 ### [2026-10-17] 대상 #80 — GRAVITY SLIME ② 슬라임 그림·연출·소리
 - 상태: 완료 — #79 표시 차이를 원본 기준으로 바로잡고, 슬라임 재질·표정·변형·잔상, 흡수/MAX/중력 연출, 합성 효과음 6종을 구현함
-- 브랜치 / PR: `gravity-slime-visuals` / PR 없음 (항목 지시대로 브랜치 push)
-- 변경 파일: `scenes/SlimeMain.tscn`, `scripts/slime/{SlimeGame,SlimeHud,SlimeSim,SlimeView}.gd`, `scripts/fx/SfxBank.gd`, `tests/test_slime_visuals.gd`, `tests/{capture_screens.ps1,spike/capture_screens.gd}`, `tests/{run_slime_window_measurement.ps1,spike/SlimeWindowMeasurement.tscn,spike/run_slime_window_measurement.gd}`, `tests/tools/{capture_slime_original_comparison.ps1,slime_original_capture_driver.gd,slime_original_capture_game.gd}`
+- 브랜치 / PR: `gravity-slime-visuals` / [PR #82](https://github.com/jeongmo-dot/gravity_orb/pull/82)
+- 변경 파일: `scenes/SlimeMain.tscn`, `scripts/slime/{SlimeGame,SlimeHud,SlimeSim,SlimeView}.gd`, `scripts/fx/SfxBank.gd`, `tests/test_slime_visuals.gd`, `tests/{capture_screens.ps1,spike/capture_screens.gd}`, `tests/{run_slime_window_measurement.ps1,run_slime_visual_render_test.ps1,spike/SlimeWindowMeasurement.tscn,spike/run_slime_window_measurement.gd}`, `tests/tools/{capture_slime_original_comparison.ps1,slime_original_capture_driver.gd,slime_original_capture_game.gd}`
+- 추가 요구 1 반영: `origin/main` 병합 뒤 슬라임·그림자 반복 직후 그리기 변환을 원점으로 복원해 반응 효과·입구 막대를 보드 좌표로 고정함. 막대 중심의 2px 안쪽 오프셋을 없애 벽선 위에 놓고, MAX CLEAR 반원을 오른쪽=A·왼쪽=B로 정정함
 - Done-when 대조:
   - [x] 원본 한국어 메시지, §12-G.5 HUD 색·서체·자리 채움·정보 줄·NEXT, FINAL MOVE 대기 중 깜빡임, 보드 격자·입구 막대 모양/색/길이/그리기 순서 반영 — 자동 (`test_slime_visuals.gd`) + 캡처 `48`·`49`
   - [x] 충돌음 사건은 슬라임 쌍의 상대 속도 `> 0.22`일 때만 만들고, 벽 충돌 제외·실제 재생 때만 쿨다운 갱신 — 자동 (`test_collision_sound_uses_strict_pair_threshold_and_sound_only_cooldown`)
@@ -51,20 +52,22 @@
   - [x] 표의 주파수·길이·음량·음높이로 22,050Hz 16-bit mono 합성음 6종을 만들고 `SFX` 버스·공용 음소거 사용 — 자동 (`test_six_synth_sounds_pitch_and_shared_mute`)
   - [x] 그림 켜기/끄기 및 60/120Hz 상태 해시 동일, 원본 6장면 틱별 패리티 허용 오차 `1e-6px` 통과, 기존 TURN/BLITZ 해시 동일
   - [x] `49_slime_states` 두 비율과 원본-현재 나란히 비교 이미지 생성·직접 확인; `48`·`49` FINAL MOVE는 실제 네 입구 막힘 상태
-  - [x] 실제 창 슬라임 40개 이동 측정 p99 `5.330ms`로 기준 `16.7ms` 이하
+  - [x] 화면 밖 `SubViewport` 화소로 네 벽 막대 중심과 MAX CLEAR 오른쪽/왼쪽 반 색을 검사 — 수정 전 `5/6`(해당 테스트 실패), 수정 후 `6/6` 통과 (`test_rendered_entry_bars_and_max_clear_waves_stay_in_board_coordinates`)
+  - [x] 실제 창 슬라임 40개 이동 측정 p99 `5.539ms`로 기준 `16.7ms` 이하
   - [x] 전체 래퍼, 기본·TURN·BLITZ·SLIME 4종 스모크, Windows 릴리스 빌드 완료
 - 캡처·화면 관측 (Godot Standard/Compatibility, 직접 확인):
   - `tests/capture_screens.ps1` → 종료 코드 0, `540×960`·`540×1170` 각 65장, 합계 130장. `49_slime_states`에 첫 입장+이동/잔상, 안전·주의·위험 막대, 깜빡임/MAX 얼굴, 흡수, MAX CLEAR, 실제 FINAL MOVE를 2×2로 기록함
-  - `49_slime_original_compare.png` → 왼쪽 원본 `640×920`, 오른쪽 현재 `49` 몽타주. 재질 명암·하이라이트, 얼굴, 크기 단계, HUD, 보드·막대, 흡수/CLEAR 상태를 나란히 확대 확인했으며 잘림 없음
+  - `49` 두 비율 직접 확인: 2번 칸은 위·아래·왼쪽·오른쪽 벽 가운데에 단계 `2,1,1,0`의 빨강·노랑·청록 막대가 보임. 3번 칸은 흡수 지점에 파동·입자·팝업이 있고 막대는 벽 위. 4번 칸은 네 벽 모두 빨간 막대이며 MAX CLEAR 파동은 반응 지점에 있고 패널 밖 렌더 잔상 없음
+  - `49_slime_original_compare.png`를 수정 뒤 다시 생성함 → 왼쪽 원본 `640×920`, 오른쪽 현재 `49` 몽타주. 재질 명암·하이라이트, 얼굴, 크기 단계, HUD, 네 벽 막대, 흡수/CLEAR 위치를 나란히 확대 확인했으며 잘림 없음
   - 원본 캡처는 원본 폴더를 OS 임시 폴더에 복사해 저장·소리를 차단한 하위 스크립트로 실행했고, 종료 후 임시 복사본을 삭제함. 원본 폴더는 읽기만 함
 - QA 관측값:
   - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
-  - 집중 테스트 `test_slime_visuals.gd` → `5/5`, 종료 코드 0
-  - `tests/run_tests.ps1` → 일반 `316/316`(`22.148초`), 장기 `5/5`(`49.888초`), 성능 `5/5`(`3.066초`), 합계 `326/326`, 종료 코드 0, 총 `75.101초`
+  - 실제 창 `tests/run_slime_visual_render_test.ps1` → 수정 전 `5/6`(막대 중심 4개·오른쪽 반 색 불일치), 수정 후 `6/6`, 종료 코드 0. 헤드리스는 dummy renderer가 `SubViewport` 화소를 반환하지 않아 해당 한 테스트의 화소 부분만 건너뛰며, 전용 창 실행에서 실제 화소를 검증함
+  - `tests/run_tests.ps1` → 일반 `317/317`(`22.702초`), 장기 `5/5`(`52.929초`), 성능 `5/5`(`3.077초`), 합계 `327/327`, 종료 코드 0, 총 `78.708초`
   - 시작 화면 / TURN / BLITZ / SLIME `--quit-after 300` → 각각 종료 코드 0, 출력 내 `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
-  - 실제 창 40개 이동: `1,258`프레임, p99 `5.330ms`, 최대 `10.436ms`, `>16.7ms` `0`, `>33.3ms` `0`, 최대 draw call `415`, RTX 4070 Ti SUPER
+  - 실제 창 40개 이동: `1,215`프레임, p99 `5.539ms`, 최대 `6.331ms`, `>16.7ms` `0`, `>33.3ms` `0`, 최대 draw call `415`, RTX 4070 Ti SUPER
   - 원본 패리티 → 6장면, 틱별 위치·속도 허용 오차 `1e-6px`, 종료 코드 0. 물리 해시 TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`
-  - Windows 릴리스 빌드 → 종료 코드 0, `GravityOrb_v0.11.1.exe` `111,150,840`바이트
+  - Windows 릴리스 빌드 → 종료 코드 0, `GravityOrb_v0.11.1.exe` `111,150,888`바이트
   - 22시드 3D 장기 물리: 최대 벽/쌍 `13.254/14.389px`, 이탈·발산 `0/0`
 - 수동 확인 절차:
   1. `Godot_v4.8-dev3_win64_console.exe --path . -- --mode=slime --jolt-seed=80`으로 실행한다 → 슬라임 표면 명암·하이라이트와 캡슐 눈이 보이고, 작은 숨쉬기·깜빡임·입장 중 늘어남이 물리 위치와 분리되어 보여야 한다.

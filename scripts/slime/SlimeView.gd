@@ -123,8 +123,10 @@ func _draw() -> void:
 	_draw_speed_trails()
 	for slime: SlimeSim.SlimeBody in _sim.slimes:
 		_draw_shadow(slime)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	for slime: SlimeSim.SlimeBody in _sim.slimes:
 		_draw_slime(slime)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	_draw_reaction_effects()
 	if not _sim.moving and not _sim.game_over:
 		_draw_entry_bars(board)
@@ -176,10 +178,10 @@ func _draw_gravity_transition(board: Rect2) -> void:
 
 
 func _draw_entry_bars(board: Rect2) -> void:
-	_draw_entry_bar(Vector2i.DOWN, Vector2(board.get_center().x, board.position.y + 2.0), Vector2.RIGHT)
-	_draw_entry_bar(Vector2i.UP, Vector2(board.get_center().x, board.end.y - 2.0), Vector2.RIGHT)
-	_draw_entry_bar(Vector2i.RIGHT, Vector2(board.position.x + 2.0, board.get_center().y), Vector2.DOWN)
-	_draw_entry_bar(Vector2i.LEFT, Vector2(board.end.x - 2.0, board.get_center().y), Vector2.DOWN)
+	_draw_entry_bar(Vector2i.DOWN, Vector2(board.get_center().x, board.position.y), Vector2.RIGHT)
+	_draw_entry_bar(Vector2i.UP, Vector2(board.get_center().x, board.end.y), Vector2.RIGHT)
+	_draw_entry_bar(Vector2i.RIGHT, Vector2(board.position.x, board.get_center().y), Vector2.DOWN)
+	_draw_entry_bar(Vector2i.LEFT, Vector2(board.end.x, board.get_center().y), Vector2.DOWN)
 
 
 func _draw_entry_bar(direction: Vector2i, center: Vector2, axis: Vector2) -> void:
@@ -312,8 +314,8 @@ func _draw_reaction_waves(center: Vector2, progress: float, power: float, effect
 	if is_clear:
 		var clear_radius: float = lerpf(16.0, 112.0, p) * power
 		var clear_width: float = lerpf(6.0, 1.0, p)
-		draw_arc(center, clear_radius, PI, TAU, 28, Color(color_a.lightened(0.30), 1.0 - p), clear_width, true)
-		draw_arc(center, clear_radius, 0.0, PI, 28, Color(color_b.lightened(0.30), 1.0 - p), clear_width, true)
+		draw_arc(center, clear_radius, -PI * 0.5, PI * 0.5, 28, Color(color_a.lightened(0.30), 1.0 - p), clear_width, true)
+		draw_arc(center, clear_radius, PI * 0.5, PI * 1.5, 28, Color(color_b.lightened(0.30), 1.0 - p), clear_width, true)
 
 
 func _draw_reaction_particles(effect: Dictionary, age: float, color_a: Color, color_b: Color, is_clear: bool) -> void:

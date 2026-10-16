@@ -121,6 +121,71 @@ func test_material_hud_entry_lengths_and_effect_lifetime_match_spec() -> void:
 	await tree.process_frame
 
 
+func test_rendered_entry_bars_and_max_clear_waves_stay_in_board_coordinates() -> void:
+	# The headless display uses the dummy renderer and cannot return SubViewport pixels.
+	# This regression is exercised by the dedicated windowed invocation documented for #80.
+	if DisplayServer.get_name() == "headless":
+		return
+	var sim := SlimeSim.new(CONFIG, 808, true, false)
+	sim.moving = false
+	sim.gravity_direction = Vector2i.DOWN
+	var last_slime: SlimeSim.SlimeBody = sim.add_slime(Vector2(485.0, 730.0), 2, 2)
+	last_slime.rotation = 0.63
+	last_slime.roll = 0.19
+	last_slime.deform = Vector2(1.27, 0.72)
+
+	var viewport := SubViewport.new()
+	viewport.size = Vector2i(640, 920)
+	viewport.gui_disable_input = true
+	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	tree.root.add_child(viewport)
+	var view := SlimeView.new()
+	viewport.add_child(view)
+	view.bind(sim)
+	var effect_center := Vector2(320.0, 500.0)
+	view.handle_events([{
+		"type": "max_clear",
+		"position": effect_center,
+		"source_a_position": effect_center,
+		"source_b_position": effect_center,
+		"source_a_radius": 0.0,
+		"source_b_radius": 0.0,
+		"color_a": 0,
+		"color_b": 1,
+		"gained_score": 7500,
+		"tick": 80,
+	}])
+	view.advance_visuals(0.17)
+	view.refresh()
+	await tree.process_frame
+	await tree.process_frame
+	RenderingServer.force_draw(true)
+	var image: Image = viewport.get_texture().get_image()
+	assert_eq(image.get_size(), Vector2i(640, 920), "offscreen render size")
+
+	var board: Rect2 = CONFIG.board_rect
+	var bar_samples: Dictionary = {
+		Vector2i.DOWN: Vector2i(roundi(board.get_center().x), roundi(board.position.y)),
+		Vector2i.UP: Vector2i(roundi(board.get_center().x), roundi(board.end.y)),
+		Vector2i.RIGHT: Vector2i(roundi(board.position.x), roundi(board.get_center().y)),
+		Vector2i.LEFT: Vector2i(roundi(board.end.x), roundi(board.get_center().y)),
+	}
+	for direction: Vector2i in bar_samples:
+		var actual: Color = image.get_pixelv(bar_samples[direction] as Vector2i)
+		var expected: Color = _entry_stage_color(sim.entry_stage_for(direction))
+		assert_true(_color_distance(actual, expected) < 0.10, "entry bar %s stays centered on its board wall" % direction)
+
+	var clear_radius: float = lerpf(16.0, 112.0, 0.25) * 1.65
+	var right_pixel: Color = image.get_pixelv(Vector2i(roundi(effect_center.x + clear_radius), roundi(effect_center.y)))
+	var left_pixel: Color = image.get_pixelv(Vector2i(roundi(effect_center.x - clear_radius), roundi(effect_center.y)))
+	var color_a: Color = CONFIG.slime_colors[0].lightened(6.0 * CONFIG.level_lighten).lightened(0.30)
+	var color_b: Color = CONFIG.slime_colors[1].lightened(6.0 * CONFIG.level_lighten).lightened(0.30)
+	assert_true(_color_distance(right_pixel, color_a) < _color_distance(right_pixel, color_b), "MAX CLEAR right half uses color A at the reaction point")
+	assert_true(_color_distance(left_pixel, color_b) < _color_distance(left_pixel, color_a), "MAX CLEAR left half uses color B at the reaction point")
+	viewport.queue_free()
+	await tree.process_frame
+
+
 func test_six_slime_synths_share_sfx_bus_and_pitch_rules() -> void:
 	var original_enabled: bool = Config.data.sfx_enabled
 	Config.data.sfx_enabled = true
@@ -164,3 +229,15 @@ func _first_event(events: Array[Dictionary], event_type: String) -> Dictionary:
 		if str(event.get("type", "")) == event_type:
 			return event
 	return {}
+
+
+func _entry_stage_color(stage: int) -> Color:
+	if stage == 2:
+		return Color("ff5878")
+	if stage == 1:
+		return Color("ffd166")
+	return Color("55e0bc")
+
+
+func _color_distance(a: Color, b: Color) -> float:
+	return Vector4(a.r - b.r, a.g - b.g, a.b - b.b, a.a - b.a).length()
