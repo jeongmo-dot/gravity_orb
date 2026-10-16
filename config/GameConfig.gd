@@ -4,7 +4,7 @@ extends Resource
 enum SpawnPositionMode { RANDOM, CENTER }
 enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 enum ShockMode { PUSH, PULL, SHAKE, LIFT }
-enum GameMode { TURN, BLITZ }
+enum GameMode { TURN, BLITZ, SLIME }
 
 @export var game_mode: GameMode = GameMode.TURN
 @export var board_size: float = 960.0

@@ -26,6 +26,7 @@ var _game_manager: Variant
 var _launch_game_on_ready: bool = false
 var _game_started: bool = false
 var _embedded_launch_mode: int = NO_MODE
+var _redirecting_to_slime: bool = false
 
 
 func _enter_tree() -> void:
@@ -35,16 +36,25 @@ func _enter_tree() -> void:
 		return
 	if _embedded_launch_mode != NO_MODE:
 		Config.data.game_mode = _as_game_mode(_embedded_launch_mode)
+		if Config.data.game_mode == GameConfig.GameMode.SLIME:
+			_queue_slime_scene()
+			return
 		_launch_game_on_ready = true
 		return
 	if _queued_mode != NO_MODE:
 		Config.data.game_mode = _as_game_mode(_queued_mode)
 		_queued_mode = NO_MODE
+		if Config.data.game_mode == GameConfig.GameMode.SLIME:
+			_queue_slime_scene()
+			return
 		_launch_game_on_ready = true
 		return
 	var argument_mode: int = _mode_from_arguments(OS.get_cmdline_user_args())
 	if argument_mode != NO_MODE:
 		Config.data.game_mode = _as_game_mode(argument_mode)
+		if Config.data.game_mode == GameConfig.GameMode.SLIME:
+			_queue_slime_scene()
+			return
 		_launch_game_on_ready = true
 		return
 	_prepare_start_screen()
@@ -60,6 +70,8 @@ func _prepare_start_screen() -> void:
 
 
 func _ready() -> void:
+	if _redirecting_to_slime:
+		return
 	RenderingServer.set_default_clear_color(BACKGROUND_COLOR)
 	if _camera_3d != null:
 		if not get_viewport().size_changed.is_connected(_apply_camera_aspect):
@@ -236,6 +248,8 @@ func _mode_from_arguments(arguments: PackedStringArray) -> int:
 			return int(GameConfig.GameMode.BLITZ)
 		if mode_name == "turn":
 			return int(GameConfig.GameMode.TURN)
+		if mode_name == "slime":
+			return int(GameConfig.GameMode.SLIME)
 	return NO_MODE
 
 
@@ -247,4 +261,15 @@ func _save_path() -> String:
 func _as_game_mode(value: int) -> GameConfig.GameMode:
 	if value == int(GameConfig.GameMode.BLITZ):
 		return GameConfig.GameMode.BLITZ
+	if value == int(GameConfig.GameMode.SLIME):
+		return GameConfig.GameMode.SLIME
 	return GameConfig.GameMode.TURN
+
+
+func _queue_slime_scene() -> void:
+	_redirecting_to_slime = true
+	call_deferred("_open_slime_scene")
+
+
+func _open_slime_scene() -> void:
+	get_tree().change_scene_to_file("res://scenes/SlimeMain.tscn")

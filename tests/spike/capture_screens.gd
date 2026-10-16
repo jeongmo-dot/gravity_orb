@@ -1,6 +1,7 @@
 extends Node
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
+const SLIME_MAIN_SCENE: PackedScene = preload("res://scenes/SlimeMain.tscn")
 const ORB_3D_SCENE: PackedScene = preload("res://scenes/Orb3D.tscn")
 const DEFAULT_OUTPUT_DIRECTORY: String = "res://artifacts/screens"
 const MEASUREMENT_DIRECTORY: String = "res://artifacts/measurements"
@@ -90,6 +91,7 @@ const CAPTURE_FILES: Array[String] = [
 	"45_turn_busy_b.png",
 	"46_turn_rejected.png",
 	"47_mars_rotations.png",
+	"48_slime_core.png",
 ]
 const HUD_CAPTURE_FILES: Array[String] = [
 	"02_turn_early.png",
@@ -147,6 +149,8 @@ func _run_capture_suite() -> void:
 		await _capture_orb_closeup()
 	if not _failed and not _hud_scenes_only:
 		await _capture_mars_rotations()
+	if not _failed and not _hud_scenes_only:
+		await _capture_slime_core()
 	if not _failed and not _hud_scenes_only:
 		await _capture_reaction_effect_scenes()
 	if not _failed and not _hud_scenes_only:
@@ -617,6 +621,87 @@ func _capture_mars_rotations() -> void:
 	await _capture("47_mars_rotations.png")
 	print("SCREEN_CAPTURE_CHECK scene=mars_rotations planet=mars level=5 angles=0,90,180,270 scale=2.2x")
 	await _destroy_main(main)
+
+
+func _capture_slime_core() -> void:
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var games: Array[Variant] = []
+	var positions: Array[Vector2] = [
+		Vector2.ZERO,
+		Vector2(viewport_size.x * 0.5, 0.0),
+		Vector2(0.0, viewport_size.y * 0.5),
+		viewport_size * 0.5,
+	]
+	for index: int in range(4):
+		var game: Variant = SLIME_MAIN_SCENE.instantiate()
+		add_child(game)
+		await get_tree().process_frame
+		game.process_mode = Node.PROCESS_MODE_DISABLED
+		game.scale = Vector2.ONE * 0.5
+		game.position = positions[index]
+		games.append(game)
+
+	var admission: SlimeSim = games[0].get_sim()
+	for tick: int in range(13):
+		admission.step(1.0 / 60.0)
+	admission.message = "첫 입장 중"
+	games[0].refresh_presentation()
+
+	var ready: SlimeSim = games[1].get_sim()
+	ready.clear_slimes()
+	ready.intro_queue.clear()
+	ready.moving = false
+	ready.message = "입구 막대: 위험 · 주의 · 안전"
+	var radius: float = ready.radius_for_level(0)
+	var down_entry: Vector2 = ready.entry_position_for(Vector2i.DOWN, radius)
+	ready.add_slime(
+		down_entry + Vector2(0.0, radius * 2.0 + ready.config.entry_margin + 14.9),
+		0,
+		0
+	)
+	var left_entry: Vector2 = ready.entry_position_for(Vector2i.LEFT, radius)
+	ready.add_slime(
+		left_entry + Vector2(-radius * 2.0 - ready.config.entry_margin - 50.0, 0.0),
+		0,
+		1
+	)
+	ready.set_next_slimes([{"level": 0, "color": 2}, {"level": 1, "color": 0}])
+	games[1].refresh_presentation()
+
+	var final_move: SlimeSim = games[2].get_sim()
+	final_move.clear_slimes()
+	final_move.intro_queue.clear()
+	final_move.moving = false
+	for index: int in range(8):
+		final_move.add_slime(
+			Vector2(125.0 + float(index % 4) * 130.0, 420.0 + float(index / 4) * 150.0),
+			index % 3,
+			index % 4
+		)
+	final_move.turn = 18
+	final_move.score = 54250
+	final_move.final_move_pending = true
+	final_move.message = "한 번의 중력 이동으로 공간을 만드세요"
+	games[2].refresh_presentation()
+
+	var result: SlimeSim = games[3].get_sim()
+	result.clear_slimes()
+	result.intro_queue.clear()
+	result.moving = false
+	result.game_over = true
+	result.turn = 27
+	result.score = 128750
+	result.run_best_chain = 6
+	result.message = "보드가 가득 찼습니다"
+	games[3].refresh_presentation()
+
+	await get_tree().process_frame
+	await get_tree().process_frame
+	await _capture("48_slime_core.png")
+	print("SCREEN_CAPTURE_CHECK scene=slime_core panels=admission,entry-bars,final-move,result")
+	for game: Variant in games:
+		game.queue_free()
+	await get_tree().process_frame
 
 
 func _verify_deterministic_orb_capture() -> void:
