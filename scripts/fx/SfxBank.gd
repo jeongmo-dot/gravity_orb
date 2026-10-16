@@ -13,6 +13,7 @@ signal play_called(
 )
 
 const SAMPLE_RATE: int = 44100
+const SLIME_SAMPLE_RATE: int = 22050
 const POP_DURATION: float = 0.045
 const BLAST_DURATION: float = 0.460
 const CHIME_DURATION: float = 0.340
@@ -21,6 +22,12 @@ const TIMER_TICK_DURATION: float = 0.060
 const TIME_UP_DURATION: float = 0.520
 const SWIPE_DURATION: float = 0.120
 const TURN_READY_DURATION: float = 0.050
+const SLIME_IMPACT_DURATION: float = 0.10
+const SLIME_GRAVITY_DURATION: float = 0.14
+const SLIME_MERGE_DURATION: float = 0.20
+const SLIME_MAX_DURATION: float = 0.34
+const SLIME_CLEAR_DURATION: float = 0.48
+const SLIME_GAME_OVER_DURATION: float = 0.52
 const VOICE_COUNT: int = 12
 const SFX_BUS: StringName = &"SFX"
 const POP_ASSET_PATHS: Array[String] = [
@@ -90,6 +97,12 @@ var _timer_tick_stream: AudioStream
 var _time_up_stream: AudioStream
 var _swipe_stream: AudioStream
 var _turn_ready_stream: AudioStream
+var _slime_impact_stream: AudioStreamWAV
+var _slime_gravity_stream: AudioStreamWAV
+var _slime_merge_stream: AudioStreamWAV
+var _slime_max_stream: AudioStreamWAV
+var _slime_clear_stream: AudioStreamWAV
+var _slime_game_over_stream: AudioStreamWAV
 var _voices: Array[AudioStreamPlayer] = []
 var _next_voice: int = 0
 var _muted: bool = false
@@ -126,6 +139,12 @@ func _ready() -> void:
 	_turn_ready_stream = _load_first(TURN_READY_ASSET_PATHS)
 	if _turn_ready_stream == null:
 		_turn_ready_stream = _synthesize_turn_ready()
+	_slime_impact_stream = _synthesize_slime_tone(135.0, 92.0, SLIME_IMPACT_DURATION, 0.20)
+	_slime_gravity_stream = _synthesize_slime_tone(230.0, 360.0, SLIME_GRAVITY_DURATION, 0.18)
+	_slime_merge_stream = _synthesize_slime_tone(390.0, 610.0, SLIME_MERGE_DURATION, 0.22)
+	_slime_max_stream = _synthesize_slime_tone(330.0, 760.0, SLIME_MAX_DURATION, 0.25)
+	_slime_clear_stream = _synthesize_slime_tone(210.0, 880.0, SLIME_CLEAR_DURATION, 0.28)
+	_slime_game_over_stream = _synthesize_slime_tone(260.0, 105.0, SLIME_GAME_OVER_DURATION, 0.23)
 	for voice_index: int in range(VOICE_COUNT):
 		var voice: AudioStreamPlayer = AudioStreamPlayer.new()
 		voice.name = "Voice%d" % voice_index
@@ -153,6 +172,12 @@ func _exit_tree() -> void:
 	_time_up_stream = null
 	_swipe_stream = null
 	_turn_ready_stream = null
+	_slime_impact_stream = null
+	_slime_gravity_stream = null
+	_slime_merge_stream = null
+	_slime_max_stream = null
+	_slime_clear_stream = null
+	_slime_game_over_stream = null
 
 
 func play_merge(
@@ -262,6 +287,42 @@ func play_turn_ready() -> void:
 	)
 
 
+func play_slime_impact(strength: float) -> void:
+	if not Config.data.sfx_enabled:
+		return
+	_play(_slime_impact_stream, slime_impact_pitch(strength), -8.0, "slime_impact", 0, -1, -1)
+
+
+func play_slime_gravity() -> void:
+	if not Config.data.sfx_enabled:
+		return
+	_play(_slime_gravity_stream, 1.0, -4.0, "slime_gravity", 0, -1, -1)
+
+
+func play_slime_merge(chain: int) -> void:
+	if not Config.data.sfx_enabled:
+		return
+	_play(_slime_merge_stream, slime_chain_pitch(chain), -4.0, "slime_merge", 0, -1, -1)
+
+
+func play_slime_max(chain: int) -> void:
+	if not Config.data.sfx_enabled:
+		return
+	_play(_slime_max_stream, slime_chain_pitch(chain), -4.0, "slime_max", 0, -1, -1)
+
+
+func play_slime_clear() -> void:
+	if not Config.data.sfx_enabled:
+		return
+	_play(_slime_clear_stream, 1.0, -4.0, "slime_clear", 0, -1, -1)
+
+
+func play_slime_game_over() -> void:
+	if not Config.data.sfx_enabled:
+		return
+	_play(_slime_game_over_stream, 1.0, -4.0, "slime_game_over", 0, -1, -1)
+
+
 func merge_pitch(result_level: int, chain: int, stable_spawn_id: int) -> float:
 	var clamped_level: int = clampi(result_level, 2, 7)
 	var level_ratio: float = float(clamped_level - 2) / 5.0
@@ -292,6 +353,31 @@ func blast_stream() -> AudioStream:
 
 func swipe_stream() -> AudioStream:
 	return _swipe_stream
+
+
+func slime_stream(kind: String) -> AudioStreamWAV:
+	match kind:
+		"impact":
+			return _slime_impact_stream
+		"gravity":
+			return _slime_gravity_stream
+		"merge":
+			return _slime_merge_stream
+		"max":
+			return _slime_max_stream
+		"clear":
+			return _slime_clear_stream
+		"game_over":
+			return _slime_game_over_stream
+	return null
+
+
+func slime_impact_pitch(strength: float) -> float:
+	return lerpf(1.15, 0.78, clampf(strength, 0.0, 1.0))
+
+
+func slime_chain_pitch(chain: int) -> float:
+	return 1.0 + minf(float(chain) * 0.055, 0.42)
 
 
 func voice_count() -> int:
@@ -543,6 +629,26 @@ func _synthesize_turn_ready() -> AudioStreamWAV:
 	return _make_wav(samples)
 
 
+func _synthesize_slime_tone(
+	start_frequency: float,
+	end_frequency: float,
+	duration: float,
+	volume: float
+) -> AudioStreamWAV:
+	var sample_count: int = int(duration * float(SLIME_SAMPLE_RATE))
+	var samples := PackedFloat32Array()
+	samples.resize(sample_count)
+	var phase: float = 0.0
+	for index: int in range(sample_count):
+		var progress: float = float(index) / float(sample_count)
+		var frequency: float = lerpf(start_frequency, end_frequency, progress)
+		phase += TAU * frequency / float(SLIME_SAMPLE_RATE)
+		var envelope: float = minf(progress / 0.08, 1.0) * pow(1.0 - progress, 1.65)
+		var wave: float = sin(phase) * 0.78 + sin(phase * 2.03) * 0.22
+		samples[index] = clampf(wave * envelope * volume, -1.0, 1.0)
+	return _make_wav_at_rate(samples, SLIME_SAMPLE_RATE)
+
+
 func _pop_sample(time: float, pitch: float, noise_index: int) -> float:
 	if time < 0.0 or time >= POP_DURATION:
 		return 0.0
@@ -569,6 +675,10 @@ func _deterministic_noise(index: int) -> float:
 
 
 func _make_wav(samples: PackedFloat32Array) -> AudioStreamWAV:
+	return _make_wav_at_rate(samples, SAMPLE_RATE)
+
+
+func _make_wav_at_rate(samples: PackedFloat32Array, sample_rate: int) -> AudioStreamWAV:
 	var bytes: PackedByteArray = PackedByteArray()
 	bytes.resize(samples.size() * 2)
 	for index: int in range(samples.size()):
@@ -576,7 +686,7 @@ func _make_wav(samples: PackedFloat32Array) -> AudioStreamWAV:
 		bytes.encode_s16(index * 2, encoded)
 	var stream: AudioStreamWAV = AudioStreamWAV.new()
 	stream.format = AudioStreamWAV.FORMAT_16_BITS
-	stream.mix_rate = SAMPLE_RATE
+	stream.mix_rate = sample_rate
 	stream.stereo = false
 	stream.data = bytes
 	return stream

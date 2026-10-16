@@ -13,6 +13,11 @@ class SlimeBody extends RefCounted:
 	var impact: float = 0.0
 	var idle_phase: float = 0.0
 	var idle_speed: float = 1.0
+	var visual_scale: float = 1.0
+	var merge_glow: float = 0.0
+	var rotation: float = 0.0
+	var roll: float = 0.0
+	var deform: Vector2 = Vector2.ONE
 
 	func copy() -> SlimeBody:
 		var result := SlimeBody.new()
@@ -25,6 +30,11 @@ class SlimeBody extends RefCounted:
 		result.impact = impact
 		result.idle_phase = idle_phase
 		result.idle_speed = idle_speed
+		result.visual_scale = visual_scale
+		result.merge_glow = merge_glow
+		result.rotation = rotation
+		result.roll = roll
+		result.deform = deform
 		return result
 
 	func physics_array() -> Array[Variant]:
@@ -158,6 +168,7 @@ func add_slime(
 	if _visuals_enabled:
 		slime.idle_phase = _visual_rng.randf_range(0.0, TAU)
 		slime.idle_speed = _visual_rng.randf_range(1.5, 2.1)
+		slime.rotation = Vector2(gravity_direction).angle() - PI * 0.5
 	slimes.append(slime)
 	maximum_slime_count = maxi(maximum_slime_count, slimes.size())
 	return slime
@@ -181,10 +192,13 @@ func start_turn(direction: Vector2i) -> bool:
 		final_move_pending = false
 		final_move_active = true
 		final_move_count += 1
-		_set_message("FINAL MOVE")
+		_set_message("FINAL MOVE · 공간을 다시 여세요")
 	else:
 		_schedule_next_batch(direction)
-		_set_message("Gravity changed")
+		if intro_queue.is_empty():
+			_set_message("중력 이동 중...")
+		else:
+			_set_message("중력 전환 · 슬라임 %d마리 등장" % intro_queue.size())
 	moving = true
 	settle_elapsed = 0.0
 	simulation_elapsed = 0.0
@@ -221,6 +235,7 @@ func step(delta: float) -> void:
 		if intro_queue.is_empty() and simulation_elapsed > config.soft_stop_start:
 			slime.velocity *= soft_factor
 		slime.position += slime.velocity * delta
+		_update_motion_visual(slime, delta, gravity, lateral)
 		_resolve_wall(slime)
 	for iteration: int in range(config.solver_iterations):
 		resolve_pairs()
@@ -260,20 +275,20 @@ func finish_turn() -> void:
 		if all_entries_blocked():
 			game_over = true
 			next_slimes.clear()
-			_set_message("GAME OVER")
+			_set_message("보드가 가득 찼습니다")
 			_emit_event("game_over", {"score": score, "turn": turn})
 		else:
 			final_move_success_count += 1
-			_set_message("Final move survived")
+			_set_message("공간 확보 성공 · 다음 중력을 선택하세요")
 			if next_slimes.is_empty():
 				roll_next_batch()
 		return
 	if all_entries_blocked():
 		final_move_pending = true
-		_set_message("FINAL MOVE")
+		_set_message("FINAL MOVE · 한 번의 중력 이동으로 공간을 만드세요")
 		_emit_event("final_move", {"turn": turn})
 	else:
-		_set_message("Choose gravity")
+		_set_message("다음 중력을 선택하세요")
 	if next_slimes.is_empty():
 		roll_next_batch()
 
@@ -542,7 +557,7 @@ func _start_initial_admission() -> void:
 	settle_elapsed = 0.0
 	simulation_elapsed = 0.0
 	intro_elapsed = 0.0
-	_set_message("Welcome to GRAVITY SLIME")
+	_set_message("슬라임들이 입장합니다...")
 
 
 func _update_visual_state(delta: float) -> void:
@@ -550,7 +565,31 @@ func _update_visual_state(delta: float) -> void:
 		return
 	for slime: SlimeBody in slimes:
 		slime.impact = maxf(0.0, slime.impact - delta * 4.8)
+		slime.visual_scale = lerpf(slime.visual_scale, 1.0, minf(delta * 13.0, 1.0))
+		slime.merge_glow = maxf(0.0, slime.merge_glow - delta * 3.2)
 		slime.idle_phase = fmod(slime.idle_phase + delta * slime.idle_speed, TAU)
+		var gravity_angle: float = Vector2(gravity_direction).angle() - PI * 0.5
+		slime.rotation = lerp_angle(slime.rotation, gravity_angle, minf(delta * 8.0, 1.0))
+		if not moving:
+			slime.deform = slime.deform.lerp(Vector2.ONE, minf(delta * 11.0, 1.0))
+			slime.roll = lerp_angle(slime.roll, 0.0, minf(delta * 4.5, 1.0))
+
+
+func _update_motion_visual(
+	slime: SlimeBody,
+	delta: float,
+	gravity: Vector2,
+	lateral: Vector2
+) -> void:
+	if not _visuals_enabled:
+		return
+	slime.roll += slime.velocity.dot(lateral) / maxf(slime.radius, 1.0) * delta * 0.86
+	var fall_speed: float = maxf(0.0, slime.velocity.dot(gravity))
+	var stretch: float = clampf(fall_speed / 5100.0, 0.0, 0.19)
+	var target := Vector2(1.0 - 0.55 * stretch, 1.0 + stretch)
+	if slime.impact > 0.0:
+		target = Vector2(1.0 + 0.18 * slime.impact, 1.0 - 0.20 * slime.impact)
+	slime.deform = slime.deform.lerp(target, minf(delta * 11.0, 1.0))
 
 
 func _update_intro(delta: float) -> void:
@@ -566,19 +605,21 @@ func _update_intro(delta: float) -> void:
 		var lane: float = float(entry.get("lane", 0.5))
 		if entry_clearance_for(gravity_direction, level_value, lane) >= 0.0:
 			var radius: float = radius_for_level(level_value)
-			add_slime(
+			var spawned: SlimeBody = add_slime(
 				entry_position_for(gravity_direction, radius, lane),
 				level_value,
 				int(entry.get("color", 0)),
 				Vector2(gravity_direction) * config.spawn_speed
 			)
+			if _visuals_enabled:
+				spawned.visual_scale = 0.35
 			intro_queue.pop_front()
 			_emit_event("spawned", {"level": level_value, "lane": lane})
 			continue
 		if intro_elapsed > delay + config.intro_abandon_time:
 			intro_queue.clear()
 			intro_cancel_count += 1
-			_set_message("Entry blocked — batch cancelled")
+			_set_message("투입 중단 · 현재 슬라임 이동 후 공간을 확인합니다")
 			_emit_event("intro_cancelled", {"turn": turn})
 		return
 
@@ -608,7 +649,6 @@ func _resolve_wall(slime: SlimeBody) -> void:
 		slime.velocity.y = -absf(slime.velocity.y) * config.wall_restitution
 	if impact > 0.0:
 		slime.impact = maxf(slime.impact, impact)
-		_emit_collision_event(impact, slime.position)
 
 
 func _apply_stack_slip(
@@ -644,6 +684,10 @@ func _apply_stack_slip(
 
 
 func _merge_pair(i: int, j: int, a: SlimeBody, b: SlimeBody) -> void:
+	var source_a_position: Vector2 = a.position
+	var source_b_position: Vector2 = b.position
+	var source_a_radius: float = a.radius
+	var source_b_radius: float = b.radius
 	var raw_mass: int = a.mass + b.mass
 	var merged_mass: int = mini(raw_mass, config.max_mass)
 	var merged_position: Vector2 = (a.position + b.position) * 0.5
@@ -657,15 +701,37 @@ func _merge_pair(i: int, j: int, a: SlimeBody, b: SlimeBody) -> void:
 		max_completions += 1
 	if newly_completed_color:
 		completed_colors[color_index] = true
-	_add_chain_score(base_score)
+	var colors_before: int = active_color_count
+	var gained_score: int = _add_chain_score(base_score)
 	slimes.remove_at(j)
 	slimes.remove_at(i)
 	var merged: SlimeBody = add_slime(merged_position, level_for_mass(merged_mass), color_index, merged_velocity, merged_mass)
-	merged.impact = 0.75
+	merged.visual_scale = clampf(
+		maxf(source_a_radius, source_b_radius) / merged.radius * 0.88,
+		0.68,
+		0.88
+	)
+	merged.merge_glow = 1.0
+	if active_color_count == colors_before:
+		if chain >= 2:
+			_set_message("%d CHAIN!  +%d" % [chain, gained_score])
+		elif reached_max:
+			_set_message("MAX 슬라임 완성!  +%d" % gained_score)
+		else:
+			_set_message("흡수!  +%d" % gained_score)
 	_emit_event("absorbed", {
 		"mass": merged_mass,
 		"raw_mass": raw_mass,
 		"position": merged_position,
+		"source_a_position": source_a_position,
+		"source_b_position": source_b_position,
+		"source_a_radius": source_a_radius,
+		"source_b_radius": source_b_radius,
+		"result_radius": merged.radius,
+		"color": color_index,
+		"level": merged.level,
+		"gained_score": gained_score,
+		"chain": chain,
 		"reached_max": reached_max,
 		"newly_completed_color": newly_completed_color,
 	})
@@ -679,9 +745,16 @@ func _merge_pair(i: int, j: int, a: SlimeBody, b: SlimeBody) -> void:
 
 func _clear_max_pair(i: int, j: int, a: SlimeBody, b: SlimeBody) -> void:
 	var center: Vector2 = (a.position + b.position) * 0.5
+	var source_a_position: Vector2 = a.position
+	var source_b_position: Vector2 = b.position
+	var source_a_radius: float = a.radius
+	var source_b_radius: float = b.radius
+	var color_a: int = a.color_index
+	var color_b: int = b.color_index
 	slimes.remove_at(j)
 	slimes.remove_at(i)
-	_add_chain_score(config.max_clear_score)
+	var colors_before: int = active_color_count
+	var gained_score: int = _add_chain_score(config.max_clear_score)
 	max_clears += 1
 	for slime: SlimeBody in slimes:
 		var delta_position: Vector2 = slime.position - center
@@ -697,7 +770,22 @@ func _clear_max_pair(i: int, j: int, a: SlimeBody, b: SlimeBody) -> void:
 		var strength: float = 1.0 - distance / config.max_clear_push_radius
 		slime.velocity += direction * config.max_clear_push_speed * strength
 		slime.impact = maxf(slime.impact, 0.28)
-	_emit_event("max_clear", {"position": center})
+	if active_color_count == colors_before:
+		if chain >= 2:
+			_set_message("MAX CLEAR · %d CHAIN!  +%d" % [chain, gained_score])
+		else:
+			_set_message("MAX CLEAR!  +%d" % gained_score)
+	_emit_event("max_clear", {
+		"position": center,
+		"source_a_position": source_a_position,
+		"source_b_position": source_b_position,
+		"source_a_radius": source_a_radius,
+		"source_b_radius": source_b_radius,
+		"color_a": color_a,
+		"color_b": color_b,
+		"gained_score": gained_score,
+		"chain": chain,
+	})
 
 
 func _add_chain_score(base_score: int) -> int:
@@ -725,6 +813,7 @@ func _check_color_unlocks() -> void:
 		active_color_count += 1
 		unlock_grace_waves_left = config.unlock_grace_waves
 		color_bag.clear()
+		_set_message("새로운 색상 해금!  %d / 7" % active_color_count)
 		_emit_event("unlock", {"color": pending_new_color, "count": active_color_count})
 
 
@@ -760,7 +849,7 @@ func _roll_batch_count() -> int:
 
 
 func _emit_collision_event(impact: float, position_value: Vector2) -> void:
-	if impact < config.sound_impact_threshold or collision_cooldown_left > 0.0:
+	if impact <= config.sound_impact_threshold or collision_cooldown_left > 0.0:
 		return
 	collision_cooldown_left = config.collision_sound_cooldown
 	_emit_event("collision", {"impact": impact, "position": position_value})

@@ -1,9 +1,10 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/slime/SlimeGame.gd" id="1_game"]
 [ext_resource type="Script" path="res://scripts/slime/SlimeView.gd" id="2_view"]
 [ext_resource type="Script" path="res://scripts/slime/SlimeHud.gd" id="3_hud"]
 [ext_resource type="Resource" path="res://config/slime_config.tres" id="4_config"]
+[ext_resource type="Script" path="res://scripts/fx/SfxBank.gd" id="5_sfx"]
 
 [node name="SlimeMain" type="Node2D"]
 script = ExtResource("1_game")
@@ -26,3 +27,7 @@ script = ExtResource("2_view")
 [node name="SlimeHud" type="Node2D" parent="Content"]
 unique_name_in_owner = true
 script = ExtResource("3_hud")
+
+[node name="SfxBank" type="Node" parent="."]
+unique_name_in_owner = true
+script = ExtResource("5_sfx")
