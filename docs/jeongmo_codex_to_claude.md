@@ -38,6 +38,54 @@
 
 ## 미확인
 
+### [2026-10-16] 대상 #79 — GRAVITY SLIME ① 규칙·물리 코어 + 최소 화면
+- 상태: 완료 — 원본 규칙·물리를 독립 `SlimeSim`으로 옮기고 `--mode=slime` 직접 실행, 최소 2D 화면, 자동 검증·패리티·300판 관측까지 구현함
+- 브랜치 / PR: `gravity-slime-core` / PR 미생성
+- 변경 파일: `config/{GameConfig.gd,SlimeConfig.gd,slime_config.tres}`, `scenes/SlimeMain.tscn`, `scripts/core/Main.gd`, `scripts/slime/{SlimeGame,SlimeHud,SlimeSim,SlimeView}.gd`, `tests/{test_frontend,test_slime_config,test_slime_game,test_slime_sim}.gd`, `tests/tools/{run_slime_bot_measurement.gd,run_slime_bot_measurement.ps1,run_slime_parity.ps1,slime_parity_candidate.gd,slime_parity_original_driver.gd,slime_parity_original_game.gd}`, `tests/{capture_screens.ps1,spike/capture_screens.gd}`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `SlimeConfig`·`slime_config.tres`에 §12-G.2 보드·물리·생성·점수·해금·입장 수치를 분리하고 기존 `default_config.tres` 값은 변경하지 않음 — 자동 (`test_slime_config.gd`)
+  - [x] 노드·입력·소리·그리기 없는 `RefCounted` `SlimeSim`에 고정 1/60초 처리 순서, 배열 반복·합체·MAX CLEAR·쌓임 미끄러짐·입장 대기·FINAL MOVE·별도 게임/그림 RNG·사건 목록 구현 — 자동 (`test_slime_sim.gd` 18개)
+  - [x] 로컬 원본과 6장면을 매 틱 비교해 위치·속도 차 `≤1e-6px`, 수·질량·점수·연쇄·턴 끝 틱 일치 — `tests/tools/run_slime_parity.ps1`, `PASS`
+  - [x] 같은 시드+같은 30턴 입력, 그림 켜기/끄기, 60Hz/120Hz 누적 실행의 상태 해시 일치 — 자동 (`test_same_seed_inputs_and_visual_toggle_keep_identical_physics`, `test_fixed_step_accumulation_matches_60_and_120_hz`)
+  - [x] 기존 TURN/BLITZ 물리 해시 유지 — TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`
+  - [x] 최소 화면에 보드 바탕·테두리·40px 격자, 색 원, 안전/주의/위험 입구 막대, FINAL MOVE 띠, HUD/NEXT, 임시 결과 상자를 원본 `640×920 × 1.6875`로 가운데 배치 — 캡처 `48_slime_core` 두 비율 직접 확인
+  - [x] 방향키/WASD·스와이프는 `InputRouter`, R 다시 시작, 이동 중 입력 잠금; `GameMode.SLIME = 2`, `--mode=slime` 직접 시작 — 자동 (`test_slime_game.gd`, `test_frontend.gd`) + 스모크
+  - [x] 봇 3전략 × 시드 1~100, 250턴 상한을 실제 `SlimeSim`으로 관측 — 아래 표
+  - [x] 전체 래퍼, 기본·TURN·BLITZ·SLIME 4종 스모크, Windows 릴리스 빌드 완료
+- 봇 측정 관측 (`tests/tools/run_slime_bot_measurement.ps1`, 300판, 수치 변경 없음):
+
+  | 전략 | 턴 평균 / 중앙 | 250턴 | 점수 평균 / 중앙 | 끝 해금 색 수 분포 | MAX 완성 / CLEAR 평균 | FINAL MOVE 발생 / 성공률 | 입장 취소 평균 | 턴 시간 p50 / p95 | 최대 슬라임 |
+  |---|---:|---:|---:|---|---:|---:|---:|---:|---:|
+  | 무작위 | 66.55 / 70.0 | 0 | 149,233.90 / 162,541.0 | 3색 2 · 4색 32 · 5색 66 | 2.33 / 0.73 | 10 / 80.00% | 0.81 | 2.483 / 2.783초 | 27 |
+  | 공간 우선 | 82.05 / 84.0 | 0 | 142,002.50 / 149,687.5 | 3색 1 · 4색 50 · 5색 49 | 2.26 / 0.69 | 44 / 86.36% | 0.64 | 2.483 / 2.783초 | 33 |
+  | 합체 우선 | 63.95 / 70.5 | 0 | 161,904.07 / 180,208.5 | 3색 4 · 4색 25 · 5색 69 · 6색 2 | 2.21 / 0.73 | 3 / 100.00% | 0.55 | 2.483 / 2.783초 | 19 |
+
+- 캡처·화면 관측 (Godot Standard/Compatibility, 직접 확인):
+  - `tests/capture_screens.ps1` → 종료 코드 0, `540×960`·`540×1170` 각 64장, 합계 128장; 전체 장면 완료, 보드 좌·우·폭 비율 간 차이 `0.000px`
+  - `48_slime_core`는 2×2 패널로 첫 입장 / 대기+입구 막대 / FINAL MOVE / 결과를 한 장에 기록함. 첫 입장에는 위쪽에서 들어온 색 원과 NEXT가 보이고, 대기 패널에는 빨강·노랑·청록 막대가 동시에 구분됨
+  - FINAL MOVE 띠는 보드 위쪽 안에 노란 테두리로 위치해 HUD 메시지와 겹치지 않고, 결과 상자는 보드 중앙 안에 들어가며 두 화면비에서 보드·원·문구 잘림이 없음
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - 집중 테스트 → `test_slime_config` `2/2`, `test_slime_game` `1/1`, `test_slime_sim` `18/18`, 종료 코드 0
+  - `tests/run_tests.ps1` → 일반 `311/311`(`19.458초`), 장기 `5/5`(`47.929초`), 성능 `5/5`(`3.076초`), 합계 `321/321`, 종료 코드 0, 총 `70.464초`
+  - 시작 화면 / TURN / BLITZ / SLIME `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - 로컬 원본 패리티 → 6장면, 틱별 허용 오차 `1e-6`, 종료 코드 0. 원본 폴더는 읽기만 하고 OS 임시 폴더의 복사본을 실행했으며 기록·소리 경로를 테스트 하위 스크립트로 차단함
+  - Windows 릴리스 빌드 → 종료 코드 0, `GravityOrb_v0.11.1.exe` `111,128,520`바이트
+  - 22시드 기존 3D 장기 물리: 최대 벽/쌍 `13.254/14.389px`, 이탈·발산 `0/0`
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 전역 난수 함수 호출 0건(`SlimeSim`은 명세의 분리된 `RandomNumberGenerator` 인스턴스만 사용), `default_config.tres` 변경 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. `Godot_v4.8-dev3_win64_console.exe --path . -- --mode=slime --jolt-seed=79`로 실행한다 → 시작 화면 없이 첫 슬라임 4개가 위에서 입장하고 정지 뒤 방향 입력이 열려야 한다.
+  2. 방향키/WASD 또는 한 방향 스와이프를 입력한다 → 중력과 HUD 화살표가 같은 방향으로 바뀌고 NEXT가 반대편 중앙에서 순차 입장하며, 이동 중 추가 입력은 무시되어야 한다.
+  3. 한 입구를 슬라임으로 막은 뒤 그 방향을 선택한다 → 턴은 시작하되 새 슬라임은 겹쳐 생성되지 않고, 기존 슬라임이 움직여 입구가 열리면 대기 중 슬라임이 들어와야 한다.
+  4. 네 입구를 모두 막고 턴을 끝낸다 → `FINAL MOVE` 띠가 나타나고 NEXT는 유지되며, 다음 한 턴에는 새 슬라임 없이 진행한다. 입구가 열리면 계속, 모두 막혀 있으면 임시 결과 상자가 보여야 한다.
+  5. 같은 색 원을 접촉시키고 MAX 두 개도 접촉시킨다 → 크기와 무관하게 같은 색은 흡수되고, MAX 둘은 색 조합과 무관하게 함께 사라지며 7,500점이 더해져야 한다.
+  6. R을 누른다 → SLIME 장면이 초기 입장 상태로 다시 시작되어야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 패리티 도구는 원본 폴더를 시스템 임시 폴더로 복사하고 검증 뒤 삭제한다. 원본 저장·소리·흡수 그림 효과는 테스트 하위 스크립트로 막아 사용자 저장과 게임 RNG를 건드리지 않는다.
+  - 시작 화면 SLIME 카드·랭킹/저장·공용 결과 패널·소리 버튼은 명세대로 #81 범위이며, 얼굴·명암·젤리 변형·연출·합성음은 #80 범위다. #79에서는 `--mode=slime` 직접 실행과 임시 결과 상자만 제공한다.
+  - 캡처 PNG·분석 JSON과 Windows 빌드는 기존 ignore 대상이라 커밋하지 않음.
+- 남은 것 · 질문: 없음
+
 ### [2026-10-16] 대상 #78 — 화성 무늬가 얼굴처럼 보이지 않게
 - 상태: 완료 — 3D 화성과 2D 미리보기의 중앙 수평 협곡·좌우 짝 크레이터 구성을 없애고, 비대칭 협곡·크레이터로 교체함
 - 브랜치 / PR: `v6-mars-pattern-fix` / [PR #80](https://github.com/jeongmo-dot/gravity_orb/pull/80)

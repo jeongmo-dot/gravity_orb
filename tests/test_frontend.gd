@@ -102,7 +102,7 @@ func test_mode_buttons_emit_modes_and_direct_launch_skips_start_screen() -> void
 	_remove_save()
 
 
-func test_mode_argument_parser_accepts_turn_and_blitz_only() -> void:
+func test_mode_argument_parser_accepts_turn_blitz_and_slime() -> void:
 	var main: Main = MAIN_SCENE.instantiate() as Main
 	assert_eq(
 		main._mode_from_arguments(PackedStringArray(["--mode=turn"])),
@@ -113,6 +113,11 @@ func test_mode_argument_parser_accepts_turn_and_blitz_only() -> void:
 		main._mode_from_arguments(PackedStringArray(["--mode=BLITZ"])),
 		int(GameConfig.GameMode.BLITZ),
 		"BLITZ argument is case insensitive"
+	)
+	assert_eq(
+		main._mode_from_arguments(PackedStringArray(["--mode=slime"])),
+		int(GameConfig.GameMode.SLIME),
+		"SLIME argument"
 	)
 	assert_eq(
 		main._mode_from_arguments(PackedStringArray(["--mode=unknown"])),

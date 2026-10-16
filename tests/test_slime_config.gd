@@ -1,0 +1,35 @@
+extends TestCase
+
+const CONFIG: SlimeConfig = preload("res://config/slime_config.tres")
+
+
+func test_slime_config_matches_ported_core_values() -> void:
+	assert_true(CONFIG.board_rect.is_equal_approx(Rect2(45.0, 180.0, 550.0, 700.0)), "board")
+	assert_near(CONFIG.gravity_acceleration, 2220.0, 1.0e-6, "gravity")
+	assert_near(CONFIG.damping, 0.981, 1.0e-6, "damping")
+	assert_near(CONFIG.lateral_damping, 0.935, 1.0e-6, "lateral damping")
+	assert_near(CONFIG.rest_speed, 34.0, 1.0e-6, "rest speed")
+	assert_near(CONFIG.settle_hold, 0.18, 1.0e-6, "settle hold")
+	assert_near(CONFIG.soft_stop_start, 1.34, 1.0e-6, "soft stop start")
+	assert_near(CONFIG.max_simulation_time, 1.85, 1.0e-6, "simulation cap")
+	assert_eq(CONFIG.solver_iterations, 4, "solver passes")
+	assert_eq(CONFIG.max_mass, 64, "max mass")
+	assert_eq(CONFIG.max_slimes, 40, "slime cap")
+	assert_eq(CONFIG.radii.size(), 7, "radius count")
+	assert_near(CONFIG.radii[0], 31.5, 1.0e-6, "first radius")
+	assert_near(CONFIG.radii[6], 112.0, 1.0e-6, "max radius")
+	assert_near(CONFIG.pre_max_radius, 108.0, 1.0e-6, "pre-max radius")
+	assert_eq(CONFIG.unlock_scores, PackedInt32Array([50000, 150000, 300000, 500000]), "unlock scores")
+	assert_eq(CONFIG.initial_levels, PackedInt32Array([0, 0, 0, 1]), "initial levels")
+	assert_eq(CONFIG.slime_colors.size(), 7, "color count")
+
+
+func test_radius_interpolation_and_mass_level_boundaries() -> void:
+	var sim := SlimeSim.new(CONFIG, 7, false, false)
+	for level: int in range(CONFIG.radii.size()):
+		var mass: int = 1 << level
+		assert_eq(sim.level_for_mass(mass), level, "mass level %d" % mass)
+		assert_near(sim.radius_for_mass(mass), CONFIG.radii[level], 1.0e-6, "mass radius %d" % mass)
+	assert_near(sim.radius_for_mass(40), 102.75, 1.0e-6, "32..64 uses pre-max radius")
+	assert_near(sim.radius_for_mass(63), 107.78125, 1.0e-6, "mass 63 interpolation")
+	assert_near(sim.radius_for_mass(64), 112.0, 1.0e-6, "max snaps to max radius")
