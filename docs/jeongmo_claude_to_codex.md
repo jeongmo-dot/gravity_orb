@@ -31,8 +31,13 @@
 
 ## 대기 중
 
-### [2026-10-17 #88] Windows 빌드 0.13.1
-- 상태: 대기 (**다음 차례** — main `52cd77a` 이후 기준. 먼저 `origin/main` 병합)
+---
+
+## 처리 완료
+
+### [2026-10-17 #88] Windows 빌드 0.13.1 — 완료
+- 상태: 완료 (2026-10-17 Claude 검수 · [PR #90](https://github.com/jeongmo-dot/gravity_orb/pull/90) 병합 `1972fc0`)
+- 검수: `build/windows/GravityOrb_v0.13.1.exe` (111,169,640바이트) + `.console.exe` + `_BUILD.txt` (커밋 `f274c15` = 브랜치 끝 = 병합 커밋과 같은 트리, 커밋 14초 뒤 빌드) 직접 확인. 내보낸 exe 스모크 4종·격리 창 시작 화면·SLIME, 사용자 `save.cfg` 해시 동일, 묶음에 테스트·문서 없음, 래퍼 340/340 (Codex). 시작 화면 → SLIME 카드 실제 클릭은 이번에도 자동화 못 함 (버튼 신호 테스트 + 두 화면 따로). Claude 재실행 없음
 - 근거: [technical_design.md](technical_design.md) **§10.5·§10.5.1** (버전 기록 0.13.1 줄)
 - 요구:
   1. `project.godot` `application/config/version` `0.13.0` → **`0.13.1`** (Claude 결정 값 — 기획서 0.13.1)
@@ -43,10 +48,6 @@
 - 건드리지 말 것: 버전 외 모든 파일, 사용자 저장 파일, `docs/` (회신 파일 제외)
 - Done-when: 위 검수 보고
 - 커밋: 항목 단위 브랜치 (`build-0.13.1`), push·PR까지
-
----
-
-## 처리 완료
 
 ### [2026-10-17 #87] 슬라임 도는 빛 경로 · 합체 잔상 크기 — 완료
 - 상태: 완료 (2026-10-17 Claude 검수 · [PR #89](https://github.com/jeongmo-dot/gravity_orb/pull/89) 병합 `52cd77a`)
