@@ -4,22 +4,48 @@ const CONFIG: SlimeConfig = preload("res://config/slime_config.tres")
 const DT: float = 1.0 / 60.0
 
 
-func test_exact_touch_max_pair_clears_for_same_or_different_colors() -> void:
-	var color_cases: Array[Array] = [[0, 0], [0, 1]]
-	for colors: Array in color_cases:
-		var sim := _empty_sim(10 + colors[1])
-		sim.turn = 1
-		var radius: float = sim.radius_for_mass(64)
-		sim.add_slime(Vector2(250.0, 500.0), 6, colors[0], Vector2.ZERO, 64)
-		sim.add_slime(Vector2(250.0 + radius * 2.0, 500.0), 6, colors[1], Vector2.ZERO, 64)
-		sim.resolve_pairs()
-		assert_eq(sim.slimes.size(), 0, "two max slimes disappear")
-		assert_eq(sim.score, 7500, "max clear score")
-		assert_eq(sim.chain, 1, "max clear starts chain")
+func test_same_color_max_absorbs_and_different_color_max_clears() -> void:
+	var same_color := _empty_sim(10)
+	same_color.turn = 1
+	var radius: float = same_color.radius_for_mass(64)
+	same_color.add_slime(Vector2(190.0, 500.0), 6, 0, Vector2.ZERO, 64)
+	same_color.add_slime(Vector2(190.0 + radius * 2.0, 500.0), 6, 0, Vector2.ZERO, 64)
+	same_color.resolve_pairs()
+	assert_eq(same_color.slimes.size(), 1, "same-color max slimes absorb")
+	assert_eq(same_color.slimes[0].mass, 128, "max masses add without cap")
+	assert_eq(same_color.slimes[0].level, 6, "grown max remains level six")
+	assert_near(same_color.slimes[0].radius, 128.65, 0.05, "mass 128 radius")
+	assert_eq(same_color.score, 128 * 25, "grown max scores raw mass without bonus")
+	assert_eq(same_color.max_completions, 0, "grown max does not complete twice")
+
+	var different_color := _empty_sim(11)
+	different_color.turn = 1
+	different_color.add_slime(Vector2(190.0, 500.0), 6, 0, Vector2.ZERO, 64)
+	different_color.add_slime(Vector2(190.0 + radius * 2.0, 500.0), 6, 1, Vector2.ZERO, 64)
+	different_color.resolve_pairs()
+	assert_eq(different_color.slimes.size(), 0, "different-color max slimes disappear")
+	assert_eq(different_color.score, 7500, "different-color max clear score")
+	assert_eq(different_color.chain, 1, "max clear starts chain")
+
+
+func test_max_absorbs_smaller_same_color_without_second_completion_bonus() -> void:
+	var sim := _empty_sim(12)
+	sim.turn = 1
+	var max_radius: float = sim.radius_for_mass(64)
+	var small_radius: float = sim.radius_for_mass(1)
+	sim.add_slime(Vector2(190.0, 500.0), 6, 1, Vector2.ZERO, 64)
+	sim.add_slime(Vector2(190.0 + max_radius + small_radius, 500.0), 0, 1)
+	sim.resolve_pairs()
+	assert_eq(sim.slimes.size(), 1, "max absorbs smaller slime")
+	assert_eq(sim.slimes[0].mass, 65, "mass 65 retained")
+	assert_near(sim.slimes[0].radius, sim.radius_for_mass(65), 1.0e-6, "mass 65 radius")
+	assert_eq(sim.score, 65 * 25, "no second max bonus")
+	assert_eq(sim.max_completions, 0, "no second max completion")
+	assert_true(sim.completed_colors.is_empty(), "no completed color added after prior max")
 
 
 func test_overflow_merge_caps_mass_and_scores_raw_mass() -> void:
-	var sim := _empty_sim(20)
+	var sim := _empty_sim_with_growth(20, false)
 	sim.turn = 1
 	var a_radius: float = sim.radius_for_mass(40)
 	var b_radius: float = sim.radius_for_mass(30)
@@ -39,7 +65,7 @@ func test_overflow_merge_caps_mass_and_scores_raw_mass() -> void:
 
 
 func test_max_slime_does_not_absorb_smaller_same_color() -> void:
-	var sim := _empty_sim(21)
+	var sim := _empty_sim_with_growth(21, false)
 	var max_radius: float = sim.radius_for_mass(64)
 	var small_radius: float = sim.radius_for_mass(1)
 	sim.add_slime(Vector2(190.0, 500.0), 6, 1, Vector2.ZERO, 64)
@@ -47,6 +73,17 @@ func test_max_slime_does_not_absorb_smaller_same_color() -> void:
 	sim.resolve_pairs()
 	assert_eq(sim.slimes.size(), 2, "max and small remain separate")
 	assert_eq(sim.score, 0, "no score")
+
+
+func test_disabled_max_growth_restores_same_color_max_clear() -> void:
+	var sim := _empty_sim_with_growth(211, false)
+	sim.turn = 1
+	var radius: float = sim.radius_for_mass(64)
+	sim.add_slime(Vector2(190.0, 500.0), 6, 3, Vector2.ZERO, 64)
+	sim.add_slime(Vector2(190.0 + radius * 2.0, 500.0), 6, 3, Vector2.ZERO, 64)
+	sim.resolve_pairs()
+	assert_eq(sim.slimes.size(), 0, "disabled flag restores original same-color max clear")
+	assert_eq(sim.score, 7500, "disabled flag restores max clear score")
 
 
 func test_chain_multiplier_rounding_and_turn_zero_exclusion() -> void:
@@ -255,6 +292,42 @@ func test_mass_growth_is_monotonic_and_eight_plus_sixteen_is_twenty_four() -> vo
 	assert_near(sim.slimes[0].radius, sim.radius_for_mass(24), 1.0e-6, "mass formula radius")
 
 
+func test_max_growth_radius_is_monotonic_capped_and_wall_safe() -> void:
+	var sim := _empty_sim(891)
+	var previous_radius: float = sim.radius_for_mass(CONFIG.max_mass)
+	for mass_value: int in range(CONFIG.max_mass + 1, 1025):
+		var radius: float = sim.radius_for_mass(mass_value)
+		assert_true(radius >= previous_radius, "grown radius monotonic at mass %d" % mass_value)
+		assert_true(radius <= CONFIG.max_growth_radius_cap, "grown radius cap at mass %d" % mass_value)
+		previous_radius = radius
+	assert_near(sim.radius_for_mass(1024), 165.0, 1.0e-6, "grown radius reaches cap")
+	var body: SlimeSim.SlimeBody = sim.add_slime(Vector2(-500.0, 2000.0), 6, 0, Vector2.ZERO, 1024)
+	sim._resolve_wall(body)
+	var board: Rect2 = CONFIG.board_rect
+	assert_true(body.position.x - body.radius >= board.position.x - 1.0e-6, "large max stays inside left wall")
+	assert_true(body.position.y + body.radius <= board.end.y + 1.0e-6, "large max stays inside bottom wall")
+
+
+func test_max_completion_bonus_and_color_apply_only_on_first_crossing() -> void:
+	var sim := _empty_sim(892)
+	sim.turn = 1
+	var radius_32: float = sim.radius_for_mass(32)
+	sim.add_slime(Vector2(190.0, 500.0), 5, 2, Vector2.ZERO, 32)
+	sim.add_slime(Vector2(190.0 + radius_32 * 2.0, 500.0), 5, 2, Vector2.ZERO, 32)
+	sim.resolve_pairs()
+	assert_eq(sim.score, 64 * 25 + 2500, "first crossing receives completion bonus")
+	assert_eq(sim.max_completions, 1, "first crossing counted once")
+	assert_true(sim.completed_colors.has(2), "first crossing completes color")
+	var radius_64: float = sim.radius_for_mass(64)
+	var radius_1: float = sim.radius_for_mass(1)
+	var score_before_growth: int = sim.score
+	sim.slimes[0].position = Vector2(190.0, 500.0)
+	sim.add_slime(Vector2(190.0 + radius_64 + radius_1, 500.0), 0, 2)
+	sim.resolve_pairs()
+	assert_eq(sim.score - score_before_growth, roundi(65.0 * 25.0 * 1.25), "later growth gets raw mass chain score without max bonus")
+	assert_eq(sim.max_completions, 1, "later growth does not repeat completion")
+
+
 func test_chain_multiplier_caps_at_two_point_seven_five_from_eighth() -> void:
 	var sim := _empty_sim(90)
 	sim.turn = 1
@@ -303,6 +376,12 @@ func test_fixed_step_accumulation_matches_60_and_120_hz() -> void:
 
 func _empty_sim(seed_value: int) -> SlimeSim:
 	return SlimeSim.new(CONFIG, seed_value, false, false)
+
+
+func _empty_sim_with_growth(seed_value: int, enabled: bool) -> SlimeSim:
+	var local_config: SlimeConfig = CONFIG.duplicate(true) as SlimeConfig
+	local_config.max_growth_enabled = enabled
+	return SlimeSim.new(local_config, seed_value, false, false)
 
 
 func _add_touching_pair(sim: SlimeSim, center: Vector2, color_index: int) -> void:

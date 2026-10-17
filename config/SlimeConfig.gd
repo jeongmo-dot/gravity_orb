@@ -29,6 +29,9 @@ extends Resource
 @export var radii: PackedFloat32Array = PackedFloat32Array([31.5, 42.0, 54.0, 68.0, 84.0, 101.0, 112.0])
 @export var pre_max_radius: float = 108.0
 @export var max_mass: int = 64
+@export var max_growth_enabled: bool = true
+@export var max_growth_exponent: float = 0.2
+@export var max_growth_radius_cap: float = 165.0
 @export var max_slimes: int = 40
 @export var slime_colors: PackedColorArray = PackedColorArray([
 	Color("59e2ab"),

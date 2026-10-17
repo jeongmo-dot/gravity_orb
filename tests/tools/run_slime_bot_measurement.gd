@@ -40,6 +40,7 @@ func _measure_strategy(strategy: String, seed_count: int, turn_cap: int) -> Dict
 	var total_final_successes: int = 0
 	var total_intro_cancels: int = 0
 	var maximum_slimes: int = 0
+	var maximum_radius: float = 0.0
 	for seed_value: int in range(1, seed_count + 1):
 		var sim := SlimeSim.new(CONFIG, seed_value, false, true)
 		var bot_rng := RandomNumberGenerator.new()
@@ -63,6 +64,7 @@ func _measure_strategy(strategy: String, seed_count: int, turn_cap: int) -> Dict
 		total_final_successes += sim.final_move_success_count
 		total_intro_cancels += sim.intro_cancel_count
 		maximum_slimes = maxi(maximum_slimes, sim.maximum_slime_count)
+		maximum_radius = maxf(maximum_radius, sim.maximum_slime_radius)
 		if seed_value % 10 == 0 or seed_value == seed_count:
 			print("SLIME_BOT_PROGRESS strategy=%s seed=%d/%d" % [strategy, seed_value, seed_count])
 	return {
@@ -85,6 +87,7 @@ func _measure_strategy(strategy: String, seed_count: int, turn_cap: int) -> Dict
 		"turn_time_p50": _percentile(turn_times, 0.50),
 		"turn_time_p95": _percentile(turn_times, 0.95),
 		"maximum_slimes": maximum_slimes,
+		"maximum_radius": maximum_radius,
 	}
 
 

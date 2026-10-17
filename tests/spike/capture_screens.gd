@@ -100,6 +100,7 @@ const CAPTURE_FILES: Array[String] = [
 	"50_slime_shell_play_final_move.png",
 	"50_slime_shell_play_busy.png",
 	"50_slime_shell_play_rejected.png",
+	"51_slime_max_growth.png",
 ]
 const HUD_CAPTURE_FILES: Array[String] = [
 	"02_turn_early.png",
@@ -165,6 +166,8 @@ func _run_capture_suite() -> void:
 		await _capture_slime_shell()
 	if not _failed and not _hud_scenes_only:
 		await _capture_slime_shell_play()
+	if not _failed and not _hud_scenes_only:
+		await _capture_slime_max_growth()
 	if not _failed and not _hud_scenes_only:
 		await _capture_reaction_effect_scenes()
 	if not _failed and not _hud_scenes_only:
@@ -920,6 +923,82 @@ func _capture_slime_shell_play() -> void:
 		"SCREEN_CAPTURE_CHECK scene=slime_shell_play states=ready,final-move,busy,rejected arrows=none shell=enabled"
 	)
 	game.queue_free()
+	await get_tree().process_frame
+
+
+func _capture_slime_max_growth() -> void:
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var games: Array[SlimeGame] = []
+	var labels: Array[Label] = []
+	var positions: Array[Vector2] = [
+		Vector2.ZERO,
+		Vector2(viewport_size.x * 0.5, 0.0),
+		Vector2(0.0, viewport_size.y * 0.5),
+		viewport_size * 0.5,
+	]
+	var masses: Array[int] = [64, 128, 256]
+	for index: int in range(4):
+		var game: SlimeGame = SLIME_MAIN_SCENE.instantiate() as SlimeGame
+		game.shell_enabled = false
+		game.save_path = _temp_save_path
+		add_child(game)
+		await get_tree().process_frame
+		game.process_mode = Node.PROCESS_MODE_DISABLED
+		game.scale = Vector2.ONE * 0.5
+		game.position = positions[index]
+		var sim: SlimeSim = game.get_sim()
+		sim.clear_slimes()
+		sim.intro_queue.clear()
+		sim.moving = false
+		sim.turn = 1
+		if index < masses.size():
+			var mass_value: int = masses[index]
+			var slime: SlimeSim.SlimeBody = sim.add_slime(
+				sim.config.board_rect.get_center(),
+				6,
+				index,
+				Vector2.ZERO,
+				mass_value
+			)
+			slime.visual_scale = 1.0
+		else:
+			var large_radius: float = sim.radius_for_mass(450)
+			var small_radius: float = sim.radius_for_mass(1)
+			sim.add_slime(Vector2(270.0, 540.0), 6, 3, Vector2.ZERO, 450).visual_scale = 1.0
+			sim.add_slime(
+				Vector2(270.0 + large_radius + small_radius, 540.0),
+				0,
+				3,
+				Vector2.ZERO,
+				1
+			).visual_scale = 1.0
+			sim.resolve_pairs()
+			var events: Array[Dictionary] = sim.drain_events()
+			(game.get_node("Content/SlimeView") as SlimeView).handle_events(events)
+			(game.get_node("Content/SlimeView") as SlimeView).advance_visuals(0.14)
+		game.refresh_presentation()
+		games.append(game)
+
+		var label := Label.new()
+		label.text = "MASS %d · MAX" % (masses[index] if index < masses.size() else 451)
+		if index == 3:
+			label.text += " · 450 + 1 흡수"
+		label.position = positions[index] + Vector2(9.0, 8.0)
+		label.add_theme_font_size_override("font_size", 18)
+		label.add_theme_color_override("font_color", Color("fff4b5"))
+		label.add_theme_color_override("font_outline_color", Color("10162f"))
+		label.add_theme_constant_override("outline_size", 4)
+		add_child(label)
+		labels.append(label)
+
+	await get_tree().process_frame
+	await get_tree().process_frame
+	await _capture("51_slime_max_growth.png")
+	print("SCREEN_CAPTURE_CHECK scene=slime_max_growth panels=mass64,128,256,451 absorption=450+1 radius_cap=165")
+	for label: Label in labels:
+		label.queue_free()
+	for game: SlimeGame in games:
+		game.queue_free()
 	await get_tree().process_frame
 
 
