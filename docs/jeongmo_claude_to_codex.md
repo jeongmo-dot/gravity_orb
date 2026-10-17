@@ -31,6 +31,19 @@
 
 ## 대기 중
 
+### [2026-10-17 #88] Windows 빌드 0.13.1
+- 상태: 대기 (#87 다음 — #87 병합 뒤 main 기준. 먼저 `origin/main` 병합)
+- 근거: [technical_design.md](technical_design.md) **§10.5·§10.5.1** (버전 기록 0.13.1 줄)
+- 요구:
+  1. `project.godot` `application/config/version` `0.13.0` → **`0.13.1`** (Claude 결정 값 — 기획서 0.13.1)
+  2. 릴리스 빌드 `.	oolsuild_windows.ps1` → `build/windows/GravityOrb_v0.13.1.exe` + `.console.exe` + `_BUILD.txt`. 다른 버전 파일은 남긴다
+  3. 내보낸 콘솔 exe로 스모크 4종 (기본·turn·blitz·slime) 종료 코드 0·`SCRIPT ERROR` 0
+  4. 격리 창에서 시작 화면 → SLIME 카드 전환까지 (#84에서 막혔던 경로) 확인. 자동 클릭이 안 되면 그 사실과 대신 확인한 방법을 적는다
+- 검수: 빌드 결과 줄·파일 크기, `_BUILD.txt` 커밋 = 이 브랜치 마지막 커밋 (빌드는 커밋한 뒤 깨끗한 작업 트리에서), 사용자 `save.cfg` 해시 전후 동일, 묶음에 `tests/`·`artifacts/`·`docs/` 없음, 래퍼 통과
+- 건드리지 말 것: 버전 외 모든 파일, 사용자 저장 파일, `docs/` (회신 파일 제외)
+- Done-when: 위 검수 보고
+- 커밋: 항목 단위 브랜치 (`build-0.13.1`), push·PR까지
+
 ### [2026-10-17 #87] 슬라임 도는 빛 경로 · 합체 잔상 크기
 - 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합)
 - 근거: [technical_design.md](technical_design.md) **§12-G.13** (배경은 §12-G.12 "#85 결과")
