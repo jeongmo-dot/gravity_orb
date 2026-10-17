@@ -1256,10 +1256,15 @@ func _active_effect_count(kind: String) -> int:
 	return count
 
 
-func _prewarm_visual_resources_offscreen() -> void:
+func _prewarm_visual_resources_offscreen(force_render_path: bool = false) -> void:
 	Orb3D.prewarm_shared_resources(Config.data)
-	if DisplayServer.get_name() == "headless":
+	if not is_inside_tree():
+		return
+	if DisplayServer.get_name() == "headless" and not force_render_path:
 		_resources_prewarmed = true
+		return
+	var scene_tree: SceneTree = get_tree()
+	if scene_tree == null:
 		return
 	var viewport: SubViewport = SubViewport.new()
 	viewport.name = "VisualResourcePrewarmer"
@@ -1330,7 +1335,9 @@ func _prewarm_visual_resources_offscreen() -> void:
 		var color_effect: ColorEffectVisual = ColorEffectVisual.new()
 		prewarm_root.add_child(color_effect)
 		color_effects.append(color_effect)
-	await get_tree().process_frame
+	await scene_tree.process_frame
+	if not is_inside_tree():
+		return
 	var lift_targets: Array[Dictionary] = [{"position": Vector2(20.0, 20.0)}]
 	for mode_value: int in range(color_effects.size()):
 		color_effects[mode_value].play(
@@ -1344,6 +1351,8 @@ func _prewarm_visual_resources_offscreen() -> void:
 			lift_targets
 		)
 	await RenderingServer.frame_post_draw
+	if not is_inside_tree() or not is_instance_valid(viewport):
+		return
 	viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	viewport.queue_free()
 	_resources_prewarmed = true

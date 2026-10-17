@@ -38,6 +38,42 @@
 
 ## 미확인
 
+### [2026-10-17] 대상 #84 — Windows 빌드 0.13.0
+- 상태: 완료 — 사용자 승인으로 릴리스 창의 SLIME 전환을 막던 비동기 프리워밍 수명주기 오류와 회귀 테스트를 #84에 함께 포함함
+- 브랜치 / PR: `build-0.13.0` / 생성 후 링크 갱신 예정
+- 변경 파일: `project.godot`, `scripts/fx/FeedbackDirector.gd`, `tests/test_feedback.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `application/config/version`을 Claude 결정 값 `0.13.0`으로 변경하고 릴리스 `GravityOrb_v0.13.0.exe`·`.console.exe`·`_BUILD.txt` 생성 — 자동
+  - [x] 이전 `0.11.1` 산출물 3개 유지, PE 파일·제품 버전 `0.13.0.0` — 자동
+  - [x] 내보낸 콘솔 exe 기본·TURN·BLITZ·SLIME 네 모드가 종료 코드 0, 스크립트 오류 0건 — 자동
+  - [x] 시작 화면에 BLITZ·CLASSIC·SLIME 카드 3장 표시, SLIME 버튼 이벤트가 `SLIME`을 방출하고 SLIME 직접 창이 보드 상태로 계속 실행 — 자동 + 격리 GUI 관측
+  - [x] 패키지에서 테스트·캡처 산출물·문서 고유 이름 0건, `SlimeGame.gdc`·`SlimeMain.scn`·`Main.gdc` 포함 — 자동
+  - [x] 사용자 `save.cfg`를 사용하지 않는 격리 APPDATA로 창 검증, 실제 저장 파일 크기·해시 유지 — 자동
+  - [x] `_BUILD.txt`의 커밋을 최종 브랜치 커밋으로 다시 생성 — 최종 커밋 뒤 재빌드 확인
+- 구현:
+  - `FeedbackDirector._prewarm_visual_resources_offscreen()`이 시작 전 트리 소속과 `SceneTree`를 확인하고, 첫 프레임 및 렌더 프레임 대기 뒤에도 트리 소속·임시 viewport 유효성을 다시 확인하도록 함
+  - 시작 화면에서 SLIME 장면으로 바뀌며 기존 Main이 제거되어도 대기 중인 프리워밍 코루틴이 null `SceneTree`에 접근하지 않음
+  - `test_visual_prewarm_stops_when_director_leaves_tree`로 첫 프레임 대기 중 director가 트리에서 빠지는 회귀를 고정함
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - `tests/run_tests.ps1` → 일반 `322/322` (`26.684초`), 장기 `5/5` (`53.218초`), 성능 `5/5` (`3.178초`), 합계 `332/332`, 종료 코드 0, 총 `83.080초`
+  - 프로젝트 기본·TURN·BLITZ·SLIME `--quit-after 300` → 네 실행 모두 종료 코드 0, 오류 0건
+  - Windows 릴리스 빌드 → 종료 코드 0, `GravityOrb_v0.13.0.exe` `111,165,560`바이트, `.console.exe` `50,176`바이트, 파일·제품 버전 `0.13.0.0`
+  - 내보낸 콘솔 exe 기본·TURN·BLITZ·SLIME → 네 실행 모두 종료 코드 0, 오류 0건
+  - 격리 GUI 시작 화면 → 카드 3장 표시; 격리 GUI `--mode=slime` → 보드와 슬라임 4개 표시, 프로세스 생존, `godot.log` 오류 0건
+  - 패키지 문자열 검사 → `run_tests.gd`·`capture_screens.gd`·`jeongmo_claude_to_codex.md`·`technical_design.md`·캡처 파일명 각 0건; 필수 런타임 3종 각 2건
+  - 이전 `GravityOrb_v0.11.1` 산출물 3개 유지
+  - 사용자 `save.cfg` 전후 `1,395`바이트, SHA-256 `572AB66D60DF6D7397380B4237A4CA326A0470C652D4AE0277476602255A8AEE`로 동일
+  - `git diff --check` → 오류 0건
+- 수동 확인 절차:
+  1. `GravityOrb_v0.13.0.exe`를 실행한다 → 시작 화면에 BLITZ·CLASSIC·SLIME 카드 3장이 보여야 한다.
+  2. SLIME 카드를 누른다 → 전환 뒤 파란 격자 보드와 슬라임이 표시되고 창이 종료되지 않아야 한다.
+  3. 게임을 종료한 뒤 기존 기록을 다시 연다 → 기존 점수·설정이 유지되어야 한다.
+- 결정 사항·알려진 문제:
+  - 최초 릴리스 GUI에서 SLIME 전환 시 `get_tree()` null 오류와 프로세스 종료를 관측했고, 사용자가 #84 범위의 최소 수정·회귀 테스트 포함을 승인함.
+  - Windows 자동 창 제어기가 Godot 창 활성화를 거부해 수정 후 실제 포인터 클릭은 자동화하지 못함. 버튼 신호는 자동 테스트로, 시작 화면과 SLIME 보드는 각각 실제 릴리스 창으로 분리 관측했으며 위 수동 절차를 남김.
+- 남은 것 · 질문: 없음
+
 ### [2026-10-17] 대상 #81 — GRAVITY SLIME ③ 앱 연결
 - 상태: 완료 — 시작 화면의 세 번째 모드부터 공용 결과·랭킹·저장·입력 표시·음소거·장면 왕복까지 SLIME을 앱 흐름에 연결함
 - 브랜치 / PR: `gravity-slime-shell` / PR 미생성
