@@ -7,7 +7,6 @@ const REJECTED_COLOR: Color = Color("#8EA3C8")
 const READY_FADE_DURATION: float = 0.20
 const BUSY_FADE_DURATION: float = 0.10
 const REJECTED_FLASH_DURATION: float = 0.30
-const ORBIT_DURATION: float = 1.0
 const BREATH_DURATION: float = 1.60
 const BREATH_ALPHA_MIN: float = 0.85
 const BREATH_ALPHA_MAX: float = 1.0
@@ -35,7 +34,8 @@ var _ready_state: bool = false
 var _cues_visible: bool = false
 var _arrow_alpha: float = 0.0
 var _breath_elapsed: float = 0.0
-var _orbit_elapsed: float = 0.0
+var _orbit_progress: float = 0.0
+var _slime_mode: bool = false
 var _rejected_remaining: float = 0.0
 var _rejected_direction: Vector2i = Vector2i.ZERO
 var _rejection_flash_count: int = 0
@@ -49,6 +49,7 @@ func _ready() -> void:
 
 
 func bind(manager: Variant, board: Variant) -> void:
+	_slime_mode = false
 	_custom_board_rect = Rect2()
 	_manager = manager as TurnManager
 	_board = board as Board3D
@@ -71,6 +72,7 @@ func bind(manager: Variant, board: Variant) -> void:
 
 
 func bind_slime(board_rect: Rect2) -> void:
+	_slime_mode = true
 	_manager = null
 	_board = null
 	_custom_board_rect = board_rect
@@ -87,14 +89,19 @@ func set_slime_board_rect(board_rect: Rect2) -> void:
 	queue_redraw()
 
 
-func set_slime_state(ready: bool, cues_visible: bool = true) -> void:
+func set_slime_state(
+	ready: bool,
+	cues_visible: bool = true,
+	busy_progress: float = 0.0
+) -> void:
 	_cues_visible = cues_visible
 	var was_ready: bool = _ready_state
 	_ready_state = ready and cues_visible
 	if _ready_state and not was_ready:
 		_breath_elapsed = 0.0
-	if not _ready_state:
-		_orbit_elapsed = 0.0
+	elif not _ready_state:
+		var next_progress: float = clampf(busy_progress, 0.0, 1.0)
+		_orbit_progress = next_progress if was_ready else maxf(_orbit_progress, next_progress)
 	if not cues_visible:
 		_arrow_alpha = 0.0
 		_rejected_remaining = 0.0
@@ -116,8 +123,8 @@ func _process(delta: float) -> void:
 	_arrow_alpha = move_toward(_arrow_alpha, target_alpha, real_delta / fade_duration)
 	if _ready_state:
 		_breath_elapsed = fmod(_breath_elapsed + real_delta, BREATH_DURATION)
-	if not _ready_state:
-		_orbit_elapsed = fmod(_orbit_elapsed + real_delta, ORBIT_DURATION)
+	elif not _slime_mode and _manager != null:
+		_orbit_progress = _classic_busy_progress()
 	if _rejected_remaining > 0.0:
 		_rejected_remaining = maxf(_rejected_remaining - real_delta, 0.0)
 		if is_zero_approx(_rejected_remaining):
@@ -131,26 +138,25 @@ func _draw() -> void:
 	var board_rect: Rect2 = _projected_board_rect()
 	if board_rect.size.x <= 0.0 or board_rect.size.y <= 0.0:
 		return
-	var border_alpha: float = 1.0 if _ready_state else BUSY_BORDER_ALPHA
-	var border_color: Color = READY_COLOR
-	border_color.a = border_alpha
+	var border_color: Color = current_border_color()
 	draw_rect(board_rect, border_color, false, BORDER_WIDTH, true)
-	for direction: Vector2i in OrbTypes.DIRECTIONS:
-		var alpha: float = _arrow_alpha
-		var scale_value: float = arrow_scale()
-		var color: Color = arrow_color(direction)
-		if direction == _rejected_direction and _rejected_remaining > 0.0:
-			alpha = _rejected_remaining / REJECTED_FLASH_DURATION
-			scale_value = 1.0
-			color = REJECTED_COLOR
-		elif _ready_state:
-			alpha *= breathing_alpha()
-		if alpha <= 0.001:
-			continue
-		color.a *= alpha
-		_draw_arrow(board_rect, direction, color, scale_value)
-		if direction in _blocked_directions and _ready_state:
-			_draw_blocked_mark(board_rect, direction, color, scale_value)
+	if not _slime_mode:
+		for direction: Vector2i in OrbTypes.DIRECTIONS:
+			var alpha: float = _arrow_alpha
+			var scale_value: float = arrow_scale()
+			var color: Color = arrow_color(direction)
+			if direction == _rejected_direction and _rejected_remaining > 0.0:
+				alpha = _rejected_remaining / REJECTED_FLASH_DURATION
+				scale_value = 1.0
+				color = REJECTED_COLOR
+			elif _ready_state:
+				alpha *= breathing_alpha()
+			if alpha <= 0.001:
+				continue
+			color.a *= alpha
+			_draw_arrow(board_rect, direction, color, scale_value)
+			if direction in _blocked_directions and _ready_state:
+				_draw_blocked_mark(board_rect, direction, color, scale_value)
 	if not _ready_state:
 		_draw_orbit_light(board_rect)
 
@@ -170,7 +176,7 @@ func _on_state_changed(next_state: int) -> void:
 	if _ready_state and not was_ready:
 		_breath_elapsed = 0.0
 	if not _ready_state:
-		_orbit_elapsed = 0.0
+		_orbit_progress = 0.0
 	queue_redraw()
 
 
@@ -187,7 +193,7 @@ func _on_warning_changed(directions: Array[Vector2i]) -> void:
 func _on_swipe_rejected(direction: Vector2i) -> void:
 	if not _cues_visible or _ready_state or direction == Vector2i.ZERO:
 		return
-	_rejected_direction = direction
+	_rejected_direction = Vector2i.ZERO if _slime_mode else direction
 	_rejected_remaining = REJECTED_FLASH_DURATION
 	_rejection_flash_count += 1
 	queue_redraw()
@@ -235,7 +241,32 @@ func orbit_visible() -> bool:
 
 
 func border_alpha() -> float:
-	return 1.0 if _ready_state else BUSY_BORDER_ALPHA
+	return current_border_color().a
+
+
+func current_border_color() -> Color:
+	var color: Color = READY_COLOR
+	if _slime_mode and _rejected_remaining > 0.0:
+		color = REJECTED_COLOR
+		color.a = maxf(
+			BUSY_BORDER_ALPHA,
+			_rejected_remaining / REJECTED_FLASH_DURATION
+		)
+	elif _ready_state:
+		color.a = breathing_alpha() if _slime_mode else 1.0
+	else:
+		color.a = BUSY_BORDER_ALPHA
+	return color
+
+
+func direction_arrows_visible() -> bool:
+	return not _slime_mode and _cues_visible and (
+		_arrow_alpha > 0.001 or _rejected_remaining > 0.0
+	)
+
+
+func uses_direction_arrows() -> bool:
+	return not _slime_mode
 
 
 func rejection_flash_count() -> int:
@@ -247,7 +278,17 @@ func rejected_direction() -> Vector2i:
 
 
 func orbit_progress() -> float:
-	return _orbit_elapsed / ORBIT_DURATION
+	return _orbit_progress
+
+
+func _classic_busy_progress() -> float:
+	if _manager == null or _manager.state == TurnManager.State.SPAWNING:
+		return 0.0
+	return clampf(
+		_manager.settle_elapsed / maxf(Config.data.max_settle_time, 0.001),
+		0.0,
+		1.0
+	)
 
 
 func _projected_board_rect() -> Rect2:

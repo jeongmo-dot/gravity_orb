@@ -38,6 +38,43 @@
 
 ## 미확인
 
+### [2026-10-17] 대상 #83 — 입력 표시 정리 · 잠김 시계 연동
+- 상태: 완료 — SLIME 방향 화살표를 제거하고 거절을 회색 테두리로 바꿨으며, CLASSIC·SLIME 도는 빛을 각 모드의 실제 잠김 시계에 연결함
+- 브랜치 / PR: `slime-input-feedback` / https://github.com/jeongmo-dot/gravity_orb/pull/86
+- 변경 파일: `scripts/slime/SlimeGame.gd`, `scripts/ui/{TurnInputIndicator,SlimeCardIcon}.gd`, `tests/{test_turn_input_indicator,test_slime_shell,capture_screens.ps1}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] SLIME 대기 = 숨쉬는 밝은 테두리·기존 틱/5ms, 움직임 = 흐린 테두리·도는 빛, 방향 화살표 0개, 잠김 중 거절 = `REJECTED_COLOR` 테두리 0.3초 — 자동 `test_slime_turn_indicator_and_haptics_follow_busy_ready_rejected_states` + 캡처
+  - [x] CLASSIC 진행이 `settle_elapsed / max_settle_time`, SPAWNING은 0 — 자동 0/0.75/1.5초 → 0/0.5/1.0 + 캡처 `45`의 0.5/1.0초
+  - [x] SLIME 진행이 예정/실제 입장 종료 시각 + `max_simulation_time`을 사용하고, 입장 지연·반복 busy 통지에도 감소/초기화되지 않으며 FINAL MOVE는 시뮬레이션 시계만 사용 — 자동 3-entry/queue-empty/cap/delay/repeat/final-move
+  - [x] SLIME 카드 아이콘을 L3 초록 재질·캡슐 눈·반사점·입 없음으로 변경 — 캡처 `01_start_screen`
+  - [x] 셸이 켜진 실제 SLIME 대기·FINAL MOVE·busy·rejected 캡처를 두 비율에 추가하고 직접 확인
+  - [x] SLIME 규칙·물리, TURN 규칙, BLITZ, 설정값 변경 없음 — `SlimeSim.gd`·config diff 0 + 패리티 6장면 + 물리 해시
+- 캡처·화면 관측 (Godot Standard/Compatibility, 직접 확인):
+  - 전체 `tests/capture_screens.ps1` → `540×960`·`540×1170` 각 72장, 합계 144장, 종료 코드 0; 최종 TURN 캡처 흐름은 HUD 34장으로 한 번 더 확인
+  - `50_slime_shell_play_ready`: 막대 단계가 섞인 대기 판에서 밝은 테두리만 있고 방향 화살표가 없음. 메시지·네 막대·소리 버튼과 겹침 없음
+  - `50_slime_shell_play_final_move`: 네 막대 빨강, 긴 안내문과 보드 안 `FINAL MOVE`가 잘리지 않고 테두리·소리 버튼과 겹치지 않음
+  - `50_slime_shell_play_busy`: 흐린 테두리와 지름 20px 빛·꼬리가 보드 바깥 경로에 있고 화살표 없음. `rejected`는 같은 장면에서 테두리가 회색으로 밝아짐
+  - `44`·`46`: 기존 CLASSIC 화살표·막힘/거절 표시 유지. `45_a`는 진행 1/3로 오른쪽 변, `45_b`는 2/3로 아래 변에 빛이 위치
+  - `01_start_screen`: SLIME 카드가 게임 L3과 같은 초록 재질·세로 캡슐 눈·흰 반사점이며 입이 없음
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, 오류 0건
+  - 집중 테스트 → TURN 입력 `2/2`, SLIME 셸 `5/5`, 종료 코드 0
+  - `tests/run_tests.ps1` → 일반 `324/324` (`23.624초`), 장기 `5/5` (`51.990초`), 성능 `5/5` (`3.178초`), 합계 `334/334`, 종료 코드 0, 총 `78.792초`
+  - SLIME 원본 패리티 → 6장면, 허용오차 `1e-6`, `PASS`
+  - 물리 해시 → TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`로 기준값 동일
+  - 기본·TURN·BLITZ·SLIME `--quit-after 300` → 네 실행 모두 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - `tools/build_windows.ps1` Release → 종료 코드 0, `GravityOrb_v0.13.0.exe` `111,168,488`바이트
+  - 규칙 검사 → 새 `Input`/`InputEvent` 호출 0건, 새 난수 호출 0건, `git diff --check` 오류 0건
+  - 캡처는 임시 저장 경로만 사용. 사용자 저장 전후 SHA-256 `BBC55B9714D09C7EE7045049F9F3D037E9330FCE70233043C6F386A59FB1EED2`로 동일
+- 수동 확인 절차:
+  1. SLIME에서 입력 가능 상태를 본다 → 밝기가 숨쉬는 보드 테두리만 있고 네 방향 화살표가 없어야 하며, 준비 틱과 5ms 진동이 한 번 발생해야 한다.
+  2. 한 방향으로 스와이프한다 → 흐린 테두리와 빛이 입장+1.85초 상한을 한 바퀴로 삼아 전진하고 매 프레임 왼쪽 위로 되감기지 않아야 한다.
+  3. 움직이는 중 다시 스와이프한다 → 화살표 없이 테두리만 회색으로 0.3초 번쩍인 뒤 흐린 파랑으로 돌아와야 한다.
+  4. CLASSIC에서 스와이프한다 → 빛이 1.5초를 한 바퀴로 삼고, 일찍 안정되면 현재 위치에서 사라지며 기존 대기·막힘·거절 화살표는 유지되어야 한다.
+  5. 시작 화면을 연다 → SLIME 카드 아이콘이 게임 안 L3 초록 슬라임처럼 캡슐 눈·반사점과 입 없는 얼굴이어야 한다.
+- 결정 사항: 명세의 `50_slime_shell_play` 네 상태를 상태별 비교가 가능하도록 `_ready`, `_final_move`, `_busy`, `_rejected` 네 파일로 분리함
+- 남은 것 · 질문: 없음
+
 ### [2026-10-17] 대상 #82 — 화성 협곡·극관 다듬기
 - 상태: 완료 — 3D 화성의 교차 가지를 한쪽 Y 가지로 바꾸고 협곡 폭 변화·평균 폭과 3D/2D 극관 경계를 명세대로 다듬음
 - 브랜치 / PR: `mars-canyon-polar-cap` / https://github.com/jeongmo-dot/gravity_orb/pull/85

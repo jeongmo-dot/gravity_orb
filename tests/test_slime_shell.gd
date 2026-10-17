@@ -175,6 +175,7 @@ func test_slime_turn_indicator_and_haptics_follow_busy_ready_rejected_states() -
 	var sim: SlimeSim = game.get_sim()
 	var indicator: TurnInputIndicator = game.turn_input_indicator()
 	assert_true(indicator.is_busy_cue(), "initial admission shows busy cue")
+	assert_true(not indicator.uses_direction_arrows(), "SLIME suppresses direction arrows")
 	var safety: int = 0
 	while sim.moving and safety < 300:
 		game.advance_elapsed(1.0 / 60.0)
@@ -196,8 +197,93 @@ func test_slime_turn_indicator_and_haptics_follow_busy_ready_rejected_states() -
 		rejected_before + 1,
 		"busy swipe shows rejected flash"
 	)
+	var rejected_color: Color = indicator.current_border_color()
+	assert_near(rejected_color.r, TurnInputIndicator.REJECTED_COLOR.r, 0.001, "rejected border red")
+	assert_near(rejected_color.g, TurnInputIndicator.REJECTED_COLOR.g, 0.001, "rejected border green")
+	assert_near(rejected_color.b, TurnInputIndicator.REJECTED_COLOR.b, 0.001, "rejected border blue")
+	assert_eq(indicator.rejected_direction(), Vector2i.ZERO, "SLIME rejection has no arrow")
 	game.sound_button().pressed.emit()
 	assert_true(SaveStore.load_sfx_muted(SAVE_PATH), "SLIME sound button shares saved mute")
+	game.queue_free()
+	await tree.process_frame
+	_remove_save()
+
+
+func test_slime_orbit_progress_uses_lock_clock_and_never_rewinds() -> void:
+	_remove_save()
+	var game: SlimeGame = SLIME_SCENE.instantiate() as SlimeGame
+	game.save_path = SAVE_PATH
+	tree.root.add_child(game)
+	await tree.process_frame
+	game.set_physics_process(false)
+	var sim: SlimeSim = game.get_sim()
+	var indicator: TurnInputIndicator = game.turn_input_indicator()
+	var entries: Array[Dictionary] = [
+		{"delay": 0.0},
+		{"delay": 0.3},
+		{"delay": 0.6},
+	]
+	sim.intro_queue.assign(entries)
+	sim.moving = true
+	sim.intro_elapsed = 0.0
+	sim.simulation_elapsed = 0.0
+	game._begin_lock_orbit_clock()
+	game._sync_input_lock()
+	assert_near(indicator.orbit_progress(), 0.0, 0.001, "three-entry turn starts at zero")
+
+	sim.intro_elapsed = 0.6
+	game._sync_input_lock()
+	var queue_empty_progress: float = 0.6 / (0.6 + sim.config.max_simulation_time)
+	assert_near(
+		indicator.orbit_progress(),
+		queue_empty_progress,
+		0.001,
+		"scheduled final entry reaches the expected progress"
+	)
+	sim.intro_queue.clear()
+	game._sync_input_lock()
+	assert_near(
+		indicator.orbit_progress(),
+		queue_empty_progress,
+		0.001,
+		"queue-empty moment preserves progress"
+	)
+	sim.simulation_elapsed = sim.config.max_simulation_time
+	game._sync_input_lock()
+	assert_near(indicator.orbit_progress(), 1.0, 0.001, "lock cap completes one orbit")
+
+	sim.moving = false
+	game._sync_input_lock()
+	sim.moving = true
+	sim.intro_queue.assign(entries)
+	sim.intro_elapsed = 1.0
+	sim.simulation_elapsed = 0.0
+	game._begin_lock_orbit_clock()
+	game._sync_input_lock()
+	var delayed_progress: float = indicator.orbit_progress()
+	game._sync_input_lock()
+	assert_near(
+		indicator.orbit_progress(),
+		delayed_progress,
+		0.001,
+		"repeating the same busy state does not reset progress"
+	)
+	sim.intro_queue.clear()
+	game._sync_input_lock()
+	assert_true(
+		indicator.orbit_progress() >= delayed_progress,
+		"actual delayed queue-empty time does not rewind progress"
+	)
+
+	sim.moving = false
+	game._sync_input_lock()
+	sim.moving = true
+	sim.intro_elapsed = 0.0
+	sim.simulation_elapsed = sim.config.max_simulation_time * 0.5
+	sim.intro_queue.clear()
+	game._begin_lock_orbit_clock()
+	game._sync_input_lock()
+	assert_near(indicator.orbit_progress(), 0.5, 0.001, "FINAL MOVE uses simulation clock")
 	game.queue_free()
 	await tree.process_frame
 	_remove_save()

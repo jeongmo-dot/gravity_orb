@@ -6,6 +6,32 @@ const WAIT_TIMEOUT_SECONDS: float = 5.0
 var _turn_ready_sound_count: int = 0
 
 
+func test_classic_orbit_progress_uses_settle_clock() -> void:
+	var manager: TurnManager = TurnManager.new()
+	manager.state = TurnManager.State.SIMULATING
+	var indicator: TurnInputIndicator = TurnInputIndicator.new()
+	indicator.set("_manager", manager)
+	indicator.set("_cues_visible", true)
+	var original_max_settle_time: float = Config.data.max_settle_time
+	Config.data.max_settle_time = 1.5
+	var samples: Array[PackedFloat32Array] = [
+		PackedFloat32Array([0.0, 0.0]),
+		PackedFloat32Array([0.75, 0.5]),
+		PackedFloat32Array([1.5, 1.0]),
+	]
+	for sample: PackedFloat32Array in samples:
+		manager.settle_elapsed = sample[0]
+		indicator._process(0.0)
+		assert_near(indicator.orbit_progress(), sample[1], 0.001, "settle clock progress")
+	manager.state = TurnManager.State.SPAWNING
+	manager.settle_elapsed = 1.0
+	indicator._process(0.0)
+	assert_near(indicator.orbit_progress(), 0.0, 0.001, "SPAWNING stays at start")
+	Config.data.max_settle_time = original_max_settle_time
+	indicator.free()
+	manager.free()
+
+
 func test_turn_input_cues_rejection_release_policy_and_ready_tick() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_sfx_enabled: bool = Config.data.sfx_enabled

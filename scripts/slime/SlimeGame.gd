@@ -42,6 +42,9 @@ var _haptics: Haptics
 var _was_ready: bool = false
 var _game_over_committed: bool = false
 var _game_over_rank: int = 0
+var _lock_orbit_progress: float = 0.0
+var _lock_intro_last_scheduled: float = 0.0
+var _lock_intro_empty_time: float = -1.0
 
 
 func _enter_tree() -> void:
@@ -71,6 +74,7 @@ func _ready() -> void:
 	InputRouter.set_accept_release_after_unlock(true)
 	_layout_content()
 	_consume_events()
+	_begin_lock_orbit_clock()
 	_sync_input_lock()
 
 
@@ -118,6 +122,7 @@ func refresh_presentation() -> void:
 
 func _on_swipe(direction: Vector2i) -> void:
 	if _sim.start_turn(direction):
+		_begin_lock_orbit_clock()
 		if _haptics != null:
 			_haptics.play_swipe()
 		refresh_presentation()
@@ -132,12 +137,55 @@ func _sync_input_lock() -> void:
 	var ready: bool = not _sim.moving and not _sim.game_over
 	InputRouter.set_locked(not ready)
 	if _turn_indicator != null:
-		_turn_indicator.set_slime_state(ready, not _sim.game_over)
+		_turn_indicator.set_slime_state(
+			ready,
+			not _sim.game_over,
+			_update_lock_orbit_progress()
+		)
 	if ready and not _was_ready:
 		_sfx.play_turn_ready()
 		if _haptics != null:
 			_haptics.play_turn_ready()
 	_was_ready = ready
+
+
+func _begin_lock_orbit_clock() -> void:
+	_lock_orbit_progress = 0.0
+	_lock_intro_empty_time = -1.0
+	_lock_intro_last_scheduled = 0.0
+	for entry: Dictionary in _sim.intro_queue:
+		_lock_intro_last_scheduled = maxf(
+			_lock_intro_last_scheduled,
+			float(entry.get("delay", 0.0))
+		)
+	if _sim.intro_queue.is_empty():
+		_lock_intro_empty_time = 0.0
+
+
+func _update_lock_orbit_progress() -> float:
+	if not _sim.moving:
+		return _lock_orbit_progress
+	var maximum_simulation: float = maxf(_sim.config.max_simulation_time, 0.001)
+	var current_progress: float = 0.0
+	if not _sim.intro_queue.is_empty():
+		current_progress = _sim.intro_elapsed / (
+			_lock_intro_last_scheduled + maximum_simulation
+		)
+	else:
+		if _lock_intro_empty_time < 0.0:
+			_lock_intro_empty_time = _sim.intro_elapsed
+		current_progress = (
+			_lock_intro_empty_time + _sim.simulation_elapsed
+		) / (_lock_intro_empty_time + maximum_simulation)
+	_lock_orbit_progress = maxf(
+		_lock_orbit_progress,
+		clampf(current_progress, 0.0, 1.0)
+	)
+	return _lock_orbit_progress
+
+
+func lock_orbit_progress() -> float:
+	return _lock_orbit_progress
 
 
 func _layout_content() -> void:
