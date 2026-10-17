@@ -38,6 +38,34 @@
 
 ## 미확인
 
+### [2026-10-17] 대상 #88 — Windows 빌드 0.13.1
+- 상태: 완료 — 프로젝트 버전을 0.13.1로 올리고 Godot 4.8 Standard 릴리스 Windows 패키지를 생성·검증함
+- 브랜치 / PR: `build-0.13.1` / https://github.com/jeongmo-dot/gravity_orb/pull/90
+- 변경 파일: `project.godot`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `application/config/version`을 Claude 결정 값 `0.13.1`로 변경하고 릴리스 `GravityOrb_v0.13.1.exe`·`.console.exe`·`_BUILD.txt` 생성 — 자동
+  - [x] 내보낸 콘솔 exe 기본·TURN·BLITZ·SLIME 네 모드 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건 — 자동
+  - [x] 격리 APPDATA에서 시작 화면과 SLIME 직접 실행 창이 각각 6초·8초 동안 생존하고 `godot.log` 오류 0건 — 자동. 실제 포인터 전환은 아래 수동 절차로 남김
+  - [x] 사용자 `save.cfg` 크기·SHA-256 전후 동일, 패키지에 `tests/`·`artifacts/`·`docs/` 없음, 전체 테스트 래퍼 통과 — 자동
+  - [x] 다른 버전 산출물을 남기고, 최종 커밋 뒤 깨끗한 작업 트리에서 재빌드해 `_BUILD.txt` 커밋을 브랜치 마지막 커밋과 일치시킴 — 자동
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` → 일반 `330/330` (`23.812초`), 장기 `5/5` (`51.929초`), 성능 `5/5` (`3.076초`), 합계 `340/340`, 종료 코드 0, 총 `78.818초`
+  - 프로젝트 기본·TURN·BLITZ·SLIME `--quit-after 300` → 네 실행 모두 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tools/build_windows.ps1` Release → 종료 코드 0, 결과 줄 `version=0.13.1 mode=Release exit=0`
+  - 산출물 → `GravityOrb_v0.13.1.exe` `111,169,640`바이트, `.console.exe` `50,176`바이트, `_BUILD.txt` `159`바이트; PE 파일·제품 버전 `0.13.1.0`
+  - 내보낸 콘솔 exe 기본·TURN·BLITZ·SLIME → 네 실행 모두 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 격리 GUI → 시작 화면 프로세스 6초 생존·로그 오류 0건, `--mode=slime` 프로세스 8초 생존·로그 오류 0건
+  - 패키지 문자열 검사 → `res://tests/`·`res://artifacts/`·`res://docs/`와 테스트·캡처·인박스·설계 문서 표식 각 0건; `SlimeGame.gdc`·`SlimeMain.scn`·`Main.gdc` 각 2건
+  - 이전 `0.11.1`·`0.13.0` 산출물 6개와 `GravityOrb.zip` 유지
+  - 사용자 저장 파일은 전후 `1,396`바이트, SHA-256 `BBC55B9714D09C7EE7045049F9F3D037E9330FCE70233043C6F386A59FB1EED2`로 동일
+  - 화면에 보이는 구현 변경이 없는 버전·빌드 항목이라 전체 캡처는 미실행
+- 수동 확인 절차:
+  1. `build/windows/GravityOrb_v0.13.1.exe`를 실행한다 → 시작 화면에 BLITZ·CLASSIC·SLIME 카드 3장이 보여야 한다.
+  2. SLIME 카드를 누른다 → 파란 격자 보드와 슬라임이 표시되고 창이 종료되지 않아야 한다.
+- 결정 사항: 없음
+- 남은 것 · 질문: 현재 자동 창 제어 수단이 내보낸 Godot 창의 실제 포인터 클릭을 지원하지 않아 시작 화면에서 SLIME 카드를 누르는 동작 자체는 자동화하지 못함. 대신 버튼이 `SLIME` 모드를 방출하는 전체 테스트, 격리 시작 화면 창, 격리 `--mode=slime` 실제 릴리스 창을 각각 확인함
+
 ### [2026-10-17] 대상 #87 — 슬라임 도는 빛 경로 · 합체 잔상 크기
 - 상태: 완료 — 슬라임 도는 빛만 실제 보드 테두리 선을 따르게 하고, 흡수·MAX CLEAR 합체 잔상을 각 재료의 반지름에서 시작하도록 변경함
 - 브랜치 / PR: `slime-orbit-merge-trails` / https://github.com/jeongmo-dot/gravity_orb/pull/89
