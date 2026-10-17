@@ -447,6 +447,8 @@ func _assert_ranking_columns_align(ranking: RankingPanel) -> void:
 	var header_path: String = "Panel/Content/RankingHeader/Columns/"
 	for column_name: String in RankingPanel.COLUMN_NAMES:
 		var header: Label = ranking.get_node(header_path + column_name) as Label
+		if not header.visible:
+			continue
 		for rank: int in range(1, SaveStore.RANKING_LIMIT + 1):
 			var cell: Label = ranking.get_node(
 				"Panel/Content/Rows/RankingRow%d/Text/Columns/%s" % [rank, column_name]

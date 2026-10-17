@@ -1,13 +1,22 @@
 class_name SlimeGame
 extends Node2D
 
+signal slime_game_over_committed(result: Dictionary)
+
 const FIXED_DELTA: float = 1.0 / 60.0
 const MAX_STEPS_PER_FRAME: int = 4
 const CONTENT_SIZE: Vector2 = Vector2(640.0, 920.0)
 const CONTENT_SCALE: float = 1.6875
 const SEED_PREFIX: String = "--jolt-seed="
+const MAIN_SCENE_PATH: String = "res://scenes/Main3D.tscn"
+const UI_SCENE: PackedScene = preload("res://scenes/UI.tscn")
+const UI_THEME: Theme = preload("res://assets/ui/gravity_orb_theme.tres")
+const SPEAKER_ON: Texture2D = preload("res://assets/ui/speaker_on.svg")
+const SPEAKER_OFF: Texture2D = preload("res://assets/ui/speaker_off.svg")
 
 @export var slime_config: SlimeConfig = preload("res://config/slime_config.tres")
+@export var save_path: String = "user://save.cfg"
+@export var shell_enabled: bool = true
 
 @onready var _background: ColorRect = %Background
 @onready var _content: Node2D = %Content
@@ -22,6 +31,24 @@ var _shake_offset: Vector2 = Vector2.ZERO
 var _shake_strength: float = 0.0
 var _shake_left: float = 0.0
 var _shake_rng := RandomNumberGenerator.new()
+var _shell_layer: CanvasLayer
+var _shell_root: Control
+var _turn_indicator: TurnInputIndicator
+var _game_over_panel: GameOverPanel
+var _ranking_panel: RankingPanel
+var _result_dimmer: ColorRect
+var _sound_button: Button
+var _haptics: Haptics
+var _was_ready: bool = false
+var _game_over_committed: bool = false
+var _game_over_rank: int = 0
+
+
+func _enter_tree() -> void:
+	Config.data.game_mode = GameConfig.GameMode.SLIME
+	var bank: SfxBank = get_node_or_null("SfxBank") as SfxBank
+	if bank != null:
+		bank.save_path = save_path
 
 
 func _ready() -> void:
@@ -29,10 +56,16 @@ func _ready() -> void:
 	_shake_rng.seed = _sim.get_seed_used() ^ 0x51A3E
 	_view.bind(_sim)
 	_hud.bind(_sim)
+	if shell_enabled:
+		_setup_shell()
 	if not InputRouter.swipe.is_connected(_on_swipe):
 		InputRouter.swipe.connect(_on_swipe)
 	if not InputRouter.restart_requested.is_connected(_on_restart_requested):
 		InputRouter.restart_requested.connect(_on_restart_requested)
+	if OS.is_debug_build() and not InputRouter.debug_toggle_game_mode.is_connected(
+		_on_debug_toggle_game_mode
+	):
+		InputRouter.debug_toggle_game_mode.connect(_on_debug_toggle_game_mode)
 	if not get_viewport().size_changed.is_connected(_layout_content):
 		get_viewport().size_changed.connect(_layout_content)
 	InputRouter.set_accept_release_after_unlock(true)
@@ -47,6 +80,8 @@ func _exit_tree() -> void:
 		InputRouter.swipe.disconnect(_on_swipe)
 	if InputRouter.restart_requested.is_connected(_on_restart_requested):
 		InputRouter.restart_requested.disconnect(_on_restart_requested)
+	if InputRouter.debug_toggle_game_mode.is_connected(_on_debug_toggle_game_mode):
+		InputRouter.debug_toggle_game_mode.disconnect(_on_debug_toggle_game_mode)
 
 
 func _physics_process(delta: float) -> void:
@@ -83,6 +118,8 @@ func refresh_presentation() -> void:
 
 func _on_swipe(direction: Vector2i) -> void:
 	if _sim.start_turn(direction):
+		if _haptics != null:
+			_haptics.play_swipe()
 		refresh_presentation()
 		_sync_input_lock()
 
@@ -92,7 +129,15 @@ func _on_restart_requested() -> void:
 
 
 func _sync_input_lock() -> void:
-	InputRouter.set_locked(_sim.moving or _sim.game_over)
+	var ready: bool = not _sim.moving and not _sim.game_over
+	InputRouter.set_locked(not ready)
+	if _turn_indicator != null:
+		_turn_indicator.set_slime_state(ready, not _sim.game_over)
+	if ready and not _was_ready:
+		_sfx.play_turn_ready()
+		if _haptics != null:
+			_haptics.play_turn_ready()
+	_was_ready = ready
 
 
 func _layout_content() -> void:
@@ -102,6 +147,7 @@ func _layout_content() -> void:
 	_content.scale = Vector2.ONE * CONTENT_SCALE
 	_content_base_position = (viewport_size - CONTENT_SIZE * CONTENT_SCALE) * 0.5
 	_content.position = _content_base_position + _shake_offset
+	_layout_shell()
 
 
 func _consume_events() -> void:
@@ -130,6 +176,7 @@ func _consume_events() -> void:
 			"game_over":
 				_sfx.play_slime_game_over()
 				_start_shake(5.0, 0.24)
+				_commit_game_over_once()
 	_view.refresh()
 	_hud.refresh()
 
@@ -152,6 +199,182 @@ func _advance_shake(delta: float) -> void:
 		if _shake_offset.length_squared() < 0.0001:
 			_shake_offset = Vector2.ZERO
 	_content.position = _content_base_position + _shake_offset
+
+
+func _setup_shell() -> void:
+	_haptics = Haptics.new()
+	_haptics.name = "Haptics"
+	add_child(_haptics)
+
+	var template: CanvasLayer = UI_SCENE.instantiate() as CanvasLayer
+	var template_hud: Control = template.get_node("Hud") as Control
+	_result_dimmer = template_hud.get_node("ResultDimmer") as ColorRect
+	_game_over_panel = template_hud.get_node("GameOverPanel") as GameOverPanel
+	_sound_button = template_hud.get_node("HudSoundButton") as Button
+	_ranking_panel = template.get_node("RankingPanel") as RankingPanel
+	for node: Node in [_result_dimmer, _game_over_panel, _sound_button]:
+		template_hud.remove_child(node)
+		_clear_owner_recursive(node)
+	template.remove_child(_ranking_panel)
+	_clear_owner_recursive(_ranking_panel)
+
+	_shell_layer = CanvasLayer.new()
+	_shell_layer.name = "SlimeShell"
+	_shell_layer.layer = 20
+	_shell_root = Control.new()
+	_shell_root.name = "ShellRoot"
+	_shell_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_shell_root.theme = UI_THEME
+	_shell_layer.add_child(_shell_root)
+	for node: Node in [
+		_result_dimmer,
+		_turn_indicator_for_shell(),
+		_sound_button,
+		_game_over_panel,
+		_ranking_panel,
+	]:
+		_shell_root.add_child(node)
+		_assign_owner_recursive(node, _shell_root)
+	template.free()
+	add_child(_shell_layer)
+
+	_sound_button.pressed.connect(_sfx.toggle_mute)
+	_sfx.mute_changed.connect(_on_mute_changed)
+	_on_mute_changed(_sfx.is_muted())
+	_game_over_panel.bind_slime()
+	_game_over_panel.mode_select_requested.connect(_on_mode_select_requested)
+	_game_over_panel.ranking_requested.connect(_on_ranking_requested)
+	_ranking_panel.bind(save_path)
+	_ranking_panel.closed.connect(_on_ranking_closed)
+	_turn_indicator.bind_slime(Rect2(Vector2.ZERO, Vector2.ONE))
+	_layout_shell()
+
+
+func _turn_indicator_for_shell() -> TurnInputIndicator:
+	_turn_indicator = TurnInputIndicator.new()
+	_turn_indicator.name = "TurnInputIndicator"
+	_turn_indicator.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	return _turn_indicator
+
+
+func _assign_owner_recursive(node: Node, new_owner: Node) -> void:
+	node.owner = new_owner
+	for child: Node in node.get_children():
+		_assign_owner_recursive(child, new_owner)
+
+
+func _clear_owner_recursive(node: Node) -> void:
+	node.owner = null
+	for child: Node in node.get_children():
+		_clear_owner_recursive(child)
+
+
+func _layout_shell() -> void:
+	if _shell_root == null or _sim == null:
+		return
+	var board_rect: Rect2 = Rect2(
+		_content_base_position + slime_config.board_rect.position * CONTENT_SCALE,
+		slime_config.board_rect.size * CONTENT_SCALE
+	)
+	if _turn_indicator != null:
+		_turn_indicator.set_slime_board_rect(board_rect.grow(4.0 * CONTENT_SCALE))
+	if _sound_button != null:
+		var button_size: Vector2 = Vector2.ONE * 104.0
+		_sound_button.position = Vector2(
+			board_rect.get_center().x - button_size.x * 0.5,
+			board_rect.end.y + 30.0
+		)
+		_sound_button.size = button_size
+	if _game_over_panel != null:
+		var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+		var panel_size: Vector2 = Vector2(788.0, 1040.0)
+		var scale_factor: float = minf(viewport_size.x / 1080.0, viewport_size.y / 1920.0)
+		_game_over_panel.size = panel_size * scale_factor
+		_game_over_panel.position = (viewport_size - _game_over_panel.size) * 0.5
+
+
+func _commit_game_over_once() -> void:
+	if _game_over_committed:
+		return
+	_game_over_committed = true
+	var stats: Dictionary = {
+		"turns": _sim.turn,
+		"max_chain": _sim.run_best_chain,
+		"max_colors": _sim.completed_colors.size(),
+	}
+	var ranking: Dictionary = SaveStore.add_ranking(
+		save_path, GameConfig.GameMode.SLIME, _sim.score, stats
+	)
+	SaveStore.save_last_mode(save_path, GameConfig.GameMode.SLIME)
+	_game_over_rank = int(ranking.get("rank", 0))
+	slime_game_over_committed.emit(ranking.duplicate(true))
+	_show_game_over_after_feedback(ranking)
+
+
+func _show_game_over_after_feedback(ranking: Dictionary) -> void:
+	await get_tree().create_timer(SfxBank.SLIME_GAME_OVER_DURATION).timeout
+	if not is_inside_tree() or _game_over_panel == null:
+		return
+	_game_over_panel.show_slime_result(
+		_sim.score,
+		_sim.turn,
+		_sim.run_best_chain,
+		_sim.completed_colors.size(),
+		ranking,
+		SaveStore.load_slime_records(save_path)
+	)
+
+
+func _on_ranking_requested(mode: GameConfig.GameMode, highlight_rank: int) -> void:
+	if mode != GameConfig.GameMode.SLIME:
+		return
+	_game_over_panel.visible = false
+	_result_dimmer.visible = false
+	_sound_button.visible = false
+	_ranking_panel.open(mode, highlight_rank)
+
+
+func _on_ranking_closed() -> void:
+	_game_over_panel.visible = true
+	_result_dimmer.visible = true
+	_sound_button.visible = true
+	_game_over_panel.restore_actions_after_ranking()
+
+
+func _on_mode_select_requested() -> void:
+	Main.queue_start_screen()
+	get_tree().change_scene_to_file(MAIN_SCENE_PATH)
+
+
+func _on_debug_toggle_game_mode() -> void:
+	Main.queue_mode(GameConfig.GameMode.TURN)
+	get_tree().change_scene_to_file(MAIN_SCENE_PATH)
+
+
+func _on_mute_changed(muted: bool) -> void:
+	_sound_button.icon = SPEAKER_OFF if muted else SPEAKER_ON
+	_sound_button.text = ""
+	_sound_button.tooltip_text = "소리 켜기" if muted else "소리 끄기"
+
+
+func game_over_panel() -> GameOverPanel:
+	return _game_over_panel
+
+
+func ranking_panel() -> RankingPanel:
+	return _ranking_panel
+
+
+func turn_input_indicator() -> TurnInputIndicator:
+	return _turn_indicator
+
+
+func sound_button() -> Button:
+	return _sound_button
+
+
+func haptics() -> Haptics:
+	return _haptics
 
 
 func _seed_from_arguments() -> int:

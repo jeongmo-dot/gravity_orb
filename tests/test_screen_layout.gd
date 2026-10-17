@@ -39,7 +39,7 @@ func test_v3_screen_layout_safe_area_touch_targets_and_extreme_content() -> void
 		var output: Vector2 = viewport_case["output"] as Vector2
 		var layout: Dictionary = StartScreen.layout_for_viewport(logical)
 		for region_name: String in [
-			"hero", "gravity", "orb", "subtitle", "blitz", "classic", "ranking",
+			"hero", "gravity", "orb", "subtitle", "blitz", "classic", "slime", "ranking",
 			"sound", "settings",
 		]:
 			assert_true(
@@ -104,7 +104,7 @@ func test_v3_screen_layout_safe_area_touch_targets_and_extreme_content() -> void
 				)
 		var logo_end: float = (layout["subtitle"] as Rect2).end.y
 		var card_top: float = (layout["blitz"] as Rect2).position.y
-		var card_end: float = (layout["blitz"] as Rect2).end.y
+		var card_end: float = (layout["slime"] as Rect2).end.y
 		var icon_top: float = (layout["ranking"] as Rect2).position.y
 		var logo_card_gap: float = card_top - logo_end
 		var card_icon_gap: float = icon_top - card_end
@@ -125,7 +125,7 @@ func test_v3_screen_layout_safe_area_touch_targets_and_extreme_content() -> void
 				output.y,
 			]
 		)
-		for touch_name: String in ["blitz", "classic", "ranking", "sound", "settings"]:
+		for touch_name: String in ["blitz", "classic", "slime", "ranking", "sound", "settings"]:
 			var touch_rect: Rect2 = layout[touch_name] as Rect2
 			assert_true(
 				touch_rect.size.x >= 88.0 and touch_rect.size.y >= 88.0,

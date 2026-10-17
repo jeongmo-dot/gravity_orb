@@ -8,8 +8,8 @@ const SILVER: Color = Color("#D5DEE8")
 const BRONZE: Color = Color("#CD8B62")
 const DEFAULT_ROW_COLOR: Color = Color("#E5EDF8")
 const HEADER_COLOR: Color = Color("#8CAED6")
-const COLUMN_NAMES: Array[String] = ["Rank", "Score", "Stat", "Date"]
-const COLUMN_WIDTHS: Array[float] = [100.0, 250.0, 250.0, 300.0]
+const COLUMN_NAMES: Array[String] = ["Rank", "Score", "Stat", "Turns", "Chain", "Max", "Date"]
+const COLUMN_WIDTHS: Array[float] = [82.0, 220.0, 210.0, 120.0, 120.0, 100.0, 220.0]
 const TRANSITION_SECONDS: float = 0.25
 const SLIDE_OFFSET: float = 180.0
 const PANEL_VERTICAL_CONTENT_MARGIN: float = 56.0
@@ -19,6 +19,7 @@ const PANEL_VERTICAL_CONTENT_MARGIN: float = 56.0
 
 @onready var _blitz_tab: Button = %RankingBlitzTab
 @onready var _classic_tab: Button = %RankingClassicTab
+@onready var _slime_tab: Button = %RankingSlimeTab
 @onready var _header: Label = %RankingHeader
 @onready var _close_button: Button = %RankingCloseButton
 @onready var _panel: PanelContainer = $Panel
@@ -48,8 +49,9 @@ func _ready() -> void:
 		_row_columns.append(_create_columns(row_host, false))
 	_blitz_tab.pressed.connect(func() -> void: _show_mode(GameConfig.GameMode.BLITZ))
 	_classic_tab.pressed.connect(func() -> void: _show_mode(GameConfig.GameMode.TURN))
+	_slime_tab.pressed.connect(func() -> void: _show_mode(GameConfig.GameMode.SLIME))
 	_close_button.pressed.connect(_on_close_pressed)
-	for button: Button in [_blitz_tab, _classic_tab, _close_button]:
+	for button: Button in [_blitz_tab, _classic_tab, _slime_tab, _close_button]:
 		ButtonMotion.bind(button)
 	if not resized.is_connected(_apply_layout):
 		resized.connect(_apply_layout)
@@ -114,11 +116,17 @@ func _show_mode(mode: GameConfig.GameMode) -> void:
 
 func _refresh() -> void:
 	var blitz_mode: bool = _mode == GameConfig.GameMode.BLITZ
+	var slime_mode: bool = _mode == GameConfig.GameMode.SLIME
 	_blitz_tab.set_pressed_no_signal(blitz_mode)
-	_classic_tab.set_pressed_no_signal(not blitz_mode)
+	_classic_tab.set_pressed_no_signal(not blitz_mode and not slime_mode)
+	_slime_tab.set_pressed_no_signal(slime_mode)
+	_set_column_visibility(slime_mode)
 	(_header_columns["Rank"] as Label).text = "순위"
 	(_header_columns["Score"] as Label).text = "점수"
 	(_header_columns["Stat"] as Label).text = "최대 체인" if blitz_mode else "최대 콤보"
+	(_header_columns["Turns"] as Label).text = "턴"
+	(_header_columns["Chain"] as Label).text = "연쇄"
+	(_header_columns["Max"] as Label).text = "MAX"
 	(_header_columns["Date"] as Label).text = "날짜"
 	var rankings: Array[Dictionary] = SaveStore.load_rankings(_save_path, _mode)
 	var active_rank: int = highlighted_rank()
@@ -132,17 +140,22 @@ func _refresh() -> void:
 		)
 		(columns["Rank"] as Label).text = str(rank)
 		if index >= rankings.size():
-			(columns["Score"] as Label).text = "—"
-			(columns["Stat"] as Label).text = ""
-			(columns["Date"] as Label).text = ""
+			for column_name: String in COLUMN_NAMES:
+				(columns[column_name] as Label).text = "—" if column_name in ["Rank", "Score"] else ""
+			(columns["Rank"] as Label).text = str(rank)
 		else:
 			var record: Dictionary = rankings[index]
-			var stat_key: String = "max_chain" if blitz_mode else "max_combo"
 			(columns["Score"] as Label).text = _format_score(int(record["score"]))
-			(columns["Stat"] as Label).text = "%s %d" % [
-				"체인" if blitz_mode else "콤보",
-				int(record[stat_key]),
-			]
+			if slime_mode:
+				(columns["Turns"] as Label).text = str(int(record["turns"]))
+				(columns["Chain"] as Label).text = str(int(record["max_chain"]))
+				(columns["Max"] as Label).text = "%d/7" % int(record["max_colors"])
+			else:
+				var stat_key: String = "max_chain" if blitz_mode else "max_combo"
+				(columns["Stat"] as Label).text = "%s %d" % [
+					"체인" if blitz_mode else "콤보",
+					int(record[stat_key]),
+				]
 			(columns["Date"] as Label).text = _short_date(str(record["date"]))
 		for column_name: String in COLUMN_NAMES:
 			(columns[column_name] as Label).add_theme_color_override(
@@ -189,6 +202,13 @@ func _create_columns(host: Control, header: bool) -> Dictionary:
 		columns_container.add_child(label)
 		columns[COLUMN_NAMES[index]] = label
 	return columns
+
+
+func _set_column_visibility(slime_mode: bool) -> void:
+	for columns: Dictionary in [_header_columns] + _row_columns:
+		(columns["Stat"] as Label).visible = not slime_mode
+		for column_name: String in ["Turns", "Chain", "Max"]:
+			(columns[column_name] as Label).visible = slime_mode
 
 
 func _on_close_pressed() -> void:
