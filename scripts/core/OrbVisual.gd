@@ -268,8 +268,29 @@ func _draw_mars(radius: float, base: Color, detail: bool, phase: float) -> void:
 				crater_rotations[crater_index],
 				_with_alpha(base.darkened(0.42), 0.58 * base.a)
 			)
-	var cap_color: Color = _with_alpha(Color("#F2ECE4"), 0.86 * base.a)
-	draw_arc(Vector2(0.0, -radius * 0.77), radius * 0.36, 0.12, PI - 0.12, 20, cap_color, maxf(2.0, radius * 0.18), true)
+	_draw_mars_polar_cap(
+		radius,
+		_with_alpha(Color("#F2ECE4"), 0.86 * base.a)
+	)
+
+
+func _draw_mars_polar_cap(radius: float, color_value: Color) -> void:
+	var points: PackedVector2Array = PackedVector2Array()
+	const POINT_COUNT: int = 16
+	for point_index: int in range(POINT_COUNT + 1):
+		var progress: float = float(point_index) / float(POINT_COUNT)
+		var angle: float = lerpf(PI + 0.78, TAU - 0.78, progress)
+		points.append(Vector2(cos(angle), sin(angle)) * radius)
+	for point_index: int in range(POINT_COUNT, -1, -1):
+		var progress: float = float(point_index) / float(POINT_COUNT)
+		var x: float = lerpf(-0.70, 0.70, progress)
+		var boundary_y: float = (
+			-0.67
+			+ sin(x * 10.0 + 0.35) * 0.024
+			+ sin(x * 21.0 - 0.80) * 0.016
+		)
+		points.append(Vector2(x, boundary_y) * radius)
+	draw_colored_polygon(points, color_value)
 
 
 func _draw_earth(radius: float, base: Color, detail: bool, phase: float) -> void:

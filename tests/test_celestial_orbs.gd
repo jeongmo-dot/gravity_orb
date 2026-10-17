@@ -85,9 +85,14 @@ func test_reviewed_planets_use_soft_surface_landmarks() -> void:
 		and shader_code.contains("canyon_tilt = 0.268")
 		and shader_code.contains("canyon_end_fade")
 		and shader_code.contains("canyon_branch")
+		and shader_code.contains("canyon_half_width = 0.028 + canyon_noise * 0.044")
+		and shader_code.contains("canyon_branch_one_side")
+		and shader_code.contains("canyon_branch_half_width")
+		and shader_code.contains("polar_boundary_noise")
+		and shader_code.contains("polar_boundary_noise - 0.5) * 0.080")
 		and shader_code.contains("crater_d")
 		and not shader_code.contains("abs(n2 - 0.52)"),
-		"Mars uses an offset tilted, tapered canyon and asymmetric scattered craters"
+		"Mars uses a broad one-sided Y canyon, organic polar cap, and asymmetric craters"
 	)
 	assert_true(
 		shader_code.contains("uranus_band_contrast = 0.05")
