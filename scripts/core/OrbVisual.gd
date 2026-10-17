@@ -276,20 +276,19 @@ func _draw_mars(radius: float, base: Color, detail: bool, phase: float) -> void:
 
 func _draw_mars_polar_cap(radius: float, color_value: Color) -> void:
 	var points: PackedVector2Array = PackedVector2Array()
-	const POINT_COUNT: int = 16
+	const POINT_COUNT: int = 32
 	for point_index: int in range(POINT_COUNT + 1):
 		var progress: float = float(point_index) / float(POINT_COUNT)
-		var angle: float = lerpf(PI + 0.78, TAU - 0.78, progress)
-		points.append(Vector2(cos(angle), sin(angle)) * radius)
-	for point_index: int in range(POINT_COUNT, -1, -1):
-		var progress: float = float(point_index) / float(POINT_COUNT)
-		var x: float = lerpf(-0.70, 0.70, progress)
-		var boundary_y: float = (
-			-0.67
-			+ sin(x * 10.0 + 0.35) * 0.024
+		var angle: float = progress * TAU
+		var x: float = cos(angle)
+		var boundary_noise: float = (
+			sin(x * 10.0 + 0.35) * 0.024
 			+ sin(x * 21.0 - 0.80) * 0.016
 		)
-		points.append(Vector2(x, boundary_y) * radius)
+		points.append(Vector2(
+			x * 0.36,
+			-0.60 + sin(angle) * 0.20 + boundary_noise
+		) * radius)
 	draw_colored_polygon(points, color_value)
 
 

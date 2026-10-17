@@ -319,8 +319,11 @@ void fragment() {
 			float polar_boundary_noise = fractal_noise3(
 				body_position * 6.8 + vec3(1.7, 8.4, 3.2)
 			);
-			float polar_boundary = body_position.y + (polar_boundary_noise - 0.5) * 0.080;
-			float polar_cap = smoothstep(0.67, 0.84, polar_boundary);
+			float polar_tilt = radians(35.0);
+			vec3 polar_axis = normalize(vec3(0.0, cos(polar_tilt), sin(polar_tilt)));
+			float polar = dot(body_position, polar_axis)
+				+ (polar_boundary_noise - 0.5) * 0.060;
+			float polar_cap = smoothstep(0.866, 0.914, polar);
 			surface = base * (0.82 + rust_grain * 0.24);
 			surface = mix(surface, mix(base * 0.58, vec3(0.34, 0.13, 0.08), 0.32), dust_zone * 0.46);
 			surface = mix(surface, mix(base * 0.52, vec3(0.34, 0.13, 0.09), 0.20), canyon * 0.58);

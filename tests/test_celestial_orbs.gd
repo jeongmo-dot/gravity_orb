@@ -89,10 +89,14 @@ func test_reviewed_planets_use_soft_surface_landmarks() -> void:
 		and shader_code.contains("canyon_branch_one_side")
 		and shader_code.contains("canyon_branch_half_width")
 		and shader_code.contains("polar_boundary_noise")
-		and shader_code.contains("polar_boundary_noise - 0.5) * 0.080")
+		and shader_code.contains("polar_tilt = radians(35.0)")
+		and shader_code.contains("normalize(vec3(0.0, cos(polar_tilt), sin(polar_tilt)))")
+		and shader_code.contains("dot(body_position, polar_axis)")
+		and shader_code.contains("polar_boundary_noise - 0.5) * 0.060")
+		and shader_code.contains("smoothstep(0.866, 0.914, polar)")
 		and shader_code.contains("crater_d")
 		and not shader_code.contains("abs(n2 - 0.52)"),
-		"Mars uses a broad one-sided Y canyon, organic polar cap, and asymmetric craters"
+		"Mars uses a broad one-sided Y canyon, tilted polar cap, and asymmetric craters"
 	)
 	assert_true(
 		shader_code.contains("uranus_band_contrast = 0.05")
@@ -101,6 +105,21 @@ func test_reviewed_planets_use_soft_surface_landmarks() -> void:
 		"Uranus uses subtle atmosphere bands and a tilted ellipse ring"
 	)
 	await _cleanup(board)
+
+
+func test_mars_preview_polar_cap_is_an_inset_flattened_round_piece() -> void:
+	var source: String = FileAccess.get_file_as_string("res://scripts/core/OrbVisual.gd")
+	assert_true(
+		source.contains("x * 0.36")
+		and source.contains("-0.60 + sin(angle) * 0.20 + boundary_noise")
+		and source.contains("sin(x * 10.0 + 0.35) * 0.024")
+		and source.contains("sin(x * 21.0 - 0.80) * 0.016"),
+		"Mars preview uses the specified inset 0.36 by 0.20 noisy polar piece"
+	)
+	assert_true(
+		not source.contains("lerpf(-0.70, 0.70, progress)"),
+		"Mars preview no longer draws a full-width polar band"
+	)
 
 
 func test_l6_l7_shader_uses_deterministic_planet_glow() -> void:
