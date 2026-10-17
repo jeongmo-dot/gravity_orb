@@ -124,6 +124,60 @@ func test_material_hud_entry_lengths_and_effect_lifetime_match_spec() -> void:
 	await tree.process_frame
 
 
+func test_merge_trails_use_each_source_radius_for_absorb_and_max_clear() -> void:
+	var sim := SlimeSim.new(CONFIG, 8071, true, false)
+	var view := SlimeView.new()
+	tree.root.add_child(view)
+	view.bind(sim)
+	view.handle_events([
+		{
+			"type": "absorbed",
+			"position": Vector2(300.0, 500.0),
+			"source_a_radius": 165.0,
+			"source_b_radius": 31.5,
+			"color": 0,
+		},
+		{
+			"type": "max_clear",
+			"position": Vector2(320.0, 520.0),
+			"source_a_radius": 112.0,
+			"source_b_radius": 42.0,
+			"color_a": 1,
+			"color_b": 2,
+		},
+	])
+	var effects: Array = view.get("_effects") as Array
+	assert_eq(effects.size(), 2, "absorb and MAX CLEAR each create one visual effect")
+	var absorbed_radii: Vector2 = view._merge_trail_radii(
+		effects[0] as Dictionary,
+		0.0
+	)
+	assert_eq(
+		absorbed_radii,
+		Vector2(165.0, 31.5),
+		"absorb trails start at each source radius"
+	)
+	var clear_radii: Vector2 = view._merge_trail_radii(
+		effects[1] as Dictionary,
+		0.5
+	)
+	var clear_radius_scale: float = lerpf(1.0, 0.04, 0.5)
+	assert_near(
+		clear_radii.x,
+		112.0 * clear_radius_scale,
+		1.0e-5,
+		"MAX CLEAR A trail shrinks from source A radius"
+	)
+	assert_near(
+		clear_radii.y,
+		42.0 * clear_radius_scale,
+		1.0e-5,
+		"MAX CLEAR B trail shrinks from source B radius"
+	)
+	view.queue_free()
+	await tree.process_frame
+
+
 func test_rendered_entry_bars_and_max_clear_waves_stay_in_board_coordinates() -> void:
 	# The headless display uses the dummy renderer and cannot return SubViewport pixels.
 	# This regression is exercised by the dedicated windowed invocation documented for #80.

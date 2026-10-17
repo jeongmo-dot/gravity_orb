@@ -910,7 +910,11 @@ func _capture_slime_shell_play() -> void:
 	sim.moving = false
 	sim.start_turn(Vector2i.LEFT)
 	game._begin_lock_orbit_clock()
-	sim.intro_elapsed = 0.45
+	var orbit_duration: float = (
+		float(game.get("_lock_intro_last_scheduled"))
+		+ sim.config.max_simulation_time
+	)
+	sim.intro_elapsed = orbit_duration * 0.10
 	game.refresh_presentation()
 	game._sync_input_lock()
 	await get_tree().process_frame
@@ -920,7 +924,7 @@ func _capture_slime_shell_play() -> void:
 	await get_tree().process_frame
 	await _capture("50_slime_shell_play_rejected.png")
 	print(
-		"SCREEN_CAPTURE_CHECK scene=slime_shell_play states=ready,final-move,busy,rejected arrows=none shell=enabled"
+		"SCREEN_CAPTURE_CHECK scene=slime_shell_play states=ready,final-move,busy@0.1,rejected arrows=none shell=enabled"
 	)
 	game.queue_free()
 	await get_tree().process_frame

@@ -325,7 +325,10 @@ func _layout_shell() -> void:
 		slime_config.board_rect.size * CONTENT_SCALE
 	)
 	if _turn_indicator != null:
-		_turn_indicator.set_slime_board_rect(board_rect.grow(4.0 * CONTENT_SCALE))
+		_turn_indicator.set_slime_board_rect(
+			board_rect.grow(4.0 * CONTENT_SCALE),
+			board_rect
+		)
 	if _sound_button != null:
 		var button_size: Vector2 = Vector2.ONE * 104.0
 		_sound_button.position = Vector2(
