@@ -40,7 +40,7 @@
 
 ### [2026-10-17] 대상 #82 — 화성 협곡·극관 다듬기
 - 상태: 완료 — 3D 화성의 교차 가지를 한쪽 Y 가지로 바꾸고 협곡 폭 변화·평균 폭과 3D/2D 극관 경계를 명세대로 다듬음
-- 브랜치 / PR: `mars-canyon-polar-cap` / PR 미생성
+- 브랜치 / PR: `mars-canyon-polar-cap` / https://github.com/jeongmo-dot/gravity_orb/pull/85
 - 변경 파일: `scripts/core/CelestialOrbArt.gd`, `scripts/core/OrbVisual.gd`, `tests/test_celestial_orbs.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 3D 협곡 가지가 접점에서 왼쪽 한 방향으로만 갈라지고, 끝으로 갈수록 폭 `0.026 → 0.010`·알파가 줄어드는 Y — 자동 셰이더 검사 + 캡처 `47`
