@@ -98,7 +98,11 @@ $expectedFiles = @(
 	"49_slime_states.png",
 	"50_slime_shell_start.png",
 	"50_slime_shell_ranking.png",
-	"50_slime_shell_result.png"
+	"50_slime_shell_result.png",
+	"50_slime_shell_play_ready.png",
+	"50_slime_shell_play_final_move.png",
+	"50_slime_shell_play_busy.png",
+	"50_slime_shell_play_rejected.png"
 )
 $hudExpectedFiles = @(
     "02_turn_early.png",

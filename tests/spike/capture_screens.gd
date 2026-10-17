@@ -96,6 +96,10 @@ const CAPTURE_FILES: Array[String] = [
 	"50_slime_shell_start.png",
 	"50_slime_shell_ranking.png",
 	"50_slime_shell_result.png",
+	"50_slime_shell_play_ready.png",
+	"50_slime_shell_play_final_move.png",
+	"50_slime_shell_play_busy.png",
+	"50_slime_shell_play_rejected.png",
 ]
 const HUD_CAPTURE_FILES: Array[String] = [
 	"02_turn_early.png",
@@ -159,6 +163,8 @@ func _run_capture_suite() -> void:
 		await _capture_slime_states()
 	if not _failed and not _hud_scenes_only:
 		await _capture_slime_shell()
+	if not _failed and not _hud_scenes_only:
+		await _capture_slime_shell_play()
 	if not _failed and not _hud_scenes_only:
 		await _capture_reaction_effect_scenes()
 	if not _failed and not _hud_scenes_only:
@@ -228,13 +234,18 @@ func _capture_turn_scenes() -> void:
 	await _capture("44_turn_ready.png")
 	manager.on_swipe(Vector2i.RIGHT)
 	manager.set_physics_process(false)
+	manager._set_state(TurnManager.State.SIMULATING)
+	manager.settle_elapsed = 0.5
 	await get_tree().create_timer(TurnInputIndicator.BUSY_FADE_DURATION + 0.02).timeout
 	await _capture("45_turn_busy_a.png")
-	await get_tree().create_timer(0.40).timeout
+	manager.settle_elapsed = 1.0
+	await get_tree().process_frame
 	await _capture("45_turn_busy_b.png")
 	InputRouter.swipe_rejected.emit(Vector2i.LEFT)
 	await get_tree().create_timer(0.04).timeout
 	await _capture("46_turn_rejected.png")
+	manager._set_state(TurnManager.State.SPAWNING)
+	manager.settle_elapsed = 0.0
 	manager.set_physics_process(true)
 	if not await _wait_for_turn_input(manager):
 		_fail("TURN cue capture did not settle")
@@ -839,6 +850,75 @@ func _capture_slime_shell() -> void:
 	await get_tree().create_timer(1.25).timeout
 	await _capture("50_slime_shell_result.png")
 	print("SCREEN_CAPTURE_CHECK scene=slime_shell cards=3 ranking=slime result=shared")
+	game.queue_free()
+	await get_tree().process_frame
+
+
+func _capture_slime_shell_play() -> void:
+	var game: SlimeGame = SLIME_MAIN_SCENE.instantiate() as SlimeGame
+	game.save_path = _temp_save_path
+	add_child(game)
+	await get_tree().process_frame
+	game.set_physics_process(false)
+	var sim: SlimeSim = game.get_sim()
+	var radius: float = sim.radius_for_level(0)
+
+	sim.clear_slimes()
+	sim.intro_queue.clear()
+	sim.game_over = false
+	sim.final_move_pending = false
+	sim.add_slime(
+		sim.entry_position_for(Vector2i.DOWN, radius)
+			+ Vector2(0.0, radius * 2.0 + sim.config.entry_margin + 14.9),
+		0,
+		0
+	).visual_scale = 1.0
+	sim.add_slime(
+		sim.entry_position_for(Vector2i.LEFT, radius)
+			+ Vector2(-radius * 2.0 - sim.config.entry_margin - 50.0, 0.0),
+		0,
+		1
+	).visual_scale = 1.0
+	sim.set_next_slimes([{"level": 0, "color": 2}, {"level": 1, "color": 0}])
+	sim.moving = true
+	sim.finish_turn()
+	game.refresh_presentation()
+	game._sync_input_lock()
+	await get_tree().process_frame
+	await _capture("50_slime_shell_play_ready.png")
+
+	sim.clear_slimes()
+	_add_slime_entry_blockers(sim)
+	sim.turn = 18
+	sim.moving = true
+	sim.finish_turn()
+	game.refresh_presentation()
+	game._sync_input_lock()
+	await get_tree().process_frame
+	await _capture("50_slime_shell_play_final_move.png")
+
+	sim.clear_slimes()
+	sim.intro_queue.clear()
+	sim.game_over = false
+	sim.final_move_pending = false
+	sim.final_move_active = false
+	sim.add_slime(Vector2(320.0, 720.0), 2, 0).visual_scale = 1.0
+	sim.set_next_slimes([{"level": 0, "color": 1}, {"level": 1, "color": 2}])
+	sim.moving = false
+	sim.start_turn(Vector2i.LEFT)
+	game._begin_lock_orbit_clock()
+	sim.intro_elapsed = 0.45
+	game.refresh_presentation()
+	game._sync_input_lock()
+	await get_tree().process_frame
+	await _capture("50_slime_shell_play_busy.png")
+
+	InputRouter.swipe_rejected.emit(Vector2i.UP)
+	await get_tree().process_frame
+	await _capture("50_slime_shell_play_rejected.png")
+	print(
+		"SCREEN_CAPTURE_CHECK scene=slime_shell_play states=ready,final-move,busy,rejected arrows=none shell=enabled"
+	)
 	game.queue_free()
 	await get_tree().process_frame
 
