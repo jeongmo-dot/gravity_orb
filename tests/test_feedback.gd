@@ -178,6 +178,24 @@ func test_feedback_toggle_preserves_turn_and_blitz_state_hashes() -> void:
 	Config.data.sfx_enabled = original_sfx
 
 
+func test_visual_prewarm_stops_when_director_leaves_tree() -> void:
+	var root: Node3D = Node3D.new()
+	var director: FeedbackDirector = FeedbackDirector.new()
+	root.add_child(director)
+	tree.root.add_child(root)
+	await tree.process_frame
+	director._resources_prewarmed = false
+	director._prewarm_visual_resources_offscreen(true)
+	root.remove_child(director)
+	await tree.process_frame
+	assert_true(
+		not director._resources_prewarmed,
+		"visual prewarm stops when its director leaves the scene tree"
+	)
+	director.free()
+	await _cleanup(root)
+
+
 func test_hitstop_uses_real_time_and_disabled_mode_does_not_change_scale() -> void:
 	var original_enabled: bool = Config.data.fx_hitstop_enabled
 	var original_scale: float = Engine.time_scale
