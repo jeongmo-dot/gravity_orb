@@ -40,7 +40,7 @@
 
 ### [2026-10-17] 대상 #84 — Windows 빌드 0.13.0
 - 상태: 완료 — 사용자 승인으로 릴리스 창의 SLIME 전환을 막던 비동기 프리워밍 수명주기 오류와 회귀 테스트를 #84에 함께 포함함
-- 브랜치 / PR: `build-0.13.0` / 생성 후 링크 갱신 예정
+- 브랜치 / PR: `build-0.13.0` / https://github.com/jeongmo-dot/gravity_orb/pull/84
 - 변경 파일: `project.godot`, `scripts/fx/FeedbackDirector.gd`, `tests/test_feedback.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `application/config/version`을 Claude 결정 값 `0.13.0`으로 변경하고 릴리스 `GravityOrb_v0.13.0.exe`·`.console.exe`·`_BUILD.txt` 생성 — 자동
