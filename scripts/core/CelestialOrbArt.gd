@@ -292,25 +292,35 @@ void fragment() {
 			float canyon_noise = fractal_noise3(body_position * 5.3 + vec3(9.1, 2.7, 3.8));
 			float canyon_path = body_position.y - canyon_center
 				- body_position.x * canyon_tilt + (canyon_noise - 0.5) * 0.040;
-			float canyon_half_width = 0.024 + canyon_noise * 0.020;
+			float canyon_half_width = 0.028 + canyon_noise * 0.044;
 			float canyon_end_fade = 1.0 - smoothstep(0.42, 0.56, abs(body_position.x));
 			float canyon_main = (1.0 - smoothstep(
 				canyon_half_width * 0.55, canyon_half_width * 1.55, abs(canyon_path)
 			)) * canyon_end_fade;
-			float canyon_branch_path = canyon_path + (body_position.x + 0.12) * 0.58 - 0.012;
-			float canyon_branch_fade = 1.0 - smoothstep(
-				0.13, 0.25, abs(body_position.x + 0.17)
+			float canyon_branch_progress = clamp(
+				(-body_position.x - 0.10) / 0.30, 0.0, 1.0
 			);
+			float canyon_branch_path = canyon_path
+				+ max(-body_position.x - 0.10, 0.0) * 0.58;
+			float canyon_branch_half_width = mix(0.026, 0.010, canyon_branch_progress);
+			float canyon_branch_one_side = smoothstep(-0.43, -0.34, body_position.x)
+				* (1.0 - smoothstep(-0.16, -0.08, body_position.x));
 			float canyon_branch = (1.0 - smoothstep(
-				0.014, 0.050, abs(canyon_branch_path)
-			)) * canyon_branch_fade;
+				canyon_branch_half_width * 0.55,
+				canyon_branch_half_width * 1.55,
+				abs(canyon_branch_path)
+			)) * canyon_branch_one_side;
 			float canyon = max(canyon_main, canyon_branch * 0.72) * detail;
 			float crater_a = sphere_spot(body_position, vec3(-0.58, 0.34, 0.74), 0.018, 0.068);
 			float crater_b = sphere_spot(body_position, vec3(0.20, 0.52, 0.83), 0.030, 0.090);
 			float crater_c = sphere_spot(body_position, vec3(0.49, -0.27, 0.83), 0.014, 0.056);
 			float crater_d = sphere_spot(body_position, vec3(-0.10, -0.57, 0.81), 0.024, 0.078);
 			float crater = max(max(crater_a, crater_b), max(crater_c, crater_d)) * detail;
-			float polar_cap = smoothstep(0.67, 0.84, body_position.y);
+			float polar_boundary_noise = fractal_noise3(
+				body_position * 6.8 + vec3(1.7, 8.4, 3.2)
+			);
+			float polar_boundary = body_position.y + (polar_boundary_noise - 0.5) * 0.080;
+			float polar_cap = smoothstep(0.67, 0.84, polar_boundary);
 			surface = base * (0.82 + rust_grain * 0.24);
 			surface = mix(surface, mix(base * 0.58, vec3(0.34, 0.13, 0.08), 0.32), dust_zone * 0.46);
 			surface = mix(surface, mix(base * 0.52, vec3(0.34, 0.13, 0.09), 0.20), canyon * 0.58);
