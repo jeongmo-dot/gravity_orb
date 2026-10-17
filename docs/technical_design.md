@@ -814,6 +814,7 @@ godot --headless --path . --quit-after 300 -- --mode=blitz
 - **파일 이름**: `build/windows/GravityOrb_v{버전}.exe` (예: `GravityOrb_v0.11.1.exe`), 콘솔 래퍼 `GravityOrb_v{버전}.console.exe`, 빌드 정보 `GravityOrb_v{버전}_BUILD.txt` (커밋·날짜·엔진·모드). 디버그는 `build/windows-debug/`에 같은 이름
 - **이전 버전은 남긴다**: 빌드 스크립트는 같은 버전의 파일만 지우고 다시 만든다 (다른 버전 파일은 그대로 — 비교 테스트용). 버전 없는 예전 이름 (`GravityOrb.exe`·`GravityOrb.console.exe`·`BUILD.txt`)은 한 번 정리
 - 빌드 결과 줄 (`WINDOWS_BUILD_RESULT`)에 버전과 실제 파일 경로를 적는다
+- **항목 검증용 빌드는 `-Debug`로** (`build/windows-debug/`) — 릴리스 이름 파일 (`build/windows/GravityOrb_v*.exe`)은 빌드 항목에서만 만든다 (2026-10-17 추가). #81까지 항목마다 검증 빌드를 릴리스로 돌려 `GravityOrb_v0.11.1.exe`가 #81 브랜치 내용으로 덮였다 — 지금 그 파일은 예전 0.11.1 (V4-1까지)이 아니다
 - **결과 — 병합** ([PR #72](https://github.com/jeongmo-dot/gravity_orb/pull/72) `87b75cc`, 2026-10-11): 프리셋 버전 칸을 비워 프로젝트 버전을 상속 (Windows 속성은 4자리 `0.11.1.0`, 파일 이름·`_BUILD.txt`는 `0.11.1`). Claude 재검수: main 기준 빌드 → `build/windows/GravityOrb_v0.11.1.exe` (111,053,536바이트) + `.console.exe` + `_BUILD.txt` (커밋 `87b75cc`), 다른 파일 (`GravityOrb.zip`) 보존, 버전 없는 예전 파일 정리됨, 내보낸 exe 스모크 3종 에러 0, 사용자 `save.cfg` 해시 전후 동일, 래퍼 291/291
 
 버전 기록
@@ -821,7 +822,7 @@ godot --headless --path . --quit-after 300 -- --mode=blitz
 |---|---|---|
 | 0.11.0 | 2026-10-11 | 첫 Windows 테스트 빌드 (#68, V3-2까지) |
 | 0.11.1 | 2026-10-11 | V4-1 반응 연출 A+C (#69) 포함 — 파일 이름 규칙 적용 첫 빌드 (#70) |
-| 0.13.0 | 2026-10-17 (#84 빌드 예정) | 기획서 0.13 — 0.12는 빌드 없이 지나감. V4-2 호령·팝업·피버 (#71), BLITZ 시계 단순화·겹 게이지 (#72), 결과 → 랭킹 버튼 잠금 수정 (#73), 행성 컬렉션 6종·두 모드 6색 (#74·#75·#78), 턴제 입력 표시 (#76·#77), GRAVITY SLIME 세 번째 모드 (#79~#81). 알려진 점: 화성 협곡 ✕·극관 곧은 경계 (#82), 슬라임 화면 화살표 겹침 (#83), 행성 늘어남 (§12-P.4, 나중에) |
+| 0.13.0 | 2026-10-17 ([PR #84](https://github.com/jeongmo-dot/gravity_orb/pull/84) `d04abba`, 빌드 커밋 `b69f2c0` — 같은 트리) | `GravityOrb_v0.13.0.exe` 111,165,560바이트. 기획서 0.13 — 0.12는 빌드 없이 지나감. V4-2 호령·팝업·피버 (#71), BLITZ 시계 단순화·겹 게이지 (#72), 결과 → 랭킹 버튼 잠금 수정 (#73), 행성 컬렉션 6종·두 모드 6색 (#74·#75·#78), 턴제 입력 표시 (#76·#77), GRAVITY SLIME 세 번째 모드 (#79~#81). 알려진 점: 화성 협곡 ✕·극관 곧은 경계 (#82), 슬라임 화면 화살표 겹침 (#83), 행성 늘어남 (§12-P.4, 나중에) |
 
 #### 10.5.2 출시 절차
 한국 모바일 출시에 필요한 법·행정·스토어·기술 절차와 M10 인박스 후보는 [release_checklist_kr.md](release_checklist_kr.md)에 둔다 (2026-10-11). 결정·확인 결과는 그 문서에 체크한다
@@ -2402,6 +2403,7 @@ M4 검수(2026-09-28)에서 발견. 합체가 없는 M4 상태에서 **이동·�
 - 검수: `49` 두 비율·원본 비교, 그림 켜고 끈 해시·패리티 그대로, 물리 해시 동일
 
 **#80 결과 — 병합** ([PR #82](https://github.com/jeongmo-dot/gravity_orb/pull/82) `8022fac`, 2026-10-17): 추가 요구 1 반영 — 그림자·슬라임 반복 뒤 변환 복원, 막대를 벽선 위로, MAX CLEAR 반원 오른쪽 = A·왼쪽 = B. 화면 밖 렌더 화소 테스트 (네 벽 막대 중심 색·MAX CLEAR 좌우 색)가 고치기 전 실패 (5/6) → 고친 뒤 6/6. 래퍼 327/327, 패리티·해시 그대로, 창 40개 p99 5.54ms (Codex). Claude 검수 (`49` 두 비율 확대·원본 비교, 재실행 없음): 막대 칸 네 벽에 단계 색, 흡수 칸 효과가 흡수 지점에, FINAL MOVE 칸 네 벽 모두 빨강 + MAX CLEAR 파동이 반응 지점에, 패널 밖 잔상 없음
+- (#84에서 발견) #81의 시작 화면 → SLIME 전환이 **릴리스 창에서 멈췄다**: `Main`이 장면 전환으로 빠진 뒤에도 `FeedbackDirector._prewarm_visual_resources_offscreen()`의 대기 코루틴이 `get_tree()` (null)를 불러 오류 후 종료. #84에서 트리 소속·`SceneTree`·임시 viewport를 대기 전후로 확인하게 고치고 회귀 테스트 추가 (사용자 승인, Codex 보고). 헤드리스 테스트·스모크는 이 경로 (헤드리스는 프리워밍을 건너뜀)를 지나지 않아 놓쳤다
 - 알아 둘 것: 화소 테스트는 헤드리스 (dummy renderer)에서 화소 부분을 건너뛰고, 실제 화소는 창 실행 `tests/run_slime_visual_render_test.ps1`에서만 본다 → #81에서 `tests/capture_screens.ps1` 실행에 포함시켜 캡처할 때마다 같이 돌게 한다
 
 **#81 결과 — 병합** ([PR #83](https://github.com/jeongmo-dot/gravity_orb/pull/83) `e23e776`, 2026-10-17): 시작 화면 카드 3장 (BLITZ·CLASSIC 400 + 가로 SLIME 카드, 아이콘 줄 1600), `SlimeMain`에서 `UI.tscn`의 실제 `GameOverPanel`·`RankingPanel`·`HudSoundButton`을 재사용, SLIME 결과 (점수·턴·최고 연쇄·MAX n/7·새 기록 순위·ALL TIME), 랭킹 SLIME 탭 6열, `SaveStore` 랭킹 `slime`·최고 점수/턴/연쇄 (순위 밖 판도 갱신)·마지막 모드, 결과 → 랭킹 → 돌아오기 후 버튼 복구 (#73), 턴 입력 표시를 슬라임 보드에 연결, 스와이프 8ms·대기 5ms 진동, 디버그 모드 순환, 캡처 때 화소 회귀 같이 실행. 래퍼 331/331, 스모크 4종, 사용자 저장 파일 변경 0 (Codex). Claude 검수 (diff·`50` 시작·랭킹·결과·`01` 두 비율, 재실행 없음): 세 화면 모두 겹침·잘림 없음

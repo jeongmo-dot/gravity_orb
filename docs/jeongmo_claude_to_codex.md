@@ -8,7 +8,8 @@
 - 새 항목은 **「대기 중」 맨 위**에 추가한다. 번호는 계속 증가하며 **재사용하지 않는다**
 - 상태는 **Claude가** 갱신한다. Codex의 회신을 확인한 뒤 `완료`로 바꾸고 「처리 완료」로 옮긴다
 - **긴 명세는 여기에 붙여넣지 않는다.** `technical_design.md` 또는 별도 문서에 두고 **링크와 요약만** 적는다
-- Codex는 「대기 중」에서 **번호가 가장 낮은 항목 하나만** 처리한다
+- Codex는 「대기 중」에서 **번호가 가장 낮은 항목 하나만** 처리한다 (항목에 "먼저"라고 적힌 예외는 그것부터)
+- 항목 검증용 Windows 빌드는 `-Debug`로 (`build/windows-debug/`). 릴리스 이름 파일은 빌드 항목에서만 만든다 ([technical_design.md](technical_design.md) §10.5.1)
 - 완료 항목이 30건을 넘으면 `docs/archive/`로 옮긴다
 
 ## 항목 양식
@@ -30,19 +31,6 @@
 
 ## 대기 중
 
-### [2026-10-17 #84] Windows 빌드 0.13.0
-- 상태: 대기 (**다음 차례 — #82·#83보다 먼저**. 사용자 2026-10-17 "빌드 진행". 먼저 `origin/main` 병합)
-- 근거: [technical_design.md](technical_design.md) **§10.5·§10.5.1** (버전 기록 0.13.0 줄)
-- 요구:
-  1. `project.godot` `application/config/version` `0.11.1` → **`0.13.0`** (Claude 결정 값 — 기획서 0.13, PATCH 0)
-  2. `.	oolsuild_windows.ps1` (릴리스) → `build/windows/GravityOrb_v0.13.0.exe` + `.console.exe` + `_BUILD.txt`. 예전 `0.11.1` 파일은 남긴다
-  3. 내보낸 콘솔 exe로 스모크 **4종** (`--headless --quit-after 300`, `-- --mode=turn`, `-- --mode=blitz`, `-- --mode=slime`) 종료 코드 0·`SCRIPT ERROR` 0
-  4. 창 실행 한 번: 시작 화면 카드 3장이 보이고 SLIME 카드로 슬라임 판이 열린다 (짧게, 저장 파일을 바꾸지 않는 방법으로)
-- 검수: 빌드 결과 줄·파일 크기, 사용자 `save.cfg` 해시 전후 동일 (없으면 없는 채로), 내보낸 묶음에 `tests/`·`artifacts/`·`docs/` 없음, 래퍼 테스트 통과
-- 건드리지 말 것: 버전 외 모든 파일 (코드·수치·그림), 사용자 저장 파일, `docs/` (회신 파일 제외)
-- Done-when: 위 검수 보고, `_BUILD.txt`의 커밋이 이 브랜치 커밋
-- 커밋: 항목 단위 브랜치 (`build-0.13.0`), push·PR까지
-
 ### [2026-10-17 #83] 슬라임 모드 입력 표시 정리 — 화살표 없이
 - 상태: 대기 (#82 다음. 먼저 `origin/main` 병합)
 - 근거: [technical_design.md](technical_design.md) **§12-G.11** (배경은 §12-G "#81 결과")
@@ -58,7 +46,7 @@
 - 커밋: 항목 단위 브랜치, push까지
 
 ### [2026-10-16 #82] 화성 협곡·극관 다듬기 (작은 마무리)
-- 상태: 대기 (#84 빌드 다음. 먼저 `origin/main` 병합)
+- 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합)
 - 근거: [technical_design.md](technical_design.md) **§12-W.4**
 - 배경 (Claude 검수, PR #80): 얼굴 인상은 해결. 3D 협곡 가지가 본줄기를 가로질러 얇은 ✕ (긁힌 자국)처럼 보이고, 극관 경계가 곧아 옆으로 굴러오면 곧은 흰 띠처럼 보인다 (`47` 90°·270°)
 - 요구:
@@ -73,6 +61,20 @@
 ---
 
 ## 처리 완료
+
+### [2026-10-17 #84] Windows 빌드 0.13.0 — 완료
+- 상태: 완료 (2026-10-17 Claude 검수 · [PR #84](https://github.com/jeongmo-dot/gravity_orb/pull/84) 병합 `d04abba`)
+- 검수: `build/windows/GravityOrb_v0.13.0.exe` (111,165,560바이트) + `.console.exe` + `_BUILD.txt` (커밋 `b69f2c0` = 병합 커밋과 같은 트리) 직접 확인. 내보낸 exe 스모크 4종·격리 창에서 시작 화면 카드 3장·SLIME 보드, 사용자 `save.cfg` 해시 동일, 묶음에 테스트·문서 없음 (Codex). Codex가 찾은 릴리스 창 SLIME 전환 멈춤 (`FeedbackDirector` 프리워밍 코루틴이 장면 전환 뒤 `get_tree()` null)을 사용자 승인으로 함께 고침 — 수정 최소, 회귀 테스트 있음. `0.11.1` 파일은 #81 검증 빌드로 덮여 예전 0.11.1이 아님 → 규칙 추가. Claude 재실행 없음
+- 근거: [technical_design.md](technical_design.md) **§10.5·§10.5.1** (버전 기록 0.13.0 줄)
+- 요구:
+  1. `project.godot` `application/config/version` `0.11.1` → **`0.13.0`** (Claude 결정 값 — 기획서 0.13, PATCH 0)
+  2. `.	oolsuild_windows.ps1` (릴리스) → `build/windows/GravityOrb_v0.13.0.exe` + `.console.exe` + `_BUILD.txt`. 예전 `0.11.1` 파일은 남긴다
+  3. 내보낸 콘솔 exe로 스모크 **4종** (`--headless --quit-after 300`, `-- --mode=turn`, `-- --mode=blitz`, `-- --mode=slime`) 종료 코드 0·`SCRIPT ERROR` 0
+  4. 창 실행 한 번: 시작 화면 카드 3장이 보이고 SLIME 카드로 슬라임 판이 열린다 (짧게, 저장 파일을 바꾸지 않는 방법으로)
+- 검수: 빌드 결과 줄·파일 크기, 사용자 `save.cfg` 해시 전후 동일 (없으면 없는 채로), 내보낸 묶음에 `tests/`·`artifacts/`·`docs/` 없음, 래퍼 테스트 통과
+- 건드리지 말 것: 버전 외 모든 파일 (코드·수치·그림), 사용자 저장 파일, `docs/` (회신 파일 제외)
+- Done-when: 위 검수 보고, `_BUILD.txt`의 커밋이 이 브랜치 커밋
+- 커밋: 항목 단위 브랜치 (`build-0.13.0`), push·PR까지
 
 ### [2026-10-16 #81] GRAVITY SLIME ③ — 앱 연결 — 완료
 - 상태: 완료 (2026-10-17 Claude 검수 · [PR #83](https://github.com/jeongmo-dot/gravity_orb/pull/83) 병합 `e23e776`)
