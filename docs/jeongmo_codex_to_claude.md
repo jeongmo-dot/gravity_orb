@@ -38,6 +38,44 @@
 
 ## 미확인
 
+### [2026-10-17] 대상 #81 — GRAVITY SLIME ③ 앱 연결
+- 상태: 완료 — 시작 화면의 세 번째 모드부터 공용 결과·랭킹·저장·입력 표시·음소거·장면 왕복까지 SLIME을 앱 흐름에 연결함
+- 브랜치 / PR: `gravity-slime-shell` / PR 미생성
+- 변경 파일: `scenes/UI.tscn`, `scripts/core/{Main,SaveStore}.gd`, `scripts/slime/{SlimeGame,SlimeHud}.gd`, `scripts/ui/{GameOverPanel,RankingPanel,SlimeCardIcon,StartScreen,TurnInputIndicator}.gd`, `tests/{test_slime_shell,test_frontend,test_rankings,test_screen_layout}.gd`, `tests/{capture_screens.ps1,spike/capture_screens.gd}`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 시작 화면에 높이 400의 BLITZ·CLASSIC 카드와 지정 위치·크기의 가로 SLIME 카드, L3 초록 슬라임 얼굴·설명·BEST·`#59E2AB` 강조색, 아래 아이콘 줄 y=1600 적용 — 자동 레이아웃 테스트 + 캡처 `01`·`50`
+  - [x] 시작 → SLIME → 결과 → 랭킹 → 돌아오기 → 다시 하기 → 모드 선택 왕복과 R 재시작 신호를 자동 검증 — `test_slime_shell.gd`, `test_frontend.gd`
+  - [x] 임시 결과 상자를 공용 `GameOverPanel`로 교체하고 점수·턴·최고 연쇄·MAX n/7·새 기록 순위·ALL TIME 한 줄, 소리·흔들림 뒤 0.52초 지연 표시 — 자동 + 캡처 `50_slime_shell_result`
+  - [x] `RankingPanel` SLIME 탭과 순위·점수·턴·연쇄·MAX·날짜 열, `SaveStore`의 TOP 10·최고 점수/턴/연쇄·마지막 모드 `slime`, 게임오버 1회 저장 구현 — 자동 (`test_slime_shell.gd` 4개)
+  - [x] 저장 파일 없음·손상은 기록 0으로 진행하고, 순위 밖 판도 최고 턴·연쇄를 갱신하며, 테스트·캡처는 임시 저장 경로만 사용 — 자동, 사용자 `user://save.cfg` 변경 0건
+  - [x] 보드 아래 가운데 공용 소리 버튼, SLIME 보드 기준 대기·움직임·거절 입력 표시(막힘 표시 없음), 스와이프 8ms·대기 5ms 진동, 디버그 순환 TURN → BLITZ → SLIME → TURN — 자동
+  - [x] 캡처 때 창 렌더 화소 회귀 `tests/run_slime_visual_render_test.ps1`를 먼저 실행하도록 연결 — 실제 렌더 `6/6`, 종료 코드 0
+  - [x] `50_slime_shell_start`·`ranking`·`result` 및 기존 `01_start_screen`을 `540×960`·`540×1170` 두 비율로 갱신하고 직접 확인
+  - [x] 전체 래퍼, 기본·TURN·BLITZ·SLIME 4종 스모크, Windows 릴리스 빌드 완료
+- 캡처·화면 관측 (Godot Standard/Compatibility, 직접 확인):
+  - `tests/capture_screens.ps1` → 종료 코드 0, `540×960`·`540×1170` 각 68장, 합계 136장; 보드 좌·우·폭 비율 간 차이 `0.000px`
+  - `50_slime_shell_start`: 두 화면비 모두 위의 BLITZ·CLASSIC 카드와 아래 가로 SLIME 카드가 한 화면에 들어오고, 카드의 L3 초록 얼굴·설명·BEST와 하단 아이콘 줄이 겹치거나 잘리지 않음
+  - `50_slime_shell_ranking`: SLIME 탭이 선택되고 순위·점수·턴·연쇄·MAX·날짜 여섯 열과 10개 행이 패널 안에 정렬됨
+  - `50_slime_shell_result`: 점수 `187,750`, 새 기록 `1위`, 턴 `73`, 최고 연쇄 `11`, MAX `6/7`, ALL TIME 한 줄과 세 버튼이 겹침 없이 표시되며 게임오버 뒤 입력 표시가 남지 않음
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - 집중 테스트 `test_slime_shell.gd` → `4/4`, 종료 코드 0
+  - `tests/run_tests.ps1` → 일반 `321/321`, 장기 `5/5`, 성능 `5/5`, 합계 `331/331`, 종료 코드 0, 총 `78.248초`
+  - 시작 화면 / TURN / BLITZ / SLIME `--quit-after 300` → 각각 종료 코드 0, 출력 내 `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - 실제 창 슬라임 화소 회귀 → `6/6`, 종료 코드 0
+  - Windows 릴리스 빌드 → 종료 코드 0, `GravityOrb_v0.11.1.exe` `111,165,384`바이트
+  - 규칙 검사 → `Input`/`InputEvent` 허용 파일 밖 0건, 새 전역 난수 호출 0건, `SlimeSim.gd` 변경 0건, `default_config.tres` 변경 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. 시작 화면을 연다 → BLITZ·CLASSIC 아래에 가로 SLIME 카드가 보이고, 카드를 누르면 `SlimeMain`이 열리며 마지막 모드가 SLIME으로 저장되어야 한다.
+  2. 입력 가능 상태에서 한 방향으로 스와이프한다 → 밝은 대기 테두리·화살표가 흐린 테두리·도는 빛으로 바뀌고, 움직이는 중 다시 스와이프하면 회색 거절 화살표만 0.3초 보이며 빨간 막힘 표시는 없어야 한다.
+  3. 게임오버까지 진행한다 → 게임오버 소리와 흔들림이 끝난 뒤 공용 결과 패널이 열리고 점수·턴·연쇄·MAX·ALL TIME과 새 기록이면 순위 배지가 보여야 한다.
+  4. 결과의 `랭킹`을 누르고 SLIME 탭의 여섯 열을 확인한 뒤 `돌아오기`를 누른다 → 결과 화면으로 돌아와야 한다. `다시 하기` 또는 R은 새 SLIME 판, `모드 선택`은 시작 화면으로 이동해야 한다.
+  5. 소리 버튼을 눌러 음소거한 뒤 합체·중력 전환·게임오버를 만든다 → SLIME 합성음이 들리지 않고 버튼 상태가 다른 모드와 공유되어야 한다.
+- 문서에 없던 결정 사항·알려진 문제:
+  - 새 결과·랭킹 UI를 따로 복제하지 않고 기존 `UI.tscn`의 실제 `GameOverPanel`·`RankingPanel`·`HudSoundButton`을 SLIME 장면에서 재사용함. 새 밸런스 수치와 `SlimeSim` 변경은 없음.
+  - 캡처 PNG와 Windows 빌드는 기존 ignore 대상이라 커밋하지 않음.
+- 남은 것 · 질문: 없음
+
 ### [2026-10-17] 대상 #80 — GRAVITY SLIME ② 슬라임 그림·연출·소리
 - 상태: 완료 — #79 표시 차이를 원본 기준으로 바로잡고, 슬라임 재질·표정·변형·잔상, 흡수/MAX/중력 연출, 합성 효과음 6종을 구현함
 - 브랜치 / PR: `gravity-slime-visuals` / [PR #82](https://github.com/jeongmo-dot/gravity_orb/pull/82)

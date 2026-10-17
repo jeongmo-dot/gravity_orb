@@ -93,6 +93,9 @@ const CAPTURE_FILES: Array[String] = [
 	"47_mars_rotations.png",
 	"48_slime_core.png",
 	"49_slime_states.png",
+	"50_slime_shell_start.png",
+	"50_slime_shell_ranking.png",
+	"50_slime_shell_result.png",
 ]
 const HUD_CAPTURE_FILES: Array[String] = [
 	"02_turn_early.png",
@@ -154,6 +157,8 @@ func _run_capture_suite() -> void:
 		await _capture_slime_core()
 	if not _failed and not _hud_scenes_only:
 		await _capture_slime_states()
+	if not _failed and not _hud_scenes_only:
+		await _capture_slime_shell()
 	if not _failed and not _hud_scenes_only:
 		await _capture_reaction_effect_scenes()
 	if not _failed and not _hud_scenes_only:
@@ -637,6 +642,8 @@ func _capture_slime_core() -> void:
 	]
 	for index: int in range(4):
 		var game: Variant = SLIME_MAIN_SCENE.instantiate()
+		game.shell_enabled = false
+		game.save_path = _temp_save_path
 		add_child(game)
 		await get_tree().process_frame
 		game.process_mode = Node.PROCESS_MODE_DISABLED
@@ -708,6 +715,8 @@ func _capture_slime_states() -> void:
 	var positions: Array[Vector2] = [Vector2.ZERO, Vector2(viewport_size.x * 0.5, 0.0), Vector2(0.0, viewport_size.y * 0.5), viewport_size * 0.5]
 	for index: int in range(4):
 		var game: Variant = SLIME_MAIN_SCENE.instantiate()
+		game.shell_enabled = false
+		game.save_path = _temp_save_path
 		add_child(game)
 		await get_tree().process_frame
 		game.process_mode = Node.PROCESS_MODE_DISABLED
@@ -786,6 +795,51 @@ func _capture_slime_states() -> void:
 	)
 	for game: Variant in games:
 		game.queue_free()
+	await get_tree().process_frame
+
+
+func _capture_slime_shell() -> void:
+	SaveStore.add_ranking(
+		_temp_save_path,
+		GameConfig.GameMode.SLIME,
+		148500,
+		{"turns": 62, "max_chain": 9, "max_colors": 5},
+		"2026-10-16 21:10"
+	)
+	SaveStore.add_ranking(
+		_temp_save_path,
+		GameConfig.GameMode.SLIME,
+		96250,
+		{"turns": 47, "max_chain": 6, "max_colors": 4},
+		"2026-10-17 09:25"
+	)
+	SaveStore.save_last_mode(_temp_save_path, GameConfig.GameMode.SLIME)
+	var main: Main = await _create_main(Main.NO_MODE)
+	await _capture("50_slime_shell_start.png")
+	var ui: DebugHud = main.get_node("UI") as DebugHud
+	ui.show_ranking(GameConfig.GameMode.SLIME, 1)
+	await get_tree().create_timer(0.30).timeout
+	await _capture("50_slime_shell_ranking.png")
+	await _destroy_main(main)
+
+	var game: SlimeGame = SLIME_MAIN_SCENE.instantiate() as SlimeGame
+	game.save_path = _temp_save_path
+	add_child(game)
+	await get_tree().process_frame
+	game.set_physics_process(false)
+	var sim: SlimeSim = game.get_sim()
+	sim.score = 187750
+	sim.turn = 73
+	sim.run_best_chain = 11
+	sim.completed_colors = {0: true, 1: true, 2: true, 3: true, 4: true, 5: true}
+	sim.game_over = true
+	game.refresh_presentation()
+	game._sync_input_lock()
+	game._commit_game_over_once()
+	await get_tree().create_timer(1.25).timeout
+	await _capture("50_slime_shell_result.png")
+	print("SCREEN_CAPTURE_CHECK scene=slime_shell cards=3 ranking=slime result=shared")
+	game.queue_free()
 	await get_tree().process_frame
 
 

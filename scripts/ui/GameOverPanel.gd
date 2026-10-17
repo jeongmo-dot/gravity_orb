@@ -32,15 +32,29 @@ const LEVEL_NAMES_KO: Array[String] = [
 var _game_manager: Variant
 var _score_manager: ScoreManager
 var _action_taken: bool = false
+var _slime_mode: bool = false
+var _slime_rank: int = 0
 
 
 func bind(game_manager: Variant, score_manager: ScoreManager) -> void:
 	_game_manager = game_manager
 	_score_manager = score_manager
 	_game_manager.game_over.connect(_on_game_over)
-	_restart_button.pressed.connect(_on_restart_pressed)
-	_ranking_button.pressed.connect(_on_ranking_pressed)
-	_mode_select_button.pressed.connect(_on_mode_select_pressed)
+	_bind_buttons()
+
+
+func bind_slime() -> void:
+	_slime_mode = true
+	_bind_buttons()
+
+
+func _bind_buttons() -> void:
+	if not _restart_button.pressed.is_connected(_on_restart_pressed):
+		_restart_button.pressed.connect(_on_restart_pressed)
+	if not _ranking_button.pressed.is_connected(_on_ranking_pressed):
+		_ranking_button.pressed.connect(_on_ranking_pressed)
+	if not _mode_select_button.pressed.is_connected(_on_mode_select_pressed):
+		_mode_select_button.pressed.connect(_on_mode_select_pressed)
 	for button: Button in [_restart_button, _ranking_button, _mode_select_button]:
 		ButtonMotion.bind(button)
 	_dimmer.visible = false
@@ -48,6 +62,7 @@ func bind(game_manager: Variant, score_manager: ScoreManager) -> void:
 
 
 func _on_game_over() -> void:
+	_slime_mode = false
 	_action_taken = false
 	_set_actions_enabled(false)
 	var blitz_mode: bool = _game_manager is BlitzManager
@@ -87,6 +102,70 @@ func _on_game_over() -> void:
 			"scale",
 			Vector2.ONE,
 			PANEL_ANIMATION_SECONDS
+		)
+	await panel_tween.finished
+	_set_actions_enabled(true)
+
+
+func show_slime_result(
+	score: int,
+	turns: int,
+	max_chain: int,
+	max_colors: int,
+	ranking: Dictionary,
+	records: Dictionary
+) -> void:
+	_slime_mode = true
+	_slime_rank = int(ranking.get("rank", 0))
+	_action_taken = false
+	_set_actions_enabled(false)
+	_title_label.text = "GAME OVER"
+	_score_label.text = "0"
+	_survived_time_label.text = "턴"
+	_survived_time_value.text = str(turns)
+	_survived_time_value.add_theme_color_override("font_color", Color("#E8EEFF"))
+	_max_combo_label.text = "최고 연쇄"
+	_max_combo_value.text = str(max_chain)
+	_blocked_label.text = "MAX 완성"
+	_blocked_value.text = "%d/7" % max_colors
+	_extra_label.visible = false
+	_extra_value.visible = true
+	_extra_value.text = "ALL TIME  %s · T %d · C %d" % [
+		_format_score(int(records.get("score", 0))),
+		int(records.get("turns", 0)),
+		int(records.get("max_chain", 0)),
+	]
+	_extra_value.position = Vector2(12.0, 552.0)
+	_extra_value.size = Vector2(668.0, 46.0)
+	_extra_value.add_theme_font_size_override("font_size", 22)
+	_ranking_result_badge.visible = _slime_rank > 0
+	_ranking_result_label.visible = _slime_rank > 0
+	_ranking_result_label.text = "새 기록! %d위" % _slime_rank
+	_best_label.visible = _slime_rank <= 0
+	_best_label.text = "BEST %s" % _format_score(int(records.get("score", 0)))
+	_dimmer.visible = true
+	_dimmer.modulate.a = 0.0
+	visible = true
+	pivot_offset = size * 0.5
+	scale = Vector2(0.92, 0.92)
+	modulate.a = 0.0
+	var dim_tween: Tween = _dimmer.create_tween()
+	dim_tween.tween_property(_dimmer, "modulate:a", 1.0, DIM_ANIMATION_SECONDS)
+	var panel_tween: Tween = create_tween().set_parallel(true)
+	panel_tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	panel_tween.tween_property(self, "scale", Vector2.ONE, PANEL_ANIMATION_SECONDS)
+	panel_tween.tween_property(self, "modulate:a", 1.0, PANEL_ANIMATION_SECONDS)
+	var score_tween: Tween = create_tween()
+	score_tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	score_tween.tween_method(_set_animated_score, 0, maxi(score, 0), SCORE_ANIMATION_SECONDS)
+	if _slime_rank > 0:
+		_ranking_result_badge.scale = Vector2(0.72, 0.72)
+		_ranking_result_badge.pivot_offset = _ranking_result_badge.size * 0.5
+		var badge_tween: Tween = _ranking_result_badge.create_tween()
+		badge_tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		badge_tween.tween_interval(SCORE_ANIMATION_SECONDS)
+		badge_tween.tween_property(
+			_ranking_result_badge, "scale", Vector2.ONE, PANEL_ANIMATION_SECONDS
 		)
 	await panel_tween.finished
 	_set_actions_enabled(true)
@@ -192,6 +271,9 @@ func _on_mode_select_pressed() -> void:
 
 func _on_ranking_pressed() -> void:
 	if not _take_action():
+		return
+	if _slime_mode:
+		ranking_requested.emit(GameConfig.GameMode.SLIME, _slime_rank)
 		return
 	var mode: GameConfig.GameMode = (
 		GameConfig.GameMode.BLITZ if _game_manager is BlitzManager else GameConfig.GameMode.TURN

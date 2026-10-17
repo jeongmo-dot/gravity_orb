@@ -95,8 +95,6 @@ func _draw() -> void:
 			25,
 			Color(1.0, 0.941, 0.627, alpha)
 		)
-	if _sim.game_over:
-		_draw_result_box()
 
 
 func _draw_preview(center: Vector2, level_value: int, color_index: int) -> void:
@@ -149,13 +147,3 @@ func _gravity_arrow() -> String:
 	if _sim.gravity_direction == Vector2i.RIGHT:
 		return "→"
 	return "↓"
-
-
-func _draw_result_box() -> void:
-	var box := Rect2(105.0, 405.0, 430.0, 250.0)
-	draw_rect(box, Color("111a38"), true)
-	draw_rect(box, FINAL_COLOR, false, 3.0)
-	draw_string(ORBITRON, Vector2(105.0, 465.0), "GAME OVER", HORIZONTAL_ALIGNMENT_CENTER, 430.0, 31, TITLE_COLOR)
-	draw_string(ORBITRON, Vector2(105.0, 520.0), "SCORE  %06d" % _sim.score, HORIZONTAL_ALIGNMENT_CENTER, 430.0, 23, SCORE_COLOR)
-	draw_string(FONT, Vector2(105.0, 558.0), "TURN  %02d    BEST CHAIN  %d" % [_sim.turn, _sim.run_best_chain], HORIZONTAL_ALIGNMENT_CENTER, 430.0, 16, TURN_COLOR)
-	draw_string(FONT, Vector2(105.0, 618.0), "R  다시 시작", HORIZONTAL_ALIGNMENT_CENTER, 430.0, 17, TITLE_COLOR)

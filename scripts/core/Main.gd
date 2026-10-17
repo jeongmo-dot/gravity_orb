@@ -154,6 +154,16 @@ func launch_immediately(mode: GameConfig.GameMode) -> void:
 	_embedded_launch_mode = int(mode)
 
 
+static func queue_mode(mode: GameConfig.GameMode) -> void:
+	_queued_mode = int(mode)
+	_force_start_screen = false
+
+
+static func queue_start_screen() -> void:
+	_queued_mode = NO_MODE
+	_force_start_screen = true
+
+
 func _start_gameplay() -> void:
 	var blitz_mode: bool = Config.data.game_mode == GameConfig.GameMode.BLITZ
 	InputRouter.set_accept_release_after_unlock(not blitz_mode)
@@ -222,11 +232,11 @@ func _cycle_spawn_count() -> void:
 
 
 func _toggle_game_mode() -> void:
-	var next_mode: GameConfig.GameMode = (
-		GameConfig.GameMode.BLITZ
-		if Config.data.game_mode == GameConfig.GameMode.TURN
-		else GameConfig.GameMode.TURN
-	)
+	var next_mode: GameConfig.GameMode = GameConfig.GameMode.TURN
+	if Config.data.game_mode == GameConfig.GameMode.TURN:
+		next_mode = GameConfig.GameMode.BLITZ
+	elif Config.data.game_mode == GameConfig.GameMode.BLITZ:
+		next_mode = GameConfig.GameMode.SLIME
 	_queued_mode = int(next_mode)
 	_force_start_screen = false
 	get_tree().reload_current_scene()

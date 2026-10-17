@@ -95,7 +95,10 @@ $expectedFiles = @(
 	"46_turn_rejected.png",
 	"47_mars_rotations.png",
 	"48_slime_core.png",
-	"49_slime_states.png"
+	"49_slime_states.png",
+	"50_slime_shell_start.png",
+	"50_slime_shell_ranking.png",
+	"50_slime_shell_result.png"
 )
 $hudExpectedFiles = @(
     "02_turn_early.png",
@@ -118,6 +121,11 @@ $hudExpectedFiles = @(
 )
 $capturedFileCount = 0
 $boardReports = @()
+
+& (Join-Path $PSScriptRoot "run_slime_visual_render_test.ps1") -GodotPath $GodotPath
+if ($LASTEXITCODE -ne 0) {
+    throw "Slime visual render regression failed before screenshot capture"
+}
 
 foreach ($captureSpec in $captureSpecs) {
     $outputPath = Join-Path $outputRoot $captureSpec.Name

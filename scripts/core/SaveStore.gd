@@ -7,9 +7,13 @@ const SETTINGS_SECTION: String = "settings"
 const TURN_BEST_KEY: String = "best_score"
 const BLITZ_BEST_KEY: String = "blitz_best_score"
 const BLITZ_SURVIVAL_BEST_KEY: String = "blitz_survival_best_score"
+const SLIME_BEST_KEY: String = "slime_best_score"
+const SLIME_BEST_TURNS_KEY: String = "slime_best_turns"
+const SLIME_BEST_CHAIN_KEY: String = "slime_best_chain"
 const TURN_RANKING_KEY: String = "turn"
 const BLITZ_RANKING_KEY: String = "blitz"
 const BLITZ_SURVIVAL_RANKING_KEY: String = "blitz_survival"
+const SLIME_RANKING_KEY: String = "slime"
 const LAST_MODE_KEY: String = "last_mode"
 const SFX_MUTED_KEY: String = "sfx_muted"
 const ORB_SYMBOLS_ENABLED_KEY: String = "orb_symbols_enabled"
@@ -98,7 +102,7 @@ static func add_ranking(
 	if rankings.size() > RANKING_LIMIT:
 		rankings.resize(RANKING_LIMIT)
 	var ranked: bool = insertion_index < RANKING_LIMIT
-	_save_rankings_and_best(path, mode, rankings)
+	_save_rankings_and_best(path, mode, rankings, stats)
 	result["rank"] = insertion_index + 1 if ranked else 0
 	result["record"] = entry.duplicate(true) if ranked else {}
 	return result
@@ -122,6 +126,8 @@ static func load_last_mode(
 		return GameConfig.GameMode.BLITZ
 	if saved_mode == "turn":
 		return GameConfig.GameMode.TURN
+	if saved_mode == "slime":
+		return GameConfig.GameMode.SLIME
 	return fallback
 
 
@@ -130,8 +136,16 @@ static func save_last_mode(path: String, mode: GameConfig.GameMode) -> Error:
 		path,
 		SETTINGS_SECTION,
 		LAST_MODE_KEY,
-		"blitz" if mode == GameConfig.GameMode.BLITZ else "turn"
+		_mode_name(mode)
 	)
+
+
+static func load_slime_records(path: String) -> Dictionary:
+	return {
+		"score": load_best_score(path, GameConfig.GameMode.SLIME),
+		"turns": _load_non_negative_record(path, SLIME_BEST_TURNS_KEY),
+		"max_chain": _load_non_negative_record(path, SLIME_BEST_CHAIN_KEY),
+	}
 
 
 static func load_sfx_muted(path: String) -> bool:
@@ -172,6 +186,8 @@ static func save_orb_symbols_enabled(path: String, enabled: bool) -> Error:
 
 
 static func record_key_for_mode(mode: GameConfig.GameMode) -> String:
+	if mode == GameConfig.GameMode.SLIME:
+		return SLIME_BEST_KEY
 	if mode == GameConfig.GameMode.BLITZ:
 		if Config.data.blitz_survival_enabled:
 			return BLITZ_SURVIVAL_BEST_KEY
@@ -180,6 +196,8 @@ static func record_key_for_mode(mode: GameConfig.GameMode) -> String:
 
 
 static func ranking_key_for_mode(mode: GameConfig.GameMode) -> String:
+	if mode == GameConfig.GameMode.SLIME:
+		return SLIME_RANKING_KEY
 	if mode == GameConfig.GameMode.BLITZ:
 		if Config.data.blitz_survival_enabled:
 			return BLITZ_SURVIVAL_RANKING_KEY
@@ -197,7 +215,11 @@ static func _ranking_entry(
 		"score": maxi(score, 0),
 		"date": date,
 	}
-	if mode == GameConfig.GameMode.BLITZ:
+	if mode == GameConfig.GameMode.SLIME:
+		entry["turns"] = maxi(int(stats.get("turns", 0)), 0)
+		entry["max_chain"] = maxi(int(stats.get("max_chain", 0)), 0)
+		entry["max_colors"] = maxi(int(stats.get("max_colors", 0)), 0)
+	elif mode == GameConfig.GameMode.BLITZ:
 		entry["max_chain"] = maxi(int(stats.get("max_chain", 0)), 0)
 		entry["blasts"] = maxi(int(stats.get("blasts", 0)), 0)
 		entry["fevers"] = maxi(int(stats.get("fevers", 0)), 0)
@@ -222,7 +244,13 @@ static func _sanitize_rankings(
 		if not _ranking_entry_is_valid(entry, mode):
 			continue
 		var stats: Dictionary = {}
-		if mode == GameConfig.GameMode.BLITZ:
+		if mode == GameConfig.GameMode.SLIME:
+			stats = {
+				"turns": entry["turns"],
+				"max_chain": entry["max_chain"],
+				"max_colors": entry["max_colors"],
+			}
+		elif mode == GameConfig.GameMode.BLITZ:
 			stats = {
 				"max_chain": entry["max_chain"],
 				"blasts": entry["blasts"],
@@ -265,7 +293,9 @@ static func _ranking_entry_is_valid(
 	):
 		return false
 	var stat_keys: Array[String] = []
-	if mode == GameConfig.GameMode.BLITZ:
+	if mode == GameConfig.GameMode.SLIME:
+		stat_keys.assign(["turns", "max_chain", "max_colors"])
+	elif mode == GameConfig.GameMode.BLITZ:
 		stat_keys.assign(["max_chain", "blasts", "fevers"])
 	else:
 		stat_keys.assign(["max_combo", "turns", "max_level"])
@@ -319,7 +349,8 @@ static func _contains_only_digits(value: String) -> bool:
 static func _save_rankings_and_best(
 	path: String,
 	mode: GameConfig.GameMode,
-	rankings: Array[Dictionary]
+	rankings: Array[Dictionary],
+	latest_stats: Dictionary = {}
 ) -> Error:
 	if path.is_empty():
 		return ERR_INVALID_PARAMETER
@@ -329,7 +360,44 @@ static func _save_rankings_and_best(
 	save_file.set_value(RANKINGS_SECTION, ranking_key_for_mode(mode), rankings)
 	var best_score: int = int(rankings[0]["score"]) if not rankings.is_empty() else 0
 	save_file.set_value(RECORDS_SECTION, record_key_for_mode(mode), best_score)
+	if mode == GameConfig.GameMode.SLIME:
+		var best_turns: int = _non_negative_int_variant(
+			save_file.get_value(RECORDS_SECTION, SLIME_BEST_TURNS_KEY, 0)
+		)
+		var best_chain: int = _non_negative_int_variant(
+			save_file.get_value(RECORDS_SECTION, SLIME_BEST_CHAIN_KEY, 0)
+		)
+		for entry: Dictionary in rankings:
+			best_turns = maxi(best_turns, int(entry.get("turns", 0)))
+			best_chain = maxi(best_chain, int(entry.get("max_chain", 0)))
+		best_turns = maxi(best_turns, _non_negative_int_variant(latest_stats.get("turns", 0)))
+		best_chain = maxi(
+			best_chain, _non_negative_int_variant(latest_stats.get("max_chain", 0))
+		)
+		save_file.set_value(RECORDS_SECTION, SLIME_BEST_TURNS_KEY, best_turns)
+		save_file.set_value(RECORDS_SECTION, SLIME_BEST_CHAIN_KEY, best_chain)
 	return save_file.save(path)
+
+
+static func _load_non_negative_record(path: String, key: String) -> int:
+	if path.is_empty() or not FileAccess.file_exists(path):
+		return 0
+	var stored_value: Variant = _read_integer_entry(
+		FileAccess.get_file_as_string(path), RECORDS_SECTION, key
+	)
+	return maxi(int(stored_value), 0) if stored_value != null else 0
+
+
+static func _non_negative_int_variant(value: Variant) -> int:
+	return maxi(int(value), 0) if typeof(value) == TYPE_INT else 0
+
+
+static func _mode_name(mode: GameConfig.GameMode) -> String:
+	if mode == GameConfig.GameMode.BLITZ:
+		return "blitz"
+	if mode == GameConfig.GameMode.SLIME:
+		return "slime"
+	return "turn"
 
 
 static func _current_local_minute() -> String:

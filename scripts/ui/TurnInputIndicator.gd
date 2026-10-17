@@ -30,6 +30,7 @@ const ORBIT_TRAIL_SAMPLES: int = 18
 
 var _manager: TurnManager
 var _board: Board3D
+var _custom_board_rect: Rect2 = Rect2()
 var _ready_state: bool = false
 var _cues_visible: bool = false
 var _arrow_alpha: float = 0.0
@@ -48,6 +49,7 @@ func _ready() -> void:
 
 
 func bind(manager: Variant, board: Variant) -> void:
+	_custom_board_rect = Rect2()
 	_manager = manager as TurnManager
 	_board = board as Board3D
 	if _manager == null or _board == null:
@@ -66,6 +68,38 @@ func bind(manager: Variant, board: Variant) -> void:
 		InputRouter.swipe_rejected.connect(_on_swipe_rejected)
 	_on_warning_changed(_manager.blocked_directions)
 	_on_state_changed(int(_manager.state))
+
+
+func bind_slime(board_rect: Rect2) -> void:
+	_manager = null
+	_board = null
+	_custom_board_rect = board_rect
+	_blocked_directions.clear()
+	visible = true
+	set_process(true)
+	if not InputRouter.swipe_rejected.is_connected(_on_swipe_rejected):
+		InputRouter.swipe_rejected.connect(_on_swipe_rejected)
+	set_slime_state(false, true)
+
+
+func set_slime_board_rect(board_rect: Rect2) -> void:
+	_custom_board_rect = board_rect
+	queue_redraw()
+
+
+func set_slime_state(ready: bool, cues_visible: bool = true) -> void:
+	_cues_visible = cues_visible
+	var was_ready: bool = _ready_state
+	_ready_state = ready and cues_visible
+	if _ready_state and not was_ready:
+		_breath_elapsed = 0.0
+	if not _ready_state:
+		_orbit_elapsed = 0.0
+	if not cues_visible:
+		_arrow_alpha = 0.0
+		_rejected_remaining = 0.0
+		_rejected_direction = Vector2i.ZERO
+	queue_redraw()
 
 
 func _exit_tree() -> void:
@@ -92,7 +126,7 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	if not _cues_visible or _board == null:
+	if not _cues_visible or (_board == null and _custom_board_rect.size == Vector2.ZERO):
 		return
 	var board_rect: Rect2 = _projected_board_rect()
 	if board_rect.size.x <= 0.0 or board_rect.size.y <= 0.0:
@@ -217,6 +251,8 @@ func orbit_progress() -> float:
 
 
 func _projected_board_rect() -> Rect2:
+	if _custom_board_rect.size != Vector2.ZERO:
+		return _custom_board_rect
 	var camera: Camera3D = get_viewport().get_camera_3d()
 	if camera == null:
 		return Rect2()
