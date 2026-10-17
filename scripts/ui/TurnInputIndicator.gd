@@ -30,6 +30,7 @@ const ORBIT_TRAIL_SAMPLES: int = 18
 var _manager: TurnManager
 var _board: Board3D
 var _custom_board_rect: Rect2 = Rect2()
+var _custom_orbit_rect: Rect2 = Rect2()
 var _ready_state: bool = false
 var _cues_visible: bool = false
 var _arrow_alpha: float = 0.0
@@ -51,6 +52,7 @@ func _ready() -> void:
 func bind(manager: Variant, board: Variant) -> void:
 	_slime_mode = false
 	_custom_board_rect = Rect2()
+	_custom_orbit_rect = Rect2()
 	_manager = manager as TurnManager
 	_board = board as Board3D
 	if _manager == null or _board == null:
@@ -76,6 +78,7 @@ func bind_slime(board_rect: Rect2) -> void:
 	_manager = null
 	_board = null
 	_custom_board_rect = board_rect
+	_custom_orbit_rect = board_rect
 	_blocked_directions.clear()
 	visible = true
 	set_process(true)
@@ -84,8 +87,9 @@ func bind_slime(board_rect: Rect2) -> void:
 	set_slime_state(false, true)
 
 
-func set_slime_board_rect(board_rect: Rect2) -> void:
+func set_slime_board_rect(board_rect: Rect2, orbit_rect: Rect2 = Rect2()) -> void:
 	_custom_board_rect = board_rect
+	_custom_orbit_rect = board_rect if orbit_rect.size == Vector2.ZERO else orbit_rect
 	queue_redraw()
 
 
@@ -334,6 +338,8 @@ func arrow_bounds(board_rect: Rect2, direction: Vector2i, scale_value: float = 1
 
 
 func orbit_path_rect(board_rect: Rect2) -> Rect2:
+	if _slime_mode:
+		return _custom_orbit_rect if _custom_orbit_rect.size != Vector2.ZERO else board_rect
 	return board_rect.grow(ORBIT_RADIUS + ORBIT_OUTSIDE_GAP)
 
 

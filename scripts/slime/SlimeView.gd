@@ -201,15 +201,22 @@ func _draw_merge_trails() -> void:
 			continue
 		var progress: float = smoothstep(0.0, 1.0, age / 0.36)
 		var center: Vector2 = effect.get("position", Vector2.ZERO) as Vector2
-		var source_radius: float = maxf(float(effect.get("source_a_radius", 0.0)), float(effect.get("source_b_radius", 0.0)))
-		var radius: float = source_radius * lerpf(1.0, 0.04, progress)
+		var radii: Vector2 = _merge_trail_radii(effect, progress)
 		var alpha: float = (1.0 - progress) * 0.78
 		var color_a: Color = effect.get("color_a", Color.WHITE) as Color
 		var color_b: Color = effect.get("color_b", color_a) as Color
 		var source_a: Vector2 = effect.get("source_a_position", center) as Vector2
 		var source_b: Vector2 = effect.get("source_b_position", center) as Vector2
-		draw_circle(source_a.lerp(center, progress), radius, Color(color_a, alpha))
-		draw_circle(source_b.lerp(center, progress), radius, Color(color_b, alpha))
+		draw_circle(source_a.lerp(center, progress), radii.x, Color(color_a, alpha))
+		draw_circle(source_b.lerp(center, progress), radii.y, Color(color_b, alpha))
+
+
+func _merge_trail_radii(effect: Dictionary, progress: float) -> Vector2:
+	var radius_scale: float = lerpf(1.0, 0.04, progress)
+	return Vector2(
+		float(effect.get("source_a_radius", 0.0)) * radius_scale,
+		float(effect.get("source_b_radius", 0.0)) * radius_scale
+	)
 
 
 func _draw_speed_trails() -> void:

@@ -38,6 +38,39 @@
 
 ## 미확인
 
+### [2026-10-17] 대상 #87 — 슬라임 도는 빛 경로 · 합체 잔상 크기
+- 상태: 완료 — 슬라임 도는 빛만 실제 보드 테두리 선을 따르게 하고, 흡수·MAX CLEAR 합체 잔상을 각 재료의 반지름에서 시작하도록 변경함
+- 브랜치 / PR: `slime-orbit-merge-trails` / https://github.com/jeongmo-dot/gravity_orb/pull/89
+- 변경 파일: `scripts/slime/{SlimeGame,SlimeView}.gd`, `scripts/ui/TurnInputIndicator.gd`, `tests/{test_slime_shell,test_slime_visuals,test_turn_input_indicator}.gd`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 슬라임 도는 빛 중심 경로가 `board_rect`와 정확히 같고 바깥으로 커지지 않음 — 자동 `test_slime_turn_indicator_and_haptics_follow_busy_ready_rejected_states` + 캡처
+  - [x] 빛 크기·꼬리·색·잠김 시계 진행은 변경 없음 — 코드 diff + 기존 진행 회귀 테스트
+  - [x] TURN 도는 빛은 기존 `ORBIT_RADIUS + ORBIT_OUTSIDE_GAP` 바깥 경로 유지 — 자동 `test_turn_input_cues_rejection_release_policy_and_ready_tick` + 캡처 `45`
+  - [x] 흡수와 MAX CLEAR의 잔상 A·B가 각각 `r_a`·`r_b × lerp(1, 0.04, 진행)`으로 축소 — 자동 `test_merge_trails_use_each_source_radius_for_absorb_and_max_clear`
+  - [x] 슬라임 규칙·물리·패리티와 TURN·BLITZ 물리 해시 유지 — 패리티 6장면 + 전체 테스트 해시
+  - [x] 마지막 실행을 전체 캡처로 완료하고 `50_slime_shell_play_busy`·`51_slime_max_growth`·`45_turn_busy_*`를 두 비율에서 직접 확인
+- 캡처·화면 관측 (Godot Standard/Compatibility, 직접 확인):
+  - 최종 `tests/capture_screens.ps1` → `540×960`·`540×1170` 각 73장, 합계 146장, 종료 코드 0
+  - `50_slime_shell_play_busy` 진행 0.1: 빛 중심이 위쪽 보드 테두리 선 위에 있고, 빛무리·꼬리가 `중력 전환 · 슬라임 2마리 등장` 글자와 겹치지 않음. 크기·색은 기존과 같음
+  - `51_slime_max_growth` 넷째 칸: 질량 450 쪽 잔상은 큰 원, 질량 1 쪽 잔상은 작은 원으로 보이며 결과 슬라임 양옆에 큰 원 두 개가 생기지 않음
+  - `45_turn_busy_a/b`: 두 비율 모두 TURN 빛이 기존처럼 보드 바깥 경로의 1/3·2/3 지점에 있고 NEXT 영역과 겹치지 않음
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - `tests/run_tests.ps1` → 일반 `330/330` (`22.881초`), 장기 `5/5` (`45.745초`), 성능 `5/5` (`3.166초`), 합계 `340/340`, 종료 코드 0, 총 `71.792초`
+  - SLIME 원본 패리티 → 6장면, 허용오차 `1e-6`, `PASS`
+  - 물리 해시 → TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`로 기준값 동일
+  - 기본·TURN·BLITZ·SLIME `--quit-after 300` → 네 실행 모두 종료 코드 0, 오류 0건
+  - `tools/build_windows.ps1 -Debug`만 실행 → 종료 코드 0, `build/windows-debug/GravityOrb_v0.13.0.exe` `105,039,464`바이트; 릴리스 빌드 명령 미실행
+  - 실제 창 슬라임 화소 회귀 `7/7`, 전체 캡처 `146/146`, 종료 코드 0
+  - 규칙 검사 → 새 `Input`/`InputEvent` 호출 0건, 새 전역 난수 호출 0건, `git diff --check` 오류 0건
+  - 사용자 저장 파일은 전후 `1,396`바이트, SHA-256 `BBC55B9714D09C7EE7045049F9F3D037E9330FCE70233043C6F386A59FB1EED2`로 동일
+- 수동 확인 절차:
+  1. 두 비율의 `50_slime_shell_play_busy.png`를 연다 → 진행 0.1의 빛이 위쪽 보드 테두리 선 위에 있고 위 메시지 글자와 겹치지 않아야 한다.
+  2. 두 비율의 `51_slime_max_growth.png` 넷째 칸을 본다 → 큰 재료 쪽 잔상 하나와 작은 재료 쪽 작은 잔상이 보이고, 결과 슬라임 양옆에 같은 크기의 큰 원 두 개가 없어야 한다.
+  3. 두 비율의 `45_turn_busy_a.png`·`45_turn_busy_b.png`를 연다 → TURN 빛은 기존 바깥 경로와 1/3·2/3 진행 위치를 유지해야 한다.
+- 결정 사항: 기존 슬라임 입력 테두리 위치는 바꾸지 않기 위해 표시 테두리 사각형과 빛 중심 경로 사각형을 분리해 전달함. 빛 경로만 실제 `board_rect`를 사용함
+- 남은 것 · 질문: 없음
+
 ### [2026-10-17] 대상 #86 — 화성 극관: 기울어진 극에서 둥근 조각으로
 - 상태: 완료 — 3D 극관을 화면 쪽 35° 기울어진 극축 기준으로 옮기고, 2D 미리보기를 원판 안쪽의 납작한 둥근 조각으로 교체함
 - 브랜치 / PR: `mars-tilted-polar-cap` / https://github.com/jeongmo-dot/gravity_orb/pull/88

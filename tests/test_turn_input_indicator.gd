@@ -57,6 +57,13 @@ func test_turn_input_cues_rejection_release_policy_and_ready_tick() -> void:
 	assert_near(indicator.arrow_size(), 56.0, 0.001, "chevron is 56 logical pixels")
 	assert_near(indicator.orbit_light_diameter(), 20.0, 0.001, "orbit light is 20 logical pixels")
 	var board_rect: Rect2 = indicator._projected_board_rect()
+	assert_eq(
+		indicator.orbit_path_rect(board_rect),
+		board_rect.grow(
+			TurnInputIndicator.ORBIT_RADIUS + TurnInputIndicator.ORBIT_OUTSIDE_GAP
+		),
+		"classic orbit path stays outside the board"
+	)
 	assert_near(
 		indicator.orbit_trail_length(board_rect),
 		minf(board_rect.size.x, board_rect.size.y) * 0.15,

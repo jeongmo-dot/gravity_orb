@@ -176,6 +176,17 @@ func test_slime_turn_indicator_and_haptics_follow_busy_ready_rejected_states() -
 	var indicator: TurnInputIndicator = game.turn_input_indicator()
 	assert_true(indicator.is_busy_cue(), "initial admission shows busy cue")
 	assert_true(not indicator.uses_direction_arrows(), "SLIME suppresses direction arrows")
+	var viewport_size: Vector2 = tree.root.get_visible_rect().size
+	var expected_orbit_rect := Rect2(
+		(viewport_size - SlimeGame.CONTENT_SIZE * SlimeGame.CONTENT_SCALE) * 0.5
+			+ sim.config.board_rect.position * SlimeGame.CONTENT_SCALE,
+		sim.config.board_rect.size * SlimeGame.CONTENT_SCALE
+	)
+	assert_eq(
+		indicator.orbit_path_rect(indicator._projected_board_rect()),
+		expected_orbit_rect,
+		"SLIME orbit light follows the board border without outside growth"
+	)
 	var safety: int = 0
 	while sim.moving and safety < 300:
 		game.advance_elapsed(1.0 / 60.0)
