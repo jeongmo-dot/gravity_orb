@@ -32,7 +32,7 @@
 ## 대기 중
 
 ### [2026-10-17 #88] Windows 빌드 0.13.1
-- 상태: 대기 (#87 다음 — #87 병합 뒤 main 기준. 먼저 `origin/main` 병합)
+- 상태: 대기 (**다음 차례** — main `52cd77a` 이후 기준. 먼저 `origin/main` 병합)
 - 근거: [technical_design.md](technical_design.md) **§10.5·§10.5.1** (버전 기록 0.13.1 줄)
 - 요구:
   1. `project.godot` `application/config/version` `0.13.0` → **`0.13.1`** (Claude 결정 값 — 기획서 0.13.1)
@@ -44,8 +44,13 @@
 - Done-when: 위 검수 보고
 - 커밋: 항목 단위 브랜치 (`build-0.13.1`), push·PR까지
 
-### [2026-10-17 #87] 슬라임 도는 빛 경로 · 합체 잔상 크기
-- 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합)
+---
+
+## 처리 완료
+
+### [2026-10-17 #87] 슬라임 도는 빛 경로 · 합체 잔상 크기 — 완료
+- 상태: 완료 (2026-10-17 Claude 검수 · [PR #89](https://github.com/jeongmo-dot/gravity_orb/pull/89) 병합 `52cd77a`)
+- 검수: Codex 캡처 `50_slime_shell_play_busy` 위 변·`51` 넷째 칸 확대 — 빛이 메시지와 떨어짐, 잔상 "귀" 없음. 래퍼 340/340·패리티·해시 그대로 (Codex). Claude 재실행 없음
 - 근거: [technical_design.md](technical_design.md) **§12-G.13** (배경은 §12-G.12 "#85 결과")
 - 배경 (Claude 검수, PR #87 `50_slime_shell_play_busy`): 슬라임 빛 경로가 보드 + 14px라 위 변을 지날 때 원본 메시지 줄 글자 아래쪽과 겹친다. 잠김 중 메시지가 바뀌는 그때 지나간다
 - 요구:
@@ -57,10 +62,6 @@
 - 건드리지 말 것: 슬라임 규칙·물리·그림, 턴제·BLITZ, 사용자 저장 파일, `docs/` (회신 파일 제외)
 - Done-when: 테스트 통과(`.\tests\run_tests.ps1`), 캡처 보고 (마지막은 전체 캡처), 검증 빌드는 `-Debug`만
 - 커밋: 항목 단위 브랜치, push까지
-
----
-
-## 처리 완료
 
 ### [2026-10-17 #86] 화성 극관 — 기울어진 극에서 둥근 조각으로 — 완료
 - 상태: 완료 (2026-10-17 Claude 검수 · [PR #88](https://github.com/jeongmo-dot/gravity_orb/pull/88) 병합 `eed646c`)
