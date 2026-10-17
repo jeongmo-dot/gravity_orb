@@ -20,8 +20,10 @@ func _run() -> void:
 		push_error("Cannot open parity output: %s" % output_path)
 		quit(2)
 		return
+	var parity_config: SlimeConfig = CONFIG.duplicate(true) as SlimeConfig
+	parity_config.max_growth_enabled = false
 	for scenario: int in range(1, 7):
-		var sim := SlimeSim.new(CONFIG, 8062 + scenario, false, false)
+		var sim := SlimeSim.new(parity_config, 8062 + scenario, false, false)
 		_setup_scenario(sim, scenario)
 		_write_snapshot(output, scenario, 0, sim)
 		var local_tick: int = 0

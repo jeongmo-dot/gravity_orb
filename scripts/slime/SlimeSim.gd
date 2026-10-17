@@ -76,6 +76,7 @@ var final_move_count: int = 0
 var final_move_success_count: int = 0
 var intro_cancel_count: int = 0
 var maximum_slime_count: int = 0
+var maximum_slime_radius: float = 0.0
 var completed_turn_durations: Array[float] = []
 
 var _game_rng := RandomNumberGenerator.new()
@@ -130,6 +131,7 @@ func reset(seed_value: int = 1, start_initial_admission: bool = true) -> void:
 	final_move_success_count = 0
 	intro_cancel_count = 0
 	maximum_slime_count = 0
+	maximum_slime_radius = 0.0
 	completed_turn_durations.clear()
 	if seed_value > 0:
 		_game_rng.seed = seed_value
@@ -161,7 +163,8 @@ func add_slime(
 	var computed_mass: int = 1 << clampi(level_value, 0, config.radii.size() - 1)
 	slime.position = position_value
 	slime.velocity = velocity_value
-	slime.mass = mini(mass_value if mass_value > 0 else computed_mass, config.max_mass)
+	var requested_mass: int = mass_value if mass_value > 0 else computed_mass
+	slime.mass = requested_mass if config.max_growth_enabled else mini(requested_mass, config.max_mass)
 	slime.level = level_for_mass(slime.mass)
 	slime.color_index = color_value
 	slime.radius = radius_for_mass(slime.mass)
@@ -171,12 +174,14 @@ func add_slime(
 		slime.rotation = Vector2(gravity_direction).angle() - PI * 0.5
 	slimes.append(slime)
 	maximum_slime_count = maxi(maximum_slime_count, slimes.size())
+	maximum_slime_radius = maxf(maximum_slime_radius, slime.radius)
 	return slime
 
 
 func clear_slimes() -> void:
 	slimes.clear()
 	maximum_slime_count = 0
+	maximum_slime_radius = 0.0
 
 
 func start_turn(direction: Vector2i) -> bool:
@@ -304,12 +309,16 @@ func resolve_pairs() -> void:
 			var distance: float = delta_position.length()
 			var target_distance: float = a.radius + b.radius
 			if distance <= target_distance + config.touch_margin:
-				if a.mass >= config.max_mass and b.mass >= config.max_mass:
-					_clear_max_pair(i, j, a, b)
+				var same_color: bool = a.color_index == b.color_index
+				var can_absorb: bool = config.max_growth_enabled or (
+					a.mass < config.max_mass and b.mass < config.max_mass
+				)
+				if same_color and can_absorb:
+					_merge_pair(i, j, a, b)
 					j = i + 1
 					continue
-				if a.color_index == b.color_index and a.mass < config.max_mass and b.mass < config.max_mass:
-					_merge_pair(i, j, a, b)
+				if a.mass >= config.max_mass and b.mass >= config.max_mass:
+					_clear_max_pair(i, j, a, b)
 					j = i + 1
 					continue
 			if distance < target_distance:
@@ -344,7 +353,15 @@ func level_for_mass(mass_value: int) -> int:
 
 
 func radius_for_mass(mass_value: int) -> float:
-	var safe_mass: int = clampi(mass_value, 1, config.max_mass)
+	var safe_mass: int = maxi(mass_value, 1)
+	if config.max_growth_enabled and safe_mass > config.max_mass:
+		var max_radius: float = radius_for_level(config.radii.size() - 1)
+		var growth_ratio: float = float(safe_mass) / float(config.max_mass)
+		return minf(
+			max_radius * pow(growth_ratio, config.max_growth_exponent),
+			config.max_growth_radius_cap
+		)
+	safe_mass = mini(safe_mass, config.max_mass)
 	if safe_mass >= config.max_mass:
 		return radius_for_level(config.radii.size() - 1)
 	var lower_level: int = level_for_mass(safe_mass)
@@ -528,6 +545,7 @@ func duplicate_sim() -> SlimeSim:
 	result.final_move_success_count = final_move_success_count
 	result.intro_cancel_count = intro_cancel_count
 	result.maximum_slime_count = maximum_slime_count
+	result.maximum_slime_radius = maximum_slime_radius
 	result.completed_turn_durations.assign(completed_turn_durations.duplicate())
 	result._game_rng.state = _game_rng.state
 	result._visual_rng.state = _visual_rng.state
@@ -689,11 +707,15 @@ func _merge_pair(i: int, j: int, a: SlimeBody, b: SlimeBody) -> void:
 	var source_a_radius: float = a.radius
 	var source_b_radius: float = b.radius
 	var raw_mass: int = a.mass + b.mass
-	var merged_mass: int = mini(raw_mass, config.max_mass)
+	var merged_mass: int = raw_mass if config.max_growth_enabled else mini(raw_mass, config.max_mass)
 	var merged_position: Vector2 = (a.position + b.position) * 0.5
 	var merged_velocity: Vector2 = (a.velocity + b.velocity) * config.merge_velocity_keep
 	var color_index: int = a.color_index
-	var reached_max: bool = merged_mass >= config.max_mass
+	var reached_max: bool = (
+		merged_mass >= config.max_mass
+		and a.mass < config.max_mass
+		and b.mass < config.max_mass
+	)
 	var newly_completed_color: bool = reached_max and not completed_colors.has(color_index)
 	var base_score: int = raw_mass * config.score_per_mass
 	if reached_max:

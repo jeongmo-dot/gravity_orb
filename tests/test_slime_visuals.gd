@@ -82,6 +82,9 @@ func test_material_hud_entry_lengths_and_effect_lifetime_match_spec() -> void:
 	assert_eq(texture.get_width(), 384, "material texture width")
 	assert_eq(texture.get_height(), 384, "material texture height")
 	assert_true(texture == SlimeView.material_texture(CONFIG, 0, 0), "material texture is cached")
+	var max_texture: Texture2D = SlimeView.material_texture(CONFIG, 0, CONFIG.radii.size() - 1)
+	assert_eq(max_texture.get_width(), 512, "max material texture width")
+	assert_eq(max_texture.get_height(), 512, "max material texture height")
 
 	var sim := SlimeSim.new(CONFIG, 807, true, false)
 	sim.score = 125

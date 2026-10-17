@@ -3,6 +3,7 @@ extends Node2D
 
 const GRID_STEP: float = 40.0
 const TEXTURE_SIZE: int = 384
+const MAX_TEXTURE_SIZE: int = 512
 const BOARD_FILL: Color = Color("111a38")
 const BOARD_BORDER: Color = Color("5b72b8")
 const GRID_COLOR: Color = Color(0.2, 0.3, 0.55, 0.10)
@@ -82,13 +83,14 @@ static func material_texture(config: SlimeConfig, color_index: int, level_value:
 	if _material_textures.has(key):
 		return _material_textures[key] as Texture2D
 	var base_color: Color = config.slime_colors[safe_color].lightened(float(safe_level) * config.level_lighten)
-	var image := Image.create(TEXTURE_SIZE, TEXTURE_SIZE, false, Image.FORMAT_RGBA8)
+	var texture_size: int = MAX_TEXTURE_SIZE if safe_level == config.radii.size() - 1 else TEXTURE_SIZE
+	var image := Image.create(texture_size, texture_size, false, Image.FORMAT_RGBA8)
 	var light := Vector3(-0.20, -0.86, 0.48).normalized()
 	var half := (light + Vector3(0.0, 0.0, 1.0)).normalized()
-	for y: int in range(TEXTURE_SIZE):
-		var unit_y: float = (float(y) + 0.5) / float(TEXTURE_SIZE) * 2.0 - 1.0
-		for x: int in range(TEXTURE_SIZE):
-			var unit_x: float = (float(x) + 0.5) / float(TEXTURE_SIZE) * 2.0 - 1.0
+	for y: int in range(texture_size):
+		var unit_y: float = (float(y) + 0.5) / float(texture_size) * 2.0 - 1.0
+		for x: int in range(texture_size):
+			var unit_x: float = (float(x) + 0.5) / float(texture_size) * 2.0 - 1.0
 			var radial_squared: float = unit_x * unit_x + unit_y * unit_y
 			if radial_squared >= 1.0:
 				image.set_pixel(x, y, Color.TRANSPARENT)
@@ -106,7 +108,7 @@ static func material_texture(config: SlimeConfig, color_index: int, level_value:
 				clampf(base_color.r * illumination + specular * 0.62 + rim * base_color.r * 0.10 + scatter * base_color.r, 0.0, 1.0),
 				clampf(base_color.g * illumination + specular * 0.66 + rim * base_color.g * 0.11 + scatter * base_color.g, 0.0, 1.0),
 				clampf(base_color.b * illumination + specular * 0.72 + rim * base_color.b * 0.13 + scatter * base_color.b, 0.0, 1.0),
-				clampf((1.0 - sqrt(radial_squared)) * float(TEXTURE_SIZE) * 0.52, 0.0, 1.0)
+				clampf((1.0 - sqrt(radial_squared)) * float(texture_size) * 0.52, 0.0, 1.0)
 			))
 	var texture := ImageTexture.create_from_image(image)
 	_material_textures[key] = texture
