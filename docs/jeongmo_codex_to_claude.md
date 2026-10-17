@@ -38,6 +38,38 @@
 
 ## 미확인
 
+### [2026-10-17] 대상 #86 — 화성 극관: 기울어진 극에서 둥근 조각으로
+- 상태: 완료 — 3D 극관을 화면 쪽 35° 기울어진 극축 기준으로 옮기고, 2D 미리보기를 원판 안쪽의 납작한 둥근 조각으로 교체함
+- 브랜치 / PR: `mars-tilted-polar-cap` / https://github.com/jeongmo-dot/gravity_orb/pull/88
+- 변경 파일: `scripts/core/CelestialOrbArt.gd`, `scripts/core/OrbVisual.gd`, `tests/test_celestial_orbs.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 3D 극관이 `pole = normalize(vec3(0, cos 35°, sin 35°))`, 잡음 폭 `0.06`, `smoothstep(0.866, 0.914, polar)`를 사용 — 자동 소스 회귀 테스트
+  - [x] 기존 3D 이음매 없는 극관 잡음과 색·세기 0.82, 협곡·크레이터·먼지·기본 방향 유지 — 코드 diff 확인 + 전체 회귀 테스트
+  - [x] 2D 미리보기가 중심에서 `0.60r` 위, 가로 반지름 `0.36r`, 세로 반지름 `0.20r`인 닫힌 둥근 조각이며 기존 사인 경계 흔들림 유지 — 자동 소스 회귀 테스트 + 캡처
+  - [x] `47_mars_rotations` 두 비율 네 방향과 `15`·`14`·`13`을 직접 확인 — 아래 캡처 관측
+  - [x] 결정적 캡처·이음매·색 차이와 TURN·BLITZ 물리 해시 유지 — 자동 측정
+- 캡처·화면 관측 (Godot Standard/Compatibility, 직접 확인):
+  - 마지막 실행을 전체 `tests/capture_screens.ps1`로 완료 → `540×960`·`540×1170` 각 73장, 합계 146장, 종료 코드 0
+  - `47_mars_rotations`: 두 비율의 0°·90°·180°·270°에서 흰 부분이 모두 원판 안쪽의 둥글고 납작한 조각으로 보임. 옆 방향에서도 곧은 흰 가장자리 띠가 없음
+  - `15_orb_closeup`·`14_orb_codex`: 화성 극관이 대표 L1/L2 규칙과 전 크기 단계에서 같은 둥근 조각 형태로 유지됨
+  - `13_turn_ramp_uncapped_next`: 보드 안 화성과 NEXT의 2D 화성 모두 극관이 원판 안쪽 조각으로 보이며 HUD 겹침·잘림 없음
+  - 결정적 캡처 `equal=true`; 이음매 비율 `0.66`; 행성 색 최소 ΔE `38.82`, 최대 색상각 오차 `19.83°`
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - `tests/run_tests.ps1` → 일반 `329/329` (`24.565초`), 장기 `5/5` (`52.566초`), 성능 `5/5` (`3.258초`), 합계 `339/339`, 종료 코드 0, 총 `80.390초`
+  - 물리 해시 → TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`로 기준값 동일
+  - 기본·TURN·BLITZ·SLIME `--quit-after 300` → 네 실행 모두 종료 코드 0, 오류 0건
+  - `tools/build_windows.ps1 -Debug`만 실행 → 종료 코드 0, `build/windows-debug/GravityOrb_v0.13.0.exe` `105,039,112`바이트; 릴리스 빌드 명령 미실행
+  - 실제 창 슬라임 화소 회귀 `6/6`, 전체 캡처 `146/146`, 종료 코드 0
+  - 규칙 검사 → 새 `Input`/`InputEvent` 호출 0건, 새 전역 난수 호출 0건, `git diff --check` 오류 0건
+  - 사용자 저장 파일은 전후 `1,396`바이트, SHA-256 `BBC55B9714D09C7EE7045049F9F3D037E9330FCE70233043C6F386A59FB1EED2`로 동일
+- 수동 확인 절차:
+  1. 두 비율의 `47_mars_rotations.png`를 연다 → 네 방향 모두 극관 전체가 화성 원판 안쪽의 둥근 조각이고, 가장자리를 따라 난 흰 띠나 곧은 경계가 없어야 한다.
+  2. `15_orb_closeup.png`와 `14_orb_codex.png`를 연다 → 근접 화성과 모든 화성 크기에서 같은 극관 인상이 유지되어야 한다.
+  3. `13_turn_ramp_uncapped_next.png`를 연다 → 실제 보드와 NEXT의 2D 화성 극관이 위쪽 가장자리 띠가 아닌 안쪽 납작한 조각이어야 한다.
+- 결정 사항: 2D 둥근 조각의 외곽을 부드럽게 닫기 위한 렌더 세분 수만 32로 사용함. 명세의 위치·반지름·경계 흔들림·색에는 별도 수치를 추가하지 않음
+- 남은 것 · 질문: 없음
+
 ### [2026-10-17] 대상 #85 — 슬라임 MAX도 계속 성장
 - 상태: 완료 — 같은 색 MAX가 질량 상한 없이 계속 흡수하고, 다른 색 MAX끼리만 CLEAR하도록 판정 순서·성장 반지름·최초 MAX 보너스를 반영함
 - 브랜치 / PR: `slime-max-growth` / https://github.com/jeongmo-dot/gravity_orb/pull/87
