@@ -536,10 +536,13 @@ func _choose_bot_direction(
 		for direction: Vector2i in candidates:
 			if not blocked.has(direction):
 				safe_candidates.append(direction)
-		if not safe_candidates.is_empty():
+		var found_safe_candidate: bool = not safe_candidates.is_empty()
+		if found_safe_candidate:
 			candidates = safe_candidates
 		if _bot_kind == "s":
 			return spawner.choose_blitz_direction(candidates)
+		if found_safe_candidate:
+			candidates = _without_current_gravity_when_possible(candidates, previous)
 	var best_directions: Array[Vector2i] = []
 	var best_count: int = -1
 	for direction: Vector2i in candidates:
@@ -552,6 +555,19 @@ func _choose_bot_direction(
 	if best_count <= 0 and _bot_kind == "heuristic":
 		return previous
 	return spawner.choose_blitz_direction(best_directions)
+
+
+func _without_current_gravity_when_possible(
+	candidates: Array[Vector2i],
+	current_gravity: Vector2i
+) -> Array[Vector2i]:
+	if candidates.size() <= 1 or not candidates.has(current_gravity):
+		return candidates
+	var alternatives: Array[Vector2i] = []
+	for direction: Vector2i in candidates:
+		if direction != current_gravity:
+			alternatives.append(direction)
+	return alternatives if not alternatives.is_empty() else candidates
 
 
 func _count_reaction_pairs(board: Board3D, direction: Vector2i) -> int:
