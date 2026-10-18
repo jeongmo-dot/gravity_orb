@@ -268,18 +268,35 @@ func _capture_turn_scenes() -> void:
 			return
 	await _capture("02_turn_early.png")
 	var capture_turn_index: int = manager.turn_index
-	manager.turn_index = 30
+	var capture_gravity: Vector2i = manager.gravity
+	var capture_orbs_before: Array = board.get_orbs()
+	manager.turn_index = 29
+	spawner.sync_next_batch_size(30)
+	var capture_batch: Array = spawner._preview_batches[0]
+	var capture_candidate: Dictionary = capture_batch[0] as Dictionary
+	capture_candidate["color"] = OrbTypes.OrbColor.PURPLE
 	hud._on_preview_changed([
 		[{"color": OrbTypes.OrbColor.PURPLE, "level": 1}],
 		[{"color": OrbTypes.OrbColor.BLUE, "level": 1}],
 	])
-	hud._on_planet_unlocked(OrbTypes.OrbColor.PURPLE)
+	manager.set_physics_process(false)
+	manager.on_swipe(Vector2i.RIGHT)
+	manager._physics_process(0.0)
 	await get_tree().create_timer(0.08).timeout
 	await _capture("52_new_planet_callout.png")
 	if hud._callout_tween != null and hud._callout_tween.is_valid():
 		hud._callout_tween.kill()
 	hud._hide_callout_label()
+	for orb: Variant in board.get_orbs():
+		if not capture_orbs_before.has(orb):
+			board.remove_orb(orb as Orb3D)
+	await get_tree().process_frame
 	manager.turn_index = capture_turn_index
+	manager.gravity = capture_gravity
+	board.set_gravity(capture_gravity)
+	manager._set_state(TurnManager.State.WAITING_INPUT)
+	InputRouter.set_locked(false)
+	manager.set_physics_process(true)
 	manager.on_swipe(Vector2i.RIGHT)
 	await get_tree().create_timer(0.12).timeout
 	if not _hud_scenes_only:
@@ -445,13 +462,16 @@ func _capture_blitz_scenes() -> void:
 	hud._on_time_changed(manager.remaining_time)
 	hud._on_time_bonus_awarded(1.6, "MERGE_L7")
 	_validate_blitz_bonus_segment_scene(main, 1, false)
+	var bonus_label: Label = main.get_node("UI/Hud/BonusLabel") as Label
+	if not bonus_label.visible or bonus_label.text != "+1.6s":
+		_fail("BLITZ bonus text must appear with the first bright frame")
 	await _capture("41_blitz_bonus_gauge_a.png")
-	await get_tree().create_timer(0.68).timeout
-	if time_bar.bonus_is_active():
-		_fail("BLITZ bonus gauge must mix into the normal fill after 0.65 seconds")
+	await get_tree().create_timer(0.98).timeout
+	if not time_bar.bonus_is_fading() or not bonus_label.visible:
+		_fail("BLITZ bonus gauge mixing must start with the label fade")
 	await _capture("41_blitz_bonus_gauge_b.png")
 
-	hud._hide_bonus_label()
+	hud._reset_callout_tracking()
 	time_bar.clear_bonus()
 	manager.remaining_time = 44.0
 	hud._on_time_changed(manager.remaining_time)
@@ -461,7 +481,7 @@ func _capture_blitz_scenes() -> void:
 	_validate_blitz_bonus_segment_scene(main, 2, false)
 	await _capture("42_blitz_bonus_layer_cross.png")
 
-	hud._hide_bonus_label()
+	hud._reset_callout_tracking()
 	time_bar.clear_bonus()
 	hud._on_fever_changed(true, 3.0)
 	board.set_fever_active(true)
@@ -471,6 +491,8 @@ func _capture_blitz_scenes() -> void:
 	hud._on_time_changed(manager.remaining_time)
 	hud._on_time_bonus_awarded(3.2, "MERGE_L7")
 	_validate_blitz_bonus_segment_scene(main, 1, true)
+	if not bonus_label.visible or bonus_label.text != "+3.2s":
+		_fail("BLITZ fever bonus text must appear with its bright piece")
 	await _capture("43_blitz_bonus_fever.png")
 
 	hud._hide_bonus_label()

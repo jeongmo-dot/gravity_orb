@@ -15,6 +15,8 @@ const CALLOUT_COSMIC_DURATION: float = 1.00
 const PLANET_UNLOCK_CALLOUT_DURATION: float = 1.20
 const PREVIEW_UNLOCK_FLASH_DURATION: float = 0.60
 const PLANET_UNLOCK_ORB_LEVEL: int = 2
+const SURVIVAL_BONUS_POST_WINDOW_HOLD: float = 0.45
+const SURVIVAL_BONUS_LABEL_FADE_DURATION: float = 0.20
 const CALLOUT_RISE_DISTANCE: float = 8.0
 const FEVER_ENTRY_DURATION: float = 0.30
 const FEVER_BAND_HOLD_DURATION: float = 0.50
@@ -1169,7 +1171,8 @@ func _on_time_bonus_awarded(seconds: float, source: String) -> void:
 		var added_seconds: float = maxf(seconds, 0.0)
 		if added_seconds <= 0.0:
 			return
-		if _time_bonus_window_remaining <= 0.0:
+		var starts_window: bool = _time_bonus_window_remaining <= 0.0
+		if starts_window:
 			_time_bonus_segment_start = maxf(_previous_time_remaining - added_seconds, 0.0)
 		_time_bonus_accumulator += added_seconds
 		_time_bar_fill.show_bonus(
@@ -1177,11 +1180,14 @@ func _on_time_bonus_awarded(seconds: float, source: String) -> void:
 			_previous_time_remaining,
 			_fever_active
 		)
-		if _time_bonus_window_remaining <= 0.0:
+		if starts_window:
 			_time_bonus_window_remaining = maxf(
 				Config.data.blitz_time_bonus_display_window,
 				0.0
 			)
+			_begin_survival_time_bonus()
+		else:
+			_update_survival_time_bonus_text()
 		if _time_bonus_window_remaining <= 0.0:
 			_flush_time_bonus_display()
 		return
@@ -1198,26 +1204,40 @@ func _advance_time_bonus_display(delta: float) -> void:
 
 
 func _flush_time_bonus_display() -> void:
-	var total: float = _time_bonus_accumulator
 	_time_bonus_accumulator = 0.0
 	_time_bonus_window_remaining = 0.0
-	if total < 0.1 or not Config.data.fx_callouts_enabled:
+	if not Config.data.fx_callouts_enabled:
 		return
-	_show_survival_time_bonus(total)
+	_finish_survival_time_bonus()
 
 
-func _show_survival_time_bonus(seconds: float) -> void:
+func _begin_survival_time_bonus() -> void:
 	if _bonus_tween != null and _bonus_tween.is_valid():
 		_bonus_tween.kill()
-	_bonus_label.text = "+%.1fs" % seconds
 	_bonus_label.visible = true
 	_bonus_label.modulate = Color.WHITE
 	_bonus_label.scale = Vector2.ONE
 	_last_bonus_target = _bonus_label.position
+	_update_survival_time_bonus_text()
 	_flash_timer_green()
+
+
+func _update_survival_time_bonus_text() -> void:
+	_bonus_label.text = "+%.1fs" % _time_bonus_accumulator
+
+
+func _finish_survival_time_bonus() -> void:
+	if not _bonus_label.visible:
+		return
 	_bonus_tween = create_tween()
-	_bonus_tween.tween_interval(0.45)
-	_bonus_tween.tween_property(_bonus_label, "modulate:a", 0.0, 0.20)
+	_bonus_tween.tween_interval(SURVIVAL_BONUS_POST_WINDOW_HOLD)
+	_bonus_tween.tween_callback(_time_bar_fill.begin_bonus_fade)
+	_bonus_tween.tween_property(
+		_bonus_label,
+		"modulate:a",
+		0.0,
+		SURVIVAL_BONUS_LABEL_FADE_DURATION
+	)
 	_bonus_tween.tween_callback(_hide_bonus_label)
 
 
@@ -1744,6 +1764,13 @@ func _reset_callout_tracking() -> void:
 
 
 func _hide_callout_visuals() -> void:
+	if _bonus_tween != null and _bonus_tween.is_valid():
+		_bonus_tween.kill()
+	_bonus_tween = null
+	_time_bonus_accumulator = 0.0
+	_time_bonus_window_remaining = 0.0
+	if is_instance_valid(_time_bar_fill):
+		_time_bar_fill.clear_bonus()
 	_hide_callout_label()
 	_hide_time_up_label()
 	_bonus_label.visible = false

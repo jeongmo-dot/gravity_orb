@@ -8,7 +8,6 @@ const LAYER_COLORS: Array[Color] = [
 ]
 const DANGER_COLOR: Color = Color("#FF3B30")
 const FEVER_GLOW_COLOR: Color = Color("#FFB020")
-const BONUS_HOLD_SECONDS: float = 0.35
 const BONUS_FADE_SECONDS: float = 0.30
 const BONUS_MIN_WIDTH: float = 6.0
 
@@ -16,8 +15,9 @@ var _remaining: float = 0.0
 var _reference: float = 45.0
 var _bonus_start: float = 0.0
 var _bonus_end: float = 0.0
-var _bonus_elapsed: float = BONUS_HOLD_SECONDS + BONUS_FADE_SECONDS
+var _bonus_elapsed: float = BONUS_FADE_SECONDS
 var _bonus_fever: bool = false
+var _bonus_fading: bool = false
 
 
 func set_time(remaining: float, reference: float) -> void:
@@ -38,19 +38,33 @@ func show_bonus(start_time: float, end_time: float, fever: bool) -> void:
 		_bonus_end = safe_end
 		_bonus_fever = fever
 	_bonus_elapsed = 0.0
+	_bonus_fading = false
 	queue_redraw()
 
 
 func advance_bonus(delta: float) -> void:
 	if not bonus_is_active():
 		return
+	if not _bonus_fading:
+		return
 	_bonus_elapsed += maxf(delta, 0.0)
 	queue_redraw()
 
 
+func begin_bonus_fade() -> void:
+	if not bonus_is_active() or _bonus_fading:
+		return
+	_bonus_fading = true
+	_bonus_elapsed = 0.0
+	queue_redraw()
+
+
 func clear_bonus() -> void:
-	_bonus_elapsed = BONUS_HOLD_SECONDS + BONUS_FADE_SECONDS
+	_bonus_start = 0.0
+	_bonus_end = 0.0
+	_bonus_elapsed = BONUS_FADE_SECONDS
 	_bonus_fever = false
+	_bonus_fading = false
 	queue_redraw()
 
 
@@ -71,17 +85,17 @@ func layer_color() -> Color:
 func bonus_is_active() -> bool:
 	return (
 		_bonus_end > _bonus_start
-		and _bonus_elapsed < BONUS_HOLD_SECONDS + BONUS_FADE_SECONDS
+		and (not _bonus_fading or _bonus_elapsed < BONUS_FADE_SECONDS)
 	)
 
 
 func bonus_alpha() -> float:
 	if not bonus_is_active():
 		return 0.0
-	if _bonus_elapsed <= BONUS_HOLD_SECONDS:
+	if not _bonus_fading:
 		return 1.0
 	return 1.0 - clampf(
-		(_bonus_elapsed - BONUS_HOLD_SECONDS) / BONUS_FADE_SECONDS,
+		_bonus_elapsed / BONUS_FADE_SECONDS,
 		0.0,
 		1.0
 	)
@@ -89,6 +103,10 @@ func bonus_alpha() -> float:
 
 func bonus_is_fever() -> bool:
 	return _bonus_fever
+
+
+func bonus_is_fading() -> bool:
+	return _bonus_fading and bonus_is_active()
 
 
 func bonus_piece_rects() -> Array[Rect2]:

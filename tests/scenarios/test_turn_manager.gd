@@ -217,26 +217,65 @@ func test_t9_combo_display_multiplier_caps_at_one_hundred_twenty_eight() -> void
 	await _cleanup_fixture(fixture, snapshot)
 
 
-func test_t10_planet_unlock_emits_once_before_input_is_released() -> void:
+func test_t10_planet_unlock_emits_on_spawn_frame_and_not_at_turn_end() -> void:
 	var snapshot: Dictionary = _snapshot_m3_config()
 	Config.data.turn_start_colors = 4
 	Config.data.turn_color_unlock_turns = [30, 60]
 	var fixture: Dictionary = await _create_ready_fixture(FIXTURE_SEED + 10)
 	var manager: TurnManager = fixture["manager"] as TurnManager
 	var spawner: Spawner = fixture["spawner"] as Spawner
+	var board: Board = fixture["board"] as Board
 	var unlocked_colors: Array[int] = []
 	var lock_states: Array[bool] = []
+	var signal_states: Array[TurnManager.State] = []
+	var orb_counts: Array[int] = []
 	manager.planet_unlocked.connect(
 		func(color_index: int) -> void:
 			unlocked_colors.append(color_index)
 			lock_states.append(InputRouter.is_locked())
+			signal_states.append(manager.state)
+			orb_counts.append(board.get_orbs().size())
 	)
 	manager.turn_index = 29
 	spawner.sync_next_batch_size(30)
+	var neptune_batch: Array = spawner._preview_batches[0]
+	var neptune_candidate: Dictionary = neptune_batch[0] as Dictionary
+	neptune_candidate["color"] = OrbTypes.OrbColor.PURPLE
+	var before_neptune_spawn: int = board.get_orbs().size()
 	manager.on_swipe(Vector2i.RIGHT)
+	assert_true(unlocked_colors.is_empty(), "turn start does not emit before spawning")
+	manager._physics_process(0.0)
+	assert_eq(unlocked_colors, [OrbTypes.OrbColor.PURPLE], "turn 30 spawn emits Neptune once")
+	assert_true(orb_counts[0] > before_neptune_spawn, "signal follows spawned Neptune orb")
+	assert_eq(signal_states[0], TurnManager.State.SPAWNING, "signal is emitted in spawning state")
+	assert_true(
+		board.get_orbs().any(func(orb: Orb) -> bool: return orb.color == OrbTypes.OrbColor.PURPLE),
+		"Neptune exists when its signal is emitted"
+	)
 	await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
-	assert_eq(unlocked_colors, [OrbTypes.OrbColor.PURPLE], "turn 30 unlock emits Neptune once")
-	assert_eq(lock_states, [true], "unlock guide starts before input release")
+	assert_eq(unlocked_colors.size(), 1, "turn 30 settlement emits no second signal")
+
+	manager.turn_index = 59
+	spawner.sync_next_batch_size(60)
+	var mercury_batch: Array = spawner._preview_batches[0]
+	var mercury_candidate: Dictionary = mercury_batch[0] as Dictionary
+	mercury_candidate["color"] = OrbTypes.OrbColor.CYAN
+	var before_mercury_spawn: int = board.get_orbs().size()
+	manager.on_swipe(Vector2i.DOWN)
+	manager._physics_process(0.0)
+	assert_eq(
+		unlocked_colors,
+		[OrbTypes.OrbColor.PURPLE, OrbTypes.OrbColor.CYAN],
+		"turn 60 spawn emits Mercury once"
+	)
+	assert_true(orb_counts[1] > before_mercury_spawn, "signal follows spawned Mercury orb")
+	assert_true(
+		board.get_orbs().any(func(orb: Orb) -> bool: return orb.color == OrbTypes.OrbColor.CYAN),
+		"Mercury exists when its signal is emitted"
+	)
+	await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
+	assert_eq(unlocked_colors.size(), 2, "turn 60 settlement emits no second signal")
+	assert_eq(lock_states, [true, true], "both guides start while input remains locked")
 	await _cleanup_fixture(fixture, snapshot)
 
 

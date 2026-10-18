@@ -132,9 +132,9 @@ func test_3d_symbol_uses_latest_fast_body_position_before_render() -> void:
 	assert_eq(symbol.rotation, Vector3.ZERO, "3D symbol stays upright")
 	assert_near(
 		mesh.rotation.z,
-		atan2(body.linear_velocity.y, body.linear_velocity.x),
+		body.rotation.z,
 		0.001,
-		"stretched 3D mesh follows latest velocity direction"
+		"round 3D mesh follows latest body rotation"
 	)
 	board.queue_free()
 	await tree.process_frame

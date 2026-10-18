@@ -168,7 +168,7 @@ enum GameMode { TURN, BLITZ, SLIME }
 @export var fx_tilt_degrees: float = 6.0
 @export var fx_tilt_duration: float = 0.3
 @export var fx_swipe_trail_enabled: bool = true
-@export var fx_orb_stretch_enabled: bool = true
+@export var fx_orb_stretch_enabled: bool = false
 @export var haptics_enabled: bool = true
 @export var sfx_enabled: bool = true
 @export var sfx_volume_db: float = 0.0

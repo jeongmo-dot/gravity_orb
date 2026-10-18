@@ -173,7 +173,7 @@ func test_blitz_timer_ticks_exactly_ten_times_with_urgent_last_three() -> void:
 	Config.data.fx_callouts_enabled = original_enabled
 
 
-func test_time_bonus_aggregates_for_half_second_and_hides_sub_tenth() -> void:
+func test_time_bonus_label_starts_immediately_updates_and_then_fades_with_piece() -> void:
 	var original_enabled: bool = Config.data.fx_callouts_enabled
 	Config.data.fx_callouts_enabled = true
 	var main: Main = await _create_main(GameConfig.GameMode.BLITZ)
@@ -181,19 +181,35 @@ func test_time_bonus_aggregates_for_half_second_and_hides_sub_tenth() -> void:
 	var bonus_label: Label = main.get_node("UI/Hud/BonusLabel") as Label
 	var timer_label: Label = main.get_node("UI/Hud/TimerLabel") as Label
 	var time_up_label: Label = main.get_node("UI/Hud/TimeUpLabel") as Label
+	var time_bar: BlitzTimeBar = main.get_node("UI/Hud/TimeBarFill") as BlitzTimeBar
 	hud._on_time_changed(8.0)
-	hud._on_time_bonus_awarded(0.05, "MERGE_L2")
-	hud._on_time_bonus_awarded(0.25, "MERGE_L4")
+	hud._on_time_bonus_awarded(0.4, "MERGE_L4")
+	assert_true(bonus_label.visible, "bonus label appears on the first bonus frame")
+	assert_eq(bonus_label.text, "+0.4s", "first bonus value is visible immediately")
+	assert_true(time_bar.bonus_is_active(), "bright bonus piece starts with the label")
+	assert_near(time_bar.bonus_alpha(), 1.0, TOLERANCE, "piece begins fully bright")
+	hud._on_time_bonus_awarded(0.8, "MERGE_L6")
+	assert_eq(bonus_label.text, "+1.2s", "label grows during the aggregation window")
 	hud._process(0.49)
-	assert_true(not bonus_label.visible, "bonus waits for aggregation window")
+	assert_true(bonus_label.visible, "label stays visible through the aggregation window")
+	assert_near(time_bar.bonus_alpha(), 1.0, TOLERANCE, "piece stays bright with label")
 	hud._process(0.02)
-	assert_true(bonus_label.visible, "aggregated bonus appears after half second")
-	assert_eq(bonus_label.text, "+0.3s", "aggregated bonus uses one decimal")
+	assert_true(bonus_label.visible, "label remains for the original post-window hold")
+	assert_eq(bonus_label.text, "+1.2s", "aggregated bonus uses one decimal")
+	assert_true(not time_bar.bonus_is_fading(), "piece does not mix before label fade")
 	assert_true(timer_label.modulate.g > timer_label.modulate.r, "timer flashes green")
-	hud._hide_bonus_label()
-	hud._on_time_bonus_awarded(0.05, "MERGE_L2")
-	hud._process(0.51)
-	assert_true(not bonus_label.visible, "sub tenth bonus omits visual")
+	await tree.create_timer(Hud.SURVIVAL_BONUS_POST_WINDOW_HOLD + 0.03, true, false, true).timeout
+	assert_true(time_bar.bonus_is_fading(), "piece starts mixing when label starts fading")
+	assert_true(bonus_label.modulate.a < 1.0, "label fade starts with piece mixing")
+	await tree.create_timer(BlitzTimeBar.BONUS_FADE_SECONDS + 0.03, true, false, true).timeout
+	assert_true(not time_bar.bonus_is_active(), "piece finishes its point three second mix")
+	assert_true(not bonus_label.visible, "label hides after its existing fade")
+	hud._on_time_bonus_awarded(0.4, "MERGE_L4")
+	Config.data.fx_callouts_enabled = false
+	hud._process(0.0)
+	assert_true(not bonus_label.visible, "disabling callouts hides an active bonus label")
+	assert_true(not time_bar.bonus_is_active(), "disabling callouts clears the bright piece")
+	Config.data.fx_callouts_enabled = true
 	hud._on_finale_started()
 	assert_true(time_up_label.visible, "TIME UP appears before finale")
 	assert_eq(hud.time_up_count(), 1, "time up fires once")

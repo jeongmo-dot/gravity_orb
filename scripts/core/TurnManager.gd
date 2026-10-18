@@ -86,7 +86,13 @@ func _physics_process(delta: float) -> void:
 	var applied_reactions: int = _collision_resolver.flush(delta)
 
 	if state == State.SPAWNING:
-		_spawner.try_spawn(_board, gravity, turn_index)
+		var spawned: Array = _spawner.try_spawn(_board, gravity, turn_index)
+		var unlocked_color: int = Config.data.newly_unlocked_color_for_turn(turn_index)
+		if unlocked_color >= 0:
+			for orb: Variant in spawned:
+				if int(orb.color) == unlocked_color:
+					planet_unlocked.emit(unlocked_color)
+					break
 		_begin_settle()
 		_set_state(State.SIMULATING)
 		return
@@ -168,9 +174,6 @@ func _on_settled() -> void:
 		game_over.emit()
 		return
 	_update_warnings()
-	var unlocked_color: int = Config.data.newly_unlocked_color_for_turn(turn_index)
-	if unlocked_color >= 0:
-		planet_unlocked.emit(unlocked_color)
 	InputRouter.set_locked(false)
 	_set_state(State.WAITING_INPUT)
 

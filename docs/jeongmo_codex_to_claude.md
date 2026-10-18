@@ -38,6 +38,34 @@
 
 ## 미확인
 
+### [2026-10-19] 대상 #93 — 새 행성 안내 시점 · 행성 늘어남 끄기 · BLITZ 보너스 글자 시점
+- 상태: 완료 — `origin/main` `80a0164`에서 항목 브랜치를 만든 뒤 새 행성 안내를 실제 생성 프레임으로 옮기고, 행성 늘어남 기본값을 끄고, BLITZ 보너스 글자·밝은 조각 시점을 맞춤
+- 브랜치 / PR: `planet-callout-spawn-timing` / https://github.com/jeongmo-dot/gravity_orb/pull/95
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/TurnManager.gd`, `scripts/ui/{BlitzTimeBar.gd,Hud.gd}`, `tests/{test_blitz_time_bar.gd,test_callouts.gd,test_config.gd,test_gravity_switch_feedback.gd}`, `tests/scenarios/{test_turn_manager.gd,test_ui_fixes.gd}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 30·60턴의 새 행성 신호를 `SPAWNING`에서 `try_spawn()` 직후 실제 생성된 묶음의 색을 확인해 게임당 행성별 1회 보내고, 정착 완료 시점 신호는 제거 — 자동 (`test_turn_manager`)
+  - [x] 안내 1.2초·그림·소리·호령 대기열·미리보기 테두리 동작 유지 — 기존 자동 테스트 + `52_new_planet_callout` 캡처 관측
+  - [x] `fx_orb_stretch_enabled` 기본값을 `false`로 변경하고 필드·켜짐 경로는 유지; 기본 꺼짐에서 빠른 행성 메시 배율 `(1, 1, 1)`, 그림 회전은 바디 회전을 따름 — 자동 (`test_config`, `test_gravity_switch_feedback`, `test_ui_fixes`)
+  - [x] BLITZ 첫 보너스 순간 `+n.ns`를 즉시 표시하고 0.5초 묶음 동안 누적값 갱신; 글자 표시 중 조각은 밝고 글자 페이드 시작과 함께 0.3초 혼합 — 자동 (`test_callouts`, `test_blitz_time_bar`) + `41_a/b`·`43` 캡처 관측
+  - [x] CLASSIC·BLITZ·SLIME 물리 해시 유지, 전체 래퍼·전체 캡처·4종 스모크·Debug 빌드 실행 — 자동 측정 + 캡처 관측
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard (`C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`)
+  - `godot --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` → 일반 `339/339` (`25.395초`), 장기 `5/5` (`46.500초`), 성능 `5/5` (`3.391초`), 합계 `349/349`, 종료 코드 0, 총 `75.286초`
+  - 물리 해시 → TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`, CLASSIC 단계 진행 `cf6172428c7901c43eb74f417e6880dc3ad375a329e669a8904234f5d38d1031`, SLIME 단계 진행 `7ebe5d76b8c4843fa739e5c10405da172b577fdea1caca2047ed176b07455e97`로 기존 기준 동일
+  - `tests/tools/run_slime_parity.ps1` → 6개 시나리오, 허용 오차 `1e-6`, `PASS`
+  - `tests/capture_screens.ps1` 전체 실행 → 두 비율×74장=`148`장, 종료 코드 0. `52_new_planet_callout`에서 보라 해왕성 구슬이 입구에 생성된 프레임에 보라 L2 그림·`새 행성 — 해왕성`·NEXT 보라 테두리가 함께 보임. `41_a`는 첫 `+1.6s`와 밝은 조각, `41_b`는 글자·조각의 동시 페이드 시작, `43`은 `+3.2s`와 밝은 주황 FEVER 조각을 두 비율에서 확인; 겹침·잘림 0건
+  - 시작 화면 + TURN·BLITZ·SLIME `--quit-after 300` → 네 실행 모두 종료 코드 0, 프로젝트 스크립트 오류 0건
+  - `tools/build_windows.ps1 -Debug`만 실행 → 종료 코드 0, `build/windows-debug/GravityOrb_v0.13.1.exe` `105,046,856`바이트; Release 미실행
+  - 규칙 검사 → `Input`/`InputEvent`는 기존 `InputRouter.gd`·`Haptics.gd`만, 난수 검색 결과는 기존 명시적 RNG 인스턴스만, `git diff --check` 오류 0건
+  - 사용자 저장 파일은 검증 뒤 `1,488`바이트, SHA-256 `FCB975CAFA6550D3C14DE2C8594E3E0EB5525208DA83130D4E359E50C7497F4C`로 기존 기준 동일
+- 수동 확인 절차:
+  1. CLASSIC 29턴에서 스와이프해 30턴 묶음을 생성한다 → 보라 해왕성 구슬이 입구에 나타나는 바로 그 프레임에 `새 행성 — 해왕성` 안내가 한 번 뜨고, 그 턴 정착 완료 때 다시 뜨지 않아야 한다. 60턴 수성도 동일하게 한 번만 확인한다.
+  2. 기본 설정에서 빠른 행성을 관찰한다 → 구슬 그림이 속도 방향으로 늘어나지 않고 원형 배율을 유지하며, 표면 그림은 물리 바디 회전을 따라야 한다.
+  3. BLITZ에서 시간 보너스를 만든다 → 첫 보너스 즉시 글자가 뜨고 0.5초 안의 추가 보너스마다 숫자가 커지며, 글자가 온전히 보일 동안 해당 게이지 조각이 밝아야 한다. 글자 페이드가 시작될 때 조각도 0.3초 혼합을 시작하고, FEVER 보너스는 기존 주황색을 유지해야 한다.
+- 결정 사항: 게이지 조각의 혼합 시작은 HUD의 기존 보너스 글자 표시 수명에 맞춰 명시적으로 호출하도록 연결함. 기존 0.5초 누적·누적 후 0.45초 유지·글자 0.2초 페이드와 보너스 계산값은 바꾸지 않았고, 조각 혼합 시간은 명세의 0.3초를 유지함
+- 남은 것 · 질문: 없음
+
 ### [2026-10-19] 대상 #92 — 단계별 난도 적용 + 새 행성 등장 안내
 - 상태: 완료 — `origin/main` `76e5aed`에서 항목 브랜치를 만든 뒤 CLASSIC C2·SLIME S2 기본값과 CLASSIC 새 행성 안내/미리보기 테두리 연출을 구현함. BLITZ 값과 SLIME 원본 안내 문구는 변경하지 않음
 - 브랜치 / PR: `staged-difficulty-rollout` / https://github.com/jeongmo-dot/gravity_orb/pull/94

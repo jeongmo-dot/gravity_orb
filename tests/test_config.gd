@@ -359,7 +359,7 @@ func test_m8_feedback_defaults() -> void:
 	assert_near(config.fx_tilt_degrees, 6.0, TOLERANCE, "tilt degrees")
 	assert_near(config.fx_tilt_duration, 0.3, TOLERANCE, "tilt duration")
 	assert_true(config.fx_swipe_trail_enabled, "swipe trail enabled")
-	assert_true(config.fx_orb_stretch_enabled, "orb stretch enabled")
+	assert_true(not config.fx_orb_stretch_enabled, "orb stretch disabled by default")
 	assert_true(config.haptics_enabled, "haptics enabled")
 	assert_true(config.sfx_enabled, "SFX enabled")
 	assert_near(config.sfx_volume_db, 0.0, TOLERANCE, "SFX volume")
