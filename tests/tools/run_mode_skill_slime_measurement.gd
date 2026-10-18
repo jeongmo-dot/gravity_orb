@@ -20,23 +20,33 @@ func _init() -> void:
 
 func _run() -> void:
 	var seed_count: int = _int_argument("--seed-count=", DEFAULT_SEED_COUNT)
+	var seed_start: int = _int_argument("--seed-start=", 1)
 	var turn_cap: int = _int_argument("--turn-cap=", DEFAULT_TURN_CAP)
 	var output_path: String = _string_argument("--output=", DEFAULT_OUTPUT)
+	var strategies: Array[String] = _strategy_argument()
 	var threads: Array[Thread] = []
-	for strategy: String in STRATEGIES:
+	for strategy: String in strategies:
 		var worker := Thread.new()
-		worker.start(Callable(self, "_measure_strategy").bind(strategy, seed_count, turn_cap))
+		worker.start(
+			Callable(self, "_measure_strategy").bind(
+				strategy,
+				seed_start,
+				seed_count,
+				turn_cap
+			)
+		)
 		threads.append(worker)
 	var strategy_reports: Dictionary = {}
 	for index: int in range(threads.size()):
 		var result: Dictionary = threads[index].wait_to_finish() as Dictionary
-		strategy_reports[STRATEGIES[index]] = result
+		strategy_reports[strategies[index]] = result
 		print(
 			"MODE_SKILL_SLIME strategy=%s seeds=%d seconds=%.3f"
-			% [STRATEGIES[index], seed_count, float(result["measurement_seconds"])]
+			% [strategies[index], seed_count, float(result["measurement_seconds"])]
 		)
 	var report: Dictionary = {
 		"mode": "slime",
+		"seed_start": seed_start,
 		"seed_count": seed_count,
 		"turn_cap": turn_cap,
 		"strategies": strategy_reports,
@@ -46,10 +56,20 @@ func _run() -> void:
 	quit(0)
 
 
-func _measure_strategy(strategy: String, seed_count: int, turn_cap: int) -> Dictionary:
+func _measure_strategy(
+	strategy: String,
+	seed_start: int,
+	seed_count: int,
+	turn_cap: int
+) -> Dictionary:
 	var started_msec: int = Time.get_ticks_msec()
 	var rows: Array[Dictionary] = []
-	for seed_value: int in range(1, seed_count + 1):
+	var preview_decision_turns: int = 0
+	var preview_fatal_avoidance_turns: int = 0
+	var preview_unblocked_spread_sum: float = 0.0
+	var preview_score_gain_spreads: Array[float] = []
+	var preview_decision_usec_sum: int = 0
+	for seed_value: int in range(seed_start, seed_start + seed_count):
 		var sim := SlimeSim.new(CONFIG, seed_value, false, true)
 		var bot_rng := RandomNumberGenerator.new()
 		bot_rng.seed = 0x5A1E0000 + seed_value * 131 + strategy.hash()
@@ -57,7 +77,27 @@ func _measure_strategy(strategy: String, seed_count: int, turn_cap: int) -> Dict
 		var maximum_mass: int = _maximum_mass(sim)
 		var maximum_level: int = _maximum_level(sim)
 		while not sim.game_over and sim.turn < turn_cap:
-			var direction: Vector2i = _choose_direction(sim, strategy, bot_rng)
+			var direction: Vector2i
+			if strategy == "preview_space" or strategy == "preview_merge":
+				var preview_decision: Dictionary = _choose_preview_direction(
+					sim,
+					strategy,
+					bot_rng
+				)
+				direction = preview_decision["direction"] as Vector2i
+				preview_decision_turns += 1
+				preview_fatal_avoidance_turns += int(
+					preview_decision["fatal_avoidance"]
+				)
+				preview_unblocked_spread_sum += float(
+					preview_decision["unblocked_direction_spread"]
+				)
+				preview_score_gain_spreads.append(
+					float(preview_decision["score_gain_spread"])
+				)
+				preview_decision_usec_sum += int(preview_decision["decision_usec"])
+			else:
+				direction = _choose_direction(sim, strategy, bot_rng)
 			if not sim.start_turn(direction):
 				break
 			_run_until_idle(sim)
@@ -78,6 +118,26 @@ func _measure_strategy(strategy: String, seed_count: int, turn_cap: int) -> Dict
 	return {
 		"measurement_seconds": float(Time.get_ticks_msec() - started_msec) / 1000.0,
 		"rows": rows,
+		"choice_metrics": {
+			"decision_turns": preview_decision_turns,
+			"fatal_avoidance_turns": preview_fatal_avoidance_turns,
+			"fatal_avoidance_turn_ratio": _safe_ratio(
+				preview_fatal_avoidance_turns,
+				preview_decision_turns
+			),
+			"unblocked_direction_spread_mean": _safe_ratio_float(
+				preview_unblocked_spread_sum,
+				preview_decision_turns
+			),
+			"score_gain_spread_median": _median(preview_score_gain_spreads),
+			"unblocked_direction_spread_sum": preview_unblocked_spread_sum,
+			"score_gain_spreads": preview_score_gain_spreads,
+			"decision_usec_sum": preview_decision_usec_sum,
+			"decision_milliseconds_per_turn": _safe_ratio_float(
+				float(preview_decision_usec_sum) / 1000.0,
+				preview_decision_turns
+			),
+		},
 	}
 
 
@@ -88,16 +148,20 @@ func _choose_direction(
 ) -> Vector2i:
 	if strategy == "r":
 		return _random_direction(DIRECTIONS, bot_rng)
-	if strategy == "preview_space" or strategy == "preview_merge":
-		return _choose_preview_direction(sim, strategy, bot_rng)
 	var safe_candidates: Array[Vector2i] = []
 	for direction: Vector2i in DIRECTIONS:
 		if sim.entry_clearance_for(direction) >= 0.0:
 			safe_candidates.append(direction)
-	if safe_candidates.is_empty():
+	var found_safe_candidate: bool = not safe_candidates.is_empty()
+	if not found_safe_candidate:
 		safe_candidates = DIRECTIONS.duplicate()
 	if strategy == "s":
 		return _random_direction(safe_candidates, bot_rng)
+	if found_safe_candidate:
+		safe_candidates = _without_current_gravity_when_possible(
+			safe_candidates,
+			sim.gravity_direction
+		)
 	var best_count: int = -1
 	var best_directions: Array[Vector2i] = []
 	for direction: Vector2i in safe_candidates:
@@ -114,23 +178,65 @@ func _choose_preview_direction(
 	sim: SlimeSim,
 	strategy: String,
 	bot_rng: RandomNumberGenerator
-) -> Vector2i:
+) -> Dictionary:
+	var decision_started_usec: int = Time.get_ticks_usec()
 	var best_direction: Vector2i = DIRECTIONS[0]
 	var best_metric: float = -INF
+	var has_game_over: bool = false
+	var has_survivor: bool = false
+	var minimum_unblocked: int = 4
+	var maximum_unblocked: int = 0
+	var minimum_score_gain: int = 2147483647
+	var maximum_score_gain: int = -2147483648
 	for direction: Vector2i in DIRECTIONS:
 		var trial: SlimeSim = sim.duplicate_sim()
 		trial.next_slimes.clear()
 		var score_before: int = trial.score
 		trial.start_turn(direction)
 		_run_until_idle(trial)
+		var score_gain: int = trial.score - score_before
+		var unblocked_count: int = _unblocked_direction_count(trial)
+		has_game_over = has_game_over or trial.game_over
+		has_survivor = has_survivor or not trial.game_over
+		minimum_unblocked = mini(minimum_unblocked, unblocked_count)
+		maximum_unblocked = maxi(maximum_unblocked, unblocked_count)
+		minimum_score_gain = mini(minimum_score_gain, score_gain)
+		maximum_score_gain = maxi(maximum_score_gain, score_gain)
 		var metric: float = trial.entry_clearance_for(direction)
 		if strategy == "preview_merge":
-			metric += float(trial.score - score_before) * 3.0
+			metric += float(score_gain) * 3.0
 		metric += bot_rng.randf() * 0.01
 		if metric > best_metric:
 			best_metric = metric
 			best_direction = direction
-	return best_direction
+	return {
+		"direction": best_direction,
+		"fatal_avoidance": has_game_over and has_survivor,
+		"unblocked_direction_spread": maximum_unblocked - minimum_unblocked,
+		"score_gain_spread": maximum_score_gain - minimum_score_gain,
+		"decision_usec": Time.get_ticks_usec() - decision_started_usec,
+	}
+
+
+func _without_current_gravity_when_possible(
+	candidates: Array[Vector2i],
+	current_gravity: Vector2i
+) -> Array[Vector2i]:
+	if candidates.size() <= 1 or not candidates.has(current_gravity):
+		return candidates
+	var alternatives: Array[Vector2i] = []
+	for direction: Vector2i in candidates:
+		if direction != current_gravity:
+			alternatives.append(direction)
+	return alternatives if not alternatives.is_empty() else candidates
+
+
+func _unblocked_direction_count(sim: SlimeSim) -> int:
+	var count: int = 0
+	for direction: Vector2i in DIRECTIONS:
+		if sim.entry_clearance_for(direction) >= 0.0:
+			count += 1
+	return count
 
 
 func _count_reaction_pairs(sim: SlimeSim, direction: Vector2i) -> int:
@@ -184,6 +290,25 @@ func _maximum_level(sim: SlimeSim) -> int:
 	return maximum
 
 
+func _safe_ratio(numerator: int, denominator: int) -> float:
+	return 0.0 if denominator == 0 else float(numerator) / float(denominator)
+
+
+func _safe_ratio_float(numerator: float, denominator: int) -> float:
+	return 0.0 if denominator == 0 else numerator / float(denominator)
+
+
+func _median(values: Array[float]) -> float:
+	if values.is_empty():
+		return 0.0
+	var sorted_values: Array[float] = values.duplicate()
+	sorted_values.sort()
+	var middle: int = sorted_values.size() / 2
+	if sorted_values.size() % 2 == 1:
+		return sorted_values[middle]
+	return (sorted_values[middle - 1] + sorted_values[middle]) * 0.5
+
+
 func _write_report(output_path: String, report: Dictionary) -> void:
 	var absolute_path: String = ProjectSettings.globalize_path(output_path)
 	DirAccess.make_dir_recursive_absolute(absolute_path.get_base_dir())
@@ -206,3 +331,15 @@ func _string_argument(prefix: String, fallback: String) -> String:
 		if argument.begins_with(prefix):
 			return argument.trim_prefix(prefix)
 	return fallback
+
+
+func _strategy_argument() -> Array[String]:
+	var requested: String = _string_argument("--strategies=", ",".join(STRATEGIES))
+	var result: Array[String] = []
+	for raw_strategy: String in requested.split(",", false):
+		var strategy: String = raw_strategy.strip_edges().to_lower()
+		if strategy in STRATEGIES and not result.has(strategy):
+			result.append(strategy)
+	if result.is_empty():
+		result.append_array(STRATEGIES)
+	return result

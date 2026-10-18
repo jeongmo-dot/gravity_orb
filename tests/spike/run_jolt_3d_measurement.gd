@@ -52,6 +52,7 @@ var _seed_first_blast_turn: int = -1
 var _current_measurement_turn: int = 0
 var _turn_reaction_count: int = 0
 var _turn_blast_count: int = 0
+var _preview_fixture_serial: int = 0
 
 
 func _ready() -> void:
@@ -253,6 +254,11 @@ func _run_seed(
 	var entrance_blocked_turns: int = 0
 	var blocked_choice_count: int = 0
 	var blocked_direction_game_over: bool = false
+	var preview_decision_turns: int = 0
+	var preview_fatal_avoidance_turns: int = 0
+	var preview_unblocked_spread_sum: float = 0.0
+	var preview_score_gain_spreads: Array[float] = []
+	var preview_decision_usec_sum: int = 0
 	_skill_rng.seed = 0x5A110000 + seed * 131 + _skill_strategy.hash()
 	var layer_distances: Dictionary = _empty_layer_distances()
 	for turn_offset: int in range(max_turns):
@@ -262,7 +268,26 @@ func _run_seed(
 		_turn_blast_count = 0
 		var score_before: int = score_manager.score
 		var direction: Vector2i = DIRECTION_PATTERN[turn_offset % DIRECTION_PATTERN.size()]
-		if not _skill_strategy.is_empty():
+		if _skill_strategy in ["l_space", "l_merge"]:
+			var preview_decision: Dictionary = await _choose_preview_direction(
+				board,
+				manager,
+				score_manager,
+				_skill_strategy
+			)
+			direction = preview_decision["direction"] as Vector2i
+			preview_decision_turns += 1
+			preview_fatal_avoidance_turns += int(
+				preview_decision["fatal_avoidance"]
+			)
+			preview_unblocked_spread_sum += float(
+				preview_decision["unblocked_direction_spread"]
+			)
+			preview_score_gain_spreads.append(
+				float(preview_decision["score_gain_spread"])
+			)
+			preview_decision_usec_sum += int(preview_decision["decision_usec"])
+		elif not _skill_strategy.is_empty():
 			direction = _choose_skill_direction(board, manager)
 		var chose_blocked_direction: bool = manager.blocked_directions.has(direction)
 		if chose_blocked_direction:
@@ -378,6 +403,11 @@ func _run_seed(
 		"entrance_blocked_turns": entrance_blocked_turns,
 		"blocked_choice_count": blocked_choice_count,
 		"blocked_direction_game_over": blocked_direction_game_over,
+		"preview_decision_turns": preview_decision_turns,
+		"preview_fatal_avoidance_turns": preview_fatal_avoidance_turns,
+		"preview_unblocked_spread_sum": preview_unblocked_spread_sum,
+		"preview_score_gain_spreads": preview_score_gain_spreads,
+		"preview_decision_usec_sum": preview_decision_usec_sum,
 		"reactions_three_turns_after_blast": _reactions_after_blast(turn_rows),
 		"turn_rows": turn_rows,
 		"aborted": aborted,
@@ -1168,10 +1198,16 @@ func _choose_skill_direction(board: Board3D, manager: TurnManager) -> Vector2i:
 	for direction: Vector2i in candidates:
 		if not manager.blocked_directions.has(direction):
 			safe_candidates.append(direction)
-	if safe_candidates.is_empty():
+	var found_safe_candidate: bool = not safe_candidates.is_empty()
+	if not found_safe_candidate:
 		safe_candidates = candidates
 	if _skill_strategy == "s":
 		return _random_direction(safe_candidates)
+	if found_safe_candidate:
+		safe_candidates = _without_current_gravity_when_possible(
+			safe_candidates,
+			manager.gravity
+		)
 	var best_count: int = -1
 	var best_directions: Array[Vector2i] = []
 	for direction: Vector2i in safe_candidates:
@@ -1182,6 +1218,254 @@ func _choose_skill_direction(board: Board3D, manager: TurnManager) -> Vector2i:
 		elif count == best_count:
 			best_directions.append(direction)
 	return _random_direction(best_directions)
+
+
+func _without_current_gravity_when_possible(
+	candidates: Array[Vector2i],
+	current_gravity: Vector2i
+) -> Array[Vector2i]:
+	if candidates.size() <= 1 or not candidates.has(current_gravity):
+		return candidates
+	var alternatives: Array[Vector2i] = []
+	for direction: Vector2i in candidates:
+		if direction != current_gravity:
+			alternatives.append(direction)
+	return alternatives if not alternatives.is_empty() else candidates
+
+
+func _choose_preview_direction(
+	board: Board3D,
+	manager: TurnManager,
+	score_manager: ScoreManager,
+	strategy: String
+) -> Dictionary:
+	var decision_started_usec: int = Time.get_ticks_usec()
+	var previews: Array[Dictionary] = await _create_preview_fixtures(
+		board,
+		manager,
+		score_manager
+	)
+	for index: int in range(previews.size()):
+		var preview: Dictionary = previews[index]
+		var preview_manager: TurnManager = preview["manager"] as TurnManager
+		preview_manager.on_swipe(OrbTypes.DIRECTIONS[index])
+	await _wait_for_preview_turns(previews)
+
+	var evaluations: Array[Dictionary] = []
+	var best_value: float = -INF
+	var best_directions: Array[Vector2i] = []
+	var has_game_over: bool = false
+	var has_survivor: bool = false
+	var minimum_unblocked: int = 4
+	var maximum_unblocked: int = 0
+	var minimum_score_gain: int = 2147483647
+	var maximum_score_gain: int = -2147483648
+	for index: int in range(previews.size()):
+		var preview: Dictionary = previews[index]
+		var preview_board: Board3D = preview["board"] as Board3D
+		var preview_manager: TurnManager = preview["manager"] as TurnManager
+		var preview_score: ScoreManager = preview["score_manager"] as ScoreManager
+		var game_over: bool = preview_manager.state == TurnManager.State.GAME_OVER
+		var unblocked_count: int = 4 - preview_manager.blocked_directions.size()
+		var score_gain: int = preview_score.score - int(preview["score_before"])
+		var space_value: float = (
+			float(unblocked_count) * 1000.0
+			+ (1.0 - _board_occupancy(preview_board)) * 1000.0
+		)
+		var value: float = -1000000.0 if game_over else space_value
+		if not game_over and strategy == "l_merge":
+			value += float(score_gain)
+		evaluations.append({
+			"direction": OrbTypes.DIRECTIONS[index],
+			"game_over": game_over,
+			"unblocked_direction_count": unblocked_count,
+			"score_gain": score_gain,
+			"occupancy": _board_occupancy(preview_board),
+			"value": value,
+		})
+		has_game_over = has_game_over or game_over
+		has_survivor = has_survivor or not game_over
+		minimum_unblocked = mini(minimum_unblocked, unblocked_count)
+		maximum_unblocked = maxi(maximum_unblocked, unblocked_count)
+		minimum_score_gain = mini(minimum_score_gain, score_gain)
+		maximum_score_gain = maxi(maximum_score_gain, score_gain)
+		var tie_broken_value: float = value + _skill_rng.randf() * 0.01
+		if tie_broken_value > best_value:
+			best_value = tie_broken_value
+			best_directions = [OrbTypes.DIRECTIONS[index]]
+		elif is_equal_approx(tie_broken_value, best_value):
+			best_directions.append(OrbTypes.DIRECTIONS[index])
+
+	for preview: Dictionary in previews:
+		var viewport: SubViewport = preview["viewport"] as SubViewport
+		viewport.queue_free()
+	await get_tree().process_frame
+	await get_tree().physics_frame
+	InputRouter.set_locked(false)
+	return {
+		"direction": _random_direction(best_directions),
+		"fatal_avoidance": has_game_over and has_survivor,
+		"unblocked_direction_spread": maximum_unblocked - minimum_unblocked,
+		"score_gain_spread": maximum_score_gain - minimum_score_gain,
+		"decision_usec": Time.get_ticks_usec() - decision_started_usec,
+		"evaluations": evaluations,
+	}
+
+
+func _create_preview_fixtures(
+	source_board: Board3D,
+	source_manager: TurnManager,
+	source_score: ScoreManager
+) -> Array[Dictionary]:
+	var previews: Array[Dictionary] = []
+	for _direction: Vector2i in OrbTypes.DIRECTIONS:
+		previews.append(_create_preview_fixture_shell())
+	await get_tree().process_frame
+	for preview: Dictionary in previews:
+		_copy_preview_state(
+			source_board,
+			source_manager,
+			source_score,
+			preview
+		)
+	return previews
+
+
+func _create_preview_fixture_shell() -> Dictionary:
+	_preview_fixture_serial += 1
+	var viewport: SubViewport = SubViewport.new()
+	viewport.name = "ClassicPreviewWorld%d" % _preview_fixture_serial
+	viewport.size = Vector2i.ONE
+	viewport.own_world_3d = true
+	viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	add_child(viewport)
+	var fixture_root: Node3D = Node3D.new()
+	fixture_root.name = "ClassicPreviewFixture"
+	var board: Board3D = BOARD_SCENE.instantiate() as Board3D
+	board.name = "Board"
+	board.unique_name_in_owner = true
+	board.orb_contact_reporting_enabled = _contact_reporting_enabled
+	board.orb_continuous_cd_enabled = _continuous_cd_enabled
+	board.orb_allow_sleep = _allow_sleep
+	board.orb_progressive_growth_enabled = _progressive_growth_enabled
+	board.reaction_ghost_enabled = _reaction_ghost_enabled
+	fixture_root.add_child(board)
+	board.owner = fixture_root
+	var resolver: CollisionResolver = RESOLVER_SCRIPT.new() as CollisionResolver
+	resolver.name = "CollisionResolver"
+	resolver.unique_name_in_owner = true
+	fixture_root.add_child(resolver)
+	resolver.owner = fixture_root
+	var spawner: Spawner = SPAWNER_SCRIPT.new() as Spawner
+	spawner.name = "Spawner"
+	spawner.unique_name_in_owner = true
+	fixture_root.add_child(spawner)
+	spawner.owner = fixture_root
+	var manager: TurnManager = TURN_MANAGER_SCRIPT.new() as TurnManager
+	manager.name = "TurnManager"
+	fixture_root.add_child(manager)
+	manager.owner = fixture_root
+	var score_manager: ScoreManager = SCORE_MANAGER_SCRIPT.new() as ScoreManager
+	score_manager.name = "ScoreManager"
+	score_manager.unique_name_in_owner = true
+	score_manager.save_path = ""
+	fixture_root.add_child(score_manager)
+	score_manager.owner = fixture_root
+	viewport.add_child(fixture_root)
+	manager.reaction_ready.connect(score_manager.on_reaction)
+	spawner.orb_spawned.connect(score_manager.on_orb_spawned)
+	return {
+		"viewport": viewport,
+		"root": fixture_root,
+		"board": board,
+		"resolver": resolver,
+		"spawner": spawner,
+		"manager": manager,
+		"score_manager": score_manager,
+		"score_before": 0,
+	}
+
+
+func _copy_preview_state(
+	source_board: Board3D,
+	source_manager: TurnManager,
+	source_score: ScoreManager,
+	preview: Dictionary
+) -> void:
+	var target_board: Board3D = preview["board"] as Board3D
+	var target_spawner: Spawner = preview["spawner"] as Spawner
+	var target_manager: TurnManager = preview["manager"] as TurnManager
+	var target_score: ScoreManager = preview["score_manager"] as ScoreManager
+	target_board.set_gravity(source_manager.gravity)
+	for source_orb: Orb3D in source_board.get_orbs():
+		var target_orb: Orb3D = target_board.spawn_orb(
+			source_orb.color,
+			source_orb.level,
+			source_orb.position,
+			source_orb.linear_velocity,
+			source_orb.generation
+		)
+		target_orb.stable_spawn_id = source_orb.stable_spawn_id
+		target_orb.get_physics_body().rotation = source_orb.get_physics_body().rotation
+		target_orb.angular_velocity = source_orb.angular_velocity
+		if source_orb.is_ghost:
+			target_orb.enter_ghost_state(Config.data.ghost_alpha)
+			target_orb.ghost_elapsed = source_orb.ghost_elapsed
+		if source_orb.is_waiting_at_entrance:
+			target_orb.enter_entrance_wait(
+				source_orb.entrance_preferred_position,
+				source_orb.entrance_gravity
+			)
+	target_board._next_orb_spawn_id = source_board._next_orb_spawn_id
+	var source_spawner: Spawner = source_manager.get_node("%Spawner") as Spawner
+	target_spawner.seed_used = source_spawner.seed_used
+	target_spawner._rng.state = source_spawner._rng.state
+	target_spawner._effect_rng.state = source_spawner._effect_rng.state
+	target_spawner._bot_rng.state = source_spawner._bot_rng.state
+	target_spawner._preview_batches.assign(
+		source_spawner._preview_batches.duplicate(true)
+	)
+	target_spawner._blitz_mode = source_spawner._blitz_mode
+	target_spawner._blitz_candidate_queue.assign(
+		source_spawner._blitz_candidate_queue.duplicate(true)
+	)
+	target_spawner._blitz_next_batch_size = source_spawner._blitz_next_batch_size
+	target_manager.state = TurnManager.State.WAITING_INPUT
+	target_manager.gravity = source_manager.gravity
+	target_manager.turn_index = source_manager.turn_index
+	target_manager.turn_combo = source_manager.turn_combo
+	target_manager.max_combo = source_manager.max_combo
+	target_manager.capped_turn_count = source_manager.capped_turn_count
+	target_manager.blocked_directions.assign(source_manager.blocked_directions)
+	target_manager.game_over_details = source_manager.game_over_details.duplicate(true)
+	target_manager.settle_elapsed = 0.0
+	target_manager._stable_time = 0.0
+	target_manager._is_initial_settle = false
+	target_score.score = source_score.score
+	target_score.best_score = source_score.best_score
+	target_score.max_level_reached = source_score.max_level_reached
+	preview["score_before"] = source_score.score
+
+
+func _wait_for_preview_turns(previews: Array[Dictionary]) -> void:
+	var max_frames: int = ceili(float(Engine.physics_ticks_per_second) * WAIT_TIMEOUT_SECONDS)
+	for _frame: int in range(max_frames):
+		await get_tree().physics_frame
+		var all_finished: bool = true
+		for preview: Dictionary in previews:
+			var manager: TurnManager = preview["manager"] as TurnManager
+			if (
+				manager.state != TurnManager.State.WAITING_INPUT
+				and manager.state != TurnManager.State.GAME_OVER
+			):
+				all_finished = false
+				break
+		if all_finished:
+			return
+	_had_runner_error = true
+	push_error("CLASSIC preview fixtures exceeded the turn timeout")
+	for preview: Dictionary in previews:
+		_freeze_orbs(preview["board"] as Board3D)
 
 
 func _random_direction(candidates: Array[Vector2i]) -> Vector2i:
@@ -1397,7 +1681,7 @@ func _apply_arguments() -> void:
 			_skip_determinism = true
 		elif argument.begins_with("--skill-strategy="):
 			_skill_strategy = argument.trim_prefix("--skill-strategy=").to_lower()
-			if _skill_strategy not in ["r", "s", "g"]:
+			if _skill_strategy not in ["r", "s", "g", "l_space", "l_merge"]:
 				_had_runner_error = true
 				push_error("Unknown skill strategy: %s" % _skill_strategy)
 
