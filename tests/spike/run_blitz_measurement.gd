@@ -21,6 +21,7 @@ var _output_path: String = DEFAULT_OUTPUT
 var _runner_failed: bool = false
 var _seed_reactions: int = 0
 var _bonus_scale: float = 1.0
+var _max_session_seconds: float = MAX_SESSION_SECONDS
 var _seed_merge_count_by_level: Dictionary = {}
 var _seed_first_l4_merge_time: float = -1.0
 var _seed_jackpot_count: int = 0
@@ -56,6 +57,7 @@ func _run() -> void:
 		"gravity_level_scale": Config.data.gravity_level_scale,
 		"survival_bonus_scale": _bonus_scale,
 		"survival_drain_ramp_per_minute": Config.data.blitz_drain_ramp_per_minute,
+		"measurement_session_cap_seconds": _max_session_seconds,
 		"seeds": rows,
 		"config": {
 			"duration": Config.data.blitz_duration,
@@ -144,6 +146,7 @@ func _run_seed(seed: int) -> Dictionary:
 				var direction: Vector2i = _choose_bot_direction(
 					board,
 					spawner,
+					manager,
 					manager.gravity
 				)
 				var accepted_before: int = manager.accepted_swipes
@@ -172,7 +175,7 @@ func _run_seed(seed: int) -> Dictionary:
 		_record_invalid_motion(board, departed_ids, divergent_ids)
 		if physics_frame_index % PAIR_SAMPLE_FRAMES == 0:
 			max_pair = maxf(max_pair, _max_pair_penetration(board))
-		if session_elapsed >= MAX_SESSION_SECONDS:
+		if session_elapsed >= _max_session_seconds:
 			cap_reached = true
 			break
 	var finale_score: int = score.score - manager.finale_score_start
@@ -181,6 +184,7 @@ func _run_seed(seed: int) -> Dictionary:
 		"completed": manager.state == BlitzManager.State.FINISHED,
 		"measurement_cap_reached": cap_reached,
 		"score": score.score,
+		"max_level_reached": score.max_level_reached,
 		"reactions": _seed_reactions,
 		"running_reactions": manager.reaction_count,
 		"reaction_without_swipe_count": manager.passive_reaction_count,
@@ -514,14 +518,28 @@ func _safe_percent_float(numerator: float, denominator: float) -> float:
 func _choose_bot_direction(
 	board: Board3D,
 	spawner: Spawner,
+	manager: BlitzManager,
 	previous: Vector2i
 ) -> Vector2i:
 	if _bot_kind == "random":
 		return spawner.next_blitz_direction(previous)
 	var candidates: Array[Vector2i] = []
 	for direction: Vector2i in OrbTypes.DIRECTIONS:
-		if direction != previous:
-			candidates.append(direction)
+		candidates.append(direction)
+	if _bot_kind == "r":
+		return spawner.choose_blitz_direction(candidates)
+	if _bot_kind == "s" or _bot_kind == "g":
+		var batch_size: int = manager._next_swipe_spawn_count()
+		var next_batch: Array[Dictionary] = spawner.peek_blitz_candidates(batch_size)
+		var blocked: Array[Vector2i] = board.blocked_spawn_directions(next_batch)
+		var safe_candidates: Array[Vector2i] = []
+		for direction: Vector2i in candidates:
+			if not blocked.has(direction):
+				safe_candidates.append(direction)
+		if not safe_candidates.is_empty():
+			candidates = safe_candidates
+		if _bot_kind == "s":
+			return spawner.choose_blitz_direction(candidates)
 	var best_directions: Array[Vector2i] = []
 	var best_count: int = -1
 	for direction: Vector2i in candidates:
@@ -531,7 +549,7 @@ func _choose_bot_direction(
 			best_directions = [direction]
 		elif count == best_count:
 			best_directions.append(direction)
-	if best_count <= 0:
+	if best_count <= 0 and _bot_kind == "heuristic":
 		return previous
 	return spawner.choose_blitz_direction(best_directions)
 
@@ -592,6 +610,11 @@ func _apply_arguments() -> void:
 				_seeds.append(value.to_int())
 		elif argument.begins_with("--blitz-output="):
 			_output_path = argument.trim_prefix("--blitz-output=")
+		elif argument.begins_with("--blitz-session-cap="):
+			_max_session_seconds = maxf(
+				argument.trim_prefix("--blitz-session-cap=").to_float(),
+				0.1
+			)
 		elif argument.begins_with("--gravity-strength="):
 			Config.data.gravity_strength = argument.trim_prefix(
 				"--gravity-strength="
