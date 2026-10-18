@@ -34,12 +34,12 @@
 ### [2026-10-19 #92] 단계별 난도 적용 + 새 행성 등장 안내 (기획서 0.14)
 - 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합)
 - 근거: [technical_design.md](technical_design.md) **§12-R.1** (선택 근거 §12-R "#91 결과")
-- 배경: #91 측정으로 CLASSIC C2·SLIME S3 선택 (Claude 2026-10-19)
+- 배경: #91 측정으로 CLASSIC C2·SLIME S3 선택 (Claude 2026-10-19) → 사용자 "slime 모드의 난이도를 조금 더 증가시키고 싶어" → **SLIME은 S2**
 - 요구:
-  1. 기본값: CLASSIC `turn_start_colors` 4·`turn_color_unlock_turns` [30, 60]·`spawn_count_ramp_turns` 50, SLIME `color_unlock_mode` turn·`color_unlock_turns` [25, 50, 75, 100]·`turn_floor_steps` [(25,2), (50,3), (75,4)]. BLITZ 그대로
+  1. 기본값: CLASSIC `turn_start_colors` 4·`turn_color_unlock_turns` [30, 60]·`spawn_count_ramp_turns` 50, SLIME `color_unlock_mode` turn·`color_unlock_turns` **[20, 40, 60, 80]**·`turn_floor_steps` **[(20,2), (40,3), (60,4)]** (S2). BLITZ 그대로
   2. CLASSIC 새 행성 안내: 해금 턴 묶음이 들어올 때 호령 자리에 "새 행성 — 해왕성/수성" 1.2초 + 그 행성 2D 그림, 호령과 겹치면 뒤에 이어서. 미리보기에 그 색이 처음 보일 때 칸 테두리가 그 색으로 0.6초 반짝 1회. 소리는 기존 짧은 합성음 하나. SLIME은 원본 메시지 그대로
   3. 테스트 갱신 (기본값 테스트·해금 턴·첫 구슬·등장 수·안내 1회), CLASSIC·SLIME 새 기준 해시 보고 (BLITZ 그대로), SLIME 원본 패리티는 score 모드로 통과
-  4. 봇 확인: C2·S3 R 10판씩 (#91 범위와 비교), 캡처 `52_new_planet_callout` 두 비율 + 기존 CLASSIC 캡처 확인
+  4. 봇 확인: C2·S2 R 10판씩 (#91 범위와 비교 — CLASSIC 약 221턴, SLIME 약 52턴), 캡처 `52_new_planet_callout` 두 비율 + 기존 CLASSIC 캡처 확인
 - 건드리지 말 것: BLITZ 규칙·수치, 다른 설정값, 사용자 저장 파일, `docs/` (회신 파일 제외)
 - Done-when: 테스트 통과(`.\tests\run_tests.ps1`), 캡처 보고 (마지막은 전체 캡처), 스모크 4종, 검증 빌드는 `-Debug`만
 - 커밋: 항목 단위 브랜치, **push·PR까지**
