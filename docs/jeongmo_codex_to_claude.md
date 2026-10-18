@@ -40,7 +40,7 @@
 
 ### [2026-10-19] 대상 #93 — 새 행성 안내 시점 · 행성 늘어남 끄기 · BLITZ 보너스 글자 시점
 - 상태: 완료 — `origin/main` `80a0164`에서 항목 브랜치를 만든 뒤 새 행성 안내를 실제 생성 프레임으로 옮기고, 행성 늘어남 기본값을 끄고, BLITZ 보너스 글자·밝은 조각 시점을 맞춤
-- 브랜치 / PR: `planet-callout-spawn-timing` / 생성 예정
+- 브랜치 / PR: `planet-callout-spawn-timing` / https://github.com/jeongmo-dot/gravity_orb/pull/95
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/TurnManager.gd`, `scripts/ui/{BlitzTimeBar.gd,Hud.gd}`, `tests/{test_blitz_time_bar.gd,test_callouts.gd,test_config.gd,test_gravity_switch_feedback.gd}`, `tests/scenarios/{test_turn_manager.gd,test_ui_fixes.gd}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 30·60턴의 새 행성 신호를 `SPAWNING`에서 `try_spawn()` 직후 실제 생성된 묶음의 색을 확인해 게임당 행성별 1회 보내고, 정착 완료 시점 신호는 제거 — 자동 (`test_turn_manager`)
