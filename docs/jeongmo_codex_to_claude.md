@@ -40,7 +40,7 @@
 
 ### [2026-10-19] 대상 #92 — 단계별 난도 적용 + 새 행성 등장 안내
 - 상태: 완료 — `origin/main` `76e5aed`에서 항목 브랜치를 만든 뒤 CLASSIC C2·SLIME S2 기본값과 CLASSIC 새 행성 안내/미리보기 테두리 연출을 구현함. BLITZ 값과 SLIME 원본 안내 문구는 변경하지 않음
-- 브랜치 / PR: `staged-difficulty-rollout` / 생성 예정
+- 브랜치 / PR: `staged-difficulty-rollout` / https://github.com/jeongmo-dot/gravity_orb/pull/94
 - 변경 파일: `config/{GameConfig,SlimeConfig}.gd`, `config/{default_config,slime_config}.tres`, `scripts/core/TurnManager.gd`, `scripts/ui/Hud.gd`, `tests/{capture_screens,test_callouts,test_config,test_slime_config,test_slime_sim,test_slime_visuals,test_spawner}.gd`, `tests/scenarios/test_turn_manager.gd`, `tests/spike/capture_screens.gd`, `tests/tools/slime_parity_candidate.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] CLASSIC 기본값을 시작 4색·30/60턴 색 해금·50턴 생성 수 증가로, SLIME을 turn 해금 20/40/60/80턴·등장 하한 20→2/40→3/60→4로 적용 — 자동 (`test_config`, `test_slime_config`, `test_spawner`, `test_slime_sim`)
