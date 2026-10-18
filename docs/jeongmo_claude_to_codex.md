@@ -31,8 +31,13 @@
 
 ## 대기 중
 
-### [2026-10-19 #93] 새 행성 안내 시점 · 행성 늘어남 끄기 · BLITZ 보너스 글자 시점
-- 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합)
+---
+
+## 처리 완료
+
+### [2026-10-19 #93] 새 행성 안내 시점 · 행성 늘어남 끄기 · BLITZ 보너스 글자 시점 — 완료
+- 상태: 완료 (2026-10-19 Claude 검수 · [PR #95](https://github.com/jeongmo-dot/gravity_orb/pull/95) 병합 `c18e0e2`)
+- 검수: diff·`52`·`41_a` 확인 — 안내가 생성 프레임에, 늘어남 기본 꺼짐, `+1.6s`와 밝은 조각이 함께. 해시 네 개·패리티 그대로, 래퍼 349/349 (Codex). `52`의 NEXT 테두리는 캡처 연출 탓. Claude 재실행 없음
 - 근거: [technical_design.md](technical_design.md) **§12-R.1** "#92 결과" 아래 "안내 시점 바꿈"
 - 배경: #92는 해금 턴이 끝나고 입력이 풀리기 직전에 안내를 띄운다. 사용자 (2026-10-19) "들어오는 순간에 뜨는게 좋지"
 - 앵커: `scripts/core/TurnManager.gd` `_on_settled()`의 `planet_unlocked.emit` → `_physics_process()`의 `SPAWNING` 처리 (`try_spawn` 직후)
@@ -45,10 +50,6 @@
 - 건드리지 말 것: 규칙·물리·위 값 외 수치, BLITZ 시간 계산·보너스 표, SLIME, 사용자 저장 파일, `docs/` (회신 파일 제외)
 - Done-when: 테스트 통과(`.	estsun_tests.ps1`), 캡처 보고 (마지막은 전체 캡처), 검증 빌드는 `-Debug`만
 - 커밋: 항목 단위 브랜치, **push·PR까지**
-
----
-
-## 처리 완료
 
 ### [2026-10-19 #92] 단계별 난도 적용 + 새 행성 등장 안내 (기획서 0.14) — 완료
 - 상태: 완료 (2026-10-19 Claude 검수 · [PR #94](https://github.com/jeongmo-dot/gravity_orb/pull/94) 병합 `3ea4f0b`)
