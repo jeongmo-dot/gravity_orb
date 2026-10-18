@@ -260,11 +260,11 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M3 | `max_settle_time` | float | 3.0 → **1.5** (기획서 0.3) | 턴 최대 길이 (초, 스케일된 시간). 도달하면 움직임이 남아도 턴 종료 — 정상 동작 |
 | M3 | `allow_same_direction_swipe` | bool | true | 11.1 참조 |
 | M4 | `spawn_level_weights` | PackedFloat32Array | [0.9, 0.1] | 인덱스 0 = 레벨1 |
-| #91 | `turn_start_colors` / `turn_color_unlock_turns` | int / Array[int] | 6 / [] (#91, 지금 동작) → **4 / [30, 60]** (#92, §12-R.1 — #92 병합 때 적용) | 턴제 시작 색 수와 색이 하나씩 열리는 턴. 색 순서는 색 번호 순 (화성·지구·천왕성·금성 → 해왕성 → 수성). 해금 턴 묶음 첫 구슬은 새 색 |
+| #91 | `turn_start_colors` / `turn_color_unlock_turns` | int / Array[int] | 6 / [] (#91) → **4 / [30, 60]** (#92, §12-R.1 — 적용 `3ea4f0b`) | 턴제 시작 색 수와 색이 하나씩 열리는 턴. 색 순서는 색 번호 순 (화성·지구·천왕성·금성 → 해왕성 → 수성). 해금 턴 묶음 첫 구슬은 새 색 |
 | M4 | `spawn_color_weights` | PackedFloat32Array | [1, 1, 1] → [1, 1, 1, 1] (#15) → **[1, 1, 1, 1, 1, 1]** (#74, 두 모드 같은 6색 §12-W.1) | 인덱스 = 색. 가중치 0인 색은 생성되지 않는다 |
 | #15 | `spawn_count_per_turn` | int | 2 (기획서 0.6) → **1 (#26, 기획서 0.9.4: 상극 폐지 후 게임 길이 258 → 136턴)** | 턴당 생성 구체 수 |
 | #26 | `preview_turns` | int | **2** | 미리보기로 보여 줄 앞으로의 턴 수 (§11.10) |
-| #15 | `spawn_count_ramp_turns` / `spawn_count_max` | int | 0 → 100 (#55) → 50 (#56, 기획서 0.10.10) → 20 (#62, 판 길이 약 250턴 목표 — p50 240턴, §12-B.10) → 40 (#74, 6색에서 p50 266턴, §12-W.1) → **50** (#92, 단계별 난도 C2 §12-R.1 — #92 병합 때 적용) / 3 → **0 = 상한 없음** (#56) | 턴제 점진 증가: **50턴마다 +1개, 상한 없음** (1~50턴 1개, 51~100턴 2개, 101~150턴 3개, 151~200턴 4개 …). `spawn_count_max ≤ 0`이면 상한 없음. BLITZ는 쓰지 않음 |
+| #15 | `spawn_count_ramp_turns` / `spawn_count_max` | int | 0 → 100 (#55) → 50 (#56, 기획서 0.10.10) → 20 (#62, 판 길이 약 250턴 목표 — p50 240턴, §12-B.10) → 40 (#74, 6색에서 p50 266턴, §12-W.1) → **50** (#92, 단계별 난도 C2 §12-R.1 — 적용 `3ea4f0b`) / 3 → **0 = 상한 없음** (#56) | 턴제 점진 증가: **50턴마다 +1개, 상한 없음** (1~50턴 1개, 51~100턴 2개, 101~150턴 3개, 151~200턴 4개 …). `spawn_count_max ≤ 0`이면 상한 없음. BLITZ는 쓰지 않음 |
 | M4 | `spawn_position_mode` | SpawnPositionMode | RANDOM | |
 | M4 | `spawn_margin` | float | 4.0 | 생성 벽 안쪽 면과 구체 사이 여백 |
 | M4 | `rng_seed` | int | 0 | 0이면 시작 시 무작위 시드를 뽑아 기록 |
@@ -2676,6 +2676,8 @@ M4 검수(2026-09-28)에서 발견. 합체가 없는 M4 상태에서 **이동·�
 - 해시: CLASSIC·SLIME 기본 동작이 바뀌므로 **새 기준 해시**를 보고 (이전 값과 다름이 맞다). BLITZ 해시는 그대로. SLIME 원본 패리티는 `color_unlock_mode = score`·원본 표로 두고 그대로 통과
 - 봇 확인: C2·S2로 R 10판씩 — #91 측정과 같은 범위인지 (CLASSIC 무작위 중앙 약 221턴, SLIME 약 52턴)
 - 캡처: `52_new_planet_callout` 두 비율 (CLASSIC 30턴 안내 + NEXT 반짝), 기존 `01`·`02` 등 CLASSIC 캡처는 4색으로 바뀐 것 확인
+
+**#92 결과 — 병합** ([PR #94](https://github.com/jeongmo-dot/gravity_orb/pull/94) `3ea4f0b`, 2026-10-19): CLASSIC C2·SLIME S2 기본값, `TurnManager.planet_unlocked` 신호 (해금 턴이 **끝나고** 입력이 풀리기 직전 — 새 행성은 그 턴에 이미 들어와 있고, 안내는 "방금 들어온 그 행성"을 알려 주는 셈), 안내는 호령 대기열 뒤에 이어서, 미리보기 칸 테두리 0.6초 1회. 새 기준 해시 CLASSIC `cf617242…`·SLIME `7ebe5d76…` (BLITZ 그대로), SLIME 원본 패리티 (score 모드) 통과, 봇 확인 R 10판 CLASSIC 중앙 224.5턴·SLIME 50.5턴 (#91 221·52 근처), 래퍼 348/348, 전체 캡처 148장 (Codex). Claude 검수 (`52`·`02` 확인, 재실행 없음): 안내 글자·해왕성 그림·NEXT 보라 테두리 겹침 없음, 시작이 4색
 
 ## 13. 알려진 함정 (Godot 4)
 

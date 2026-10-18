@@ -31,8 +31,13 @@
 
 ## 대기 중
 
-### [2026-10-19 #92] 단계별 난도 적용 + 새 행성 등장 안내 (기획서 0.14)
-- 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합)
+---
+
+## 처리 완료
+
+### [2026-10-19 #92] 단계별 난도 적용 + 새 행성 등장 안내 (기획서 0.14) — 완료
+- 상태: 완료 (2026-10-19 Claude 검수 · [PR #94](https://github.com/jeongmo-dot/gravity_orb/pull/94) 병합 `3ea4f0b`)
+- 검수: Codex 캡처 `52`·`02` — 새 행성 안내·NEXT 테두리 겹침 없음, 시작 4색. 봇 확인 CLASSIC 224.5턴·SLIME 50.5턴, 새 기준 해시, BLITZ 해시·SLIME 패리티 그대로, 래퍼 348/348 (Codex). Claude 재실행 없음
 - 근거: [technical_design.md](technical_design.md) **§12-R.1** (선택 근거 §12-R "#91 결과")
 - 배경: #91 측정으로 CLASSIC C2·SLIME S3 선택 (Claude 2026-10-19) → 사용자 "slime 모드의 난이도를 조금 더 증가시키고 싶어" → **SLIME은 S2**
 - 요구:
@@ -43,10 +48,6 @@
 - 건드리지 말 것: BLITZ 규칙·수치, 다른 설정값, 사용자 저장 파일, `docs/` (회신 파일 제외)
 - Done-when: 테스트 통과(`.\tests\run_tests.ps1`), 캡처 보고 (마지막은 전체 캡처), 스모크 4종, 검증 빌드는 `-Debug`만
 - 커밋: 항목 단위 브랜치, **push·PR까지**
-
----
-
-## 처리 완료
 
 ### [2026-10-18 #91] 단계별 난도 후보 측정 — 색 수·등장 수를 턴에 따라 — 완료
 - 상태: 완료 (2026-10-19 Claude 검수 · [PR #93](https://github.com/jeongmo-dot/gravity_orb/pull/93) 병합 `ea103ff`)
