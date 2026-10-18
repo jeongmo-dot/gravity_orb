@@ -40,6 +40,8 @@ var _reaction_ghost_enabled: bool = false
 var _record_seed_hashes: bool = false
 var _scan_pairs_each_frame: bool = false
 var _skip_determinism: bool = false
+var _skill_strategy: String = ""
+var _skill_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _turn_shock_events: Array[Dictionary] = []
 var _seed_reactions_by_color: Dictionary = {}
 var _seed_max_clear_count: int = 0
@@ -114,12 +116,17 @@ func _run() -> void:
 		report["ticks"].append(tick_report)
 
 	Engine.physics_ticks_per_second = 120
-	report["feel_metrics"] = await _measure_feel_metrics()
-	report["determinism"] = (
-		{"skipped": true}
-		if _skip_determinism
-		else await _run_determinism_check(101)
-	)
+	if _skill_strategy.is_empty():
+		report["feel_metrics"] = await _measure_feel_metrics()
+		report["determinism"] = (
+			{"skipped": true}
+			if _skip_determinism
+			else await _run_determinism_check(101)
+		)
+	else:
+		report["skill_strategy"] = _skill_strategy
+		report["feel_metrics"] = {"skipped": true, "reason": "skill_measurement"}
+		report["determinism"] = {"skipped": true, "reason": "skill_measurement"}
 	Engine.physics_ticks_per_second = _original_ticks
 	_write_report(report)
 	print("JOLT3D_REPORT_PATH %s" % _report_path)
@@ -150,6 +157,17 @@ func _run_tick_suite(ticks: int) -> Dictionary:
 			shock_displacements
 		)
 		seed_rows.append(result)
+		if not _skill_strategy.is_empty():
+			print(
+				"MODE_SKILL_CLASSIC strategy=%s seed=%d turns=%d score=%d game_over=%s"
+				% [
+					_skill_strategy,
+					seed,
+					int(result["completed_turns"]),
+					int(result["score"]),
+					str(result["game_over"]),
+				]
+			)
 		ghost_completed_count += int(result["ghost_completed_count"])
 		ghost_timeout_count += int(result["ghost_timeout_count"])
 		ghost_duration_sum += float(result["ghost_duration_sum"])
@@ -233,6 +251,9 @@ func _run_seed(
 	var seed_max_pair_end_turn: int = 0
 	var seed_max_wall: float = 0.0
 	var entrance_blocked_turns: int = 0
+	var blocked_choice_count: int = 0
+	var blocked_direction_game_over: bool = false
+	_skill_rng.seed = 0x5A110000 + seed * 131 + _skill_strategy.hash()
 	var layer_distances: Dictionary = _empty_layer_distances()
 	for turn_offset: int in range(max_turns):
 		_turn_shock_events.clear()
@@ -241,6 +262,11 @@ func _run_seed(
 		_turn_blast_count = 0
 		var score_before: int = score_manager.score
 		var direction: Vector2i = DIRECTION_PATTERN[turn_offset % DIRECTION_PATTERN.size()]
+		if not _skill_strategy.is_empty():
+			direction = _choose_skill_direction(board, manager)
+		var chose_blocked_direction: bool = manager.blocked_directions.has(direction)
+		if chose_blocked_direction:
+			blocked_choice_count += 1
 		var same_direction: bool = direction == manager.gravity
 		var before: Dictionary = _snapshot_orbs(board)
 		var start_occupancy: float = _snapshot_occupancy(before)
@@ -332,6 +358,7 @@ func _run_seed(
 			abort_reason = str(frame_metrics["abort_reason"])
 			break
 		if manager.state == TurnManager.State.GAME_OVER:
+			blocked_direction_game_over = chose_blocked_direction
 			break
 	var result: Dictionary = {
 		"seed": seed,
@@ -349,6 +376,8 @@ func _run_seed(
 		"blast_moved_orb_ratio_by_level": _blast_moved_ratio_by_level(),
 		"first_blast_turn": _seed_first_blast_turn,
 		"entrance_blocked_turns": entrance_blocked_turns,
+		"blocked_choice_count": blocked_choice_count,
+		"blocked_direction_game_over": blocked_direction_game_over,
 		"reactions_three_turns_after_blast": _reactions_after_blast(turn_rows),
 		"turn_rows": turn_rows,
 		"aborted": aborted,
@@ -1129,6 +1158,72 @@ func _state_hash(board: Board3D) -> String:
 	return "|".join(states).sha256_text()
 
 
+func _choose_skill_direction(board: Board3D, manager: TurnManager) -> Vector2i:
+	var candidates: Array[Vector2i] = []
+	for direction: Vector2i in OrbTypes.DIRECTIONS:
+		candidates.append(direction)
+	if _skill_strategy == "r":
+		return _random_direction(candidates)
+	var safe_candidates: Array[Vector2i] = []
+	for direction: Vector2i in candidates:
+		if not manager.blocked_directions.has(direction):
+			safe_candidates.append(direction)
+	if safe_candidates.is_empty():
+		safe_candidates = candidates
+	if _skill_strategy == "s":
+		return _random_direction(safe_candidates)
+	var best_count: int = -1
+	var best_directions: Array[Vector2i] = []
+	for direction: Vector2i in safe_candidates:
+		var count: int = _count_skill_reaction_pairs(board, direction)
+		if count > best_count:
+			best_count = count
+			best_directions = [direction]
+		elif count == best_count:
+			best_directions.append(direction)
+	return _random_direction(best_directions)
+
+
+func _random_direction(candidates: Array[Vector2i]) -> Vector2i:
+	if candidates.is_empty():
+		return Vector2i.DOWN
+	return candidates[_skill_rng.randi_range(0, candidates.size() - 1)]
+
+
+func _count_skill_reaction_pairs(board: Board3D, direction: Vector2i) -> int:
+	var count: int = 0
+	var orbs: Array[Orb3D] = board.get_orbs()
+	for first_index: int in range(orbs.size()):
+		var first: Orb3D = orbs[first_index]
+		if first.is_ghost or first.is_waiting_at_entrance:
+			continue
+		for second_index: int in range(first_index + 1, orbs.size()):
+			var second: Orb3D = orbs[second_index]
+			if second.is_ghost or second.is_waiting_at_entrance:
+				continue
+			var reaction: Dictionary = ReactionRules.classify(
+				first.color,
+				first.level,
+				second.color,
+				second.level,
+				Config.data
+			)
+			var reaction_type: ReactionRules.Type = reaction["type"] as ReactionRules.Type
+			if (
+				reaction_type != ReactionRules.Type.MERGE
+				and reaction_type != ReactionRules.Type.MAX_CLEAR
+				and reaction_type != ReactionRules.Type.BLAST
+			):
+				continue
+			var offset: Vector2 = second.position - first.position
+			var maximum_distance: float = (first.get_radius() + second.get_radius()) * 3.0
+			if offset.is_zero_approx() or offset.length() > maximum_distance:
+				continue
+			if absf(offset.normalized().dot(Vector2(direction))) >= 0.8:
+				count += 1
+	return count
+
+
 func _state_rows(board: Board3D) -> Array[Dictionary]:
 	var rows: Array[Dictionary] = []
 	for orb: Orb3D in board.get_orbs():
@@ -1300,6 +1395,11 @@ func _apply_arguments() -> void:
 			_scan_pairs_each_frame = true
 		elif argument == "--jolt-no-determinism":
 			_skip_determinism = true
+		elif argument.begins_with("--skill-strategy="):
+			_skill_strategy = argument.trim_prefix("--skill-strategy=").to_lower()
+			if _skill_strategy not in ["r", "s", "g"]:
+				_had_runner_error = true
+				push_error("Unknown skill strategy: %s" % _skill_strategy)
 
 
 func _parse_int_list(csv: String) -> Array[int]:
