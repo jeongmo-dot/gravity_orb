@@ -217,6 +217,29 @@ func test_t9_combo_display_multiplier_caps_at_one_hundred_twenty_eight() -> void
 	await _cleanup_fixture(fixture, snapshot)
 
 
+func test_t10_planet_unlock_emits_once_before_input_is_released() -> void:
+	var snapshot: Dictionary = _snapshot_m3_config()
+	Config.data.turn_start_colors = 4
+	Config.data.turn_color_unlock_turns = [30, 60]
+	var fixture: Dictionary = await _create_ready_fixture(FIXTURE_SEED + 10)
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	var spawner: Spawner = fixture["spawner"] as Spawner
+	var unlocked_colors: Array[int] = []
+	var lock_states: Array[bool] = []
+	manager.planet_unlocked.connect(
+		func(color_index: int) -> void:
+			unlocked_colors.append(color_index)
+			lock_states.append(InputRouter.is_locked())
+	)
+	manager.turn_index = 29
+	spawner.sync_next_batch_size(30)
+	manager.on_swipe(Vector2i.RIGHT)
+	await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
+	assert_eq(unlocked_colors, [OrbTypes.OrbColor.PURPLE], "turn 30 unlock emits Neptune once")
+	assert_eq(lock_states, [true], "unlock guide starts before input release")
+	await _cleanup_fixture(fixture, snapshot)
+
+
 func _create_ready_fixture(seed: int) -> Dictionary:
 	var fixture: Dictionary = await _create_fixture(seed)
 	var manager: TurnManager = fixture["manager"] as TurnManager
@@ -296,6 +319,8 @@ func _snapshot_m3_config() -> Dictionary:
 		"stable_duration": Config.data.stable_duration,
 		"max_settle_time": Config.data.max_settle_time,
 		"allow_same_direction_swipe": Config.data.allow_same_direction_swipe,
+		"turn_start_colors": Config.data.turn_start_colors,
+		"turn_color_unlock_turns": Config.data.turn_color_unlock_turns.duplicate(),
 	}
 
 
@@ -305,6 +330,8 @@ func _restore_m3_config(snapshot: Dictionary) -> void:
 	Config.data.stable_duration = float(snapshot["stable_duration"])
 	Config.data.max_settle_time = float(snapshot["max_settle_time"])
 	Config.data.allow_same_direction_swipe = bool(snapshot["allow_same_direction_swipe"])
+	Config.data.turn_start_colors = int(snapshot["turn_start_colors"])
+	Config.data.turn_color_unlock_turns.assign(snapshot["turn_color_unlock_turns"])
 
 
 func _reset_signal_records() -> void:

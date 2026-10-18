@@ -162,7 +162,7 @@ func test_color_bag_has_two_of_each_and_unlock_forces_first_two() -> void:
 		counts[color_index] += 1
 	assert_eq(counts, [2, 2, 2], "two copies per active color")
 
-	var unlock_sim := _empty_sim(41)
+	var unlock_sim := SlimeSim.new(_legacy_score_config(), 41, false, false)
 	unlock_sim.score = 50000
 	unlock_sim.roll_next_batch()
 	assert_eq(unlock_sim.active_color_count, 4, "fourth color unlocks")
@@ -172,13 +172,14 @@ func test_color_bag_has_two_of_each_and_unlock_forces_first_two() -> void:
 
 
 func test_all_unlock_score_boundaries() -> void:
-	var sim := _empty_sim(42)
+	var legacy_config: SlimeConfig = _legacy_score_config()
+	var sim := SlimeSim.new(legacy_config, 42, false, false)
 	for index: int in range(CONFIG.unlock_scores.size()):
 		var expected_before: int = CONFIG.start_colors + index
-		sim.score = CONFIG.unlock_scores[index] - 1
+		sim.score = legacy_config.unlock_scores[index] - 1
 		sim._check_color_unlocks()
 		assert_eq(sim.active_color_count, expected_before, "threshold minus one stays locked")
-		sim.score = CONFIG.unlock_scores[index]
+		sim.score = legacy_config.unlock_scores[index]
 		sim._check_color_unlocks()
 		assert_eq(sim.active_color_count, expected_before + 1, "exact threshold unlocks")
 
@@ -207,6 +208,57 @@ func test_turn_unlock_preview_uses_incoming_turn_and_forces_first_two() -> void:
 	assert_eq(sim.next_slimes.size(), 2, "unlock grace caps scheduled floor-three batch")
 
 
+func test_default_turn_unlocks_apply_at_twenty_turn_intervals() -> void:
+	var sim := SlimeSim.new(CONFIG, 44, false, false)
+	sim.turn = 18
+	sim.roll_next_batch()
+	assert_eq(sim.active_color_count, 3, "turn 19 preview keeps three colors")
+	var expected_turns: Array[int] = [20, 40, 60, 80]
+	for unlock_index: int in range(expected_turns.size()):
+		var unlock_turn: int = expected_turns[unlock_index]
+		sim.turn = unlock_turn - 1
+		sim.roll_next_batch()
+		var unlocked_color: int = CONFIG.start_colors + unlock_index
+		assert_eq(
+			sim.active_color_count,
+			unlocked_color + 1,
+			"active color count at turn %d" % unlock_turn
+		)
+		assert_eq(sim.next_slimes.size(), 2, "unlock grace caps turn %d" % unlock_turn)
+		for entry: Dictionary in sim.next_slimes:
+			assert_eq(
+				int(entry["color"]),
+				unlocked_color,
+				"turn %d forces the new color first" % unlock_turn
+			)
+
+
+func test_default_slime_progression_hash() -> void:
+	var sim := SlimeSim.new(CONFIG, 9200, false, false)
+	var turn_hashes: Array[String] = []
+	for incoming_turn: int in range(1, 81):
+		sim.turn = incoming_turn - 1
+		sim.roll_next_batch()
+		turn_hashes.append(sim.state_hash())
+	var hash_value: String = JSON.stringify(turn_hashes).sha256_text()
+	print("STAGED_DIFFICULTY_HASH slime=%s" % hash_value)
+	assert_eq(
+		hash_value,
+		"7ebe5d76b8c4843fa739e5c10405da172b577fdea1caca2047ed176b07455e97",
+		"SLIME staged progression hash"
+	)
+	var legacy_config: SlimeConfig = _legacy_score_config()
+	var legacy_sim := SlimeSim.new(legacy_config, 9200, false, false)
+	var legacy_turn_hashes: Array[String] = []
+	for incoming_turn: int in range(1, 81):
+		legacy_sim.turn = incoming_turn - 1
+		legacy_sim.roll_next_batch()
+		legacy_turn_hashes.append(legacy_sim.state_hash())
+	var legacy_hash: String = JSON.stringify(legacy_turn_hashes).sha256_text()
+	print("STAGED_DIFFICULTY_HASH slime_previous=%s" % legacy_hash)
+	assert_true(hash_value != legacy_hash, "SLIME default changed from the score schedule")
+
+
 func test_level_distribution_is_70_25_5_within_tolerance() -> void:
 	var sim := _empty_sim(50)
 	var counts: Array[int] = [0, 0, 0]
@@ -228,12 +280,9 @@ func test_batch_count_crowding_turn_floors_and_cap() -> void:
 	high.turn = 1
 	high.roll_next_batch()
 	assert_eq(high.next_slimes.size(), 1, "high crowd count")
-	high.turn = 30
-	high.roll_next_batch()
-	assert_eq(high.next_slimes.size(), 2, "turn 30 floor")
-	high.turn = 60
-	high.roll_next_batch()
-	assert_eq(high.next_slimes.size(), 3, "turn 60 floor")
+	assert_eq(high._roll_batch_count(20), 2, "turn 20 floor")
+	assert_eq(high._roll_batch_count(40), 3, "turn 40 floor")
+	assert_eq(high._roll_batch_count(60), 4, "turn 60 floor")
 
 	var capped := _empty_sim(62)
 	_add_separated_slimes(capped, 39)
@@ -246,7 +295,7 @@ func test_batch_count_table_and_unlock_grace() -> void:
 	for slime_count: int in [9, 10, 15, 16]:
 		var sim := _empty_sim(63 + slime_count)
 		_add_separated_slimes(sim, slime_count)
-		sim.turn = 29
+		sim.turn = 19
 		var base_count: int = sim._roll_batch_count()
 		if slime_count == 9:
 			assert_true(base_count == 3 or base_count == 4, "low crowd rolls 3 or 4")
@@ -254,10 +303,12 @@ func test_batch_count_table_and_unlock_grace() -> void:
 			assert_eq(base_count, 2, "10..15 crowd rolls 2")
 		else:
 			assert_eq(base_count, 1, "16+ crowd rolls 1")
-		sim.turn = 30
-		assert_true(sim._roll_batch_count() >= 2, "turn 30 minimum 2")
+		sim.turn = 20
+		assert_true(sim._roll_batch_count() >= 2, "turn 20 minimum 2")
+		sim.turn = 40
+		assert_true(sim._roll_batch_count() >= 3, "turn 40 minimum 3")
 		sim.turn = 60
-		assert_true(sim._roll_batch_count() >= 3, "turn 60 minimum 3")
+		assert_true(sim._roll_batch_count() >= 4, "turn 60 minimum 4")
 		sim.unlock_grace_waves_left = 1
 		sim.roll_next_batch()
 		assert_true(sim.next_slimes.size() <= 2, "unlock grace caps at two")
@@ -406,6 +457,14 @@ func test_fixed_step_accumulation_matches_60_and_120_hz() -> void:
 
 func _empty_sim(seed_value: int) -> SlimeSim:
 	return SlimeSim.new(CONFIG, seed_value, false, false)
+
+
+func _legacy_score_config() -> SlimeConfig:
+	var result: SlimeConfig = CONFIG.duplicate(true) as SlimeConfig
+	result.color_unlock_mode = "score"
+	result.color_unlock_turns = []
+	result.turn_floor_steps = [Vector2i(30, 2), Vector2i(60, 3)]
+	return result
 
 
 func _empty_sim_with_growth(seed_value: int, enabled: bool) -> SlimeSim:

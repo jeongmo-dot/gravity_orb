@@ -101,6 +101,7 @@ const CAPTURE_FILES: Array[String] = [
 	"50_slime_shell_play_busy.png",
 	"50_slime_shell_play_rejected.png",
 	"51_slime_max_growth.png",
+	"52_new_planet_callout.png",
 ]
 const HUD_CAPTURE_FILES: Array[String] = [
 	"02_turn_early.png",
@@ -120,6 +121,7 @@ const HUD_CAPTURE_FILES: Array[String] = [
 	"45_turn_busy_a.png",
 	"45_turn_busy_b.png",
 	"46_turn_rejected.png",
+	"52_new_planet_callout.png",
 ]
 
 var _failed: bool = false
@@ -265,6 +267,19 @@ func _capture_turn_scenes() -> void:
 			await _destroy_main(main)
 			return
 	await _capture("02_turn_early.png")
+	var capture_turn_index: int = manager.turn_index
+	manager.turn_index = 30
+	hud._on_preview_changed([
+		[{"color": OrbTypes.OrbColor.PURPLE, "level": 1}],
+		[{"color": OrbTypes.OrbColor.BLUE, "level": 1}],
+	])
+	hud._on_planet_unlocked(OrbTypes.OrbColor.PURPLE)
+	await get_tree().create_timer(0.08).timeout
+	await _capture("52_new_planet_callout.png")
+	if hud._callout_tween != null and hud._callout_tween.is_valid():
+		hud._callout_tween.kill()
+	hud._hide_callout_label()
+	manager.turn_index = capture_turn_index
 	manager.on_swipe(Vector2i.RIGHT)
 	await get_tree().create_timer(0.12).timeout
 	if not _hud_scenes_only:

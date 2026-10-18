@@ -96,10 +96,10 @@ func test_m4_spawn_defaults() -> void:
 	)
 	assert_eq(config.spawn_count_per_turn, 1, "spawn count per turn")
 	assert_eq(config.preview_turns, 2, "preview turns")
-	assert_eq(config.spawn_count_ramp_turns, 40, "spawn count ramp interval")
+	assert_eq(config.spawn_count_ramp_turns, 50, "spawn count ramp interval")
 	assert_eq(config.spawn_count_max, 0, "non-positive spawn count maximum is uncapped")
-	assert_eq(config.turn_start_colors, 6, "turn mode starts with all six colors")
-	assert_true(config.turn_color_unlock_turns.is_empty(), "turn color unlocks disabled by default")
+	assert_eq(config.turn_start_colors, 4, "turn mode starts with four colors")
+	assert_eq(config.turn_color_unlock_turns, [30, 60], "turn color unlock schedule")
 	assert_eq(config.spawn_position_mode, GameConfig.SpawnPositionMode.RANDOM, "position mode")
 	assert_near(config.spawn_margin, 4.0, TOLERANCE, "spawn margin")
 	assert_near(config.spawn_probe_step, 5.0, TOLERANCE, "spawn probe step")
@@ -111,11 +111,11 @@ func test_spawn_count_ramp_turn_boundaries() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	var expected: Dictionary = {
 		1: 1,
-		39: 1,
-		40: 1,
-		41: 2,
-		80: 2,
-		81: 3,
+		49: 1,
+		50: 1,
+		51: 2,
+		100: 2,
+		101: 3,
 	}
 	for turn_value: Variant in expected:
 		var turn_index: int = int(turn_value)
@@ -125,10 +125,10 @@ func test_spawn_count_ramp_turn_boundaries() -> void:
 			"spawn count at turn %d" % turn_index
 		)
 	config.spawn_count_max = -1
-	assert_eq(config.spawn_count_for_turn(81), 3, "negative maximum is also uncapped")
+	assert_eq(config.spawn_count_for_turn(101), 3, "negative maximum is also uncapped")
 	config.spawn_count_max = 3
-	assert_eq(config.spawn_count_for_turn(81), 3, "positive maximum permits third orb")
-	assert_eq(config.spawn_count_for_turn(121), 3, "positive maximum caps later turns")
+	assert_eq(config.spawn_count_for_turn(101), 3, "positive maximum permits third orb")
+	assert_eq(config.spawn_count_for_turn(151), 3, "positive maximum caps later turns")
 	assert_eq(config.spawn_count_for_turn(201), 3, "positive maximum remains capped")
 
 

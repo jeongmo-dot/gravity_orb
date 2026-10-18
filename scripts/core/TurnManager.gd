@@ -7,6 +7,7 @@ signal state_changed(state: State)
 signal gravity_changed(dir: Vector2i)
 signal turn_started(turn_index: int, dir: Vector2i)
 signal turn_finished(turn_index: int, combo: int)
+signal planet_unlocked(color_index: int)
 signal combo_changed(combo: int, multiplier: float, max_combo: int)
 signal reaction_ready(reaction: Dictionary)
 signal warning_changed(walls: Array[Vector2i])
@@ -167,6 +168,9 @@ func _on_settled() -> void:
 		game_over.emit()
 		return
 	_update_warnings()
+	var unlocked_color: int = Config.data.newly_unlocked_color_for_turn(turn_index)
+	if unlocked_color >= 0:
+		planet_unlocked.emit(unlocked_color)
 	InputRouter.set_locked(false)
 	_set_state(State.WAITING_INPUT)
 

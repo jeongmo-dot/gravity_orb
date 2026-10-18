@@ -40,7 +40,11 @@ func test_max_clear_unlock_and_turn_messages_use_spec_text() -> void:
 	chained_max.resolve_pairs()
 	assert_true(chained_max.message.begins_with("2 CHAIN!  +"), "chain message has priority over max message")
 
-	var unlock_sim := SlimeSim.new(CONFIG, 803, true, false)
+	var legacy_score_config: SlimeConfig = CONFIG.duplicate(true) as SlimeConfig
+	legacy_score_config.color_unlock_mode = "score"
+	legacy_score_config.color_unlock_turns = []
+	legacy_score_config.turn_floor_steps = [Vector2i(30, 2), Vector2i(60, 3)]
+	var unlock_sim := SlimeSim.new(legacy_score_config, 803, true, false)
 	unlock_sim.turn = 1
 	unlock_sim.score = 49950
 	_add_touching_pair(unlock_sim, Vector2(250.0, 420.0), 0, 1)
