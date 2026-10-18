@@ -108,6 +108,51 @@ func test_callout_stage_treatment_and_time_up_ring() -> void:
 	Config.data.fx_callouts_enabled = original_enabled
 
 
+func test_planet_unlock_waits_for_callout_and_preview_border_flashes_once() -> void:
+	var original_enabled: bool = Config.data.fx_callouts_enabled
+	Config.data.fx_callouts_enabled = true
+	var main: Main = await _create_main(GameConfig.GameMode.TURN)
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	var callout: Label = main.get_node("UI/Hud/CalloutLabel") as Label
+	var planet_visual: OrbVisual = main.get_node("UI/Hud/PlanetUnlockVisual") as OrbVisual
+	var then_flash: ReferenceRect = (
+		main.get_node("UI/Hud/ThenPreviewRegion/ThenUnlockFlash") as ReferenceRect
+	)
+	hud._show_callout("GREAT!", 1)
+	hud._on_planet_unlocked(OrbTypes.OrbColor.PURPLE)
+	hud._on_planet_unlocked(OrbTypes.OrbColor.PURPLE)
+	assert_eq(callout.text, "GREAT!", "ordinary callout keeps priority")
+	assert_eq(
+		hud.planet_unlock_history(),
+		[OrbTypes.OrbColor.PURPLE],
+		"planet unlock guide is recorded once"
+	)
+	await tree.create_timer(Hud.CALLOUT_TOTAL_DURATION + 0.05, true, false, true).timeout
+	assert_eq(callout.text, "새 행성 — 해왕성", "planet guide follows ordinary callout")
+	assert_true(callout.visible and planet_visual.visible, "planet guide shows text and L2 art")
+	assert_eq(planet_visual.celestial_level(), 2, "planet guide uses L2 art")
+
+	var unlock_preview: Array = [
+		[{"color": OrbTypes.OrbColor.RED, "level": 1}],
+		[{"color": OrbTypes.OrbColor.PURPLE, "level": 1}],
+	]
+	hud._on_preview_changed(unlock_preview)
+	hud._on_preview_changed(unlock_preview)
+	assert_eq(
+		hud.preview_unlock_flash_history(),
+		[OrbTypes.OrbColor.PURPLE],
+		"preview unlock border flashes once"
+	)
+	assert_true(then_flash.visible, "THEN border is visible during unlock flash")
+	assert_eq(
+		then_flash.border_color,
+		Config.data.color_display[OrbTypes.OrbColor.PURPLE],
+		"preview border uses unlocked planet color"
+	)
+	await _destroy_main(main)
+	Config.data.fx_callouts_enabled = original_enabled
+
+
 func test_blitz_timer_ticks_exactly_ten_times_with_urgent_last_three() -> void:
 	var original_enabled: bool = Config.data.fx_callouts_enabled
 	Config.data.fx_callouts_enabled = true

@@ -38,6 +38,39 @@
 
 ## 미확인
 
+### [2026-10-19] 대상 #92 — 단계별 난도 적용 + 새 행성 등장 안내
+- 상태: 완료 — `origin/main` `76e5aed`에서 항목 브랜치를 만든 뒤 CLASSIC C2·SLIME S2 기본값과 CLASSIC 새 행성 안내/미리보기 테두리 연출을 구현함. BLITZ 값과 SLIME 원본 안내 문구는 변경하지 않음
+- 브랜치 / PR: `staged-difficulty-rollout` / https://github.com/jeongmo-dot/gravity_orb/pull/94
+- 변경 파일: `config/{GameConfig,SlimeConfig}.gd`, `config/{default_config,slime_config}.tres`, `scripts/core/TurnManager.gd`, `scripts/ui/Hud.gd`, `tests/{capture_screens,test_callouts,test_config,test_slime_config,test_slime_sim,test_slime_visuals,test_spawner}.gd`, `tests/scenarios/test_turn_manager.gd`, `tests/spike/capture_screens.gd`, `tests/tools/slime_parity_candidate.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] CLASSIC 기본값을 시작 4색·30/60턴 색 해금·50턴 생성 수 증가로, SLIME을 turn 해금 20/40/60/80턴·등장 하한 20→2/40→3/60→4로 적용 — 자동 (`test_config`, `test_slime_config`, `test_spawner`, `test_slime_sim`)
+  - [x] CLASSIC 30턴 해왕성·60턴 수성 해금 신호를 정착/경고 갱신 뒤 입력 잠금 해제 전에 1회 발생 — 자동 (`test_turn_manager`, `test_callouts`)
+  - [x] 새 행성 안내를 호령 자리에서 1.2초·L2 2D 그림·기존 짧은 합성음으로 표시하고 기존 호령 활성 중이면 뒤에 이어서 표시 — 자동 (`test_callouts`) + 캡처 관측
+  - [x] NEXT/THEN에 새 색이 처음 나타난 칸의 테두리를 해당 색으로 0.6초 1회 표시 — 자동 (`test_callouts`) + 캡처 관측
+  - [x] 새 기본값의 CLASSIC·SLIME 진행 해시를 고정하고 BLITZ 기존 물리 해시, SLIME score 모드 원본 패리티를 확인 — 자동
+  - [x] C2·S2 R 봇 각 10판, 두 화면 비율 `52_new_planet_callout` 및 기존 CLASSIC 화면, 전체 캡처·4종 스모크·Debug 빌드 확인 — 자동 측정 + 캡처 관측
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard (`C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`)
+  - `godot --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` → 일반 `338/338`, 장기 `5/5`, 성능 `5/5`, 합계 `348/348`, 종료 코드 0, 총 `76.256초`
+  - 단계 진행 해시 → CLASSIC 새 기준 `cf6172428c7901c43eb74f417e6880dc3ad375a329e669a8904234f5d38d1031` (이전 기본값 `d8c292a705978725abf061e39e12a5880b46273e2b32755decd708acdaf8dc43`), SLIME 새 기준 `7ebe5d76b8c4843fa739e5c10405da172b577fdea1caca2047ed176b07455e97` (이전 score 기준 `667b808e1767c066dcc44149d4f41d7a491e69dbbd7e3b1d99ce7b5a6477c6cb`)
+  - BLITZ 물리 해시 → `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`로 기존 기준 동일
+  - `tests/tools/run_slime_parity.ps1` → score 모드·기존 하한으로 6개 시나리오, 허용 오차 `1e-6`, `PASS`
+  - C2 R 10판 턴 수 `[214, 227, 221, 193, 254, 227, 223, 240, 226, 223]`, 중앙값 `224.5`턴 (#91 C2 `221`턴 근처); 보고서 `artifacts/measurements/staged_difficulty_confirm_classic.json`
+  - S2 R 10판 턴 수 `[46, 36, 59, 58, 50, 51, 43, 62, 23, 59]`, 중앙값 `50.5`턴 (#91 S2 `52`턴 근처); 보고서 `artifacts/measurements/staged_difficulty_confirm_slime.json`
+  - `tests/capture_screens.ps1` 전체 실행 → 두 비율×74장=`148`장, 종료 코드 0. `52_new_planet_callout` 두 비율에서 호령 영역의 보라 L2 그림·`새 행성 — 해왕성`·NEXT 보라 테두리, 겹침/잘림 0건을 직접 확인. 기존 `02_turn_early`에서 시작 4색만 보이는 것도 확인
+  - 시작 화면 + TURN·BLITZ·SLIME `--quit-after 300` → 네 실행 모두 종료 코드 0, 오류 출력 0건
+  - `tools/build_windows.ps1 -Debug`만 실행 → 종료 코드 0, `build/windows-debug/GravityOrb_v0.13.1.exe` `105,046,040`바이트; Release 미실행
+  - 규칙 검사 → `Input`/`InputEvent`는 기존 `InputRouter.gd`·`Haptics.gd`만, 난수 검색 결과는 기존 명시적 RNG 인스턴스만, `git diff --check` 오류 0건
+  - 사용자 저장 파일은 검증 전후 `1,488`바이트, SHA-256 `FCB975CAFA6550D3C14DE2C8594E3E0EB5525208DA83130D4E359E50C7497F4C`로 동일
+- 수동 확인 절차:
+  1. CLASSIC을 시작해 30턴을 마친다 → 입력이 다시 열리기 직전에 기존 호령이 있으면 그것이 끝난 뒤, 보라 L2 그림과 `새 행성 — 해왕성`이 1.2초 표시되고 짧은 합성음이 한 번 나야 한다.
+  2. 30턴에 들어갈 보라색이 NEXT 또는 THEN에서 처음 보이는 시점을 본다 → 해당 미리보기 칸 테두리만 보라색으로 0.6초 한 번 반짝이고 이후 같은 색에는 반복하지 않아야 한다.
+  3. 같은 방식으로 60턴의 수성/청록색 안내와 테두리를 확인한다 → 각 안내·테두리는 게임당 한 번이어야 한다.
+  4. SLIME을 20·40·60·80턴까지 진행한다 → 원본 색 해금 메시지 문구가 유지되고, CLASSIC의 `새 행성 — …` 안내는 나타나지 않아야 한다.
+- 결정 사항: 행성 해금 신호는 정착·게임오버 검사·경고 갱신 뒤, 입력 잠금 해제 전에 보냄. 미리보기 테두리 굵기는 기존 호령 외곽선 토큰 `4px`을 재사용했고, 새 행성 안내는 활성 호령을 중단하지 않고 대기열에서 다음 순서로 재생함
+- 남은 것 · 질문: 없음
+
 ### [2026-10-18] 대상 #91 — 단계별 난도 후보 측정
 - 상태: 완료 — CLASSIC·SLIME의 턴별 색 해금/최소 등장 수 설정과 들어갈 턴 기준 미리보기를 구현하고, 기본값은 기존 동작으로 유지한 채 §12-R 후보 전체를 측정함
 - 브랜치 / PR: `staged-difficulty-measurement` / https://github.com/jeongmo-dot/gravity_orb/pull/93

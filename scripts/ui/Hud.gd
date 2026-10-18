@@ -12,6 +12,9 @@ const POPUP_MERGE_DISTANCE: float = 40.0
 const GOLD_COLOR: Color = Color("#FFD54A")
 const CALLOUT_TOTAL_DURATION: float = 0.80
 const CALLOUT_COSMIC_DURATION: float = 1.00
+const PLANET_UNLOCK_CALLOUT_DURATION: float = 1.20
+const PREVIEW_UNLOCK_FLASH_DURATION: float = 0.60
+const PLANET_UNLOCK_ORB_LEVEL: int = 2
 const CALLOUT_RISE_DISTANCE: float = 8.0
 const FEVER_ENTRY_DURATION: float = 0.30
 const FEVER_BAND_HOLD_DURATION: float = 0.50
@@ -31,6 +34,10 @@ const CALLOUT_COLORS: Array[Color] = [
 	Color("#FFD54A"),
 	Color("#FFD54A"),
 ]
+const PLANET_NAMES: Dictionary = {
+	OrbTypes.OrbColor.PURPLE: "해왕성",
+	OrbTypes.OrbColor.CYAN: "수성",
+}
 const TIMER_NORMAL_COLOR: Color = Color("#E8EEFF")
 const TIMER_DANGER_COLOR: Color = Color("#FF3B30")
 const TIMER_BONUS_COLOR: Color = Color("#30D158")
@@ -91,6 +98,8 @@ var _score_manager: ScoreManager
 var _blitz_manager: BlitzManager
 var _bonus_tween: Tween
 var _callout_tween: Tween
+var _next_preview_flash_tween: Tween
+var _then_preview_flash_tween: Tween
 var _fever_tween: Tween
 var _fever_streak_tween: Tween
 var _timer_punch_tween: Tween
@@ -125,6 +134,11 @@ var _previous_time_remaining: float = -1.0
 var _timer_flashing: bool = false
 var _callout_seen: Dictionary = {}
 var _callout_history: Array[int] = []
+var _planet_unlock_seen: Dictionary = {}
+var _planet_unlock_history: Array[int] = []
+var _pending_planet_unlocks: Array[int] = []
+var _preview_unlock_seen: Dictionary = {}
+var _preview_unlock_flash_history: Array[int] = []
 var _timer_tick_history: Array[int] = []
 var _urgent_timer_tick_history: Array[int] = []
 var _timer_tick_seen: Dictionary = {}
@@ -135,6 +149,10 @@ var _time_bonus_segment_start: float = 0.0
 var _last_bonus_target: Vector2 = Vector2.ZERO
 var _time_up_count: int = 0
 var _callout_base_position: Vector2 = Vector2.ZERO
+var _planet_callout_visual: OrbVisual
+var _planet_callout_base_position: Vector2 = Vector2.ZERO
+var _next_preview_flash: ReferenceRect
+var _then_preview_flash: ReferenceRect
 var _callout_sparkles: Array[CosmicSparkle] = []
 var _fever_sparkles: Array[CosmicSparkle] = []
 var _fever_streak: ColorRect
@@ -160,6 +178,8 @@ func _exit_tree() -> void:
 		get_viewport().size_changed.disconnect(_apply_responsive_layout)
 	for tween: Tween in [
 		_callout_tween,
+		_next_preview_flash_tween,
+		_then_preview_flash_tween,
 		_fever_tween,
 		_fever_streak_tween,
 		_time_up_tween,
@@ -178,6 +198,13 @@ func _exit_tree() -> void:
 
 
 func _create_v4_ui_effects() -> void:
+	_planet_callout_visual = OrbVisual.new()
+	_planet_callout_visual.name = "PlanetUnlockVisual"
+	_planet_callout_visual.z_index = 31
+	_planet_callout_visual.visible = false
+	add_child(_planet_callout_visual)
+	_next_preview_flash = _create_preview_flash("NextUnlockFlash", _next_preview_region)
+	_then_preview_flash = _create_preview_flash("ThenUnlockFlash", _then_preview_region)
 	for index: int in range(5):
 		var callout_sparkle: CosmicSparkle = CosmicSparkle.new()
 		callout_sparkle.name = "CalloutSparkle%d" % index
@@ -216,6 +243,18 @@ func _create_v4_ui_effects() -> void:
 	_fever_streak.color = Color.WHITE
 	add_child(_fever_streak)
 	_fever_streak.visible = false
+
+
+func _create_preview_flash(flash_name: String, region: Control) -> ReferenceRect:
+	var flash: ReferenceRect = ReferenceRect.new()
+	flash.name = flash_name
+	flash.editor_only = false
+	flash.border_width = float(_callout_label.get_theme_constant("outline_size"))
+	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	flash.visible = false
+	region.add_child(flash)
+	flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	return flash
 
 
 func _layout_fever_streak(viewport_size: Vector2) -> void:
@@ -447,6 +486,9 @@ func bind_game_state(
 	_blitz_manager = game_manager as BlitzManager if _blitz_mode else null
 	if not _blitz_mode:
 		_turn_input_indicator.bind(game_manager, board)
+		var turn_manager: TurnManager = game_manager as TurnManager
+		if not turn_manager.planet_unlocked.is_connected(_on_planet_unlocked):
+			turn_manager.planet_unlocked.connect(_on_planet_unlocked)
 	game_manager.warning_changed.connect(_on_warning_changed)
 	game_manager.combo_changed.connect(_on_combo_changed)
 	_game_over_panel.bind(game_manager, score_manager)
@@ -488,6 +530,48 @@ func _on_preview_changed(batches: Array) -> void:
 	_render_preview(_then_preview, then_batch)
 	_then_count_label.visible = has_then and then_batch.size() > MAX_PREVIEW_COUNT
 	_then_count_label.text = "×%d" % then_batch.size()
+	_track_preview_unlocks(batches)
+
+
+func _track_preview_unlocks(batches: Array) -> void:
+	if Config.data.game_mode != GameConfig.GameMode.TURN:
+		return
+	for batch_index: int in range(mini(batches.size(), 2)):
+		var batch: Array = batches[batch_index] as Array
+		for candidate: Dictionary in batch:
+			var color_index: int = int(candidate.get("color", -1))
+			if color_index < Config.data.turn_start_colors:
+				continue
+			if _preview_unlock_seen.has(color_index):
+				continue
+			_preview_unlock_seen[color_index] = true
+			_preview_unlock_flash_history.append(color_index)
+			if Config.data.fx_callouts_enabled:
+				_flash_preview_slot(batch_index, color_index)
+			break
+
+
+func _flash_preview_slot(batch_index: int, color_index: int) -> void:
+	var flash: ReferenceRect = (
+		_next_preview_flash if batch_index == 0 else _then_preview_flash
+	)
+	var active_tween: Tween = (
+		_next_preview_flash_tween if batch_index == 0 else _then_preview_flash_tween
+	)
+	if active_tween != null and active_tween.is_valid():
+		active_tween.kill()
+	flash.border_color = Config.data.color_display[color_index]
+	flash.modulate = Color.WHITE
+	flash.visible = true
+	var tween: Tween = create_tween()
+	tween.tween_property(
+		flash, "modulate:a", 0.0, PREVIEW_UNLOCK_FLASH_DURATION
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_callback(flash.hide)
+	if batch_index == 0:
+		_next_preview_flash_tween = tween
+	else:
+		_then_preview_flash_tween = tween
 
 
 func _render_preview(preview_root: Node2D, batch: Array) -> void:
@@ -1223,6 +1307,7 @@ func _show_callout(text: String, stage_index: int = 0) -> void:
 	if _callout_tween != null and _callout_tween.is_valid():
 		_callout_tween.kill()
 	_stop_sparkles(_callout_sparkles)
+	_planet_callout_visual.visible = false
 	var clamped_stage: int = clampi(stage_index, 0, CALLOUT_WORDS.size() - 1)
 	var cosmic: bool = clamped_stage >= 3
 	var duration: float = CALLOUT_COSMIC_DURATION if cosmic else CALLOUT_TOTAL_DURATION
@@ -1257,7 +1342,114 @@ func _show_callout(text: String, stage_index: int = 0) -> void:
 	_callout_tween.tween_property(
 		_callout_label, "modulate:a", 0.0, 0.25
 	).set_delay(duration - 0.25)
-	_callout_tween.chain().tween_callback(_hide_callout_label)
+	_callout_tween.chain().tween_callback(_complete_callout)
+
+
+func _on_planet_unlocked(color_index: int) -> void:
+	if not PLANET_NAMES.has(color_index) or _planet_unlock_seen.has(color_index):
+		return
+	_planet_unlock_seen[color_index] = true
+	_planet_unlock_history.append(color_index)
+	if not Config.data.fx_callouts_enabled:
+		return
+	_pending_planet_unlocks.append(color_index)
+	if not _callout_label.visible:
+		_show_next_planet_unlock()
+
+
+func _show_next_planet_unlock() -> void:
+	if _pending_planet_unlocks.is_empty() or _callout_label.visible:
+		return
+	var color_index: int = _pending_planet_unlocks.pop_front()
+	_show_planet_unlock(color_index)
+
+
+func _show_planet_unlock(color_index: int) -> void:
+	if _callout_tween != null and _callout_tween.is_valid():
+		_callout_tween.kill()
+	_stop_sparkles(_callout_sparkles)
+	var text: String = "새 행성 — %s" % str(PLANET_NAMES[color_index])
+	var display_color: Color = Config.data.color_display[color_index]
+	_callout_label.text = text
+	_callout_label.add_theme_color_override("font_color", display_color)
+	_callout_label.add_theme_color_override(
+		"font_outline_color", Color(0.02, 0.035, 0.07, 0.92)
+	)
+	_callout_label.add_theme_constant_override("outline_size", 4)
+	_callout_label.add_theme_color_override("font_shadow_color", Color.TRANSPARENT)
+	_callout_label.add_theme_constant_override("shadow_outline_size", 0)
+	_callout_label.visible = true
+	_callout_label.modulate = Color.WHITE
+	_callout_label.position = _callout_base_position
+	_callout_label.scale = Vector2.ONE * 0.90
+	_planet_callout_visual.setup_celestial_preview(
+		display_color,
+		Config.data.radius_for_level(PLANET_UNLOCK_ORB_LEVEL),
+		PLANET_UNLOCK_ORB_LEVEL,
+		color_index,
+		Config.data.orb_symbols_enabled
+	)
+	_layout_planet_callout_visual(text)
+	_planet_callout_visual.visible = true
+	_planet_callout_visual.modulate = Color.WHITE
+	_planet_callout_visual.scale = Vector2.ONE * 0.90
+	if _sfx_bank != null:
+		_sfx_bank.play_callout_chime(0)
+	_callout_tween = create_tween()
+	_callout_tween.set_parallel(true)
+	_callout_tween.tween_property(
+		_callout_label, "scale", Vector2.ONE, PLANET_UNLOCK_CALLOUT_DURATION * 0.45
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_callout_tween.tween_property(
+		_planet_callout_visual,
+		"scale",
+		Vector2.ONE,
+		PLANET_UNLOCK_CALLOUT_DURATION * 0.45
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_callout_tween.tween_property(
+		_callout_label,
+		"position",
+		_callout_base_position + Vector2.UP * CALLOUT_RISE_DISTANCE,
+		PLANET_UNLOCK_CALLOUT_DURATION * 0.72
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_callout_tween.tween_property(
+		_planet_callout_visual,
+		"position",
+		_planet_callout_base_position + Vector2.UP * CALLOUT_RISE_DISTANCE,
+		PLANET_UNLOCK_CALLOUT_DURATION * 0.72
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_callout_tween.tween_property(
+		_callout_label, "modulate:a", 0.0, 0.25
+	).set_delay(PLANET_UNLOCK_CALLOUT_DURATION - 0.25)
+	_callout_tween.tween_property(
+		_planet_callout_visual, "modulate:a", 0.0, 0.25
+	).set_delay(PLANET_UNLOCK_CALLOUT_DURATION - 0.25)
+	_callout_tween.chain().tween_callback(_complete_callout)
+
+
+func _layout_planet_callout_visual(text: String) -> void:
+	var font: Font = _callout_label.get_theme_font("font")
+	var font_size: int = _callout_label.get_theme_font_size("font_size")
+	var text_width: float = font.get_string_size(
+		text,
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1.0,
+		font_size
+	).x
+	var radius: float = Config.data.radius_for_level(PLANET_UNLOCK_ORB_LEVEL)
+	_planet_callout_base_position = Vector2(
+		_callout_label.position.x + (_callout_label.size.x - text_width) * 0.5
+		- radius - PREVIEW_GAP,
+		_callout_label.position.y + _callout_label.size.y * 0.5
+	)
+	_planet_callout_visual.position = _planet_callout_base_position
+
+
+func _complete_callout() -> void:
+	_hide_callout_label()
+	_callout_tween = null
+	if not _pending_planet_unlocks.is_empty():
+		call_deferred("_show_next_planet_unlock")
 
 
 func _show_callout_sparkles(stage_index: int, duration: float) -> void:
@@ -1532,6 +1724,11 @@ func _configure_fever_vignette() -> void:
 func _reset_callout_tracking() -> void:
 	_callout_seen.clear()
 	_callout_history.clear()
+	_planet_unlock_seen.clear()
+	_planet_unlock_history.clear()
+	_pending_planet_unlocks.clear()
+	_preview_unlock_seen.clear()
+	_preview_unlock_flash_history.clear()
 	_timer_tick_seen.clear()
 	_timer_tick_history.clear()
 	_urgent_timer_tick_history.clear()
@@ -1557,6 +1754,9 @@ func _hide_callout_label() -> void:
 	_callout_label.visible = false
 	_callout_label.scale = Vector2.ONE
 	_callout_label.position = _callout_base_position
+	_planet_callout_visual.visible = false
+	_planet_callout_visual.scale = Vector2.ONE
+	_planet_callout_visual.position = _planet_callout_base_position
 	_stop_sparkles(_callout_sparkles)
 
 
@@ -1602,6 +1802,14 @@ func fever_vignette_shader_code() -> String:
 
 func callout_history() -> Array[int]:
 	return _callout_history.duplicate()
+
+
+func planet_unlock_history() -> Array[int]:
+	return _planet_unlock_history.duplicate()
+
+
+func preview_unlock_flash_history() -> Array[int]:
+	return _preview_unlock_flash_history.duplicate()
 
 
 func timer_tick_history() -> Array[int]:

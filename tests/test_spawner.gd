@@ -285,21 +285,32 @@ func test_ramp_preview_batches_use_each_future_turn_number() -> void:
 func test_turn_color_preview_uses_target_turn_and_forces_new_color_first() -> void:
 	var snapshot: Dictionary = _snapshot_spawn_config()
 	Config.data.preview_turns = 2
-	Config.data.spawn_count_per_turn = 2
-	Config.data.spawn_count_ramp_turns = 0
+	Config.data.spawn_count_per_turn = 1
+	Config.data.spawn_count_ramp_turns = 50
 	Config.data.turn_start_colors = 4
-	Config.data.turn_color_unlock_turns = [5, 8]
+	Config.data.turn_color_unlock_turns = [30, 60]
 	var spawner := Spawner.new()
 	spawner.init_rng(9105)
-	spawner.sync_next_batch_size(4)
+	spawner.sync_next_batch_size(29)
 	var before_unlock: Array = spawner.peek_preview()
 	for candidate: Dictionary in before_unlock[0] as Array:
-		assert_true(int(candidate["color"]) < 4, "turn 4 only uses starting colors")
+		assert_true(int(candidate["color"]) < 4, "turn 29 only uses starting colors")
 	var unlock_batch: Array = before_unlock[1] as Array
-	assert_eq(int((unlock_batch[0] as Dictionary)["color"]), 4, "turn 5 first orb is new color")
+	assert_eq(int((unlock_batch[0] as Dictionary)["color"]), 4, "turn 30 first orb is Neptune")
 	for candidate: Dictionary in unlock_batch:
-		assert_true(int(candidate["color"]) <= 4, "turn 5 excludes sixth color")
+		assert_true(int(candidate["color"]) <= 4, "turn 30 excludes Mercury")
 	spawner.free()
+	var second_spawner := Spawner.new()
+	second_spawner.init_rng(9105)
+	second_spawner.sync_next_batch_size(59)
+	var second_unlock_preview: Array = second_spawner.peek_preview()
+	var second_unlock_batch: Array = second_unlock_preview[1] as Array
+	assert_eq(
+		int((second_unlock_batch[0] as Dictionary)["color"]),
+		5,
+		"turn 60 first orb is Mercury"
+	)
+	second_spawner.free()
 	_restore_spawn_config(snapshot)
 
 
@@ -316,6 +327,53 @@ func test_turn_ramp_does_not_change_blitz_preview_sizes() -> void:
 	assert_eq((preview[1] as Array).size(), 1, "BLITZ THEN remains one candidate")
 	assert_eq(spawner._batch_size_for_index(201), 1, "BLITZ ignores turn ramp")
 	spawner.free()
+	_restore_spawn_config(snapshot)
+
+
+func test_default_classic_progression_hash() -> void:
+	var snapshot: Dictionary = _snapshot_spawn_config()
+	var spawner := Spawner.new()
+	spawner.init_rng(9200)
+	var rows: Array[Dictionary] = []
+	for turn_index: int in range(1, 81):
+		var candidates: Array[Dictionary] = []
+		for candidate: Dictionary in spawner._draw_batch(turn_index):
+			candidates.append({
+				"color": int(candidate["color"]),
+				"level": int(candidate["level"]),
+				"t": float(candidate["t"]),
+			})
+		rows.append({"turn": turn_index, "candidates": candidates})
+	var hash_value: String = JSON.stringify(rows).sha256_text()
+	print("STAGED_DIFFICULTY_HASH classic=%s" % hash_value)
+	assert_eq(
+		hash_value,
+		"cf6172428c7901c43eb74f417e6880dc3ad375a329e669a8904234f5d38d1031",
+		"CLASSIC staged progression hash"
+	)
+	spawner.free()
+	Config.data.spawn_count_ramp_turns = 40
+	Config.data.turn_start_colors = 6
+	Config.data.turn_color_unlock_turns = []
+	var legacy_spawner := Spawner.new()
+	legacy_spawner.init_rng(9200)
+	var legacy_rows: Array[Dictionary] = []
+	for turn_index: int in range(1, 81):
+		var legacy_candidates: Array[Dictionary] = []
+		for candidate: Dictionary in legacy_spawner._draw_batch(turn_index):
+			legacy_candidates.append({
+				"color": int(candidate["color"]),
+				"level": int(candidate["level"]),
+				"t": float(candidate["t"]),
+			})
+		legacy_rows.append({"turn": turn_index, "candidates": legacy_candidates})
+	var legacy_hash: String = JSON.stringify(legacy_rows).sha256_text()
+	print("STAGED_DIFFICULTY_HASH classic_previous=%s" % legacy_hash)
+	assert_true(
+		hash_value != legacy_hash,
+		"CLASSIC default changed from the six-color schedule"
+	)
+	legacy_spawner.free()
 	_restore_spawn_config(snapshot)
 
 

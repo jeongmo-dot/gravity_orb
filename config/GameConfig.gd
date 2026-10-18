@@ -47,10 +47,10 @@ enum GameMode { TURN, BLITZ, SLIME }
 )
 @export var spawn_count_per_turn: int = 1
 @export var preview_turns: int = 2
-@export var spawn_count_ramp_turns: int = 40
+@export var spawn_count_ramp_turns: int = 50
 @export var spawn_count_max: int = 0
-@export var turn_start_colors: int = 6
-@export var turn_color_unlock_turns: Array[int] = []
+@export var turn_start_colors: int = 4
+@export var turn_color_unlock_turns: Array[int] = [30, 60]
 @export var spawn_position_mode: SpawnPositionMode = SpawnPositionMode.RANDOM
 @export var spawn_margin: float = 4.0
 @export var spawn_probe_step: float = 5.0

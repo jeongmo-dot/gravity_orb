@@ -22,6 +22,9 @@ func _run() -> void:
 		return
 	var parity_config: SlimeConfig = CONFIG.duplicate(true) as SlimeConfig
 	parity_config.max_growth_enabled = false
+	parity_config.color_unlock_mode = "score"
+	parity_config.color_unlock_turns = []
+	parity_config.turn_floor_steps = [Vector2i(30, 2), Vector2i(60, 3)]
 	for scenario: int in range(1, 7):
 		var sim := SlimeSim.new(parity_config, 8062 + scenario, false, false)
 		_setup_scenario(sim, scenario)
