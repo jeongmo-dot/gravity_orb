@@ -51,8 +51,10 @@ var _seed_blast_moved_ratio_sum_by_level: Dictionary = {}
 var _seed_first_blast_turn: int = -1
 var _current_measurement_turn: int = 0
 var _turn_reaction_count: int = 0
+var _turn_merge_count: int = 0
 var _turn_blast_count: int = 0
 var _preview_fixture_serial: int = 0
+var _seed_seen_colors: Dictionary = {}
 
 
 func _ready() -> void:
@@ -94,6 +96,8 @@ func _run() -> void:
 		"spawn_count_per_turn": Config.data.spawn_count_per_turn,
 		"spawn_count_ramp_turns": Config.data.spawn_count_ramp_turns,
 		"spawn_count_max": Config.data.spawn_count_max,
+		"turn_start_colors": Config.data.turn_start_colors,
+		"turn_color_unlock_turns": Config.data.turn_color_unlock_turns,
 		"preview_turns": Config.data.preview_turns,
 		"level_radii_px": Array(Config.data.level_radii),
 		"corrections": {
@@ -235,12 +239,14 @@ func _run_seed(
 	_seed_blast_count_by_level.clear()
 	_seed_blast_moved_ratio_sum_by_level.clear()
 	_seed_first_blast_turn = -1
+	_seed_seen_colors.clear()
 	_current_measurement_turn = 0
 	var fixture: Dictionary = await _create_fixture(seed)
 	var fixture_root: Node = fixture["root"] as Node
 	var board: Board3D = fixture["board"] as Board3D
 	var manager: TurnManager = fixture["manager"] as TurnManager
 	var score_manager: ScoreManager = fixture["score_manager"] as ScoreManager
+	_record_seen_colors(board)
 	var completed_turns: int = 0
 	var aborted: bool = false
 	var abort_reason: String = ""
@@ -265,6 +271,7 @@ func _run_seed(
 		_turn_shock_events.clear()
 		_current_measurement_turn = turn_offset + 1
 		_turn_reaction_count = 0
+		_turn_merge_count = 0
 		_turn_blast_count = 0
 		var score_before: int = score_manager.score
 		var direction: Vector2i = DIRECTION_PATTERN[turn_offset % DIRECTION_PATTERN.size()]
@@ -298,6 +305,7 @@ func _run_seed(
 		manager.on_swipe(direction)
 		var frame_metrics: Dictionary = await _wait_for_turn_end(manager, board, physics_ms)
 		var entrance_waiting_count: int = board.entrance_waiting_orbs().size()
+		_record_seen_colors(board)
 		if entrance_waiting_count > 0:
 			entrance_blocked_turns += 1
 		if start_occupancy >= 0.60:
@@ -321,6 +329,7 @@ func _run_seed(
 			"turn": completed_turns,
 			"occupancy": occupancy,
 			"reactions": _turn_reaction_count,
+			"merges": _turn_merge_count,
 			"combo": manager.turn_combo,
 			"score_gain": score_manager.score - score_before,
 			"blast_count": _turn_blast_count,
@@ -408,6 +417,10 @@ func _run_seed(
 		"preview_unblocked_spread_sum": preview_unblocked_spread_sum,
 		"preview_score_gain_spreads": preview_score_gain_spreads,
 		"preview_decision_usec_sum": preview_decision_usec_sum,
+		"early_merge_count": _early_merge_count(turn_rows),
+		"early_turn_count": mini(completed_turns, 30),
+		"seen_colors": _sorted_seen_colors(),
+		"seen_color_count": _seed_seen_colors.size(),
 		"reactions_three_turns_after_blast": _reactions_after_blast(turn_rows),
 		"turn_rows": turn_rows,
 		"aborted": aborted,
@@ -796,6 +809,8 @@ func _projection_item_less(first: Dictionary, second: Dictionary) -> bool:
 func _record_shock_event(reaction: Dictionary) -> void:
 	var reaction_type: ReactionRules.Type = reaction["type"] as ReactionRules.Type
 	_turn_reaction_count += 1
+	if reaction_type == ReactionRules.Type.MERGE:
+		_turn_merge_count += 1
 	if reaction_type == ReactionRules.Type.BLAST:
 		_turn_blast_count += 1
 		_seed_blast_count += 1
@@ -895,6 +910,28 @@ func _empty_shock_displacements() -> Dictionary:
 			"reaction_mean_sum_px": 0.0,
 			"reaction_samples": 0,
 		}
+	return result
+
+
+func _record_seen_colors(board: Board3D) -> void:
+	for orb: Orb3D in board.get_orbs():
+		_seed_seen_colors[orb.color] = true
+
+
+func _sorted_seen_colors() -> Array[int]:
+	var result: Array[int] = []
+	for color_value: Variant in _seed_seen_colors.keys():
+		result.append(int(color_value))
+	result.sort()
+	return result
+
+
+func _early_merge_count(turn_rows: Array[Dictionary]) -> int:
+	var result: int = 0
+	for row: Dictionary in turn_rows:
+		if int(row["turn"]) > 30:
+			break
+		result += int(row.get("merges", 0))
 	return result
 
 
@@ -1607,6 +1644,15 @@ func _apply_arguments() -> void:
 			Config.data.spawn_count_max = maxi(
 				argument.trim_prefix("--spawn-count-max=").to_int(),
 				0
+			)
+		elif argument.begins_with("--turn-start-colors="):
+			Config.data.turn_start_colors = maxi(
+				argument.trim_prefix("--turn-start-colors=").to_int(),
+				1
+			)
+		elif argument.begins_with("--turn-color-unlock-turns="):
+			Config.data.turn_color_unlock_turns.assign(
+				_parse_int_list(argument.trim_prefix("--turn-color-unlock-turns="))
 			)
 		elif argument.begins_with("--level-radii="):
 			Config.data.level_radii = _parse_float_list(

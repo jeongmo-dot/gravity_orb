@@ -282,6 +282,27 @@ func test_ramp_preview_batches_use_each_future_turn_number() -> void:
 	_restore_spawn_config(snapshot)
 
 
+func test_turn_color_preview_uses_target_turn_and_forces_new_color_first() -> void:
+	var snapshot: Dictionary = _snapshot_spawn_config()
+	Config.data.preview_turns = 2
+	Config.data.spawn_count_per_turn = 2
+	Config.data.spawn_count_ramp_turns = 0
+	Config.data.turn_start_colors = 4
+	Config.data.turn_color_unlock_turns = [5, 8]
+	var spawner := Spawner.new()
+	spawner.init_rng(9105)
+	spawner.sync_next_batch_size(4)
+	var before_unlock: Array = spawner.peek_preview()
+	for candidate: Dictionary in before_unlock[0] as Array:
+		assert_true(int(candidate["color"]) < 4, "turn 4 only uses starting colors")
+	var unlock_batch: Array = before_unlock[1] as Array
+	assert_eq(int((unlock_batch[0] as Dictionary)["color"]), 4, "turn 5 first orb is new color")
+	for candidate: Dictionary in unlock_batch:
+		assert_true(int(candidate["color"]) <= 4, "turn 5 excludes sixth color")
+	spawner.free()
+	_restore_spawn_config(snapshot)
+
+
 func test_turn_ramp_does_not_change_blitz_preview_sizes() -> void:
 	var snapshot: Dictionary = _snapshot_spawn_config()
 	Config.data.spawn_count_ramp_turns = 100
@@ -375,6 +396,8 @@ func _snapshot_spawn_config() -> Dictionary:
 		"preview_turns": Config.data.preview_turns,
 		"spawn_count_ramp_turns": Config.data.spawn_count_ramp_turns,
 		"spawn_count_max": Config.data.spawn_count_max,
+		"turn_start_colors": Config.data.turn_start_colors,
+		"turn_color_unlock_turns": Config.data.turn_color_unlock_turns.duplicate(),
 	}
 
 
@@ -389,3 +412,5 @@ func _restore_spawn_config(snapshot: Dictionary) -> void:
 	Config.data.preview_turns = int(snapshot["preview_turns"])
 	Config.data.spawn_count_ramp_turns = int(snapshot["spawn_count_ramp_turns"])
 	Config.data.spawn_count_max = int(snapshot["spawn_count_max"])
+	Config.data.turn_start_colors = int(snapshot["turn_start_colors"])
+	Config.data.turn_color_unlock_turns.assign(snapshot["turn_color_unlock_turns"])

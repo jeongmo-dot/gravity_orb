@@ -380,12 +380,15 @@ func radius_for_mass(mass_value: int) -> float:
 
 
 func roll_next_batch() -> void:
-	_check_color_unlocks()
+	var scheduled_turn: int = turn
+	if config.color_unlock_mode == "turn":
+		scheduled_turn = turn + 1
+	_check_color_unlocks(scheduled_turn)
 	var free_slots: int = maxi(0, config.max_slimes - slimes.size())
 	if free_slots <= 0:
 		next_slimes.clear()
 		return
-	var count: int = _roll_batch_count()
+	var count: int = _roll_batch_count(scheduled_turn)
 	if unlock_grace_waves_left > 0:
 		count = mini(count, config.unlock_grace_max_count)
 		unlock_grace_waves_left -= 1
@@ -632,7 +635,10 @@ func _update_intro(delta: float) -> void:
 			if _visuals_enabled:
 				spawned.visual_scale = 0.35
 			intro_queue.pop_front()
-			_emit_event("spawned", {"level": level_value, "lane": lane})
+			_emit_event(
+				"spawned",
+				{"level": level_value, "color": spawned.color_index, "lane": lane}
+			)
 			continue
 		if intro_elapsed > delay + config.intro_abandon_time:
 			intro_queue.clear()
@@ -824,13 +830,21 @@ func _add_chain_score(base_score: int) -> int:
 	return gained
 
 
-func _check_color_unlocks() -> void:
+func _check_color_unlocks(scheduled_turn: int = -1) -> void:
 	while active_color_count < config.slime_colors.size():
 		var threshold_index: int = active_color_count - config.start_colors
-		if threshold_index < 0 or threshold_index >= config.unlock_scores.size():
+		if threshold_index < 0:
 			return
-		if score < config.unlock_scores[threshold_index]:
-			return
+		if config.color_unlock_mode == "turn":
+			if threshold_index >= config.color_unlock_turns.size():
+				return
+			if scheduled_turn < 0 or scheduled_turn < config.color_unlock_turns[threshold_index]:
+				return
+		else:
+			if threshold_index >= config.unlock_scores.size():
+				return
+			if score < config.unlock_scores[threshold_index]:
+				return
 		pending_new_color = active_color_count
 		active_color_count += 1
 		unlock_grace_waves_left = config.unlock_grace_waves
@@ -854,7 +868,7 @@ func _schedule_next_batch(direction: Vector2i) -> void:
 	gravity_direction = direction
 
 
-func _roll_batch_count() -> int:
+func _roll_batch_count(scheduled_turn: int = -1) -> int:
 	var slime_count: int = slimes.size()
 	var count: int
 	if slime_count < config.crowd_thresholds[0]:
@@ -863,10 +877,8 @@ func _roll_batch_count() -> int:
 		count = config.medium_crowd_spawn_count
 	else:
 		count = config.high_crowd_spawn_count
-	if turn >= config.turn_level_three_floor:
-		count = maxi(count, 3)
-	elif turn >= config.turn_level_two_floor:
-		count = maxi(count, 2)
+	var floor_turn: int = turn if scheduled_turn < 0 else scheduled_turn
+	count = maxi(count, config.minimum_spawn_count_for_turn(floor_turn))
 	return count
 
 

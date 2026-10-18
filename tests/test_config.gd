@@ -98,6 +98,8 @@ func test_m4_spawn_defaults() -> void:
 	assert_eq(config.preview_turns, 2, "preview turns")
 	assert_eq(config.spawn_count_ramp_turns, 40, "spawn count ramp interval")
 	assert_eq(config.spawn_count_max, 0, "non-positive spawn count maximum is uncapped")
+	assert_eq(config.turn_start_colors, 6, "turn mode starts with all six colors")
+	assert_true(config.turn_color_unlock_turns.is_empty(), "turn color unlocks disabled by default")
 	assert_eq(config.spawn_position_mode, GameConfig.SpawnPositionMode.RANDOM, "position mode")
 	assert_near(config.spawn_margin, 4.0, TOLERANCE, "spawn margin")
 	assert_near(config.spawn_probe_step, 5.0, TOLERANCE, "spawn probe step")
@@ -128,6 +130,18 @@ func test_spawn_count_ramp_turn_boundaries() -> void:
 	assert_eq(config.spawn_count_for_turn(81), 3, "positive maximum permits third orb")
 	assert_eq(config.spawn_count_for_turn(121), 3, "positive maximum caps later turns")
 	assert_eq(config.spawn_count_for_turn(201), 3, "positive maximum remains capped")
+
+
+func test_turn_color_unlock_boundaries_follow_color_order() -> void:
+	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
+	config.turn_start_colors = 4
+	config.turn_color_unlock_turns = [30, 60]
+	assert_eq(config.color_count_for_turn(29), 4, "four colors before first unlock")
+	assert_eq(config.color_count_for_turn(30), 5, "fifth color unlocks at turn 30")
+	assert_eq(config.color_count_for_turn(60), 6, "sixth color unlocks at turn 60")
+	assert_eq(config.newly_unlocked_color_for_turn(30), 4, "fifth color index")
+	assert_eq(config.newly_unlocked_color_for_turn(60), 5, "sixth color index")
+	assert_eq(config.newly_unlocked_color_for_turn(31), -1, "no forced color after unlock turn")
 
 
 func test_m5_contact_defaults() -> void:

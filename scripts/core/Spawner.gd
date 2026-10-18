@@ -84,7 +84,7 @@ func spawn_initial(board: Variant, gravity: Vector2i) -> void:
 	var count: int = Config.data.initial_orb_count
 	var half: float = board.half_size()
 	for index: int in range(count):
-		var candidate: Dictionary = _draw_candidate()
+		var candidate: Dictionary = _draw_candidate_for_turn(1)
 		var level: int = int(candidate["level"])
 		var radius: float = Config.data.radius_for_level(level)
 		var fraction: float = float(index + 1) / float(count + 1)
@@ -243,7 +243,12 @@ func sync_next_batch_size(next_turn_index: int = 1) -> void:
 		var batch: Array = _preview_batches[turn_offset]
 		var target_size: int = _batch_size_for_index(next_turn_index + turn_offset)
 		while batch.size() < target_size:
-			batch.append(_draw_candidate())
+			batch.append(
+				_draw_candidate_for_turn(
+					next_turn_index + turn_offset,
+					batch.is_empty()
+				)
+			)
 		if batch.size() > target_size:
 			batch.resize(target_size)
 	_publish_preview()
@@ -274,11 +279,29 @@ func _draw_candidate() -> Dictionary:
 	return {"level": level, "color": color, "t": position_t}
 
 
+func _draw_candidate_for_turn(turn_index: int, first_in_batch: bool = false) -> Dictionary:
+	if _blitz_mode:
+		return _draw_candidate()
+	var level: int = _rng.rand_weighted(Config.data.spawn_level_weights) + 1
+	var active_color_count: int = Config.data.color_count_for_turn(turn_index)
+	var color_weights: PackedFloat32Array = Config.data.spawn_color_weights
+	if active_color_count < color_weights.size():
+		color_weights = color_weights.duplicate()
+		for color_index: int in range(active_color_count, color_weights.size()):
+			color_weights[color_index] = 0.0
+	var color: int = _rng.rand_weighted(color_weights)
+	var position_t: float = _rng.randf()
+	var forced_color: int = Config.data.newly_unlocked_color_for_turn(turn_index)
+	if first_in_batch and forced_color >= 0:
+		color = forced_color
+	return {"level": level, "color": color, "t": position_t}
+
+
 func _draw_batch(turn_index: int = 1) -> Array[Dictionary]:
 	var batch: Array[Dictionary] = []
 	var count: int = _batch_size_for_index(turn_index)
-	for _index: int in range(count):
-		batch.append(_draw_candidate())
+	for index: int in range(count):
+		batch.append(_draw_candidate_for_turn(turn_index, index == 0))
 	return batch
 
 
