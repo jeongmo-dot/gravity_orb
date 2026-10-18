@@ -38,6 +38,61 @@
 
 ## 미확인
 
+### [2026-10-18] 대상 #91 — 단계별 난도 후보 측정
+- 상태: 완료 — CLASSIC·SLIME의 턴별 색 해금/최소 등장 수 설정과 들어갈 턴 기준 미리보기를 구현하고, 기본값은 기존 동작으로 유지한 채 §12-R 후보 전체를 측정함
+- 브랜치 / PR: `staged-difficulty-measurement` / PR 생성 후 갱신 예정
+- 변경 파일: `config/{GameConfig,SlimeConfig}.gd`, `config/{default_config,slime_config}.tres`, `scripts/core/Spawner.gd`, `scripts/slime/SlimeSim.gd`, `tests/{test_config,test_slime_config,test_slime_sim,test_spawner}.gd`, `tests/spike/run_jolt_3d_measurement.gd`, `tests/tools/{run_mode_skill_slime_measurement.gd,run_staged_difficulty_measurement.ps1}`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] CLASSIC `turn_start_colors`·`turn_color_unlock_turns`, SLIME `color_unlock_mode`·`color_unlock_turns`·`turn_floor_steps` 추가, 기본값은 기존 6색/점수 해금/30→2·60→3 — 자동 (`test_config`, `test_slime_config`)
+  - [x] CLASSIC 새 색은 해금 턴 묶음 첫 구슬, SLIME은 앞 2개 강제 + 두 묶음 최대 2개, 미리보기는 들어갈 턴 일정 사용 — 자동 (`test_turn_color_preview_uses_target_turn_and_forces_new_color_first`, `test_turn_unlock_preview_uses_incoming_turn_and_forces_first_two`)
+  - [x] CLASSIC C1~C3×시드 1~20×R/G/L-합체, SLIME S0~S3×시드 1~100×R/G/미리보기 2개 측정; C0은 #89/#90 30판 재사용 — 자동 측정
+  - [x] 전략별 턴·점수 중앙값, 실력 비, 같은 시드 승률, R 길이 CV, 1~30턴 합체율, 실제 색 등장 판 비율, 치명 회피 턴 비율, 측정 시간을 아래 표로 보고 — 자동 집계
+  - [x] 기본값 물리 해시·SLIME 패리티 동일, 전체 래퍼·4경로 스모크·Debug 빌드 통과 — 자동
+- 한 줄 재실행: `.\tests\tools\run_staged_difficulty_measurement.ps1` (#89/#90의 C0 원시 결과가 `artifacts/measurements`에 있어야 함; 중단 뒤 완료 조각 재사용은 `-ReuseCompleted`)
+
+#### CLASSIC 결과 (C0 30판/전략 재사용, C1~C3 20판/전략)
+
+| 후보 | R 턴/점수 중앙 | G 턴/점수 중앙 | L-합체 턴/점수 중앙 | 최고 preview/R 길이·점수 | 동일 시드 승률 | R 길이 CV | R 초반 합체/턴 | 5·6색 등장 판 | 치명 회피 턴 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| C0 | 201.5 / 125,864 | 244 / 159,194.5 | 269 / 303,078 | 1.335 / 2.408 | 100% | 0.085 | 0.510 | 100% / 100% | 0.396% |
+| C1 | 194 / 90,161.5 | 251.5 / 195,143.5 | 277.5 / 357,386 | 1.430 / 3.964 | 100% | 0.078 | 0.590 | 100% / 100% | 0.307% |
+| C2 | 221 / 124,262.5 | 277.5 / 178,381.5 | 327 / 338,539.5 | 1.480 / 2.724 | 100% | 0.096 | 0.595 | 100% / 100% | 0.273% |
+| C3 | 257.5 / 120,884 | 325.5 / 189,930.5 | 379.5 / 379,300 | 1.474 / 3.138 | 100% | 0.103 | 0.617 | 100% / 100% | 0.262% |
+
+- 후보별 최고 preview는 모두 L-합체. §12-R의 R 판 길이 150~250 범위에는 C1·C2가 들고 C3은 `257.5`턴으로 범위를 넘음. 범위 안 실력 비 최고 관측은 C2 `1.480`; 합격·선택 판정은 Claude 몫
+- 초반 합체율은 C0 `0.510`보다 C1~C3 모두 높았고, 세 후보 모두 R 20판에서 5·6색이 실제로 한 번 이상 생성된 비율 `100%`
+- 측정 프로세스 합계 / 가장 긴 조각: C1 `7,664.936초 / 406.343초`, C2 `8,745.226초 / 401.113초`, C3 `9,863.165초 / 456.920초`; C0은 기존 원시 결과 재사용
+
+#### SLIME 결과 (100판/전략)
+
+| 후보 | R 턴/점수 중앙 | G 턴/점수 중앙 | preview 공간 턴/점수 | preview 합체 턴/점수 | 최고 preview/R 길이·점수 | 동일 시드 승률 | R 길이 CV | R 초반 합체/턴 | 4·5·6·7색 등장 판 | 치명 회피 턴 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| S0 | 73 / 186,453 | 72 / 174,916 | 93.5 / 179,651.5 | 75 / 219,491 | 1.281 / 0.964 (공간) | 77.5% | 0.328 | 3.111 | 96% / 65% / 2% / 0% | 0.619% |
+| S1 | 64 / 86,434.5 | 59 / 69,908 | 64 / 47,166.5 | 55 / 106,993 | 1.000 / 0.546 (공간) | 57.0% | 0.181 | 2.846 | 100% / 100% / 85% / 66% | 1.099% |
+| S2 | 52 / 103,232 | 57 / 98,441 | 59 / 67,087.5 | 60 / 151,202 | 1.154 / 1.465 (합체) | 57.5% | 0.227 | 2.966 | 100% / 85% / 26% / 1% | 0.000% |
+| S3 | 65.5 / 160,424 | 65.5 / 143,411 | 69 / 97,997.5 | 73 / 220,096.5 | 1.115 / 1.372 (합체) | 56.5% | 0.322 | 3.041 | 97% / 62% / 39% / 0% | 0.000% |
+
+- §12-R의 R 판 길이 60~95 범위에는 S0·S1·S3가 들고 S2는 `52`턴. 범위 안 실력 비 최고 관측은 S0 `1.281`; 턴 해금 후보 중에는 S3 `1.115`
+- 초반 합체율은 S0 `3.111`보다 S1~S3 모두 낮음. 마지막 7색이 R 판 절반 이상에서 실제 생성된 후보는 S1 `66%`뿐이며 S2 `1%`, S3 `0%`
+- 측정 프로세스 합계 / 가장 긴 조각: S0 `964.705초 / 257.647초`, S1 `1,038.019초 / 262.689초`, S2 `717.651초 / 186.230초`, S3 `775.845초 / 207.925초`
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard, 측정 래퍼 → 신규 CLASSIC `180`판(후보·전략 합산), SLIME `1,600`판(후보·전략 합산), C0 `90`판 재사용; 결과 파일 CLASSIC `84개`, SLIME `16개`, stderr `100개` 중 비어 있지 않은 파일 `0개`
+  - `godot --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·기타 `ERROR` 0건
+  - `tests/run_tests.ps1` → 일반 `333/333`, 장기 `5/5` (`48.317초`), 성능 `5/5` (`3.166초`), 합계 `343/343`, 종료 코드 0, 총 `75.384초`
+  - 물리 해시 → TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`로 기준값 동일
+  - `tests/tools/run_slime_parity.ps1` → 6개 시나리오, 허용 오차 `1e-6`, `PASS`
+  - 시작 화면 + TURN·BLITZ·SLIME `--quit-after 300` → 네 실행 모두 종료 코드 0, 오류 0건
+  - `tools/build_windows.ps1 -Debug`만 실행 → 종료 코드 0, `build/windows-debug/GravityOrb_v0.13.1.exe` `105,041,368`바이트; Release 미실행
+  - 규칙 검사 → `Input`/`InputEvent`는 기존 `InputRouter.gd`·`Haptics.gd`만, 난수는 명시적 RNG 인스턴스만 사용, `git diff --check` 오류 0건
+  - 사용자 저장 파일은 전후 `1,488`바이트, SHA-256 `FCB975CAFA6550D3C14DE2C8594E3E0EB5525208DA83130D4E359E50C7497F4C`로 동일
+  - 새 설정 기본값이 기존 화면과 같고 후보값은 측정 도구에서만 적용하므로 화면 캡처 미실행
+- 수동 확인 절차:
+  1. 저장소 루트에서 `.\tests\tools\run_staged_difficulty_measurement.ps1`를 실행한다 → 모든 조각이 `exit=0`으로 끝나고 `artifacts/measurements/staged_difficulty_report.json`이 생성되어야 한다.
+  2. 보고서 판 수를 센다 → C1~C3는 전략마다 20판, S0~S3는 전략마다 100판이고, `random_color_appearance`는 실제 `spawned` 이벤트 색을 포함해야 한다.
+  3. 기본 설정으로 TURN·SLIME을 실행한다 → TURN은 처음부터 기존 6색, SLIME은 기존 점수 해금과 30/60턴 등장 수 하한을 유지해야 한다.
+- 결정 사항: 원본 호환을 위해 기존 SLIME `turn_level_two_floor`·`turn_level_three_floor` 필드는 남기고 새 `turn_floor_steps`를 등장 수 계산의 기준으로 사용함. `score` 모드는 기존 `turn` 기준 호출 순서를 보존하고, `turn` 모드만 들어갈 턴(`turn + 1`)을 사용해 기본 패리티와 후보 미리보기 일정을 동시에 맞춤. 측정은 CLASSIC R/G 5시드·L 1시드, SLIME 25시드 조각으로 나누고 개수·stderr를 집계 시 검증함
+- 남은 것 · 질문: 후보 선택과 기본값 반영은 Claude 판단/후속 항목. 구현·측정 자체의 남은 작업 없음
+
 ### [2026-10-18] 대상 #90 — CLASSIC 미리보기 봇 + G 고쳐 세 모드 다시 측정
 - 상태: 완료 — G가 다른 안전 방향이 있을 때 현재 중력을 제외하도록 세 모드 측정 도구를 고치고, CLASSIC에 실제 `TurnManager` 한 턴을 방향별 독립 `World3D`에서 실행하는 L-공간·L-합체 봇을 추가해 지정 시드 전체를 측정함. 게임 코드·설정·규칙은 변경하지 않음
 - 브랜치 / PR: `mode-preview-measurement` / 미생성

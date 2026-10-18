@@ -139,6 +139,12 @@ func test_each_blocked_entry_waits_then_enters_and_final_move_spawns_nothing() -
 		sim._update_intro(0.01)
 		assert_true(sim.intro_queue.is_empty(), "waiting slime enters after opening")
 		assert_eq(sim.slimes.size(), 2, "one waiting slime entered")
+		var spawned_event: Dictionary = {}
+		for event: Dictionary in sim.drain_events():
+			if str(event.get("type", "")) == "spawned":
+				spawned_event = event
+				break
+		assert_eq(int(spawned_event.get("color", -1)), 1, "spawn event reports actual color")
 
 	var final_move := _empty_sim(39)
 	final_move.final_move_pending = true
@@ -175,6 +181,30 @@ func test_all_unlock_score_boundaries() -> void:
 		sim.score = CONFIG.unlock_scores[index]
 		sim._check_color_unlocks()
 		assert_eq(sim.active_color_count, expected_before + 1, "exact threshold unlocks")
+
+
+func test_turn_unlock_preview_uses_incoming_turn_and_forces_first_two() -> void:
+	var local_config: SlimeConfig = CONFIG.duplicate(true) as SlimeConfig
+	local_config.color_unlock_mode = "turn"
+	local_config.color_unlock_turns = [3, 6, 9, 12]
+	local_config.turn_floor_steps = [Vector2i(3, 2), Vector2i(6, 3)]
+	var sim := SlimeSim.new(local_config, 43, false, false)
+	sim.turn = 1
+	sim.roll_next_batch()
+	assert_eq(sim.active_color_count, 3, "turn 2 preview keeps three colors")
+	for entry: Dictionary in sim.next_slimes:
+		assert_true(int(entry["color"]) < 3, "turn 2 preview excludes locked color")
+	sim.turn = 2
+	sim.roll_next_batch()
+	assert_eq(sim.active_color_count, 4, "turn 3 preview unlocks fourth color")
+	assert_eq(sim.next_slimes.size(), 2, "unlock grace retains original two-slot cap")
+	for entry: Dictionary in sim.next_slimes:
+		assert_eq(int(entry["color"]), 3, "new color occupies first two slots")
+	sim.unlock_grace_waves_left = 0
+	sim.turn = 5
+	sim.roll_next_batch()
+	assert_eq(sim.active_color_count, 5, "turn 6 preview unlocks fifth color")
+	assert_eq(sim.next_slimes.size(), 2, "unlock grace caps scheduled floor-three batch")
 
 
 func test_level_distribution_is_70_25_5_within_tolerance() -> void:

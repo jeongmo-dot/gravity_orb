@@ -54,6 +54,7 @@ extends Resource
 @export var high_crowd_spawn_count: int = 1
 @export var turn_level_two_floor: int = 30
 @export var turn_level_three_floor: int = 60
+@export var turn_floor_steps: Array[Vector2i] = [Vector2i(30, 2), Vector2i(60, 3)]
 @export var color_bag_copies: int = 2
 @export var spawn_speed: float = 90.0
 @export var intro_initial_delay: float = 0.03
@@ -61,6 +62,8 @@ extends Resource
 @export var intro_abandon_time: float = 0.90
 @export var entry_margin: float = 5.0
 @export var start_colors: int = 3
+@export_enum("score", "turn") var color_unlock_mode: String = "score"
+@export var color_unlock_turns: Array[int] = []
 @export var unlock_scores: PackedInt32Array = PackedInt32Array([50000, 150000, 300000, 500000])
 @export var unlock_grace_waves: int = 2
 @export var unlock_grace_max_count: int = 2
@@ -97,3 +100,11 @@ extends Resource
 @export var sound_impact_threshold: float = 0.22
 @export var collision_sound_cooldown: float = 0.09
 @export var gravity_flash_duration: float = 0.28
+
+
+func minimum_spawn_count_for_turn(turn_index: int) -> int:
+	var result: int = 1
+	for step: Vector2i in turn_floor_steps:
+		if turn_index >= step.x:
+			result = maxi(result, step.y)
+	return result

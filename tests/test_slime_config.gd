@@ -23,6 +23,12 @@ func test_slime_config_matches_ported_core_values() -> void:
 	assert_near(CONFIG.radii[6], 112.0, 1.0e-6, "max radius")
 	assert_near(CONFIG.pre_max_radius, 108.0, 1.0e-6, "pre-max radius")
 	assert_eq(CONFIG.unlock_scores, PackedInt32Array([50000, 150000, 300000, 500000]), "unlock scores")
+	assert_eq(CONFIG.color_unlock_mode, "score", "score unlock remains default")
+	assert_true(CONFIG.color_unlock_turns.is_empty(), "turn unlock schedule disabled by default")
+	assert_eq(CONFIG.turn_floor_steps, [Vector2i(30, 2), Vector2i(60, 3)], "turn floor defaults")
+	assert_eq(CONFIG.minimum_spawn_count_for_turn(29), 1, "floor before turn 30")
+	assert_eq(CONFIG.minimum_spawn_count_for_turn(30), 2, "turn 30 floor")
+	assert_eq(CONFIG.minimum_spawn_count_for_turn(60), 3, "turn 60 floor")
 	assert_eq(CONFIG.initial_levels, PackedInt32Array([0, 0, 0, 1]), "initial levels")
 	assert_eq(CONFIG.slime_colors.size(), 7, "color count")
 

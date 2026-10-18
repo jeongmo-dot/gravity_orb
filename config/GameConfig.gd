@@ -49,6 +49,8 @@ enum GameMode { TURN, BLITZ, SLIME }
 @export var preview_turns: int = 2
 @export var spawn_count_ramp_turns: int = 40
 @export var spawn_count_max: int = 0
+@export var turn_start_colors: int = 6
+@export var turn_color_unlock_turns: Array[int] = []
 @export var spawn_position_mode: SpawnPositionMode = SpawnPositionMode.RANDOM
 @export var spawn_margin: float = 4.0
 @export var spawn_probe_step: float = 5.0
@@ -219,6 +221,25 @@ func spawn_count_for_turn(turn_index: int) -> int:
 	if spawn_count_max <= 0:
 		return ramped_count
 	return mini(ramped_count, spawn_count_max)
+
+
+func color_count_for_turn(turn_index: int) -> int:
+	var available_colors: int = spawn_color_weights.size()
+	var count: int = clampi(turn_start_colors, 1, available_colors)
+	for unlock_turn: int in turn_color_unlock_turns:
+		if turn_index >= unlock_turn:
+			count += 1
+	return mini(count, available_colors)
+
+
+func newly_unlocked_color_for_turn(turn_index: int) -> int:
+	var unlocked_before: int = clampi(turn_start_colors, 1, spawn_color_weights.size())
+	for unlock_turn: int in turn_color_unlock_turns:
+		if turn_index == unlock_turn and unlocked_before < spawn_color_weights.size():
+			return unlocked_before
+		if turn_index > unlock_turn:
+			unlocked_before += 1
+	return -1
 
 
 func is_opposite(c1: int, c2: int) -> bool:

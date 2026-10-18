@@ -24,6 +24,7 @@ func _run() -> void:
 	var turn_cap: int = _int_argument("--turn-cap=", DEFAULT_TURN_CAP)
 	var output_path: String = _string_argument("--output=", DEFAULT_OUTPUT)
 	var strategies: Array[String] = _strategy_argument()
+	var candidate_settings: Dictionary = _candidate_settings()
 	var threads: Array[Thread] = []
 	for strategy: String in strategies:
 		var worker := Thread.new()
@@ -32,7 +33,8 @@ func _run() -> void:
 				strategy,
 				seed_start,
 				seed_count,
-				turn_cap
+				turn_cap,
+				candidate_settings
 			)
 		)
 		threads.append(worker)
@@ -49,6 +51,7 @@ func _run() -> void:
 		"seed_start": seed_start,
 		"seed_count": seed_count,
 		"turn_cap": turn_cap,
+		"candidate_settings": candidate_settings,
 		"strategies": strategy_reports,
 	}
 	_write_report(output_path, report)
@@ -60,9 +63,12 @@ func _measure_strategy(
 	strategy: String,
 	seed_start: int,
 	seed_count: int,
-	turn_cap: int
+	turn_cap: int,
+	candidate_settings: Dictionary
 ) -> Dictionary:
 	var started_msec: int = Time.get_ticks_msec()
+	var measurement_config: SlimeConfig = CONFIG.duplicate(true) as SlimeConfig
+	_apply_candidate_settings(measurement_config, candidate_settings)
 	var rows: Array[Dictionary] = []
 	var preview_decision_turns: int = 0
 	var preview_fatal_avoidance_turns: int = 0
@@ -70,10 +76,14 @@ func _measure_strategy(
 	var preview_score_gain_spreads: Array[float] = []
 	var preview_decision_usec_sum: int = 0
 	for seed_value: int in range(seed_start, seed_start + seed_count):
-		var sim := SlimeSim.new(CONFIG, seed_value, false, true)
+		var sim := SlimeSim.new(measurement_config, seed_value, false, true)
 		var bot_rng := RandomNumberGenerator.new()
 		bot_rng.seed = 0x5A1E0000 + seed_value * 131 + strategy.hash()
 		_run_until_idle(sim)
+		var seen_colors: Dictionary = {}
+		_record_seen_colors(sim, seen_colors)
+		_record_spawned_colors(sim.drain_events(), seen_colors)
+		var early_merge_count: int = 0
 		var maximum_mass: int = _maximum_mass(sim)
 		var maximum_level: int = _maximum_level(sim)
 		while not sim.game_over and sim.turn < turn_cap:
@@ -101,6 +111,12 @@ func _measure_strategy(
 			if not sim.start_turn(direction):
 				break
 			_run_until_idle(sim)
+			var events: Array[Dictionary] = sim.drain_events()
+			_record_spawned_colors(events, seen_colors)
+			for event: Dictionary in events:
+				if sim.turn <= 30 and str(event.get("type", "")) == "absorbed":
+					early_merge_count += 1
+			_record_seen_colors(sim, seen_colors)
 			maximum_mass = maxi(maximum_mass, _maximum_mass(sim))
 			maximum_level = maxi(maximum_level, _maximum_level(sim))
 		rows.append({
@@ -114,6 +130,10 @@ func _measure_strategy(
 			"max_completions": sim.max_completions,
 			"max_clears": sim.max_clears,
 			"max_chain": sim.run_best_chain,
+			"early_merge_count": early_merge_count,
+			"early_turn_count": mini(sim.turn, 30),
+			"seen_colors": _sorted_color_keys(seen_colors),
+			"seen_color_count": seen_colors.size(),
 		})
 	return {
 		"measurement_seconds": float(Time.get_ticks_msec() - started_msec) / 1000.0,
@@ -246,8 +266,8 @@ func _count_reaction_pairs(sim: SlimeSim, direction: Vector2i) -> int:
 		for second_index: int in range(first_index + 1, sim.slimes.size()):
 			var second: SlimeSim.SlimeBody = sim.slimes[second_index]
 			var reacts: bool = first.color_index == second.color_index or (
-				first.mass >= CONFIG.max_mass
-				and second.mass >= CONFIG.max_mass
+				first.mass >= sim.config.max_mass
+				and second.mass >= sim.config.max_mass
 			)
 			if not reacts:
 				continue
@@ -288,6 +308,25 @@ func _maximum_level(sim: SlimeSim) -> int:
 	for slime: SlimeSim.SlimeBody in sim.slimes:
 		maximum = maxi(maximum, slime.level)
 	return maximum
+
+
+func _record_seen_colors(sim: SlimeSim, seen_colors: Dictionary) -> void:
+	for slime: SlimeSim.SlimeBody in sim.slimes:
+		seen_colors[slime.color_index] = true
+
+
+func _record_spawned_colors(events: Array[Dictionary], seen_colors: Dictionary) -> void:
+	for event: Dictionary in events:
+		if str(event.get("type", "")) == "spawned":
+			seen_colors[int(event.get("color", 0))] = true
+
+
+func _sorted_color_keys(seen_colors: Dictionary) -> Array[int]:
+	var result: Array[int] = []
+	for color_value: Variant in seen_colors.keys():
+		result.append(int(color_value))
+	result.sort()
+	return result
 
 
 func _safe_ratio(numerator: int, denominator: int) -> float:
@@ -342,4 +381,48 @@ func _strategy_argument() -> Array[String]:
 			result.append(strategy)
 	if result.is_empty():
 		result.append_array(STRATEGIES)
+	return result
+
+
+func _candidate_settings() -> Dictionary:
+	return {
+		"color_unlock_mode": _string_argument("--color-unlock-mode=", CONFIG.color_unlock_mode),
+		"color_unlock_turns": _parse_int_list(
+			_string_argument("--color-unlock-turns=", "")
+		),
+		"turn_floor_steps": _parse_floor_steps(
+			_string_argument("--turn-floor-steps=", "")
+		),
+	}
+
+
+func _apply_candidate_settings(config: SlimeConfig, settings: Dictionary) -> void:
+	config.color_unlock_mode = str(settings["color_unlock_mode"])
+	var unlock_turns: Array[int] = []
+	for value: Variant in settings["color_unlock_turns"] as Array:
+		unlock_turns.append(int(value))
+	config.color_unlock_turns.assign(unlock_turns)
+	var floor_steps: Array[Vector2i] = []
+	for value: Variant in settings["turn_floor_steps"] as Array:
+		var pair: Array = value as Array
+		floor_steps.append(Vector2i(int(pair[0]), int(pair[1])))
+	if not floor_steps.is_empty():
+		config.turn_floor_steps.assign(floor_steps)
+
+
+func _parse_int_list(value: String) -> Array[int]:
+	var result: Array[int] = []
+	for item: String in value.split(",", false):
+		var stripped: String = item.strip_edges()
+		if not stripped.is_empty():
+			result.append(stripped.to_int())
+	return result
+
+
+func _parse_floor_steps(value: String) -> Array[Array]:
+	var result: Array[Array] = []
+	for item: String in value.split(",", false):
+		var parts: PackedStringArray = item.strip_edges().split(":", false)
+		if parts.size() == 2:
+			result.append([parts[0].to_int(), parts[1].to_int()])
 	return result
