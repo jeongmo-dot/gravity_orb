@@ -118,6 +118,36 @@ func test_orb_stretch_smoothly_interpolates_only_the_mesh() -> void:
 	Config.data.fx_orb_stretch_enabled = original_stretch
 
 
+func test_default_fast_orb_keeps_round_mesh_and_body_rotation() -> void:
+	var original_fx: bool = Config.data.fx_enabled
+	var original_stretch: bool = Config.data.fx_orb_stretch_enabled
+	Config.data.fx_enabled = true
+	Config.data.fx_orb_stretch_enabled = false
+	var fixture: Dictionary = await _create_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var orb: Orb3D = board.spawn_orb(OrbTypes.OrbColor.PURPLE, 2, Vector2.ZERO)
+	var body: RigidBody3D = orb.get_physics_body()
+	body.freeze = true
+	body.rotation = Vector3(0.0, 0.0, 0.42)
+	orb.linear_velocity = Vector2(1400.0, 500.0)
+	orb._update_visual_transform()
+	assert_near(
+		orb.visual_mesh_scale().distance_to(Vector3.ONE),
+		0.0,
+		TOLERANCE,
+		"disabled default keeps fast planet mesh round"
+	)
+	assert_near(
+		orb._mesh.rotation.z,
+		body.rotation.z,
+		TOLERANCE,
+		"disabled default keeps planet art on body rotation"
+	)
+	await _cleanup(fixture["root"] as Node)
+	Config.data.fx_enabled = original_fx
+	Config.data.fx_orb_stretch_enabled = original_stretch
+
+
 func test_tilt_rotation_and_blue_frame_shake_position_coexist_and_restore() -> void:
 	var original_fx: bool = Config.data.fx_enabled
 	var original_hitstop: bool = Config.data.fx_hitstop_enabled
