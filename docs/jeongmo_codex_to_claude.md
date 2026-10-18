@@ -40,7 +40,7 @@
 
 ### [2026-10-18] 대상 #91 — 단계별 난도 후보 측정
 - 상태: 완료 — CLASSIC·SLIME의 턴별 색 해금/최소 등장 수 설정과 들어갈 턴 기준 미리보기를 구현하고, 기본값은 기존 동작으로 유지한 채 §12-R 후보 전체를 측정함
-- 브랜치 / PR: `staged-difficulty-measurement` / PR 생성 후 갱신 예정
+- 브랜치 / PR: `staged-difficulty-measurement` / https://github.com/jeongmo-dot/gravity_orb/pull/93
 - 변경 파일: `config/{GameConfig,SlimeConfig}.gd`, `config/{default_config,slime_config}.tres`, `scripts/core/Spawner.gd`, `scripts/slime/SlimeSim.gd`, `tests/{test_config,test_slime_config,test_slime_sim,test_spawner}.gd`, `tests/spike/run_jolt_3d_measurement.gd`, `tests/tools/{run_mode_skill_slime_measurement.gd,run_staged_difficulty_measurement.ps1}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] CLASSIC `turn_start_colors`·`turn_color_unlock_turns`, SLIME `color_unlock_mode`·`color_unlock_turns`·`turn_floor_steps` 추가, 기본값은 기존 6색/점수 해금/30→2·60→3 — 자동 (`test_config`, `test_slime_config`)
