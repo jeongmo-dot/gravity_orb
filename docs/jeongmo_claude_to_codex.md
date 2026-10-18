@@ -31,6 +31,19 @@
 
 ## 대기 중
 
+### [2026-10-19 #94] Windows 빌드 0.14.0
+- 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합)
+- 근거: [technical_design.md](technical_design.md) **§10.5·§10.5.1** (버전 기록 0.14.0 줄)
+- 요구:
+  1. `project.godot` `application/config/version` `0.13.1` → **`0.14.0`** (Claude 결정 값 — 기획서 0.14, PATCH 0)
+  2. 릴리스 빌드 `.	oolsuild_windows.ps1` → `build/windows/GravityOrb_v0.14.0.exe` + `.console.exe` + `_BUILD.txt`. 다른 버전 파일은 남긴다
+  3. 내보낸 콘솔 exe로 스모크 4종 (기본·turn·blitz·slime) 종료 코드 0·`SCRIPT ERROR` 0
+  4. 격리 창에서 시작 화면·SLIME 직접 실행 확인 (실제 클릭이 안 되면 그 사실과 대신 확인한 방법)
+- 검수: 빌드 결과 줄·파일 크기, `_BUILD.txt` 커밋 = 이 브랜치 마지막 커밋 (커밋한 뒤 깨끗한 작업 트리에서 빌드), 사용자 `save.cfg` 해시 전후 동일, 묶음에 `tests/`·`artifacts/`·`docs/` 없음, 래퍼 통과
+- 건드리지 말 것: 버전 외 모든 파일, 사용자 저장 파일, `docs/` (회신 파일 제외)
+- Done-when: 위 검수 보고
+- 커밋: 항목 단위 브랜치 (`build-0.14.0`), **push·PR까지**
+
 ---
 
 ## 처리 완료
