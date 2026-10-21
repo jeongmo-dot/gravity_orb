@@ -51,7 +51,7 @@
 - 커밋: 항목 단위 브랜치, **push·PR까지**
 
 ### [2026-10-21 #95] JELLY ① — 규칙 (흡수·대폭발 없음·FINAL MOVE) + 측정
-- 상태: 대기 (#94 빌드 다음)
+- 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합)
 - 근거: [technical_design.md](technical_design.md) **§12-JE.1·12-JE.4** (기획서 0.15)
 - 배경: 사용자 (2026-10-21) "클래식과 슬라임의 중간 버전이 필요할 것 같아" → 합체 규칙·FINAL MOVE·대폭발 빼기, 새 4번째 모드
 - 요구:
@@ -67,8 +67,13 @@
 - Done-when: 테스트 통과(`.\tests\run_tests.ps1`), 측정 보고, 스모크 5종 (기본·turn·blitz·slime·jelly), 검증 빌드는 `-Debug`만
 - 커밋: 항목 단위 브랜치, **push·PR까지**
 
-### [2026-10-19 #94] Windows 빌드 0.14.0
-- 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합)
+---
+
+## 처리 완료
+
+### [2026-10-19 #94] Windows 빌드 0.14.0 — 완료
+- 상태: 완료 (2026-10-21 Claude 검수 · [PR #96](https://github.com/jeongmo-dot/gravity_orb/pull/96) 병합 `1ec2b7a`)
+- 검수: `build/windows/GravityOrb_v0.14.0.exe` (111,177,032바이트) + `.console.exe` + `_BUILD.txt` (커밋 `aedda73` = 브랜치 끝 = 병합 커밋과 같은 트리, 커밋 18초 뒤 빌드) 직접 확인. 스모크 4종·격리 창·사용자 `save.cfg` 해시 동일·묶음 검사·래퍼 349/349 (Codex). 시작 화면 → SLIME 실제 클릭은 이번에도 자동화 못 함. Claude 재실행 없음
 - 근거: [technical_design.md](technical_design.md) **§10.5·§10.5.1** (버전 기록 0.14.0 줄)
 - 요구:
   1. `project.godot` `application/config/version` `0.13.1` → **`0.14.0`** (Claude 결정 값 — 기획서 0.14, PATCH 0)
@@ -79,10 +84,6 @@
 - 건드리지 말 것: 버전 외 모든 파일, 사용자 저장 파일, `docs/` (회신 파일 제외)
 - Done-when: 위 검수 보고
 - 커밋: 항목 단위 브랜치 (`build-0.14.0`), **push·PR까지**
-
----
-
-## 처리 완료
 
 ### [2026-10-19 #93] 새 행성 안내 시점 · 행성 늘어남 끄기 · BLITZ 보너스 글자 시점 — 완료
 - 상태: 완료 (2026-10-19 Claude 검수 · [PR #95](https://github.com/jeongmo-dot/gravity_orb/pull/95) 병합 `c18e0e2`)
