@@ -265,6 +265,48 @@ func test_blitz_and_turn_share_level_four_blast_with_same_color_merge() -> void:
 	assert_eq(same_color_four["type"], ReactionRules.Type.MERGE, "L4 same color merges")
 
 
+func test_jelly_same_and_adjacent_levels_absorb_by_abstract_mass() -> void:
+	var cfg: GameConfig = GameConfig.new()
+	cfg.game_mode = GameConfig.GameMode.JELLY
+	var equal: Dictionary = ReactionRules.classify(2, 3, 2, 3, cfg, 4.0, 4.0)
+	assert_eq(equal["type"], ReactionRules.Type.MERGE, "JELLY L+L merges")
+	assert_eq(equal["result_level"], 4, "JELLY L3+L3 reaches L4")
+	assert_near(float(equal["result_mass"]), 8.0, 0.001, "JELLY equal mass sum")
+	assert_eq(equal["absorber"], 0, "equal levels use midpoint")
+
+	var adjacent: Dictionary = ReactionRules.classify(2, 3, 2, 2, cfg, 4.0, 2.0)
+	assert_eq(adjacent["type"], ReactionRules.Type.MERGE, "JELLY L+(L-1) absorbs")
+	assert_eq(adjacent["result_level"], 3, "adjacent absorption keeps level")
+	assert_near(float(adjacent["result_mass"]), 6.0, 0.001, "adjacent mass sum")
+	assert_eq(adjacent["absorber"], 1, "larger first orb keeps position")
+	assert_true(bool(adjacent["jelly_absorption"]), "adjacent merge is absorption")
+
+	var reversed: Dictionary = ReactionRules.classify(2, 2, 2, 3, cfg, 2.0, 4.0)
+	assert_eq(reversed["absorber"], 2, "larger second orb keeps position")
+	var gap: Dictionary = ReactionRules.classify(2, 4, 2, 2, cfg, 8.0, 2.0)
+	assert_eq(gap["type"], ReactionRules.Type.NONE, "JELLY L+(L-2) does not react")
+
+
+func test_jelly_level_seven_jackpot_and_capped_absorption() -> void:
+	var cfg: GameConfig = GameConfig.new()
+	cfg.game_mode = GameConfig.GameMode.JELLY
+	var jackpot: Dictionary = ReactionRules.classify(1, 7, 1, 7, cfg, 64.0, 64.0)
+	assert_eq(jackpot["type"], ReactionRules.Type.MAX_CLEAR, "JELLY L7+L7 jackpots")
+	var capped: Dictionary = ReactionRules.classify(1, 7, 1, 6, cfg, 64.0, 32.0)
+	assert_eq(capped["type"], ReactionRules.Type.MERGE, "JELLY L7 absorbs L6")
+	assert_eq(capped["result_level"], 7, "capped absorption stays L7")
+	assert_near(float(capped["result_mass"]), 64.0, 0.001, "JELLY mass caps at 64")
+
+
+func test_jelly_different_colors_never_blast_or_annihilate() -> void:
+	var cfg: GameConfig = GameConfig.new()
+	cfg.game_mode = GameConfig.GameMode.JELLY
+	cfg.blast_enabled = true
+	cfg.opposite_pairs = [Vector2i(0, 1)]
+	var result: Dictionary = ReactionRules.classify(0, 6, 1, 6, cfg, 32.0, 32.0)
+	assert_eq(result["type"], ReactionRules.Type.NONE, "JELLY has no BLAST or opposite reaction")
+
+
 func _enable_red_blue(cfg: GameConfig) -> void:
 	cfg.opposite_pairs = [
 		Vector2i(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE),

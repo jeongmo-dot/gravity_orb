@@ -68,7 +68,18 @@ static func points_for(reaction: Dictionary, cfg: GameConfig) -> int:
 	var reaction_type: ReactionRules.Type = reaction["type"] as ReactionRules.Type
 	match reaction_type:
 		ReactionRules.Type.MERGE:
-			base_points = cfg.score_for_level(int(reaction["result_level"]))
+			var merged_levels: Array = reaction.get("levels", []) as Array
+			var previous_level: int = 0
+			for merged_level_value: Variant in merged_levels:
+				var merged_level: int = int(merged_level_value)
+				previous_level = maxi(previous_level, merged_level)
+			if (
+				bool(reaction.get("jelly_absorption", false))
+				and int(reaction["result_level"]) <= previous_level
+			):
+				base_points = cfg.score_for_level(int(reaction["absorbed_level"]))
+			else:
+				base_points = cfg.score_for_level(int(reaction["result_level"]))
 		ReactionRules.Type.ANNIHILATE:
 			var levels: Array[int] = reaction["levels"] as Array[int]
 			base_points = int(

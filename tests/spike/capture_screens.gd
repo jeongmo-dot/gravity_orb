@@ -102,6 +102,7 @@ const CAPTURE_FILES: Array[String] = [
 	"50_slime_shell_play_rejected.png",
 	"51_slime_max_growth.png",
 	"52_new_planet_callout.png",
+	"52_jelly_final_move.png",
 ]
 const HUD_CAPTURE_FILES: Array[String] = [
 	"02_turn_early.png",
@@ -122,6 +123,7 @@ const HUD_CAPTURE_FILES: Array[String] = [
 	"45_turn_busy_b.png",
 	"46_turn_rejected.png",
 	"52_new_planet_callout.png",
+	"52_jelly_final_move.png",
 ]
 
 var _failed: bool = false
@@ -330,6 +332,19 @@ func _capture_turn_scenes() -> void:
 	_validate_turn_blocked_scene(main)
 	await _capture("18_board_blocked.png")
 	_validate_turn_blocked_pixels(main)
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	manager.final_move_pending = true
+	manager.final_move_changed.emit(true, TurnManager.FINAL_MOVE_MESSAGE)
+	await get_tree().create_timer(0.20).timeout
+	if not hud._jelly_final_move_banner.visible:
+		_fail("JELLY FINAL MOVE banner must be visible")
+	if hud._jelly_final_move_banner.message != TurnManager.FINAL_MOVE_MESSAGE:
+		_fail("JELLY FINAL MOVE message mismatch")
+	await _capture("52_jelly_final_move.png")
+	print("SCREEN_CAPTURE_CHECK scene=jelly_final_move band=visible message=exact")
+	manager.final_move_pending = false
+	manager.final_move_changed.emit(false, "")
+	Config.data.game_mode = GameConfig.GameMode.TURN
 	manager.blocked_directions.clear()
 	hud._on_warning_changed(manager.blocked_directions)
 	board.set_warning_directions(manager.blocked_directions)

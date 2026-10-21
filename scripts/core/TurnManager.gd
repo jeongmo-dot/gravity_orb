@@ -11,7 +11,10 @@ signal planet_unlocked(color_index: int)
 signal combo_changed(combo: int, multiplier: float, max_combo: int)
 signal reaction_ready(reaction: Dictionary)
 signal warning_changed(walls: Array[Vector2i])
+signal final_move_changed(visible: bool, message: String)
 signal game_over
+
+const FINAL_MOVE_MESSAGE: String = "막혔어요 · 한 번의 이동으로 입구를 비우세요"
 
 @onready var _board: Variant = %Board
 @onready var _spawner: Spawner = %Spawner
@@ -27,6 +30,10 @@ var max_combo: int = 0
 var capped_turn_count: int = 0
 var blocked_directions: Array[Vector2i] = []
 var game_over_details: Dictionary = {}
+var final_move_pending: bool = false
+var final_move_active: bool = false
+var final_move_count: int = 0
+var final_move_success_count: int = 0
 var settle_elapsed: float = 0.0
 var _settle_elapsed: float:
 	get:
@@ -50,6 +57,11 @@ func start_game() -> void:
 	capped_turn_count = 0
 	blocked_directions.clear()
 	game_over_details.clear()
+	final_move_pending = false
+	final_move_active = false
+	final_move_count = 0
+	final_move_success_count = 0
+	final_move_changed.emit(false, "")
 	gravity = Vector2i.DOWN
 	_is_initial_settle = true
 	InputRouter.set_locked(true)
@@ -79,7 +91,13 @@ func on_swipe(dir: Vector2i) -> void:
 		_board.play_visual_tilt(gravity)
 	gravity_changed.emit(gravity)
 	turn_started.emit(turn_index, gravity)
-	_set_state(State.SPAWNING)
+	if final_move_pending:
+		final_move_pending = false
+		final_move_active = true
+		_begin_settle()
+		_set_state(State.SIMULATING)
+	else:
+		_set_state(State.SPAWNING)
 
 
 func _physics_process(delta: float) -> void:
@@ -168,11 +186,27 @@ func _on_settled() -> void:
 	turn_finished.emit(turn_index, turn_combo)
 	var blocked_spawns: Array = _board.entrance_waiting_orbs()
 	if not blocked_spawns.is_empty():
+		if Config.data.game_mode == GameConfig.GameMode.JELLY and not final_move_active:
+			final_move_pending = true
+			final_move_count += 1
+			final_move_changed.emit(true, FINAL_MOVE_MESSAGE)
+			_update_warnings()
+			InputRouter.set_locked(false)
+			_set_state(State.WAITING_INPUT)
+			return
 		game_over_details = _build_game_over_details(blocked_spawns)
+		game_over_details["final_moves"] = final_move_count
+		game_over_details["final_move_successes"] = final_move_success_count
 		game_over_details["ranking"] = _commit_completed_ranking()
+		final_move_active = false
+		final_move_changed.emit(false, "")
 		_set_state(State.GAME_OVER)
 		game_over.emit()
 		return
+	if final_move_active:
+		final_move_active = false
+		final_move_success_count += 1
+		final_move_changed.emit(false, "")
 	_update_warnings()
 	InputRouter.set_locked(false)
 	_set_state(State.WAITING_INPUT)
@@ -180,6 +214,8 @@ func _on_settled() -> void:
 
 func _commit_completed_ranking() -> Dictionary:
 	if _score_manager == null:
+		return {"rank": 0, "record": {}}
+	if Config.data.game_mode == GameConfig.GameMode.JELLY:
 		return {"rank": 0, "record": {}}
 	return _score_manager.commit_ranking(
 		GameConfig.GameMode.TURN,

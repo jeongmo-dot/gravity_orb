@@ -38,6 +38,49 @@
 
 ## 미확인
 
+### [2026-10-21] 대상 #95 — JELLY 규칙 · FINAL MOVE · 측정
+- 상태: 완료 — CLASSIC 턴제 위에 JELLY 흡수 질량·점수·FINAL MOVE를 구현하고 3전략×20시드×600턴을 측정함. 바라는 자리 밖 수치는 임의 조정하지 않고 후보만 보고함
+- 브랜치 / PR: `jelly-rules-measurement` / 생성 예정
+- 변경 파일: `config/GameConfig.gd`, `scripts/core/{CollisionResolver,Main,Orb,ReactionRules,ScoreManager,TurnManager}.gd`, `scripts/spike/Orb3D.gd`, `scripts/ui/{DebugHud,Hud,JellyFinalMoveBanner}.gd`, `tests/` JELLY 규칙·점수·3D·FINAL MOVE·캡처·측정 도구, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `GameMode.JELLY = 3`·`--mode=jelly`, 같은 색 레벨 차 0~1 흡수, 추상 질량 `2^(L-1)`·64 상한·레벨 내 반지름 보간·한 단계 차 큰 쪽 위치, 차이 2+/다른 색 무반응 — 자동 (`test_config`, `test_rules`, `test_jolt_3d`)
+  - [x] L7+L7 잭팟, L7+L6 흡수, 레벨 상승 시 새 레벨 점수/유지 시 먹힌 레벨 점수, JELLY BLAST 없음 — 자동 (`test_rules`, `test_score`, `test_jolt_3d`)
+  - [x] 게임오버 판정을 FINAL MOVE 대기로 한 번 미루고 다음 스와이프에서 생성·미리보기 소비 없이 중력 턴만 실행, 성공 시 계속/실패 시 게임오버 — 자동 (`test_game_over`)
+  - [x] 노랑 깜빡임 테두리의 `FINAL MOVE` 띠와 정확한 안내 `막혔어요 · 한 번의 이동으로 입구를 비우세요` — 자동 (`test_frontend`, 캡처 검사) + 두 비율 직접 관측
+  - [x] R·G·L-합체×시드 1~20×600턴 측정, C2·S2 비교와 JELLY 전용 조정 후보 보고 — 자동 집계. 기본 수치 변경 없음
+  - [x] CLASSIC·BLITZ·SLIME 기존 해시, 전체 래퍼, 재임포트, 기본·TURN·BLITZ·SLIME·JELLY 스모크, Debug 빌드, 사용자 저장 해시 확인 — 자동
+- 한 줄 재실행: `.\tests\tools\run_jelly_measurement.ps1 -GodotPath "C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe" -SeedCount 20 -Parallelism 3 -TurnCap 600`
+
+#### JELLY 측정 결과 (각 20판, 시드 1~20, 600턴 상한)
+
+| 전략 | 턴 중앙 | 점수 중앙 | 1~30턴 합체/턴 | FINAL MOVE 발생/성공 | 한 단계 흡수/합체 | L7 도달 판 | 잭팟 | 치명 회피 턴 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| R | 154 | 9,073.5 | 0.725 | 21 / 1 (4.76%) | 54.01% | 0/20 | 0 | 0 |
+| G | 159 | 9,595 | 0.743 | 21 / 1 (4.76%) | 54.94% | 0/20 | 0 | 0 |
+| L-합체 | 158.5 | 10,600.5 | 0.793 | 23 / 3 (13.04%) | 55.10% | 0/20 | 0 | 50 (판단의 1.582%) |
+
+- L-합체/R 실력 비: 길이 `1.029`, 점수 `1.168`; 같은 시드 승률은 길이 `90%`, 점수 `70%`
+- 비교 기준: CLASSIC C2 R `221턴/124,262.5점`, L `327턴/338,539.5점`, 길이 비 `1.480`, 초반 합체율 `0.595`; SLIME S2 R `52턴/103,232점`, L `60턴/151,202점`, 길이 비 `1.154`, 초반 합체율 `2.966`
+- 바라는 자리 대조: R 판 길이 `154`로 150~300 안, R 초반 합체율 `0.725`로 C2 `0.595`보다 높음, 실력 길이 비 `1.029`로 목표 `1.3` 및 S2 `1.154`보다 낮음
+- 조정 후보(미적용): JELLY 전용 단계별 난도 전환 간격을 후보군으로 만들어 추가 측정. 현재 R 길이와 초반 합체율은 범위 안이므로 `spawn_count_ramp_turns`·색 해금 턴을 바로 바꾸지 않았고, 후보 값 결정은 Claude에 남김
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard (`C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`)
+  - `godot --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·`ERROR:` 0건
+  - `tests/run_tests.ps1` → 일반 `347/347` (`27.232초`), 장기 `5/5` (`47.670초`), 성능 `5/5` (`3.069초`), 합계 `357/357`, 종료 코드 0, 총 `77.972초`
+  - 측정 → 60판 결과 파일, 측정 로그 오류 표식 0건. 보고서 `artifacts/measurements/jelly_rules_measurement.json` (git 제외 산출물)
+  - 기존 해시 → TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`, CLASSIC 단계 진행 `cf6172428c7901c43eb74f417e6880dc3ad375a329e669a8904234f5d38d1031`, SLIME 단계 진행 `7ebe5d76b8c4843fa739e5c10405da172b577fdea1caca2047ed176b07455e97`로 기존 기준 동일
+  - `tests/capture_screens.ps1 -HudScenesOnly` → 두 비율×19장=`38`장, 종료 코드 0. `52_jelly_final_move` 두 장에서 띠가 보드 위쪽 안에 있고 점수·행성·미리보기와 겹침/잘림 0건, 정확한 안내와 `↓ 막힘`을 직접 확인
+  - 기본·TURN·BLITZ·SLIME·JELLY `--quit-after 300` → 5개 모두 종료 코드 0, 프로젝트 오류 표식 0건
+  - `tools/build_windows.ps1 -Debug`만 실행 → 종료 코드 0, `build/windows-debug/GravityOrb_v0.14.0.exe` `105,055,408`바이트; Release 미실행
+  - 규칙 검사 → 새 `Input`/`InputEvent`·전역 난수 사용 0건, `git diff --check` 오류 0건
+  - 사용자 저장 파일 SHA-256은 검증 전후 `FCB975CAFA6550D3C14DE2C8594E3E0EB5525208DA83130D4E359E50C7497F4C`로 동일
+- 수동 확인 절차:
+  1. `GravityOrb_v0.14.0.console.exe --mode=jelly`로 실행해 같은 색 L+L, L+(L−1), L+(L−2)를 차례로 접촉시킨다 → 앞 둘만 합쳐지고 한 단계 차는 큰 쪽 자리·중간 크기로 남으며 차이 2는 부딪히기만 해야 한다.
+  2. 같은 색 L7+L7과 L7+L6을 접촉시킨다 → 앞은 둘 다 사라지는 잭팟, 뒤는 L6만 사라지고 L7 크기는 그대로여야 한다. 다른 색 L4+L4는 대폭발 없이 남아야 한다.
+  3. 입구를 막아 턴을 끝낸다 → 게임오버 대신 FINAL MOVE 띠·안내가 뜨고 NEXT/THEN이 유지되어야 한다. 다음 스와이프에는 새 구슬이 생기지 않으며, 입구를 비우면 계속하고 못 비우면 결과 화면으로 가야 한다.
+- 결정 사항: 규칙 질량은 기존 Jolt 물리 질량과 분리해 `jelly_mass`로 저장하고, 충돌 반지름에 맞춘 기존 질량식으로 물리 질량을 다시 계산한 뒤 기존 중력 가속도를 재적용함. 이번 #95는 명세대로 CLASSIC 행성 그림을 유지했고 JELLY 그림은 #96, 시작 카드·랭킹·저장은 #97 범위로 남겨 JELLY 완료 기록을 기존 TURN 저장에 쓰지 않음
+- 남은 것 · 질문: 60판에서 L7 도달·잭팟 관측은 0건(규칙 단위 테스트는 통과). 실력 길이 비가 목표보다 낮아 위 난도 전환 후보의 값·추가 측정 범위 결정이 필요함. 캡처 첫 비율 종료 때 기존 캡처 장면의 `ObjectDB instances leaked` 경고 4건이 있었으나 종료 코드 0이며 프로젝트 스크립트 오류는 0건
+
 ### [2026-10-21] 대상 #94 — Windows 빌드 0.14.0
 - 상태: 완료 — 프로젝트 버전을 Claude 결정 값 `0.14.0`으로 올리고 Godot 4.8 Standard 릴리스 Windows 패키지를 생성·검증함
 - 브랜치 / PR: `build-0.14.0` / https://github.com/jeongmo-dot/gravity_orb/pull/96

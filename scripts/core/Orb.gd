@@ -19,6 +19,7 @@ var color: int
 var level: int
 var generation: int = 0
 var stable_spawn_id: int = 0
+var jelly_mass: float = 1.0
 var consumed: bool = false
 var is_ghost: bool = false
 var ghost_elapsed: float = 0.0
@@ -48,6 +49,7 @@ var _render_clamp_enabled: bool = true
 func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	color = p_color
 	level = p_level
+	jelly_mass = cfg.jelly_mass_for_level(level)
 	_radius = cfg.radius_for_level(level)
 	_growth_duration = maxf(cfg.grow_duration, 0.0)
 	_growth_start_radius = _radius * clampf(cfg.grow_start_ratio, 0.0, 1.0)
@@ -88,7 +90,11 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	_visual.top_level = true
 	_update_visual_transform()
 	_visual.set_blast_armed(
-		cfg.blast_enabled and level >= cfg.active_blast_min_level(),
+		(
+			cfg.game_mode != GameConfig.GameMode.JELLY
+			and cfg.blast_enabled
+			and level >= cfg.active_blast_min_level()
+		),
 		cfg.blast_blink_period
 	)
 
@@ -99,6 +105,31 @@ func get_radius() -> float:
 
 func get_current_radius() -> float:
 	return _current_radius
+
+
+func get_jelly_mass() -> float:
+	return jelly_mass
+
+
+func set_jelly_mass(next_mass: float, cfg: GameConfig) -> void:
+	jelly_mass = clampf(
+		next_mass,
+		cfg.jelly_mass_for_level(1),
+		cfg.jelly_mass_for_level(cfg.orb_max_level)
+	)
+	level = cfg.jelly_level_for_mass(jelly_mass)
+	_radius = cfg.jelly_radius_for_mass(jelly_mass)
+	_current_radius = _radius
+	_growth_start_radius = _radius
+	_growth_elapsed = _growth_duration
+	mass = cfg.mass_for_radius(_radius)
+	set_gravity(Vector2i(_gravity_direction), cfg.gravity_strength)
+	var circle: CircleShape2D = _collision_shape.shape as CircleShape2D
+	if circle != null:
+		circle.radius = _radius
+	_visual.setup(cfg.color_display[color], _radius, color, cfg.orb_symbols_enabled)
+	_visual.set_blast_armed(false, cfg.blast_blink_period)
+	_update_visual_transform()
 
 
 func is_blast_armed() -> bool:

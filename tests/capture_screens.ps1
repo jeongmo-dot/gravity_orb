@@ -104,7 +104,8 @@ $expectedFiles = @(
 	"50_slime_shell_play_busy.png",
 	"50_slime_shell_play_rejected.png",
 	"51_slime_max_growth.png",
-	"52_new_planet_callout.png"
+	"52_new_planet_callout.png",
+	"52_jelly_final_move.png"
 )
 $hudExpectedFiles = @(
     "02_turn_early.png",
@@ -124,7 +125,8 @@ $hudExpectedFiles = @(
 	"45_turn_busy_a.png",
 	"45_turn_busy_b.png",
 	"46_turn_rejected.png",
-	"52_new_planet_callout.png"
+	"52_new_planet_callout.png",
+	"52_jelly_final_move.png"
 )
 $capturedFileCount = 0
 $boardReports = @()

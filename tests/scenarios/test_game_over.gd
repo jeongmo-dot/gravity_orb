@@ -157,6 +157,69 @@ func test_warning_set_matches_directions_that_would_wait() -> void:
 	await _cleanup_fixture(fixture, snapshot)
 
 
+func test_jelly_final_move_failure_spawns_nothing_and_preserves_preview() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	_configure_single_center_spawn()
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.stable_linear_speed = HIGH_THRESHOLD
+	Config.data.stable_angular_speed = HIGH_THRESHOLD
+	Config.data.stable_duration = 0.10
+	Config.data.max_settle_time = 0.25
+	var fixture: Dictionary = await _create_fixture(5301)
+	var board: Board = fixture["board"] as Board
+	var spawner: Spawner = fixture["spawner"] as Spawner
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	_fill_spawn_wall(board, Vector2i.DOWN, true)
+	_set_next_level_one_batch(spawner, [0.5])
+
+	manager.on_swipe(Vector2i.DOWN)
+	await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
+	assert_true(manager.final_move_pending, "blocked JELLY turn enters FINAL MOVE")
+	assert_eq(manager.final_move_count, 1, "FINAL MOVE occurrence counted")
+	var preview_before: Array = spawner.peek_preview()
+	var orb_count_before: int = board.get_orbs().size()
+	manager.on_swipe(Vector2i.RIGHT)
+	assert_true(manager.final_move_active, "next swipe activates FINAL MOVE")
+	assert_eq(manager.state, TurnManager.State.SIMULATING, "FINAL MOVE skips SPAWNING")
+	assert_eq(board.get_orbs().size(), orb_count_before, "FINAL MOVE creates no orb")
+	assert_eq(spawner.peek_preview(), preview_before, "FINAL MOVE preserves NEXT and THEN")
+	await _wait_for_state(manager, TurnManager.State.GAME_OVER)
+	assert_eq(manager.final_move_success_count, 0, "blocked FINAL MOVE fails")
+	await _cleanup_fixture(fixture, snapshot)
+
+
+func test_jelly_final_move_success_returns_to_input() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	_configure_single_center_spawn()
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.stable_linear_speed = HIGH_THRESHOLD
+	Config.data.stable_angular_speed = HIGH_THRESHOLD
+	Config.data.stable_duration = 0.10
+	Config.data.max_settle_time = 0.40
+	var fixture: Dictionary = await _create_fixture(5302)
+	var board: Board = fixture["board"] as Board
+	var spawner: Spawner = fixture["spawner"] as Spawner
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	_fill_spawn_wall(board, Vector2i.UP, true)
+	_set_next_level_one_batch(spawner, [0.5])
+
+	manager.on_swipe(Vector2i.UP)
+	await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
+	assert_true(manager.final_move_pending, "blocked turn offers FINAL MOVE")
+	for orb: Orb in board.get_orbs():
+		if orb.is_waiting_at_entrance:
+			continue
+		orb.freeze = false
+		orb.linear_velocity = Vector2.UP * 700.0
+	manager.on_swipe(Vector2i.LEFT)
+	await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
+	assert_eq(board.entrance_waiting_orbs().size(), 0, "FINAL MOVE opens the entrance")
+	assert_eq(manager.final_move_success_count, 1, "successful FINAL MOVE counted")
+	assert_true(not manager.final_move_pending, "success clears pending state")
+	assert_true(not manager.final_move_active, "success clears active state")
+	await _cleanup_fixture(fixture, snapshot)
+
+
 func _configure_single_center_spawn() -> void:
 	Config.data.spawn_position_mode = GameConfig.SpawnPositionMode.CENTER
 	Config.data.spawn_count_per_turn = 1
@@ -254,6 +317,7 @@ func _wait_for_state(manager: TurnManager, target: TurnManager.State) -> void:
 
 func _snapshot_config() -> Dictionary:
 	return {
+		"game_mode": Config.data.game_mode,
 		"gravity_strength": Config.data.gravity_strength,
 		"stable_linear_speed": Config.data.stable_linear_speed,
 		"stable_angular_speed": Config.data.stable_angular_speed,
@@ -269,6 +333,7 @@ func _snapshot_config() -> Dictionary:
 
 
 func _restore_config(snapshot: Dictionary) -> void:
+	Config.data.game_mode = int(snapshot["game_mode"]) as GameConfig.GameMode
 	Config.data.gravity_strength = float(snapshot["gravity_strength"])
 	Config.data.stable_linear_speed = float(snapshot["stable_linear_speed"])
 	Config.data.stable_angular_speed = float(snapshot["stable_angular_speed"])

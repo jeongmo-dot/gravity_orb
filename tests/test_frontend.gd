@@ -106,7 +106,7 @@ func test_mode_buttons_emit_modes_and_direct_launch_skips_start_screen() -> void
 	_remove_save()
 
 
-func test_mode_argument_parser_accepts_turn_blitz_and_slime() -> void:
+func test_mode_argument_parser_accepts_turn_blitz_slime_and_jelly() -> void:
 	var main: Main = MAIN_SCENE.instantiate() as Main
 	assert_eq(
 		main._mode_from_arguments(PackedStringArray(["--mode=turn"])),
@@ -122,6 +122,11 @@ func test_mode_argument_parser_accepts_turn_blitz_and_slime() -> void:
 		main._mode_from_arguments(PackedStringArray(["--mode=slime"])),
 		int(GameConfig.GameMode.SLIME),
 		"SLIME argument"
+	)
+	assert_eq(
+		main._mode_from_arguments(PackedStringArray(["--mode=jelly"])),
+		int(GameConfig.GameMode.JELLY),
+		"JELLY argument"
 	)
 	assert_eq(
 		main._mode_from_arguments(PackedStringArray(["--mode=unknown"])),

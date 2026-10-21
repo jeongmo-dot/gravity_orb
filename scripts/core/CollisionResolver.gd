@@ -78,7 +78,9 @@ func flush(delta: float = 0.0) -> int:
 			a.level,
 			b.color,
 			b.level,
-			Config.data
+			Config.data,
+			float(a.get("jelly_mass")),
+			float(b.get("jelly_mass"))
 		)
 		var reaction_type: ReactionRules.Type = classified["type"] as ReactionRules.Type
 		if reaction_type == ReactionRules.Type.NONE:
@@ -99,19 +101,37 @@ func flush(delta: float = 0.0) -> int:
 		var survivor: int = int(classified["survivor"])
 		var result_orb: Variant = null
 		var occupancy: float = _board_occupancy()
+		var result_mass: float = float(classified.get("result_mass", 0.0))
+		var jelly_absorption: bool = bool(classified.get("jelly_absorption", false))
+		var absorber: int = int(classified.get("absorber", 0))
+		if absorber == 1:
+			reaction_position = position_a
+		elif absorber == 2:
+			reaction_position = position_b
 
 		_board.remove_orb(a)
 		_board.remove_orb(b)
 		if reaction_type == ReactionRules.Type.MERGE:
-			var result_radius: float = Config.data.radius_for_level(result_level)
+			var result_radius: float = (
+				Config.data.jelly_radius_for_mass(result_mass)
+				if Config.data.game_mode == GameConfig.GameMode.JELLY
+				else Config.data.radius_for_level(result_level)
+			)
 			reaction_position = _clamp_inside(reaction_position, result_radius)
+			var result_velocity: Vector2 = (velocity_a + velocity_b) * 0.5
+			if absorber == 1:
+				result_velocity = velocity_a
+			elif absorber == 2:
+				result_velocity = velocity_b
 			result_orb = _board.spawn_orb(
 				result_color,
 				result_level,
 				reaction_position,
-				(velocity_a + velocity_b) * 0.5,
+				result_velocity,
 				chain
 			)
+			if Config.data.game_mode == GameConfig.GameMode.JELLY:
+				result_orb.set_jelly_mass(result_mass, Config.data)
 			result_orb.note_diagnostic_event("merge_result")
 			if _board.should_ghost_reaction_results():
 				result_orb.enter_ghost_state(Config.data.ghost_alpha)
@@ -169,6 +189,10 @@ func flush(delta: float = 0.0) -> int:
 			"result_level": result_level,
 			"result_color": result_color,
 			"result_orb": result_orb,
+			"result_mass": result_mass,
+			"jelly_absorption": jelly_absorption,
+			"absorbed_level": int(classified.get("absorbed_level", 0)),
+			"absorber": absorber,
 			"shock_level": shock_level,
 			"shock_targets": shock_targets,
 			"blast_targets": blast_targets,
@@ -300,7 +324,9 @@ func _pair_can_react(a: Variant, b: Variant) -> bool:
 		a.level,
 		b.color,
 		b.level,
-		Config.data
+		Config.data,
+		float(a.get("jelly_mass")),
+		float(b.get("jelly_mass"))
 	)
 	return int(classified["type"]) != ReactionRules.Type.NONE
 
@@ -318,7 +344,11 @@ func _is_valid_reaction_orb(orb: Variant) -> bool:
 func _board_occupancy() -> float:
 	var occupied_area: float = 0.0
 	for orb: Variant in _board.get_orbs():
-		var radius: float = Config.data.radius_for_level(orb.level)
+		var radius: float = (
+			_orb_contact_radius(orb)
+			if Config.data.game_mode == GameConfig.GameMode.JELLY
+			else Config.data.radius_for_level(orb.level)
+		)
 		occupied_area += PI * radius * radius
 	return occupied_area / (Config.data.board_size * Config.data.board_size)
 
@@ -452,6 +482,9 @@ func _scan_geometric_contacts(queue_reactions: bool, measure_contacts: bool) -> 
 
 func _scan_reaction_proximity_groups(queue_contacts: bool) -> void:
 	var config: GameConfig = Config.data
+	if config.game_mode == GameConfig.GameMode.JELLY:
+		_scan_geometric_contacts(queue_contacts, false)
+		return
 	var level_stride: int = config.orb_max_level + 1
 	var exact_group_count: int = config.color_display.size() * level_stride
 	var blast_group_offset: int = exact_group_count

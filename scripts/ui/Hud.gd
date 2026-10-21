@@ -159,6 +159,7 @@ var _callout_sparkles: Array[CosmicSparkle] = []
 var _fever_sparkles: Array[CosmicSparkle] = []
 var _fever_streak: ColorRect
 var _time_up_ring: CosmicRing2D
+var _jelly_final_move_banner: JellyFinalMoveBanner
 
 
 func _ready() -> void:
@@ -200,6 +201,11 @@ func _exit_tree() -> void:
 
 
 func _create_v4_ui_effects() -> void:
+	_jelly_final_move_banner = JellyFinalMoveBanner.new()
+	_jelly_final_move_banner.name = "JellyFinalMoveBanner"
+	_jelly_final_move_banner.z_index = 29
+	add_child(_jelly_final_move_banner)
+	_jelly_final_move_banner.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_planet_callout_visual = OrbVisual.new()
 	_planet_callout_visual.name = "PlanetUnlockVisual"
 	_planet_callout_visual.z_index = 31
@@ -491,6 +497,12 @@ func bind_game_state(
 		var turn_manager: TurnManager = game_manager as TurnManager
 		if not turn_manager.planet_unlocked.is_connected(_on_planet_unlocked):
 			turn_manager.planet_unlocked.connect(_on_planet_unlocked)
+		if not turn_manager.final_move_changed.is_connected(_on_final_move_changed):
+			turn_manager.final_move_changed.connect(_on_final_move_changed)
+		_on_final_move_changed(
+			turn_manager.final_move_pending or turn_manager.final_move_active,
+			TurnManager.FINAL_MOVE_MESSAGE
+		)
 	game_manager.warning_changed.connect(_on_warning_changed)
 	game_manager.combo_changed.connect(_on_combo_changed)
 	_game_over_panel.bind(game_manager, score_manager)
@@ -520,6 +532,15 @@ func bind_game_state(
 	_refresh_danger_badge()
 
 
+func _on_final_move_changed(visible: bool, message: String) -> void:
+	if not is_instance_valid(_jelly_final_move_banner):
+		return
+	if visible and Config.data.game_mode == GameConfig.GameMode.JELLY:
+		_jelly_final_move_banner.show_final_move(message)
+	else:
+		_jelly_final_move_banner.hide_final_move()
+
+
 func _on_preview_changed(batches: Array) -> void:
 	var next_batch: Array = batches[0] if not batches.is_empty() else []
 	_render_preview(_next_preview, next_batch)
@@ -536,7 +557,7 @@ func _on_preview_changed(batches: Array) -> void:
 
 
 func _track_preview_unlocks(batches: Array) -> void:
-	if Config.data.game_mode != GameConfig.GameMode.TURN:
+	if Config.data.game_mode not in [GameConfig.GameMode.TURN, GameConfig.GameMode.JELLY]:
 		return
 	for batch_index: int in range(mini(batches.size(), 2)):
 		var batch: Array = batches[batch_index] as Array
