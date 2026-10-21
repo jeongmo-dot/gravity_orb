@@ -38,6 +38,34 @@
 
 ## 미확인
 
+### [2026-10-21] 대상 #94 — Windows 빌드 0.14.0
+- 상태: 완료 — 프로젝트 버전을 Claude 결정 값 `0.14.0`으로 올리고 Godot 4.8 Standard 릴리스 Windows 패키지를 생성·검증함
+- 브랜치 / PR: `build-0.14.0` / https://github.com/jeongmo-dot/gravity_orb/pull/96
+- 변경 파일: `project.godot`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `application/config/version`을 `0.13.1`에서 `0.14.0`으로 변경하고 릴리스 `GravityOrb_v0.14.0.exe`·`.console.exe`·`_BUILD.txt` 생성 — 자동
+  - [x] 내보낸 콘솔 exe 기본·TURN·BLITZ·SLIME 네 경로 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건 — 자동
+  - [x] 격리 `APPDATA`에서 시작 화면과 SLIME 직접 실행 창이 각각 6초·8초 동안 생존하고 `godot.log` 오류 0건 — 자동. 실제 시작 화면 카드 클릭은 아래 수동 절차로 남김
+  - [x] 사용자 `save.cfg` 크기·SHA-256 기존 기준 동일, 패키지에 `tests/`·`artifacts/`·`docs/` 없음, 전체 테스트 래퍼 통과 — 자동
+  - [x] 다른 버전 산출물을 남기고, 최종 커밋 뒤 깨끗한 작업 트리에서 다시 빌드해 `_BUILD.txt` 커밋을 브랜치 마지막 커밋과 일치시킴 — 자동
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard (`C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`)
+  - `godot --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` → 일반 `339/339` (`23.543초`), 장기 `5/5` (`47.588초`), 성능 `5/5` (`3.088초`), 합계 `349/349`, 종료 코드 0, 총 `74.219초`
+  - `tools/build_windows.ps1` Release → 종료 코드 0, 결과 줄 `version=0.14.0 mode=Release exit=0 bytes=111177032`
+  - 산출물 → `GravityOrb_v0.14.0.exe` `111,177,032`바이트, `.console.exe` `50,176`바이트, `_BUILD.txt` `159`바이트; PE 파일·제품 버전 `0.14.0.0`, 제품 이름 `Gravity Orb`
+  - 내보낸 콘솔 exe 기본·TURN·BLITZ·SLIME → 네 실행 모두 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 격리 GUI → 시작 화면 프로세스 6초 생존·창 제목 `Gravity Orb`·로그 오류 0건, `--mode=slime` 프로세스 8초 생존·창 제목 `Gravity Orb`·로그 오류 0건
+  - 패키지 문자열 검사 → `res://tests/`·`res://artifacts/`·`res://docs/`와 테스트·캡처·인박스·설계 문서 표식 각 0건; `SlimeGame.gdc`·`SlimeMain.scn`·`Main.gdc` 각 2건
+  - 이전 `0.11.1`·`0.13.0`·`0.13.1` 산출물 10개(`0.13.1.zip` 포함) 유지
+  - 사용자 저장 파일은 검증 뒤 `1,488`바이트, SHA-256 `FCB975CAFA6550D3C14DE2C8594E3E0EB5525208DA83130D4E359E50C7497F4C`로 기존 기준 동일
+  - 화면에 보이는 구현 변경이 없는 버전·빌드 항목이라 전체 캡처는 미실행
+- 수동 확인 절차:
+  1. `build/windows/GravityOrb_v0.14.0.exe`를 실행한다 → 시작 화면에 BLITZ·CLASSIC·SLIME 카드 3장이 보여야 한다.
+  2. SLIME 카드를 누른다 → 파란 격자 보드와 슬라임이 표시되고 창이 종료되지 않아야 한다.
+- 결정 사항: 없음
+- 남은 것 · 질문: Computer Use 스킬의 Windows 제어 런타임이 초기화 경로 오류로 두 번 실패해 시작 화면에서 SLIME 카드를 실제 포인터로 누르는 동작은 자동화하지 못함. 대신 격리 시작 화면 창과 격리 `--mode=slime` 실제 릴리스 창을 각각 실행해 생존·창·로그를 확인함
+
 ### [2026-10-19] 대상 #93 — 새 행성 안내 시점 · 행성 늘어남 끄기 · BLITZ 보너스 글자 시점
 - 상태: 완료 — `origin/main` `80a0164`에서 항목 브랜치를 만든 뒤 새 행성 안내를 실제 생성 프레임으로 옮기고, 행성 늘어남 기본값을 끄고, BLITZ 보너스 글자·밝은 조각 시점을 맞춤
 - 브랜치 / PR: `planet-callout-spawn-timing` / https://github.com/jeongmo-dot/gravity_orb/pull/95
