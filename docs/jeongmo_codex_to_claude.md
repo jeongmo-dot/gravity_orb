@@ -40,7 +40,7 @@
 
 ### [2026-10-21] 대상 #94 — Windows 빌드 0.14.0
 - 상태: 완료 — 프로젝트 버전을 Claude 결정 값 `0.14.0`으로 올리고 Godot 4.8 Standard 릴리스 Windows 패키지를 생성·검증함
-- 브랜치 / PR: `build-0.14.0` / 생성 예정
+- 브랜치 / PR: `build-0.14.0` / https://github.com/jeongmo-dot/gravity_orb/pull/96
 - 변경 파일: `project.godot`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `application/config/version`을 `0.13.1`에서 `0.14.0`으로 변경하고 릴리스 `GravityOrb_v0.14.0.exe`·`.console.exe`·`_BUILD.txt` 생성 — 자동
