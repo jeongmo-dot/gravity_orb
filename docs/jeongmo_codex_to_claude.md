@@ -40,7 +40,7 @@
 
 ### [2026-10-21] 대상 #95 — JELLY 규칙 · FINAL MOVE · 측정
 - 상태: 완료 — CLASSIC 턴제 위에 JELLY 흡수 질량·점수·FINAL MOVE를 구현하고 3전략×20시드×600턴을 측정함. 바라는 자리 밖 수치는 임의 조정하지 않고 후보만 보고함
-- 브랜치 / PR: `jelly-rules-measurement` / 생성 예정
+- 브랜치 / PR: `jelly-rules-measurement` / https://github.com/jeongmo-dot/gravity_orb/pull/97
 - 변경 파일: `config/GameConfig.gd`, `scripts/core/{CollisionResolver,Main,Orb,ReactionRules,ScoreManager,TurnManager}.gd`, `scripts/spike/Orb3D.gd`, `scripts/ui/{DebugHud,Hud,JellyFinalMoveBanner}.gd`, `tests/` JELLY 규칙·점수·3D·FINAL MOVE·캡처·측정 도구, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `GameMode.JELLY = 3`·`--mode=jelly`, 같은 색 레벨 차 0~1 흡수, 추상 질량 `2^(L-1)`·64 상한·레벨 내 반지름 보간·한 단계 차 큰 쪽 위치, 차이 2+/다른 색 무반응 — 자동 (`test_config`, `test_rules`, `test_jolt_3d`)
