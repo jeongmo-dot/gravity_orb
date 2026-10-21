@@ -22,6 +22,7 @@ var color: int = 0
 var level: int = 1
 var generation: int = 0
 var stable_spawn_id: int = 0
+var jelly_mass: float = 1.0
 var consumed: bool = false
 var is_ghost: bool = false
 var ghost_elapsed: float = 0.0
@@ -152,8 +153,13 @@ static func shared_visual_material_for_color(
 func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	color = p_color
 	level = p_level
+	jelly_mass = cfg.jelly_mass_for_level(level)
 	_visual_alpha = 1.0
-	_blast_armed = cfg.blast_enabled and level >= cfg.active_blast_min_level()
+	_blast_armed = (
+		cfg.game_mode != GameConfig.GameMode.JELLY
+		and cfg.blast_enabled
+		and level >= cfg.active_blast_min_level()
+	)
 	_blast_blink_period = maxf(cfg.blast_blink_period, 0.001)
 	_blast_blink_elapsed = 0.0
 	_radius = cfg.radius_for_level(level)
@@ -233,6 +239,39 @@ func get_radius() -> float:
 
 func get_current_radius() -> float:
 	return _current_radius
+
+
+func get_jelly_mass() -> float:
+	return jelly_mass
+
+
+func set_jelly_mass(next_mass: float, cfg: GameConfig) -> void:
+	var gravity_direction: Vector2 = world_vector_to_plane(_body.constant_force).normalized()
+	jelly_mass = clampf(
+		next_mass,
+		cfg.jelly_mass_for_level(1),
+		cfg.jelly_mass_for_level(cfg.orb_max_level)
+	)
+	level = cfg.jelly_level_for_mass(jelly_mass)
+	_radius = cfg.jelly_radius_for_mass(jelly_mass)
+	_current_radius = _radius
+	_growth_start_radius = _radius
+	_growth_elapsed = _growth_duration
+	_body.mass = cfg.mass_for_radius(_radius)
+	if not gravity_direction.is_zero_approx():
+		set_gravity(
+			Vector2i(roundi(gravity_direction.x), roundi(gravity_direction.y)),
+			cfg.gravity_strength
+		)
+	_blast_armed = false
+	_blast_outline.visible = false
+	var celestial_material: ShaderMaterial = CelestialOrbArt.material_for(cfg, color, level)
+	_mesh.material_override = celestial_material
+	_adornment.material_override = celestial_material
+	_adornment.visible = CelestialOrbArt.has_adornment(level)
+	_ensure_unique_radius_resources()
+	_apply_current_radius_to_resources(_radius / PIXELS_PER_METER)
+	_update_visual_transform()
 
 
 func set_render_clamp_enabled(enabled: bool) -> void:

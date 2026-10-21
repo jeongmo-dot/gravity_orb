@@ -4,7 +4,7 @@ extends Resource
 enum SpawnPositionMode { RANDOM, CENTER }
 enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 enum ShockMode { PUSH, PULL, SHAKE, LIFT }
-enum GameMode { TURN, BLITZ, SLIME }
+enum GameMode { TURN, BLITZ, SLIME, JELLY }
 
 @export var game_mode: GameMode = GameMode.TURN
 @export var board_size: float = 960.0
@@ -182,6 +182,43 @@ func radius_for_level(level: int) -> float:
 
 func mass_for_level(level: int) -> float:
 	var radius_ratio: float = radius_for_level(level) / radius_for_level(1)
+	return orb_base_mass * pow(radius_ratio, mass_exponent)
+
+
+func jelly_mass_for_level(level: int) -> float:
+	return pow(2.0, float(clampi(level, 1, orb_max_level) - 1))
+
+
+func jelly_level_for_mass(mass: float) -> int:
+	var clamped_mass: float = clampf(
+		mass,
+		jelly_mass_for_level(1),
+		jelly_mass_for_level(orb_max_level)
+	)
+	return clampi(floori(log(clamped_mass) / log(2.0)) + 1, 1, orb_max_level)
+
+
+func jelly_radius_for_mass(mass: float) -> float:
+	var clamped_mass: float = clampf(
+		mass,
+		jelly_mass_for_level(1),
+		jelly_mass_for_level(orb_max_level)
+	)
+	var lower_level: int = jelly_level_for_mass(clamped_mass)
+	if lower_level >= orb_max_level:
+		return radius_for_level(orb_max_level)
+	var lower_mass: float = jelly_mass_for_level(lower_level)
+	var upper_mass: float = jelly_mass_for_level(lower_level + 1)
+	var fraction: float = inverse_lerp(lower_mass, upper_mass, clamped_mass)
+	return lerpf(
+		radius_for_level(lower_level),
+		radius_for_level(lower_level + 1),
+		fraction
+	)
+
+
+func mass_for_radius(radius: float) -> float:
+	var radius_ratio: float = radius / radius_for_level(1)
 	return orb_base_mass * pow(radius_ratio, mass_exponent)
 
 

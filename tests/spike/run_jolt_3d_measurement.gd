@@ -41,6 +41,7 @@ var _record_seed_hashes: bool = false
 var _scan_pairs_each_frame: bool = false
 var _skip_determinism: bool = false
 var _skill_strategy: String = ""
+var _measurement_mode: GameConfig.GameMode = GameConfig.GameMode.TURN
 var _skill_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _turn_shock_events: Array[Dictionary] = []
 var _seed_reactions_by_color: Dictionary = {}
@@ -55,6 +56,8 @@ var _turn_merge_count: int = 0
 var _turn_blast_count: int = 0
 var _preview_fixture_serial: int = 0
 var _seed_seen_colors: Dictionary = {}
+var _seed_merge_count: int = 0
+var _seed_absorption_count: int = 0
 
 
 func _ready() -> void:
@@ -68,6 +71,7 @@ func _run() -> void:
 	_seeds.append_array(SEEDS)
 	_apply_arguments()
 	var report: Dictionary = {
+		"game_mode": _mode_name(_measurement_mode),
 		"engine": Engine.get_version_info(),
 		"physics_engine": str(ProjectSettings.get_setting("physics/3d/physics_engine")),
 		"pixels_per_meter": Orb3D.PIXELS_PER_METER,
@@ -164,8 +168,9 @@ func _run_tick_suite(ticks: int) -> Dictionary:
 		seed_rows.append(result)
 		if not _skill_strategy.is_empty():
 			print(
-				"MODE_SKILL_CLASSIC strategy=%s seed=%d turns=%d score=%d game_over=%s"
+				"MODE_SKILL_%s strategy=%s seed=%d turns=%d score=%d game_over=%s"
 				% [
+					_mode_name(_measurement_mode).to_upper(),
 					_skill_strategy,
 					seed,
 					int(result["completed_turns"]),
@@ -240,6 +245,8 @@ func _run_seed(
 	_seed_blast_moved_ratio_sum_by_level.clear()
 	_seed_first_blast_turn = -1
 	_seed_seen_colors.clear()
+	_seed_merge_count = 0
+	_seed_absorption_count = 0
 	_current_measurement_turn = 0
 	var fixture: Dictionary = await _create_fixture(seed)
 	var fixture_root: Node = fixture["root"] as Node
@@ -405,6 +412,21 @@ func _run_seed(
 		"reactions_by_color": _seed_reactions_by_color.duplicate(),
 		"max_level_reached": score_manager.max_level_reached,
 		"max_clear_count": _seed_max_clear_count,
+		"merge_count": _seed_merge_count,
+		"one_level_absorption_count": _seed_absorption_count,
+		"one_level_absorption_fraction": (
+			float(_seed_absorption_count) / float(_seed_merge_count)
+			if _seed_merge_count > 0
+			else 0.0
+		),
+		"reached_level_seven": score_manager.max_level_reached >= Config.data.orb_max_level,
+		"final_move_count": manager.final_move_count,
+		"final_move_success_count": manager.final_move_success_count,
+		"final_move_success_rate": (
+			float(manager.final_move_success_count) / float(manager.final_move_count)
+			if manager.final_move_count > 0
+			else 0.0
+		),
 		"blast_count": _seed_blast_count,
 		"blast_count_by_level": _seed_blast_count_by_level.duplicate(true),
 		"blast_moved_orb_ratio_by_level": _blast_moved_ratio_by_level(),
@@ -811,6 +833,9 @@ func _record_shock_event(reaction: Dictionary) -> void:
 	_turn_reaction_count += 1
 	if reaction_type == ReactionRules.Type.MERGE:
 		_turn_merge_count += 1
+		_seed_merge_count += 1
+		if bool(reaction.get("jelly_absorption", false)):
+			_seed_absorption_count += 1
 	if reaction_type == ReactionRules.Type.BLAST:
 		_turn_blast_count += 1
 		_seed_blast_count += 1
@@ -1209,8 +1234,8 @@ func _run_determinism_check(seed: int) -> Dictionary:
 func _state_hash(board: Board3D) -> String:
 	var states: Array[String] = []
 	for orb: Orb3D in board.get_orbs():
-		states.append(
-			"%d:%d:%.3f:%.3f:%.3f:%.3f:%.3f:%d" % [
+		var format: String = "%d:%d:%.3f:%.3f:%.3f:%.3f:%.3f:%d"
+		var values: Array = [
 				orb.color,
 				orb.level,
 				orb.position.x,
@@ -1220,7 +1245,10 @@ func _state_hash(board: Board3D) -> String:
 				orb.angular_velocity,
 				1 if orb.is_waiting_at_entrance else 0,
 			]
-		)
+		var state: String = format % values
+		if _measurement_mode == GameConfig.GameMode.JELLY:
+			state += ":%.3f" % orb.jelly_mass
+		states.append(state)
 	states.sort()
 	return "|".join(states).sha256_text()
 
@@ -1291,7 +1319,7 @@ func _choose_preview_direction(
 	var evaluations: Array[Dictionary] = []
 	var best_value: float = -INF
 	var best_directions: Array[Vector2i] = []
-	var has_game_over: bool = false
+	var has_fatal: bool = false
 	var has_survivor: bool = false
 	var minimum_unblocked: int = 4
 	var maximum_unblocked: int = 0
@@ -1303,6 +1331,8 @@ func _choose_preview_direction(
 		var preview_manager: TurnManager = preview["manager"] as TurnManager
 		var preview_score: ScoreManager = preview["score_manager"] as ScoreManager
 		var game_over: bool = preview_manager.state == TurnManager.State.GAME_OVER
+		var final_move_pending: bool = preview_manager.final_move_pending
+		var fatal: bool = game_over or final_move_pending
 		var unblocked_count: int = 4 - preview_manager.blocked_directions.size()
 		var score_gain: int = preview_score.score - int(preview["score_before"])
 		var space_value: float = (
@@ -1310,18 +1340,21 @@ func _choose_preview_direction(
 			+ (1.0 - _board_occupancy(preview_board)) * 1000.0
 		)
 		var value: float = -1000000.0 if game_over else space_value
+		if not game_over and preview_manager.final_move_pending:
+			value = -500000.0
 		if not game_over and strategy == "l_merge":
 			value += float(score_gain)
 		evaluations.append({
 			"direction": OrbTypes.DIRECTIONS[index],
 			"game_over": game_over,
+			"final_move_pending": final_move_pending,
 			"unblocked_direction_count": unblocked_count,
 			"score_gain": score_gain,
 			"occupancy": _board_occupancy(preview_board),
 			"value": value,
 		})
-		has_game_over = has_game_over or game_over
-		has_survivor = has_survivor or not game_over
+		has_fatal = has_fatal or fatal
+		has_survivor = has_survivor or not fatal
 		minimum_unblocked = mini(minimum_unblocked, unblocked_count)
 		maximum_unblocked = maxi(maximum_unblocked, unblocked_count)
 		minimum_score_gain = mini(minimum_score_gain, score_gain)
@@ -1341,7 +1374,7 @@ func _choose_preview_direction(
 	InputRouter.set_locked(false)
 	return {
 		"direction": _random_direction(best_directions),
-		"fatal_avoidance": has_game_over and has_survivor,
+		"fatal_avoidance": has_fatal and has_survivor,
 		"unblocked_direction_spread": maximum_unblocked - minimum_unblocked,
 		"score_gain_spread": maximum_score_gain - minimum_score_gain,
 		"decision_usec": Time.get_ticks_usec() - decision_started_usec,
@@ -1443,6 +1476,8 @@ func _copy_preview_state(
 			source_orb.generation
 		)
 		target_orb.stable_spawn_id = source_orb.stable_spawn_id
+		if _measurement_mode == GameConfig.GameMode.JELLY:
+			target_orb.set_jelly_mass(source_orb.jelly_mass, Config.data)
 		target_orb.get_physics_body().rotation = source_orb.get_physics_body().rotation
 		target_orb.angular_velocity = source_orb.angular_velocity
 		if source_orb.is_ghost:
@@ -1475,6 +1510,10 @@ func _copy_preview_state(
 	target_manager.capped_turn_count = source_manager.capped_turn_count
 	target_manager.blocked_directions.assign(source_manager.blocked_directions)
 	target_manager.game_over_details = source_manager.game_over_details.duplicate(true)
+	target_manager.final_move_pending = source_manager.final_move_pending
+	target_manager.final_move_active = source_manager.final_move_active
+	target_manager.final_move_count = source_manager.final_move_count
+	target_manager.final_move_success_count = source_manager.final_move_success_count
 	target_manager.settle_elapsed = 0.0
 	target_manager._stable_time = 0.0
 	target_manager._is_initial_settle = false
@@ -1527,7 +1566,9 @@ func _count_skill_reaction_pairs(board: Board3D, direction: Vector2i) -> int:
 				first.level,
 				second.color,
 				second.level,
-				Config.data
+				Config.data,
+				first.jelly_mass,
+				second.jelly_mass
 			)
 			var reaction_type: ReactionRules.Type = reaction["type"] as ReactionRules.Type
 			if (
@@ -1537,7 +1578,9 @@ func _count_skill_reaction_pairs(board: Board3D, direction: Vector2i) -> int:
 			):
 				continue
 			var offset: Vector2 = second.position - first.position
-			var maximum_distance: float = (first.get_radius() + second.get_radius()) * 3.0
+			var maximum_distance: float = (
+				first.get_current_radius() + second.get_current_radius()
+			) * 3.0
 			if offset.is_zero_approx() or offset.length() > maximum_distance:
 				continue
 			if absf(offset.normalized().dot(Vector2(direction))) >= 0.8:
@@ -1557,6 +1600,7 @@ func _state_rows(board: Board3D) -> Array[Dictionary]:
 			"velocity_y": orb.linear_velocity.y,
 			"angular_velocity": orb.angular_velocity,
 			"waiting": orb.is_waiting_at_entrance,
+			"jelly_mass": orb.jelly_mass if _measurement_mode == GameConfig.GameMode.JELLY else 0.0,
 		})
 	return rows
 
@@ -1730,6 +1774,21 @@ func _apply_arguments() -> void:
 			if _skill_strategy not in ["r", "s", "g", "l_space", "l_merge"]:
 				_had_runner_error = true
 				push_error("Unknown skill strategy: %s" % _skill_strategy)
+		elif argument.begins_with("--game-mode="):
+			var mode_name: String = argument.trim_prefix("--game-mode=").to_lower()
+			if mode_name == "jelly":
+				_measurement_mode = GameConfig.GameMode.JELLY
+				Config.data.game_mode = GameConfig.GameMode.JELLY
+			elif mode_name == "turn" or mode_name == "classic":
+				_measurement_mode = GameConfig.GameMode.TURN
+				Config.data.game_mode = GameConfig.GameMode.TURN
+			else:
+				_had_runner_error = true
+				push_error("Unknown measurement game mode: %s" % mode_name)
+
+
+func _mode_name(mode: GameConfig.GameMode) -> String:
+	return "jelly" if mode == GameConfig.GameMode.JELLY else "classic"
 
 
 func _parse_int_list(csv: String) -> Array[int]:

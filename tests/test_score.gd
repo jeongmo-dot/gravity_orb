@@ -167,6 +167,44 @@ func test_blitz_combo_fever_and_finale_scoring() -> void:
 	assert_near(float(finale["fever_multiplier"]), 1.0, TOLERANCE, "finale fever ignored")
 
 
+func test_jelly_merge_scores_new_level_and_absorption_scores_eaten_level() -> void:
+	var cfg: GameConfig = _config()
+	cfg.game_mode = GameConfig.GameMode.JELLY
+	var leveled: Dictionary = _reaction(
+		ReactionRules.Type.MERGE,
+		1,
+		[2, 2],
+		3,
+		0.20
+	)
+	leveled["jelly_absorption"] = false
+	assert_eq(ScoreManager.points_for(leveled, cfg), 8, "JELLY level-up scores L3")
+	var absorbed: Dictionary = _reaction(
+		ReactionRules.Type.MERGE,
+		1,
+		[3, 2],
+		3,
+		0.20
+	)
+	absorbed["jelly_absorption"] = true
+	absorbed["absorbed_level"] = 2
+	assert_eq(ScoreManager.points_for(absorbed, cfg), 4, "JELLY unchanged level scores eaten L2")
+	var absorption_level_up: Dictionary = _reaction(
+		ReactionRules.Type.MERGE,
+		1,
+		[3, 2],
+		4,
+		0.20
+	)
+	absorption_level_up["jelly_absorption"] = true
+	absorption_level_up["absorbed_level"] = 2
+	assert_eq(
+		ScoreManager.points_for(absorption_level_up, cfg),
+		16,
+		"JELLY absorption that raises level scores new L4"
+	)
+
+
 func _config() -> GameConfig:
 	return CONFIG_RESOURCE.duplicate(true) as GameConfig
 

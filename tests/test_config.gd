@@ -46,6 +46,23 @@ func test_mass_for_candidate_exponents() -> void:
 	)
 
 
+func test_jelly_mass_level_and_radius_interpolation() -> void:
+	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
+	assert_eq(int(GameConfig.GameMode.JELLY), 3, "JELLY enum keeps prior values stable")
+	for level: int in range(1, config.orb_max_level + 1):
+		var mass: float = pow(2.0, float(level - 1))
+		assert_near(config.jelly_mass_for_level(level), mass, TOLERANCE, "mass L%d" % level)
+		assert_eq(config.jelly_level_for_mass(mass), level, "level from exact mass L%d" % level)
+		assert_near(
+			config.jelly_radius_for_mass(mass),
+			config.radius_for_level(level),
+			TOLERANCE,
+			"exact mass radius L%d" % level
+		)
+	assert_eq(config.jelly_level_for_mass(6.0), 3, "mass 6 remains L3")
+	assert_near(config.jelly_radius_for_mass(6.0), 72.5, TOLERANCE, "mass 6 is halfway L3-L4")
+
+
 func test_m2_swipe_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	assert_near(config.swipe_min_distance, 80.0, TOLERANCE, "swipe minimum distance")

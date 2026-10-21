@@ -260,6 +260,8 @@ func _mode_from_arguments(arguments: PackedStringArray) -> int:
 			return int(GameConfig.GameMode.TURN)
 		if mode_name == "slime":
 			return int(GameConfig.GameMode.SLIME)
+		if mode_name == "jelly":
+			return int(GameConfig.GameMode.JELLY)
 	return NO_MODE
 
 
@@ -273,6 +275,8 @@ func _as_game_mode(value: int) -> GameConfig.GameMode:
 		return GameConfig.GameMode.BLITZ
 	if value == int(GameConfig.GameMode.SLIME):
 		return GameConfig.GameMode.SLIME
+	if value == int(GameConfig.GameMode.JELLY):
+		return GameConfig.GameMode.JELLY
 	return GameConfig.GameMode.TURN
 
 

@@ -175,12 +175,13 @@ func _on_combo_changed(combo: int, multiplier: float, max_combo: int) -> void:
 
 func _update_label() -> void:
 	var blitz_mode: bool = Config.data.game_mode == GameConfig.GameMode.BLITZ
+	var mode_name: String = "JELLY" if Config.data.game_mode == GameConfig.GameMode.JELLY else "TURN"
 	var state_names: Array[String] = BLITZ_STATE_NAMES if blitz_mode else TURN_STATE_NAMES
 	var spawn_amount: int = 1 if blitz_mode else Config.data.spawn_count_for_turn(
 		_game_manager.turn_index + 1
 	)
 	_label.text = "Mode: %s\nState: %s\nGravity: %s\n%s: %d\n%s: %d (x%s)\n%s: %d\nRule: %s\nSpawn: %d\nElapsed: %.2f s\nSeed: %d" % [
-		"BLITZ" if blitz_mode else "TURN",
+		"BLITZ" if blitz_mode else mode_name,
 		state_names[_state],
 		OrbTypes.dir_name(_gravity),
 		"Swipes" if blitz_mode else "Turn",
