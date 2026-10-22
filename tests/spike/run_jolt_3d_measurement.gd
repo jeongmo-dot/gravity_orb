@@ -93,6 +93,7 @@ func _run() -> void:
 		"green_shake_max_speed": Config.data.green_shake_max_speed,
 		"blast_enabled": Config.data.blast_enabled,
 		"blast_min_level": Config.data.blast_min_level,
+		"jelly_blast_min_level": Config.data.jelly_blast_min_level,
 		"blast_push_radius_by_level": Array(Config.data.blast_push_radius_by_level),
 		"blast_speed": Config.data.blast_speed,
 		"blast_far_factor": Config.data.blast_far_factor,
@@ -1736,6 +1737,12 @@ func _apply_arguments() -> void:
 			Config.data.blast_min_level = maxi(
 				argument.trim_prefix("--blast-min-level=").to_int(),
 				1
+			)
+		elif argument.begins_with("--jelly-blast-min-level="):
+			Config.data.jelly_blast_min_level = clampi(
+				argument.trim_prefix("--jelly-blast-min-level=").to_int(),
+				0,
+				Config.data.orb_max_level
 			)
 		elif argument.begins_with("--blast-push-radius-by-level="):
 			Config.data.blast_push_radius_by_level = _parse_float_list(

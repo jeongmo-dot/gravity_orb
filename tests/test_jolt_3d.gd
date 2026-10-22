@@ -221,6 +221,25 @@ func test_3d_blast_blink_starts_at_shared_level_four_in_both_modes() -> void:
 	Config.data.game_mode = original_mode
 
 
+func test_jelly_blast_blink_follows_candidate_threshold_and_mass_level() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_jelly_minimum: int = Config.data.jelly_blast_min_level
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_blast_min_level = 5
+	var board: Board3D = await _create_board()
+	var level_four: Orb3D = board.spawn_orb(0, 4, Vector2(-180.0, 0.0))
+	var level_five: Orb3D = board.spawn_orb(1, 5, Vector2(180.0, 0.0))
+	assert_true(not level_four.is_blast_armed(), "J5 leaves L4 unarmed")
+	assert_true(level_five.is_blast_armed(), "J5 arms L5")
+	level_four.set_jelly_mass(16.0, Config.data)
+	assert_eq(level_four.level, 5, "mass update reaches displayed L5")
+	assert_true(level_four.is_blast_armed(), "mass-updated displayed L5 arms BLAST")
+	assert_true(level_four._blast_outline.visible, "mass-updated L5 shows pulse outline")
+	_cleanup(board)
+	Config.data.jelly_blast_min_level = original_jelly_minimum
+	Config.data.game_mode = original_mode
+
+
 func test_jolt_reaction_uses_shared_rules_and_spawns_3d_result() -> void:
 	var fixture_root: Node = Node.new()
 	fixture_root.name = "JoltReactionFixture"

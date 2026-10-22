@@ -155,11 +155,7 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	level = p_level
 	jelly_mass = cfg.jelly_mass_for_level(level)
 	_visual_alpha = 1.0
-	_blast_armed = (
-		cfg.game_mode != GameConfig.GameMode.JELLY
-		and cfg.blast_enabled
-		and level >= cfg.active_blast_min_level()
-	)
+	_blast_armed = cfg.blast_enabled_for_level(level)
 	_blast_blink_period = maxf(cfg.blast_blink_period, 0.001)
 	_blast_blink_elapsed = 0.0
 	_radius = cfg.radius_for_level(level)
@@ -263,8 +259,8 @@ func set_jelly_mass(next_mass: float, cfg: GameConfig) -> void:
 			Vector2i(roundi(gravity_direction.x), roundi(gravity_direction.y)),
 			cfg.gravity_strength
 		)
-	_blast_armed = false
-	_blast_outline.visible = false
+	_blast_armed = cfg.blast_enabled_for_level(level)
+	_blast_outline.visible = _blast_armed
 	var celestial_material: ShaderMaterial = CelestialOrbArt.material_for(cfg, color, level)
 	_mesh.material_override = celestial_material
 	_adornment.material_override = celestial_material

@@ -103,6 +103,7 @@ enum GameMode { TURN, BLITZ, SLIME, JELLY }
 @export var chain_reaction_delay: float = 0.2
 @export var blast_enabled: bool = true
 @export var blast_min_level: int = 4
+@export var jelly_blast_min_level: int = 0
 @export var blast_push_radius_by_level: PackedFloat32Array = PackedFloat32Array(
 	[0.0, 0.0, 0.0, 0.3, 0.55, 1.0, 1.0]
 )
@@ -231,7 +232,14 @@ func score_for_level(level: int) -> int:
 
 
 func active_blast_min_level() -> int:
+	if game_mode == GameMode.JELLY:
+		return jelly_blast_min_level
 	return blast_min_level
+
+
+func blast_enabled_for_level(level: int) -> bool:
+	var minimum_level: int = active_blast_min_level()
+	return blast_enabled and minimum_level > 0 and level >= minimum_level
 
 
 func blast_push_radius_factor_for_level(level: int) -> float:

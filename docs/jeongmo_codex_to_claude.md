@@ -38,6 +38,55 @@
 
 ## 미확인
 
+### [2026-10-22] 대상 #98 — JELLY 대폭발 되살리기 후보 J4·J5 측정
+- 상태: 완료 — JELLY 전용 대폭발 임계값과 판정 우선순위를 구현하고 J4·J5를 각 3전략×20시드×600턴으로 측정함. 기본값은 `0`(대폭발 없음)으로 유지했고 후보 채택은 하지 않음
+- 브랜치 / PR: `jelly-blast-measurement` / 생성 예정
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/{Orb,ReactionRules}.gd`, `scripts/spike/Orb3D.gd`, `tests/{test_config,test_jolt_3d,test_rules}.gd`, `tests/spike/{capture_screens,run_jolt_3d_measurement}.gd`, `tests/{capture_screens,tools/run_jelly_blast_measurement}.ps1`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `jelly_blast_min_level` 추가, 기본 `0`에서 #95 J0 규칙·해시 유지, 후보값 4·5에서만 JELLY 대폭발 활성 — 자동 (`test_config`, `test_rules`)
+  - [x] JELLY 판정 순서 `같은 색·표시 레벨 차 ≤1 흡수` → `다른 색·같은 표시 레벨·임계 이상 BLAST` → 무반응, 추상 질량 차이는 대폭발 판정에 쓰지 않음 — 자동 (`test_jelly_blast_default_threshold_and_absorption_precedence`)
+  - [x] 후보 임계 레벨부터 2D·3D 점멸 테두리 표시, 질량 흡수로 표시 레벨이 임계에 도달해도 즉시 갱신 — 자동 (`test_jelly_blast_blink_follows_candidate_threshold_and_mass_level`) + 두 비율 캡처 직접 관측
+  - [x] J4·J5×R/G/L-합체×시드 1~20×600턴 측정, J0 #95 재사용, 턴·점수·실력 비·같은 시드 승률·초반 합체·폭발·L7/잭팟·FINAL MOVE와 C2/S2 비교 — 자동 집계
+  - [x] 기본값 불변, 기존 CLASSIC·BLITZ·SLIME 해시, 전체 래퍼, 재임포트, 5경로 스모크, Debug 빌드, 사용자 저장 해시 확인 — 자동
+- 한 줄 재실행: `.\tests\tools\run_jelly_blast_measurement.ps1 -GodotPath "C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe" -SeedCount 20 -Parallelism 4 -TurnCap 600`
+
+#### 후보 측정 결과 (각 전략 20판, 시드 1~20, 600턴 상한)
+
+| 후보·전략 | 턴 중앙 | 점수 중앙 | 1~30턴 합체/턴 | 대폭발 | FINAL MOVE 발생/성공 | 한 단계 흡수/합체 | L7 도달 판 | 잭팟 | 치명 회피 턴 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| J0 R (#95 재사용) | 154 | 9,073.5 | 0.725 | 0 | 21 / 1 (4.76%) | 54.01% | 0/20 | 0 | 0 |
+| J0 G (#95 재사용) | 159 | 9,595 | 0.743 | 0 | 21 / 1 (4.76%) | 54.94% | 0/20 | 0 | 0 |
+| J0 L-합체 (#95 재사용) | 158.5 | 10,600.5 | 0.793 | 0 | 23 / 3 (13.04%) | 55.10% | 0/20 | 0 | 50 (1.582%) |
+| J4 R | 358 | 692,764 | 0.732 | 1,320 | 20 / 0 (0%) | 52.42% | 1/20 | 0 | 0 |
+| J4 G | 426.5 | 721,276.5 | 0.765 | 1,951 | 20 / 0 (0%) | 52.01% | 2/20 | 0 | 0 |
+| J4 L-합체 | 579 | 2,744,566 | 0.805 | 3,552 | 12 / 1 (8.33%) | 51.80% | 3/20 | 0 | 23 (0.205%) |
+| J5 R | 223.5 | 92,887 | 0.725 | 188 | 22 / 2 (9.09%) | 54.58% | 0/20 | 0 | 0 |
+| J5 G | 282.5 | 190,071.5 | 0.743 | 380 | 22 / 2 (9.09%) | 53.76% | 1/20 | 0 | 0 |
+| J5 L-합체 | 328 | 385,756.5 | 0.793 | 544 | 22 / 2 (9.09%) | 55.11% | 3/20 | 0 | 36 (0.557%) |
+
+- J0 실력 비: 길이 `1.029`, 점수 `1.168`, 같은 시드 길이/점수 승률 `90% / 70%`
+- J4 실력 비: 길이 `1.617`, 점수 `3.962`, 같은 시드 길이/점수 승률 `95% / 95%`; R `358턴`으로 목표 150~300 밖, 길이 비와 R 초반 합체율 `0.732 > C2 0.595`는 충족
+- J5 실력 비: 길이 `1.468`, 점수 `4.153`, 같은 시드 길이/점수 승률 `95% / 95%`; R `223.5턴`, 길이 비 `≥1.3`, R 초반 합체율 `0.725 > C2 0.595` 세 기준 모두 충족
+- 비교 기준: CLASSIC C2 R `221턴/124,262.5점`, L `327턴/338,539.5점`, 길이 비 `1.480`, 초반 합체율 `0.595`; SLIME S2 R `52턴/103,232점`, L `60턴/151,202점`, 길이 비 `1.154`, 초반 합체율 `2.966`
+- 관측만 기록: J5는 R 길이가 C2와 `+2.5턴`, L 길이가 C2와 `+1턴`이고 길이 비는 C2보다 `0.012` 낮음. J4는 대폭발 횟수와 생존 길이가 크게 증가함. 후보 채택·기본값 변경 판단은 Claude에 남김
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard (`C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`)
+  - `godot --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·`ERROR:` 0건
+  - `tests/run_tests.ps1` 최종 재실행 → 일반 `348/348` (`25.773초`), 장기 `5/5` (`51.008초`), 성능 `5/5` (`3.390초`), 합계 `358/358`, 종료 코드 0, 총 `80.172초`
+  - 후보 측정 → 신규 J4·J5 `120판` 모두 종료 코드 0; 보고서 `artifacts/measurements/jelly_blast_candidates_measurement.json`과 원시 시드 파일은 git 제외 산출물
+  - 기존 해시 → TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`, CLASSIC 단계 진행 `cf6172428c7901c43eb74f417e6880dc3ad375a329e669a8904234f5d38d1031`, SLIME 단계 진행 `7ebe5d76b8c4843fa739e5c10405da172b577fdea1caca2047ed176b07455e97`로 기존 기준 동일
+  - `tests/capture_screens.ps1 -HudScenesOnly` → 두 비율×20장=`40`장, 종료 코드 0. 새 `53_jelly_blast_j5` 두 장에서 L4 점멸 없음·L5 파란 점멸 테두리·겹침/잘림 0건을 직접 확인
+  - 기본·TURN·BLITZ·SLIME·JELLY `--quit-after 300` → 5개 모두 종료 코드 0, 프로젝트 오류 표식 0건
+  - `tools/build_windows.ps1 -Debug` → 종료 코드 0, `build/windows-debug/GravityOrb_v0.14.0.exe` `105,055,456`바이트; Release 미실행
+  - 규칙 검사 → 새 `Input`/`InputEvent`·전역 난수 사용 0건, `git diff --check` 오류 0건
+  - 사용자 저장 파일은 검증 전후 `1,488`바이트, SHA-256 `FCB975CAFA6550D3C14DE2C8594E3E0EB5525208DA83130D4E359E50C7497F4C`로 동일
+- 수동 확인 절차:
+  1. 임시 테스트 설정에서 `game_mode=JELLY`, `jelly_blast_min_level=5`로 실행해 다른 색 L4+L4와 L5+L5를 접촉시킨다 → L4 쌍은 남고 L5 쌍만 대폭발해야 한다.
+  2. 같은 설정에서 같은 색 L5+L5와 L5+L4를 접촉시킨다 → 둘 다 대폭발보다 흡수가 우선하며 합쳐져야 한다. 같은 색 L6+L4는 레벨 차 2라 무반응이어야 한다.
+  3. L4 구슬을 부분 흡수시켜 표시 레벨 L5에 도달시킨다 → 도달 즉시 파란 점멸 테두리가 시작되어야 한다. 기본 설정 `jelly_blast_min_level=0`에서는 JELLY 모든 레벨에 점멸과 대폭발이 없어야 한다.
+- 결정 사항: 후보 측정용 설정 오버라이드는 측정 프로세스 안에서만 적용했고 `default_config.tres`는 `0`으로 유지함. #95 J0 원시 집계는 재실행하지 않고 명세대로 기존 결과를 재사용함
+- 남은 것 · 질문: J5만 §12-JE.5의 세 기준을 모두 충족했고 J4는 R 판 길이 기준을 넘음. 적용 후보 결정이 필요함. 캡처 첫 비율 종료 때 기존 `ObjectDB instances leaked` 경고 4건이 있었으나 종료 코드 0이며 프로젝트 스크립트 오류는 0건
+
 ### [2026-10-21] 대상 #95 — JELLY 규칙 · FINAL MOVE · 측정
 - 상태: 완료 — CLASSIC 턴제 위에 JELLY 흡수 질량·점수·FINAL MOVE를 구현하고 3전략×20시드×600턴을 측정함. 바라는 자리 밖 수치는 임의 조정하지 않고 후보만 보고함
 - 브랜치 / PR: `jelly-rules-measurement` / https://github.com/jeongmo-dot/gravity_orb/pull/97

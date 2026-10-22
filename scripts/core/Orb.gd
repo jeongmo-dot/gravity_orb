@@ -90,11 +90,7 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	_visual.top_level = true
 	_update_visual_transform()
 	_visual.set_blast_armed(
-		(
-			cfg.game_mode != GameConfig.GameMode.JELLY
-			and cfg.blast_enabled
-			and level >= cfg.active_blast_min_level()
-		),
+		cfg.blast_enabled_for_level(level),
 		cfg.blast_blink_period
 	)
 
@@ -128,7 +124,7 @@ func set_jelly_mass(next_mass: float, cfg: GameConfig) -> void:
 	if circle != null:
 		circle.radius = _radius
 	_visual.setup(cfg.color_display[color], _radius, color, cfg.orb_symbols_enabled)
-	_visual.set_blast_armed(false, cfg.blast_blink_period)
+	_visual.set_blast_armed(cfg.blast_enabled_for_level(level), cfg.blast_blink_period)
 	_update_visual_transform()
 
 

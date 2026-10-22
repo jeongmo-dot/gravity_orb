@@ -298,13 +298,31 @@ func test_jelly_level_seven_jackpot_and_capped_absorption() -> void:
 	assert_near(float(capped["result_mass"]), 64.0, 0.001, "JELLY mass caps at 64")
 
 
-func test_jelly_different_colors_never_blast_or_annihilate() -> void:
+func test_jelly_blast_default_threshold_and_absorption_precedence() -> void:
 	var cfg: GameConfig = GameConfig.new()
 	cfg.game_mode = GameConfig.GameMode.JELLY
 	cfg.blast_enabled = true
 	cfg.opposite_pairs = [Vector2i(0, 1)]
-	var result: Dictionary = ReactionRules.classify(0, 6, 1, 6, cfg, 32.0, 32.0)
-	assert_eq(result["type"], ReactionRules.Type.NONE, "JELLY has no BLAST or opposite reaction")
+	var default_result: Dictionary = ReactionRules.classify(0, 6, 1, 6, cfg, 32.0, 32.0)
+	assert_eq(default_result["type"], ReactionRules.Type.NONE, "J0 has no BLAST or opposite reaction")
+
+	cfg.jelly_blast_min_level = 5
+	var level_four: Dictionary = ReactionRules.classify(0, 4, 1, 4, cfg, 8.0, 8.0)
+	var level_five: Dictionary = ReactionRules.classify(0, 5, 1, 5, cfg, 16.0, 16.0)
+	assert_eq(level_four["type"], ReactionRules.Type.NONE, "J5 leaves different-color L4 pair")
+	assert_eq(level_five["type"], ReactionRules.Type.BLAST, "J5 blasts different-color L5 pair")
+
+	cfg.jelly_blast_min_level = 4
+	var partial_level_four: Dictionary = ReactionRules.classify(0, 4, 1, 4, cfg, 12.0, 8.0)
+	assert_eq(
+		partial_level_four["type"],
+		ReactionRules.Type.BLAST,
+		"J4 uses displayed levels even when abstract masses differ"
+	)
+	var same_color: Dictionary = ReactionRules.classify(0, 4, 0, 4, cfg, 12.0, 8.0)
+	assert_eq(same_color["type"], ReactionRules.Type.MERGE, "same-color absorption precedes BLAST")
+	var same_color_gap: Dictionary = ReactionRules.classify(0, 6, 0, 4, cfg, 32.0, 8.0)
+	assert_eq(same_color_gap["type"], ReactionRules.Type.NONE, "same-color level gap does not BLAST")
 
 
 func _enable_red_blue(cfg: GameConfig) -> void:

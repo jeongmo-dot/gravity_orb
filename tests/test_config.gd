@@ -273,6 +273,7 @@ func test_m9_blast_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	assert_true(config.blast_enabled, "blast enabled")
 	assert_eq(config.blast_min_level, 4, "shared blast minimum level")
+	assert_eq(config.jelly_blast_min_level, 0, "JELLY blast disabled by default")
 	assert_eq(
 		config.blast_push_radius_by_level,
 		PackedFloat32Array([0.0, 0.0, 0.0, 0.3, 0.55, 1.0, 1.0]),
@@ -349,6 +350,12 @@ func test_blitz_spike_defaults() -> void:
 	assert_eq(config.active_blast_min_level(), 4, "turn blast level")
 	config.game_mode = GameConfig.GameMode.BLITZ
 	assert_eq(config.active_blast_min_level(), 4, "BLITZ uses shared blast level")
+	config.game_mode = GameConfig.GameMode.JELLY
+	assert_eq(config.active_blast_min_level(), 0, "JELLY default has no blast level")
+	assert_true(not config.blast_enabled_for_level(7), "JELLY default never arms blast")
+	config.jelly_blast_min_level = 5
+	assert_true(not config.blast_enabled_for_level(4), "JELLY J5 leaves L4 unarmed")
+	assert_true(config.blast_enabled_for_level(5), "JELLY J5 arms L5")
 	assert_near(config.blast_push_radius_factor_for_level(4), 0.3, TOLERANCE)
 	assert_near(config.blast_push_radius_factor_for_level(5), 0.55, TOLERANCE)
 	assert_near(config.blast_push_radius_factor_for_level(6), 1.0, TOLERANCE)
