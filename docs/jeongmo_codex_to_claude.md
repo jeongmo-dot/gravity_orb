@@ -40,7 +40,7 @@
 
 ### [2026-10-22] 대상 #98 — JELLY 대폭발 되살리기 후보 J4·J5 측정
 - 상태: 완료 — JELLY 전용 대폭발 임계값과 판정 우선순위를 구현하고 J4·J5를 각 3전략×20시드×600턴으로 측정함. 기본값은 `0`(대폭발 없음)으로 유지했고 후보 채택은 하지 않음
-- 브랜치 / PR: `jelly-blast-measurement` / 생성 예정
+- 브랜치 / PR: `jelly-blast-measurement` / https://github.com/jeongmo-dot/gravity_orb/pull/98
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/{Orb,ReactionRules}.gd`, `scripts/spike/Orb3D.gd`, `tests/{test_config,test_jolt_3d,test_rules}.gd`, `tests/spike/{capture_screens,run_jolt_3d_measurement}.gd`, `tests/{capture_screens,tools/run_jelly_blast_measurement}.ps1`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `jelly_blast_min_level` 추가, 기본 `0`에서 #95 J0 규칙·해시 유지, 후보값 4·5에서만 JELLY 대폭발 활성 — 자동 (`test_config`, `test_rules`)
