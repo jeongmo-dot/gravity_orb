@@ -41,7 +41,13 @@
 - 커밋: 항목 단위 브랜치, **push·PR까지**
 
 ### [2026-10-21 #96] JELLY ② — 3D 젤리 그림·말랑함·연출
-- 상태: 대기 (**다음 차례** — 보류 풀림 2026-10-22. 먼저 `origin/main` 병합)
+- 상태: **추가 요구 1** (2026-10-22 Claude 검수 — PR #99 병합 보류, 같은 브랜치 `jelly-3d-visuals`에서 이어서. **먼저 `origin/main` 병합**)
+- 추가 요구 1: [technical_design.md](technical_design.md) §12-JE "#96 1차 결과"·"#96 추가 요구 1"
+  - Claude 검수: 젤리 몸통·색·크기·붐비는 판·늘어남은 좋다. 그런데 **MAX 얼굴이 위아래로 뒤집혀** 미소가 눈 위에 있다 (찡그린 얼굴), NEXT·THEN 미리보기가 아직 행성이다
+  1. 얼굴 방향 바로잡기 (중력 아래일 때 원본처럼 눈 위·미소 아래·반사점 왼쪽 위) + 화면 기준 회귀 테스트 (지금 코드로 실패해야 함)
+  2. JELLY 미리보기를 2D 젤리로 (색·밝기·캡슐 눈 / L7 MAX 얼굴)
+  3. JELLY 새 색 안내를 "새 젤리 — 보라/주황" + 젤리 그림, 미리보기 테두리는 젤리 색 (CLASSIC 그대로)
+  4. `53_jelly_look_*` 다시 + `53_jelly_look_unlock` 두 비율, 마지막은 전체 캡처
 - **먼저 (규칙 값)**: `jelly_blast_min_level` 기본값 0 → **5** (Claude 결정 — #98 J5, technical_design §12-JE.5 "#98 결과"). `default_config.tres`·`GameConfig` 기본·테스트 갱신, JELLY 새 기준 해시 보고 (다른 모드 해시 그대로)
 - 근거: [technical_design.md](technical_design.md) **§12-JE.2**
 - 배경: 사용자 (2026-10-21) "3d 행성이 아닌 3d 젤리로"
