@@ -1,0 +1,155 @@
+extends TestCase
+
+const BOARD_SCENE: PackedScene = preload("res://scenes/Board3D.tscn")
+
+
+func test_jelly_palette_matches_classic_color_indices_and_level_lightening() -> void:
+	var expected: Array[Color] = [
+		Color("ff7595"), Color("72a7ff"), Color("59e2ab"),
+		Color("ffe77a"), Color("bc86ff"), Color("ffad63"),
+	]
+	for color_index: int in range(expected.size()):
+		assert_eq(JellyOrbArt.PALETTE[color_index], expected[color_index], "JELLY color %d" % color_index)
+		assert_eq(
+			JellyOrbArt.color_for(color_index, 4),
+			expected[color_index].lightened(4.0 * 0.018),
+			"JELLY color %d L4 lightening" % color_index
+		)
+
+
+func test_jelly_orb_uses_face_shader_without_planet_adornment() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var board: Board3D = await _create_board()
+	var orb: Orb3D = board.spawn_orb(2, 7, Vector2.ZERO)
+	assert_true(orb._face.visible, "JELLY face billboard visible")
+	assert_true(not orb._adornment.visible, "JELLY hides planet halo and prominence")
+	assert_true(orb.visual_material_resource().shader.code.contains("lower_scatter"), "JELLY body shader")
+	assert_true(
+		(orb._face.material_override as ShaderMaterial).shader.code.contains("capsule"),
+		"JELLY capsule-eye face shader"
+	)
+	assert_near(orb.mesh_resource().radius, orb.shape_resource().radius, 0.0001, "JELLY body fills radius")
+	await _cleanup(board)
+	Config.data.game_mode = original_mode
+
+
+func test_jelly_stretch_is_enabled_when_planet_stretch_setting_is_off() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_stretch: bool = Config.data.fx_orb_stretch_enabled
+	var original_fx: bool = Config.data.fx_enabled
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.fx_enabled = true
+	Config.data.fx_orb_stretch_enabled = false
+	var board: Board3D = await _create_board()
+	var orb: Orb3D = board.spawn_orb(0, 3, Vector2.ZERO, Vector2(1100.0, 0.0))
+	assert_eq(
+		orb.visual_stretch_scale(),
+		Vector3(1.19, 0.90, 0.90),
+		"JELLY uses its own falling stretch"
+	)
+	orb.play_jelly_impact(1.0)
+	assert_eq(orb._jelly_impact_scale, Vector3(0.80, 1.18, 1.18), "JELLY collision squash")
+	await _cleanup(board)
+	Config.data.game_mode = original_mode
+	Config.data.fx_orb_stretch_enabled = original_stretch
+	Config.data.fx_enabled = original_fx
+
+
+func test_non_jelly_modes_keep_planet_visuals_and_stretch_gate() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_stretch: bool = Config.data.fx_orb_stretch_enabled
+	Config.data.game_mode = GameConfig.GameMode.TURN
+	Config.data.fx_orb_stretch_enabled = false
+	var board: Board3D = await _create_board()
+	var orb: Orb3D = board.spawn_orb(1, 6, Vector2.ZERO, Vector2(1100.0, 0.0))
+	assert_true(not orb._face.visible, "CLASSIC face hidden")
+	assert_true(orb._adornment.visible, "CLASSIC planet glow remains")
+	assert_eq(orb.visual_stretch_scale(), Vector3.ONE, "CLASSIC stretch setting remains off")
+	await _cleanup(board)
+	Config.data.game_mode = original_mode
+	Config.data.fx_orb_stretch_enabled = original_stretch
+
+
+func test_jelly_jackpot_uses_max_sparkle_without_planet_prominence() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_fx: bool = Config.data.fx_enabled
+	var original_hitstop: bool = Config.data.fx_hitstop_enabled
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.fx_enabled = true
+	Config.data.fx_hitstop_enabled = false
+	var root: Node3D = Node3D.new()
+	var camera: Camera3D = Camera3D.new()
+	camera.name = "Camera3D"
+	root.add_child(camera)
+	var director: FeedbackDirector = FeedbackDirector.new()
+	root.add_child(director)
+	tree.root.add_child(root)
+	await tree.process_frame
+	director.play_reaction_visuals({
+		"type": ReactionRules.Type.MAX_CLEAR,
+		"position": Vector2.ZERO,
+		"result_color": 4,
+		"levels": [7, 7],
+		"colors": [4, 4],
+	})
+	assert_eq(director.active_prominence_count(), 0, "JELLY jackpot has no planet prominence")
+	assert_eq(director.active_glow_count(), 1, "JELLY jackpot has one MAX rim pulse")
+	assert_eq(director.active_ring_count(), 1, "JELLY jackpot has one white ring")
+	assert_eq(director.active_particle_count(), 1, "JELLY jackpot has white sparkles")
+	await _cleanup(root)
+	Config.data.game_mode = original_mode
+	Config.data.fx_enabled = original_fx
+	Config.data.fx_hitstop_enabled = original_hitstop
+
+
+func test_jelly_visual_toggle_preserves_state_hash() -> void:
+	var hidden: String = await _jelly_state_hash(false)
+	var visible: String = await _jelly_state_hash(true)
+	assert_eq(visible, hidden, "JELLY visual layers do not change state")
+	print("JELLY_VISUAL_STATE_HASH hash=%s" % visible.sha256_text())
+
+
+func _jelly_state_hash(visible: bool) -> String:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var board: Board3D = await _create_board()
+	for index: int in range(14):
+		var orb: Orb3D = board.spawn_orb(
+			index % JellyOrbArt.PALETTE.size(),
+			1 + index % Config.data.orb_max_level,
+			Vector2(float(index % 4) * 90.0, float(index / 4) * 90.0)
+		)
+		orb.disable_physics()
+		orb._mesh.visible = visible
+		orb._face.visible = visible
+		orb._blast_outline.visible = visible and orb.is_blast_armed()
+		orb._symbol_mesh.visible = visible and Config.data.orb_symbols_enabled
+	var state: Array[Dictionary] = []
+	for orb: Orb3D in board.get_orbs():
+		state.append({
+			"id": orb.stable_spawn_id,
+			"color": orb.color,
+			"level": orb.level,
+			"mass": orb.jelly_mass,
+			"blast_armed": orb.is_blast_armed(),
+			"position": orb.position,
+			"velocity": orb.linear_velocity,
+		})
+	var result: String = JSON.stringify(state)
+	await _cleanup(board)
+	Config.data.game_mode = original_mode
+	return result
+
+
+func _create_board() -> Board3D:
+	var board: Board3D = BOARD_SCENE.instantiate() as Board3D
+	tree.root.add_child(board)
+	await tree.process_frame
+	return board
+
+
+func _cleanup(node: Node) -> void:
+	if is_instance_valid(node):
+		node.queue_free()
+	await tree.process_frame

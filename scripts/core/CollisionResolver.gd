@@ -93,6 +93,7 @@ func flush(delta: float = 0.0) -> int:
 		var stable_spawn_ids: Array[int] = [a.stable_spawn_id, b.stable_spawn_id]
 		var position_a: Vector2 = a.position
 		var position_b: Vector2 = b.position
+		var source_radii: Array[float] = [a.get_current_radius(), b.get_current_radius()]
 		var velocity_a: Vector2 = a.linear_velocity
 		var velocity_b: Vector2 = b.linear_velocity
 		var reaction_position: Vector2 = (position_a + position_b) * 0.5
@@ -186,6 +187,8 @@ func flush(delta: float = 0.0) -> int:
 			"colors": colors,
 			"stable_spawn_ids": stable_spawn_ids,
 			"position": reaction_position,
+			"source_positions": [position_a, position_b],
+			"source_radii": source_radii,
 			"result_level": result_level,
 			"result_color": result_color,
 			"result_orb": result_orb,

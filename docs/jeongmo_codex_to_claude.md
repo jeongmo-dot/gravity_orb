@@ -38,6 +38,35 @@
 
 ## 미확인
 
+### [2026-10-22] 대상 #96 — JELLY 3D 젤리 그림과 말랑한 연출
+- 상태: 완료 — #98에서 선택한 J5를 기본값으로 반영하고 JELLY 모드만 전용 색·재질·표정·변형·합체/대폭발 연출로 교체함. 보드와 HUD, 다른 모드의 행성 그림은 유지함
+- 브랜치 / PR: `jelly-3d-visuals` / 생성 예정
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scenes/Orb3D.tscn`, `scripts/core/{CollisionResolver,JellyOrbArt}.gd`, `scripts/fx/FeedbackDirector.gd`, `scripts/spike/{Board3D,Orb3D}.gd`, `tests/{capture_screens,test_config,test_jelly_visuals,test_rules}.gd`, `tests/spike/{capture_screens,JellyWindowMeasurement,run_jelly_window_measurement}.gd`, `tests/run_jelly_window_measurement.ps1`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `jelly_blast_min_level` 기본값을 #98 채택값 J5로 변경하고 같은 색 흡수 우선·다른 색 L5+ 대폭발 규칙 유지 — 자동 (`test_config`, `test_rules`, `test_jelly_visuals`)
+  - [x] 명세의 6색 기본 팔레트와 레벨당 `0.018` 밝기 증가, 화면 고정 좌상단 광원·넓은 하이라이트·아래쪽 산란·반투명 가장자리·MAX 흰 맥동을 JELLY 전용 셰이더로 적용 — 자동 (정확한 색/밝기 테스트) + 두 비율 캡처 직접 관측
+  - [x] 중력을 천천히 따라 도는 얼굴, 일반/깜빡임/MAX 표정, 얼굴 아래의 작은 색각형 기호를 추가하고 접근성 기호 끄기 경로 유지 — 자동 (`test_jelly_visuals`) + 캡처 관측
+  - [x] 이동 늘어남 `1.19/0.90`, 충돌 눌림 `0.80/1.18`, 대기 호흡 `±0.018`, 합체 생성 `0.88→1.0`을 Visual 자식에만 적용해 충돌체 크기 불변 — 자동 (`test_jelly_visuals`)
+  - [x] 합체·대폭발을 젤리 색으로 바꾸고 흡수 원본 크기 꼬리, L7/MAX 흰 테두리·고리·반짝임을 추가하며 행성 코로나/홍염을 JELLY에서 제거 — 자동 (`test_jelly_visuals`) + 캡처 관측
+  - [x] CLASSIC·BLITZ·SLIME의 기존 행성 재질·효과와 물리 상태를 유지하고 JELLY 시각효과 켜기/끄기 상태 해시 동일 — 자동
+  - [x] `53_jelly_look` 5장×두 비율, 움직이는 구슬 40개 실제 창 성능, 전체 래퍼·전체 캡처·5경로 스모크·Debug 빌드 실행 — 자동 측정 + 캡처 직접 관측
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard (`C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`)
+  - `tests/run_tests.ps1` 최종 재실행 → 일반 `354/354` (`27.964초`), 장기 `5/5` (`48.771초`), 성능 `5/5` (`4.092초`), 합계 `364/364`, 종료 코드 0, 총 `80.827초`
+  - JELLY 시각효과 켜기/끄기 상태 해시 → 두 경로 모두 `5c96a80c71c632fb8e727cf1be541757c464b436dd83d6c8d0737b1211347df1`
+  - 기존 해시 → TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`, CLASSIC 단계 진행 `cf6172428c7901c43eb74f417e6880dc3ad375a329e669a8904234f5d38d1031`, SLIME 단계 진행 `7ebe5d76b8c4843fa739e5c10405da172b577fdea1caca2047ed176b07455e97`로 기존 기준 동일
+  - `tests/capture_screens.ps1` 전체 실행 → 두 비율×81장=`162`장, 종료 코드 0. `53_jelly_look_{levels,crowded,absorption,max,stretch}`에서 7단계 색/표정, 25개 혼잡 보드 가독성, 원본 크기 흡수 꼬리, MAX 흰 반짝임, 이동 늘어남을 직접 확인; 겹침·잘림 0건
+  - 실제 창 측정 → 움직이는 JELLY 구슬 40개, 2,608표본, p99 `3.511ms`, 최대 `4.502ms`, `16.7ms` 초과 0프레임, 최대 draw call `261` (RTX 4070 Ti SUPER)
+  - 기본·TURN·BLITZ·SLIME·JELLY `--quit-after 300` → 5개 모두 종료 코드 0, 프로젝트 오류 표식 0건
+  - `tools/build_windows.ps1 -Debug` → 종료 코드 0, `build/windows-debug/GravityOrb_v0.14.0.exe` `105,068,368`바이트; Release 미실행
+  - 규칙 검사 → 새 `Input`/`InputEvent`·전역 난수 사용 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. `--mode=jelly`로 실행해 상·하·좌·우로 스와이프한다 → 얼굴이 중력 방향을 급회전하지 않고 천천히 따라가며 구슬이 이동 방향으로 늘어나고 벽 충돌 순간 반대로 눌려야 한다.
+  2. 같은 색 L3+L2를 합체하고 L7/MAX·잭팟까지 만든다 → 먹힌 구슬 크기의 짧은 흡수 꼬리와 `0.88→1.0` 부풀기가 보이고, MAX에는 흰 테두리·고리·반짝임이 보이되 행성 코로나/홍염은 없어야 한다.
+  3. 접근성 색각형 기호를 켠다 → 작은 기호가 얼굴을 가리지 않고 아래에 보여야 하며, 끄면 사라져야 한다. CLASSIC·BLITZ를 실행하면 기존 행성 그림이 그대로여야 한다.
+- 결정 사항: JELLY 전용 그림 자원과 셰이더 캐시는 `JellyOrbArt`로 분리하고 기존 `CelestialOrbArt`와 보드/HUD 구조는 건드리지 않음. 명세 밖 밸런스 수치는 변경하지 않음
+- 남은 것 · 질문: 자동 캡처와 직접 관측까지 완료했으며 최종 합격/불합격 판정은 Claude에 남김
+
 ### [2026-10-22] 대상 #98 — JELLY 대폭발 되살리기 후보 J4·J5 측정
 - 상태: 완료 — JELLY 전용 대폭발 임계값과 판정 우선순위를 구현하고 J4·J5를 각 3전략×20시드×600턴으로 측정함. 기본값은 `0`(대폭발 없음)으로 유지했고 후보 채택은 하지 않음
 - 브랜치 / PR: `jelly-blast-measurement` / https://github.com/jeongmo-dot/gravity_orb/pull/98
