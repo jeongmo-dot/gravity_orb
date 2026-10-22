@@ -103,6 +103,7 @@ const CAPTURE_FILES: Array[String] = [
 	"51_slime_max_growth.png",
 	"52_new_planet_callout.png",
 	"52_jelly_final_move.png",
+	"53_jelly_blast_j5.png",
 ]
 const HUD_CAPTURE_FILES: Array[String] = [
 	"02_turn_early.png",
@@ -124,6 +125,7 @@ const HUD_CAPTURE_FILES: Array[String] = [
 	"46_turn_rejected.png",
 	"52_new_planet_callout.png",
 	"52_jelly_final_move.png",
+	"53_jelly_blast_j5.png",
 ]
 
 var _failed: bool = false
@@ -344,6 +346,29 @@ func _capture_turn_scenes() -> void:
 	print("SCREEN_CAPTURE_CHECK scene=jelly_final_move band=visible message=exact")
 	manager.final_move_pending = false
 	manager.final_move_changed.emit(false, "")
+	Config.data.jelly_blast_min_level = 5
+	var jelly_level_four: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		4,
+		Vector2(-150.0, -250.0)
+	)
+	var jelly_level_five: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.BLUE,
+		5,
+		Vector2(150.0, -250.0)
+	)
+	jelly_level_four.disable_physics()
+	jelly_level_five.disable_physics()
+	if jelly_level_four.is_blast_armed():
+		_fail("J5 capture L4 must not show BLAST pulse")
+	if not jelly_level_five.is_blast_armed():
+		_fail("J5 capture L5 must show BLAST pulse")
+	await get_tree().create_timer(0.10).timeout
+	await _capture("53_jelly_blast_j5.png")
+	print("SCREEN_CAPTURE_CHECK scene=jelly_blast_j5 l4=unarmed l5=armed")
+	board.remove_orb(jelly_level_four)
+	board.remove_orb(jelly_level_five)
+	Config.data.jelly_blast_min_level = 0
 	Config.data.game_mode = GameConfig.GameMode.TURN
 	manager.blocked_directions.clear()
 	hud._on_warning_changed(manager.blocked_directions)
