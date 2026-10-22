@@ -40,7 +40,7 @@
 
 ### [2026-10-22] 대상 #96 — JELLY 3D 젤리 그림과 말랑한 연출
 - 상태: 완료 — #98에서 선택한 J5를 기본값으로 반영하고 JELLY 모드만 전용 색·재질·표정·변형·합체/대폭발 연출로 교체함. 보드와 HUD, 다른 모드의 행성 그림은 유지함
-- 브랜치 / PR: `jelly-3d-visuals` / 생성 예정
+- 브랜치 / PR: `jelly-3d-visuals` / https://github.com/jeongmo-dot/gravity_orb/pull/99
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scenes/Orb3D.tscn`, `scripts/core/{CollisionResolver,JellyOrbArt}.gd`, `scripts/fx/FeedbackDirector.gd`, `scripts/spike/{Board3D,Orb3D}.gd`, `tests/{capture_screens,test_config,test_jelly_visuals,test_rules}.gd`, `tests/spike/{capture_screens,JellyWindowMeasurement,run_jelly_window_measurement}.gd`, `tests/run_jelly_window_measurement.ps1`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `jelly_blast_min_level` 기본값을 #98 채택값 J5로 변경하고 같은 색 흡수 우선·다른 색 L5+ 대폭발 규칙 유지 — 자동 (`test_config`, `test_rules`, `test_jelly_visuals`)
