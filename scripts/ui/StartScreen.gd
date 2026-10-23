@@ -81,8 +81,8 @@ func bind(save_path: String, sfx_bank: SfxBank) -> void:
 	_sfx_bank = sfx_bank
 	_blitz_button.tooltip_text = "BLITZ — 시간 버티기"
 	_classic_button.tooltip_text = "CLASSIC — 턴제 퍼즐"
-	_jelly_button.tooltip_text = "JELLY — 한 단계 작은 것도 먹고 자라요"
-	_slime_button.tooltip_text = "SLIME — 같은 색이면 크기 상관없이 흡수"
+	_jelly_button.tooltip_text = "JELLY — 작은 것도 먹고 자라요"
+	_slime_button.tooltip_text = "SLIME — 크기 상관없이 흡수"
 	_blitz_best_label.text = _best_text(
 		SaveStore.load_best_score(save_path, GameConfig.GameMode.BLITZ)
 	)

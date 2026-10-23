@@ -413,6 +413,7 @@ func _capture_turn_scenes() -> void:
 
 	score.score = TURN_CAPTURE_SCORE
 	score.best_score = TURN_CAPTURE_BEST
+	score.max_level_reached = Config.data.orb_max_level
 	manager.max_combo = 4
 	manager.gravity = TURN_GAME_OVER_DIRECTION
 	manager.blocked_directions.clear()
@@ -974,6 +975,20 @@ func _capture_jelly_shell() -> void:
 	var start: StartScreen = main.get_node("UI/StartScreen") as StartScreen
 	if not (start.get_node("Content/JellyButton") as Button).button_pressed:
 		_fail("JELLY start card must reflect the saved last mode")
+	var jelly_description: Label = start.get_node("Content/JellyDescriptionLabel") as Label
+	var slime_description: Label = start.get_node("Content/SlimeDescriptionLabel") as Label
+	_expect_label_text(jelly_description, "작은 것도 먹고 자라요", "JELLY start description")
+	_expect_label_text(slime_description, "크기 상관없이 흡수", "SLIME start description")
+	if (
+		jelly_description.get_theme_font_size("font_size")
+		!= (start.get_node("Content/BlitzDescriptionLabel") as Label).get_theme_font_size("font_size")
+	):
+		_fail("JELLY description font must match upper cards")
+	if (
+		slime_description.get_theme_font_size("font_size")
+		!= (start.get_node("Content/ClassicDescriptionLabel") as Label).get_theme_font_size("font_size")
+	):
+		_fail("SLIME description font must match upper cards")
 	await _capture("54_jelly_shell_start.png")
 	var ui: DebugHud = main.get_node("UI") as DebugHud
 	ui.show_ranking(GameConfig.GameMode.JELLY, 1)
@@ -1000,6 +1015,16 @@ func _capture_jelly_shell() -> void:
 	manager.game_over_details["ranking"] = manager._commit_completed_ranking()
 	manager.game_over.emit()
 	await get_tree().create_timer(0.85).timeout
+	_expect_label_text(
+		main.get_node("UI/Hud/GameOverPanel/Margin/Content/GameOverBlocked") as Label,
+		"최고 젤리",
+		"JELLY result level label"
+	)
+	_expect_label_text(
+		main.get_node("UI/Hud/GameOverPanel/Margin/Content/GameOverBlockedValue") as Label,
+		"L7 MAX",
+		"JELLY result MAX level"
+	)
 	await _capture("54_jelly_shell_result.png")
 	print("SCREEN_CAPTURE_CHECK scene=jelly_shell cards=4 ranking=jelly result=final-move")
 	await _destroy_main(main)
@@ -2795,6 +2820,16 @@ func _validate_turn_game_over_scene(main: Main) -> void:
 		main.get_node("UI/Hud/GameOverPanel/Margin/Content/ResultExtraValue") as Label,
 		"LEFT",
 		"TURN result blocked direction"
+	)
+	_expect_label_text(
+		main.get_node("UI/Hud/GameOverPanel/Margin/Content/GameOverBlocked") as Label,
+		"최고 레벨",
+		"TURN result level label"
+	)
+	_expect_label_text(
+		main.get_node("UI/Hud/GameOverPanel/Margin/Content/GameOverBlockedValue") as Label,
+		"L7",
+		"TURN result level value"
 	)
 	print("SCREEN_CAPTURE_CHECK scene=turn_game_over score=%d blocked=LEFT" % TURN_CAPTURE_SCORE)
 

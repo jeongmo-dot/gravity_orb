@@ -62,8 +62,8 @@ func test_jelly_start_card_and_ranking_tab() -> void:
 	var jelly_button: Button = start.get_node("Content/JellyButton") as Button
 	assert_eq((start.get_node("Content/JellyNameLabel") as Label).text, "JELLY", "JELLY card name")
 	assert_eq(
-		(start.get_node("Content/JellyDescriptionLabel") as Label).text.replace("\n", " "),
-		"한 단계 작은 것도 먹고 자라요",
+		(start.get_node("Content/JellyDescriptionLabel") as Label).text,
+		"작은 것도 먹고 자라요",
 		"JELLY card description"
 	)
 	assert_eq((start.get_node("Content/JellyBestLabel") as Label).text, "BEST 9,876", "JELLY BEST")
@@ -77,6 +77,17 @@ func test_jelly_start_card_and_ranking_tab() -> void:
 	)
 	var slime_button: Button = start.get_node("Content/SlimeButton") as Button
 	var slime_description: Label = start.get_node("Content/SlimeDescriptionLabel") as Label
+	assert_eq(slime_description.text, "크기 상관없이 흡수", "SLIME card description")
+	assert_eq(
+		jelly_description.get_theme_font_size("font_size"),
+		(start.get_node("Content/BlitzDescriptionLabel") as Label).get_theme_font_size("font_size"),
+		"JELLY description matches upper-card font size"
+	)
+	assert_eq(
+		slime_description.get_theme_font_size("font_size"),
+		(start.get_node("Content/ClassicDescriptionLabel") as Label).get_theme_font_size("font_size"),
+		"SLIME description matches upper-card font size"
+	)
 	assert_true(
 		slime_button.get_global_rect().encloses(slime_description.get_global_rect()),
 		"SLIME description stays inside its card: card=%s description=%s" % [
@@ -135,8 +146,13 @@ func test_jelly_result_ranking_restart_and_mode_selection_round_trip() -> void:
 	await tree.create_timer(0.85).timeout
 	var panel: GameOverPanel = main.get_node("UI/Hud/GameOverPanel") as GameOverPanel
 	assert_true(panel.visible, "JELLY result opens")
+	assert_eq((panel.get_node("Margin/Content/GameOverBlocked") as Label).text, "최고 젤리", "JELLY result level label")
+	assert_eq((panel.get_node("Margin/Content/GameOverBlockedValue") as Label).text, "L6", "JELLY result non-MAX level")
 	assert_eq((panel.get_node("Margin/Content/ResultExtraLabel") as Label).text, "FINAL MOVE", "result label")
 	assert_eq((panel.get_node("Margin/Content/ResultExtraValue") as Label).text, "3번 버팀", "result survived count")
+	score.max_level_reached = Config.data.orb_max_level
+	panel._set_stat_text(false)
+	assert_eq((panel.get_node("Margin/Content/GameOverBlockedValue") as Label).text, "L7 MAX", "JELLY result MAX level")
 	assert_eq(
 		SaveStore.load_rankings(SAVE_PATH, GameConfig.GameMode.JELLY).size(),
 		1,

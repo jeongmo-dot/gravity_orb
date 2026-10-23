@@ -38,6 +38,31 @@
 
 ## 미확인
 
+### [2026-10-23] 대상 #99 — 결과 화면 레벨 이름 · 반쪽 카드 글자 크기
+- 상태: 완료 — CLASSIC·JELLY 결과의 최고 레벨 문구를 모드에 맞게 바꾸고, JELLY·SLIME 반쪽 카드 설명을 한 줄·상단 카드와 같은 크기로 조정함
+- 브랜치 / PR: `jelly-result-copy` / https://github.com/jeongmo-dot/gravity_orb/pull/101
+- 변경 파일: `scenes/UI.tscn`, `scripts/ui/{GameOverPanel,StartScreen}.gd`, `tests/scenarios/test_score_flow.gd`, `tests/{test_jelly_shell,test_slime_shell}.gd`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] CLASSIC 결과의 최고 레벨 칸을 `최고 레벨` / `L7` 형식으로 변경하고 천체 이름 표 제거 — 자동 (`test_score_flow`) + `04_turn_game_over` 두 비율 직접 관측
+  - [x] JELLY 결과의 최고 레벨 칸을 `최고 젤리` / `L5` 형식으로 표시하고 L7에서만 `L7 MAX` 표시 — 자동 (`test_jelly_shell`) + `54_jelly_shell_result` 두 비율 직접 관측
+  - [x] BLITZ·SLIME 결과 경로 유지 — 기존 `test_blitz_manager`, `test_slime_shell` 통과 + 전체 캡처 직접 관측
+  - [x] JELLY 설명을 `작은 것도 먹고 자라요`, SLIME 설명을 `크기 상관없이 흡수` 한 줄로 변경하고 둘 다 위 카드 설명과 같은 28px 적용 — 자동 (`test_jelly_shell`, `test_slime_shell`) + `54_jelly_shell_start` 두 비율 직접 관측
+  - [x] 카드 높이·배치와 사용자 저장 파일 유지 — 전체 레이아웃 테스트 + 전체 캡처 저장 파일 바이트 불변 검사
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard (`C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`)
+  - `godot --headless --path . --import` 정상 권한 재실행 → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` → 일반 `360/360` (`27.158초`), 장기 `5/5` (`51.925초`), 성능 `5/5` (`3.411초`), 합계 `370/370`, 종료 코드 0, 총 `82.494초`
+  - 기본·TURN·BLITZ·SLIME·JELLY `--quit-after 300` → 5개 모두 종료 코드 0, `SCRIPT ERROR` 0건
+  - `tests/capture_screens.ps1` 전체 실행 → 두 비율×85장=`170`장, 종료 코드 0. `54_jelly_shell_{start,result}`와 `04_turn_game_over`를 두 비율에서 직접 확인: 카드 설명 한 줄·동일 글자 크기, `최고 젤리 / L7 MAX`, `최고 레벨 / L7`, 겹침·잘림 0건. 사용자 저장 파일 바이트 동일
+  - `tools/build_windows.ps1 -Debug` → 종료 코드 0, `build/windows-debug/GravityOrb_v0.14.0.exe` `105,083,408`바이트; Release 미실행 (지시대로 Debug만 실행)
+  - 규칙 검사 → 새 `Input`/`InputEvent`·전역 난수 사용 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. 시작 화면을 540×960과 540×1170으로 연다 → 아래 카드에 `작은 것도 먹고 자라요`, `크기 상관없이 흡수`가 각각 한 줄로 보이고 위 카드 설명과 같은 크기여야 한다.
+  2. CLASSIC에서 L7까지 도달한 뒤 결과 화면을 연다 → `최고 레벨` 아래 `L7`만 보이고 천체 이름은 없어야 한다.
+  3. JELLY에서 L5와 L7 결과를 각각 연다 → L5는 `최고 젤리 / L5`, L7은 `최고 젤리 / L7 MAX`로 보여야 한다.
+- 결정 사항: 명세에 적힌 문구·28px만 적용했으며 카드 배치, 규칙, 물리, 그림, 밸런스 수치는 변경하지 않음
+- 남은 것 · 질문: 자동 검증과 두 화면비 캡처 직접 관측을 완료했으며 최종 합격/불합격 판정은 Claude에 남김
+
 ### [2026-10-23] 대상 #97 — JELLY 앱 연결
 - 상태: 완료 — 시작 화면·랭킹·저장·결과 화면에 JELLY를 연결하고, #96 검수의 JELLY MAX 3D 얼굴 크기 보완까지 반영함
 - 브랜치 / PR: `jelly-app-shell` / https://github.com/jeongmo-dot/gravity_orb/pull/100

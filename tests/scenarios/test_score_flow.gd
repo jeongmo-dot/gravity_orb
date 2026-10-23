@@ -307,8 +307,8 @@ func test_game_over_panel_shows_scores_direction_and_restart_button() -> void:
 	assert_eq(best_label.text, "BEST 48", "game-over best")
 	assert_eq(combo_label.text, "최대 콤보", "game-over max combo label")
 	assert_eq(combo_value.text, "2", "game-over max combo value")
-	assert_eq(blocked_label.text, "최고 천체", "game-over highest celestial label")
-	assert_eq(blocked_value.text, "L4 고리 행성", "game-over highest celestial value")
+	assert_eq(blocked_label.text, "최고 레벨", "CLASSIC game-over highest level label")
+	assert_eq(blocked_value.text, "L4", "CLASSIC game-over highest level value")
 	assert_eq(direction_label.text, "막힌 방향", "game-over blocked direction label")
 	assert_eq(direction_value.text, "LEFT", "game-over blocked direction value")
 	assert_true(
