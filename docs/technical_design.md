@@ -2763,6 +2763,8 @@ M4 검수(2026-09-28)에서 발견. 합체가 없는 M4 상태에서 **이동·�
 - 아래 줄 카드 설명을 **한 줄**로 짧게 — JELLY "작은 것도 먹고 자라요", SLIME "크기 상관없이 흡수". 글자 크기는 위 카드 설명 (BLITZ "시간 버티기")과 같게. 카드 높이·배치는 그대로, 두 비율에서 잘림 없이
 - 검수: 캡처 `54_jelly_shell_{start,result}`·CLASSIC 결과 캡처 두 비율, 테스트 (레벨 칸 문구 세 경우)
 
+**#99 결과 — 병합** ([PR #101](https://github.com/jeongmo-dot/gravity_orb/pull/101) `9cc17a0`, 2026-10-23): `GameOverPanel` 천체 이름 표 (`LEVEL_NAMES_KO`) 삭제, 레벨 칸 CLASSIC "최고 레벨 / L7"·JELLY "최고 젤리 / L5" (L7만 `L7 MAX`). 반쪽 카드 설명 JELLY "작은 것도 먹고 자라요"·SLIME "크기 상관없이 흡수", 글자 18·16 → 28 (위 카드 설명과 같음), 툴팁 문구도 같게. 테스트 세 경우 (CLASSIC L4·JELLY L6·JELLY L7 MAX)와 캡처 검사 추가. 래퍼 370/370, 전체 캡처 170장, 사용자 저장 파일 불변 (Codex). Claude 검수 (`54_jelly_shell_start` 두 비율·`54_jelly_shell_result`·`04_turn_game_over`, 재실행 없음): 설명 한 줄·잘림 없음, 레벨 칸 문구 바름
+
 ### 12-JE.4 측정 (#95)
 - 도구: #89~#91 그대로 — 전략 R·G (고친 것)·L-합체 (미리보기 — 평가에 FINAL MOVE 대기 `−500,000`, 게임오버 `−1,000,000`), 시드 1~20, 600턴 상한
 - 비교: CLASSIC (C2, #91)·SLIME (S2, #91) 결과와 나란히
