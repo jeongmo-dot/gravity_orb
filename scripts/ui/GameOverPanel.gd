@@ -34,6 +34,7 @@ var _score_manager: ScoreManager
 var _action_taken: bool = false
 var _slime_mode: bool = false
 var _slime_rank: int = 0
+var _result_mode: GameConfig.GameMode = GameConfig.GameMode.TURN
 
 
 func bind(game_manager: Variant, score_manager: ScoreManager) -> void:
@@ -63,6 +64,7 @@ func _bind_buttons() -> void:
 
 func _on_game_over() -> void:
 	_slime_mode = false
+	_result_mode = Config.data.game_mode
 	_action_taken = false
 	_set_actions_enabled(false)
 	var blitz_mode: bool = _game_manager is BlitzManager
@@ -198,8 +200,14 @@ func _set_stat_text(blitz_mode: bool) -> void:
 		var blocked_direction: Vector2i = _game_manager.game_over_details.get(
 			"direction", _game_manager.gravity
 		) as Vector2i
-		_extra_label.text = "막힌 방향"
-		_extra_value.text = OrbTypes.dir_name(blocked_direction)
+		if Config.data.game_mode == GameConfig.GameMode.JELLY:
+			_extra_label.text = "FINAL MOVE"
+			_extra_value.text = "%d번 버팀" % int(
+				_game_manager.game_over_details.get("final_move_successes", 0)
+			)
+		else:
+			_extra_label.text = "막힌 방향"
+			_extra_value.text = OrbTypes.dir_name(blocked_direction)
 	for label: Label in [
 		_survived_time_label,
 		_survived_time_value,
@@ -276,7 +284,7 @@ func _on_ranking_pressed() -> void:
 		ranking_requested.emit(GameConfig.GameMode.SLIME, _slime_rank)
 		return
 	var mode: GameConfig.GameMode = (
-		GameConfig.GameMode.BLITZ if _game_manager is BlitzManager else GameConfig.GameMode.TURN
+		GameConfig.GameMode.BLITZ if _game_manager is BlitzManager else _result_mode
 	)
 	var ranking: Dictionary = _game_manager.game_over_details.get("ranking", {}) as Dictionary
 	ranking_requested.emit(mode, int(ranking.get("rank", 0)))

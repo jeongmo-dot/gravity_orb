@@ -39,7 +39,7 @@ func test_v3_screen_layout_safe_area_touch_targets_and_extreme_content() -> void
 		var output: Vector2 = viewport_case["output"] as Vector2
 		var layout: Dictionary = StartScreen.layout_for_viewport(logical)
 		for region_name: String in [
-			"hero", "gravity", "orb", "subtitle", "blitz", "classic", "slime", "ranking",
+			"hero", "gravity", "orb", "subtitle", "blitz", "classic", "jelly", "slime", "ranking",
 			"sound", "settings",
 		]:
 			assert_true(
@@ -49,6 +49,10 @@ func test_v3_screen_layout_safe_area_touch_targets_and_extreme_content() -> void
 		assert_true(
 			not (layout["blitz"] as Rect2).intersects(layout["classic"] as Rect2),
 			"%dx%d mode cards do not overlap" % [output.x, output.y]
+		)
+		assert_true(
+			not (layout["jelly"] as Rect2).intersects(layout["slime"] as Rect2),
+			"%dx%d lower mode cards do not overlap" % [output.x, output.y]
 		)
 		var hero_rect: Rect2 = layout["hero"] as Rect2
 		var orbit_sweep: Rect2 = layout["orbiter_sweep"] as Rect2
@@ -125,7 +129,7 @@ func test_v3_screen_layout_safe_area_touch_targets_and_extreme_content() -> void
 				output.y,
 			]
 		)
-		for touch_name: String in ["blitz", "classic", "slime", "ranking", "sound", "settings"]:
+		for touch_name: String in ["blitz", "classic", "jelly", "slime", "ranking", "sound", "settings"]:
 			var touch_rect: Rect2 = layout[touch_name] as Rect2
 			assert_true(
 				touch_rect.size.x >= 88.0 and touch_rect.size.y >= 88.0,

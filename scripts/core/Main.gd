@@ -237,6 +237,8 @@ func _toggle_game_mode() -> void:
 		next_mode = GameConfig.GameMode.BLITZ
 	elif Config.data.game_mode == GameConfig.GameMode.BLITZ:
 		next_mode = GameConfig.GameMode.SLIME
+	elif Config.data.game_mode == GameConfig.GameMode.SLIME:
+		next_mode = GameConfig.GameMode.JELLY
 	_queued_mode = int(next_mode)
 	_force_start_screen = false
 	get_tree().reload_current_scene()

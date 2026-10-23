@@ -38,6 +38,35 @@
 
 ## 미확인
 
+### [2026-10-23] 대상 #97 — JELLY 앱 연결
+- 상태: 완료 — 시작 화면·랭킹·저장·결과 화면에 JELLY를 연결하고, #96 검수의 JELLY MAX 3D 얼굴 크기 보완까지 반영함
+- 브랜치 / PR: `jelly-app-shell` / https://github.com/jeongmo-dot/gravity_orb/pull/100
+- 변경 파일: `scenes/UI.tscn`, `scripts/core/{Main,SaveStore,TurnManager}.gd`, `scripts/spike/Orb3D.gd`, `scripts/ui/{GameOverPanel,JellyCardIcon,RankingPanel,StartScreen}.gd`, `tests/{capture_screens,test_frontend,test_jelly_shell,test_jelly_visuals,test_screen_layout}.gd`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 시작 화면을 위 BLITZ·CLASSIC, 아래 JELLY·SLIME의 4장 카드로 배치하고 아래 카드는 각각 절반 너비·높이 150으로 구성 — 자동 (`test_screen_layout`, `test_jelly_shell`) + 두 비율 캡처 직접 관측
+  - [x] JELLY 카드에 L3 분홍 젤리 얼굴, `#FF7595`, `한 단계 작은 것도 먹고 자라요`, BEST를 적용하고 SLIME 카드 문구·기능 유지 — 자동 (`test_frontend`, `test_jelly_shell`) + 캡처 직접 관측
+  - [x] 랭킹 순서를 BLITZ·CLASSIC·JELLY·SLIME으로 구성하고 JELLY에 CLASSIC 열과 `FINAL MOVE` 횟수 열을 표시 — 자동 (`test_jelly_shell`) + 캡처 직접 관측
+  - [x] JELLY 랭킹을 별도 `jelly` 키에 저장하고 `jelly_best_score`·마지막 모드 `jelly`·FINAL MOVE 성공 횟수를 저장·복원 — 자동 (`test_jelly_shell`)
+  - [x] JELLY 결과 화면에 `FINAL MOVE`와 `n번 버팀`을 표시하고 결과에서 JELLY 랭킹으로 이동 — 자동 (`test_jelly_shell`) + 캡처 직접 관측
+  - [x] 시작 → JELLY → 결과 → 랭킹 → 닫기 → 다시 하기 → 모드 선택 왕복 — 자동 (`test_jelly_shell`)
+  - [x] JELLY L7/MAX의 3D 얼굴만 몸통 반지름 기준 비율 그대로 확대하고 일반 얼굴·SLIME은 유지 — 자동 (`test_jelly_visuals`) + `53_jelly_look_max` 재촬영·직접 관측
+  - [x] 전체 테스트·두 비율 전체 캡처·5경로 스모크·Debug 빌드 실행, 캡처 과정에서 사용자 저장 파일 바이트 불변 확인
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard (`C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`)
+  - `godot --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` 최종 실행 → 일반 `360/360` (`26.407초`), 장기 `5/5` (`48.201초`), 성능 `5/5` (`3.369초`), 합계 `370/370`, 종료 코드 0, 총 `77.977초`
+  - 기본·TURN·BLITZ·SLIME·JELLY `--quit-after 300` → 5개 모두 종료 코드 0, 프로젝트 오류 표식 0건
+  - `tests/capture_screens.ps1` 최종 전체 실행 → 두 비율×85장=`170`장, 종료 코드 0. `54_jelly_shell_{start,ranking,result}`와 `53_jelly_look_max`를 두 비율에서 직접 확인했고 겹침·잘림 0건. 캡처 전후 사용자 저장 파일 바이트 동일
+  - `tools/build_windows.ps1 -Debug` → 종료 코드 0, `build/windows-debug/GravityOrb_v0.14.0.exe` `105,083,552`바이트; Release 미실행 (지시대로 Debug만 실행)
+  - 규칙 검사 → 새 `Input`/`InputEvent`·전역 난수 사용 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. 시작 화면을 두 화면비로 연다 → 위 BLITZ·CLASSIC, 아래 JELLY·SLIME 카드가 겹침 없이 보이고 JELLY 카드에 분홍 젤리 얼굴·설명·BEST가 보여야 한다.
+  2. JELLY 카드를 눌러 플레이한 뒤 게임오버를 만든다 → 결과 화면에 `FINAL MOVE n번 버팀`이 보이고 랭킹을 누르면 JELLY 탭과 CLASSIC 열·FINAL MOVE 열이 보여야 한다.
+  3. 랭킹을 닫고 다시 하기를 누른 뒤 모드 선택으로 돌아간다 → JELLY 새 게임과 시작 화면이 각각 정상 표시되어야 한다.
+  4. JELLY MAX를 만든다 → 3D 얼굴이 2D 시안 C와 같은 몸통 반지름 비율로 보이고, 일반 젤리 얼굴과 SLIME MAX 얼굴 크기는 기존과 같아야 한다.
+- 결정 사항: 랭킹의 `FINAL MOVE` 값은 결과 문구 `n번 버팀`과 동일하게 성공적으로 버틴 횟수(`final_move_success_count`)를 저장·표시함. 새 밸런스 수치·규칙·물리는 변경하지 않음
+- 남은 것 · 질문: 자동 검증과 캡처 직접 관측을 완료했으며 최종 합격/불합격 판정은 Claude에 남김
+
 ### [2026-10-22] 대상 #96 — JELLY 3D 젤리 그림과 말랑한 연출
 - 상태: 완료 — 1차 구현 뒤 추가 요구 1의 1~5번까지 반영함. #98에서 선택한 J5, JELLY 전용 3D 그림·연출, 시안 C의 MAX 얼굴, JELLY NEXT·THEN과 새 젤리 안내를 구현했고 다른 모드는 유지함
 - 브랜치 / PR: `jelly-3d-visuals` / https://github.com/jeongmo-dot/gravity_orb/pull/99

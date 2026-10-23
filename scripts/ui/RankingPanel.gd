@@ -20,6 +20,7 @@ const PANEL_VERTICAL_CONTENT_MARGIN: float = 56.0
 @onready var _blitz_tab: Button = %RankingBlitzTab
 @onready var _classic_tab: Button = %RankingClassicTab
 @onready var _slime_tab: Button = %RankingSlimeTab
+@onready var _jelly_tab: Button = %RankingJellyTab
 @onready var _header: Label = %RankingHeader
 @onready var _close_button: Button = %RankingCloseButton
 @onready var _panel: PanelContainer = $Panel
@@ -38,6 +39,7 @@ var _rest_position: Vector2 = Vector2.ZERO
 
 
 func _ready() -> void:
+	_jelly_tab.get_parent().move_child(_jelly_tab, 2)
 	_header.text = ""
 	_header_columns = _create_columns(_header, true)
 	for rank: int in range(1, SaveStore.RANKING_LIMIT + 1):
@@ -50,8 +52,11 @@ func _ready() -> void:
 	_blitz_tab.pressed.connect(func() -> void: _show_mode(GameConfig.GameMode.BLITZ))
 	_classic_tab.pressed.connect(func() -> void: _show_mode(GameConfig.GameMode.TURN))
 	_slime_tab.pressed.connect(func() -> void: _show_mode(GameConfig.GameMode.SLIME))
+	_jelly_tab.pressed.connect(func() -> void: _show_mode(GameConfig.GameMode.JELLY))
 	_close_button.pressed.connect(_on_close_pressed)
-	for button: Button in [_blitz_tab, _classic_tab, _slime_tab, _close_button]:
+	for button: Button in [
+		_blitz_tab, _classic_tab, _jelly_tab, _slime_tab, _close_button
+	]:
 		ButtonMotion.bind(button)
 	if not resized.is_connected(_apply_layout):
 		resized.connect(_apply_layout)
@@ -117,14 +122,16 @@ func _show_mode(mode: GameConfig.GameMode) -> void:
 func _refresh() -> void:
 	var blitz_mode: bool = _mode == GameConfig.GameMode.BLITZ
 	var slime_mode: bool = _mode == GameConfig.GameMode.SLIME
+	var jelly_mode: bool = _mode == GameConfig.GameMode.JELLY
 	_blitz_tab.set_pressed_no_signal(blitz_mode)
-	_classic_tab.set_pressed_no_signal(not blitz_mode and not slime_mode)
+	_classic_tab.set_pressed_no_signal(not blitz_mode and not slime_mode and not jelly_mode)
 	_slime_tab.set_pressed_no_signal(slime_mode)
-	_set_column_visibility(slime_mode)
+	_jelly_tab.set_pressed_no_signal(jelly_mode)
+	_set_column_visibility(slime_mode, jelly_mode)
 	(_header_columns["Rank"] as Label).text = "순위"
 	(_header_columns["Score"] as Label).text = "점수"
 	(_header_columns["Stat"] as Label).text = "최대 체인" if blitz_mode else "최대 콤보"
-	(_header_columns["Turns"] as Label).text = "턴"
+	(_header_columns["Turns"] as Label).text = "FINAL MOVE" if jelly_mode else "턴"
 	(_header_columns["Chain"] as Label).text = "연쇄"
 	(_header_columns["Max"] as Label).text = "MAX"
 	(_header_columns["Date"] as Label).text = "날짜"
@@ -156,6 +163,8 @@ func _refresh() -> void:
 					"체인" if blitz_mode else "콤보",
 					int(record[stat_key]),
 				]
+				if jelly_mode:
+					(columns["Turns"] as Label).text = str(int(record["final_moves"]))
 			(columns["Date"] as Label).text = _short_date(str(record["date"]))
 		for column_name: String in COLUMN_NAMES:
 			(columns[column_name] as Label).add_theme_color_override(
@@ -204,10 +213,11 @@ func _create_columns(host: Control, header: bool) -> Dictionary:
 	return columns
 
 
-func _set_column_visibility(slime_mode: bool) -> void:
+func _set_column_visibility(slime_mode: bool, jelly_mode: bool) -> void:
 	for columns: Dictionary in [_header_columns] + _row_columns:
 		(columns["Stat"] as Label).visible = not slime_mode
-		for column_name: String in ["Turns", "Chain", "Max"]:
+		(columns["Turns"] as Label).visible = slime_mode or jelly_mode
+		for column_name: String in ["Chain", "Max"]:
 			(columns[column_name] as Label).visible = slime_mode
 
 

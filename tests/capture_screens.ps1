@@ -112,7 +112,10 @@ $expectedFiles = @(
 	"53_jelly_look_absorption.png",
 	"53_jelly_look_max.png",
 	"53_jelly_look_stretch.png",
-	"53_jelly_look_unlock.png"
+	"53_jelly_look_unlock.png",
+	"54_jelly_shell_start.png",
+	"54_jelly_shell_ranking.png",
+	"54_jelly_shell_result.png"
 )
 $hudExpectedFiles = @(
     "02_turn_early.png",
