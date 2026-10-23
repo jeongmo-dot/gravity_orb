@@ -40,7 +40,7 @@
 
 ### [2026-10-23] 대상 #97 — JELLY 앱 연결
 - 상태: 완료 — 시작 화면·랭킹·저장·결과 화면에 JELLY를 연결하고, #96 검수의 JELLY MAX 3D 얼굴 크기 보완까지 반영함
-- 브랜치 / PR: `jelly-app-shell` / 생성 예정
+- 브랜치 / PR: `jelly-app-shell` / https://github.com/jeongmo-dot/gravity_orb/pull/100
 - 변경 파일: `scenes/UI.tscn`, `scripts/core/{Main,SaveStore,TurnManager}.gd`, `scripts/spike/Orb3D.gd`, `scripts/ui/{GameOverPanel,JellyCardIcon,RankingPanel,StartScreen}.gd`, `tests/{capture_screens,test_frontend,test_jelly_shell,test_jelly_visuals,test_screen_layout}.gd`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 시작 화면을 위 BLITZ·CLASSIC, 아래 JELLY·SLIME의 4장 카드로 배치하고 아래 카드는 각각 절반 너비·높이 150으로 구성 — 자동 (`test_screen_layout`, `test_jelly_shell`) + 두 비율 캡처 직접 관측
