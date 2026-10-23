@@ -48,6 +48,7 @@
   2. JELLY 미리보기를 2D 젤리로 (색·밝기·캡슐 눈 / L7 MAX 얼굴)
   3. JELLY 새 색 안내를 "새 젤리 — 보라/주황" + 젤리 그림, 미리보기 테두리는 젤리 색 (CLASSIC 그대로)
   4. `53_jelly_look_*` 다시 + `53_jelly_look_unlock` 두 비율, 마지막은 전체 캡처
+  5. **MAX 얼굴을 시안 C (반짝 눈 + 고양이 입 `ω`)로** — 사용자 2026-10-23 "웃는 얼굴이 안 예뻐" → 시안 [`docs/mockups/jelly_max_faces.png`](mockups/jelly_max_faces.png)에서 C 선택. 크기·위치는 technical_design §12-JE "#96 추가 요구 1" 5번 (몸통 반지름 비율). JELLY만, SLIME MAX 얼굴은 그대로
 - **먼저 (규칙 값)**: `jelly_blast_min_level` 기본값 0 → **5** (Claude 결정 — #98 J5, technical_design §12-JE.5 "#98 결과"). `default_config.tres`·`GameConfig` 기본·테스트 갱신, JELLY 새 기준 해시 보고 (다른 모드 해시 그대로)
 - 근거: [technical_design.md](technical_design.md) **§12-JE.2**
 - 배경: 사용자 (2026-10-21) "3d 행성이 아닌 3d 젤리로"
