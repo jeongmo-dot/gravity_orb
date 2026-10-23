@@ -93,7 +93,7 @@ func test_start_card_and_ranking_panel_expose_slime_mode() -> void:
 	assert_eq((start.get_node("Content/SlimeNameLabel") as Label).text, "SLIME", "SLIME card name")
 	assert_eq(
 		(start.get_node("Content/SlimeDescriptionLabel") as Label).text,
-		"같은 색이면 크기 상관없이 흡수",
+		"크기 상관없이 흡수",
 		"SLIME card description"
 	)
 	assert_eq((start.get_node("Content/SlimeBestLabel") as Label).text, "BEST 9,876", "SLIME card BEST")

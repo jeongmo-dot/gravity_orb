@@ -7,9 +7,6 @@ signal ranking_requested(mode: GameConfig.GameMode, highlight_rank: int)
 const SCORE_ANIMATION_SECONDS: float = 0.6
 const PANEL_ANIMATION_SECONDS: float = 0.25
 const DIM_ANIMATION_SECONDS: float = 0.2
-const LEVEL_NAMES_KO: Array[String] = [
-	"", "운석", "달", "바위 행성", "고리 행성", "가스 거인", "별", "태양"
-]
 
 @onready var _title_label: Label = %ResultTitle
 @onready var _score_label: Label = %GameOverScore
@@ -189,18 +186,25 @@ func _set_stat_text(blitz_mode: bool) -> void:
 		_extra_label.text = "피버"
 		_extra_value.text = str(_game_manager.fever_count)
 	else:
-		var level: int = clampi(_score_manager.max_level_reached, 0, LEVEL_NAMES_KO.size() - 1)
+		var level: int = clampi(
+			_score_manager.max_level_reached, 0, Config.data.orb_max_level
+		)
+		var jelly_mode: bool = Config.data.game_mode == GameConfig.GameMode.JELLY
 		_survived_time_label.text = "턴 수"
 		_survived_time_value.text = str(_game_manager.turn_index)
 		_survived_time_value.add_theme_color_override("font_color", Color("#E8EEFF"))
 		_max_combo_label.text = "최대 콤보"
 		_max_combo_value.text = str(_game_manager.max_combo)
-		_blocked_label.text = "최고 천체"
-		_blocked_value.text = "L%d %s" % [level, LEVEL_NAMES_KO[level]]
+		_blocked_label.text = "최고 젤리" if jelly_mode else "최고 레벨"
+		_blocked_value.text = (
+			"L%d MAX" % level
+			if jelly_mode and level == Config.data.orb_max_level
+			else "L%d" % level
+		)
 		var blocked_direction: Vector2i = _game_manager.game_over_details.get(
 			"direction", _game_manager.gravity
 		) as Vector2i
-		if Config.data.game_mode == GameConfig.GameMode.JELLY:
+		if jelly_mode:
 			_extra_label.text = "FINAL MOVE"
 			_extra_value.text = "%d번 버팀" % int(
 				_game_manager.game_over_details.get("final_move_successes", 0)

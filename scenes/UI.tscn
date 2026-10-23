@@ -1178,9 +1178,9 @@ unique_name_in_owner = true
 layout_mode = 0
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.557, 0.639, 0.784, 1)
-theme_override_font_sizes/font_size = 18
+theme_override_font_sizes/font_size = 28
 theme_type_variation = &"HudBody"
-text = "한 단계 작은 것도\n먹고 자라요"
+text = "작은 것도 먹고 자라요"
 clip_text = true
 vertical_alignment = 1
 
@@ -1225,9 +1225,9 @@ unique_name_in_owner = true
 layout_mode = 0
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.557, 0.639, 0.784, 1)
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 28
 theme_type_variation = &"HudBody"
-text = "같은 색이면 크기 상관없이 흡수"
+text = "크기 상관없이 흡수"
 clip_text = true
 vertical_alignment = 1
 
