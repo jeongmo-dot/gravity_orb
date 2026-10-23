@@ -1403,6 +1403,7 @@ func _capture_crowded_blast_pair(
 
 func _capture_jelly_look(main: Main, board: Board3D) -> void:
 	var feedback: FeedbackDirector = main.get_node("FeedbackDirector") as FeedbackDirector
+	var hud: Hud = main.get_node("UI/Hud") as Hud
 	feedback.clear_effects()
 	_clear_capture_board(board)
 	var level_positions: Array[Vector2] = [
@@ -1461,7 +1462,14 @@ func _capture_jelly_look(main: Main, board: Board3D) -> void:
 		"levels": [6, 6],
 		"colors": [4, 4],
 	})
+	hud._on_preview_changed([
+		[{"color": OrbTypes.OrbColor.PURPLE, "level": 7}],
+		[{"color": OrbTypes.OrbColor.RED, "level": 7}],
+	])
 	await get_tree().create_timer(0.16).timeout
+	var max_preview: OrbVisual = hud._next_preview.get_child(0) as OrbVisual
+	if max_preview.jelly_level() != 7 or max_preview.celestial_level() != 0:
+		_fail("JELLY MAX capture NEXT must use the 2D MAX jelly face")
 	await _capture("53_jelly_look_max.png")
 
 	feedback.clear_effects()
@@ -1477,7 +1485,6 @@ func _capture_jelly_look(main: Main, board: Board3D) -> void:
 	_clear_capture_board(board)
 	feedback.clear_effects()
 
-	var hud: Hud = main.get_node("UI/Hud") as Hud
 	if hud._callout_tween != null and hud._callout_tween.is_valid():
 		hud._callout_tween.kill()
 	hud._hide_callout_label()

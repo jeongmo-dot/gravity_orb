@@ -44,9 +44,16 @@ func test_max_face_projects_smile_below_eyes_and_rotates_with_gravity() -> void:
 		0.0,
 		float(material.get_shader_parameter("max_eye_y"))
 	)
+	var left_eye_center: Vector2 = Vector2(
+		-float(material.get_shader_parameter("max_eye_x")),
+		float(material.get_shader_parameter("max_eye_y"))
+	)
 	var smile_center: Vector2 = Vector2(
 		0.0,
-		float(material.get_shader_parameter("max_smile_y"))
+		float(material.get_shader_parameter("max_mouth_y"))
+	)
+	var highlight_offset: Vector2 = material.get_shader_parameter(
+		"max_highlight_large_offset"
 	)
 	orb.set_gravity(Vector2i.DOWN, Config.data.gravity_strength)
 	var down_eyes: Vector2 = _face_point_on_screen(
@@ -57,17 +64,20 @@ func test_max_face_projects_smile_below_eyes_and_rotates_with_gravity() -> void:
 		smile_center,
 		orb._jelly_face_target_rotation
 	)
-	var normal_material: ShaderMaterial = JellyOrbArt.face_material_for(0, 3)
 	var down_highlight: Vector2 = _face_point_on_screen(
-		Vector2(-0.285, float(normal_material.get_shader_parameter("highlight_y"))),
+		left_eye_center + highlight_offset,
+		orb._jelly_face_target_rotation
+	)
+	var down_left_eye: Vector2 = _face_point_on_screen(
+		left_eye_center,
 		orb._jelly_face_target_rotation
 	)
 	assert_true(down_smile.y > down_eyes.y, "down gravity puts MAX smile below eyes")
 	assert_true(
-		down_highlight.y < down_eyes.y,
+		down_highlight.y < down_left_eye.y,
 		"down gravity keeps reflection above the eyes"
 	)
-	assert_true(down_highlight.x < down_eyes.x, "reflection stays on the left")
+	assert_true(down_highlight.x < down_left_eye.x, "reflection stays on the left")
 	orb.set_gravity(Vector2i.RIGHT, Config.data.gravity_strength)
 	var right_eyes: Vector2 = _face_point_on_screen(
 		eye_center,
@@ -89,10 +99,59 @@ func test_max_face_projects_smile_below_eyes_and_rotates_with_gravity() -> void:
 		"MAX shader uses tested eye center"
 	)
 	assert_near(
-		float(material.get_shader_parameter("max_smile_y")),
-		JellyOrbArt.MAX_SMILE_CENTER_Y,
+		float(material.get_shader_parameter("max_mouth_y")),
+		JellyOrbArt.MAX_MOUTH_CENTER_Y,
 		0.0001,
-		"MAX shader uses tested smile center"
+		"MAX shader uses tested cat-mouth center"
+	)
+	assert_eq(
+		material.get_shader_parameter("max_face_color"),
+		JellyOrbArt.MAX_FACE_COLOR,
+		"MAX eyes and cat mouth use the mockup C dark purple"
+	)
+	assert_eq(
+		material.get_shader_parameter("max_eye_radii"),
+		Vector2(0.09, 0.13),
+		"MAX eye radii match mockup C"
+	)
+	assert_eq(
+		material.get_shader_parameter("max_highlight_large_offset"),
+		Vector2(-0.03, -0.06),
+		"both MAX eyes share the upper-left large reflection"
+	)
+	assert_near(
+		float(material.get_shader_parameter("max_highlight_large_radius")),
+		0.04,
+		0.0001,
+		"MAX large reflection radius matches mockup C"
+	)
+	assert_eq(
+		material.get_shader_parameter("max_highlight_small_offset"),
+		Vector2(0.04, 0.06),
+		"both MAX eyes share the lower-right small reflection"
+	)
+	assert_near(
+		float(material.get_shader_parameter("max_highlight_small_radius")),
+		0.02,
+		0.0001,
+		"MAX small reflection radius matches mockup C"
+	)
+	assert_near(
+		float(material.get_shader_parameter("max_mouth_radius")),
+		0.06,
+		0.0001,
+		"MAX omega mouth uses two specified arcs"
+	)
+	assert_eq(
+		material.get_shader_parameter("max_blush_radii"),
+		Vector2(0.12, 0.07),
+		"MAX blush ellipse matches mockup C"
+	)
+	assert_near(
+		float(material.get_shader_parameter("max_blush_alpha")),
+		0.45,
+		0.0001,
+		"MAX blush alpha matches mockup C"
 	)
 	await _cleanup(board)
 	Config.data.game_mode = original_mode

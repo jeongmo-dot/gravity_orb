@@ -204,40 +204,10 @@ func _draw_jelly_face() -> void:
 	var eye_size: float = clampf(3.8 + float(level_index) * 0.75, 3.8, 7.6)
 	var eye_y: float = -0.12 * _radius
 	var spacing: float = 0.30 * _radius
-	if _jelly_level >= 7:
-		for sign_value: float in [-1.0, 1.0]:
-			draw_arc(
-				Vector2(sign_value * spacing, eye_y + 2.0),
-				eye_size + 2.5,
-				PI + 0.22,
-				TAU - 0.22,
-				18,
-				JELLY_FACE_COLOR,
-				4.0,
-				true
-			)
-		draw_circle(
-			Vector2(-0.48 * _radius, 0.11 * _radius),
-			7.5,
-			Color(1.0, 0.373, 0.529, 0.52 * _display_color.a)
-		)
-		draw_circle(
-			Vector2(0.48 * _radius, 0.11 * _radius),
-			7.5,
-			Color(1.0, 0.373, 0.529, 0.52 * _display_color.a)
-		)
-		draw_arc(
-			Vector2(0.0, 0.12 * _radius),
-			0.105 * _radius,
-			0.16,
-			PI - 0.16,
-			18,
-			JELLY_FACE_COLOR,
-			4.0,
-			true
-		)
-		return
 	var blink: bool = sin(_planet_animation_elapsed * 2.35 + float(_jelly_color_index) * 0.91) > 0.985
+	if _jelly_level >= 7:
+		_draw_jelly_max_face(blink)
+		return
 	var half_width: float = eye_size * 0.72
 	var half_height: float = eye_size * lerpf(1.08, 1.42, float(level_index) / 6.0)
 	for sign_value: float in [-1.0, 1.0]:
@@ -257,6 +227,104 @@ func _draw_jelly_face() -> void:
 				maxf(1.0, 0.27 * half_width),
 				Color(1.0, 1.0, 1.0, 0.88 * _display_color.a)
 			)
+
+
+func _draw_jelly_max_face(blink: bool) -> void:
+	var face_color: Color = JellyOrbArt.MAX_FACE_COLOR
+	face_color.a *= _display_color.a
+	var blush_color: Color = JellyOrbArt.MAX_BLUSH_COLOR
+	blush_color.a = JellyOrbArt.MAX_BLUSH_ALPHA * _display_color.a
+	for sign_value: float in [-1.0, 1.0]:
+		_draw_jelly_ellipse(
+			Vector2(
+				sign_value * JellyOrbArt.MAX_BLUSH_CENTER_X * _radius,
+				JellyOrbArt.MAX_BLUSH_CENTER_Y * _radius
+			),
+			Vector2(
+				JellyOrbArt.MAX_BLUSH_RADIUS_X * _radius,
+				JellyOrbArt.MAX_BLUSH_RADIUS_Y * _radius
+			),
+			blush_color
+		)
+		var eye_center: Vector2 = Vector2(
+			sign_value * JellyOrbArt.MAX_EYE_CENTER_X * _radius,
+			JellyOrbArt.MAX_EYE_CENTER_Y * _radius
+		)
+		if blink:
+			_draw_rounded_line(
+				eye_center - Vector2(JellyOrbArt.MAX_EYE_RADIUS_X * _radius, 0.0),
+				eye_center + Vector2(JellyOrbArt.MAX_EYE_RADIUS_X * _radius, 0.0),
+				JellyOrbArt.MAX_MOUTH_STROKE_WIDTH * _radius,
+				face_color
+			)
+		else:
+			_draw_jelly_ellipse(
+				eye_center,
+				Vector2(
+					JellyOrbArt.MAX_EYE_RADIUS_X * _radius,
+					JellyOrbArt.MAX_EYE_RADIUS_Y * _radius
+				),
+				face_color
+			)
+			var highlight_color: Color = Color(1.0, 1.0, 1.0, _display_color.a)
+			draw_circle(
+				eye_center + JellyOrbArt.MAX_HIGHLIGHT_LARGE_OFFSET * _radius,
+				JellyOrbArt.MAX_HIGHLIGHT_LARGE_RADIUS * _radius,
+				highlight_color
+			)
+			draw_circle(
+				eye_center + JellyOrbArt.MAX_HIGHLIGHT_SMALL_OFFSET * _radius,
+				JellyOrbArt.MAX_HIGHLIGHT_SMALL_RADIUS * _radius,
+				highlight_color
+			)
+	var mouth_y: float = JellyOrbArt.MAX_MOUTH_CENTER_Y * _radius
+	var mouth_radius: float = JellyOrbArt.MAX_MOUTH_ARC_RADIUS * _radius
+	var mouth_width: float = JellyOrbArt.MAX_MOUTH_STROKE_WIDTH * _radius
+	draw_arc(
+		Vector2(-mouth_radius, mouth_y),
+		mouth_radius,
+		0.0,
+		PI,
+		16,
+		face_color,
+		mouth_width,
+		true
+	)
+	draw_arc(
+		Vector2(mouth_radius, mouth_y),
+		mouth_radius,
+		0.0,
+		PI,
+		16,
+		face_color,
+		mouth_width,
+		true
+	)
+	for endpoint_x: float in [-mouth_radius * 2.0, 0.0, mouth_radius * 2.0]:
+		draw_circle(Vector2(endpoint_x, mouth_y), mouth_width * 0.5, face_color)
+
+
+func _draw_jelly_ellipse(
+	center: Vector2,
+	radii: Vector2,
+	color_value: Color
+) -> void:
+	var points: PackedVector2Array = PackedVector2Array()
+	for index: int in range(24):
+		var angle: float = TAU * float(index) / 24.0
+		points.append(center + Vector2(cos(angle) * radii.x, sin(angle) * radii.y))
+	draw_colored_polygon(points, color_value)
+
+
+func _draw_rounded_line(
+	from: Vector2,
+	to: Vector2,
+	width: float,
+	color_value: Color
+) -> void:
+	draw_line(from, to, color_value, width, true)
+	draw_circle(from, width * 0.5, color_value)
+	draw_circle(to, width * 0.5, color_value)
 
 
 func _draw_jelly_capsule_eye(

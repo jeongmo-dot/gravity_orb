@@ -11,11 +11,24 @@ const PALETTE: Array[Color] = [
 ]
 const LEVEL_LIGHTEN_AMOUNT: float = 0.018
 const CAPTURE_ANIMATION_TIME: float = 4.25
-const MAX_EYE_CENTER_Y: float = -0.05
-const MAX_EYE_CUT_Y: float = 0.015
-const MAX_SMILE_CENTER_Y: float = 0.22
-const MAX_SMILE_CUT_Y: float = 0.16
-const MAX_BLUSH_CENTER_Y: float = 0.18
+const MAX_FACE_COLOR: Color = Color("1b1630")
+const MAX_BLUSH_COLOR: Color = Color("ff4f7f")
+const MAX_EYE_CENTER_X: float = 0.26
+const MAX_EYE_CENTER_Y: float = -0.08
+const MAX_EYE_RADIUS_X: float = 0.09
+const MAX_EYE_RADIUS_Y: float = 0.13
+const MAX_HIGHLIGHT_LARGE_OFFSET: Vector2 = Vector2(-0.03, -0.06)
+const MAX_HIGHLIGHT_LARGE_RADIUS: float = 0.04
+const MAX_HIGHLIGHT_SMALL_OFFSET: Vector2 = Vector2(0.04, 0.06)
+const MAX_HIGHLIGHT_SMALL_RADIUS: float = 0.02
+const MAX_MOUTH_CENTER_Y: float = 0.14
+const MAX_MOUTH_ARC_RADIUS: float = 0.06
+const MAX_MOUTH_STROKE_WIDTH: float = 0.04
+const MAX_BLUSH_CENTER_X: float = 0.46
+const MAX_BLUSH_CENTER_Y: float = 0.16
+const MAX_BLUSH_RADIUS_X: float = 0.12
+const MAX_BLUSH_RADIUS_Y: float = 0.07
+const MAX_BLUSH_ALPHA: float = 0.45
 const NORMAL_HIGHLIGHT_Y: float = -0.075
 const PREVIEW_TEXTURE_SIZE: int = 384
 const PREVIEW_MAX_TEXTURE_SIZE: int = 512
@@ -153,11 +166,28 @@ static func face_material_for(color_index: int, level: int) -> ShaderMaterial:
 		material.set_shader_parameter("jelly_color", color_for(color_index, level))
 		material.set_shader_parameter("color_id", color_index)
 		material.set_shader_parameter("is_max", level >= 7)
+		material.set_shader_parameter("max_face_color", MAX_FACE_COLOR)
+		material.set_shader_parameter("max_blush_color", MAX_BLUSH_COLOR)
+		material.set_shader_parameter("max_eye_x", MAX_EYE_CENTER_X)
 		material.set_shader_parameter("max_eye_y", MAX_EYE_CENTER_Y)
-		material.set_shader_parameter("max_eye_cut_y", MAX_EYE_CUT_Y)
-		material.set_shader_parameter("max_smile_y", MAX_SMILE_CENTER_Y)
-		material.set_shader_parameter("max_smile_cut_y", MAX_SMILE_CUT_Y)
+		material.set_shader_parameter("max_eye_radii", Vector2(
+			MAX_EYE_RADIUS_X,
+			MAX_EYE_RADIUS_Y
+		))
+		material.set_shader_parameter("max_highlight_large_offset", MAX_HIGHLIGHT_LARGE_OFFSET)
+		material.set_shader_parameter("max_highlight_large_radius", MAX_HIGHLIGHT_LARGE_RADIUS)
+		material.set_shader_parameter("max_highlight_small_offset", MAX_HIGHLIGHT_SMALL_OFFSET)
+		material.set_shader_parameter("max_highlight_small_radius", MAX_HIGHLIGHT_SMALL_RADIUS)
+		material.set_shader_parameter("max_mouth_y", MAX_MOUTH_CENTER_Y)
+		material.set_shader_parameter("max_mouth_radius", MAX_MOUTH_ARC_RADIUS)
+		material.set_shader_parameter("max_mouth_width", MAX_MOUTH_STROKE_WIDTH)
+		material.set_shader_parameter("max_blush_x", MAX_BLUSH_CENTER_X)
 		material.set_shader_parameter("max_blush_y", MAX_BLUSH_CENTER_Y)
+		material.set_shader_parameter("max_blush_radii", Vector2(
+			MAX_BLUSH_RADIUS_X,
+			MAX_BLUSH_RADIUS_Y
+		))
+		material.set_shader_parameter("max_blush_alpha", MAX_BLUSH_ALPHA)
 		material.set_shader_parameter("highlight_y", NORMAL_HIGHLIGHT_Y)
 		material.set_shader_parameter("animation_time", _animation_time)
 		_face_materials[key] = material
@@ -259,11 +289,22 @@ uniform vec4 jelly_color : source_color = vec4(1.0);
 uniform int color_id = 0;
 uniform bool is_max = false;
 uniform float animation_time = 0.0;
-uniform float max_eye_y = -0.05;
-uniform float max_eye_cut_y = 0.015;
-uniform float max_smile_y = 0.22;
-uniform float max_smile_cut_y = 0.16;
-uniform float max_blush_y = 0.18;
+uniform vec4 max_face_color : source_color = vec4(0.106, 0.086, 0.188, 1.0);
+uniform vec4 max_blush_color : source_color = vec4(1.0, 0.31, 0.50, 1.0);
+uniform float max_eye_x = 0.26;
+uniform float max_eye_y = -0.08;
+uniform vec2 max_eye_radii = vec2(0.09, 0.13);
+uniform vec2 max_highlight_large_offset = vec2(-0.03, -0.06);
+uniform float max_highlight_large_radius = 0.04;
+uniform vec2 max_highlight_small_offset = vec2(0.04, 0.06);
+uniform float max_highlight_small_radius = 0.02;
+uniform float max_mouth_y = 0.14;
+uniform float max_mouth_radius = 0.06;
+uniform float max_mouth_width = 0.04;
+uniform float max_blush_x = 0.46;
+uniform float max_blush_y = 0.16;
+uniform vec2 max_blush_radii = vec2(0.12, 0.07);
+uniform float max_blush_alpha = 0.45;
 uniform float highlight_y = -0.075;
 
 float capsule(vec2 p, vec2 a, vec2 b, float radius) {
@@ -277,6 +318,18 @@ float circle_mask(vec2 p, vec2 center, float radius, float feather) {
 	return 1.0 - smoothstep(radius - feather, radius + feather, length(p - center));
 }
 
+float ellipse_mask(vec2 p, vec2 center, vec2 radii, float feather) {
+	float radial = length((p - center) / radii);
+	return 1.0 - smoothstep(1.0 - feather, 1.0 + feather, radial);
+}
+
+float lower_arc_mask(vec2 p, vec2 center, float radius, float width) {
+	float ring_distance = abs(length(p - center) - radius);
+	float ring = 1.0 - smoothstep(width * 0.5 - 0.008, width * 0.5 + 0.008, ring_distance);
+	float lower_half = smoothstep(center.y - 0.008, center.y + 0.008, p.y);
+	return ring * lower_half;
+}
+
 void fragment() {
 	vec2 p = UV * 2.0 - 1.0;
 	float blink_wave = sin(animation_time * 2.35 + float(color_id) * 0.91);
@@ -286,18 +339,36 @@ void fragment() {
 	float right_eye = 0.0;
 	float smile = 0.0;
 	float blush = 0.0;
+	float max_highlight = 0.0;
 	if (is_max) {
-		float left_outer = circle_mask(p, vec2(-0.29, max_eye_y), 0.19, 0.018);
-		float left_cut = circle_mask(p, vec2(-0.29, max_eye_cut_y), 0.17, 0.018);
-		float right_outer = circle_mask(p, vec2(0.29, max_eye_y), 0.19, 0.018);
-		float right_cut = circle_mask(p, vec2(0.29, max_eye_cut_y), 0.17, 0.018);
-		left_eye = max(left_outer - left_cut, 0.0);
-		right_eye = max(right_outer - right_cut, 0.0);
-		float mouth_outer = circle_mask(p, vec2(0.0, max_smile_y), 0.24, 0.018);
-		float mouth_cut = circle_mask(p, vec2(0.0, max_smile_cut_y), 0.22, 0.018);
-		smile = max(mouth_outer - mouth_cut, 0.0);
-		blush = circle_mask(p, vec2(-0.48, max_blush_y), 0.095, 0.025)
-			+ circle_mask(p, vec2(0.48, max_blush_y), 0.095, 0.025);
+		vec2 left_center = vec2(-max_eye_x, max_eye_y);
+		vec2 right_center = vec2(max_eye_x, max_eye_y);
+		float left_open = ellipse_mask(p, left_center, max_eye_radii, 0.08);
+		float right_open = ellipse_mask(p, right_center, max_eye_radii, 0.08);
+		float left_closed = 1.0 - smoothstep(-0.008, 0.008,
+			capsule(p, left_center - vec2(max_eye_radii.x, 0.0), left_center + vec2(max_eye_radii.x, 0.0), max_mouth_width * 0.5));
+		float right_closed = 1.0 - smoothstep(-0.008, 0.008,
+			capsule(p, right_center - vec2(max_eye_radii.x, 0.0), right_center + vec2(max_eye_radii.x, 0.0), max_mouth_width * 0.5));
+		left_eye = mix(left_open, left_closed, blink);
+		right_eye = mix(right_open, right_closed, blink);
+		float eye_open = 1.0 - blink;
+		max_highlight = (
+			circle_mask(p, left_center + max_highlight_large_offset, max_highlight_large_radius, 0.008)
+			+ circle_mask(p, left_center + max_highlight_small_offset, max_highlight_small_radius, 0.006)
+			+ circle_mask(p, right_center + max_highlight_large_offset, max_highlight_large_radius, 0.008)
+			+ circle_mask(p, right_center + max_highlight_small_offset, max_highlight_small_radius, 0.006)
+		) * eye_open;
+		vec2 left_mouth_center = vec2(-max_mouth_radius, max_mouth_y);
+		vec2 right_mouth_center = vec2(max_mouth_radius, max_mouth_y);
+		smile = max(
+			lower_arc_mask(p, left_mouth_center, max_mouth_radius, max_mouth_width),
+			lower_arc_mask(p, right_mouth_center, max_mouth_radius, max_mouth_width)
+		);
+		smile = max(smile, circle_mask(p, vec2(-max_mouth_radius * 2.0, max_mouth_y), max_mouth_width * 0.5, 0.008));
+		smile = max(smile, circle_mask(p, vec2(0.0, max_mouth_y), max_mouth_width * 0.5, 0.008));
+		smile = max(smile, circle_mask(p, vec2(max_mouth_radius * 2.0, max_mouth_y), max_mouth_width * 0.5, 0.008));
+		blush = ellipse_mask(p, vec2(-max_blush_x, max_blush_y), max_blush_radii, 0.12)
+			+ ellipse_mask(p, vec2(max_blush_x, max_blush_y), max_blush_radii, 0.12);
 	} else {
 		left_eye = 1.0 - smoothstep(-0.015, 0.015,
 			capsule(p, vec2(-0.25, -eye_height), vec2(-0.25, eye_height), 0.105));
@@ -310,10 +381,14 @@ void fragment() {
 		highlight = circle_mask(p, vec2(-0.285, highlight_y), 0.034, 0.012)
 			+ circle_mask(p, vec2(0.215, highlight_y), 0.034, 0.012);
 	}
-	float alpha = clamp(eyes + smile + blush * 0.72 + highlight, 0.0, 1.0);
+	float alpha = clamp(eyes + smile + blush * max_blush_alpha + highlight + max_highlight, 0.0, 1.0);
 	vec3 dark = mix(vec3(0.055, 0.065, 0.11), jelly_color.rgb * 0.20, 0.22);
+	if (is_max) {
+		dark = max_face_color.rgb;
+	}
 	vec3 face_color = mix(dark, vec3(1.0), clamp(highlight, 0.0, 1.0));
-	face_color = mix(face_color, vec3(1.0, 0.34, 0.50), clamp(blush, 0.0, 1.0) * 0.72);
+	face_color = mix(face_color, max_blush_color.rgb, clamp(blush, 0.0, 1.0) * max_blush_alpha);
+	face_color = mix(face_color, vec3(1.0), clamp(max_highlight, 0.0, 1.0));
 	ALBEDO = face_color;
 	EMISSION = face_color * 0.08;
 	ALPHA = alpha;
