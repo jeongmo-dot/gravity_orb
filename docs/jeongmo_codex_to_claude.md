@@ -40,7 +40,7 @@
 
 ### [2026-10-23] 대상 #99 — 결과 화면 레벨 이름 · 반쪽 카드 글자 크기
 - 상태: 완료 — CLASSIC·JELLY 결과의 최고 레벨 문구를 모드에 맞게 바꾸고, JELLY·SLIME 반쪽 카드 설명을 한 줄·상단 카드와 같은 크기로 조정함
-- 브랜치 / PR: `jelly-result-copy` / 생성 예정
+- 브랜치 / PR: `jelly-result-copy` / https://github.com/jeongmo-dot/gravity_orb/pull/101
 - 변경 파일: `scenes/UI.tscn`, `scripts/ui/{GameOverPanel,StartScreen}.gd`, `tests/scenarios/test_score_flow.gd`, `tests/{test_jelly_shell,test_slime_shell}.gd`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] CLASSIC 결과의 최고 레벨 칸을 `최고 레벨` / `L7` 형식으로 변경하고 천체 이름 표 제거 — 자동 (`test_score_flow`) + `04_turn_game_over` 두 비율 직접 관측
