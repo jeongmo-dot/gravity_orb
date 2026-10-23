@@ -153,6 +153,57 @@ func test_planet_unlock_waits_for_callout_and_preview_border_flashes_once() -> v
 	Config.data.fx_callouts_enabled = original_enabled
 
 
+func test_jelly_preview_and_unlock_use_jelly_art_and_names() -> void:
+	var original_enabled: bool = Config.data.fx_callouts_enabled
+	Config.data.fx_callouts_enabled = true
+	var main: Main = await _create_main(GameConfig.GameMode.JELLY)
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	var callout: Label = main.get_node("UI/Hud/CalloutLabel") as Label
+	var unlock_visual: OrbVisual = (
+		main.get_node("UI/Hud/PlanetUnlockVisual") as OrbVisual
+	)
+	var then_flash: ReferenceRect = (
+		main.get_node("UI/Hud/ThenPreviewRegion/ThenUnlockFlash") as ReferenceRect
+	)
+	hud._on_planet_unlocked(OrbTypes.OrbColor.PURPLE)
+	assert_eq(callout.text, "새 젤리 — 보라", "JELLY unlock uses jelly wording")
+	assert_eq(unlock_visual.jelly_level(), 2, "JELLY unlock uses L2 jelly art")
+	assert_eq(unlock_visual.celestial_level(), 0, "JELLY unlock has no planet art")
+	assert_eq(
+		unlock_visual.display_color(),
+		JellyOrbArt.color_for(OrbTypes.OrbColor.PURPLE, 2),
+		"JELLY unlock uses level-lightened jelly color"
+	)
+
+	var unlock_preview: Array = [
+		[{"color": OrbTypes.OrbColor.RED, "level": 2}],
+		[{"color": OrbTypes.OrbColor.CYAN, "level": 7}],
+	]
+	hud._on_preview_changed(unlock_preview)
+	var next_visual: OrbVisual = hud._next_preview.get_child(0) as OrbVisual
+	var then_visual: OrbVisual = hud._then_preview.get_child(0) as OrbVisual
+	assert_eq(next_visual.jelly_level(), 2, "JELLY NEXT uses jelly preview")
+	assert_eq(then_visual.jelly_level(), 7, "JELLY THEN uses MAX jelly face")
+	assert_eq(next_visual.celestial_level(), 0, "JELLY NEXT does not use planet art")
+	assert_eq(
+		then_flash.border_color,
+		JellyOrbArt.color_for(OrbTypes.OrbColor.CYAN, 7),
+		"JELLY preview border uses jelly level color"
+	)
+	if hud._callout_tween != null and hud._callout_tween.is_valid():
+		hud._callout_tween.kill()
+	hud._hide_callout_label()
+	hud._show_planet_unlock(OrbTypes.OrbColor.CYAN)
+	assert_eq(callout.text, "새 젤리 — 주황", "second JELLY unlock uses orange wording")
+	assert_eq(
+		unlock_visual.display_color(),
+		JellyOrbArt.color_for(OrbTypes.OrbColor.CYAN, 2),
+		"orange unlock uses JELLY palette instead of CLASSIC cyan"
+	)
+	await _destroy_main(main)
+	Config.data.fx_callouts_enabled = original_enabled
+
+
 func test_blitz_timer_ticks_exactly_ten_times_with_urgent_last_three() -> void:
 	var original_enabled: bool = Config.data.fx_callouts_enabled
 	Config.data.fx_callouts_enabled = true

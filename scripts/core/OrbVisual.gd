@@ -1,6 +1,8 @@
 class_name OrbVisual
 extends Node2D
 
+const JELLY_FACE_COLOR: Color = Color("17203c")
+
 var _display_color: Color = Color.WHITE
 var _radius: float = 0.0
 var _waiting_at_entrance: bool = false
@@ -12,6 +14,8 @@ var _symbol_color: int = -1
 var _symbols_enabled: bool = true
 var _symbol_polygons: Array[PackedVector2Array] = []
 var _celestial_level: int = 0
+var _jelly_level: int = 0
+var _jelly_color_index: int = 0
 var _planet_animation_elapsed: float = 0.0
 
 
@@ -22,6 +26,7 @@ func setup(
 	symbols_enabled: bool = true
 ) -> void:
 	_celestial_level = 0
+	_jelly_level = 0
 	_display_color = display_color
 	_symbol_color = symbol_color
 	_symbols_enabled = symbols_enabled
@@ -38,9 +43,28 @@ func setup_celestial_preview(
 	symbols_enabled: bool = true
 ) -> void:
 	_celestial_level = clampi(level, 1, 7)
+	_jelly_level = 0
 	_planet_animation_elapsed = 0.0
 	_display_color = display_color
 	_symbol_color = symbol_color
+	_symbols_enabled = symbols_enabled
+	_symbol_polygons = OrbSymbols.polygons_for_color(_symbol_color)
+	_update_processing()
+	set_radius(radius)
+
+
+func setup_jelly_preview(
+	color_index: int,
+	radius: float,
+	level: int,
+	symbols_enabled: bool = true
+) -> void:
+	_celestial_level = 0
+	_jelly_level = clampi(level, 1, 7)
+	_jelly_color_index = clampi(color_index, 0, JellyOrbArt.PALETTE.size() - 1)
+	_planet_animation_elapsed = 0.0
+	_display_color = JellyOrbArt.color_for(_jelly_color_index, _jelly_level)
+	_symbol_color = _jelly_color_index
 	_symbols_enabled = symbols_enabled
 	_symbol_polygons = OrbSymbols.polygons_for_color(_symbol_color)
 	_update_processing()
@@ -75,6 +99,14 @@ func has_symbol() -> bool:
 
 func celestial_level() -> int:
 	return _celestial_level
+
+
+func jelly_level() -> int:
+	return _jelly_level
+
+
+func display_color() -> Color:
+	return _display_color
 
 
 func celestial_art_key() -> String:
@@ -116,7 +148,7 @@ func blast_brightness() -> float:
 
 
 func _process(delta: float) -> void:
-	if _celestial_level >= 6:
+	if _celestial_level >= 6 or _jelly_level > 0:
 		_planet_animation_elapsed += delta
 	if _waiting_at_entrance:
 		_waiting_blink_elapsed += delta
@@ -134,6 +166,12 @@ func _draw() -> void:
 		if _waiting_at_entrance:
 			_draw_waiting_outline()
 		return
+	if _jelly_level > 0:
+		_draw_jelly()
+		_draw_symbol()
+		if _waiting_at_entrance:
+			_draw_waiting_outline()
+		return
 	var draw_color: Color = _display_color
 	if _blast_armed:
 		var alpha: float = draw_color.a
@@ -143,6 +181,102 @@ func _draw() -> void:
 	_draw_symbol()
 	if _waiting_at_entrance:
 		_draw_waiting_outline()
+
+
+func _draw_jelly() -> void:
+	var texture: Texture2D = JellyOrbArt.preview_texture_for(
+		_jelly_color_index,
+		_jelly_level
+	)
+	draw_texture_rect(
+		texture,
+		Rect2(Vector2.ONE * -_radius, Vector2.ONE * _radius * 2.0),
+		false,
+		Color(1.0, 1.0, 1.0, _display_color.a)
+	)
+	_draw_jelly_face()
+	if _blast_armed:
+		_draw_blast_rim(_radius * 0.96, _display_color)
+
+
+func _draw_jelly_face() -> void:
+	var level_index: int = _jelly_level - 1
+	var eye_size: float = clampf(3.8 + float(level_index) * 0.75, 3.8, 7.6)
+	var eye_y: float = -0.12 * _radius
+	var spacing: float = 0.30 * _radius
+	if _jelly_level >= 7:
+		for sign_value: float in [-1.0, 1.0]:
+			draw_arc(
+				Vector2(sign_value * spacing, eye_y + 2.0),
+				eye_size + 2.5,
+				PI + 0.22,
+				TAU - 0.22,
+				18,
+				JELLY_FACE_COLOR,
+				4.0,
+				true
+			)
+		draw_circle(
+			Vector2(-0.48 * _radius, 0.11 * _radius),
+			7.5,
+			Color(1.0, 0.373, 0.529, 0.52 * _display_color.a)
+		)
+		draw_circle(
+			Vector2(0.48 * _radius, 0.11 * _radius),
+			7.5,
+			Color(1.0, 0.373, 0.529, 0.52 * _display_color.a)
+		)
+		draw_arc(
+			Vector2(0.0, 0.12 * _radius),
+			0.105 * _radius,
+			0.16,
+			PI - 0.16,
+			18,
+			JELLY_FACE_COLOR,
+			4.0,
+			true
+		)
+		return
+	var blink: bool = sin(_planet_animation_elapsed * 2.35 + float(_jelly_color_index) * 0.91) > 0.985
+	var half_width: float = eye_size * 0.72
+	var half_height: float = eye_size * lerpf(1.08, 1.42, float(level_index) / 6.0)
+	for sign_value: float in [-1.0, 1.0]:
+		var center: Vector2 = Vector2(sign_value * spacing, eye_y)
+		if blink:
+			draw_line(
+				center - Vector2(eye_size, 0.0),
+				center + Vector2(eye_size, 0.0),
+				JELLY_FACE_COLOR,
+				3.0,
+				true
+			)
+		else:
+			_draw_jelly_capsule_eye(center, half_width, half_height)
+			draw_circle(
+				center + Vector2(-0.28 * half_width, -0.40 * half_height),
+				maxf(1.0, 0.27 * half_width),
+				Color(1.0, 1.0, 1.0, 0.88 * _display_color.a)
+			)
+
+
+func _draw_jelly_capsule_eye(
+	center: Vector2,
+	half_width: float,
+	half_height: float
+) -> void:
+	var inner_height: float = maxf(0.0, half_height - half_width)
+	draw_rect(
+		Rect2(
+			center.x - half_width,
+			center.y - inner_height,
+			half_width * 2.0,
+			inner_height * 2.0
+		),
+		JELLY_FACE_COLOR,
+		true
+	)
+	draw_circle(center - Vector2(0.0, inner_height), half_width, JELLY_FACE_COLOR)
+	draw_circle(center + Vector2(0.0, inner_height), half_width, JELLY_FACE_COLOR)
 
 
 func _draw_celestial() -> void:
@@ -743,11 +877,15 @@ func _draw_symbol() -> void:
 		OrbSymbols.SYMBOL_ALPHA * _display_color.a
 	)
 	var scale_factor: float = _radius * OrbSymbols.SYMBOL_SIZE_FACTOR
+	var symbol_offset: Vector2 = Vector2.ZERO
+	if _jelly_level > 0:
+		scale_factor *= 0.42
+		symbol_offset = Vector2(0.0, _radius * 0.54)
 	for normalized_polygon: PackedVector2Array in _symbol_polygons:
 		var scaled_polygon: PackedVector2Array = PackedVector2Array()
 		for point: Vector2 in normalized_polygon:
-			scaled_polygon.append(point * scale_factor)
-		if _celestial_level > 0:
+			scaled_polygon.append(point * scale_factor + symbol_offset)
+		if _celestial_level > 0 or _jelly_level > 0:
 			var outline_width: float = maxf(1.5, _radius * 0.035)
 			var outline_color: Color = OrbSymbols.OUTLINE_COLOR
 			outline_color.a *= _display_color.a
@@ -768,4 +906,9 @@ func _with_alpha(color_value: Color, alpha: float) -> Color:
 
 
 func _update_processing() -> void:
-	set_process(_waiting_at_entrance or _blast_armed or _celestial_level >= 6)
+	set_process(
+		_waiting_at_entrance
+		or _blast_armed
+		or _celestial_level >= 6
+		or _jelly_level > 0
+	)

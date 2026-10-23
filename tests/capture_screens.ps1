@@ -111,7 +111,8 @@ $expectedFiles = @(
 	"53_jelly_look_crowded.png",
 	"53_jelly_look_absorption.png",
 	"53_jelly_look_max.png",
-	"53_jelly_look_stretch.png"
+	"53_jelly_look_stretch.png",
+	"53_jelly_look_unlock.png"
 )
 $hudExpectedFiles = @(
     "02_turn_early.png",
@@ -138,7 +139,8 @@ $hudExpectedFiles = @(
 	"53_jelly_look_crowded.png",
 	"53_jelly_look_absorption.png",
 	"53_jelly_look_max.png",
-	"53_jelly_look_stretch.png"
+	"53_jelly_look_stretch.png",
+	"53_jelly_look_unlock.png"
 )
 $capturedFileCount = 0
 $boardReports = @()

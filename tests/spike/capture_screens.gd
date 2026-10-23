@@ -109,6 +109,7 @@ const CAPTURE_FILES: Array[String] = [
 	"53_jelly_look_absorption.png",
 	"53_jelly_look_max.png",
 	"53_jelly_look_stretch.png",
+	"53_jelly_look_unlock.png",
 ]
 const HUD_CAPTURE_FILES: Array[String] = [
 	"02_turn_early.png",
@@ -136,6 +137,7 @@ const HUD_CAPTURE_FILES: Array[String] = [
 	"53_jelly_look_absorption.png",
 	"53_jelly_look_max.png",
 	"53_jelly_look_stretch.png",
+	"53_jelly_look_unlock.png",
 ]
 
 var _failed: bool = false
@@ -1472,9 +1474,33 @@ func _capture_jelly_look(main: Main, board: Board3D) -> void:
 		stretch_orb.linear_velocity = stretch_directions[index] * 1100.0
 		stretch_orb._process(0.0)
 	await _capture("53_jelly_look_stretch.png")
-	print("SCREEN_CAPTURE_CHECK scene=jelly_look levels=7 crowded=25 absorption=true max=true stretch=true")
 	_clear_capture_board(board)
 	feedback.clear_effects()
+
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	if hud._callout_tween != null and hud._callout_tween.is_valid():
+		hud._callout_tween.kill()
+	hud._hide_callout_label()
+	hud._planet_unlock_seen.erase(OrbTypes.OrbColor.PURPLE)
+	hud._preview_unlock_seen.erase(OrbTypes.OrbColor.PURPLE)
+	hud._on_preview_changed([
+		[{"color": OrbTypes.OrbColor.PURPLE, "level": 2}],
+		[{"color": OrbTypes.OrbColor.BLUE, "level": 1}],
+	])
+	hud._on_planet_unlocked(OrbTypes.OrbColor.PURPLE)
+	await get_tree().create_timer(0.08).timeout
+	var next_jelly: OrbVisual = hud._next_preview.get_child(0) as OrbVisual
+	if hud._callout_label.text != "새 젤리 — 보라":
+		_fail("JELLY unlock capture must use the new jelly wording")
+	if hud._planet_callout_visual.jelly_level() != Hud.PLANET_UNLOCK_ORB_LEVEL:
+		_fail("JELLY unlock capture must use jelly callout art")
+	if next_jelly.jelly_level() != 2 or next_jelly.celestial_level() != 0:
+		_fail("JELLY unlock capture NEXT must use jelly preview art")
+	await _capture("53_jelly_look_unlock.png")
+	print("SCREEN_CAPTURE_CHECK scene=jelly_look levels=7 crowded=25 absorption=true max=true stretch=true unlock=jelly")
+	if hud._callout_tween != null and hud._callout_tween.is_valid():
+		hud._callout_tween.kill()
+	hud._hide_callout_label()
 
 
 func _clear_capture_board(board: Board3D) -> void:

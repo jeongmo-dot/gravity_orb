@@ -34,6 +34,70 @@ func test_jelly_orb_uses_face_shader_without_planet_adornment() -> void:
 	Config.data.game_mode = original_mode
 
 
+func test_max_face_projects_smile_below_eyes_and_rotates_with_gravity() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var board: Board3D = await _create_board()
+	var orb: Orb3D = board.spawn_orb(0, 7, Vector2.ZERO)
+	var material: ShaderMaterial = orb._face.material_override as ShaderMaterial
+	var eye_center: Vector2 = Vector2(
+		0.0,
+		float(material.get_shader_parameter("max_eye_y"))
+	)
+	var smile_center: Vector2 = Vector2(
+		0.0,
+		float(material.get_shader_parameter("max_smile_y"))
+	)
+	orb.set_gravity(Vector2i.DOWN, Config.data.gravity_strength)
+	var down_eyes: Vector2 = _face_point_on_screen(
+		eye_center,
+		orb._jelly_face_target_rotation
+	)
+	var down_smile: Vector2 = _face_point_on_screen(
+		smile_center,
+		orb._jelly_face_target_rotation
+	)
+	var normal_material: ShaderMaterial = JellyOrbArt.face_material_for(0, 3)
+	var down_highlight: Vector2 = _face_point_on_screen(
+		Vector2(-0.285, float(normal_material.get_shader_parameter("highlight_y"))),
+		orb._jelly_face_target_rotation
+	)
+	assert_true(down_smile.y > down_eyes.y, "down gravity puts MAX smile below eyes")
+	assert_true(
+		down_highlight.y < down_eyes.y,
+		"down gravity keeps reflection above the eyes"
+	)
+	assert_true(down_highlight.x < down_eyes.x, "reflection stays on the left")
+	orb.set_gravity(Vector2i.RIGHT, Config.data.gravity_strength)
+	var right_eyes: Vector2 = _face_point_on_screen(
+		eye_center,
+		orb._jelly_face_target_rotation
+	)
+	var right_smile: Vector2 = _face_point_on_screen(
+		smile_center,
+		orb._jelly_face_target_rotation
+	)
+	assert_true(
+		right_smile.x > right_eyes.x,
+		"right gravity rotates the smile to the right of the eyes"
+	)
+
+	assert_near(
+		float(material.get_shader_parameter("max_eye_y")),
+		JellyOrbArt.MAX_EYE_CENTER_Y,
+		0.0001,
+		"MAX shader uses tested eye center"
+	)
+	assert_near(
+		float(material.get_shader_parameter("max_smile_y")),
+		JellyOrbArt.MAX_SMILE_CENTER_Y,
+		0.0001,
+		"MAX shader uses tested smile center"
+	)
+	await _cleanup(board)
+	Config.data.game_mode = original_mode
+
+
 func test_jelly_stretch_is_enabled_when_planet_stretch_setting_is_off() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_stretch: bool = Config.data.fx_orb_stretch_enabled
@@ -153,3 +217,7 @@ func _cleanup(node: Node) -> void:
 	if is_instance_valid(node):
 		node.queue_free()
 	await tree.process_frame
+
+
+func _face_point_on_screen(point: Vector2, face_rotation: float) -> Vector2:
+	return point.rotated(-face_rotation)

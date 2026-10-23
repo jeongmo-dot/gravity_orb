@@ -40,6 +40,10 @@ const PLANET_NAMES: Dictionary = {
 	OrbTypes.OrbColor.PURPLE: "해왕성",
 	OrbTypes.OrbColor.CYAN: "수성",
 }
+const JELLY_NAMES: Dictionary = {
+	OrbTypes.OrbColor.PURPLE: "보라",
+	OrbTypes.OrbColor.CYAN: "주황",
+}
 const TIMER_NORMAL_COLOR: Color = Color("#E8EEFF")
 const TIMER_DANGER_COLOR: Color = Color("#FF3B30")
 const TIMER_BONUS_COLOR: Color = Color("#30D158")
@@ -570,11 +574,15 @@ func _track_preview_unlocks(batches: Array) -> void:
 			_preview_unlock_seen[color_index] = true
 			_preview_unlock_flash_history.append(color_index)
 			if Config.data.fx_callouts_enabled:
-				_flash_preview_slot(batch_index, color_index)
+				_flash_preview_slot(
+					batch_index,
+					color_index,
+					int(candidate.get("level", 1))
+				)
 			break
 
 
-func _flash_preview_slot(batch_index: int, color_index: int) -> void:
+func _flash_preview_slot(batch_index: int, color_index: int, level: int) -> void:
 	var flash: ReferenceRect = (
 		_next_preview_flash if batch_index == 0 else _then_preview_flash
 	)
@@ -583,7 +591,11 @@ func _flash_preview_slot(batch_index: int, color_index: int) -> void:
 	)
 	if active_tween != null and active_tween.is_valid():
 		active_tween.kill()
-	flash.border_color = Config.data.color_display[color_index]
+	flash.border_color = (
+		JellyOrbArt.color_for(color_index, level)
+		if Config.data.game_mode == GameConfig.GameMode.JELLY
+		else Config.data.color_display[color_index]
+	)
 	flash.modulate = Color.WHITE
 	flash.visible = true
 	var tween: Tween = create_tween()
@@ -641,13 +653,22 @@ func _render_preview(preview_root: Node2D, batch: Array) -> void:
 			preview_root.add_child(visual)
 		visual.visible = true
 		var preview_level: int = int(candidate["level"])
-		visual.setup_celestial_preview(
-			Config.data.color_display[int(candidate["color"])],
-			radius,
-			preview_level,
-			int(candidate["color"]),
-			Config.data.orb_symbols_enabled
-		)
+		var preview_color: int = int(candidate["color"])
+		if Config.data.game_mode == GameConfig.GameMode.JELLY:
+			visual.setup_jelly_preview(
+				preview_color,
+				radius,
+				preview_level,
+				Config.data.orb_symbols_enabled
+			)
+		else:
+			visual.setup_celestial_preview(
+				Config.data.color_display[preview_color],
+				radius,
+				preview_level,
+				preview_color,
+				Config.data.orb_symbols_enabled
+			)
 		visual.set_blast_armed(
 			Config.data.blast_enabled
 			and preview_level >= Config.data.active_blast_min_level(),
@@ -1387,7 +1408,12 @@ func _show_callout(text: String, stage_index: int = 0) -> void:
 
 
 func _on_planet_unlocked(color_index: int) -> void:
-	if not PLANET_NAMES.has(color_index) or _planet_unlock_seen.has(color_index):
+	var names: Dictionary = (
+		JELLY_NAMES
+		if Config.data.game_mode == GameConfig.GameMode.JELLY
+		else PLANET_NAMES
+	)
+	if not names.has(color_index) or _planet_unlock_seen.has(color_index):
 		return
 	_planet_unlock_seen[color_index] = true
 	_planet_unlock_history.append(color_index)
@@ -1409,8 +1435,15 @@ func _show_planet_unlock(color_index: int) -> void:
 	if _callout_tween != null and _callout_tween.is_valid():
 		_callout_tween.kill()
 	_stop_sparkles(_callout_sparkles)
-	var text: String = "새 행성 — %s" % str(PLANET_NAMES[color_index])
-	var display_color: Color = Config.data.color_display[color_index]
+	var jelly_mode: bool = Config.data.game_mode == GameConfig.GameMode.JELLY
+	var names: Dictionary = JELLY_NAMES if jelly_mode else PLANET_NAMES
+	var noun: String = "젤리" if jelly_mode else "행성"
+	var text: String = "새 %s — %s" % [noun, str(names[color_index])]
+	var display_color: Color = (
+		JellyOrbArt.color_for(color_index, PLANET_UNLOCK_ORB_LEVEL)
+		if jelly_mode
+		else Config.data.color_display[color_index]
+	)
 	_callout_label.text = text
 	_callout_label.add_theme_color_override("font_color", display_color)
 	_callout_label.add_theme_color_override(
@@ -1423,13 +1456,21 @@ func _show_planet_unlock(color_index: int) -> void:
 	_callout_label.modulate = Color.WHITE
 	_callout_label.position = _callout_base_position
 	_callout_label.scale = Vector2.ONE * 0.90
-	_planet_callout_visual.setup_celestial_preview(
-		display_color,
-		Config.data.radius_for_level(PLANET_UNLOCK_ORB_LEVEL),
-		PLANET_UNLOCK_ORB_LEVEL,
-		color_index,
-		Config.data.orb_symbols_enabled
-	)
+	if jelly_mode:
+		_planet_callout_visual.setup_jelly_preview(
+			color_index,
+			Config.data.radius_for_level(PLANET_UNLOCK_ORB_LEVEL),
+			PLANET_UNLOCK_ORB_LEVEL,
+			Config.data.orb_symbols_enabled
+		)
+	else:
+		_planet_callout_visual.setup_celestial_preview(
+			display_color,
+			Config.data.radius_for_level(PLANET_UNLOCK_ORB_LEVEL),
+			PLANET_UNLOCK_ORB_LEVEL,
+			color_index,
+			Config.data.orb_symbols_enabled
+		)
 	_layout_planet_callout_visual(text)
 	_planet_callout_visual.visible = true
 	_planet_callout_visual.modulate = Color.WHITE
