@@ -104,6 +104,12 @@ const CAPTURE_FILES: Array[String] = [
 	"52_new_planet_callout.png",
 	"52_jelly_final_move.png",
 	"53_jelly_blast_j5.png",
+	"53_jelly_look_levels.png",
+	"53_jelly_look_crowded.png",
+	"53_jelly_look_absorption.png",
+	"53_jelly_look_max.png",
+	"53_jelly_look_stretch.png",
+	"53_jelly_look_unlock.png",
 ]
 const HUD_CAPTURE_FILES: Array[String] = [
 	"02_turn_early.png",
@@ -126,6 +132,12 @@ const HUD_CAPTURE_FILES: Array[String] = [
 	"52_new_planet_callout.png",
 	"52_jelly_final_move.png",
 	"53_jelly_blast_j5.png",
+	"53_jelly_look_levels.png",
+	"53_jelly_look_crowded.png",
+	"53_jelly_look_absorption.png",
+	"53_jelly_look_max.png",
+	"53_jelly_look_stretch.png",
+	"53_jelly_look_unlock.png",
 ]
 
 var _failed: bool = false
@@ -151,6 +163,7 @@ func _run_capture_suite() -> void:
 	Config.data.rng_seed = CAPTURE_SEED
 	Config.data.fx_hitstop_enabled = false
 	CelestialOrbArt.freeze_animation_for_capture()
+	JellyOrbArt.freeze_animation_for_capture()
 
 	if not _hud_scenes_only:
 		await _capture_start_screen()
@@ -187,6 +200,7 @@ func _run_capture_suite() -> void:
 	_verify_user_save_unchanged()
 	_remove_file(_temp_save_path)
 	CelestialOrbArt.unfreeze_animation()
+	JellyOrbArt.unfreeze_animation()
 	get_tree().quit(1 if _failed else 0)
 
 
@@ -368,7 +382,8 @@ func _capture_turn_scenes() -> void:
 	print("SCREEN_CAPTURE_CHECK scene=jelly_blast_j5 l4=unarmed l5=armed")
 	board.remove_orb(jelly_level_four)
 	board.remove_orb(jelly_level_five)
-	Config.data.jelly_blast_min_level = 0
+	await _capture_jelly_look(main, board)
+	Config.data.jelly_blast_min_level = 5
 	Config.data.game_mode = GameConfig.GameMode.TURN
 	manager.blocked_directions.clear()
 	hud._on_warning_changed(manager.blocked_directions)
@@ -1384,6 +1399,120 @@ func _capture_crowded_blast_pair(
 		]
 	)
 	await _destroy_main(main)
+
+
+func _capture_jelly_look(main: Main, board: Board3D) -> void:
+	var feedback: FeedbackDirector = main.get_node("FeedbackDirector") as FeedbackDirector
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	feedback.clear_effects()
+	_clear_capture_board(board)
+	var level_positions: Array[Vector2] = [
+		Vector2(-330.0, -230.0), Vector2(-225.0, -230.0),
+		Vector2(-100.0, -225.0), Vector2(45.0, -215.0),
+		Vector2(220.0, -195.0), Vector2(-155.0, 105.0),
+		Vector2(135.0, 120.0),
+	]
+	for index: int in range(level_positions.size()):
+		var orb: Orb3D = board.spawn_orb(index % JellyOrbArt.PALETTE.size(), index + 1, level_positions[index])
+		orb.disable_physics()
+	await _capture("53_jelly_look_levels.png")
+
+	_clear_capture_board(board)
+	var crowded_coordinates: Array[float] = [-320.0, -160.0, 0.0, 160.0, 320.0]
+	var orb_index: int = 0
+	for y: float in crowded_coordinates:
+		for x: float in crowded_coordinates:
+			var crowded_orb: Orb3D = board.spawn_orb(
+				orb_index % JellyOrbArt.PALETTE.size(),
+				1 + orb_index % 3,
+				Vector2(x, y)
+			)
+			crowded_orb.disable_physics()
+			orb_index += 1
+	await _capture("53_jelly_look_crowded.png")
+
+	_clear_capture_board(board)
+	var absorber: Orb3D = board.spawn_orb(2, 4, Vector2(115.0, 0.0))
+	absorber.disable_physics()
+	feedback.play_reaction_visuals({
+		"type": ReactionRules.Type.MERGE,
+		"position": Vector2(115.0, 0.0),
+		"result_level": 4,
+		"result_color": 2,
+		"result_orb": absorber,
+		"jelly_absorption": true,
+		"source_positions": [Vector2(-180.0, 0.0), Vector2(115.0, 0.0)],
+		"source_radii": [Config.data.radius_for_level(3), Config.data.radius_for_level(4)],
+		"levels": [3, 4],
+		"colors": [2, 2],
+	})
+	await get_tree().create_timer(0.035).timeout
+	await _capture("53_jelly_look_absorption.png")
+
+	feedback.clear_effects()
+	_clear_capture_board(board)
+	var max_orb: Orb3D = board.spawn_orb(4, 7, Vector2.ZERO)
+	max_orb.disable_physics()
+	feedback.play_reaction_visuals({
+		"type": ReactionRules.Type.MERGE,
+		"position": Vector2.ZERO,
+		"result_level": 7,
+		"result_color": 4,
+		"result_orb": max_orb,
+		"levels": [6, 6],
+		"colors": [4, 4],
+	})
+	hud._on_preview_changed([
+		[{"color": OrbTypes.OrbColor.PURPLE, "level": 7}],
+		[{"color": OrbTypes.OrbColor.RED, "level": 7}],
+	])
+	await get_tree().create_timer(0.16).timeout
+	var max_preview: OrbVisual = hud._next_preview.get_child(0) as OrbVisual
+	if max_preview.jelly_level() != 7 or max_preview.celestial_level() != 0:
+		_fail("JELLY MAX capture NEXT must use the 2D MAX jelly face")
+	await _capture("53_jelly_look_max.png")
+
+	feedback.clear_effects()
+	_clear_capture_board(board)
+	var stretch_directions: Array[Vector2] = [Vector2.RIGHT, Vector2.DOWN, Vector2(-1.0, -0.55).normalized()]
+	var stretch_positions: Array[Vector2] = [Vector2(-240.0, 0.0), Vector2.ZERO, Vector2(240.0, 0.0)]
+	for index: int in range(stretch_positions.size()):
+		var stretch_orb: Orb3D = board.spawn_orb(index, 3 + index, stretch_positions[index])
+		stretch_orb.disable_physics()
+		stretch_orb.linear_velocity = stretch_directions[index] * 1100.0
+		stretch_orb._process(0.0)
+	await _capture("53_jelly_look_stretch.png")
+	_clear_capture_board(board)
+	feedback.clear_effects()
+
+	if hud._callout_tween != null and hud._callout_tween.is_valid():
+		hud._callout_tween.kill()
+	hud._hide_callout_label()
+	hud._planet_unlock_seen.erase(OrbTypes.OrbColor.PURPLE)
+	hud._preview_unlock_seen.erase(OrbTypes.OrbColor.PURPLE)
+	hud._on_preview_changed([
+		[{"color": OrbTypes.OrbColor.PURPLE, "level": 2}],
+		[{"color": OrbTypes.OrbColor.BLUE, "level": 1}],
+	])
+	hud._on_planet_unlocked(OrbTypes.OrbColor.PURPLE)
+	await get_tree().create_timer(0.08).timeout
+	var next_jelly: OrbVisual = hud._next_preview.get_child(0) as OrbVisual
+	if hud._callout_label.text != "새 젤리 — 보라":
+		_fail("JELLY unlock capture must use the new jelly wording")
+	if hud._planet_callout_visual.jelly_level() != Hud.PLANET_UNLOCK_ORB_LEVEL:
+		_fail("JELLY unlock capture must use jelly callout art")
+	if next_jelly.jelly_level() != 2 or next_jelly.celestial_level() != 0:
+		_fail("JELLY unlock capture NEXT must use jelly preview art")
+	await _capture("53_jelly_look_unlock.png")
+	print("SCREEN_CAPTURE_CHECK scene=jelly_look levels=7 crowded=25 absorption=true max=true stretch=true unlock=jelly")
+	if hud._callout_tween != null and hud._callout_tween.is_valid():
+		hud._callout_tween.kill()
+	hud._hide_callout_label()
+
+
+func _clear_capture_board(board: Board3D) -> void:
+	for orb: Orb3D in board.get_orbs().duplicate():
+		board.remove_orb(orb)
 
 
 func _populate_crowded_board(board: Board3D) -> Array[Dictionary]:

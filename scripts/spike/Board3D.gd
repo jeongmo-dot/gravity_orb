@@ -588,6 +588,8 @@ func _complete_ghost(orb: Orb3D, timed_out: bool) -> void:
 
 
 func _on_orb_body_entered(other_body: Node, orb: Orb3D) -> void:
+	if not orb.consumed:
+		orb.play_jelly_impact(clampf(orb.linear_velocity.length() / 1100.0, 0.18, 1.0))
 	var other: Orb3D = other_body.get_parent() as Orb3D
 	if other == null or orb.consumed or other.consumed:
 		return

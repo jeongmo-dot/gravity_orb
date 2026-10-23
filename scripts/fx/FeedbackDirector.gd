@@ -159,7 +159,19 @@ func play_reaction_visuals(reaction: Dictionary) -> void:
 		return
 	var level: int = _effect_level(reaction)
 	var intensity: float = FINALE_INTENSITY if finale else 1.0
-	_play_blast_feedback(reaction, level, intensity)
+	if (
+		Config.data.game_mode == GameConfig.GameMode.JELLY
+		and reaction_type == ReactionRules.Type.MAX_CLEAR
+	):
+		var jackpot_origin: Vector2 = reaction.get("position", Vector2.ZERO) as Vector2
+		var jackpot_color: int = int(reaction.get("result_color", 0))
+		_create_jelly_max_feedback(
+			jackpot_origin,
+			_display_color(jackpot_color, Config.data.orb_max_level),
+			Config.data.radius_for_level(Config.data.orb_max_level) / Orb3D.PIXELS_PER_METER
+		)
+	else:
+		_play_blast_feedback(reaction, level, intensity)
 	if reaction_type == ReactionRules.Type.MAX_CLEAR:
 		_play_color_effect_visual(reaction, COLOR_JACKPOT_INTENSITY)
 	if not finale and _hitstop_enabled_for_mode():
@@ -378,7 +390,9 @@ func _play_merge_feedback(reaction: Dictionary) -> void:
 		var color_mode: GameConfig.ShockMode = color_effect_mode_for_color(
 			int(reaction.get("result_color", 0))
 		)
-		if (
+		if Config.data.game_mode == GameConfig.GameMode.JELLY:
+			result_orb.play_visual_punch(1.0, 0.18)
+		elif (
 			_color_effect_visuals_enabled()
 			and color_mode == GameConfig.ShockMode.PULL
 			and result_orb.has_method("play_visual_pull_punch")
@@ -389,7 +403,7 @@ func _play_merge_feedback(reaction: Dictionary) -> void:
 	if not Config.data.fx_enabled or _camera == null:
 		return
 	var color_index: int = int(reaction.get("result_color", 0))
-	var color_value: Color = Config.data.color_display[color_index]
+	var color_value: Color = _display_color(color_index, int(reaction.get("result_level", 1)))
 	var origin: Vector2 = reaction.get("position", Vector2.ZERO) as Vector2
 	var result_level: int = clampi(
 		int(reaction.get("result_level", 2)),
@@ -399,7 +413,31 @@ func _play_merge_feedback(reaction: Dictionary) -> void:
 	var result_radius_m: float = (
 		Config.data.radius_for_level(result_level) / Orb3D.PIXELS_PER_METER
 	)
-	if result_level <= 5:
+	if is_instance_valid(result_orb) and result_orb.has_method("get_current_radius"):
+		result_radius_m = float(result_orb.get_current_radius()) / Orb3D.PIXELS_PER_METER
+	if Config.data.game_mode == GameConfig.GameMode.JELLY:
+		_create_particles(
+			origin,
+			color_value,
+			MERGE_STARDUST_COUNT,
+			1.0,
+			"JellyMergeStardust",
+			"stardust"
+		)
+		if bool(reaction.get("jelly_absorption", false)):
+			_create_jelly_absorption_trails(reaction, origin)
+		if result_level >= Config.data.orb_max_level:
+			_create_jelly_max_feedback(origin, color_value, result_radius_m)
+		elif not _color_effect_visuals_enabled():
+			_create_ring(
+				origin,
+				color_value.lightened(0.34),
+				result_radius_m * 2.0,
+				0.0,
+				MERGE_RING_DURATION,
+				result_radius_m
+			)
+	elif result_level <= 5:
 		_create_particles(
 			origin,
 			color_value,
@@ -478,6 +516,87 @@ func _create_birth_feedback(
 	_start_reaction_shake(4, 0.5)
 
 
+func _create_jelly_max_feedback(
+	origin: Vector2,
+	color_value: Color,
+	radius_m: float
+) -> void:
+	_create_particles(
+		origin,
+		Color.WHITE,
+		WHITE_SPARK_COUNT,
+		1.15,
+		"JellyMaxSparkle",
+		"stars"
+	)
+	_create_ring(
+		origin,
+		Color.WHITE,
+		radius_m * 2.35,
+		0.0,
+		BIRTH_NOVA_DURATION,
+		radius_m * 0.92
+	)
+	_create_glow(
+		origin,
+		Color.WHITE,
+		color_value,
+		radius_m * 2.0,
+		0.0,
+		BIRTH_NOVA_DURATION,
+		radius_m * 0.72,
+		"JellyMaxRimPulse"
+	)
+
+
+func _create_jelly_absorption_trails(reaction: Dictionary, target: Vector2) -> void:
+	var positions: Array = reaction.get("source_positions", []) as Array
+	var radii: Array = reaction.get("source_radii", []) as Array
+	var colors: Array = reaction.get("colors", []) as Array
+	var levels: Array = reaction.get("levels", []) as Array
+	for index: int in range(mini(positions.size(), radii.size())):
+		var start: Vector2 = positions[index] as Vector2
+		if start.distance_squared_to(target) < 1.0:
+			continue
+		var color_index: int = int(colors[index]) if index < colors.size() else 0
+		var source_level: int = int(levels[index]) if index < levels.size() else 1
+		_create_jelly_absorption_trail(
+			start,
+			target,
+			float(radii[index]) / Orb3D.PIXELS_PER_METER,
+			_display_color(color_index, source_level)
+		)
+
+
+func _create_jelly_absorption_trail(
+	start: Vector2,
+	target: Vector2,
+	radius_m: float,
+	color_value: Color
+) -> void:
+	var glow: MeshInstance3D = _acquire_blast_effect("glow") as MeshInstance3D
+	glow.name = "JellyAbsorptionTrail"
+	glow.position = Orb3D.plane_position_to_world(start, -0.22)
+	glow.scale = Vector3.ONE * radius_m
+	var material: ShaderMaterial = glow.material_override as ShaderMaterial
+	material.set_shader_parameter("inner_color", color_value.lightened(0.34))
+	material.set_shader_parameter("outer_color", color_value)
+	material.set_shader_parameter("effect_alpha", 0.82)
+	material.set_shader_parameter("noise_seed", float(_effects.size() % 11) * 0.37)
+	_effects.append({
+		"node": glow,
+		"kind": "glow",
+		"elapsed": 0.0,
+		"duration": 0.24,
+		"delay": 0.0,
+		"start_scale": radius_m,
+		"end_scale": radius_m * 0.36,
+		"material": material,
+		"motion_start": start,
+		"motion_target": target,
+	})
+
+
 func _play_color_effect_visual(
 	reaction: Dictionary,
 	visual_intensity: float = 1.0
@@ -528,7 +647,7 @@ func _play_color_effect_visual(
 	effect.play(
 		color_mode,
 		reaction.get("position", Vector2.ZERO) as Vector2,
-		Config.data.color_display[color_index],
+		_display_color(color_index, level),
 		result_radius_px,
 		effect_radius_px,
 		visual_intensity * strength_scale,
@@ -656,9 +775,9 @@ func _play_blast_feedback(
 	var nebula_inner: Color = mixed_color
 	var nebula_outer: Color = mixed_color
 	if not colors.is_empty():
-		nebula_inner = Config.data.color_display[int(colors[0])]
+		nebula_inner = _display_color(int(colors[0]), level)
 	if colors.size() > 1:
-		nebula_outer = Config.data.color_display[int(colors[1])]
+		nebula_outer = _display_color(int(colors[1]), level)
 	_create_ring(origin, Color.WHITE, radius_m, 0.0, BLAST_RING_DURATION)
 	_create_ring(
 		origin,
@@ -671,7 +790,7 @@ func _play_blast_feedback(
 		var color_index: int = int(color_value)
 		_create_particles(
 			origin,
-			Config.data.color_display[color_index],
+			_display_color(color_index, level),
 			maxi(roundi(float(Config.data.fx_debris_per_orb) * intensity), 1),
 			level_scale,
 			"BlastDebris",
@@ -1383,6 +1502,11 @@ func _update_effect(effect: Dictionary, progress: float) -> void:
 		flash.color = flash_color
 	elif kind == "glow":
 		var glow: MeshInstance3D = effect["node"] as MeshInstance3D
+		if effect.has("motion_start"):
+			var start: Vector2 = effect["motion_start"] as Vector2
+			var target: Vector2 = effect["motion_target"] as Vector2
+			var eased: float = 1.0 - pow(1.0 - progress, 3.0)
+			glow.position = Orb3D.plane_position_to_world(start.lerp(target, eased), -0.22)
 		var glow_radius: float = lerpf(
 			float(effect["start_scale"]),
 			float(effect["end_scale"]),
@@ -1449,12 +1573,18 @@ func _mixed_color(colors: Array) -> Color:
 	var green: float = 0.0
 	var blue: float = 0.0
 	for color_value: Variant in colors:
-		var display: Color = Config.data.color_display[int(color_value)]
+		var display: Color = _display_color(int(color_value), 1)
 		red += display.r
 		green += display.g
 		blue += display.b
 	var divisor: float = float(colors.size())
 	return Color(red / divisor, green / divisor, blue / divisor, 1.0)
+
+
+func _display_color(color_index: int, level: int = 1) -> Color:
+	if Config.data.game_mode == GameConfig.GameMode.JELLY:
+		return JellyOrbArt.color_for(color_index, level)
+	return Config.data.color_display[color_index]
 
 
 func _particle_gravity() -> Vector3:

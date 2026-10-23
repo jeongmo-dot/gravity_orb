@@ -6,6 +6,10 @@ const STRETCH_SPEED_MIN: float = 700.0
 const STRETCH_SPEED_MAX: float = 1100.0
 const STRETCH_ALONG_SCALE: float = 1.15
 const STRETCH_PERPENDICULAR_SCALE: float = 0.92
+const JELLY_STRETCH_ALONG_SCALE: float = 1.19
+const JELLY_STRETCH_PERPENDICULAR_SCALE: float = 0.90
+const JELLY_BREATHE_AMOUNT: float = 0.018
+const JELLY_FACE_TURN_SPEED: float = 2.4
 
 static var _shared_physics_materials: Dictionary = {}
 static var _shared_shapes: Dictionary = {}
@@ -16,6 +20,7 @@ static var _shared_meshes: Dictionary = {}
 @onready var _mesh: MeshInstance3D = %Mesh
 @onready var _adornment: MeshInstance3D = %Adornment
 @onready var _blast_outline: MeshInstance3D = %BlastOutline
+@onready var _face: MeshInstance3D = %Face
 @onready var _symbol_mesh: MeshInstance3D = %Symbol
 
 var color: int = 0
@@ -51,6 +56,15 @@ var _visual_punch_scale: Vector3 = Vector3.ONE:
 var _render_clamp_enabled: bool = true
 var _radius_resources_are_unique: bool = false
 var _visual_alpha: float = 1.0
+var _is_jelly_visual: bool = false
+var _jelly_idle_elapsed: float = 0.0
+var _jelly_face_rotation: float = 0.0
+var _jelly_face_target_rotation: float = 0.0
+var _jelly_impact_tween: Tween
+var _jelly_impact_scale: Vector3 = Vector3.ONE:
+	set(value):
+		_jelly_impact_scale = value
+		_update_visual_transform()
 
 var position: Vector2:
 	get:
@@ -118,6 +132,7 @@ static func prewarm_shared_resources(cfg: GameConfig) -> void:
 		_shared_shape_for_level(cfg, level_index)
 		_shared_mesh_for_level(cfg, level_index)
 	CelestialOrbArt.prewarm(cfg)
+	JellyOrbArt.prewarm(cfg)
 	OrbSymbols.prewarm_shared_resources()
 
 
@@ -126,6 +141,7 @@ static func clear_shared_resource_cache() -> void:
 	_shared_shapes.clear()
 	_shared_meshes.clear()
 	CelestialOrbArt.clear_cache()
+	JellyOrbArt.clear_cache()
 
 
 static func shared_resource_counts() -> Dictionary:
@@ -134,6 +150,7 @@ static func shared_resource_counts() -> Dictionary:
 		"shapes": _shared_shapes.size(),
 		"meshes": _shared_meshes.size(),
 		"visual_materials": CelestialOrbArt.shared_material_count(),
+		"jelly_visual_materials": JellyOrbArt.shared_material_count(),
 		"adornment_meshes": CelestialOrbArt.shared_mesh_count(),
 	}
 
@@ -155,6 +172,11 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	level = p_level
 	jelly_mass = cfg.jelly_mass_for_level(level)
 	_visual_alpha = 1.0
+	_is_jelly_visual = cfg.game_mode == GameConfig.GameMode.JELLY
+	_jelly_idle_elapsed = 0.0
+	_jelly_face_rotation = 0.0
+	_jelly_face_target_rotation = 0.0
+	_jelly_impact_scale = Vector3.ONE
 	_blast_armed = cfg.blast_enabled_for_level(level)
 	_blast_blink_period = maxf(cfg.blast_blink_period, 0.001)
 	_blast_blink_elapsed = 0.0
@@ -185,16 +207,29 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	_collision_shape.shape = _shared_shape_for_level(cfg, level)
 	_mesh.mesh = _shared_mesh_for_level(cfg, level)
 	_radius_resources_are_unique = false
-	var celestial_material: ShaderMaterial = CelestialOrbArt.material_for(cfg, color, level)
-	_mesh.material_override = celestial_material
+	var visual_material: ShaderMaterial = (
+		JellyOrbArt.body_material_for(color, level)
+		if _is_jelly_visual
+		else CelestialOrbArt.material_for(cfg, color, level)
+	)
+	_mesh.material_override = visual_material
 	_adornment.mesh = CelestialOrbArt.billboard_mesh(1)
-	_adornment.material_override = celestial_material
-	_adornment.visible = CelestialOrbArt.has_adornment(level)
+	_adornment.material_override = visual_material
+	_adornment.visible = not _is_jelly_visual and CelestialOrbArt.has_adornment(level)
 	_blast_outline.mesh = CelestialOrbArt.billboard_mesh(2)
-	_blast_outline.material_override = celestial_material
+	_blast_outline.material_override = (
+		JellyOrbArt.outline_material_for(color, level)
+		if _is_jelly_visual
+		else visual_material
+	)
 	_blast_outline.visible = _blast_armed
+	_face.mesh = JellyOrbArt.face_mesh()
+	_face.material_override = JellyOrbArt.face_material_for(color, level)
+	_face.visible = _is_jelly_visual
+	if _is_jelly_visual:
+		_blast_outline.material_override = JellyOrbArt.outline_material_for(color, level)
 	_apply_visual_transparency()
-	if _current_radius < _radius:
+	if _is_jelly_visual or _current_radius < _radius:
 		_ensure_unique_radius_resources()
 		_apply_current_radius_to_resources(radius_m)
 	_symbol_mesh.mesh = OrbSymbols.mesh_for_color(color)
@@ -213,7 +248,16 @@ func _physics_process(delta: float) -> void:
 	_advance_blast_blink(delta)
 
 
-func _process(_delta: float) -> void:
+
+func _process(delta: float) -> void:
+	if _is_jelly_visual:
+		_jelly_idle_elapsed += maxf(delta, 0.0)
+		_jelly_face_rotation = lerp_angle(
+			_jelly_face_rotation,
+			_jelly_face_target_rotation,
+			clampf(delta * JELLY_FACE_TURN_SPEED, 0.0, 1.0)
+		)
+		JellyOrbArt.advance_animation(delta)
 	_update_visual_transform()
 
 
@@ -261,10 +305,16 @@ func set_jelly_mass(next_mass: float, cfg: GameConfig) -> void:
 		)
 	_blast_armed = cfg.blast_enabled_for_level(level)
 	_blast_outline.visible = _blast_armed
-	var celestial_material: ShaderMaterial = CelestialOrbArt.material_for(cfg, color, level)
-	_mesh.material_override = celestial_material
-	_adornment.material_override = celestial_material
-	_adornment.visible = CelestialOrbArt.has_adornment(level)
+	var visual_material: ShaderMaterial = (
+		JellyOrbArt.body_material_for(color, level)
+		if _is_jelly_visual
+		else CelestialOrbArt.material_for(cfg, color, level)
+	)
+	_mesh.material_override = visual_material
+	_adornment.material_override = visual_material
+	_adornment.visible = not _is_jelly_visual and CelestialOrbArt.has_adornment(level)
+	_face.material_override = JellyOrbArt.face_material_for(color, level)
+	_face.visible = _is_jelly_visual
 	_ensure_unique_radius_resources()
 	_apply_current_radius_to_resources(_radius / PIXELS_PER_METER)
 	_update_visual_transform()
@@ -291,7 +341,11 @@ func play_visual_punch(scale_factor: float = 1.18, duration: float = 0.14) -> vo
 	if _visual_punch_tween != null and _visual_punch_tween.is_valid():
 		_visual_punch_tween.kill()
 	var target_scale: Vector3 = Vector3.ONE * scale_factor
-	var start_scale: Vector3 = Vector3.ONE.lerp(target_scale, 0.02)
+	var start_scale: Vector3 = (
+		Vector3.ONE * 0.88
+		if _is_jelly_visual
+		else Vector3.ONE.lerp(target_scale, 0.02)
+	)
 	_visual_punch_scale = start_scale
 	_visual_punch_tween = create_tween()
 	_visual_punch_tween.set_trans(Tween.TRANS_BACK)
@@ -310,6 +364,26 @@ func play_visual_punch(scale_factor: float = 1.18, duration: float = 0.14) -> vo
 		Vector3.ONE,
 		duration * 0.55
 	)
+
+
+func play_jelly_impact(intensity: float) -> void:
+	if not _is_jelly_visual:
+		return
+	var clamped_intensity: float = clampf(intensity, 0.0, 1.0)
+	if clamped_intensity <= 0.01:
+		return
+	if _jelly_impact_tween != null and _jelly_impact_tween.is_valid():
+		_jelly_impact_tween.kill()
+	var impact_scale: Vector3 = Vector3(
+		1.0 - 0.20 * clamped_intensity,
+		1.0 + 0.18 * clamped_intensity,
+		1.0 + 0.18 * clamped_intensity
+	)
+	_jelly_impact_scale = impact_scale
+	_jelly_impact_tween = create_tween()
+	_jelly_impact_tween.set_trans(Tween.TRANS_BACK)
+	_jelly_impact_tween.set_ease(Tween.EASE_OUT)
+	_jelly_impact_tween.tween_property(self, "_jelly_impact_scale", Vector3.ONE, 0.18)
 
 
 func play_visual_pull_punch(duration: float = 0.3) -> void:
@@ -387,6 +461,8 @@ func set_gravity(direction: Vector2i, strength: float) -> void:
 	)
 	var acceleration_px: Vector2 = Vector2(direction) * level_strength
 	_body.constant_force = plane_vector_to_world(acceleration_px) * _body.mass
+	if _is_jelly_visual and direction != Vector2i.ZERO:
+		_jelly_face_target_rotation = atan2(float(direction.x), float(direction.y))
 	_body.sleeping = false
 
 
@@ -476,16 +552,26 @@ func visual_stretch_scale() -> Vector3:
 
 
 func _visual_stretch_ratio() -> float:
-	if not Config.data.fx_enabled or not Config.data.fx_orb_stretch_enabled:
+	if not Config.data.fx_enabled:
+		return 0.0
+	if not _is_jelly_visual and not Config.data.fx_orb_stretch_enabled:
 		return 0.0
 	return smoothstep(STRETCH_SPEED_MIN, STRETCH_SPEED_MAX, linear_velocity.length())
 
 
 func _stretch_scale_for_ratio(ratio: float) -> Vector3:
+	var along_scale: float = (
+		JELLY_STRETCH_ALONG_SCALE if _is_jelly_visual else STRETCH_ALONG_SCALE
+	)
+	var perpendicular_scale: float = (
+		JELLY_STRETCH_PERPENDICULAR_SCALE
+		if _is_jelly_visual
+		else STRETCH_PERPENDICULAR_SCALE
+	)
 	return Vector3(
-		lerpf(1.0, STRETCH_ALONG_SCALE, ratio),
-		lerpf(1.0, STRETCH_PERPENDICULAR_SCALE, ratio),
-		lerpf(1.0, STRETCH_PERPENDICULAR_SCALE, ratio)
+		lerpf(1.0, along_scale, ratio),
+		lerpf(1.0, perpendicular_scale, ratio),
+		lerpf(1.0, perpendicular_scale, ratio)
 	)
 
 
@@ -527,6 +613,7 @@ func _apply_visual_transparency() -> void:
 	var base_transparency: float = 1.0 - clampf(_visual_alpha, 0.0, 1.0)
 	_mesh.transparency = base_transparency
 	_adornment.transparency = base_transparency
+	_face.transparency = base_transparency
 	_blast_outline.transparency = 1.0 - clampf(
 		_visual_alpha * blast_emission_strength(),
 		0.0,
@@ -557,7 +644,11 @@ func _apply_current_radius_to_resources(radius_m: float) -> void:
 		sphere_shape.radius = radius_m
 	var sphere_mesh: SphereMesh = _mesh.mesh as SphereMesh
 	if sphere_mesh != null:
-		var visual_radius_m: float = radius_m * CelestialOrbArt.body_radius_ratio(level)
+		var visual_radius_m: float = (
+			radius_m
+			if _is_jelly_visual
+			else radius_m * CelestialOrbArt.body_radius_ratio(level)
+		)
 		sphere_mesh.radius = visual_radius_m
 		sphere_mesh.height = visual_radius_m * 2.0
 
@@ -632,11 +723,16 @@ func _update_visual_transform() -> void:
 	_mesh.position = render_world_position
 	_adornment.position = render_world_position + Vector3(0.0, 0.0, 0.001)
 	_blast_outline.position = render_world_position + Vector3(0.0, 0.0, radius_m + 0.004)
+	_face.position = render_world_position + Vector3(0.0, 0.0, radius_m + 0.006)
 	var stretch_ratio: float = _visual_stretch_ratio()
 	var stretch_scale: Vector3 = _stretch_scale_for_ratio(stretch_ratio)
-	_mesh.scale = _visual_punch_scale * stretch_scale
+	var breathe_scale: float = 1.0
+	if _is_jelly_visual and linear_velocity.length() < STRETCH_SPEED_MIN * 0.20:
+		breathe_scale += sin(_jelly_idle_elapsed * 1.8 + float(color)) * JELLY_BREATHE_AMOUNT
+	var jelly_soft_scale: Vector3 = _jelly_impact_scale * breathe_scale
+	_mesh.scale = _visual_punch_scale * stretch_scale * jelly_soft_scale
 	if stretch_ratio <= 0.0:
-		_mesh.rotation = _body.rotation
+		_mesh.rotation = Vector3.ZERO if _is_jelly_visual else _body.rotation
 	else:
 		var world_velocity: Vector3 = _body.linear_velocity
 		_mesh.rotation = Vector3(0.0, 0.0, atan2(world_velocity.y, world_velocity.x))
@@ -646,6 +742,7 @@ func _update_visual_transform() -> void:
 		CelestialOrbArt.RING_TILT_RADIANS if level == 4 else 0.0
 	)
 	_blast_outline.rotation = Vector3.ZERO
+	_face.rotation = Vector3(0.0, 0.0, _jelly_face_rotation)
 	var punch_scale: float = maxf(
 		_visual_punch_scale.x,
 		maxf(_visual_punch_scale.y, _visual_punch_scale.z)
@@ -656,7 +753,23 @@ func _update_visual_transform() -> void:
 		* punch_scale
 		* blast_pulse_scale()
 	)
-	_symbol_mesh.position = render_world_position + Vector3(0.0, 0.0, radius_m + 0.002)
+	var face_scale_m: float = radius_m * 0.62 * punch_scale
+	_face.scale = Vector3(
+		face_scale_m * stretch_scale.x * jelly_soft_scale.x,
+		face_scale_m * stretch_scale.y * jelly_soft_scale.y,
+		1.0
+	)
+	var symbol_y_offset: float = radius_m * 0.54 if _is_jelly_visual else 0.0
+	_symbol_mesh.position = (
+		render_world_position
+		+ Vector3(
+			0.0,
+			-symbol_y_offset,
+			radius_m + (0.008 if _is_jelly_visual else 0.002)
+		)
+	)
 	_symbol_mesh.rotation = Vector3.ZERO
-	var symbol_size_m: float = radius_m * OrbSymbols.SYMBOL_SIZE_FACTOR
+	var symbol_size_m: float = radius_m * OrbSymbols.SYMBOL_SIZE_FACTOR * (
+		0.42 if _is_jelly_visual else 1.0
+	)
 	_symbol_mesh.scale = Vector3(symbol_size_m, symbol_size_m, 1.0)

@@ -304,7 +304,10 @@ func test_jelly_blast_default_threshold_and_absorption_precedence() -> void:
 	cfg.blast_enabled = true
 	cfg.opposite_pairs = [Vector2i(0, 1)]
 	var default_result: Dictionary = ReactionRules.classify(0, 6, 1, 6, cfg, 32.0, 32.0)
-	assert_eq(default_result["type"], ReactionRules.Type.NONE, "J0 has no BLAST or opposite reaction")
+	assert_eq(default_result["type"], ReactionRules.Type.BLAST, "default J5 blasts L6")
+	cfg.jelly_blast_min_level = 0
+	var disabled_result: Dictionary = ReactionRules.classify(0, 6, 1, 6, cfg, 32.0, 32.0)
+	assert_eq(disabled_result["type"], ReactionRules.Type.NONE, "explicit J0 disables BLAST")
 
 	cfg.jelly_blast_min_level = 5
 	var level_four: Dictionary = ReactionRules.classify(0, 4, 1, 4, cfg, 8.0, 8.0)

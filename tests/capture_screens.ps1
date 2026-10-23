@@ -106,7 +106,13 @@ $expectedFiles = @(
 	"51_slime_max_growth.png",
 	"52_new_planet_callout.png",
 	"52_jelly_final_move.png",
-	"53_jelly_blast_j5.png"
+	"53_jelly_blast_j5.png",
+	"53_jelly_look_levels.png",
+	"53_jelly_look_crowded.png",
+	"53_jelly_look_absorption.png",
+	"53_jelly_look_max.png",
+	"53_jelly_look_stretch.png",
+	"53_jelly_look_unlock.png"
 )
 $hudExpectedFiles = @(
     "02_turn_early.png",
@@ -128,7 +134,13 @@ $hudExpectedFiles = @(
 	"46_turn_rejected.png",
 	"52_new_planet_callout.png",
 	"52_jelly_final_move.png",
-	"53_jelly_blast_j5.png"
+	"53_jelly_blast_j5.png",
+	"53_jelly_look_levels.png",
+	"53_jelly_look_crowded.png",
+	"53_jelly_look_absorption.png",
+	"53_jelly_look_max.png",
+	"53_jelly_look_stretch.png",
+	"53_jelly_look_unlock.png"
 )
 $capturedFileCount = 0
 $boardReports = @()
