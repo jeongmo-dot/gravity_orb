@@ -110,6 +110,9 @@ const CAPTURE_FILES: Array[String] = [
 	"53_jelly_look_max.png",
 	"53_jelly_look_stretch.png",
 	"53_jelly_look_unlock.png",
+	"54_jelly_shell_start.png",
+	"54_jelly_shell_ranking.png",
+	"54_jelly_shell_result.png",
 ]
 const HUD_CAPTURE_FILES: Array[String] = [
 	"02_turn_early.png",
@@ -183,6 +186,8 @@ func _run_capture_suite() -> void:
 		await _capture_slime_states()
 	if not _failed and not _hud_scenes_only:
 		await _capture_slime_shell()
+	if not _failed and not _hud_scenes_only:
+		await _capture_jelly_shell()
 	if not _failed and not _hud_scenes_only:
 		await _capture_slime_shell_play()
 	if not _failed and not _hud_scenes_only:
@@ -947,6 +952,57 @@ func _capture_slime_shell() -> void:
 	print("SCREEN_CAPTURE_CHECK scene=slime_shell cards=3 ranking=slime result=shared")
 	game.queue_free()
 	await get_tree().process_frame
+
+
+func _capture_jelly_shell() -> void:
+	SaveStore.add_ranking(
+		_temp_save_path,
+		GameConfig.GameMode.JELLY,
+		176400,
+		{"max_combo": 12, "turns": 84, "max_level": 7, "final_moves": 3},
+		"2026-10-23 20:15"
+	)
+	SaveStore.add_ranking(
+		_temp_save_path,
+		GameConfig.GameMode.JELLY,
+		112750,
+		{"max_combo": 8, "turns": 61, "max_level": 6, "final_moves": 1},
+		"2026-10-23 18:40"
+	)
+	SaveStore.save_last_mode(_temp_save_path, GameConfig.GameMode.JELLY)
+	var main: Main = await _create_main(Main.NO_MODE)
+	var start: StartScreen = main.get_node("UI/StartScreen") as StartScreen
+	if not (start.get_node("Content/JellyButton") as Button).button_pressed:
+		_fail("JELLY start card must reflect the saved last mode")
+	await _capture("54_jelly_shell_start.png")
+	var ui: DebugHud = main.get_node("UI") as DebugHud
+	ui.show_ranking(GameConfig.GameMode.JELLY, 1)
+	await get_tree().create_timer(0.30).timeout
+	await _capture("54_jelly_shell_ranking.png")
+	await _destroy_main(main)
+
+	main = await _create_main(int(GameConfig.GameMode.JELLY))
+	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
+	var score: ScoreManager = main.get_node("ScoreManager") as ScoreManager
+	manager.set_physics_process(false)
+	manager.turn_index = 73
+	manager.max_combo = 11
+	manager.final_move_count = 5
+	manager.final_move_success_count = 4
+	score.score = 187750
+	score.best_score = 187750
+	score.max_level_reached = 7
+	manager.game_over_details = {
+		"direction": Vector2i.RIGHT,
+		"final_moves": 5,
+		"final_move_successes": 4,
+	}
+	manager.game_over_details["ranking"] = manager._commit_completed_ranking()
+	manager.game_over.emit()
+	await get_tree().create_timer(0.85).timeout
+	await _capture("54_jelly_shell_result.png")
+	print("SCREEN_CAPTURE_CHECK scene=jelly_shell cards=4 ranking=jelly result=final-move")
+	await _destroy_main(main)
 
 
 func _capture_slime_shell_play() -> void:
@@ -2477,11 +2533,11 @@ func _prepare_blitz_ranking_capture() -> Dictionary:
 func _create_main(mode: int) -> Main:
 	var main: Main = MAIN_SCENE.instantiate() as Main
 	if mode != Main.NO_MODE:
-		var game_mode: GameConfig.GameMode = (
-			GameConfig.GameMode.BLITZ
-			if mode == int(GameConfig.GameMode.BLITZ)
-			else GameConfig.GameMode.TURN
-		)
+		var game_mode: GameConfig.GameMode = GameConfig.GameMode.TURN
+		if mode == int(GameConfig.GameMode.BLITZ):
+			game_mode = GameConfig.GameMode.BLITZ
+		elif mode == int(GameConfig.GameMode.JELLY):
+			game_mode = GameConfig.GameMode.JELLY
 		main.launch_immediately(game_mode)
 	(main.get_node("ScoreManager") as ScoreManager).save_path = _temp_save_path
 	(main.get_node("FeedbackDirector/SfxBank") as SfxBank).save_path = _temp_save_path

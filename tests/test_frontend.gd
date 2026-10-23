@@ -72,11 +72,15 @@ func test_mode_buttons_emit_modes_and_direct_launch_skips_start_screen() -> void
 	start_screen.prepare_to_show()
 	(start_screen.get_node("Content/SlimeButton") as Button).pressed.emit()
 	await tree.create_timer(0.30).timeout
-	assert_eq(selected_modes.size(), 3, "all three mode buttons emit")
-	if selected_modes.size() == 3:
+	start_screen.prepare_to_show()
+	(start_screen.get_node("Content/JellyButton") as Button).pressed.emit()
+	await tree.create_timer(0.30).timeout
+	assert_eq(selected_modes.size(), 4, "all four mode buttons emit")
+	if selected_modes.size() == 4:
 		assert_eq(selected_modes[0], GameConfig.GameMode.BLITZ, "BLITZ button mode")
 		assert_eq(selected_modes[1], GameConfig.GameMode.TURN, "CLASSIC button mode")
 		assert_eq(selected_modes[2], GameConfig.GameMode.SLIME, "SLIME button mode")
+		assert_eq(selected_modes[3], GameConfig.GameMode.JELLY, "JELLY button mode")
 	await _cleanup_main(menu_main)
 
 	var turn_main: Main = _new_main("")

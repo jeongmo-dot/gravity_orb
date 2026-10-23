@@ -1,4 +1,4 @@
-[gd_scene load_steps=28 format=3]
+[gd_scene load_steps=29 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/DebugHud.gd" id="1_debug_hud"]
 [ext_resource type="Script" path="res://scripts/ui/Hud.gd" id="2_hud"]
@@ -17,6 +17,7 @@
 [ext_resource type="Script" path="res://scripts/ui/BlitzTimeBar.gd" id="15_blitz_time_bar"]
 [ext_resource type="Script" path="res://scripts/ui/TurnInputIndicator.gd" id="16_turn_input_indicator"]
 [ext_resource type="Script" path="res://scripts/ui/SlimeCardIcon.gd" id="17_slime_card_icon"]
+[ext_resource type="Script" path="res://scripts/ui/JellyCardIcon.gd" id="18_jelly_card_icon"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_result_panel"]
 bg_color = Color(0.025, 0.05, 0.105, 0.97)
@@ -1146,6 +1147,53 @@ theme_type_variation = &"HudDisplayBold"
 text = "BEST —"
 horizontal_alignment = 1
 
+[node name="JellyButton" type="Button" parent="StartScreen/Content"]
+unique_name_in_owner = true
+layout_mode = 0
+mouse_filter = 0
+theme_override_styles/normal = SubResource("StyleBoxFlat_mode_unselected")
+theme_override_styles/hover = SubResource("StyleBoxFlat_mode_unselected")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_mode_selected_cyan")
+theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_mode_selected_cyan")
+toggle_mode = true
+
+[node name="JellyIcon" type="Control" parent="StartScreen/Content"]
+unique_name_in_owner = true
+layout_mode = 0
+mouse_filter = 2
+script = ExtResource("18_jelly_card_icon")
+
+[node name="JellyNameLabel" type="Label" parent="StartScreen/Content"]
+unique_name_in_owner = true
+layout_mode = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.458824, 0.584314, 1)
+theme_override_font_sizes/font_size = 34
+theme_type_variation = &"HudDisplayBold"
+text = "JELLY"
+vertical_alignment = 1
+
+[node name="JellyDescriptionLabel" type="Label" parent="StartScreen/Content"]
+unique_name_in_owner = true
+layout_mode = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.557, 0.639, 0.784, 1)
+theme_override_font_sizes/font_size = 18
+theme_type_variation = &"HudBody"
+text = "한 단계 작은 것도\n먹고 자라요"
+clip_text = true
+vertical_alignment = 1
+
+[node name="JellyBestLabel" type="Label" parent="StartScreen/Content"]
+unique_name_in_owner = true
+layout_mode = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.458824, 0.584314, 1)
+theme_override_font_sizes/font_size = 22
+theme_type_variation = &"HudDisplayBold"
+text = "BEST —"
+vertical_alignment = 1
+
 [node name="SlimeButton" type="Button" parent="StartScreen/Content"]
 unique_name_in_owner = true
 layout_mode = 0
@@ -1167,7 +1215,7 @@ unique_name_in_owner = true
 layout_mode = 0
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.34902, 0.886275, 0.670588, 1)
-theme_override_font_sizes/font_size = 42
+theme_override_font_sizes/font_size = 34
 theme_type_variation = &"HudDisplayBold"
 text = "SLIME"
 vertical_alignment = 1
@@ -1177,9 +1225,10 @@ unique_name_in_owner = true
 layout_mode = 0
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.557, 0.639, 0.784, 1)
-theme_override_font_sizes/font_size = 26
+theme_override_font_sizes/font_size = 16
 theme_type_variation = &"HudBody"
 text = "같은 색이면 크기 상관없이 흡수"
+clip_text = true
 vertical_alignment = 1
 
 [node name="SlimeBestLabel" type="Label" parent="StartScreen/Content"]
@@ -1187,7 +1236,7 @@ unique_name_in_owner = true
 layout_mode = 0
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.34902, 0.886275, 0.670588, 1)
-theme_override_font_sizes/font_size = 26
+theme_override_font_sizes/font_size = 22
 theme_type_variation = &"HudDisplayBold"
 text = "BEST —"
 horizontal_alignment = 1
@@ -1297,19 +1346,19 @@ horizontal_alignment = 1
 [node name="Tabs" type="HBoxContainer" parent="RankingPanel/Panel/Content"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_constants/separation = 16
+theme_override_constants/separation = 12
 alignment = 1
 
 [node name="RankingBlitzTab" type="Button" parent="RankingPanel/Panel/Content/Tabs"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(280, 120)
+custom_minimum_size = Vector2(210, 120)
 layout_mode = 2
 mouse_filter = 0
 theme_override_colors/font_color = Color(0.48, 0.57, 0.68, 1)
 theme_override_colors/font_hover_color = Color(0.68, 0.76, 0.86, 1)
 theme_override_colors/font_pressed_color = Color(0.015, 0.05, 0.09, 1)
 theme_override_colors/font_hover_pressed_color = Color(0.015, 0.05, 0.09, 1)
-theme_override_font_sizes/font_size = 38
+theme_override_font_sizes/font_size = 32
 theme_override_styles/normal = SubResource("StyleBoxFlat_mode_unselected")
 theme_override_styles/hover = SubResource("StyleBoxFlat_mode_unselected")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_ranking_selected")
@@ -1319,14 +1368,14 @@ text = "BLITZ"
 
 [node name="RankingClassicTab" type="Button" parent="RankingPanel/Panel/Content/Tabs"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(280, 120)
+custom_minimum_size = Vector2(210, 120)
 layout_mode = 2
 mouse_filter = 0
 theme_override_colors/font_color = Color(0.48, 0.57, 0.68, 1)
 theme_override_colors/font_hover_color = Color(0.68, 0.76, 0.86, 1)
 theme_override_colors/font_pressed_color = Color(0.015, 0.05, 0.09, 1)
 theme_override_colors/font_hover_pressed_color = Color(0.015, 0.05, 0.09, 1)
-theme_override_font_sizes/font_size = 38
+theme_override_font_sizes/font_size = 32
 theme_override_styles/normal = SubResource("StyleBoxFlat_mode_unselected")
 theme_override_styles/hover = SubResource("StyleBoxFlat_mode_unselected")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_ranking_selected")
@@ -1336,20 +1385,37 @@ text = "CLASSIC"
 
 [node name="RankingSlimeTab" type="Button" parent="RankingPanel/Panel/Content/Tabs"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(280, 120)
+custom_minimum_size = Vector2(210, 120)
 layout_mode = 2
 mouse_filter = 0
 theme_override_colors/font_color = Color(0.48, 0.57, 0.68, 1)
 theme_override_colors/font_hover_color = Color(0.68, 0.76, 0.86, 1)
 theme_override_colors/font_pressed_color = Color(0.015, 0.05, 0.09, 1)
 theme_override_colors/font_hover_pressed_color = Color(0.015, 0.05, 0.09, 1)
-theme_override_font_sizes/font_size = 38
+theme_override_font_sizes/font_size = 32
 theme_override_styles/normal = SubResource("StyleBoxFlat_mode_unselected")
 theme_override_styles/hover = SubResource("StyleBoxFlat_mode_unselected")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_ranking_selected")
 theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_ranking_selected")
 toggle_mode = true
 text = "SLIME"
+
+[node name="RankingJellyTab" type="Button" parent="RankingPanel/Panel/Content/Tabs"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(210, 120)
+layout_mode = 2
+mouse_filter = 0
+theme_override_colors/font_color = Color(0.48, 0.57, 0.68, 1)
+theme_override_colors/font_hover_color = Color(0.68, 0.76, 0.86, 1)
+theme_override_colors/font_pressed_color = Color(0.015, 0.05, 0.09, 1)
+theme_override_colors/font_hover_pressed_color = Color(0.015, 0.05, 0.09, 1)
+theme_override_font_sizes/font_size = 32
+theme_override_styles/normal = SubResource("StyleBoxFlat_mode_unselected")
+theme_override_styles/hover = SubResource("StyleBoxFlat_mode_unselected")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_ranking_selected")
+theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_ranking_selected")
+toggle_mode = true
+text = "JELLY"
 
 [node name="RankingHeader" type="Label" parent="RankingPanel/Panel/Content"]
 unique_name_in_owner = true

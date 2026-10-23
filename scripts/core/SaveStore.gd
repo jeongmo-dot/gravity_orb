@@ -8,12 +8,14 @@ const TURN_BEST_KEY: String = "best_score"
 const BLITZ_BEST_KEY: String = "blitz_best_score"
 const BLITZ_SURVIVAL_BEST_KEY: String = "blitz_survival_best_score"
 const SLIME_BEST_KEY: String = "slime_best_score"
+const JELLY_BEST_KEY: String = "jelly_best_score"
 const SLIME_BEST_TURNS_KEY: String = "slime_best_turns"
 const SLIME_BEST_CHAIN_KEY: String = "slime_best_chain"
 const TURN_RANKING_KEY: String = "turn"
 const BLITZ_RANKING_KEY: String = "blitz"
 const BLITZ_SURVIVAL_RANKING_KEY: String = "blitz_survival"
 const SLIME_RANKING_KEY: String = "slime"
+const JELLY_RANKING_KEY: String = "jelly"
 const LAST_MODE_KEY: String = "last_mode"
 const SFX_MUTED_KEY: String = "sfx_muted"
 const ORB_SYMBOLS_ENABLED_KEY: String = "orb_symbols_enabled"
@@ -128,6 +130,8 @@ static func load_last_mode(
 		return GameConfig.GameMode.TURN
 	if saved_mode == "slime":
 		return GameConfig.GameMode.SLIME
+	if saved_mode == "jelly":
+		return GameConfig.GameMode.JELLY
 	return fallback
 
 
@@ -188,6 +192,8 @@ static func save_orb_symbols_enabled(path: String, enabled: bool) -> Error:
 static func record_key_for_mode(mode: GameConfig.GameMode) -> String:
 	if mode == GameConfig.GameMode.SLIME:
 		return SLIME_BEST_KEY
+	if mode == GameConfig.GameMode.JELLY:
+		return JELLY_BEST_KEY
 	if mode == GameConfig.GameMode.BLITZ:
 		if Config.data.blitz_survival_enabled:
 			return BLITZ_SURVIVAL_BEST_KEY
@@ -198,6 +204,8 @@ static func record_key_for_mode(mode: GameConfig.GameMode) -> String:
 static func ranking_key_for_mode(mode: GameConfig.GameMode) -> String:
 	if mode == GameConfig.GameMode.SLIME:
 		return SLIME_RANKING_KEY
+	if mode == GameConfig.GameMode.JELLY:
+		return JELLY_RANKING_KEY
 	if mode == GameConfig.GameMode.BLITZ:
 		if Config.data.blitz_survival_enabled:
 			return BLITZ_SURVIVAL_RANKING_KEY
@@ -227,6 +235,8 @@ static func _ranking_entry(
 		entry["max_combo"] = maxi(int(stats.get("max_combo", 0)), 0)
 		entry["turns"] = maxi(int(stats.get("turns", 0)), 0)
 		entry["max_level"] = maxi(int(stats.get("max_level", 0)), 0)
+		if mode == GameConfig.GameMode.JELLY:
+			entry["final_moves"] = maxi(int(stats.get("final_moves", 0)), 0)
 	return entry
 
 
@@ -262,6 +272,8 @@ static func _sanitize_rankings(
 				"turns": entry["turns"],
 				"max_level": entry["max_level"],
 			}
+			if mode == GameConfig.GameMode.JELLY:
+				stats["final_moves"] = entry["final_moves"]
 		var sanitized: Dictionary = _ranking_entry(
 			mode,
 			int(entry["score"]),
@@ -299,6 +311,8 @@ static func _ranking_entry_is_valid(
 		stat_keys.assign(["max_chain", "blasts", "fevers"])
 	else:
 		stat_keys.assign(["max_combo", "turns", "max_level"])
+		if mode == GameConfig.GameMode.JELLY:
+			stat_keys.append("final_moves")
 	for key: String in stat_keys:
 		if not entry.has(key) or typeof(entry[key]) != TYPE_INT or int(entry[key]) < 0:
 			return false
@@ -397,6 +411,8 @@ static func _mode_name(mode: GameConfig.GameMode) -> String:
 		return "blitz"
 	if mode == GameConfig.GameMode.SLIME:
 		return "slime"
+	if mode == GameConfig.GameMode.JELLY:
+		return "jelly"
 	return "turn"
 
 

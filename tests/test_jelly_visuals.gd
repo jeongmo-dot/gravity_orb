@@ -34,6 +34,20 @@ func test_jelly_orb_uses_face_shader_without_planet_adornment() -> void:
 	Config.data.game_mode = original_mode
 
 
+func test_jelly_max_face_uses_body_radius_while_regular_faces_keep_original_scale() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var board: Board3D = await _create_board()
+	var regular: Orb3D = board.spawn_orb(0, 3, Vector2(-100.0, 0.0))
+	var maximum: Orb3D = board.spawn_orb(0, 7, Vector2(100.0, 0.0))
+	var regular_radius_m: float = Config.data.radius_for_level(3) / Orb3D.PIXELS_PER_METER
+	var maximum_radius_m: float = Config.data.radius_for_level(7) / Orb3D.PIXELS_PER_METER
+	assert_near(regular._face.scale.x / regular_radius_m, 0.62, 0.001, "regular face scale unchanged")
+	assert_near(maximum._face.scale.x / maximum_radius_m, 1.0, 0.001, "MAX face matches body radius")
+	await _cleanup(board)
+	Config.data.game_mode = original_mode
+
+
 func test_max_face_projects_smile_below_eyes_and_rotates_with_gravity() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	Config.data.game_mode = GameConfig.GameMode.JELLY

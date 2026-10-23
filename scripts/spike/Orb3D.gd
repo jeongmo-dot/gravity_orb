@@ -753,7 +753,10 @@ func _update_visual_transform() -> void:
 		* punch_scale
 		* blast_pulse_scale()
 	)
-	var face_scale_m: float = radius_m * 0.62 * punch_scale
+	var face_radius_ratio: float = (
+		1.0 if _is_jelly_visual and level >= Config.data.orb_max_level else 0.62
+	)
+	var face_scale_m: float = radius_m * face_radius_ratio * punch_scale
 	_face.scale = Vector3(
 		face_scale_m * stretch_scale.x * jelly_soft_scale.x,
 		face_scale_m * stretch_scale.y * jelly_soft_scale.y,

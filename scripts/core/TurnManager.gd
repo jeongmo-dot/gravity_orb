@@ -215,14 +215,14 @@ func _on_settled() -> void:
 func _commit_completed_ranking() -> Dictionary:
 	if _score_manager == null:
 		return {"rank": 0, "record": {}}
-	if Config.data.game_mode == GameConfig.GameMode.JELLY:
-		return {"rank": 0, "record": {}}
+	var mode: GameConfig.GameMode = Config.data.game_mode
 	return _score_manager.commit_ranking(
-		GameConfig.GameMode.TURN,
+		mode,
 		{
 			"max_combo": max_combo,
 			"turns": turn_index,
 			"max_level": _score_manager.max_level_reached,
+			"final_moves": final_move_success_count,
 		}
 	)
 
