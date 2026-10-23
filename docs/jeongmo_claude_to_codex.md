@@ -31,8 +31,25 @@
 
 ## 대기 중
 
-### [2026-10-21 #97] JELLY ③ — 앱 연결
+### [2026-10-23 #99] 결과 화면 레벨 이름 · 반쪽 카드 글자 크기
 - 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합)
+- 근거: [technical_design.md](technical_design.md) **§12-JE.6** (배경 §12-JE "#97 결과")
+- 배경 (Claude 검수, PR #100): 결과 화면이 "최고 천체 — L7 태양"처럼 V3 천체 사다리 이름을 아직 쓴다 (CLASSIC도 틀리고 JELLY는 젤리인데 태양). 아래 줄 반쪽 카드 설명이 두 줄로 접히며 너무 작다
+- 요구:
+  1. 결과 화면 레벨 칸: CLASSIC "최고 레벨 — L7", JELLY "최고 젤리 — L7 MAX" (L7만 MAX). 천체 이름 표 삭제. BLITZ·SLIME 그대로
+  2. 반쪽 카드 설명 한 줄: JELLY "작은 것도 먹고 자라요", SLIME "크기 상관없이 흡수", 글자 크기는 위 카드 설명과 같게
+- 검수: `54_jelly_shell_{start,result}`·CLASSIC 결과 두 비율, 레벨 칸 문구 테스트
+- 건드리지 말 것: 규칙·물리·그림, 카드 배치, 사용자 저장 파일, `docs/` (회신 파일 제외)
+- Done-when: 테스트 통과(`.	estsun_tests.ps1`), 캡처 보고 (마지막은 전체 캡처), 검증 빌드는 `-Debug`만
+- 커밋: 항목 단위 브랜치, **push·PR까지**
+
+---
+
+## 처리 완료
+
+### [2026-10-21 #97] JELLY ③ — 앱 연결 — 완료
+- 상태: 완료 (2026-10-23 Claude 검수 · [PR #100](https://github.com/jeongmo-dot/gravity_orb/pull/100) 병합 `d6a77a5`)
+- 검수: Codex 캡처 `54_jelly_shell_{start,ranking,result}`·`53_jelly_look_max` — 카드 4장·랭킹 JELLY 탭·결과 FINAL MOVE, MAX 얼굴 시안 C 크기. 래퍼 370/370, 사용자 저장 불변 (Codex). 결과 화면 "최고 천체 — 태양" 이름과 반쪽 카드 작은 글자는 #99. Claude 재실행 없음
 - **먼저 (#96 검수에서)**: 3D MAX 얼굴 (시안 C)이 시안의 약 60% 크기 — `Orb3D` 얼굴 판 `radius_m × 0.62` 배율 탓. MAX (L7) 얼굴만 몸통 반지름 기준 비율 그대로 그려지게 (3D·2D 같은 비율, 보통 얼굴은 그대로). 캡처 `53_jelly_look_max` 다시 — technical_design §12-JE "#96 결과"
 - 근거: [technical_design.md](technical_design.md) **§12-JE.3**
 - 요구: 시작 화면 카드 4장 (아래 줄을 JELLY·SLIME 반씩, 높이 150, 아이콘 줄 비율별로), JELLY 카드 (L3 분홍 젤리 얼굴·"한 단계 작은 것도 먹고 자라요"·BEST·`#FF7595`), 랭킹 JELLY 탭 (CLASSIC 열 + FINAL MOVE 횟수), 저장 키 `jelly`·마지막 모드 `"jelly"`, 결과 화면 "FINAL MOVE n번 버팀", 시작 → JELLY → 결과 → 랭킹 → 돌아오기 → 다시 하기 → 모드 선택 왕복
@@ -40,10 +57,6 @@
 - 건드리지 말 것: 규칙·물리·그림, 다른 모드, 사용자 저장 파일, `docs/` (회신 파일 제외)
 - Done-when: 테스트 통과(`.\tests\run_tests.ps1`), 캡처 보고 (마지막은 전체 캡처), 스모크 5종 (기본·turn·blitz·slime·jelly), 검증 빌드는 `-Debug`만
 - 커밋: 항목 단위 브랜치, **push·PR까지**
-
----
-
-## 처리 완료
 
 ### [2026-10-21 #96] JELLY ② — 3D 젤리 그림·말랑함·연출 — 완료
 - 상태: 완료 (2026-10-23 Claude 검수 · [PR #99](https://github.com/jeongmo-dot/gravity_orb/pull/99) 병합 `7d20bd9`)
