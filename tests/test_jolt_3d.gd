@@ -314,6 +314,26 @@ func test_jelly_absorption_keeps_larger_position_mass_and_interpolated_radius() 
 		assert_eq(active[0].level, 3, "mass six remains level three")
 		assert_near(active[0].jelly_mass, 6.0, 0.001, "abstract mass is preserved")
 		assert_near(active[0].get_radius(), 72.5, 0.001, "radius is halfway L3-L4")
+		assert_near(
+			active[0].get_current_radius(),
+			Config.data.radius_for_level(3),
+			0.001,
+			"absorption growth starts from the absorber radius"
+		)
+		active[0]._physics_process(0.05)
+		assert_near(
+			active[0].get_current_radius(),
+			(Config.data.radius_for_level(3) + 72.5) * 0.5,
+			0.001,
+			"absorption radius is halfway after 0.05 seconds"
+		)
+		active[0]._physics_process(0.05)
+		assert_near(
+			active[0].get_current_radius(),
+			72.5,
+			0.001,
+			"absorption reaches the target radius after 0.10 seconds"
+		)
 		assert_true(
 			active[0].position.distance_to(larger_position) < 0.001,
 			"larger orb position survives"

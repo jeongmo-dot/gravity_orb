@@ -254,6 +254,8 @@ func _update_warnings() -> void:
 
 
 func _set_state(next_state: State) -> void:
+	if _board.has_method("set_turn_resting"):
+		_board.set_turn_resting(next_state == State.WAITING_INPUT)
 	if state == next_state:
 		return
 	state = next_state

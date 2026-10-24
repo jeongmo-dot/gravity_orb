@@ -72,19 +72,19 @@ func test_max_face_projects_smile_below_eyes_and_rotates_with_gravity() -> void:
 	orb.set_gravity(Vector2i.DOWN, Config.data.gravity_strength)
 	var down_eyes: Vector2 = _face_point_on_screen(
 		eye_center,
-		orb._jelly_face_target_rotation
+		orb._jelly_frame_target_rotation
 	)
 	var down_smile: Vector2 = _face_point_on_screen(
 		smile_center,
-		orb._jelly_face_target_rotation
+		orb._jelly_frame_target_rotation
 	)
 	var down_highlight: Vector2 = _face_point_on_screen(
 		left_eye_center + highlight_offset,
-		orb._jelly_face_target_rotation
+		orb._jelly_frame_target_rotation
 	)
 	var down_left_eye: Vector2 = _face_point_on_screen(
 		left_eye_center,
-		orb._jelly_face_target_rotation
+		orb._jelly_frame_target_rotation
 	)
 	assert_true(down_smile.y > down_eyes.y, "down gravity puts MAX smile below eyes")
 	assert_true(
@@ -95,11 +95,11 @@ func test_max_face_projects_smile_below_eyes_and_rotates_with_gravity() -> void:
 	orb.set_gravity(Vector2i.RIGHT, Config.data.gravity_strength)
 	var right_eyes: Vector2 = _face_point_on_screen(
 		eye_center,
-		orb._jelly_face_target_rotation
+		orb._jelly_frame_target_rotation
 	)
 	var right_smile: Vector2 = _face_point_on_screen(
 		smile_center,
-		orb._jelly_face_target_rotation
+		orb._jelly_frame_target_rotation
 	)
 	assert_true(
 		right_smile.x > right_eyes.x,
@@ -171,7 +171,7 @@ func test_max_face_projects_smile_below_eyes_and_rotates_with_gravity() -> void:
 	Config.data.game_mode = original_mode
 
 
-func test_jelly_stretch_is_enabled_when_planet_stretch_setting_is_off() -> void:
+func test_jelly_deform_follows_gravity_smoothly_and_squashes_on_speed_loss() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_stretch: bool = Config.data.fx_orb_stretch_enabled
 	var original_fx: bool = Config.data.fx_enabled
@@ -179,18 +179,180 @@ func test_jelly_stretch_is_enabled_when_planet_stretch_setting_is_off() -> void:
 	Config.data.fx_enabled = true
 	Config.data.fx_orb_stretch_enabled = false
 	var board: Board3D = await _create_board()
-	var orb: Orb3D = board.spawn_orb(0, 3, Vector2.ZERO, Vector2(1100.0, 0.0))
-	assert_eq(
-		orb.visual_stretch_scale(),
-		Vector3(1.19, 0.90, 0.90),
-		"JELLY uses its own falling stretch"
+	var orb: Orb3D = board.spawn_orb(0, 3, Vector2.ZERO)
+	orb.set_gravity(Vector2i.DOWN, Config.data.gravity_strength)
+	orb.linear_velocity = Vector2(0.0, 1100.0)
+	orb._process(1.0 / 120.0)
+	var falling_deform: Vector2 = orb._jelly_deform
+	assert_true(falling_deform.x < 1.0, "falling JELLY narrows across gravity")
+	assert_true(falling_deform.y > 1.0, "falling JELLY stretches along gravity")
+	assert_true(
+		falling_deform.y < 1.19,
+		"deform follows the target instead of jumping there in one frame"
 	)
-	orb.play_jelly_impact(1.0)
-	assert_eq(orb._jelly_impact_scale, Vector3(0.80, 1.18, 1.18), "JELLY collision squash")
+	orb.linear_velocity = Vector2(0.0, 1100.0)
+	orb.get_physics_body().linear_velocity = Vector3.ZERO
+	orb._physics_process(1.0 / 120.0)
+	assert_near(orb._jelly_impact, 1.0, 0.001, "speed loss drives impact without contact event")
+	orb._process(1.0 / 120.0)
+	assert_true(orb._jelly_deform.x > falling_deform.x, "impact widens across gravity")
+	assert_true(orb._jelly_deform.y < falling_deform.y, "impact flattens along gravity")
+	var face_radius_m: float = orb.get_current_radius() / Orb3D.PIXELS_PER_METER * 0.62
+	assert_near(
+		orb._face.scale.x / face_radius_m,
+		orb._mesh.scale.x / orb._visual_punch_scale.x,
+		0.001,
+		"face and body share horizontal deform"
+	)
+	assert_near(
+		orb._face.scale.y / face_radius_m,
+		orb._mesh.scale.y / orb._visual_punch_scale.y,
+		0.001,
+		"face and body share gravity-axis deform"
+	)
 	await _cleanup(board)
 	Config.data.game_mode = original_mode
 	Config.data.fx_orb_stretch_enabled = original_stretch
 	Config.data.fx_enabled = original_fx
+
+
+func test_jelly_frame_rotation_and_breath_weight_change_without_jumps() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var board: Board3D = await _create_board()
+	var orb: Orb3D = board.spawn_orb(0, 3, Vector2.ZERO)
+	orb.set_gravity(Vector2i.RIGHT, Config.data.gravity_strength)
+	orb._process(1.0 / 120.0)
+	assert_true(orb._jelly_frame_rotation > 0.0, "JELLY frame begins turning toward gravity")
+	assert_true(
+		orb._jelly_frame_rotation < orb._jelly_frame_target_rotation,
+		"JELLY frame does not jump to the target rotation"
+	)
+	assert_near(
+		orb._mesh.rotation.z,
+		orb._face.rotation.z,
+		0.0001,
+		"body and face use the same frame rotation"
+	)
+	board.set_turn_resting(true)
+	orb._process(1.0 / 120.0)
+	assert_near(
+		orb._jelly_breath_weight,
+		1.0 / 30.0,
+		0.0001,
+		"breathing fades in at delta times four"
+	)
+	board.set_turn_resting(false)
+	orb._process(1.0 / 120.0)
+	assert_near(orb._jelly_breath_weight, 0.0, 0.0001, "breathing fades back out")
+	await _cleanup(board)
+	Config.data.game_mode = original_mode
+
+
+func test_jelly_impact_ignores_small_speed_loss_and_decays_per_step() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var board: Board3D = await _create_board()
+	var orb: Orb3D = board.spawn_orb(0, 3, Vector2.ZERO)
+	orb.linear_velocity = Vector2(1000.0, 0.0)
+	orb.get_physics_body().linear_velocity = Orb3D.plane_vector_to_world(Vector2(950.0, 0.0))
+	orb._physics_process(1.0 / 120.0)
+	assert_near(orb._jelly_impact, 0.0, 0.0001, "speed loss below 0.06 is ignored")
+	orb.linear_velocity = Vector2(1000.0, 0.0)
+	orb.get_physics_body().linear_velocity = Orb3D.plane_vector_to_world(Vector2(900.0, 0.0))
+	orb._physics_process(1.0 / 120.0)
+	assert_near(orb._jelly_impact, 0.1, 0.0001, "speed loss divided by 1000 starts impact")
+	orb._physics_process(1.0 / 120.0)
+	assert_near(orb._jelly_impact, 0.06, 0.0001, "impact decays by 4.8 per second")
+	await _cleanup(board)
+	Config.data.game_mode = original_mode
+
+
+func test_jelly_landing_deform_uses_gravity_frame_in_all_four_directions() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var board: Board3D = await _create_board()
+	var directions: Array[Vector2i] = [
+		Vector2i.DOWN,
+		Vector2i.RIGHT,
+		Vector2i.UP,
+		Vector2i.LEFT,
+	]
+	for direction: Vector2i in directions:
+		var orb: Orb3D = board.spawn_orb(0, 3, Vector2.ZERO)
+		orb.set_gravity(direction, Config.data.gravity_strength)
+		orb.linear_velocity = Vector2(direction) * 1100.0
+		orb._process(1.0 / 120.0)
+		assert_true(orb._jelly_deform.x < 1.0, "%s fall narrows across gravity" % direction)
+		assert_true(orb._jelly_deform.y > 1.0, "%s fall stretches along gravity" % direction)
+		orb.linear_velocity = Vector2(direction) * 1100.0
+		orb.get_physics_body().linear_velocity = Vector3.ZERO
+		orb._physics_process(1.0 / 120.0)
+		orb._process(1.0 / 120.0)
+		assert_true(orb._jelly_deform.x > 1.0, "%s landing widens across gravity" % direction)
+		assert_true(orb._jelly_deform.y < 1.0, "%s landing flattens along gravity" % direction)
+		board.remove_orb(orb)
+	await _cleanup(board)
+	Config.data.game_mode = original_mode
+
+
+func test_interpolation_smooths_120hz_physics_for_164hz_rendering() -> void:
+	var velocity: float = 900.0
+	var physics_hz: float = 120.0
+	var render_hz: float = 164.0
+	var physics_step_distance: float = velocity / physics_hz
+	var raw_positions: Array[float] = []
+	var interpolated_positions: Array[float] = []
+	for render_frame: int in range(1, 165):
+		var physics_time: float = float(render_frame) / render_hz * physics_hz
+		var current_tick: int = floori(physics_time)
+		var fraction: float = physics_time - float(current_tick)
+		raw_positions.append(float(current_tick) * physics_step_distance)
+		interpolated_positions.append(
+			(float(current_tick - 1) + fraction) * physics_step_distance
+		)
+	var raw_variation: float = _step_variation_ratio(raw_positions)
+	var interpolated_variation: float = _step_variation_ratio(interpolated_positions)
+	assert_true(raw_variation > 0.25, "120-to-164Hz raw positions have visibly uneven steps")
+	assert_true(
+		interpolated_variation < 0.001,
+		"interpolated render movement has near-zero step variation"
+	)
+	assert_true(
+		interpolated_variation < raw_variation,
+		"interpolation reduces frame-to-frame movement variation"
+	)
+
+
+func test_visual_position_interpolates_and_teleport_resets_history() -> void:
+	var board: Board3D = await _create_board()
+	var orb: Orb3D = board.spawn_orb(0, 1, Vector2.ZERO)
+	orb._previous_physics_position = Vector3(0.0, 0.0, 0.0)
+	orb._current_physics_position = Vector3(2.0, -1.0, 0.0)
+	orb._physics_position_initialized = true
+	assert_eq(orb.interpolated_body_position(0.0), Vector3.ZERO, "fraction zero uses previous position")
+	assert_eq(
+		orb.interpolated_body_position(0.5),
+		Vector3(1.0, -0.5, 0.0),
+		"fraction half uses midpoint"
+	)
+	assert_eq(
+		orb.interpolated_body_position(1.0),
+		Vector3(2.0, -1.0, 0.0),
+		"fraction one uses current position"
+	)
+	orb.position = Vector2(250.0, -150.0)
+	assert_eq(
+		orb._previous_physics_position,
+		orb._current_physics_position,
+		"teleport resets interpolation history"
+	)
+	assert_eq(
+		orb.interpolated_body_position(0.0),
+		Orb3D.plane_position_to_world(Vector2(250.0, -150.0)),
+		"first frame after teleport does not drag from the old position"
+	)
+	await _cleanup(board)
 
 
 func test_non_jelly_modes_keep_planet_visuals_and_stretch_gate() -> void:
@@ -294,3 +456,18 @@ func _cleanup(node: Node) -> void:
 
 func _face_point_on_screen(point: Vector2, face_rotation: float) -> Vector2:
 	return point.rotated(-face_rotation)
+
+
+func _step_variation_ratio(positions: Array[float]) -> float:
+	var steps: Array[float] = []
+	for index: int in range(1, positions.size()):
+		steps.append(positions[index] - positions[index - 1])
+	var mean: float = 0.0
+	for step: float in steps:
+		mean += step
+	mean /= float(steps.size())
+	var variance: float = 0.0
+	for step: float in steps:
+		variance += (step - mean) * (step - mean)
+	variance /= float(steps.size())
+	return sqrt(variance) / maxf(absf(mean), 0.000001)

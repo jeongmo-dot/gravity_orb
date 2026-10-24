@@ -6,10 +6,16 @@ const STRETCH_SPEED_MIN: float = 700.0
 const STRETCH_SPEED_MAX: float = 1100.0
 const STRETCH_ALONG_SCALE: float = 1.15
 const STRETCH_PERPENDICULAR_SCALE: float = 0.92
-const JELLY_STRETCH_ALONG_SCALE: float = 1.19
-const JELLY_STRETCH_PERPENDICULAR_SCALE: float = 0.90
 const JELLY_BREATHE_AMOUNT: float = 0.018
-const JELLY_FACE_TURN_SPEED: float = 2.4
+const JELLY_FRAME_TURN_SPEED: float = 8.0
+const JELLY_DEFORM_FOLLOW_SPEED: float = 11.0
+const JELLY_STRETCH_SPEED_DIVISOR: float = 5800.0
+const JELLY_STRETCH_MAX: float = 0.19
+const JELLY_IMPACT_SPEED_DIVISOR: float = 1000.0
+const JELLY_IMPACT_MINIMUM: float = 0.06
+const JELLY_IMPACT_DECAY: float = 4.8
+const JELLY_BREATH_BLEND_SPEED: float = 4.0
+const JELLY_ABSORPTION_GROWTH_DURATION: float = 0.10
 
 static var _shared_physics_materials: Dictionary = {}
 static var _shared_shapes: Dictionary = {}
@@ -58,19 +64,24 @@ var _radius_resources_are_unique: bool = false
 var _visual_alpha: float = 1.0
 var _is_jelly_visual: bool = false
 var _jelly_idle_elapsed: float = 0.0
-var _jelly_face_rotation: float = 0.0
-var _jelly_face_target_rotation: float = 0.0
-var _jelly_impact_tween: Tween
-var _jelly_impact_scale: Vector3 = Vector3.ONE:
-	set(value):
-		_jelly_impact_scale = value
-		_update_visual_transform()
+var _jelly_frame_rotation: float = 0.0
+var _jelly_frame_target_rotation: float = 0.0
+var _jelly_deform: Vector2 = Vector2.ONE
+var _jelly_impact: float = 0.0
+var _jelly_breath_weight: float = 0.0
+var _jelly_turn_resting: bool = false
+var _jelly_previous_speed: float = 0.0
+var _jelly_impact_start_count: int = 0
+var _previous_physics_position: Vector3 = Vector3.ZERO
+var _current_physics_position: Vector3 = Vector3.ZERO
+var _physics_position_initialized: bool = false
 
 var position: Vector2:
 	get:
 		return world_position_to_plane(_body.position)
 	set(value):
 		_body.position = plane_position_to_world(value)
+		_reset_visual_interpolation()
 		_update_visual_transform()
 
 var linear_velocity: Vector2:
@@ -78,6 +89,7 @@ var linear_velocity: Vector2:
 		return world_vector_to_plane(_body.linear_velocity)
 	set(value):
 		_body.linear_velocity = plane_vector_to_world(value)
+		_jelly_previous_speed = value.length()
 
 var angular_velocity: float:
 	get:
@@ -174,9 +186,14 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	_visual_alpha = 1.0
 	_is_jelly_visual = cfg.game_mode == GameConfig.GameMode.JELLY
 	_jelly_idle_elapsed = 0.0
-	_jelly_face_rotation = 0.0
-	_jelly_face_target_rotation = 0.0
-	_jelly_impact_scale = Vector3.ONE
+	_jelly_frame_rotation = 0.0
+	_jelly_frame_target_rotation = 0.0
+	_jelly_deform = Vector2.ONE
+	_jelly_impact = 0.0
+	_jelly_breath_weight = 0.0
+	_jelly_turn_resting = false
+	_jelly_previous_speed = 0.0
+	_jelly_impact_start_count = 0
 	_blast_armed = cfg.blast_enabled_for_level(level)
 	_blast_blink_period = maxf(cfg.blast_blink_period, 0.001)
 	_blast_blink_elapsed = 0.0
@@ -236,6 +253,7 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	_symbol_mesh.visible = cfg.orb_symbols_enabled
 	_symbol_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_symbol_mesh.transparency = 0.0
+	_reset_visual_interpolation()
 	_update_visual_transform()
 
 
@@ -244,19 +262,17 @@ func set_symbols_enabled(enabled: bool) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_sample_physics_position()
 	_advance_growth(delta)
 	_advance_blast_blink(delta)
+	_advance_jelly_impact(delta)
 
 
 
 func _process(delta: float) -> void:
 	if _is_jelly_visual:
 		_jelly_idle_elapsed += maxf(delta, 0.0)
-		_jelly_face_rotation = lerp_angle(
-			_jelly_face_rotation,
-			_jelly_face_target_rotation,
-			clampf(delta * JELLY_FACE_TURN_SPEED, 0.0, 1.0)
-		)
+		_advance_jelly_visual(delta)
 		JellyOrbArt.advance_animation(delta)
 	_update_visual_transform()
 
@@ -287,6 +303,7 @@ func get_jelly_mass() -> float:
 
 func set_jelly_mass(next_mass: float, cfg: GameConfig) -> void:
 	var gravity_direction: Vector2 = world_vector_to_plane(_body.constant_force).normalized()
+	var previous_radius: float = _current_radius
 	jelly_mass = clampf(
 		next_mass,
 		cfg.jelly_mass_for_level(1),
@@ -294,9 +311,14 @@ func set_jelly_mass(next_mass: float, cfg: GameConfig) -> void:
 	)
 	level = cfg.jelly_level_for_mass(jelly_mass)
 	_radius = cfg.jelly_radius_for_mass(jelly_mass)
-	_current_radius = _radius
-	_growth_start_radius = _radius
-	_growth_elapsed = _growth_duration
+	_growth_start_radius = previous_radius
+	_growth_duration = (
+		JELLY_ABSORPTION_GROWTH_DURATION
+		if _radius > previous_radius + 0.000001
+		else 0.0
+	)
+	_growth_elapsed = 0.0
+	_current_radius = previous_radius if _growth_duration > 0.0 else _radius
 	_body.mass = cfg.mass_for_radius(_radius)
 	if not gravity_direction.is_zero_approx():
 		set_gravity(
@@ -316,7 +338,7 @@ func set_jelly_mass(next_mass: float, cfg: GameConfig) -> void:
 	_face.material_override = JellyOrbArt.face_material_for(color, level)
 	_face.visible = _is_jelly_visual
 	_ensure_unique_radius_resources()
-	_apply_current_radius_to_resources(_radius / PIXELS_PER_METER)
+	_apply_current_radius_to_resources(_current_radius / PIXELS_PER_METER)
 	_update_visual_transform()
 
 
@@ -366,24 +388,16 @@ func play_visual_punch(scale_factor: float = 1.18, duration: float = 0.14) -> vo
 	)
 
 
-func play_jelly_impact(intensity: float) -> void:
-	if not _is_jelly_visual:
-		return
-	var clamped_intensity: float = clampf(intensity, 0.0, 1.0)
-	if clamped_intensity <= 0.01:
-		return
-	if _jelly_impact_tween != null and _jelly_impact_tween.is_valid():
-		_jelly_impact_tween.kill()
-	var impact_scale: Vector3 = Vector3(
-		1.0 - 0.20 * clamped_intensity,
-		1.0 + 0.18 * clamped_intensity,
-		1.0 + 0.18 * clamped_intensity
-	)
-	_jelly_impact_scale = impact_scale
-	_jelly_impact_tween = create_tween()
-	_jelly_impact_tween.set_trans(Tween.TRANS_BACK)
-	_jelly_impact_tween.set_ease(Tween.EASE_OUT)
-	_jelly_impact_tween.tween_property(self, "_jelly_impact_scale", Vector3.ONE, 0.18)
+func jelly_impact_start_count() -> int:
+	return _jelly_impact_start_count
+
+
+func reset_jelly_motion_diagnostics() -> void:
+	_jelly_impact_start_count = 0
+
+
+func set_turn_resting(resting: bool) -> void:
+	_jelly_turn_resting = resting
 
 
 func play_visual_pull_punch(duration: float = 0.3) -> void:
@@ -462,7 +476,7 @@ func set_gravity(direction: Vector2i, strength: float) -> void:
 	var acceleration_px: Vector2 = Vector2(direction) * level_strength
 	_body.constant_force = plane_vector_to_world(acceleration_px) * _body.mass
 	if _is_jelly_visual and direction != Vector2i.ZERO:
-		_jelly_face_target_rotation = atan2(float(direction.x), float(direction.y))
+		_jelly_frame_target_rotation = atan2(float(direction.x), float(direction.y))
 	_body.sleeping = false
 
 
@@ -511,6 +525,7 @@ func disable_physics() -> void:
 	_body.collision_mask = 0
 	_body.constant_force = Vector3.ZERO
 	_body.freeze = true
+	_reset_visual_interpolation()
 
 
 func get_physics_body() -> RigidBody3D:
@@ -548,30 +563,24 @@ func blast_pulse_scale() -> float:
 
 
 func visual_stretch_scale() -> Vector3:
+	if _is_jelly_visual:
+		return Vector3(_jelly_deform.x, _jelly_deform.y, _jelly_deform.x)
 	return _stretch_scale_for_ratio(_visual_stretch_ratio())
 
 
 func _visual_stretch_ratio() -> float:
 	if not Config.data.fx_enabled:
 		return 0.0
-	if not _is_jelly_visual and not Config.data.fx_orb_stretch_enabled:
+	if _is_jelly_visual or not Config.data.fx_orb_stretch_enabled:
 		return 0.0
 	return smoothstep(STRETCH_SPEED_MIN, STRETCH_SPEED_MAX, linear_velocity.length())
 
 
 func _stretch_scale_for_ratio(ratio: float) -> Vector3:
-	var along_scale: float = (
-		JELLY_STRETCH_ALONG_SCALE if _is_jelly_visual else STRETCH_ALONG_SCALE
-	)
-	var perpendicular_scale: float = (
-		JELLY_STRETCH_PERPENDICULAR_SCALE
-		if _is_jelly_visual
-		else STRETCH_PERPENDICULAR_SCALE
-	)
 	return Vector3(
-		lerpf(1.0, along_scale, ratio),
-		lerpf(1.0, perpendicular_scale, ratio),
-		lerpf(1.0, perpendicular_scale, ratio)
+		lerpf(1.0, STRETCH_ALONG_SCALE, ratio),
+		lerpf(1.0, STRETCH_PERPENDICULAR_SCALE, ratio),
+		lerpf(1.0, STRETCH_PERPENDICULAR_SCALE, ratio)
 	)
 
 
@@ -628,6 +637,93 @@ func _advance_growth(delta: float) -> void:
 	_growth_elapsed = minf(_growth_elapsed + delta, _growth_duration)
 	var progress: float = _growth_elapsed / _growth_duration
 	_set_current_radius(lerpf(_growth_start_radius, _radius, progress))
+
+
+func _advance_jelly_impact(delta: float) -> void:
+	if not _is_jelly_visual:
+		return
+	_jelly_impact = maxf(0.0, _jelly_impact - maxf(delta, 0.0) * JELLY_IMPACT_DECAY)
+	var current_speed: float = linear_velocity.length()
+	var intensity: float = clampf(
+		(_jelly_previous_speed - current_speed) / JELLY_IMPACT_SPEED_DIVISOR,
+		0.0,
+		1.0
+	)
+	if intensity >= JELLY_IMPACT_MINIMUM:
+		if _jelly_impact <= 0.000001:
+			_jelly_impact_start_count += 1
+		_jelly_impact = maxf(_jelly_impact, intensity)
+	_jelly_previous_speed = current_speed
+
+
+func _advance_jelly_visual(delta: float) -> void:
+	var safe_delta: float = maxf(delta, 0.0)
+	_jelly_frame_rotation = lerp_angle(
+		_jelly_frame_rotation,
+		_jelly_frame_target_rotation,
+		clampf(safe_delta * JELLY_FRAME_TURN_SPEED, 0.0, 1.0)
+	)
+	_jelly_breath_weight = move_toward(
+		_jelly_breath_weight,
+		1.0 if _jelly_turn_resting else 0.0,
+		safe_delta * JELLY_BREATH_BLEND_SPEED
+	)
+	_jelly_deform = _jelly_deform.lerp(
+		_jelly_target_deform(),
+		clampf(safe_delta * JELLY_DEFORM_FOLLOW_SPEED, 0.0, 1.0)
+	)
+
+
+func _jelly_target_deform() -> Vector2:
+	if _jelly_turn_resting:
+		return Vector2.ONE
+	if _jelly_impact > 0.0:
+		return Vector2(
+			1.0 + 0.18 * _jelly_impact,
+			1.0 - 0.20 * _jelly_impact
+		)
+	var gravity_direction: Vector2 = world_vector_to_plane(_body.constant_force).normalized()
+	var fall_speed: float = maxf(0.0, linear_velocity.dot(gravity_direction))
+	var stretch: float = clampf(
+		fall_speed / JELLY_STRETCH_SPEED_DIVISOR,
+		0.0,
+		JELLY_STRETCH_MAX
+	)
+	return Vector2(1.0 - 0.55 * stretch, 1.0 + stretch)
+
+
+func _jelly_render_deform() -> Vector2:
+	var breathe: float = (
+		sin(_jelly_idle_elapsed * 1.8 + float(color))
+		* JELLY_BREATHE_AMOUNT
+		* _jelly_breath_weight
+	)
+	return _jelly_deform * Vector2(1.0 + breathe, 1.0 - breathe)
+
+
+func _sample_physics_position() -> void:
+	if not _physics_position_initialized:
+		_reset_visual_interpolation()
+		return
+	_previous_physics_position = _current_physics_position
+	_current_physics_position = _body.position
+
+
+func _reset_visual_interpolation() -> void:
+	if not is_instance_valid(_body):
+		return
+	_previous_physics_position = _body.position
+	_current_physics_position = _body.position
+	_physics_position_initialized = true
+
+
+func interpolated_body_position(fraction: float) -> Vector3:
+	if not _physics_position_initialized:
+		return _body.position
+	return _previous_physics_position.lerp(
+		_current_physics_position,
+		clampf(fraction, 0.0, 1.0)
+	)
 
 
 func _set_current_radius(radius_px: float) -> void:
@@ -708,7 +804,10 @@ func _update_visual_transform() -> void:
 	):
 		return
 	var radius_m: float = _current_radius / PIXELS_PER_METER
-	var render_plane_position: Vector2 = world_position_to_plane(_body.position)
+	var interpolated_position: Vector3 = interpolated_body_position(
+		Engine.get_physics_interpolation_fraction()
+	)
+	var render_plane_position: Vector2 = world_position_to_plane(interpolated_position)
 	if _render_clamp_enabled:
 		var half: float = Config.data.board_size * 0.5
 		var limit: float = maxf(half - _current_radius, 0.0)
@@ -718,7 +817,7 @@ func _update_visual_transform() -> void:
 		)
 	var render_world_position: Vector3 = plane_position_to_world(
 		render_plane_position,
-		_body.position.z
+		interpolated_position.z
 	)
 	_mesh.position = render_world_position
 	_adornment.position = render_world_position + Vector3(0.0, 0.0, 0.001)
@@ -726,13 +825,13 @@ func _update_visual_transform() -> void:
 	_face.position = render_world_position + Vector3(0.0, 0.0, radius_m + 0.006)
 	var stretch_ratio: float = _visual_stretch_ratio()
 	var stretch_scale: Vector3 = _stretch_scale_for_ratio(stretch_ratio)
-	var breathe_scale: float = 1.0
-	if _is_jelly_visual and linear_velocity.length() < STRETCH_SPEED_MIN * 0.20:
-		breathe_scale += sin(_jelly_idle_elapsed * 1.8 + float(color)) * JELLY_BREATHE_AMOUNT
-	var jelly_soft_scale: Vector3 = _jelly_impact_scale * breathe_scale
-	_mesh.scale = _visual_punch_scale * stretch_scale * jelly_soft_scale
-	if stretch_ratio <= 0.0:
-		_mesh.rotation = Vector3.ZERO if _is_jelly_visual else _body.rotation
+	var jelly_deform: Vector2 = _jelly_render_deform() if _is_jelly_visual else Vector2.ONE
+	var jelly_scale: Vector3 = Vector3(jelly_deform.x, jelly_deform.y, jelly_deform.x)
+	_mesh.scale = _visual_punch_scale * stretch_scale * jelly_scale
+	if _is_jelly_visual:
+		_mesh.rotation = Vector3(0.0, 0.0, _jelly_frame_rotation)
+	elif stretch_ratio <= 0.0:
+		_mesh.rotation = _body.rotation
 	else:
 		var world_velocity: Vector3 = _body.linear_velocity
 		_mesh.rotation = Vector3(0.0, 0.0, atan2(world_velocity.y, world_velocity.x))
@@ -742,7 +841,7 @@ func _update_visual_transform() -> void:
 		CelestialOrbArt.RING_TILT_RADIANS if level == 4 else 0.0
 	)
 	_blast_outline.rotation = Vector3.ZERO
-	_face.rotation = Vector3(0.0, 0.0, _jelly_face_rotation)
+	_face.rotation = Vector3(0.0, 0.0, _jelly_frame_rotation)
 	var punch_scale: float = maxf(
 		_visual_punch_scale.x,
 		maxf(_visual_punch_scale.y, _visual_punch_scale.z)
@@ -758,8 +857,8 @@ func _update_visual_transform() -> void:
 	)
 	var face_scale_m: float = radius_m * face_radius_ratio * punch_scale
 	_face.scale = Vector3(
-		face_scale_m * stretch_scale.x * jelly_soft_scale.x,
-		face_scale_m * stretch_scale.y * jelly_soft_scale.y,
+		face_scale_m * jelly_deform.x,
+		face_scale_m * jelly_deform.y,
 		1.0
 	)
 	var symbol_y_offset: float = radius_m * 0.54 if _is_jelly_visual else 0.0

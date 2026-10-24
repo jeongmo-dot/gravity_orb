@@ -58,6 +58,7 @@ var reaction_ghost_enabled: bool = false
 var ghost_timeout_count: int = 0
 var ghost_completed_count: int = 0
 var ghost_total_duration: float = 0.0
+var _turn_resting: bool = false
 
 
 func _ready() -> void:
@@ -172,6 +173,7 @@ func spawn_orb(
 	orb.linear_velocity = p_velocity
 	orb.generation = p_generation
 	orb.set_gravity(_gravity_direction, Config.data.gravity_strength)
+	orb.set_turn_resting(_turn_resting)
 	orb.get_physics_body().body_entered.connect(_on_orb_body_entered.bind(orb))
 	_orbs.append(orb)
 	return orb
@@ -192,6 +194,12 @@ func get_orbs() -> Array[Orb3D]:
 		if is_instance_valid(orb) and not orb.consumed:
 			active.append(orb)
 	return active
+
+
+func set_turn_resting(resting: bool) -> void:
+	_turn_resting = resting
+	for orb: Orb3D in get_orbs():
+		orb.set_turn_resting(resting)
 
 
 func apply_shockwave(
@@ -588,8 +596,6 @@ func _complete_ghost(orb: Orb3D, timed_out: bool) -> void:
 
 
 func _on_orb_body_entered(other_body: Node, orb: Orb3D) -> void:
-	if not orb.consumed:
-		orb.play_jelly_impact(clampf(orb.linear_velocity.length() / 1100.0, 0.18, 1.0))
 	var other: Orb3D = other_body.get_parent() as Orb3D
 	if other == null or orb.consumed or other.consumed:
 		return

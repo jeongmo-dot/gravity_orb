@@ -113,6 +113,18 @@ const CAPTURE_FILES: Array[String] = [
 	"54_jelly_shell_start.png",
 	"54_jelly_shell_ranking.png",
 	"54_jelly_shell_result.png",
+	"55_jelly_motion_land_01.png",
+	"55_jelly_motion_land_02.png",
+	"55_jelly_motion_land_03.png",
+	"55_jelly_motion_land_04.png",
+	"55_jelly_motion_land_05.png",
+	"55_jelly_motion_land_06.png",
+	"55_jelly_motion_land_07.png",
+	"55_jelly_motion_land_08.png",
+	"55_jelly_motion_land_09.png",
+	"55_jelly_motion_land_10.png",
+	"55_jelly_motion_rest.png",
+	"55_jelly_motion_right.png",
 ]
 const HUD_CAPTURE_FILES: Array[String] = [
 	"02_turn_early.png",
@@ -141,6 +153,18 @@ const HUD_CAPTURE_FILES: Array[String] = [
 	"53_jelly_look_max.png",
 	"53_jelly_look_stretch.png",
 	"53_jelly_look_unlock.png",
+	"55_jelly_motion_land_01.png",
+	"55_jelly_motion_land_02.png",
+	"55_jelly_motion_land_03.png",
+	"55_jelly_motion_land_04.png",
+	"55_jelly_motion_land_05.png",
+	"55_jelly_motion_land_06.png",
+	"55_jelly_motion_land_07.png",
+	"55_jelly_motion_land_08.png",
+	"55_jelly_motion_land_09.png",
+	"55_jelly_motion_land_10.png",
+	"55_jelly_motion_rest.png",
+	"55_jelly_motion_right.png",
 ]
 
 var _failed: bool = false
@@ -1560,9 +1584,14 @@ func _capture_jelly_look(main: Main, board: Board3D) -> void:
 	for index: int in range(stretch_positions.size()):
 		var stretch_orb: Orb3D = board.spawn_orb(index, 3 + index, stretch_positions[index])
 		stretch_orb.disable_physics()
+		stretch_orb.set_gravity(
+			Vector2i(roundi(stretch_directions[index].x), roundi(stretch_directions[index].y)),
+			Config.data.gravity_strength
+		)
 		stretch_orb.linear_velocity = stretch_directions[index] * 1100.0
-		stretch_orb._process(0.0)
+		stretch_orb._process(0.20)
 	await _capture("53_jelly_look_stretch.png")
+	await _capture_jelly_motion(board)
 	_clear_capture_board(board)
 	feedback.clear_effects()
 
@@ -1589,6 +1618,54 @@ func _capture_jelly_look(main: Main, board: Board3D) -> void:
 	if hud._callout_tween != null and hud._callout_tween.is_valid():
 		hud._callout_tween.kill()
 	hud._hide_callout_label()
+
+
+func _capture_jelly_motion(board: Board3D) -> void:
+	_clear_capture_board(board)
+	board.set_turn_resting(false)
+	var landing: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		7,
+		Vector2.ZERO
+	)
+	landing.disable_physics()
+	landing.set_gravity(Vector2i.DOWN, Config.data.gravity_strength)
+	for frame_index: int in range(10):
+		if frame_index < 4:
+			landing.linear_velocity = Vector2(0.0, 1100.0 - float(frame_index) * 120.0)
+		else:
+			if frame_index == 4:
+				landing.linear_velocity = Vector2(0.0, 1100.0)
+			landing.get_physics_body().linear_velocity = Vector3.ZERO
+			landing._physics_process(0.025)
+		landing._process(0.025)
+		await _capture("55_jelly_motion_land_%02d.png" % (frame_index + 1))
+
+	_clear_capture_board(board)
+	var coordinates: Array[float] = [-320.0, -160.0, 0.0, 160.0, 320.0]
+	var orb_index: int = 0
+	for y: float in coordinates:
+		for x: float in coordinates:
+			var resting_orb: Orb3D = board.spawn_orb(
+				orb_index % JellyOrbArt.PALETTE.size(),
+				1 + orb_index % 3,
+				Vector2(x, y)
+			)
+			resting_orb.disable_physics()
+			orb_index += 1
+	board.set_turn_resting(true)
+	await get_tree().create_timer(0.25).timeout
+	await _capture("55_jelly_motion_rest.png")
+
+	board.set_turn_resting(false)
+	board.set_gravity(Vector2i.RIGHT)
+	for orb: Orb3D in board.get_orbs():
+		orb._process(0.25)
+	board.set_turn_resting(true)
+	await _capture("55_jelly_motion_right.png")
+	print(
+		"SCREEN_CAPTURE_CHECK scene=jelly_motion land_frames=10 rest_orbs=25 gravity=right"
+	)
 
 
 func _clear_capture_board(board: Board3D) -> void:
