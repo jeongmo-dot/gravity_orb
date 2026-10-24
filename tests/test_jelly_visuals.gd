@@ -48,6 +48,100 @@ func test_jelly_max_face_uses_body_radius_while_regular_faces_keep_original_scal
 	Config.data.game_mode = original_mode
 
 
+func test_jelly_blast_ready_face_and_glow_match_mockup_c() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_jelly_minimum: int = Config.data.jelly_blast_min_level
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_blast_min_level = 5
+	var board: Board3D = await _create_board()
+	var level_four: Orb3D = board.spawn_orb(0, 4, Vector2(-270.0, 0.0))
+	var level_five: Orb3D = board.spawn_orb(3, 5, Vector2(-90.0, 0.0))
+	var level_six: Orb3D = board.spawn_orb(4, 6, Vector2(110.0, 0.0))
+	var level_seven: Orb3D = board.spawn_orb(1, 7, Vector2(310.0, 0.0))
+	var regular_material: ShaderMaterial = level_four._face.material_override as ShaderMaterial
+	var blast_material: ShaderMaterial = level_five._face.material_override as ShaderMaterial
+	var level_six_material: ShaderMaterial = level_six._face.material_override as ShaderMaterial
+	var max_material: ShaderMaterial = level_seven._face.material_override as ShaderMaterial
+
+	assert_true(not bool(regular_material.get_shader_parameter("is_blast_ready")), "L4 keeps normal face")
+	assert_true(bool(blast_material.get_shader_parameter("is_blast_ready")), "L5 uses blast-ready face")
+	assert_true(bool(level_six_material.get_shader_parameter("is_blast_ready")), "L6 uses blast-ready face")
+	assert_true(not bool(max_material.get_shader_parameter("is_blast_ready")), "L7 keeps MAX face")
+	assert_true(bool(max_material.get_shader_parameter("is_max")), "L7 remains MAX")
+	assert_near(
+		level_four._face.scale.x / (level_four.get_current_radius() / Orb3D.PIXELS_PER_METER),
+		0.62,
+		0.001,
+		"L4 normal face scale stays unchanged"
+	)
+	for orb: Orb3D in [level_five, level_six, level_seven]:
+		assert_near(
+			orb._face.scale.x / (orb.get_current_radius() / Orb3D.PIXELS_PER_METER),
+			1.0,
+			0.001,
+			"L%d face uses full body-radius plate" % orb.level
+		)
+
+	assert_eq(blast_material.get_shader_parameter("blast_eye_outer_top"), Vector2(0.32, -0.16), "blast eye outer top")
+	assert_eq(blast_material.get_shader_parameter("blast_eye_inner"), Vector2(0.16, -0.04), "blast eye inner corner")
+	assert_eq(blast_material.get_shader_parameter("blast_eye_outer_bottom"), Vector2(0.32, 0.08), "blast eye outer bottom")
+	assert_near(float(blast_material.get_shader_parameter("blast_eye_stroke_width")), 0.064, 0.0001, "blast eye stroke")
+	assert_eq(blast_material.get_shader_parameter("blast_mouth_center"), Vector2(0.0, 0.22), "blast mouth center")
+	assert_eq(blast_material.get_shader_parameter("blast_mouth_radii"), Vector2(0.064, 0.076), "blast mouth radii")
+	assert_eq(blast_material.get_shader_parameter("blast_mouth_color"), Color("3a1530"), "blast mouth color")
+	assert_eq(blast_material.get_shader_parameter("blast_blush_center"), Vector2(0.48, 0.18), "blast blush center")
+	assert_eq(blast_material.get_shader_parameter("blast_blush_radii"), Vector2(0.16, 0.10), "blast blush radii")
+	assert_near(float(blast_material.get_shader_parameter("blast_blush_alpha")), 0.60, 0.0001, "blast blush alpha")
+	assert_true(not level_four._blast_outline.visible, "L4 has no blast glow")
+	for orb: Orb3D in [level_five, level_six, level_seven]:
+		assert_true(orb._blast_outline.visible, "L%d blast glow visible" % orb.level)
+		var glow_material: ShaderMaterial = orb._blast_outline.material_override as ShaderMaterial
+		assert_true(not glow_material.shader.code.contains("ring"), "JELLY ring shader removed")
+		assert_eq(
+			glow_material.get_shader_parameter("glow_color"),
+			JellyOrbArt.color_for(orb.color, orb.level).lightened(JellyOrbArt.LEVEL_LIGHTEN_AMOUNT),
+			"L%d glow uses a slightly brighter body color" % orb.level
+		)
+		assert_true(orb._blast_outline.position.z < orb._mesh.position.z, "glow plate stays behind body")
+		assert_near(
+			orb._blast_outline.scale.x / (orb.get_current_radius() / Orb3D.PIXELS_PER_METER),
+			JellyOrbArt.BLAST_GLOW_OUTER_SCALE,
+			0.001,
+			"glow reaches 0.25r beyond body"
+		)
+
+	await _cleanup(board)
+	Config.data.jelly_blast_min_level = original_jelly_minimum
+	Config.data.game_mode = original_mode
+
+
+func test_jelly_blast_glow_alpha_is_smooth_and_disabled_threshold_keeps_normal_face() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_jelly_minimum: int = Config.data.jelly_blast_min_level
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_blast_min_level = 5
+	var board: Board3D = await _create_board()
+	var armed: Orb3D = board.spawn_orb(3, 5, Vector2.ZERO)
+	var before: float = armed.jelly_blast_glow_alpha()
+	armed._physics_process(1.0 / 120.0)
+	var after: float = armed.jelly_blast_glow_alpha()
+	assert_true(after >= JellyOrbArt.BLAST_GLOW_ALPHA_MIN, "glow stays above minimum alpha")
+	assert_true(after <= JellyOrbArt.BLAST_GLOW_ALPHA_MAX, "glow stays below maximum alpha")
+	assert_true(absf(after - before) <= 0.02, "glow alpha changes by at most 0.02 per frame")
+	await _cleanup(board)
+
+	Config.data.jelly_blast_min_level = 0
+	board = await _create_board()
+	var disabled: Orb3D = board.spawn_orb(4, 6, Vector2.ZERO)
+	var disabled_material: ShaderMaterial = disabled._face.material_override as ShaderMaterial
+	assert_true(not disabled.is_blast_armed(), "zero threshold disables JELLY blast mark")
+	assert_true(not disabled._blast_outline.visible, "zero threshold hides JELLY glow")
+	assert_true(not bool(disabled_material.get_shader_parameter("is_blast_ready")), "zero threshold keeps normal face")
+	await _cleanup(board)
+	Config.data.jelly_blast_min_level = original_jelly_minimum
+	Config.data.game_mode = original_mode
+
+
 func test_max_face_projects_smile_below_eyes_and_rotates_with_gravity() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	Config.data.game_mode = GameConfig.GameMode.JELLY

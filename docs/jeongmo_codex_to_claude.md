@@ -38,6 +38,36 @@
 
 ## 미확인
 
+### [2026-10-25] 대상 #102 — JELLY 대폭발 가능 표시: 터질 듯한 얼굴
+- 상태: 완료 — JELLY의 어두운 대폭발 링을 제거하고, 대폭발 가능 L5·L6에는 시안 C의 고정 얼굴(`>`·`<` 눈, `o` 입, 볼), L5·L6·L7에는 몸통 뒤 제 색 빛을 적용함. L7 MAX 얼굴과 CLASSIC·BLITZ 표시는 유지함
+- 브랜치 / PR: `jelly-blast-face` / PR 생성 후 갱신
+- 변경 파일: `scripts/core/JellyOrbArt.gd`, `scripts/spike/Orb3D.gd`, `tests/{capture_screens.ps1,test_jelly_visuals.gd,test_jolt_3d.gd}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] JELLY 대폭발 가능 표시에서 기존 어두운 링을 제거하고 CLASSIC·BLITZ 경로는 변경하지 않음 — 자동 (`test_jelly_visuals`) + 캡처 직접 관측
+  - [x] 대폭발 가능 L5·L6에 §12-JE.8의 정확한 좌표·굵기·색·얼굴 판 1.0 배율을 사용한 고정 얼굴을 표시하고 깜빡임을 끔. L4는 보통 얼굴, L7은 기존 MAX 얼굴 유지 — 자동 (`test_jelly_visuals`, `test_jolt_3d`) + 캡처 직접 관측
+  - [x] 대폭발 가능 L5·L6·L7 뒤에 같은 색의 1.25r 빛을 두고 알파 0.22↔0.40을 1.6초 사인으로 변화, 프레임당 알파 변화 0.02 이하 — 자동 (`test_jelly_visuals`)
+  - [x] 얼굴·빛이 #101의 중력 틀 회전과 `deform`을 공유하며, `jelly_blast_min_level=0`이면 얼굴·빛 표시 없음 — 자동 (`test_jelly_visuals`, `test_jolt_3d`) + 캡처 직접 관측
+  - [x] TURN·BLITZ·CLASSIC·SLIME·JELLY 상태 해시 유지 — 자동
+  - [x] `56_jelly_blast_face`를 노랑·보라 L5, L6, L7, 붐비는 판, 오른쪽 중력으로 구성해 두 비율에서 마지막 전체 캡처 — 자동 캡처 + 직접 관측
+  - [x] 전체 래퍼, 5경로 스모크, Debug Windows 빌드, 사용자 저장 해시 불변 — 자동
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard (`C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`)
+  - `godot --headless --path . --import` 최종 실행 → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` → 일반 `369/369` (`26.410초`), 장기 `5/5` (`49.351초`), 성능 `5/5` (`3.272초`), 합계 `379/379`, 종료 코드 0, 총 `79.033초`
+  - 해시 → TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`, CLASSIC 단계 `cf6172428c7901c43eb74f417e6880dc3ad375a329e669a8904234f5d38d1031`, SLIME 단계 `7ebe5d76b8c4843fa739e5c10405da172b577fdea1caca2047ed176b07455e97`, JELLY 시각 `5c96a80c71c632fb8e727cf1be541757c464b436dd83d6c8d0737b1211347df1`
+  - 기본·TURN·BLITZ·SLIME·JELLY `--quit-after 300` → 5개 모두 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/capture_screens.ps1` 최종 전체 실행 → 두 비율×99장=`198`장, 종료 코드 0. `56_jelly_blast_face` 두 화면비에서 노랑·보라 L5, L6, L7 MAX, 군집, 오른쪽 중력, JELLY NEXT·THEN을 직접 확인; 얼굴·빛 잘림 0건, 어두운 링 0건
+  - `tools/build_windows.ps1 -Debug` → 종료 코드 0, `build/windows-debug/GravityOrb_v0.15.0.exe` `105,088,880`바이트; Release 미실행
+  - 사용자 `save.cfg`는 검증 전후 `1,488`바이트, SHA-256 `4D8C75B028AD8710E8B24779A35283848845F75D9A97D238B9D24419BD1FB14D` 동일
+  - 규칙 검사 → 허용 파일 외 신규 `Input`/`InputEvent` 0건, 본 변경의 신규 전역 난수 호출 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. JELLY에서 대폭발 가능 기준을 L5로 두고 노랑 L5와 보라 L5를 나란히 만든다 → 두 젤리 모두 어두운 링 없이 `>`·`<` 눈, `o` 입, 볼이 보이고 얼굴이 깜빡이지 않아야 한다.
+  2. 같은 판에서 L6·L7을 대폭발 가능 상태로 만든다 → 세 레벨 모두 몸통 뒤 빛이 은은하게 밝아졌다 어두워지고, L7은 기존 MAX 얼굴을 유지해야 한다.
+  3. 중력을 오른쪽으로 바꾸고 젤리가 움직이거나 찌그러지는 모습을 본다 → 얼굴과 빛이 몸통의 회전·말랑함을 함께 따라가며 서로 어긋나지 않아야 한다.
+  4. `jelly_blast_min_level=0`으로 실행한다 → L5·L6의 터질 듯한 얼굴과 뒤 빛이 모두 없어야 한다.
+- 결정 사항: 빛의 색은 §12-JE.8의 “제 색보다 약간 밝게”를 기존 `LEVEL_LIGHTEN_AMOUNT`로 적용해 새 밸런스 수치를 만들지 않음. 규칙·물리·점수·보통/MAX 얼굴 원본·다른 모드 그림·설정 값은 변경하지 않음
+- 남은 것 · 질문: 자동 검증·전체 캡처·직접 관측을 완료했으며 최종 합격/불합격 판정은 Claude에 남김
+
 ### [2026-10-25] 대상 #101 — JELLY 움직임 다듬기 (지글거림·툙툙 튀)
 - 상태: 완료 — 추가 요구 1까지 반영. 변형된 몸통의 실제 앞면을 기준으로 얼굴·기호를 배치하고, 새 젤리의 첫 중력 틀은 즉시 맞추되 이후 중력 전환만 부드럽게 회전시킴. 흡수 레벨업은 흡수자 현재 반지름에서 0.10초 성장하며, 실제 접촉 더미로 전후 측정·캡처를 다시 수행함
 - 브랜치 / PR: `jelly-motion-smoothing` / https://github.com/jeongmo-dot/gravity_orb/pull/103

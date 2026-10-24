@@ -126,6 +126,7 @@ const CAPTURE_FILES: Array[String] = [
 	"55_jelly_motion_breathe_max.png",
 	"55_jelly_motion_rest.png",
 	"55_jelly_motion_right.png",
+	"56_jelly_blast_face.png",
 ]
 const HUD_CAPTURE_FILES: Array[String] = [
 	"02_turn_early.png",
@@ -167,6 +168,7 @@ const HUD_CAPTURE_FILES: Array[String] = [
 	"55_jelly_motion_breathe_max.png",
 	"55_jelly_motion_rest.png",
 	"55_jelly_motion_right.png",
+	"56_jelly_blast_face.png",
 ]
 
 var _failed: bool = false
@@ -413,6 +415,7 @@ func _capture_turn_scenes() -> void:
 	print("SCREEN_CAPTURE_CHECK scene=jelly_blast_j5 l4=unarmed l5=armed")
 	board.remove_orb(jelly_level_four)
 	board.remove_orb(jelly_level_five)
+	await _capture_jelly_blast_face(main, board)
 	await _capture_jelly_look(main, board)
 	Config.data.jelly_blast_min_level = 5
 	Config.data.game_mode = GameConfig.GameMode.TURN
@@ -1506,6 +1509,63 @@ func _capture_crowded_blast_pair(
 		]
 	)
 	await _destroy_main(main)
+
+
+func _capture_jelly_blast_face(main: Main, board: Board3D) -> void:
+	_clear_capture_board(board)
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_blast_min_level = 5
+	board.set_gravity(Vector2i.RIGHT)
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	hud._on_preview_changed([
+		[{"color": OrbTypes.OrbColor.YELLOW, "level": 2}],
+		[{"color": OrbTypes.OrbColor.PURPLE, "level": 1}],
+	])
+	var featured: Array[Dictionary] = [
+		{"color": OrbTypes.OrbColor.YELLOW, "level": 5, "position": Vector2(-270.0, -230.0)},
+		{"color": OrbTypes.OrbColor.PURPLE, "level": 5, "position": Vector2(-55.0, -230.0)},
+		{"color": OrbTypes.OrbColor.GREEN, "level": 6, "position": Vector2(225.0, -195.0)},
+		{"color": OrbTypes.OrbColor.RED, "level": 7, "position": Vector2(-255.0, 95.0)},
+		{"color": OrbTypes.OrbColor.BLUE, "level": 5, "position": Vector2(-5.0, 80.0)},
+		{"color": OrbTypes.OrbColor.CYAN, "level": 6, "position": Vector2(270.0, 115.0)},
+	]
+	for descriptor: Dictionary in featured:
+		var featured_position: Vector2 = descriptor["position"]
+		var orb: Orb3D = board.spawn_orb(
+			int(descriptor["color"]),
+			int(descriptor["level"]),
+			featured_position
+		)
+		orb.disable_physics()
+		if not orb.is_blast_armed():
+			_fail("JELLY blast-face capture L%d must be armed" % orb.level)
+		var face_material: ShaderMaterial = orb._face.material_override as ShaderMaterial
+		if orb.level < Config.data.orb_max_level and not bool(face_material.get_shader_parameter("is_blast_ready")):
+			_fail("JELLY blast-face capture L%d must use the burst face" % orb.level)
+		if orb.level == Config.data.orb_max_level and not bool(face_material.get_shader_parameter("is_max")):
+			_fail("JELLY blast-face capture L7 must keep MAX face")
+
+	var crowd_positions: Array[Vector2] = [
+		Vector2(-355.0, 315.0), Vector2(-235.0, 325.0), Vector2(-115.0, 315.0),
+		Vector2(5.0, 325.0), Vector2(125.0, 315.0), Vector2(245.0, 325.0),
+		Vector2(355.0, 315.0),
+	]
+	for index: int in range(crowd_positions.size()):
+		var crowd_orb: Orb3D = board.spawn_orb(
+			index % JellyOrbArt.PALETTE.size(),
+			1 + index % 3,
+			crowd_positions[index]
+		)
+		crowd_orb.disable_physics()
+	await get_tree().create_timer(0.20).timeout
+	await _capture("56_jelly_blast_face.png")
+	print(
+		"SCREEN_CAPTURE_CHECK scene=jelly_blast_face armed=%d crowd=%d gravity=right rings=off" % [
+			featured.size(),
+			crowd_positions.size(),
+		]
+	)
+	_clear_capture_board(board)
 
 
 func _capture_jelly_look(main: Main, board: Board3D) -> void:

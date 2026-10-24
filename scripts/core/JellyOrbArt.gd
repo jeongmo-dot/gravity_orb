@@ -30,15 +30,29 @@ const MAX_BLUSH_RADIUS_X: float = 0.12
 const MAX_BLUSH_RADIUS_Y: float = 0.07
 const MAX_BLUSH_ALPHA: float = 0.45
 const NORMAL_HIGHLIGHT_Y: float = -0.075
+const BLAST_EYE_OUTER_TOP: Vector2 = Vector2(0.32, -0.16)
+const BLAST_EYE_INNER: Vector2 = Vector2(0.16, -0.04)
+const BLAST_EYE_OUTER_BOTTOM: Vector2 = Vector2(0.32, 0.08)
+const BLAST_EYE_STROKE_WIDTH: float = 0.064
+const BLAST_MOUTH_CENTER: Vector2 = Vector2(0.0, 0.22)
+const BLAST_MOUTH_RADII: Vector2 = Vector2(0.064, 0.076)
+const BLAST_MOUTH_COLOR: Color = Color("3a1530")
+const BLAST_BLUSH_CENTER: Vector2 = Vector2(0.48, 0.18)
+const BLAST_BLUSH_RADII: Vector2 = Vector2(0.16, 0.10)
+const BLAST_BLUSH_ALPHA: float = 0.60
+const BLAST_GLOW_OUTER_SCALE: float = 1.25
+const BLAST_GLOW_ALPHA_MIN: float = 0.22
+const BLAST_GLOW_ALPHA_MAX: float = 0.40
+const BLAST_GLOW_PERIOD: float = 1.6
 const PREVIEW_TEXTURE_SIZE: int = 384
 const PREVIEW_MAX_TEXTURE_SIZE: int = 512
 
 static var _body_shader: Shader
 static var _face_shader: Shader
-static var _outline_shader: Shader
+static var _glow_shader: Shader
 static var _body_materials: Dictionary = {}
 static var _face_materials: Dictionary = {}
-static var _outline_materials: Dictionary = {}
+static var _glow_materials: Dictionary = {}
 static var _preview_textures: Dictionary = {}
 static var _face_mesh: ArrayMesh
 static var _animation_time: float = 0.0
@@ -58,17 +72,17 @@ static func prewarm(cfg: GameConfig) -> void:
 		for level_index: int in range(1, cfg.orb_max_level + 1):
 			body_material_for(color_index, level_index)
 			face_material_for(color_index, level_index)
-			outline_material_for(color_index, level_index)
+			glow_material_for(color_index, level_index)
 
 
 static func clear_cache() -> void:
 	_body_materials.clear()
 	_face_materials.clear()
-	_outline_materials.clear()
+	_glow_materials.clear()
 	_preview_textures.clear()
 	_body_shader = null
 	_face_shader = null
-	_outline_shader = null
+	_glow_shader = null
 	_face_mesh = null
 	_last_animation_frame = -1
 	if not _animation_frozen:
@@ -76,7 +90,7 @@ static func clear_cache() -> void:
 
 
 static func shared_material_count() -> int:
-	return _body_materials.size() + _face_materials.size() + _outline_materials.size()
+	return _body_materials.size() + _face_materials.size() + _glow_materials.size()
 
 
 static func advance_animation(delta: float) -> void:
@@ -157,15 +171,25 @@ static func body_material_for(color_index: int, level: int) -> ShaderMaterial:
 	return _body_materials[key] as ShaderMaterial
 
 
-static func face_material_for(color_index: int, level: int) -> ShaderMaterial:
-	var key: String = "%d:%d" % [color_index, level]
+static func face_material_for(
+	color_index: int,
+	level: int,
+	blast_ready: bool = false
+) -> ShaderMaterial:
+	var uses_blast_face: bool = blast_ready and level < 7
+	var key: String = "%d:%d:%s" % [color_index, level, uses_blast_face]
 	if not _face_materials.has(key):
 		var material: ShaderMaterial = ShaderMaterial.new()
-		material.resource_name = "jelly_face_c%d_l%d" % [color_index, level]
+		material.resource_name = "jelly_face_c%d_l%d_b%s" % [
+			color_index,
+			level,
+			uses_blast_face,
+		]
 		material.shader = _get_face_shader()
 		material.set_shader_parameter("jelly_color", color_for(color_index, level))
 		material.set_shader_parameter("color_id", color_index)
 		material.set_shader_parameter("is_max", level >= 7)
+		material.set_shader_parameter("is_blast_ready", uses_blast_face)
 		material.set_shader_parameter("max_face_color", MAX_FACE_COLOR)
 		material.set_shader_parameter("max_blush_color", MAX_BLUSH_COLOR)
 		material.set_shader_parameter("max_eye_x", MAX_EYE_CENTER_X)
@@ -188,21 +212,34 @@ static func face_material_for(color_index: int, level: int) -> ShaderMaterial:
 			MAX_BLUSH_RADIUS_Y
 		))
 		material.set_shader_parameter("max_blush_alpha", MAX_BLUSH_ALPHA)
+		material.set_shader_parameter("blast_eye_outer_top", BLAST_EYE_OUTER_TOP)
+		material.set_shader_parameter("blast_eye_inner", BLAST_EYE_INNER)
+		material.set_shader_parameter("blast_eye_outer_bottom", BLAST_EYE_OUTER_BOTTOM)
+		material.set_shader_parameter("blast_eye_stroke_width", BLAST_EYE_STROKE_WIDTH)
+		material.set_shader_parameter("blast_mouth_center", BLAST_MOUTH_CENTER)
+		material.set_shader_parameter("blast_mouth_radii", BLAST_MOUTH_RADII)
+		material.set_shader_parameter("blast_mouth_color", BLAST_MOUTH_COLOR)
+		material.set_shader_parameter("blast_blush_center", BLAST_BLUSH_CENTER)
+		material.set_shader_parameter("blast_blush_radii", BLAST_BLUSH_RADII)
+		material.set_shader_parameter("blast_blush_alpha", BLAST_BLUSH_ALPHA)
 		material.set_shader_parameter("highlight_y", NORMAL_HIGHLIGHT_Y)
 		material.set_shader_parameter("animation_time", _animation_time)
 		_face_materials[key] = material
 	return _face_materials[key] as ShaderMaterial
 
 
-static func outline_material_for(color_index: int, level: int) -> ShaderMaterial:
+static func glow_material_for(color_index: int, level: int) -> ShaderMaterial:
 	var key: String = "%d:%d" % [color_index, level]
-	if not _outline_materials.has(key):
+	if not _glow_materials.has(key):
 		var material: ShaderMaterial = ShaderMaterial.new()
-		material.resource_name = "jelly_outline_c%d_l%d" % [color_index, level]
-		material.shader = _get_outline_shader()
-		material.set_shader_parameter("rim_color", color_for(color_index, level))
-		_outline_materials[key] = material
-	return _outline_materials[key] as ShaderMaterial
+		material.resource_name = "jelly_blast_glow_c%d_l%d" % [color_index, level]
+		material.shader = _get_glow_shader()
+		material.set_shader_parameter(
+			"glow_color",
+			color_for(color_index, level).lightened(LEVEL_LIGHTEN_AMOUNT)
+		)
+		_glow_materials[key] = material
+	return _glow_materials[key] as ShaderMaterial
 
 
 static func face_mesh() -> ArrayMesh:
@@ -288,6 +325,7 @@ render_mode unshaded, cull_disabled, depth_prepass_alpha;
 uniform vec4 jelly_color : source_color = vec4(1.0);
 uniform int color_id = 0;
 uniform bool is_max = false;
+uniform bool is_blast_ready = false;
 uniform float animation_time = 0.0;
 uniform vec4 max_face_color : source_color = vec4(0.106, 0.086, 0.188, 1.0);
 uniform vec4 max_blush_color : source_color = vec4(1.0, 0.31, 0.50, 1.0);
@@ -305,6 +343,16 @@ uniform float max_blush_x = 0.46;
 uniform float max_blush_y = 0.16;
 uniform vec2 max_blush_radii = vec2(0.12, 0.07);
 uniform float max_blush_alpha = 0.45;
+uniform vec2 blast_eye_outer_top = vec2(0.32, -0.16);
+uniform vec2 blast_eye_inner = vec2(0.16, -0.04);
+uniform vec2 blast_eye_outer_bottom = vec2(0.32, 0.08);
+uniform float blast_eye_stroke_width = 0.064;
+uniform vec2 blast_mouth_center = vec2(0.0, 0.22);
+uniform vec2 blast_mouth_radii = vec2(0.064, 0.076);
+uniform vec4 blast_mouth_color : source_color = vec4(0.227, 0.082, 0.188, 1.0);
+uniform vec2 blast_blush_center = vec2(0.48, 0.18);
+uniform vec2 blast_blush_radii = vec2(0.16, 0.10);
+uniform float blast_blush_alpha = 0.60;
 uniform float highlight_y = -0.075;
 
 float capsule(vec2 p, vec2 a, vec2 b, float radius) {
@@ -338,6 +386,7 @@ void fragment() {
 	float left_eye = 0.0;
 	float right_eye = 0.0;
 	float smile = 0.0;
+	float blast_mouth = 0.0;
 	float blush = 0.0;
 	float max_highlight = 0.0;
 	if (is_max) {
@@ -369,6 +418,26 @@ void fragment() {
 		smile = max(smile, circle_mask(p, vec2(max_mouth_radius * 2.0, max_mouth_y), max_mouth_width * 0.5, 0.008));
 		blush = ellipse_mask(p, vec2(-max_blush_x, max_blush_y), max_blush_radii, 0.12)
 			+ ellipse_mask(p, vec2(max_blush_x, max_blush_y), max_blush_radii, 0.12);
+	} else if (is_blast_ready) {
+		float stroke_radius = blast_eye_stroke_width * 0.5;
+		vec2 left_outer_top = vec2(-blast_eye_outer_top.x, blast_eye_outer_top.y);
+		vec2 left_inner = vec2(-blast_eye_inner.x, blast_eye_inner.y);
+		vec2 left_outer_bottom = vec2(-blast_eye_outer_bottom.x, blast_eye_outer_bottom.y);
+		left_eye = max(
+			1.0 - smoothstep(-0.008, 0.008, capsule(p, left_outer_top, left_inner, stroke_radius)),
+			1.0 - smoothstep(-0.008, 0.008, capsule(p, left_inner, left_outer_bottom, stroke_radius))
+		);
+		right_eye = max(
+			1.0 - smoothstep(-0.008, 0.008, capsule(p, blast_eye_outer_top, blast_eye_inner, stroke_radius)),
+			1.0 - smoothstep(-0.008, 0.008, capsule(p, blast_eye_inner, blast_eye_outer_bottom, stroke_radius))
+		);
+		blast_mouth = ellipse_mask(p, blast_mouth_center, blast_mouth_radii, 0.12);
+		blush = ellipse_mask(
+			p,
+			vec2(-blast_blush_center.x, blast_blush_center.y),
+			blast_blush_radii,
+			0.12
+		) + ellipse_mask(p, blast_blush_center, blast_blush_radii, 0.12);
 	} else {
 		left_eye = 1.0 - smoothstep(-0.015, 0.015,
 			capsule(p, vec2(-0.25, -eye_height), vec2(-0.25, eye_height), 0.105));
@@ -377,17 +446,23 @@ void fragment() {
 	}
 	float eyes = clamp(left_eye + right_eye, 0.0, 1.0);
 	float highlight = 0.0;
-	if (!is_max && blink < 0.72) {
+	if (!is_max && !is_blast_ready && blink < 0.72) {
 		highlight = circle_mask(p, vec2(-0.285, highlight_y), 0.034, 0.012)
 			+ circle_mask(p, vec2(0.215, highlight_y), 0.034, 0.012);
 	}
-	float alpha = clamp(eyes + smile + blush * max_blush_alpha + highlight + max_highlight, 0.0, 1.0);
+	float blush_alpha = is_blast_ready ? blast_blush_alpha : max_blush_alpha;
+	float alpha = clamp(
+		eyes + smile + blast_mouth + blush * blush_alpha + highlight + max_highlight,
+		0.0,
+		1.0
+	);
 	vec3 dark = mix(vec3(0.055, 0.065, 0.11), jelly_color.rgb * 0.20, 0.22);
-	if (is_max) {
+	if (is_max || is_blast_ready) {
 		dark = max_face_color.rgb;
 	}
 	vec3 face_color = mix(dark, vec3(1.0), clamp(highlight, 0.0, 1.0));
-	face_color = mix(face_color, max_blush_color.rgb, clamp(blush, 0.0, 1.0) * max_blush_alpha);
+	face_color = mix(face_color, blast_mouth_color.rgb, clamp(blast_mouth, 0.0, 1.0));
+	face_color = mix(face_color, max_blush_color.rgb, clamp(blush, 0.0, 1.0) * blush_alpha);
 	face_color = mix(face_color, vec3(1.0), clamp(max_highlight, 0.0, 1.0));
 	ALBEDO = face_color;
 	EMISSION = face_color * 0.08;
@@ -397,24 +472,24 @@ void fragment() {
 	return _face_shader
 
 
-static func _get_outline_shader() -> Shader:
-	if _outline_shader != null:
-		return _outline_shader
-	_outline_shader = Shader.new()
-	_outline_shader.resource_name = "jelly_outline_shader"
-	_outline_shader.code = """
+static func _get_glow_shader() -> Shader:
+	if _glow_shader != null:
+		return _glow_shader
+	_glow_shader = Shader.new()
+	_glow_shader.resource_name = "jelly_blast_glow_shader"
+	_glow_shader.code = """
 shader_type spatial;
 render_mode unshaded, cull_disabled, depth_prepass_alpha;
 
-uniform vec4 rim_color : source_color = vec4(1.0);
+uniform vec4 glow_color : source_color = vec4(1.0);
 
 void fragment() {
 	vec2 p = UV * 2.0 - 1.0;
 	float radial = length(p);
-	float ring = smoothstep(0.78, 0.90, radial) * (1.0 - smoothstep(0.94, 1.0, radial));
-	ALBEDO = mix(rim_color.rgb, vec3(1.0), 0.35);
-	EMISSION = ALBEDO * 0.70;
-	ALPHA = ring * 0.92;
+	float glow = 1.0 - smoothstep(0.80, 1.0, radial);
+	ALBEDO = glow_color.rgb;
+	EMISSION = glow_color.rgb * 0.70;
+	ALPHA = glow;
 }
 """
-	return _outline_shader
+	return _glow_shader
