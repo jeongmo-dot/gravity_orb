@@ -216,6 +216,68 @@ func test_jelly_deform_follows_gravity_smoothly_and_squashes_on_speed_loss() -> 
 	Config.data.fx_enabled = original_fx
 
 
+func test_jelly_face_and_symbol_stay_in_front_of_deformed_body() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var board: Board3D = await _create_board()
+	var orb: Orb3D = board.spawn_orb(0, 7, Vector2.ZERO)
+	var body_mesh: SphereMesh = orb._mesh.mesh as SphereMesh
+
+	orb._jelly_deform = Vector2(1.18, 0.80)
+	orb._update_visual_transform()
+	var squash_front_z: float = orb._mesh.position.z + body_mesh.radius * orb._mesh.scale.z
+	assert_true(orb._face.position.z > squash_front_z, "face stays ahead at maximum squash")
+	assert_true(orb._symbol_mesh.position.z > squash_front_z, "symbol stays ahead at maximum squash")
+
+	orb._jelly_deform = Vector2.ONE
+	orb._jelly_breath_weight = 1.0
+	orb._jelly_idle_elapsed = PI / (2.0 * 1.8)
+	orb._update_visual_transform()
+	var breath_front_z: float = orb._mesh.position.z + body_mesh.radius * orb._mesh.scale.z
+	assert_true(orb._face.position.z > breath_front_z, "face stays ahead at L7 breath peak")
+	assert_true(orb._symbol_mesh.position.z > breath_front_z, "symbol stays ahead at L7 breath peak")
+
+	orb._visual_punch_scale = Vector3.ONE * 1.18
+	var punch_front_z: float = orb._mesh.position.z + body_mesh.radius * orb._mesh.scale.z
+	assert_true(orb._face.position.z > punch_front_z, "face stays ahead during merge punch")
+	assert_true(orb._symbol_mesh.position.z > punch_front_z, "symbol stays ahead during merge punch")
+	await _cleanup(board)
+	Config.data.game_mode = original_mode
+
+
+func test_new_jelly_frame_starts_at_first_gravity_then_turns_smoothly() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var board: Board3D = await _create_board()
+	var directions: Array[Vector2i] = [
+		Vector2i.UP,
+		Vector2i.LEFT,
+		Vector2i.RIGHT,
+	]
+	for direction: Vector2i in directions:
+		board.set_gravity(direction)
+		var orb: Orb3D = board.spawn_orb(0, 3, Vector2.ZERO)
+		assert_near(
+			orb._jelly_frame_rotation,
+			orb._jelly_frame_target_rotation,
+			0.0001,
+			"new JELLY starts at %s gravity angle" % direction
+		)
+		board.remove_orb(orb)
+
+	board.set_gravity(Vector2i.DOWN)
+	var turning: Orb3D = board.spawn_orb(0, 3, Vector2.ZERO)
+	board.set_gravity(Vector2i.RIGHT)
+	turning._process(1.0 / 120.0)
+	assert_true(turning._jelly_frame_rotation > 0.0, "existing JELLY begins turning")
+	assert_true(
+		turning._jelly_frame_rotation < turning._jelly_frame_target_rotation,
+		"existing JELLY does not jump when gravity changes"
+	)
+	await _cleanup(board)
+	Config.data.game_mode = original_mode
+
+
 func test_jelly_frame_rotation_and_breath_weight_change_without_jumps() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	Config.data.game_mode = GameConfig.GameMode.JELLY

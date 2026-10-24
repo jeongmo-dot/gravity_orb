@@ -132,7 +132,17 @@ func flush(delta: float = 0.0) -> int:
 				chain
 			)
 			if Config.data.game_mode == GameConfig.GameMode.JELLY:
-				result_orb.set_jelly_mass(result_mass, Config.data)
+				var growth_start_radius: float = -1.0
+				if jelly_absorption and absorber >= 1 and absorber <= source_radii.size():
+					growth_start_radius = source_radii[absorber - 1]
+				if result_orb is Orb3D:
+					result_orb.set_jelly_mass(
+						result_mass,
+						Config.data,
+						growth_start_radius
+					)
+				else:
+					result_orb.set_jelly_mass(result_mass, Config.data)
 			result_orb.note_diagnostic_event("merge_result")
 			if _board.should_ghost_reaction_results():
 				result_orb.enter_ghost_state(Config.data.ghost_alpha)

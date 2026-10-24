@@ -66,6 +66,7 @@ var _is_jelly_visual: bool = false
 var _jelly_idle_elapsed: float = 0.0
 var _jelly_frame_rotation: float = 0.0
 var _jelly_frame_target_rotation: float = 0.0
+var _jelly_frame_initialized: bool = false
 var _jelly_deform: Vector2 = Vector2.ONE
 var _jelly_impact: float = 0.0
 var _jelly_breath_weight: float = 0.0
@@ -188,6 +189,7 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	_jelly_idle_elapsed = 0.0
 	_jelly_frame_rotation = 0.0
 	_jelly_frame_target_rotation = 0.0
+	_jelly_frame_initialized = false
 	_jelly_deform = Vector2.ONE
 	_jelly_impact = 0.0
 	_jelly_breath_weight = 0.0
@@ -301,7 +303,11 @@ func get_jelly_mass() -> float:
 	return jelly_mass
 
 
-func set_jelly_mass(next_mass: float, cfg: GameConfig) -> void:
+func set_jelly_mass(
+	next_mass: float,
+	cfg: GameConfig,
+	growth_start_radius_px: float = -1.0
+) -> void:
 	var gravity_direction: Vector2 = world_vector_to_plane(_body.constant_force).normalized()
 	var previous_radius: float = _current_radius
 	jelly_mass = clampf(
@@ -311,6 +317,8 @@ func set_jelly_mass(next_mass: float, cfg: GameConfig) -> void:
 	)
 	level = cfg.jelly_level_for_mass(jelly_mass)
 	_radius = cfg.jelly_radius_for_mass(jelly_mass)
+	if growth_start_radius_px >= 0.0:
+		previous_radius = minf(growth_start_radius_px, _radius)
 	_growth_start_radius = previous_radius
 	_growth_duration = (
 		JELLY_ABSORPTION_GROWTH_DURATION
@@ -477,6 +485,9 @@ func set_gravity(direction: Vector2i, strength: float) -> void:
 	_body.constant_force = plane_vector_to_world(acceleration_px) * _body.mass
 	if _is_jelly_visual and direction != Vector2i.ZERO:
 		_jelly_frame_target_rotation = atan2(float(direction.x), float(direction.y))
+		if not _jelly_frame_initialized:
+			_jelly_frame_rotation = _jelly_frame_target_rotation
+			_jelly_frame_initialized = true
 	_body.sleeping = false
 
 
@@ -819,15 +830,20 @@ func _update_visual_transform() -> void:
 		render_plane_position,
 		interpolated_position.z
 	)
-	_mesh.position = render_world_position
-	_adornment.position = render_world_position + Vector3(0.0, 0.0, 0.001)
-	_blast_outline.position = render_world_position + Vector3(0.0, 0.0, radius_m + 0.004)
-	_face.position = render_world_position + Vector3(0.0, 0.0, radius_m + 0.006)
 	var stretch_ratio: float = _visual_stretch_ratio()
 	var stretch_scale: Vector3 = _stretch_scale_for_ratio(stretch_ratio)
 	var jelly_deform: Vector2 = _jelly_render_deform() if _is_jelly_visual else Vector2.ONE
 	var jelly_scale: Vector3 = Vector3(jelly_deform.x, jelly_deform.y, jelly_deform.x)
 	_mesh.scale = _visual_punch_scale * stretch_scale * jelly_scale
+	_mesh.position = render_world_position
+	_adornment.position = render_world_position + Vector3(0.0, 0.0, 0.001)
+	_blast_outline.position = render_world_position + Vector3(0.0, 0.0, radius_m + 0.004)
+	var body_front_offset: float = (
+		radius_m * absf(_mesh.scale.z)
+		if _is_jelly_visual
+		else radius_m
+	)
+	_face.position = render_world_position + Vector3(0.0, 0.0, body_front_offset + 0.006)
 	if _is_jelly_visual:
 		_mesh.rotation = Vector3(0.0, 0.0, _jelly_frame_rotation)
 	elif stretch_ratio <= 0.0:
@@ -867,7 +883,7 @@ func _update_visual_transform() -> void:
 		+ Vector3(
 			0.0,
 			-symbol_y_offset,
-			radius_m + (0.008 if _is_jelly_visual else 0.002)
+			body_front_offset + (0.008 if _is_jelly_visual else 0.002)
 		)
 	)
 	_symbol_mesh.rotation = Vector3.ZERO

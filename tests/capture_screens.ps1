@@ -126,6 +126,7 @@ $expectedFiles = @(
 	"55_jelly_motion_land_08.png",
 	"55_jelly_motion_land_09.png",
 	"55_jelly_motion_land_10.png",
+	"55_jelly_motion_breathe_max.png",
 	"55_jelly_motion_rest.png",
 	"55_jelly_motion_right.png"
 )
@@ -166,6 +167,7 @@ $hudExpectedFiles = @(
 	"55_jelly_motion_land_08.png",
 	"55_jelly_motion_land_09.png",
 	"55_jelly_motion_land_10.png",
+	"55_jelly_motion_breathe_max.png",
 	"55_jelly_motion_rest.png",
 	"55_jelly_motion_right.png"
 )

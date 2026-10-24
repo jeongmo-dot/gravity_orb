@@ -123,6 +123,7 @@ const CAPTURE_FILES: Array[String] = [
 	"55_jelly_motion_land_08.png",
 	"55_jelly_motion_land_09.png",
 	"55_jelly_motion_land_10.png",
+	"55_jelly_motion_breathe_max.png",
 	"55_jelly_motion_rest.png",
 	"55_jelly_motion_right.png",
 ]
@@ -163,6 +164,7 @@ const HUD_CAPTURE_FILES: Array[String] = [
 	"55_jelly_motion_land_08.png",
 	"55_jelly_motion_land_09.png",
 	"55_jelly_motion_land_10.png",
+	"55_jelly_motion_breathe_max.png",
 	"55_jelly_motion_rest.png",
 	"55_jelly_motion_right.png",
 ]
@@ -1623,6 +1625,7 @@ func _capture_jelly_look(main: Main, board: Board3D) -> void:
 func _capture_jelly_motion(board: Board3D) -> void:
 	_clear_capture_board(board)
 	board.set_turn_resting(false)
+	board.set_gravity(Vector2i.DOWN)
 	var landing: Orb3D = board.spawn_orb(
 		OrbTypes.OrbColor.RED,
 		7,
@@ -1642,30 +1645,70 @@ func _capture_jelly_motion(board: Board3D) -> void:
 		await _capture("55_jelly_motion_land_%02d.png" % (frame_index + 1))
 
 	_clear_capture_board(board)
-	var coordinates: Array[float] = [-320.0, -160.0, 0.0, 160.0, 320.0]
-	var orb_index: int = 0
-	for y: float in coordinates:
-		for x: float in coordinates:
-			var resting_orb: Orb3D = board.spawn_orb(
-				orb_index % JellyOrbArt.PALETTE.size(),
-				1 + orb_index % 3,
-				Vector2(x, y)
-			)
-			resting_orb.disable_physics()
-			orb_index += 1
+	board.set_gravity(Vector2i.DOWN)
+	var breathing_max: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, 7, Vector2.ZERO)
+	breathing_max.disable_physics()
+	breathing_max.set_turn_resting(true)
+	breathing_max._jelly_breath_weight = 1.0
+	breathing_max._jelly_idle_elapsed = PI / (2.0 * 1.8)
+	breathing_max._process(0.0)
+	await _capture("55_jelly_motion_breathe_max.png")
+
+	_clear_capture_board(board)
+	board.set_turn_resting(false)
+	board.set_gravity(Vector2i.DOWN)
+	for orb_index: int in range(40):
+		var column: int = orb_index % 8
+		var row: int = orb_index / 8
+		board.spawn_orb(
+			orb_index % JellyOrbArt.PALETTE.size(),
+			1,
+			Vector2(-315.0 + float(column) * 90.0, -360.0 + float(row) * 78.0)
+		)
+	var settle_directions: Array[Vector2i] = [
+		Vector2i.DOWN,
+		Vector2i.RIGHT,
+		Vector2i.UP,
+		Vector2i.LEFT,
+		Vector2i.DOWN,
+	]
+	for direction: Vector2i in settle_directions:
+		board.set_gravity(direction)
+		await _wait_physics_seconds(1.2)
+	board.set_gravity(Vector2i.DOWN)
+	await _wait_physics_seconds(1.8)
+	var touching_pairs: int = _count_touching_orb_pairs(board)
+	if touching_pairs <= 0:
+		_fail("JELLY motion rest capture must contain a touching pile")
 	board.set_turn_resting(true)
 	await get_tree().create_timer(0.25).timeout
 	await _capture("55_jelly_motion_rest.png")
 
 	board.set_turn_resting(false)
 	board.set_gravity(Vector2i.RIGHT)
-	for orb: Orb3D in board.get_orbs():
-		orb._process(0.25)
-	board.set_turn_resting(true)
+	await _wait_physics_seconds(0.75)
 	await _capture("55_jelly_motion_right.png")
 	print(
-		"SCREEN_CAPTURE_CHECK scene=jelly_motion land_frames=10 rest_orbs=25 gravity=right"
+		"SCREEN_CAPTURE_CHECK scene=jelly_motion land_frames=10 breath_max=true rest_orbs=40 touching_pairs=%d turns=5 gravity=right"
+		% touching_pairs
 	)
+
+
+func _count_touching_orb_pairs(board: Board3D) -> int:
+	var orbs: Array[Orb3D] = board.get_orbs()
+	var count: int = 0
+	for first_index: int in range(orbs.size()):
+		for second_index: int in range(first_index + 1, orbs.size()):
+			var first: Orb3D = orbs[first_index]
+			var second: Orb3D = orbs[second_index]
+			var touching_distance: float = (
+				first.get_current_radius()
+				+ second.get_current_radius()
+				+ 4.0
+			)
+			if first.position.distance_to(second.position) <= touching_distance:
+				count += 1
+	return count
 
 
 func _clear_capture_board(board: Board3D) -> void:

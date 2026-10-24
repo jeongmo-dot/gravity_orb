@@ -39,30 +39,32 @@
 ## 미확인
 
 ### [2026-10-25] 대상 #101 — JELLY 움직임 다듬기 (지글거림·툙툙 튀)
-- 상태: 완료 — JELLY의 몸통·얼굴을 하나의 중력 틀·`deform`으로 통합하고, 접촉 트윈 대신 물리 스텝 속력 감소량으로 충돌 누름을 만듦. 흡수 반지름 0.10초 성장과 3D 모드 렌더 위치 보간을 적용함
+- 상태: 완료 — 추가 요구 1까지 반영. 변형된 몸통의 실제 앞면을 기준으로 얼굴·기호를 배치하고, 새 젤리의 첫 중력 틀은 즉시 맞추되 이후 중력 전환만 부드럽게 회전시킴. 흡수 레벨업은 흡수자 현재 반지름에서 0.10초 성장하며, 실제 접촉 더미로 전후 측정·캡처를 다시 수행함
 - 브랜치 / PR: `jelly-motion-smoothing` / https://github.com/jeongmo-dot/gravity_orb/pull/103
-- 변경 파일: `scripts/core/TurnManager.gd`, `scripts/spike/{Board3D,Orb3D}.gd`, `tests/{capture_screens.ps1,run_jelly_motion_measurement.ps1,test_jelly_visuals.gd,test_jolt_3d.gd}`, `tests/scenarios/test_ui_fixes.gd`, `tests/spike/{capture_screens.gd,JellyMotionMeasurement.tscn,run_jelly_motion_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
+- 변경 파일: `scripts/core/{CollisionResolver,TurnManager}.gd`, `scripts/spike/{Board3D,Orb3D}.gd`, `tests/{capture_screens.ps1,run_jelly_motion_measurement.ps1,test_jelly_visuals.gd,test_jolt_3d.gd}`, `tests/scenarios/test_ui_fixes.gd`, `tests/spike/{capture_screens.gd,JellyMotionMeasurement.tscn,run_jelly_motion_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] JELLY 틀을 중력 방향으로 `delta×8`, 단일 `deform`을 `delta×11`로 보간하고 몸통·얼굴에 같이 적용; 속도 방향 회전·즉시 스케일·`TRANS_BACK` 제거 — 자동 (`test_jelly_visuals`) + 캡처 직접 관측
+  - [x] 추가 요구 1: 최대 눌림·L7 호흡 최대·합체 펀치에서도 얼굴·기호 Z를 변형 몸통 실제 앞면보다 앞으로 배치 — 자동 (`test_jelly_face_and_symbol_stay_in_front_of_deformed_body`) + 캡처 직접 관측
+  - [x] 추가 요구 1: 새 JELLY는 생성 당시 첫 중력 각도에 즉시 맞고, 이미 존재하는 JELLY만 이후 중력 변경을 `delta×8`로 보간 — 자동 (`test_new_jelly_frame_starts_at_first_gravity_then_turns_smoothly`)
   - [x] 낙하 `v·g/5800`(최대 0.19), 속력 감소 `/1000`의 충돌 강도·0.06 미만 무시·`4.8/s` 감쇠, 입력 대기에서만 `delta×4` 숨쉬기 — 자동 (`test_jelly_deform_*`, `test_jelly_impact_*`, `test_jelly_frame_*`)
-  - [x] 흡수 결과의 물리·그림 반지름을 이전→신규로 0.10초 동안 증가 — 자동 (`test_jelly_absorption_keeps_larger_position_mass_and_interpolated_radius`)
+  - [x] 흡수 결과의 물리·그림 반지름을 흡수자 현재 반지름→신규 반지름으로 0.10초 동안 증가. 질량 6(`72.5`) + 2 → 8(L4 `85.0`)은 0.05초 `78.75`, 0.10초 `85.0` — 자동 (`test_jelly_absorption_keeps_larger_position_mass_and_interpolated_radius`)
   - [x] CLASSIC·BLITZ·JELLY 3D 그림 위치를 이전/현재 물리 위치와 `Engine.get_physics_interpolation_fraction()`으로 보간하고 생성·입구 대기/해제·순간이동·물리 끄기에서 기록 초기화 — 자동 (`test_visual_position_interpolates_and_teleport_resets_history`, `test_interpolation_smooths_120hz_physics_for_164hz_rendering`, `test_3d_symbol_uses_interpolated_fast_body_position_before_render`)
-  - [x] 붐비는 40개 대기 판 3초 측정: 찌그러짐 시작 0회/초, 프레임 최대 크기 변화 0.5% 이하, 숨쉬기 전환 0.5% 이하 — 자동 측정
+  - [x] 실제로 떨어뜨린 40개를 5회 중력 전환 후 접촉 더미로 만든 뒤 정지·1.5초 이동을 전후 측정. 변경 후 접촉쌍 68개, 정지 충돌 시작 0회/초, 정지 최대 크기 변화 0.0270%, 이동 최대 크기 변화 2.5587%, 틀 변화 0.104720rad — 자동 측정
   - [x] CLASSIC·BLITZ·SLIME 기준 해시 유지, JELLY 시각 켜기/끄기 해시 동일, 흡수 성장이 반영된 JELLY 신규 시드 1 마지막 상태 해시 보고 — 자동
   - [x] JELLY 무작위 R 20시드×600턴 상한 재측정, 중앙값 `230.5`턴으로 #98 J5 `223.5±10%` 범위 `201.15~245.85` 안 — 자동 측정
-  - [x] 두 비율 `55_jelly_motion_land_01~10`·`rest`·`right` 추가 및 마지막 전체 캡처 실행 — 자동 캡처 + 10프레임·정지·오른쪽 중력 직접 관측
+  - [x] 두 비율 `55_jelly_motion_land_01~10`·`breathe_max`·`rest`·`right`와 실제 40개 접촉 더미(3턴 이상)를 마지막 전체 캡처로 실행 — 자동 캡처 + 착지 6~8·L7 호흡 최대·정지·오른쪽 이동 직접 관측
   - [x] 전체 래퍼, 5경로 스모크, 실제 GPU 창 측정, Debug Windows 빌드, 사용자 저장 해시 불변 — 자동
 - QA 관측값:
   - Godot `4.8.dev3.official.51105ccbe` Standard (`C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`)
   - `godot --headless --path . --import` 최종 권한 실행 → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
-  - 움직임 측정(붐비는 JELLY 40개, 대기 3초): 변경 전 `impact 0.000000/s`, 프레임 최대 크기 변화 `0.000270`(0.0270%), 숨쉬기 전환 `0.047325`(4.7325%); 변경 후 최종 `0.000000/s`, `0.000628`(0.0628%), `0.000626`(0.0626%). 결정적 대기 배치에서 접촉 재시작은 변경 전·후 모두 0이었고, 코드 경로 교체와 속력 감소 임계/감쇠는 별도 자동 테스트로 관측
-  - `tests/run_tests.ps1` → 일반 `365/365` (`26.997초`), 장기 `5/5` (`48.786초`), 성능 `5/5` (`3.300초`), 합계 `375/375`, 종료 코드 0, 총 `79.082초`
-  - 해시 → TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`, CLASSIC 단계 `cf6172428c7901c43eb74f417e6880dc3ad375a329e669a8904234f5d38d1031`, SLIME 단계 `7ebe5d76b8c4843fa739e5c10405da172b577fdea1caca2047ed176b07455e97` 기존 기준 동일. JELLY 시각 ON/OFF `5c96a80c71c632fb8e727cf1be541757c464b436dd83d6c8d0737b1211347df1` 동일; 신규 시드 1·256턴 마지막 상태 `58e06dee6e3f22ff7ed21f5cc6f57c0a66a341a9ed693100e7c3e39b899f2d93`
+  - 실제 접촉 더미 측정(`orbs=40`, `turns=5`): `origin/main`은 접촉쌍 `69`, 정지 충돌 시작 `0.000000/s`, 정지 크기 변화 `0.000270`, 1.5초 이동 크기 변화 `0.268981`, 틀 회전 변화 `1.724097rad`; 변경 후 접촉쌍 `68`, `0.000000/s`, `0.000270`, `0.025587`, `0.104720rad`, 호흡 전환 `0.000666`. 즉 이동 중 최대 크기 변화는 `26.8981%→2.5587%`, 틀 변화는 `1.724097→0.104720rad`
+  - `tests/run_tests.ps1` → 일반 `367/367` (`25.315초`), 장기 `5/5` (`43.798초`), 성능 `5/5` (`3.380초`), 합계 `377/377`, 종료 코드 0, 총 `72.493초`
+  - 해시 → TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`, CLASSIC 단계 `cf6172428c7901c43eb74f417e6880dc3ad375a329e669a8904234f5d38d1031`, SLIME 단계 `7ebe5d76b8c4843fa739e5c10405da172b577fdea1caca2047ed176b07455e97` 기존 기준 동일. JELLY 시각 ON/OFF `5c96a80c71c632fb8e727cf1be541757c464b436dd83d6c8d0737b1211347df1` 동일; 추가 요구 반영 신규 시드 1은 `209`턴 종료, 마지막 상태 `95ecb85998dc11d3b1b7aeed67728fbb78f1a4d1104e799e3ccbeaac42e4e8b0`
   - JELLY R 20시드 완료 턴 → 중앙 `230.5`, 최소 `202`, 최대 `260`; 요구 범위 안
   - 실제 창(RTX 4070 Ti SUPER, VSync off) JELLY 40개 → `2,406`표본, p99 `2.854ms`, 최대 `5.091ms`, `16.7ms`/`33.3ms` 초과 각 0프레임, draw call 최대 `253`. 표시장치 실제 주사율은 자동 보고에 포함되지 않아 미측정
-  - `tests/capture_screens.ps1` 최종 전체 실행 → 두 비율×97장=`194`장, 종료 코드 0. `55_jelly_motion_land_01~10`에서 세로 늘어남→충돌 직후 가로로 납작→원형 복귀가 이어지고 MAX 얼굴이 같은 축으로 변형됨을 직접 확인. `rest`는 25개 정지 배치에서 급격한 변형 없음, `right`는 몸통·얼굴이 함께 오른쪽으로 회전함; 겹침·잘림 0건
+  - `tests/capture_screens.ps1` 최종 전체 실행 → 두 비율×98장=`196`장, 종료 코드 0. 캡처의 실제 더미는 40개·접촉쌍 71개·중력 전환 5회. `land_06~08`과 `breathe_max`에서 MAX 얼굴이 몸통 앞에 선명하게 유지되고, `rest`는 바닥에 닿아 쌓인 실제 더미, `right`는 오른쪽으로 이동·적층 중인 실제 더미임을 두 화면비에서 직접 확인; 얼굴 겹침·잘림 0건
   - 기본·TURN·BLITZ·SLIME·JELLY `--quit-after 300` → 5개 모두 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
-  - `tools/build_windows.ps1 -Debug` → 종료 코드 0, `build/windows-debug/GravityOrb_v0.15.0.exe` `105,086,000`바이트; Release 미실행
+  - `tools/build_windows.ps1 -Debug` → 종료 코드 0, `build/windows-debug/GravityOrb_v0.15.0.exe` `105,086,640`바이트; Release 미실행
   - 사용자 `save.cfg` 캡처·창·빌드 검증 전후 `1,488`바이트, SHA-256 `4D8C75B028AD8710E8B24779A35283848845F75D9A97D238B9D24419BD1FB14D` 동일
   - 규칙 검사 → 본 항목의 신규 `Input`/`InputEvent`·전역 난수 호출 0건, `git diff --check` 오류 0건. 전체 검색의 `SlimeSim`/`SlimeGame` 명시적 RNG는 기존 코드이며 diff 없음
 - 수동 확인 절차:
@@ -70,7 +72,8 @@
   2. 떨어지는 젤리가 벽에 내려앉는 순간을 본다 → 낙하 중에는 중력 축으로 늘어나고, 충돌 순간에는 중력 축으로 납작해진 뒤 튀지 않고 이어서 원형으로 복귀해야 한다.
   3. 붐비는 대기 판을 3초 이상 본다 → 접촉이 재연결될 때마다 찌그러지거나 숨쉬기가 급격히 켜지고 꺼지는 지글거림이 없어야 한다.
   4. 같은 색 단계 차 1 젤리를 흡수시킨다 → 먹는 쪽의 물리·그림 크기가 한 프레임에 튀지 않고 약 0.10초 동안 커져야 한다.
-- 결정 사항: 실제 물리와 독립된 렌더 보간 기록을 `Orb3D` 내부에 두었고, 턴 상태는 `TurnManager → Board3D → Orb3D` 호출로 전파함. 밸런스 수치·규칙·점수·SLIME은 변경하지 않음
+  5. 아래/왼쪽/오른쪽 중력 상태에서 새 JELLY를 만든다 → 생성 프레임부터 해당 중력 각도로 보이고, 그 뒤 중력을 바꿀 때만 부드럽게 회전해야 한다.
+- 결정 사항: `origin/main` `6eee55c`를 먼저 병합함. 실제 물리와 독립된 렌더 보간 기록을 `Orb3D` 내부에 두었고, 턴 상태는 `TurnManager → Board3D → Orb3D` 호출로 전파함. 흡수자 반지름은 `CollisionResolver`가 기존 소스 반지름 기록에서 결과 `Orb3D`에 전달함. 밸런스 수치·규칙·점수·SLIME은 변경하지 않음
 - 남은 것 · 질문: 자동 검증·실제 창·전체 캡처·직접 관측을 완료했으며 최종 합격/불합격 판정은 Claude에 남김
 
 ### [2026-10-24] 대상 #100 — Windows 빌드 0.15.0

@@ -36,7 +36,9 @@ if (-not (Test-Path -LiteralPath $reportPath)) {
 }
 $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
 Write-Output (
-    "JELLY_MOTION_RESULT label={0} exit=0 orbs={1} impact_starts_per_second={2:N6} max_scale_change_ratio={3:N6} breath_toggle_ratio={4:N6}" -f `
-        $Label, $report.jelly_count, $report.impact_starts_per_second, `
-        $report.max_scale_change_ratio, $report.max_breath_toggle_change_ratio
+    "JELLY_MOTION_RESULT label={0} exit=0 orbs={1} turns={2} touching_pairs={3} impact_starts_per_second={4:N6} rest_scale_change_ratio={5:N6} motion_scale_change_ratio={6:N6} motion_rotation_change_radians={7:N6} breath_toggle_ratio={8:N6}" -f `
+        $Label, $report.jelly_count, $report.settle_turn_count, $report.touching_pairs, `
+        $report.impact_starts_per_second, $report.rest_max_scale_change_ratio, `
+        $report.motion_max_scale_change_ratio, $report.motion_max_rotation_change_radians, `
+        $report.max_breath_toggle_change_ratio
 )
