@@ -40,7 +40,7 @@
 
 ### [2026-10-25] 대상 #101 — JELLY 움직임 다듬기 (지글거림·툙툙 튀)
 - 상태: 완료 — JELLY의 몸통·얼굴을 하나의 중력 틀·`deform`으로 통합하고, 접촉 트윈 대신 물리 스텝 속력 감소량으로 충돌 누름을 만듦. 흡수 반지름 0.10초 성장과 3D 모드 렌더 위치 보간을 적용함
-- 브랜치 / PR: `jelly-motion-smoothing` / PR 생성 후 링크 갱신 예정
+- 브랜치 / PR: `jelly-motion-smoothing` / https://github.com/jeongmo-dot/gravity_orb/pull/103
 - 변경 파일: `scripts/core/TurnManager.gd`, `scripts/spike/{Board3D,Orb3D}.gd`, `tests/{capture_screens.ps1,run_jelly_motion_measurement.ps1,test_jelly_visuals.gd,test_jolt_3d.gd}`, `tests/scenarios/test_ui_fixes.gd`, `tests/spike/{capture_screens.gd,JellyMotionMeasurement.tscn,run_jelly_motion_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] JELLY 틀을 중력 방향으로 `delta×8`, 단일 `deform`을 `delta×11`로 보간하고 몸통·얼굴에 같이 적용; 속도 방향 회전·즉시 스케일·`TRANS_BACK` 제거 — 자동 (`test_jelly_visuals`) + 캡처 직접 관측
