@@ -31,7 +31,19 @@
 
 ## 대기 중
 
-- 없음 (다음 항목은 사용자 결정 뒤)
+### [2026-10-24 #100] Windows 빌드 0.15.0
+- 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합)
+- 근거: [technical_design.md](technical_design.md) **§10.5·§10.5.1** (버전 기록 0.15.0 줄)
+- 배경: 사용자 (2026-10-24) "빌드 새 버전 생성" — 네 모드 (BLITZ·CLASSIC·JELLY·SLIME)를 직접 해 보고 메인 모드를 정하기 위한 빌드
+- 요구:
+  1. `project.godot` `application/config/version` `0.14.0` → **`0.15.0`** (Claude 결정 값 — 기획서 0.15.1, `MAJOR.MINOR` 0.15, PATCH 0)
+  2. 버전을 커밋한 뒤 **깨끗한 작업 트리에서** 릴리스 빌드 `.\tools\build_windows.ps1` → `build/windows/GravityOrb_v0.15.0.exe` + `.console.exe` + `_BUILD.txt`. 다른 버전 파일은 남긴다
+  3. 내보낸 콘솔 exe로 스모크 5종 (기본·turn·blitz·slime·jelly) 종료 코드 0·`SCRIPT ERROR` 0
+  4. 격리 창에서 시작 화면·JELLY 직접 실행 확인 (실제 클릭이 안 되면 그 사실과 대신 확인한 방법)
+- 검수: 빌드 결과 줄·파일 크기, `_BUILD.txt` 커밋 = 이 브랜치 마지막 커밋, 사용자 `save.cfg` 해시 전후 동일, 묶음에 `tests/`·`artifacts/`·`docs/` 없음, 래퍼 통과
+- 건드리지 말 것: 버전 외 모든 파일, 사용자 저장 파일, 다른 버전 빌드 파일, `docs/` (회신 파일 제외)
+- Done-when: 위 검수 보고
+- 커밋: 항목 단위 브랜치 (`build-0.15.0`), **push·PR까지**
 
 ---
 
@@ -118,7 +130,7 @@
 - 근거: [technical_design.md](technical_design.md) **§10.5·§10.5.1** (버전 기록 0.14.0 줄)
 - 요구:
   1. `project.godot` `application/config/version` `0.13.1` → **`0.14.0`** (Claude 결정 값 — 기획서 0.14, PATCH 0)
-  2. 릴리스 빌드 `.	oolsuild_windows.ps1` → `build/windows/GravityOrb_v0.14.0.exe` + `.console.exe` + `_BUILD.txt`. 다른 버전 파일은 남긴다
+  2. 릴리스 빌드 `.\tools\build_windows.ps1` → `build/windows/GravityOrb_v0.14.0.exe` + `.console.exe` + `_BUILD.txt`. 다른 버전 파일은 남긴다
   3. 내보낸 콘솔 exe로 스모크 4종 (기본·turn·blitz·slime) 종료 코드 0·`SCRIPT ERROR` 0
   4. 격리 창에서 시작 화면·SLIME 직접 실행 확인 (실제 클릭이 안 되면 그 사실과 대신 확인한 방법)
 - 검수: 빌드 결과 줄·파일 크기, `_BUILD.txt` 커밋 = 이 브랜치 마지막 커밋 (커밋한 뒤 깨끗한 작업 트리에서 빌드), 사용자 `save.cfg` 해시 전후 동일, 묶음에 `tests/`·`artifacts/`·`docs/` 없음, 래퍼 통과
@@ -206,7 +218,7 @@
 - 근거: [technical_design.md](technical_design.md) **§10.5·§10.5.1** (버전 기록 0.13.1 줄)
 - 요구:
   1. `project.godot` `application/config/version` `0.13.0` → **`0.13.1`** (Claude 결정 값 — 기획서 0.13.1)
-  2. 릴리스 빌드 `.	oolsuild_windows.ps1` → `build/windows/GravityOrb_v0.13.1.exe` + `.console.exe` + `_BUILD.txt`. 다른 버전 파일은 남긴다
+  2. 릴리스 빌드 `.\tools\build_windows.ps1` → `build/windows/GravityOrb_v0.13.1.exe` + `.console.exe` + `_BUILD.txt`. 다른 버전 파일은 남긴다
   3. 내보낸 콘솔 exe로 스모크 4종 (기본·turn·blitz·slime) 종료 코드 0·`SCRIPT ERROR` 0
   4. 격리 창에서 시작 화면 → SLIME 카드 전환까지 (#84에서 막혔던 경로) 확인. 자동 클릭이 안 되면 그 사실과 대신 확인한 방법을 적는다
 - 검수: 빌드 결과 줄·파일 크기, `_BUILD.txt` 커밋 = 이 브랜치 마지막 커밋 (빌드는 커밋한 뒤 깨끗한 작업 트리에서), 사용자 `save.cfg` 해시 전후 동일, 묶음에 `tests/`·`artifacts/`·`docs/` 없음, 래퍼 통과
@@ -299,7 +311,7 @@
 - 근거: [technical_design.md](technical_design.md) **§10.5·§10.5.1** (버전 기록 0.13.0 줄)
 - 요구:
   1. `project.godot` `application/config/version` `0.11.1` → **`0.13.0`** (Claude 결정 값 — 기획서 0.13, PATCH 0)
-  2. `.	oolsuild_windows.ps1` (릴리스) → `build/windows/GravityOrb_v0.13.0.exe` + `.console.exe` + `_BUILD.txt`. 예전 `0.11.1` 파일은 남긴다
+  2. `.\tools\build_windows.ps1` (릴리스) → `build/windows/GravityOrb_v0.13.0.exe` + `.console.exe` + `_BUILD.txt`. 예전 `0.11.1` 파일은 남긴다
   3. 내보낸 콘솔 exe로 스모크 **4종** (`--headless --quit-after 300`, `-- --mode=turn`, `-- --mode=blitz`, `-- --mode=slime`) 종료 코드 0·`SCRIPT ERROR` 0
   4. 창 실행 한 번: 시작 화면 카드 3장이 보이고 SLIME 카드로 슬라임 판이 열린다 (짧게, 저장 파일을 바꾸지 않는 방법으로)
 - 검수: 빌드 결과 줄·파일 크기, 사용자 `save.cfg` 해시 전후 동일 (없으면 없는 채로), 내보낸 묶음에 `tests/`·`artifacts/`·`docs/` 없음, 래퍼 테스트 통과
