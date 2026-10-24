@@ -40,7 +40,7 @@
 
 ### [2026-10-25] 대상 #102 — JELLY 대폭발 가능 표시: 터질 듯한 얼굴
 - 상태: 완료 — JELLY의 어두운 대폭발 링을 제거하고, 대폭발 가능 L5·L6에는 시안 C의 고정 얼굴(`>`·`<` 눈, `o` 입, 볼), L5·L6·L7에는 몸통 뒤 제 색 빛을 적용함. L7 MAX 얼굴과 CLASSIC·BLITZ 표시는 유지함
-- 브랜치 / PR: `jelly-blast-face` / PR 생성 후 갱신
+- 브랜치 / PR: `jelly-blast-face` / https://github.com/jeongmo-dot/gravity_orb/pull/104
 - 변경 파일: `scripts/core/JellyOrbArt.gd`, `scripts/spike/Orb3D.gd`, `tests/{capture_screens.ps1,test_jelly_visuals.gd,test_jolt_3d.gd}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] JELLY 대폭발 가능 표시에서 기존 어두운 링을 제거하고 CLASSIC·BLITZ 경로는 변경하지 않음 — 자동 (`test_jelly_visuals`) + 캡처 직접 관측
