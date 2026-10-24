@@ -15,7 +15,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 [application]
 
 config/name="Gravity Orb"
-config/version="0.14.0"
+config/version="0.15.0"
 run/main_scene="res://scenes/Main3D.tscn"
 config/features=PackedStringArray("4.8", "GL Compatibility")
 
