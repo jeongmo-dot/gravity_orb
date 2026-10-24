@@ -100,7 +100,7 @@ func test_3d_render_clamp_keeps_mesh_symbol_and_physics_separate() -> void:
 	await tree.process_frame
 
 
-func test_3d_symbol_uses_latest_fast_body_position_before_render() -> void:
+func test_3d_symbol_uses_interpolated_fast_body_position_before_render() -> void:
 	var board: Board3D = BOARD_3D_SCENE.instantiate() as Board3D
 	tree.root.add_child(board)
 	await tree.process_frame
@@ -120,10 +120,17 @@ func test_3d_symbol_uses_latest_fast_body_position_before_render() -> void:
 	var mesh_plane: Vector2 = Orb3D.world_position_to_plane(mesh.position)
 	var symbol_plane: Vector2 = Orb3D.world_position_to_plane(symbol.position)
 	var body_plane: Vector2 = orb.position
+	var expected_plane: Vector2 = Orb3D.world_position_to_plane(
+		orb.interpolated_body_position(Engine.get_physics_interpolation_fraction())
+	)
 	assert_true(body.position.x > initial_x, "900px/s body advances during physics")
 	assert_true(
-		mesh_plane.distance_to(body_plane) < 0.5,
-		"3D mesh center follows latest body position within 0.5px"
+		mesh_plane.distance_to(expected_plane) < 0.5,
+		"3D mesh center follows the interpolated physics position"
+	)
+	assert_true(
+		mesh_plane.distance_to(body_plane) <= 900.0 / 120.0 + 0.5,
+		"interpolated render position stays within one physics step"
 	)
 	assert_true(
 		symbol_plane.distance_to(mesh_plane) < 0.5,

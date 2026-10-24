@@ -115,7 +115,20 @@ $expectedFiles = @(
 	"53_jelly_look_unlock.png",
 	"54_jelly_shell_start.png",
 	"54_jelly_shell_ranking.png",
-	"54_jelly_shell_result.png"
+	"54_jelly_shell_result.png",
+	"55_jelly_motion_land_01.png",
+	"55_jelly_motion_land_02.png",
+	"55_jelly_motion_land_03.png",
+	"55_jelly_motion_land_04.png",
+	"55_jelly_motion_land_05.png",
+	"55_jelly_motion_land_06.png",
+	"55_jelly_motion_land_07.png",
+	"55_jelly_motion_land_08.png",
+	"55_jelly_motion_land_09.png",
+	"55_jelly_motion_land_10.png",
+	"55_jelly_motion_breathe_max.png",
+	"55_jelly_motion_rest.png",
+	"55_jelly_motion_right.png"
 )
 $hudExpectedFiles = @(
     "02_turn_early.png",
@@ -143,7 +156,20 @@ $hudExpectedFiles = @(
 	"53_jelly_look_absorption.png",
 	"53_jelly_look_max.png",
 	"53_jelly_look_stretch.png",
-	"53_jelly_look_unlock.png"
+	"53_jelly_look_unlock.png",
+	"55_jelly_motion_land_01.png",
+	"55_jelly_motion_land_02.png",
+	"55_jelly_motion_land_03.png",
+	"55_jelly_motion_land_04.png",
+	"55_jelly_motion_land_05.png",
+	"55_jelly_motion_land_06.png",
+	"55_jelly_motion_land_07.png",
+	"55_jelly_motion_land_08.png",
+	"55_jelly_motion_land_09.png",
+	"55_jelly_motion_land_10.png",
+	"55_jelly_motion_breathe_max.png",
+	"55_jelly_motion_rest.png",
+	"55_jelly_motion_right.png"
 )
 $capturedFileCount = 0
 $boardReports = @()

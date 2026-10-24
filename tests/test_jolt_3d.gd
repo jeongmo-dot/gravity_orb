@@ -303,28 +303,57 @@ func test_jelly_absorption_keeps_larger_position_mass_and_interpolated_radius() 
 	resolver.owner = fixture_root
 	tree.root.add_child(fixture_root)
 	await tree.process_frame
+	board.set_gravity(Vector2i.LEFT)
 	var larger_position: Vector2 = Vector2(-120.0, 25.0)
 	var larger: Orb3D = board.spawn_orb(2, 3, larger_position, Vector2(30.0, 0.0))
+	larger.set_jelly_mass(6.0, Config.data)
+	larger._physics_process(0.10)
 	var smaller: Orb3D = board.spawn_orb(2, 2, Vector2(-60.0, 25.0), Vector2.ZERO)
 	resolver.report_contact(larger, smaller)
 	assert_eq(resolver.flush(), 1, "JELLY adjacent levels absorb once")
 	var active: Array[Orb3D] = board.get_orbs()
 	assert_eq(active.size(), 1, "absorption leaves one orb")
 	if active.size() == 1:
-		assert_eq(active[0].level, 3, "mass six remains level three")
-		assert_near(active[0].jelly_mass, 6.0, 0.001, "abstract mass is preserved")
-		assert_near(active[0].get_radius(), 72.5, 0.001, "radius is halfway L3-L4")
+		assert_eq(active[0].level, 4, "mass eight reaches level four")
+		assert_near(active[0].jelly_mass, 8.0, 0.001, "absorbed mass is preserved")
+		assert_near(active[0].get_radius(), 85.0, 0.001, "mass eight uses the L4 radius")
+		assert_near(
+			active[0].get_current_radius(),
+			72.5,
+			0.001,
+			"level-up absorption starts from the mass-six absorber radius"
+		)
+		active[0]._physics_process(0.05)
+		assert_near(
+			active[0].get_current_radius(),
+			(72.5 + 85.0) * 0.5,
+			0.001,
+			"absorption radius is halfway after 0.05 seconds"
+		)
+		active[0]._physics_process(0.05)
+		assert_near(
+			active[0].get_current_radius(),
+			85.0,
+			0.001,
+			"absorption reaches the target radius after 0.10 seconds"
+		)
 		assert_true(
 			active[0].position.distance_to(larger_position) < 0.001,
 			"larger orb position survives"
 		)
 		assert_true(not active[0].is_blast_armed(), "JELLY result never arms BLAST")
+		assert_near(
+			active[0]._jelly_frame_rotation,
+			-PI * 0.5,
+			0.0001,
+			"absorption result starts at the current left-gravity frame"
+		)
 		var result_body: RigidBody3D = active[0].get_physics_body()
 		assert_near(
-			(result_body.constant_force / result_body.mass).y,
-			-Config.data.gravity_for_level(3) / Orb3D.PIXELS_PER_METER,
+			(result_body.constant_force / result_body.mass).x,
+			-Config.data.gravity_for_level(4) / Orb3D.PIXELS_PER_METER,
 			0.001,
-			"interpolated physical mass keeps level-three gravity acceleration"
+			"interpolated physical mass keeps level-four gravity acceleration"
 		)
 	_cleanup(fixture_root)
 	Config.data.game_mode = original_mode
