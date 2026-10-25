@@ -503,9 +503,8 @@ func set_gravity(direction: Vector2i, strength: float) -> void:
 	_body.constant_force = plane_vector_to_world(acceleration_px) * _body.mass
 	if _is_jelly_visual and direction != Vector2i.ZERO:
 		_jelly_frame_target_rotation = atan2(float(direction.x), float(direction.y))
-		if not _jelly_frame_initialized:
-			_jelly_frame_rotation = _jelly_frame_target_rotation
-			_jelly_frame_initialized = true
+		_jelly_frame_rotation = _jelly_frame_target_rotation
+		_jelly_frame_initialized = true
 	_body.sleeping = false
 
 
@@ -853,6 +852,19 @@ static func _shared_mesh_for_level(cfg: GameConfig, level_index: int) -> SphereM
 	return _shared_meshes[key] as SphereMesh
 
 
+func _front_overlay_position(body_position: Vector3, front_offset: float) -> Vector3:
+	var direction_to_camera: Vector3 = Vector3.BACK
+	var viewport: Viewport = get_viewport()
+	if viewport != null:
+		var camera: Camera3D = viewport.get_camera_3d()
+		if camera != null:
+			var camera_offset: Vector3 = camera.global_position - body_position
+			if not camera_offset.is_zero_approx():
+				direction_to_camera = camera_offset.normalized()
+	var ray_distance: float = front_offset / maxf(absf(direction_to_camera.z), 0.000001)
+	return body_position + direction_to_camera * ray_distance
+
+
 func _update_visual_transform() -> void:
 	if (
 		not is_instance_valid(_mesh)
@@ -883,8 +895,14 @@ func _update_visual_transform() -> void:
 	_mesh.scale = jelly_body_scale if _is_jelly_visual else _visual_punch_scale * stretch_scale
 	_mesh.position = render_world_position
 	var body_front_offset: float = radius_m * _mesh.scale.z
-	_belly.position = render_world_position + Vector3(0.0, 0.0, body_front_offset + 0.003)
-	_face.position = render_world_position + Vector3(0.0, 0.0, body_front_offset + 0.006)
+	_belly.position = _front_overlay_position(
+		render_world_position,
+		body_front_offset + 0.003
+	)
+	_face.position = _front_overlay_position(
+		render_world_position,
+		body_front_offset + 0.006
+	)
 	if _is_jelly_visual:
 		_mesh.rotation = Vector3(0.0, 0.0, _jelly_frame_rotation)
 	elif stretch_ratio <= 0.0:
@@ -927,12 +945,11 @@ func _update_visual_transform() -> void:
 	)
 	var symbol_y_offset: float = radius_m * 0.54 if _is_jelly_visual else 0.0
 	_symbol_mesh.position = (
-		render_world_position
-		+ Vector3(
-			0.0,
-			-symbol_y_offset,
+		_front_overlay_position(
+			render_world_position,
 			body_front_offset + (0.008 if _is_jelly_visual else 0.002)
 		)
+		+ Vector3(0.0, -symbol_y_offset, 0.0)
 	)
 	_symbol_mesh.rotation = Vector3.ZERO
 	var symbol_size_m: float = radius_m * OrbSymbols.SYMBOL_SIZE_FACTOR * (

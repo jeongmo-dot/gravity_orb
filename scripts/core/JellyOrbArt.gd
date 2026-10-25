@@ -164,6 +164,7 @@ static func body_material_for(color_index: int, level: int) -> ShaderMaterial:
 	if not _body_materials.has(key):
 		var material: ShaderMaterial = ShaderMaterial.new()
 		material.resource_name = "jelly_body_c%d_l%d" % [color_index, level]
+		material.render_priority = 10
 		material.shader = _get_body_shader()
 		material.set_shader_parameter("base_color", color_for(color_index, level))
 		material.set_shader_parameter("level_id", level)
