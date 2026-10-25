@@ -16,6 +16,7 @@ const JELLY_IMPACT_MINIMUM: float = 0.06
 const JELLY_IMPACT_DECAY: float = 4.8
 const JELLY_BREATH_BLEND_SPEED: float = 4.0
 const JELLY_ABSORPTION_GROWTH_DURATION: float = 0.10
+const JELLY_BLAST_GLOW_Z_OFFSET: float = -0.30
 
 static var _shared_physics_materials: Dictionary = {}
 static var _shared_shapes: Dictionary = {}
@@ -113,6 +114,23 @@ static func plane_position_to_world(value: Vector2, z: float = 0.0) -> Vector3:
 
 static func world_position_to_plane(value: Vector3) -> Vector2:
 	return Vector2(value.x, -value.y) * PIXELS_PER_METER
+
+
+static func jelly_upright_deform_basis(
+	frame_rotation: float,
+	deform: Vector2,
+	uniform_scale: float
+) -> Basis:
+	var cosine: float = cos(frame_rotation)
+	var sine: float = sin(frame_rotation)
+	var xx: float = cosine * cosine * deform.x + sine * sine * deform.y
+	var xy: float = cosine * sine * (deform.x - deform.y)
+	var yy: float = sine * sine * deform.x + cosine * cosine * deform.y
+	return Basis(
+		Vector3(xx * uniform_scale, xy * uniform_scale, 0.0),
+		Vector3(xy * uniform_scale, yy * uniform_scale, 0.0),
+		Vector3(0.0, 0.0, 1.0)
+	)
 
 
 static func plane_vector_to_world(value: Vector2) -> Vector3:
@@ -235,7 +253,11 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	_adornment.mesh = CelestialOrbArt.billboard_mesh(1)
 	_adornment.material_override = visual_material
 	_adornment.visible = not _is_jelly_visual and CelestialOrbArt.has_adornment(level)
-	_blast_outline.mesh = CelestialOrbArt.billboard_mesh(2)
+	_blast_outline.mesh = (
+		JellyOrbArt.face_mesh()
+		if _is_jelly_visual
+		else CelestialOrbArt.billboard_mesh(2)
+	)
 	_blast_outline.material_override = (
 		JellyOrbArt.glow_material_for(color, level)
 		if _is_jelly_visual
@@ -655,11 +677,18 @@ func _apply_visual_transparency() -> void:
 	_mesh.transparency = base_transparency
 	_adornment.transparency = base_transparency
 	_face.transparency = base_transparency
-	_blast_outline.transparency = 1.0 - clampf(
-		_visual_alpha * blast_emission_strength(),
-		0.0,
-		1.0
-	)
+	if _is_jelly_visual:
+		_blast_outline.transparency = 0.0
+		_blast_outline.set_instance_shader_parameter(
+			"glow_alpha",
+			clampf(_visual_alpha * blast_emission_strength(), 0.0, 1.0)
+		)
+	else:
+		_blast_outline.transparency = 1.0 - clampf(
+			_visual_alpha * blast_emission_strength(),
+			0.0,
+			1.0
+		)
 	_symbol_mesh.transparency = base_transparency
 
 
@@ -864,7 +893,7 @@ func _update_visual_transform() -> void:
 		else radius_m
 	)
 	_blast_outline.position = (
-		render_world_position - Vector3(0.0, 0.0, body_front_offset + 0.004)
+		render_world_position + Vector3(0.0, 0.0, JELLY_BLAST_GLOW_Z_OFFSET)
 		if _is_jelly_visual
 		else render_world_position + Vector3(0.0, 0.0, radius_m + 0.004)
 	)
@@ -886,7 +915,6 @@ func _update_visual_transform() -> void:
 		if _is_jelly_visual
 		else Vector3.ZERO
 	)
-	_face.rotation = Vector3(0.0, 0.0, _jelly_frame_rotation)
 	var punch_scale: float = maxf(
 		_visual_punch_scale.x,
 		maxf(_visual_punch_scale.y, _visual_punch_scale.z)
@@ -907,10 +935,14 @@ func _update_visual_transform() -> void:
 		else 0.62
 	)
 	var face_scale_m: float = radius_m * face_radius_ratio * punch_scale
-	_face.scale = Vector3(
-		face_scale_m * jelly_deform.x,
-		face_scale_m * jelly_deform.y,
-		1.0
+	_face.basis = (
+		jelly_upright_deform_basis(
+			_jelly_frame_rotation,
+			jelly_deform,
+			face_scale_m
+		)
+		if _is_jelly_visual
+		else Basis.from_scale(Vector3(face_scale_m, face_scale_m, 1.0))
 	)
 	var symbol_y_offset: float = radius_m * 0.54 if _is_jelly_visual else 0.0
 	_symbol_mesh.position = (

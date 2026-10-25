@@ -462,7 +462,9 @@ void fragment() {
 	}
 	vec3 face_color = mix(dark, vec3(1.0), clamp(highlight, 0.0, 1.0));
 	face_color = mix(face_color, blast_mouth_color.rgb, clamp(blast_mouth, 0.0, 1.0));
-	face_color = mix(face_color, max_blush_color.rgb, clamp(blush, 0.0, 1.0) * blush_alpha);
+	float other_feature = clamp(eyes + smile + blast_mouth + highlight + max_highlight, 0.0, 1.0);
+	float blush_color_mask = clamp(blush, 0.0, 1.0) * (1.0 - other_feature);
+	face_color = mix(face_color, max_blush_color.rgb, blush_color_mask);
 	face_color = mix(face_color, vec3(1.0), clamp(max_highlight, 0.0, 1.0));
 	ALBEDO = face_color;
 	EMISSION = face_color * 0.08;
@@ -482,6 +484,7 @@ shader_type spatial;
 render_mode unshaded, cull_disabled, depth_prepass_alpha;
 
 uniform vec4 glow_color : source_color = vec4(1.0);
+instance uniform float glow_alpha = 1.0;
 
 void fragment() {
 	vec2 p = UV * 2.0 - 1.0;
@@ -489,7 +492,7 @@ void fragment() {
 	float glow = 1.0 - smoothstep(0.80, 1.0, radial);
 	ALBEDO = glow_color.rgb;
 	EMISSION = glow_color.rgb * 0.70;
-	ALPHA = glow;
+	ALPHA = glow * glow_alpha;
 }
 """
 	return _glow_shader

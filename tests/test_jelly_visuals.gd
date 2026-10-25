@@ -92,17 +92,29 @@ func test_jelly_blast_ready_face_and_glow_match_mockup_c() -> void:
 	assert_eq(blast_material.get_shader_parameter("blast_blush_center"), Vector2(0.48, 0.18), "blast blush center")
 	assert_eq(blast_material.get_shader_parameter("blast_blush_radii"), Vector2(0.16, 0.10), "blast blush radii")
 	assert_near(float(blast_material.get_shader_parameter("blast_blush_alpha")), 0.60, 0.0001, "blast blush alpha")
+	assert_true(
+		blast_material.shader.code.contains(
+			"face_color = mix(face_color, max_blush_color.rgb, blush_color_mask);"
+		),
+		"blast and MAX blush keep the source pink and use alpha only"
+	)
 	assert_true(not level_four._blast_outline.visible, "L4 has no blast glow")
 	for orb: Orb3D in [level_five, level_six, level_seven]:
 		assert_true(orb._blast_outline.visible, "L%d blast glow visible" % orb.level)
+		assert_eq(orb._blast_outline.mesh, JellyOrbArt.face_mesh(), "JELLY glow uses zero-to-one UV mesh")
 		var glow_material: ShaderMaterial = orb._blast_outline.material_override as ShaderMaterial
 		assert_true(not glow_material.shader.code.contains("ring"), "JELLY ring shader removed")
+		assert_true(glow_material.shader.code.contains("instance uniform float glow_alpha"), "glow alpha is per orb")
 		assert_eq(
 			glow_material.get_shader_parameter("glow_color"),
 			JellyOrbArt.color_for(orb.color, orb.level).lightened(JellyOrbArt.LEVEL_LIGHTEN_AMOUNT),
 			"L%d glow uses a slightly brighter body color" % orb.level
 		)
 		assert_true(orb._blast_outline.position.z < orb._mesh.position.z, "glow plate stays behind body")
+		assert_true(
+			orb._blast_outline.position.z > -0.31,
+			"glow plate stays in front of board grid and backing"
+		)
 		assert_near(
 			orb._blast_outline.scale.x / (orb.get_current_radius() / Orb3D.PIXELS_PER_METER),
 			JellyOrbArt.BLAST_GLOW_OUTER_SCALE,
@@ -128,6 +140,12 @@ func test_jelly_blast_glow_alpha_is_smooth_and_disabled_threshold_keeps_normal_f
 	assert_true(after >= JellyOrbArt.BLAST_GLOW_ALPHA_MIN, "glow stays above minimum alpha")
 	assert_true(after <= JellyOrbArt.BLAST_GLOW_ALPHA_MAX, "glow stays below maximum alpha")
 	assert_true(absf(after - before) <= 0.02, "glow alpha changes by at most 0.02 per frame")
+	assert_near(
+		float(armed._blast_outline.get_instance_shader_parameter("glow_alpha")),
+		after,
+		0.0001,
+		"glow shader receives the exact animated alpha"
+	)
 	await _cleanup(board)
 
 	Config.data.jelly_blast_min_level = 0
@@ -142,7 +160,7 @@ func test_jelly_blast_glow_alpha_is_smooth_and_disabled_threshold_keeps_normal_f
 	Config.data.game_mode = original_mode
 
 
-func test_max_face_projects_smile_below_eyes_and_rotates_with_gravity() -> void:
+func test_max_face_projects_smile_below_eyes_and_stays_upright() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	var board: Board3D = await _create_board()
@@ -164,22 +182,10 @@ func test_max_face_projects_smile_below_eyes_and_rotates_with_gravity() -> void:
 		"max_highlight_large_offset"
 	)
 	orb.set_gravity(Vector2i.DOWN, Config.data.gravity_strength)
-	var down_eyes: Vector2 = _face_point_on_screen(
-		eye_center,
-		orb._jelly_frame_target_rotation
-	)
-	var down_smile: Vector2 = _face_point_on_screen(
-		smile_center,
-		orb._jelly_frame_target_rotation
-	)
-	var down_highlight: Vector2 = _face_point_on_screen(
-		left_eye_center + highlight_offset,
-		orb._jelly_frame_target_rotation
-	)
-	var down_left_eye: Vector2 = _face_point_on_screen(
-		left_eye_center,
-		orb._jelly_frame_target_rotation
-	)
+	var down_eyes: Vector2 = eye_center
+	var down_smile: Vector2 = smile_center
+	var down_highlight: Vector2 = left_eye_center + highlight_offset
+	var down_left_eye: Vector2 = left_eye_center
 	assert_true(down_smile.y > down_eyes.y, "down gravity puts MAX smile below eyes")
 	assert_true(
 		down_highlight.y < down_left_eye.y,
@@ -187,17 +193,9 @@ func test_max_face_projects_smile_below_eyes_and_rotates_with_gravity() -> void:
 	)
 	assert_true(down_highlight.x < down_left_eye.x, "reflection stays on the left")
 	orb.set_gravity(Vector2i.RIGHT, Config.data.gravity_strength)
-	var right_eyes: Vector2 = _face_point_on_screen(
-		eye_center,
-		orb._jelly_frame_target_rotation
-	)
-	var right_smile: Vector2 = _face_point_on_screen(
-		smile_center,
-		orb._jelly_frame_target_rotation
-	)
 	assert_true(
-		right_smile.x > right_eyes.x,
-		"right gravity rotates the smile to the right of the eyes"
+		smile_center.y > eye_center.y,
+		"right gravity keeps the MAX smile below the eyes"
 	)
 
 	assert_near(
@@ -384,12 +382,13 @@ func test_jelly_frame_rotation_and_breath_weight_change_without_jumps() -> void:
 		orb._jelly_frame_rotation < orb._jelly_frame_target_rotation,
 		"JELLY frame does not jump to the target rotation"
 	)
-	assert_near(
-		orb._mesh.rotation.z,
-		orb._face.rotation.z,
-		0.0001,
-		"body and face use the same frame rotation"
+	assert_near(orb._mesh.rotation.z, orb._jelly_frame_rotation, 0.0001, "body uses frame rotation")
+	var expected_face_basis: Basis = Orb3D.jelly_upright_deform_basis(
+		orb._jelly_frame_rotation,
+		orb._jelly_render_deform(),
+		orb.get_current_radius() / Orb3D.PIXELS_PER_METER * 0.62
 	)
+	_assert_basis_near(orb._face.basis, expected_face_basis, 0.0001, "face counter-rotates frame")
 	board.set_turn_resting(true)
 	orb._process(1.0 / 120.0)
 	assert_near(
@@ -402,6 +401,51 @@ func test_jelly_frame_rotation_and_breath_weight_change_without_jumps() -> void:
 	orb._process(1.0 / 120.0)
 	assert_near(orb._jelly_breath_weight, 0.0, 0.0001, "breathing fades back out")
 	await _cleanup(board)
+	Config.data.game_mode = original_mode
+
+
+func test_all_jelly_faces_and_symbols_stay_upright_with_screen_axis_deform() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_minimum: int = Config.data.jelly_blast_min_level
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_blast_min_level = 5
+	var board: Board3D = await _create_board()
+	var directions: Array[Vector2i] = [
+		Vector2i.DOWN,
+		Vector2i.RIGHT,
+		Vector2i.UP,
+		Vector2i.LEFT,
+	]
+	for direction: Vector2i in directions:
+		board.set_gravity(direction)
+		var orb: Orb3D = board.spawn_orb(3, 5, Vector2.ZERO)
+		orb._jelly_deform = Vector2(0.82, 1.16)
+		orb._update_visual_transform()
+		assert_near(orb._face.rotation.z, 0.0, 0.0001, "%s face remains upright" % direction)
+		assert_near(orb._symbol_mesh.rotation.z, 0.0, 0.0001, "%s symbol remains upright" % direction)
+		var face_radius_m: float = orb.get_current_radius() / Orb3D.PIXELS_PER_METER
+		var expected_basis: Basis = Orb3D.jelly_upright_deform_basis(
+			orb._jelly_frame_rotation,
+			orb._jelly_render_deform(),
+			face_radius_m
+		)
+		_assert_basis_near(orb._face.basis, expected_basis, 0.0001, "%s face deform" % direction)
+		if direction == Vector2i.RIGHT:
+			assert_near(
+				Vector2(orb._face.basis.x.x, orb._face.basis.x.y).length() / face_radius_m,
+				1.16,
+				0.001,
+				"right gravity maps gravity-axis deform to screen horizontal"
+			)
+			assert_near(
+				Vector2(orb._face.basis.y.x, orb._face.basis.y.y).length() / face_radius_m,
+				0.82,
+				0.001,
+				"right gravity maps cross-axis deform to screen vertical"
+			)
+		board.remove_orb(orb)
+	await _cleanup(board)
+	Config.data.jelly_blast_min_level = original_minimum
 	Config.data.game_mode = original_mode
 
 
@@ -610,8 +654,10 @@ func _cleanup(node: Node) -> void:
 	await tree.process_frame
 
 
-func _face_point_on_screen(point: Vector2, face_rotation: float) -> Vector2:
-	return point.rotated(-face_rotation)
+func _assert_basis_near(actual: Basis, expected: Basis, tolerance: float, context: String) -> void:
+	assert_true(actual.x.distance_to(expected.x) <= tolerance, "%s x basis" % context)
+	assert_true(actual.y.distance_to(expected.y) <= tolerance, "%s y basis" % context)
+	assert_true(actual.z.distance_to(expected.z) <= tolerance, "%s z basis" % context)
 
 
 func _step_variation_ratio(positions: Array[float]) -> float:

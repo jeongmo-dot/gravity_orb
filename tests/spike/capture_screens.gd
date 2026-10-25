@@ -126,7 +126,10 @@ const CAPTURE_FILES: Array[String] = [
 	"55_jelly_motion_breathe_max.png",
 	"55_jelly_motion_rest.png",
 	"55_jelly_motion_right.png",
-	"56_jelly_blast_face.png",
+	"56_jelly_blast_face_down.png",
+	"56_jelly_blast_face_right.png",
+	"56_jelly_blast_glow_min.png",
+	"56_jelly_blast_glow_max.png",
 ]
 const HUD_CAPTURE_FILES: Array[String] = [
 	"02_turn_early.png",
@@ -168,7 +171,10 @@ const HUD_CAPTURE_FILES: Array[String] = [
 	"55_jelly_motion_breathe_max.png",
 	"55_jelly_motion_rest.png",
 	"55_jelly_motion_right.png",
-	"56_jelly_blast_face.png",
+	"56_jelly_blast_face_down.png",
+	"56_jelly_blast_face_right.png",
+	"56_jelly_blast_glow_min.png",
+	"56_jelly_blast_glow_max.png",
 ]
 
 var _failed: bool = false
@@ -1515,36 +1521,29 @@ func _capture_jelly_blast_face(main: Main, board: Board3D) -> void:
 	_clear_capture_board(board)
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.jelly_blast_min_level = 5
-	board.set_gravity(Vector2i.RIGHT)
 	var hud: Hud = main.get_node("UI/Hud") as Hud
 	hud._on_preview_changed([
 		[{"color": OrbTypes.OrbColor.YELLOW, "level": 2}],
 		[{"color": OrbTypes.OrbColor.PURPLE, "level": 1}],
 	])
 	var featured: Array[Dictionary] = [
-		{"color": OrbTypes.OrbColor.YELLOW, "level": 5, "position": Vector2(-270.0, -230.0)},
-		{"color": OrbTypes.OrbColor.PURPLE, "level": 5, "position": Vector2(-55.0, -230.0)},
-		{"color": OrbTypes.OrbColor.GREEN, "level": 6, "position": Vector2(225.0, -195.0)},
-		{"color": OrbTypes.OrbColor.RED, "level": 7, "position": Vector2(-255.0, 95.0)},
-		{"color": OrbTypes.OrbColor.BLUE, "level": 5, "position": Vector2(-5.0, 80.0)},
-		{"color": OrbTypes.OrbColor.CYAN, "level": 6, "position": Vector2(270.0, 115.0)},
+		{"color": OrbTypes.OrbColor.YELLOW, "level": 5, "position": Vector2(-300.0, -230.0)},
+		{"color": OrbTypes.OrbColor.PURPLE, "level": 5, "position": Vector2(-95.0, -230.0)},
+		{"color": OrbTypes.OrbColor.GREEN, "level": 5, "position": Vector2(115.0, -230.0)},
+		{"color": OrbTypes.OrbColor.BLUE, "level": 5, "position": Vector2(315.0, -230.0)},
+		{"color": OrbTypes.OrbColor.CYAN, "level": 6, "position": Vector2(-170.0, 105.0)},
+		{"color": OrbTypes.OrbColor.RED, "level": 7, "position": Vector2(155.0, 115.0)},
 	]
-	for descriptor: Dictionary in featured:
-		var featured_position: Vector2 = descriptor["position"]
-		var orb: Orb3D = board.spawn_orb(
-			int(descriptor["color"]),
-			int(descriptor["level"]),
-			featured_position
-		)
-		orb.disable_physics()
-		if not orb.is_blast_armed():
-			_fail("JELLY blast-face capture L%d must be armed" % orb.level)
-		var face_material: ShaderMaterial = orb._face.material_override as ShaderMaterial
-		if orb.level < Config.data.orb_max_level and not bool(face_material.get_shader_parameter("is_blast_ready")):
-			_fail("JELLY blast-face capture L%d must use the burst face" % orb.level)
-		if orb.level == Config.data.orb_max_level and not bool(face_material.get_shader_parameter("is_max")):
-			_fail("JELLY blast-face capture L7 must keep MAX face")
+	board.set_gravity(Vector2i.DOWN)
+	var down_orbs: Array[Orb3D] = _spawn_jelly_blast_featured(board, featured)
+	await get_tree().create_timer(0.20).timeout
+	await _capture("56_jelly_blast_face_down.png")
+	await _report_jelly_blast_blush_pixels(main, down_orbs)
+	print("SCREEN_CAPTURE_CHECK scene=jelly_blast_face_down armed=6 gravity=down upright=yes rings=off")
 
+	_clear_capture_board(board)
+	board.set_gravity(Vector2i.RIGHT)
+	_spawn_jelly_blast_featured(board, featured)
 	var crowd_positions: Array[Vector2] = [
 		Vector2(-355.0, 315.0), Vector2(-235.0, 325.0), Vector2(-115.0, 315.0),
 		Vector2(5.0, 325.0), Vector2(125.0, 315.0), Vector2(245.0, 325.0),
@@ -1558,14 +1557,172 @@ func _capture_jelly_blast_face(main: Main, board: Board3D) -> void:
 		)
 		crowd_orb.disable_physics()
 	await get_tree().create_timer(0.20).timeout
-	await _capture("56_jelly_blast_face.png")
+	await _capture("56_jelly_blast_face_right.png")
 	print(
-		"SCREEN_CAPTURE_CHECK scene=jelly_blast_face armed=%d crowd=%d gravity=right rings=off" % [
+		"SCREEN_CAPTURE_CHECK scene=jelly_blast_face_right armed=%d crowd=%d gravity=right upright=yes rings=off" % [
 			featured.size(),
 			crowd_positions.size(),
 		]
 	)
+
 	_clear_capture_board(board)
+	board.set_gravity(Vector2i.DOWN)
+	var ui: CanvasLayer = main.get_node("UI") as CanvasLayer
+	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
+	var original_ui_visible: bool = ui.visible
+	var original_camera_z: float = camera.position.z
+	ui.visible = false
+	camera.position.z = original_camera_z / 2.2
+	var glow_orb: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 5, Vector2.ZERO)
+	glow_orb.disable_physics()
+	glow_orb.set_render_clamp_enabled(false)
+	glow_orb._blast_blink_elapsed = JellyOrbArt.BLAST_GLOW_PERIOD * 0.75
+	glow_orb._apply_visual_transparency()
+	await _capture("56_jelly_blast_glow_min.png")
+	var min_metrics: Dictionary = _jelly_glow_pixel_metrics(main, glow_orb)
+	glow_orb._blast_blink_elapsed = JellyOrbArt.BLAST_GLOW_PERIOD * 0.25
+	glow_orb._apply_visual_transparency()
+	await _capture("56_jelly_blast_glow_max.png")
+	var max_metrics: Dictionary = _jelly_glow_pixel_metrics(main, glow_orb)
+	print(
+		"JELLY_BLAST_GLOW_PIXEL min_rgb=%s min_luma=%.5f min_bg=%.5f max_rgb=%s max_luma=%.5f max_bg=%.5f" % [
+			min_metrics["rgb"],
+			float(min_metrics["glow_luma"]),
+			float(min_metrics["background_luma"]),
+			max_metrics["rgb"],
+			float(max_metrics["glow_luma"]),
+			float(max_metrics["background_luma"]),
+		]
+	)
+	if float(min_metrics["glow_luma"]) <= float(min_metrics["background_luma"]):
+		_fail("JELLY blast glow minimum must be brighter than board background")
+	if float(max_metrics["glow_luma"]) <= float(min_metrics["glow_luma"]):
+		_fail("JELLY blast glow maximum must be brighter than minimum")
+	ui.visible = original_ui_visible
+	camera.position.z = original_camera_z
+	print("SCREEN_CAPTURE_CHECK scene=jelly_blast_glow scale=2.2x alpha=min,max visible=yes")
+	_clear_capture_board(board)
+
+
+func _spawn_jelly_blast_featured(
+	board: Board3D,
+	descriptors: Array[Dictionary]
+) -> Array[Orb3D]:
+	var orbs: Array[Orb3D] = []
+	for descriptor: Dictionary in descriptors:
+		var orb: Orb3D = board.spawn_orb(
+			int(descriptor["color"]),
+			int(descriptor["level"]),
+			descriptor["position"] as Vector2
+		)
+		orb.disable_physics()
+		orbs.append(orb)
+		if not orb.is_blast_armed():
+			_fail("JELLY blast-face capture L%d must be armed" % orb.level)
+		var face_material: ShaderMaterial = orb._face.material_override as ShaderMaterial
+		if orb.level < Config.data.orb_max_level and not bool(face_material.get_shader_parameter("is_blast_ready")):
+			_fail("JELLY blast-face capture L%d must use the burst face" % orb.level)
+		if orb.level == Config.data.orb_max_level and not bool(face_material.get_shader_parameter("is_max")):
+			_fail("JELLY blast-face capture L7 must keep MAX face")
+		if absf(orb._face.rotation.z) > 0.0001:
+			_fail("JELLY blast-face capture L%d face must stay upright" % orb.level)
+	return orbs
+
+
+func _report_jelly_blast_blush_pixels(main: Main, orbs: Array[Orb3D]) -> void:
+	await RenderingServer.frame_post_draw
+	var face_image: Image = get_viewport().get_texture().get_image()
+	for orb: Orb3D in orbs:
+		orb._face.visible = false
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var body_image: Image = get_viewport().get_texture().get_image()
+	for orb: Orb3D in orbs:
+		orb._face.visible = true
+		if orb.level != 5 or orb.color not in [
+			OrbTypes.OrbColor.YELLOW,
+			OrbTypes.OrbColor.GREEN,
+			OrbTypes.OrbColor.BLUE,
+		]:
+			continue
+		var sample_position: Vector2 = _project_node_point(
+			main,
+			orb._face,
+			Vector3(JellyOrbArt.BLAST_BLUSH_CENTER.x, -JellyOrbArt.BLAST_BLUSH_CENTER.y, 0.0),
+			face_image
+		)
+		var actual: Color = _average_pixel_color(face_image, sample_position, 2)
+		var body: Color = _average_pixel_color(body_image, sample_position, 2)
+		var expected: Color = body.lerp(JellyOrbArt.MAX_BLUSH_COLOR, JellyOrbArt.BLAST_BLUSH_ALPHA)
+		var delta_rgb: Vector3 = Vector3(
+			absf(actual.r - expected.r),
+			absf(actual.g - expected.g),
+			absf(actual.b - expected.b)
+		) * 255.0
+		print(
+			"JELLY_BLAST_BLUSH_PIXEL color=%d actual=%s body=%s expected=%s delta=%s" % [
+				orb.color,
+				_color_rgb8(actual),
+				_color_rgb8(body),
+				_color_rgb8(expected),
+				Vector3i(roundi(delta_rgb.x), roundi(delta_rgb.y), roundi(delta_rgb.z)),
+			]
+		)
+		if maxf(delta_rgb.x, maxf(delta_rgb.y, delta_rgb.z)) > 12.0:
+			_fail("JELLY L5 blush color %d differs from alpha composite by more than 12" % orb.color)
+	await get_tree().process_frame
+
+
+func _jelly_glow_pixel_metrics(main: Main, orb: Orb3D) -> Dictionary:
+	var image: Image = get_viewport().get_texture().get_image()
+	var radius: float = orb.get_current_radius()
+	var glow_position: Vector2 = orb.position + Vector2(radius * 1.10, 0.0)
+	var background_position: Vector2 = orb.position + Vector2(radius * 1.38, 0.0)
+	var glow_pixel: Vector2 = _project_world_point(
+		main,
+		Orb3D.plane_position_to_world(glow_position, Orb3D.JELLY_BLAST_GLOW_Z_OFFSET),
+		image
+	)
+	var background_pixel: Vector2 = _project_world_point(
+		main,
+		Orb3D.plane_position_to_world(background_position, Orb3D.JELLY_BLAST_GLOW_Z_OFFSET),
+		image
+	)
+	var glow_color: Color = _average_pixel_color(image, glow_pixel, 2)
+	var background_color: Color = _average_pixel_color(image, background_pixel, 2)
+	return {
+		"rgb": _color_rgb8(glow_color),
+		"glow_luma": glow_color.get_luminance(),
+		"background_luma": background_color.get_luminance(),
+	}
+
+
+func _project_node_point(main: Main, node: Node3D, point: Vector3, image: Image) -> Vector2:
+	return _project_world_point(main, node.to_global(point), image)
+
+
+func _project_world_point(main: Main, point: Vector3, image: Image) -> Vector2:
+	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
+	var image_scale: Vector2 = Vector2(image.get_size()) / get_viewport().get_visible_rect().size
+	return camera.unproject_position(point) * image_scale
+
+
+func _average_pixel_color(image: Image, center: Vector2, radius: int) -> Color:
+	var total: Color = Color(0.0, 0.0, 0.0, 0.0)
+	var count: int = 0
+	for y: int in range(maxi(0, roundi(center.y) - radius), mini(image.get_height() - 1, roundi(center.y) + radius) + 1):
+		for x: int in range(maxi(0, roundi(center.x) - radius), mini(image.get_width() - 1, roundi(center.x) + radius) + 1):
+			total += image.get_pixel(x, y)
+			count += 1
+	return total / float(maxi(count, 1))
+
+
+func _color_rgb8(color_value: Color) -> Vector3i:
+	return Vector3i(
+		roundi(clampf(color_value.r, 0.0, 1.0) * 255.0),
+		roundi(clampf(color_value.g, 0.0, 1.0) * 255.0),
+		roundi(clampf(color_value.b, 0.0, 1.0) * 255.0)
+	)
 
 
 func _capture_jelly_look(main: Main, board: Board3D) -> void:
