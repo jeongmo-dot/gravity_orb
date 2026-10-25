@@ -32,6 +32,11 @@ func test_color_symbol_mapping_has_six_distinct_polygon_shapes() -> void:
 func test_3d_symbol_texture_has_white_fill_and_dark_outline() -> void:
 	for color: int in range(OrbSymbols.SYMBOL_COUNT):
 		var texture: ImageTexture = OrbSymbols.material_for_color(color).albedo_texture as ImageTexture
+		assert_eq(
+			OrbSymbols.material_for_color(color).render_priority,
+			13,
+			"color %d symbol renders after JELLY face" % color
+		)
 		var image: Image = texture.get_image()
 		var white_pixels: int = 0
 		var outline_pixels: int = 0

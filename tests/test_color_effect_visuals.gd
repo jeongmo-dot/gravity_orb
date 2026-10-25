@@ -30,6 +30,11 @@ func test_push_and_pull_keep_directional_stardust_without_ring_geometry() -> voi
 	director.play_reaction_visuals(_merge_reaction(OrbTypes.OrbColor.RED))
 	var push: ColorEffectVisual = director.active_color_effects()[0]
 	var push_start: float = push.current_radius_px
+	assert_eq(push._point_material.render_priority, 14, "foreground stardust renders after JELLY overlays")
+	assert_true(
+		push._point_material.shader.code.contains("depth_test_disabled"),
+		"foreground stardust remains visible while it crosses a JELLY body"
+	)
 	assert_eq(push.push_ray_count(), 0, "PUSH removes the old six rays")
 	assert_eq(push.stardust_count(), 12, "PUSH has outward stardust")
 	assert_eq(_forbidden_ring_geometry_count(fixture["root"] as Node), 0, "PUSH has no ring geometry")

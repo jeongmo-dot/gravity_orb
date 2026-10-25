@@ -39,9 +39,9 @@
 ## 미확인
 
 ### [2026-10-26] 대상 #111 — 가장자리 젤리 어두운 띠 원인 분리·제거
-- 상태: 완료 — 실제 창 두 비율에서 후보를 하나씩 비교해 보드 반투명판과 몸통의 거리 정렬, 몸통 그림자, 얼굴·배 판 원근 시차, 중력 전환 중 변형틀 회전 지연을 분리하고 비의도 항목을 제거함
+- 상태: 완료 (추가 요구 1 반영) — 1차의 어두운 띠·그림자·변형축·판 시차 수정을 유지하면서 몸통에 덮인 볼·배·문양·전경 연출을 복구하고, 배 위치만 `delta × 8`로 부드럽게 회전하도록 분리함
 - 브랜치 / PR: `jelly-edge-dark-rim` / https://github.com/jeongmo-dot/gravity_orb/pull/112
-- 변경 파일: `scenes/{Main3D,Orb3D}.tscn`, `scripts/core/JellyOrbArt.gd`, `scripts/spike/Orb3D.gd`, `tests/test_jelly_visuals.gd`, `tests/run_jelly_edge_rendering_diagnostic.ps1`, `tests/spike/{JellyEdgeRenderingDiagnostic.tscn,run_jelly_edge_rendering_diagnostic.gd}`, `docs/jeongmo_codex_to_claude.md`
+- 변경 파일: `scenes/{Main3D,Orb3D}.tscn`, `scripts/core/{JellyOrbArt,OrbSymbols}.gd`, `scripts/fx/{ColorEffectVisual,FeedbackDirector}.gd`, `scripts/spike/Orb3D.gd`, `tests/{capture_screens.ps1,test_color_effect_visuals.gd,test_feedback.gd,test_jelly_visuals.gd,test_orb_symbols.gd}`, `tests/run_jelly_edge_rendering_diagnostic.ps1`, `tests/spike/{capture_screens.gd,JellyEdgeRenderingDiagnostic.tscn,run_jelly_edge_rendering_diagnostic.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 같은 초록 L3를 가운데·네 변·네 구석에 두고 실제 창 `540×960`·`540×1170`에서 몸통 바깥 `1.0r~1.3r`, 안쪽 `0.7r~1.0r`, 몸통 중심을 픽셀 계측 — 자동 실제 창 진단 + 직접 관측
   - [x] 보드판·몸통 알파·렌더 순서·그림자·벽 빛·얼굴/배·직교 카메라를 각각 비교 — 자동. 원인은 (1) 기본 거리 정렬에서 보드 반투명판이 끝의 몸통 가장자리 일부만 덮음, (2) 몸통이 보드에 드리운 그림자가 원근 시차로 끝에서 삐져나옴의 중첩
@@ -51,6 +51,13 @@
   - [x] 중력 전환 시 변형틀을 새 중력축에 즉시 맞춰 비스듬한 늘어남을 제거. 낙하·충돌의 의도된 최대 `1.189475`와 109/120프레임 지속은 유지 — 자동 + 실제 창 계측
   - [x] 림 켬/끔을 가운데·오른쪽 아래, 정지·오른쪽 이동에서 두 비율 확대 캡처. 림은 몸통 표면 밝기만 바꾸며 바깥 띠를 만들지 않음을 직접 확인하고 제작 셰이더는 유지 — 자동 캡처 + 직접 관측
   - [x] 수정 후 두 비율의 가운데·네 변·네 구석에서 어두운 바깥 띠 0px, 그림자 켜기 설정 0건. 전체 테스트·스모크·전체 캡처·Debug 빌드·저장 파일 불변 확인 — 자동
+- 추가 요구 1 대조:
+  - [x] 투명 렌더 순서를 몸통 `10` → 배 `11` → 얼굴 `12` → 문양 `13`으로 고정. 실제 창 볼 중심 RGB는 두 비율에서 노랑 L5 `246,132,125`, 초록 L5 `192,131,142`, 파랑 L5 `200,112,171`로 각각 명세 기대값 ±12 안 — 자동 픽셀 검사 + 확대 캡처 직접 관측
+  - [x] 배 채움 `0.50`·`0.75`를 실제 창에서 각각 확대 캡처하고, 배 판을 잠시 숨긴 같은 좌표와 RGB를 비교. 두 비율 모두 보임 `144,233,197`, 숨김 `91,210~211,162~163`, 채널 최대 차이 `53`으로 채움이 몸통에 덮이지 않음 — 자동 픽셀 검사 + 직접 관측
+  - [x] 전경 별가루·MAX 반짝임의 재질 우선순위를 `14`로 두고 깊이 검사를 끄며, 몸 뒤의 부드러운 빛 구름은 기존 깊이/우선순위를 유지. 합체·흡수·대폭발·잭팟·MAX 전체 및 MAX 확대 캡처에서 전경 입자가 몸통 위에, 빛 구름은 뒤에 보임 — 자동 회귀 + 직접 관측
+  - [x] 몸통 변형틀은 중력 변경 즉시 맞추고 `_jelly_belly_rotation`만 기존 `lerp_angle(..., delta × 8)`로 분리. 새 공은 첫 중력에 즉시 초기화되고 기존 공의 배 위치는 이전 각도와 목표 각도 사이를 부드럽게 이동 — 자동 (`test_jelly_frame_stays_aligned_with_current_gravity`)
+  - [x] 1차 실제 창 진단을 두 비율에서 재실행: 아홉 자리 어두운 바깥 띠 모두 0px, 변형축 최대 오차 `0.00000501°`, 얼굴/배 판 중심 최대 오프셋 `0.00006104px`, 의도된 늘어남 최대 `1.189475`, 원근 축비 최대 `1.000001973`으로 1차 수정 상태 유지 — 자동 실제 창 측정
+  - [x] 두 비율 전체 캡처를 각 25장으로 확장해 합계 50장 생성. 기존 19장 전부과 볼 3색·배 0.50/0.75·MAX 연출 확대 6장을 직접 열어 확인 — 자동 캡처 + 직접 관측
 - 원인 후보 표 (실제 창 직접 관측; 수정 전 그림자 수치는 `origin/main af9c4a6`, 반투명 순서 수치는 같은 진단의 후보 토글):
   - 기본값 → `540×960` 어두운 바깥 픽셀 45, `540×1170` 67; 중앙 0이고 아래·구석·오른쪽 끝에만 발생. 내부 띠 휘도 위치 범위 `0.376018~0.731463`
   - `Backing`·`GravityField` 숨김 → 몸통색 띠는 사라지지만 그림자 45/67은 남음
@@ -72,19 +79,21 @@
 - QA 관측값:
   - Godot `4.8.dev3.official.51105ccbe` Standard (`C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`)
   - `godot --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
-  - `tests/run_tests.ps1` 최종 → 일반 `277/277`, 장기 `5/5`, 성능 `4/4`, 합계 `286/286`, 종료 코드 0, 총 `57.113초`; JELLY 그림 ON/OFF 상태 해시 `5c96a80c71c632fb8e727cf1be541757c464b436dd83d6c8d0737b1211347df1` 유지
+  - `tests/run_tests.ps1` 최종 → 일반 `277/277`, 장기 `5/5`, 성능 `4/4`, 합계 `286/286`, 종료 코드 0, 총 `60.922초`; JELLY 그림 ON/OFF 상태 해시 `5c96a80c71c632fb8e727cf1be541757c464b436dd83d6c8d0737b1211347df1` 유지
   - 소스 기본·`--mode=jelly` `--quit-after 300` → 각각 종료 코드 0, 오류 표식 0건
   - `tests/run_jelly_edge_rendering_diagnostic.ps1` → 두 비율 종료 코드 0; 위치 9개·후보 11개·움직임 전후·림 전후 보고서와 캡처 생성
-  - `tests/capture_screens.ps1` → 두 비율 각 19장, 총 38장, 종료 코드 0. `04_jelly_gameplay`, `18_jelly_landing_strip`, `19_jelly_crowded_rest` 포함 직접 확인: 끝·구석·쌓인 젤리 바깥 어두운 띠 0, 얼굴 중심 일치, 기존 반투명 밝기 유지
-  - `tools/build_windows.ps1 -Debug` → 종료 코드 0, `build/windows-debug/GravityOrb_v0.16.0.exe` `104,940,144`바이트; Release 미실행. 내보낸 Debug 기본·JELLY 스모크 각각 종료 코드 0
+  - `tests/capture_screens.ps1` → 두 비율 각 25장, 총 50장, 종료 코드 0. 기존 전체 장면과 볼 3색·배 0.50/0.75·MAX 반짝임 확대를 직접 확인: 끝·구석 바깥 띠 0, 볼·배·문양·전경 별가루 보임, 뒤 빛 구름 유지
+  - `tools/build_windows.ps1 -Debug` → 종료 코드 0, `build/windows-debug/GravityOrb_v0.16.0.exe` `104,940,432`바이트; Release 미실행. 내보낸 Debug 기본·JELLY 스모크 각각 종료 코드 0
   - 그림자 검색 `shadow_enabled = true`·`cast_shadow = 1`·`SHADOW_CASTING_SETTING_ON` → `scenes/`, `scripts/`, `tests/` 0건
   - 사용자 `save.cfg`는 검증 전후 `1,488`바이트, SHA-256 `4D8C75B028AD8710E8B24779A35283848845F75D9A97D238B9D24419BD1FB14D` 동일
   - 규칙 검사 → 허용 파일 외 `Input`/`InputEvent` 0건, Spawner 외 신규 전역 난수 호출 0건, `git diff --check` 오류 0건
 - 수동 확인 절차:
   1. Debug 빌드에서 JELLY를 시작하고 같은 색·레벨 젤리를 중앙과 네 변·네 구석에 정지시킨다 → 중앙과 끝 모두 몸통 가장자리 밝기가 같고, 몸통 바깥에 어두운 띠·그림자·외곽선이 없어야 한다.
   2. 중력을 아래·오른쪽·위·왼쪽으로 바꾸며 젤리를 끝까지 보낸다 → 젤리 자체만 중력축/충돌축으로 늘어나고 비스듬한 중간 변형, 얼굴·배 중심 어긋남, 바깥 그림자가 없어야 한다.
-  3. 진단의 `baseline_*_zoom.png`와 `rim_off_*_zoom.png`, `motion_right_*_zoom.png`와 `motion_rim_off_right_*_zoom.png`를 비교한다 → 림 켬은 몸통 표면에만 은은한 밝기를 더하고 바깥 띠를 만들지 않아야 한다.
-- 결정 사항: 새 밸런스 수치·공개 API·카메라 투영·보드/몸통 셰이더는 바꾸지 않았다. 명세가 비의도로 지정한 변형틀 회전 지연만 즉시 정렬로 바꾸고, 기존 z 앞면 거리를 보존한 카메라 광선 배치로 얼굴·배·문양 시차를 보정함
+  3. 중력을 연속으로 바꾸며 배가 찬 젤리를 관찰한다 → 몸통 늘어남 축은 즉시 새 중력에 맞고, 배 속 젤리 위치만 새 아래쪽으로 짧게 부드럽게 돌아가야 한다.
+  4. 합체·흡수·L7 MAX 생성을 만든다 → 별가루·MAX 반짝임은 몸통 위에서 보여야 하고, 부드러운 빛 구름은 기존처럼 몸 뒤에 있어야 한다.
+  5. 진단의 `baseline_*_zoom.png`와 `rim_off_*_zoom.png`, `motion_right_*_zoom.png`와 `motion_rim_off_right_*_zoom.png`를 비교한다 → 림 켬은 몸통 표면에만 은은한 밝기를 더하고 바깥 띠를 만들지 않아야 한다.
+- 결정 사항: 새 밸런스 수치·공개 API·카메라 투영·보드/몸통 셰이더는 바꾸지 않았다. 1차의 몸통 `10` 뒤로 명세 예시 순서 `11/12/13`을 적용하고, 실제 확대에서 몸 안 전경 입자가 깊이 버퍼에 막히는 것을 확인해 전경 별가루만 `14`·`depth_test_disabled`로 배치했다. 뒤 빛 구름의 재질은 바꾸지 않았다
 - 남은 것 · 질문: 자동 검증·두 비율 전체/확대 캡처 직접 관측을 완료했으며 최종 합격/불합격 판정은 Claude에 남김
 
 ### [2026-10-26] 대상 #107 — Windows 빌드 0.16.0 · JELLY 단일 앱 첫 Release

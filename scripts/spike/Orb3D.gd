@@ -64,6 +64,7 @@ var _is_jelly_visual: bool = false
 var _jelly_idle_elapsed: float = 0.0
 var _jelly_frame_rotation: float = 0.0
 var _jelly_frame_target_rotation: float = 0.0
+var _jelly_belly_rotation: float = 0.0
 var _jelly_frame_initialized: bool = false
 var _jelly_deform: Vector2 = Vector2.ONE
 var _jelly_impact: float = 0.0
@@ -207,6 +208,7 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	_jelly_idle_elapsed = 0.0
 	_jelly_frame_rotation = 0.0
 	_jelly_frame_target_rotation = 0.0
+	_jelly_belly_rotation = 0.0
 	_jelly_frame_initialized = false
 	_jelly_deform = Vector2.ONE
 	_jelly_impact = 0.0
@@ -503,6 +505,8 @@ func set_gravity(direction: Vector2i, strength: float) -> void:
 	_body.constant_force = plane_vector_to_world(acceleration_px) * _body.mass
 	if _is_jelly_visual and direction != Vector2i.ZERO:
 		_jelly_frame_target_rotation = atan2(float(direction.x), float(direction.y))
+		if not _jelly_frame_initialized:
+			_jelly_belly_rotation = _jelly_frame_target_rotation
 		_jelly_frame_rotation = _jelly_frame_target_rotation
 		_jelly_frame_initialized = true
 	_body.sleeping = false
@@ -714,8 +718,8 @@ func _advance_jelly_impact(delta: float) -> void:
 
 func _advance_jelly_visual(delta: float) -> void:
 	var safe_delta: float = maxf(delta, 0.0)
-	_jelly_frame_rotation = lerp_angle(
-		_jelly_frame_rotation,
+	_jelly_belly_rotation = lerp_angle(
+		_jelly_belly_rotation,
 		_jelly_frame_target_rotation,
 		clampf(safe_delta * JELLY_FRAME_TURN_SPEED, 0.0, 1.0)
 	)
@@ -910,7 +914,7 @@ func _update_visual_transform() -> void:
 	else:
 		var world_velocity: Vector3 = _body.linear_velocity
 		_mesh.rotation = Vector3(0.0, 0.0, atan2(world_velocity.y, world_velocity.x))
-	_belly.rotation = Vector3(0.0, 0.0, _jelly_frame_rotation)
+	_belly.rotation = Vector3(0.0, 0.0, _jelly_belly_rotation)
 	var punch_scale: float = maxf(
 		_visual_punch_scale.x,
 		maxf(_visual_punch_scale.y, _visual_punch_scale.z)

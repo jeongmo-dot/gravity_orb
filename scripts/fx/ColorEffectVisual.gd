@@ -249,7 +249,7 @@ func _star_material() -> ShaderMaterial:
 	var shader: Shader = Shader.new()
 	shader.code = "\n".join([
 		"shader_type spatial;",
-		"render_mode unshaded, cull_disabled, blend_add, depth_draw_never;",
+		"render_mode unshaded, cull_disabled, blend_add, depth_draw_never, depth_test_disabled;",
 		"uniform vec4 tint : source_color = vec4(1.0);",
 		"uniform float brightness = 1.0;",
 		"uniform float alpha_multiplier = 1.0;",
@@ -264,5 +264,6 @@ func _star_material() -> ShaderMaterial:
 		"}",
 	])
 	var material: ShaderMaterial = ShaderMaterial.new()
+	material.render_priority = 14
 	material.shader = shader
 	return material

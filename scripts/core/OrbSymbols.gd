@@ -115,6 +115,7 @@ static func _ensure_shared_resources() -> void:
 		var texture: ImageTexture = _create_texture(color)
 		var material: StandardMaterial3D = StandardMaterial3D.new()
 		material.resource_name = "orb_symbol_%s_material" % symbol_name_for_color(color)
+		material.render_priority = 13
 		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		material.cull_mode = BaseMaterial3D.CULL_DISABLED

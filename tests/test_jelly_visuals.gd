@@ -76,6 +76,21 @@ func test_jelly_orb_uses_face_shader_without_ring_geometry() -> void:
 	assert_eq(_forbidden_geometry_count(orb), 0, "JELLY orb has no ring geometry")
 	assert_true(orb.visual_material_resource().shader.code.contains("lower_scatter"), "JELLY body shader")
 	assert_eq(orb.visual_material_resource().render_priority, 10, "JELLY body renders after board glass")
+	assert_eq(
+		(orb._belly.material_override as ShaderMaterial).render_priority,
+		11,
+		"JELLY belly renders after the translucent body"
+	)
+	assert_eq(
+		(orb._face.material_override as ShaderMaterial).render_priority,
+		12,
+		"JELLY face renders after the belly"
+	)
+	assert_eq(
+		(orb._symbol_mesh.mesh as QuadMesh).material.render_priority,
+		13,
+		"JELLY symbol renders after the face"
+	)
 	assert_true(
 		(orb._face.material_override as ShaderMaterial).shader.code.contains("capsule"),
 		"JELLY capsule-eye face shader"
@@ -420,13 +435,37 @@ func test_jelly_frame_stays_aligned_with_current_gravity() -> void:
 
 	board.set_gravity(Vector2i.DOWN)
 	var turning: Orb3D = board.spawn_orb(0, 3, Vector2.ZERO)
+	var initial_belly_rotation: float = turning._jelly_belly_rotation
 	board.set_gravity(Vector2i.RIGHT)
+	assert_near(
+		turning._jelly_frame_rotation,
+		turning._jelly_frame_target_rotation,
+		0.0001,
+		"existing JELLY deform frame snaps before the next render frame"
+	)
+	assert_near(
+		turning._jelly_belly_rotation,
+		initial_belly_rotation,
+		0.0001,
+		"belly position does not snap with the deform frame"
+	)
 	turning._process(1.0 / 120.0)
 	assert_near(
 		turning._jelly_frame_rotation,
 		turning._jelly_frame_target_rotation,
 		0.0001,
 		"existing JELLY deform frame immediately aligns with changed gravity"
+	)
+	assert_true(
+		turning._jelly_belly_rotation > initial_belly_rotation
+		and turning._jelly_belly_rotation < turning._jelly_frame_target_rotation,
+		"belly position rotates smoothly at delta times eight"
+	)
+	assert_near(
+		turning._belly.rotation.z,
+		turning._jelly_belly_rotation,
+		0.0001,
+		"belly mesh uses the smoothed rotation"
 	)
 	await _cleanup(board)
 	Config.data.game_mode = original_mode
