@@ -67,6 +67,33 @@ func test_push_and_pull_use_one_ring_with_directional_stardust() -> void:
 	await _cleanup(fixture["root"] as Node)
 
 
+func test_jelly_hides_color_mode_ring_but_keeps_other_feedback() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var fixture: Dictionary = await _create_fixture()
+	var director: FeedbackDirector = fixture["director"] as FeedbackDirector
+	director.play_reaction_visuals(_merge_reaction(OrbTypes.OrbColor.GREEN))
+	var push: ColorEffectVisual = director.active_color_effects()[0]
+	assert_eq(push.ring_layer_count(), 0, "JELLY PUSH has no misleading body-size ring")
+	assert_eq(push.stardust_count(), 12, "JELLY PUSH keeps directional stardust")
+	assert_eq(director.active_particle_count(), 1, "JELLY merge keeps merge stardust")
+	director.clear_effects()
+	director.play_reaction_visuals(_merge_reaction(OrbTypes.OrbColor.BLUE))
+	var shake: ColorEffectVisual = director.active_color_effects()[0]
+	assert_eq(shake.ring_layer_count(), 0, "JELLY SHAKE has no misleading body-size ring")
+	assert_eq(director.active_color_frame_shake_count(), 1, "JELLY SHAKE keeps board motion")
+	director.clear_effects()
+	Config.data.game_mode = GameConfig.GameMode.TURN
+	director.play_reaction_visuals(_merge_reaction(OrbTypes.OrbColor.GREEN))
+	assert_eq(
+		director.active_color_effects()[0].ring_layer_count(),
+		1,
+		"pooled non-JELLY PUSH restores its ring"
+	)
+	await _cleanup(fixture["root"] as Node)
+	Config.data.game_mode = original_mode
+
+
 func test_pull_shrinks_only_result_mesh_before_punching() -> void:
 	var fixture: Dictionary = await _create_fixture()
 	var board: Board3D = fixture["board"] as Board3D

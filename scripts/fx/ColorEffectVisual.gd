@@ -27,6 +27,7 @@ var _point_material: ShaderMaterial
 var _color: Color = Color.WHITE
 var _result_radius_px: float = 0.0
 var _target_positions: Array[Vector2] = []
+var _ring_enabled: bool = true
 
 
 func _ready() -> void:
@@ -108,7 +109,7 @@ func play(
 	_point_material.set_shader_parameter("alpha_multiplier", 1.0)
 	active = true
 	visible = true
-	_ring.visible = mode != GameConfig.ShockMode.LIFT
+	_ring.visible = _ring_enabled and mode != GameConfig.ShockMode.LIFT
 	_points.visible = mode in [GameConfig.ShockMode.PUSH, GameConfig.ShockMode.PULL, GameConfig.ShockMode.LIFT]
 	_configure_point_count()
 	advance(0.0)
@@ -159,6 +160,12 @@ func stardust_count() -> int:
 
 func ring_layer_count() -> int:
 	return 1 if active and _ring.visible else 0
+
+
+func set_ring_enabled(enabled: bool) -> void:
+	_ring_enabled = enabled
+	if _ring != null:
+		_ring.visible = _ring_enabled and active and mode != GameConfig.ShockMode.LIFT
 
 
 func uses_light_beam() -> bool:
