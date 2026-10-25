@@ -40,7 +40,7 @@
 
 ### [2026-10-25] 대상 #104 — JELLY 레벨 고정 크기 · 배 속 젤리 · 뒤 빛 삭제 · 어두운 띠 조사
 - 상태: 완료 — JELLY의 물리·그림 반지름을 표시 레벨에 고정하고, 흡수한 질량은 배 속 젤리로 표시함. JELLY `BlastOutline`은 대폭발 가능 여부와 관계없이 숨기고, 어두운 띠 재현 계측·60판 규칙 측정·두 비율 전체 캡처까지 완료함
-- 브랜치 / PR: `jelly-level-fixed-belly` / push·PR 생성 뒤 링크 반영 예정
+- 브랜치 / PR: `jelly-level-fixed-belly` / https://github.com/jeongmo-dot/gravity_orb/pull/106
 - 변경 파일: `config/GameConfig.gd`, `scenes/Orb3D.tscn`, `scripts/core/JellyOrbArt.gd`, `scripts/spike/Orb3D.gd`, `tests/{capture_screens.ps1,test_config.gd,test_jelly_visuals.gd,test_jolt_3d.gd}`, `tests/spike/{capture_screens.gd,run_jolt_3d_measurement.gd}`, `tests/tools/run_jelly_measurement.ps1`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `jelly_radius_for_mass(m)`을 `radius_for_level(jelly_level_for_mass(m))`으로 변경해 물리·그림 크기를 레벨 반지름에 고정. 같은 레벨 흡수는 60→60으로 크기 불변, L3 질량 6이 L2를 한 번 더 먹어 L4 질량 8이 될 때만 60→85를 0.10초 성장 — 자동 (`test_config`, `test_jolt_3d`)
