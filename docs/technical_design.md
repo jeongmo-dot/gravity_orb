@@ -3075,6 +3075,21 @@ M4 검수(2026-09-28)에서 발견. 합체가 없는 M4 상태에서 **이동·�
 
 **#111 결과 — 병합** ([PR #112](https://github.com/jeongmo-dot/gravity_orb/pull/112) `9e546c6`, 2026-10-26): 추가 요구 1 반영 — 반투명 그리기 순서를 몸통 10 → 배 속 11 → 얼굴 12 → 문양 13 → 앞쪽 별가루·MAX 반짝임 14 (깊이 검사 끔)로 고정, 몸 뒤 빛 구름은 그대로. 배 속 젤리 위치만 `_jelly_belly_rotation`으로 `delta × 8` 부드럽게 (늘어남 축은 즉시). 볼 중심 노랑 L5 `(246,132,125)`·초록 `(192,131,142)`·파랑 `(200,112,171)` (예전 값 ±1), 배 속 젤리 보임 `(144,233,197)` vs 숨김 `(91,210,162)`. 아홉 자리 어두운 띠 0·늘어남 기울어짐 0 그대로, main에서 그림자 설정 0건. 래퍼 286/286, 해시 그대로 (Codex). Claude 검수 (`08_jelly_full_down`·`06_jelly_blast_down`·`25_jelly_max_effect_zoom`·`04_jelly_gameplay` 직접, 재실행 없음): 배 속 젤리 (채움 0.5·0.75)·볼 (터질 듯한·MAX)·MAX 반짝임 보임, 끝 쪽 젤리 띠 없음
 
+**#108 1차 결과** ([PR #113](https://github.com/jeongmo-dot/gravity_orb/pull/113), 2026-10-26 Claude 검수 — 병합 보류): 9가지 중 8가지는 명세대로 —
+- 호령 테스트 5개 되살림 (`test_jelly_turn_callout_stages_fire_once_per_chain`·`test_jelly_preview_and_unlock_use_jelly_art_and_names`·`test_callout_sound_uses_sfx_mute_and_stage_pitch`·`test_callout_toggle_hides_callout_and_preserves_jelly_state_hash`·`test_callout_frame_cost_report`, 성능 4 → 5), 래퍼 293/293
+- **JELLY 기준 해시 새로**: 시드 `1085050` 한 판이 흡수 (레벨 그대로·오름)·L5 대폭발·L7이 L6 먹기·MAX CLEAR·FINAL MOVE 성공·실패를 모두 지남, 그림 켠·끈 같음 `2891601066178f822af63ef863edf9f40f82933979680ea5196ebe0033fa62a8` (이전 `5c96a80c…`를 대신하는 JELLY 물리 기준)
+- `ObjectDB instances leaked` — 테스트 끝 직전 효과음 재생이 남긴 `AudioStreamPlaybackWAV` (테스트 코드 쪽) → 고쳐서 0건
+- 호령·점수 팝업이 붐비는 판에서 젤리 얼굴을 덮음: 최대 100%, 1초 중 0.908초 (두 비율) — 보고만, 결정은 사용자
+- 보드 왼쪽 흰 줄 = `SpaceBackdrop.gd` 배경 셰이더의 유성 (30초마다 0.6초)
+- Codex 회신 #100 이하 → `docs/archive/codex_to_claude_001-100.md` (Claude 확인: 원문 5,207줄 중 빠진 줄 0)
+- 사라진 빌드 파일: 지운 명령은 기록에서 찾지 못함. `build/windows-debug/`에는 0.11.1·0.13.0·0.13.1·0.14.0이 남아 있어 `build/windows/`만 겨냥한 정리로 본다. 빌드 스크립트가 다른 버전 파일의 경로·크기를 전후로 검사해 빠지거나 바뀌면 실패하게 하고 테스트 (`test_windows_build_preserves_other_version_artifacts`) 추가
+- 캡처 31장 되살림 (두 비율 56장씩) — 옛 이름 대응표는 회신에
+- **남은 것 → 추가 요구 1 (Claude 캡처 검수)**: 움직임 캡처가 이름과 내용이 다르다 — `44~53_jelly_motion_land_01~10`이 10장 모두 같은 동그란 젤리 (떨어짐 → 착지 → 돌아옴이 없다. 턴 입력 대기 상태라 말랑함 목표가 1로 잡힌 것으로 보임), `55_jelly_motion_rest`·`56_jelly_motion_right`는 공중에 띄운 격자 판 (실제로 쌓인 더미·오른쪽으로 쏠리는 움직임이 아님). 회신의 "착지/호흡/쌓임/오른쪽 중력 직접 확인"은 맞지 않는다
+  1. 착지 띠: 젤리를 높이 두고 실제 중력으로 떨어뜨려 (턴 진행 중 — 쉼 상태 아님) 떨어지는 동안·착지 순간·돌아오는 동안을 10장. 각 장의 몸통 가로·세로 배율을 회신에 적어 장마다 달라짐을 보인다
+  2. 쌓인 판: 실제로 떨어뜨려 바닥·벽·구석까지 맞닿아 쌓인 더미 (#101 추가 요구 1 때와 같은 방식)
+  3. 오른쪽 중력: 쌓인 더미에서 중력을 오른쪽으로 바꾼 뒤 움직이는 도중
+  4. 캡처 검사가 "장마다 다름"·"실제 접촉 쌍 수"를 확인해 같은 일이 다시 없게 한다
+
 ### 12-ONE.3 다음 (JELLY 개선)
 - CLASSIC 전용 분기 정리 (행성 그림·연출·규칙 — JELLY가 안 쓰는 것)
 - 결정 대기에서 이어지는 것: 효과음 (합성·녹음), 시작 화면 그림 (지금 행성 — JELLY에 맞게?)
