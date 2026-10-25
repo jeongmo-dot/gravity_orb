@@ -307,10 +307,10 @@ func test_game_over_panel_shows_scores_direction_and_restart_button() -> void:
 	assert_eq(best_label.text, "BEST 48", "game-over best")
 	assert_eq(combo_label.text, "최대 콤보", "game-over max combo label")
 	assert_eq(combo_value.text, "2", "game-over max combo value")
-	assert_eq(blocked_label.text, "최고 레벨", "CLASSIC game-over highest level label")
-	assert_eq(blocked_value.text, "L4", "CLASSIC game-over highest level value")
-	assert_eq(direction_label.text, "막힌 방향", "game-over blocked direction label")
-	assert_eq(direction_value.text, "LEFT", "game-over blocked direction value")
+	assert_eq(blocked_label.text, "최고 젤리", "JELLY game-over highest level label")
+	assert_eq(blocked_value.text, "L4", "JELLY game-over highest level value")
+	assert_eq(direction_label.text, "FINAL MOVE", "JELLY final-move label")
+	assert_eq(direction_value.text, "0번 버팀", "JELLY final-move value")
 	assert_true(
 		combo_value.get_theme_font_size("font_size")
 		>= roundi(float(combo_label.get_theme_font_size("font_size")) * 1.6),
@@ -318,7 +318,7 @@ func test_game_over_panel_shows_scores_direction_and_restart_button() -> void:
 	)
 	assert_true(
 		turn_value.get_theme_color("font_color").is_equal_approx(Color("#E8EEFF")),
-		"turn count does not use BLITZ green"
+		"JELLY turn count uses the neutral result color"
 	)
 	assert_eq(panel.mouse_filter, Control.MOUSE_FILTER_IGNORE, "panel ignores pointer")
 	assert_eq(restart_button.mouse_filter, Control.MOUSE_FILTER_STOP, "restart consumes pointer")
@@ -442,7 +442,7 @@ func _assert_preview_visuals(
 		)
 		assert_eq(
 			visual._display_color,
-			Config.data.color_display[int(candidate["color"])],
+			JellyOrbArt.color_for(int(candidate["color"]), int(candidate["level"])),
 			"%s color %d" % [label, index]
 		)
 

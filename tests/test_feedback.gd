@@ -161,23 +161,6 @@ func test_supernova_shell_is_mottled_and_rendered_behind_orbs() -> void:
 	Config.data.fx_hitstop_enabled = original_hitstop
 
 
-func test_feedback_toggle_preserves_turn_and_blitz_state_hashes() -> void:
-	var original_fx: bool = Config.data.fx_enabled
-	var original_hitstop: bool = Config.data.fx_hitstop_enabled
-	var original_sfx: bool = Config.data.sfx_enabled
-	Config.data.fx_hitstop_enabled = false
-	Config.data.sfx_enabled = false
-	var turn_without_fx: String = await _scripted_state_hash(false, false)
-	var turn_with_fx: String = await _scripted_state_hash(true, false)
-	var blitz_without_fx: String = await _scripted_state_hash(false, true)
-	var blitz_with_fx: String = await _scripted_state_hash(true, true)
-	assert_eq(turn_with_fx, turn_without_fx, "20-turn state hash")
-	assert_eq(blitz_with_fx, blitz_without_fx, "20-second BLITZ state hash")
-	Config.data.fx_enabled = original_fx
-	Config.data.fx_hitstop_enabled = original_hitstop
-	Config.data.sfx_enabled = original_sfx
-
-
 func test_visual_prewarm_stops_when_director_leaves_tree() -> void:
 	var root: Node3D = Node3D.new()
 	var director: FeedbackDirector = FeedbackDirector.new()
@@ -211,34 +194,6 @@ func test_hitstop_uses_real_time_and_disabled_mode_does_not_change_scale() -> vo
 	assert_near(Engine.time_scale, 1.0, TOLERANCE, "disabled hitstop leaves scale unchanged")
 	await _cleanup(fixture["root"] as Node)
 	Config.data.fx_hitstop_enabled = original_enabled
-	Engine.time_scale = original_scale
-
-
-func test_blitz_blast_skips_hitstop_while_turn_blast_keeps_it() -> void:
-	var original_enabled: bool = Config.data.fx_hitstop_enabled
-	var original_blitz_enabled: bool = Config.data.blitz_hitstop_enabled
-	var original_mode: GameConfig.GameMode = Config.data.game_mode
-	var original_scale: float = Engine.time_scale
-	var fixture: Dictionary = await _create_director_fixture()
-	var director: FeedbackDirector = fixture["director"] as FeedbackDirector
-	Config.data.fx_hitstop_enabled = true
-	Config.data.blitz_hitstop_enabled = false
-	Config.data.game_mode = GameConfig.GameMode.BLITZ
-	director.play_reaction_visuals(_blast_reaction())
-	assert_near(Engine.time_scale, 1.0, TOLERANCE, "BLITZ blast keeps real time")
-	Config.data.game_mode = GameConfig.GameMode.TURN
-	director.play_reaction_visuals(_blast_reaction())
-	assert_near(
-		Engine.time_scale,
-		Config.data.fx_hitstop_scale,
-		TOLERANCE,
-		"turn blast keeps hitstop"
-	)
-	await tree.create_timer(0.10, true, false, true).timeout
-	await _cleanup(fixture["root"] as Node)
-	Config.data.fx_hitstop_enabled = original_enabled
-	Config.data.blitz_hitstop_enabled = original_blitz_enabled
-	Config.data.game_mode = original_mode
 	Engine.time_scale = original_scale
 
 
@@ -577,52 +532,6 @@ func _create_director_fixture() -> Dictionary:
 	tree.root.add_child(root)
 	await tree.process_frame
 	return {"root": root, "camera": camera, "director": director}
-
-
-func _scripted_state_hash(fx_enabled: bool, blitz: bool) -> String:
-	Config.data.fx_enabled = fx_enabled
-	var root: Node3D = Node3D.new()
-	var camera: Camera3D = Camera3D.new()
-	camera.name = "Camera3D"
-	root.add_child(camera)
-	var board: Board3D = BOARD_SCENE.instantiate() as Board3D
-	root.add_child(board)
-	var director: FeedbackDirector = FeedbackDirector.new()
-	root.add_child(director)
-	tree.root.add_child(root)
-	await tree.process_frame
-	var steps: int = 20
-	for index: int in range(steps):
-		var direction: Vector2i = OrbTypes.DIRECTIONS[index % OrbTypes.DIRECTIONS.size()]
-		board.set_gravity(direction)
-		var color: int = (index * 5 + (2 if blitz else 0)) % 6
-		var level: int = 1 + index % (3 if blitz else 2)
-		var position: Vector2 = Vector2(
-			float((index % 5) * 120 - 240),
-			float((index / 5) * 120 - 180)
-		)
-		var orb: Orb3D = board.spawn_orb(color, level, position)
-		if index % 4 == 0:
-			director.play_reaction({
-				"type": ReactionRules.Type.MERGE,
-				"result_orb": orb,
-				"result_level": level,
-				"result_color": color,
-				"position": position,
-				"chain": 1 + index,
-			})
-	var state: Array[Dictionary] = []
-	for orb: Orb3D in board.get_orbs():
-		state.append({
-			"id": orb.stable_spawn_id,
-			"color": orb.color,
-			"level": orb.level,
-			"position": orb.position,
-			"velocity": orb.linear_velocity,
-		})
-	var hash_value: String = JSON.stringify(state)
-	await _cleanup(root)
-	return hash_value
 
 
 func _cleanup(node: Node) -> void:

@@ -131,7 +131,7 @@ func test_3d_symbol_follows_position_without_inheriting_roll_and_keeps_blink() -
 	var original_enabled: bool = Config.data.orb_symbols_enabled
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	Config.data.orb_symbols_enabled = true
-	Config.data.game_mode = GameConfig.GameMode.BLITZ
+	Config.data.game_mode = GameConfig.GameMode.TURN
 	var board: Board3D = BOARD_3D_SCENE.instantiate() as Board3D
 	tree.root.add_child(board)
 	await tree.process_frame

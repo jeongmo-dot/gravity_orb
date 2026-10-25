@@ -9,17 +9,24 @@ $ErrorActionPreference = "Stop"
 $repoPath = Split-Path -Parent $PSScriptRoot
 $outputRoot = Join-Path $repoPath "artifacts\screens"
 $captureSpecs = @(
-    [ordered]@{
-        Name = "540x960"
-        Resolution = "540x960"
-        HudOnly = $HudScenesOnly.IsPresent
-    },
-    [ordered]@{
-        Name = "540x1170"
-        Resolution = "540x1170"
-        HudOnly = $HudScenesOnly.IsPresent
-    }
+    [ordered]@{ Name = "540x960"; Resolution = "540x960" },
+    [ordered]@{ Name = "540x1170"; Resolution = "540x1170" }
 )
+$expectedFiles = @(
+    "01_jelly_start.png",
+    "02_jelly_ranking.png",
+    "03_jelly_result.png",
+    "04_jelly_gameplay.png",
+    "05_jelly_final_move.png",
+    "06_jelly_blast_down.png",
+    "07_jelly_blast_right.png",
+    "08_jelly_full_down.png",
+    "09_jelly_full_right.png",
+    "10_jelly_eat_00.png",
+    "11_jelly_eat_01.png",
+    "12_jelly_eat_02.png"
+)
+
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {
     if (-not [string]::IsNullOrWhiteSpace($env:GODOT)) {
         $GodotPath = $env:GODOT
@@ -30,169 +37,7 @@ if ([string]::IsNullOrWhiteSpace($GodotPath)) {
     }
 }
 
-$expectedFiles = @(
-    "01_start_screen.png",
-    "02_turn_early.png",
-    "03_turn_combo.png",
-    "04_turn_game_over.png",
-    "05_blitz_ready.png",
-    "06_blitz_fever_chain.png",
-    "07_blitz_danger.png",
-    "08_blitz_time_up.png",
-    "09_blitz_result.png",
-    "10_ranking_blitz.png",
-    "11_result_new_record.png",
-    "12_turn_ramp_next.png",
-    "13_turn_ramp_uncapped_next.png",
-    "14_orb_codex.png",
-    "15_orb_closeup.png",
-    "16_gravity_switch.png",
-    "17_board_danger.png",
-    "18_board_blocked.png",
-    "19_settings.png",
-    "20_start_no_record.png",
-    "21_start_screen_t2_5.png",
-    "22_start_screen_t5_0.png",
-    "23_merge_stardust_a.png",
-    "23_merge_stardust_b.png",
-    "24_birth_l6_a.png",
-    "24_birth_l6_b.png",
-    "25_birth_l7_a.png",
-    "25_birth_l7_b.png",
-    "26_blast_l4_a.png",
-    "26_blast_l4_b.png",
-    "27_blast_l6_a.png",
-    "27_blast_l6_b.png",
-    "28_blast_l5_crowded_a.png",
-    "28_blast_l5_crowded_b.png",
-    "29_blast_l6_crowded_a.png",
-	"29_blast_l6_crowded_b.png",
-	"30_callout_great_a.png",
-	"30_callout_great_b.png",
-	"31_callout_unstoppable_a.png",
-	"31_callout_unstoppable_b.png",
-	"32_popup_merge.png",
-	"33_popup_blast_big.png",
-	"34_color_push_a.png",
-	"34_color_push_b.png",
-	"35_color_pull_a.png",
-	"35_color_pull_b.png",
-	"36_color_shake_a.png",
-	"36_color_shake_b.png",
-	"37_color_lift_a.png",
-	"37_color_lift_b.png",
-	"38_fever_start_a.png",
-	"38_fever_start_b.png",
-	"39_fever_running.png",
-	"40_blitz_timer_long.png",
-	"41_blitz_bonus_gauge_a.png",
-	"41_blitz_bonus_gauge_b.png",
-	"42_blitz_bonus_layer_cross.png",
-	"43_blitz_bonus_fever.png",
-	"44_turn_ready.png",
-	"45_turn_busy_a.png",
-	"45_turn_busy_b.png",
-	"46_turn_rejected.png",
-	"47_mars_rotations.png",
-	"48_slime_core.png",
-	"49_slime_states.png",
-	"50_slime_shell_start.png",
-	"50_slime_shell_ranking.png",
-	"50_slime_shell_result.png",
-	"50_slime_shell_play_ready.png",
-	"50_slime_shell_play_final_move.png",
-	"50_slime_shell_play_busy.png",
-	"50_slime_shell_play_rejected.png",
-	"51_slime_max_growth.png",
-	"52_new_planet_callout.png",
-	"52_jelly_final_move.png",
-	"53_jelly_blast_j5.png",
-	"53_jelly_look_levels.png",
-	"53_jelly_look_crowded.png",
-	"53_jelly_look_absorption.png",
-	"53_jelly_look_max.png",
-	"53_jelly_look_stretch.png",
-	"53_jelly_look_unlock.png",
-	"54_jelly_shell_start.png",
-	"54_jelly_shell_ranking.png",
-	"54_jelly_shell_result.png",
-	"55_jelly_motion_land_01.png",
-	"55_jelly_motion_land_02.png",
-	"55_jelly_motion_land_03.png",
-	"55_jelly_motion_land_04.png",
-	"55_jelly_motion_land_05.png",
-	"55_jelly_motion_land_06.png",
-	"55_jelly_motion_land_07.png",
-	"55_jelly_motion_land_08.png",
-	"55_jelly_motion_land_09.png",
-	"55_jelly_motion_land_10.png",
-	"55_jelly_motion_breathe_max.png",
-	"55_jelly_motion_rest.png",
-	"55_jelly_motion_right.png",
-	"56_jelly_blast_face_down.png",
-	"56_jelly_blast_face_right.png",
-	"57_jelly_full_down.png",
-	"57_jelly_full_right.png",
-	"57_jelly_full_eat_00.png",
-	"57_jelly_full_eat_01.png",
-	"57_jelly_full_eat_02.png"
-)
-$hudExpectedFiles = @(
-    "02_turn_early.png",
-    "03_turn_combo.png",
-    "06_blitz_fever_chain.png",
-    "07_blitz_danger.png",
-    "12_turn_ramp_next.png",
-    "13_turn_ramp_uncapped_next.png",
-    "17_board_danger.png",
-	"18_board_blocked.png",
-	"40_blitz_timer_long.png",
-	"41_blitz_bonus_gauge_a.png",
-	"41_blitz_bonus_gauge_b.png",
-	"42_blitz_bonus_layer_cross.png",
-	"43_blitz_bonus_fever.png",
-	"44_turn_ready.png",
-	"45_turn_busy_a.png",
-	"45_turn_busy_b.png",
-	"46_turn_rejected.png",
-	"52_new_planet_callout.png",
-	"52_jelly_final_move.png",
-	"53_jelly_blast_j5.png",
-	"53_jelly_look_levels.png",
-	"53_jelly_look_crowded.png",
-	"53_jelly_look_absorption.png",
-	"53_jelly_look_max.png",
-	"53_jelly_look_stretch.png",
-	"53_jelly_look_unlock.png",
-	"55_jelly_motion_land_01.png",
-	"55_jelly_motion_land_02.png",
-	"55_jelly_motion_land_03.png",
-	"55_jelly_motion_land_04.png",
-	"55_jelly_motion_land_05.png",
-	"55_jelly_motion_land_06.png",
-	"55_jelly_motion_land_07.png",
-	"55_jelly_motion_land_08.png",
-	"55_jelly_motion_land_09.png",
-	"55_jelly_motion_land_10.png",
-	"55_jelly_motion_breathe_max.png",
-	"55_jelly_motion_rest.png",
-	"55_jelly_motion_right.png",
-	"56_jelly_blast_face_down.png",
-	"56_jelly_blast_face_right.png",
-	"57_jelly_full_down.png",
-	"57_jelly_full_right.png",
-	"57_jelly_full_eat_00.png",
-	"57_jelly_full_eat_01.png",
-	"57_jelly_full_eat_02.png"
-)
 $capturedFileCount = 0
-$boardReports = @()
-
-& (Join-Path $PSScriptRoot "run_slime_visual_render_test.ps1") -GodotPath $GodotPath
-if ($LASTEXITCODE -ne 0) {
-    throw "Slime visual render regression failed before screenshot capture"
-}
-
 foreach ($captureSpec in $captureSpecs) {
     $outputPath = Join-Path $outputRoot $captureSpec.Name
     New-Item -ItemType Directory -Path $outputPath -Force | Out-Null
@@ -205,27 +50,13 @@ foreach ($captureSpec in $captureSpecs) {
         "res://tests/spike/CaptureScreens.tscn",
         "--",
         "--capture-output-directory=res://artifacts/screens/$($captureSpec.Name)",
-        "--capture-save-path=res://artifacts/screens/$($captureSpec.Name)/capture_save.tmp.cfg",
-        "--jolt-seed=5050"
+        "--capture-save-path=res://artifacts/screens/$($captureSpec.Name)/capture_save.tmp.cfg"
     )
-    if ($captureSpec.HudOnly) {
-        $arguments += "--capture-hud-scenes-only"
+    & $GodotPath @arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "Screenshot capture $($captureSpec.Name) failed with exit code $LASTEXITCODE"
     }
-
-    $previousErrorActionPreference = $ErrorActionPreference
-    try {
-        $ErrorActionPreference = "Continue"
-        & $GodotPath @arguments
-        $captureExit = $LASTEXITCODE
-    } finally {
-        $ErrorActionPreference = $previousErrorActionPreference
-    }
-    if ($captureExit -ne 0) {
-        throw "Screenshot capture $($captureSpec.Name) failed with exit code $captureExit"
-    }
-
-    $captureExpectedFiles = if ($captureSpec.HudOnly) { $hudExpectedFiles } else { $expectedFiles }
-    foreach ($fileName in $captureExpectedFiles) {
+    foreach ($fileName in $expectedFiles) {
         $filePath = Join-Path $outputPath $fileName
         if (-not (Test-Path -LiteralPath $filePath)) {
             throw "Screenshot capture did not create $filePath"
@@ -233,67 +64,9 @@ foreach ($captureSpec in $captureSpecs) {
         Write-Output ("SCREEN_CAPTURE_RESULT ratio={0} file={1}" -f $captureSpec.Name, $filePath)
         $capturedFileCount += 1
     }
-
-    $boardReportPath = Join-Path $outputPath "board_projection.json"
-    if (-not (Test-Path -LiteralPath $boardReportPath)) {
-        throw "Screenshot capture did not create $boardReportPath"
-    }
-    $boardReport = Get-Content -LiteralPath $boardReportPath -Raw | ConvertFrom-Json
-    if ($boardReport.logical.left -lt 16.0 -or
-        $boardReport.logical.right -gt $boardReport.logical_size.x - 16.0) {
-        throw "Projected board is outside the 16 logical pixel margins for $($captureSpec.Name)"
-    }
-    $boardReports += [pscustomobject]@{
-        Name = $captureSpec.Name
-        Left = [double]$boardReport.pixels.left
-        Right = [double]$boardReport.pixels.right
-        Width = [double]$boardReport.pixels.width
-    }
-
-    $turnCueReportPath = Join-Path $outputPath "turn_input_cue.json"
-    if (-not (Test-Path -LiteralPath $turnCueReportPath)) {
-        throw "Screenshot capture did not create $turnCueReportPath"
-    }
-    $turnCueReport = Get-Content -LiteralPath $turnCueReportPath -Raw | ConvertFrom-Json
-    if ([Math]::Abs([double]$turnCueReport.arrow_size_logical_px - 56.0) -gt 0.01) {
-        throw "Turn arrow size is not 56 logical pixels for $($captureSpec.Name)"
-    }
-    if ([Math]::Abs([double]$turnCueReport.orbit_light_diameter_logical_px - 20.0) -gt 0.01) {
-        throw "Turn orbit light diameter is not 20 logical pixels for $($captureSpec.Name)"
-    }
-    if ([Math]::Abs([double]$turnCueReport.orbit_trail_side_fraction - 0.15) -gt 0.001) {
-        throw "Turn orbit trail is not 15 percent of a side for $($captureSpec.Name)"
-    }
-    if (-not [bool]$turnCueReport.arrows_inside_viewport -or
-        -not [bool]$turnCueReport.arrows_outside_board -or
-        -not [bool]$turnCueReport.top_hud_clear -or
-        -not [bool]$turnCueReport.preview_shelf_clear) {
-        throw "Turn input cue overlaps the board, HUD, shelf, or viewport for $($captureSpec.Name)"
-    }
-    Write-Output ("TURN_INPUT_CUE_RESULT ratio={0} arrow={1:N1}px orbit={2:N1}px trail={3:N1}px" -f `
-        $captureSpec.Name, [double]$turnCueReport.arrow_size_logical_px, `
-        [double]$turnCueReport.orbit_light_diameter_logical_px, `
-        [double]$turnCueReport.orbit_trail_logical_px)
-
     $temporarySave = Join-Path $outputPath "capture_save.tmp.cfg"
     if (Test-Path -LiteralPath $temporarySave) {
         Remove-Item -LiteralPath $temporarySave -Force
     }
 }
-$baseBoard = $boardReports[0]
-$tallBoard = $boardReports[1]
-$leftDifference = [Math]::Abs($baseBoard.Left - $tallBoard.Left)
-$rightDifference = [Math]::Abs($baseBoard.Right - $tallBoard.Right)
-$widthDifferenceRatio = [Math]::Abs($baseBoard.Width - $tallBoard.Width) / $baseBoard.Width
-if ($leftDifference -gt 2.0 -or $rightDifference -gt 2.0) {
-    throw ("Board capture x mismatch: left={0:N3}px right={1:N3}px" -f `
-        $leftDifference, $rightDifference)
-}
-if ($widthDifferenceRatio -gt 0.01) {
-    throw ("Board capture width mismatch: {0:P3}" -f $widthDifferenceRatio)
-}
-Write-Output (("SCREEN_CAPTURE_BOARD_RESULT base={0:N3},{1:N3} tall={2:N3},{3:N3} " +
-    "left_delta={4:N3}px right_delta={5:N3}px width_delta={6:P3}") -f `
-    $baseBoard.Left, $baseBoard.Right, $tallBoard.Left, $tallBoard.Right, `
-    $leftDifference, $rightDifference, $widthDifferenceRatio)
 Write-Output ("SCREEN_CAPTURE_SUITE exit=0 ratios={0} files={1}" -f $captureSpecs.Count, $capturedFileCount)

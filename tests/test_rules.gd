@@ -146,23 +146,6 @@ func test_yellow_same_level_merges() -> void:
 	assert_eq(result["result_color"], OrbTypes.OrbColor.YELLOW, "yellow merge color")
 
 
-func test_new_blitz_colors_merge_and_blast() -> void:
-	var cfg: GameConfig = GameConfig.new()
-	cfg.game_mode = GameConfig.GameMode.BLITZ
-	for color: int in [OrbTypes.OrbColor.PURPLE, OrbTypes.OrbColor.CYAN]:
-		var merge: Dictionary = ReactionRules.classify(color, 3, color, 3, cfg)
-		assert_eq(merge["type"], ReactionRules.Type.MERGE, "new color merge")
-		assert_eq(merge["result_color"], color, "new color merge result")
-	var blast: Dictionary = ReactionRules.classify(
-		OrbTypes.OrbColor.PURPLE,
-		4,
-		OrbTypes.OrbColor.CYAN,
-		4,
-		cfg
-	)
-	assert_eq(blast["type"], ReactionRules.Type.BLAST, "new colors BLITZ blast")
-
-
 func test_same_color_merge_has_precedence_over_configured_opposite_pair() -> void:
 	var cfg: GameConfig = GameConfig.new()
 	cfg.opposite_pairs.append(Vector2i(OrbTypes.OrbColor.RED, OrbTypes.OrbColor.RED))
@@ -248,21 +231,6 @@ func test_default_blast_minimum_starts_at_level_four() -> void:
 	var level_four: Dictionary = ReactionRules.classify(0, 4, 1, 4, cfg)
 	assert_eq(level_three["type"], ReactionRules.Type.NONE, "default excludes L3")
 	assert_eq(level_four["type"], ReactionRules.Type.BLAST, "default includes L4")
-
-
-func test_blitz_and_turn_share_level_four_blast_with_same_color_merge() -> void:
-	var cfg: GameConfig = GameConfig.new()
-	var turn_level_three: Dictionary = ReactionRules.classify(0, 3, 1, 3, cfg)
-	var turn_level_four: Dictionary = ReactionRules.classify(0, 4, 1, 4, cfg)
-	assert_eq(turn_level_three["type"], ReactionRules.Type.NONE, "turn L3 is none")
-	assert_eq(turn_level_four["type"], ReactionRules.Type.BLAST, "turn L4 blasts")
-	cfg.game_mode = GameConfig.GameMode.BLITZ
-	var blitz_level_three: Dictionary = ReactionRules.classify(0, 3, 1, 3, cfg)
-	var blitz_level_four: Dictionary = ReactionRules.classify(0, 4, 1, 4, cfg)
-	var same_color_four: Dictionary = ReactionRules.classify(0, 4, 0, 4, cfg)
-	assert_eq(blitz_level_three["type"], ReactionRules.Type.NONE, "BLITZ L3 is none")
-	assert_eq(blitz_level_four["type"], ReactionRules.Type.BLAST, "BLITZ L4 blasts")
-	assert_eq(same_color_four["type"], ReactionRules.Type.MERGE, "L4 same color merges")
 
 
 func test_jelly_same_and_adjacent_levels_absorb_by_abstract_mass() -> void:

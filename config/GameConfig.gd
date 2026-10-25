@@ -4,7 +4,12 @@ extends Resource
 enum SpawnPositionMode { RANDOM, CENTER }
 enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 enum ShockMode { PUSH, PULL, SHAKE, LIFT }
-enum GameMode { TURN, BLITZ, SLIME, JELLY }
+enum GameMode {
+	TURN = 0, # Legacy: kept for save compatibility and shared JELLY foundations.
+	BLITZ = 1, # Legacy: kept for save compatibility only.
+	SLIME = 2, # Legacy: kept for save compatibility only.
+	JELLY = 3,
+}
 
 @export var game_mode: GameMode = GameMode.TURN
 @export var board_size: float = 960.0
@@ -111,47 +116,6 @@ enum GameMode { TURN, BLITZ, SLIME, JELLY }
 @export var blast_far_factor: float = 0.4
 @export var blast_score_factor: float = 5.0
 @export var blast_blink_period: float = 0.8
-@export var blitz_duration: float = 90.0
-@export var blitz_survival_enabled: bool = true
-@export var blitz_start_time: float = 30.0
-@export var blitz_time_max: float = 0.0
-@export var blitz_time_bar_reference: float = 45.0
-@export var blitz_time_bonus_merge_by_level: PackedFloat32Array = PackedFloat32Array(
-	[0.0, 0.05, 0.1, 0.2, 0.4, 0.8, 1.6]
-)
-@export var blitz_time_bonus_display_window: float = 0.5
-@export var blitz_fever_time_multiplier: float = 2.0
-@export var blitz_drain_ramp_per_minute: float = 0.0
-@export var blitz_swipe_cooldown: float = 0.08
-@export var blitz_swipe_buffer_enabled: bool = true
-@export var blitz_hitstop_enabled: bool = false
-@export var blitz_spawn_on_swipe: bool = true
-@export var blitz_min_spawn_per_swipe: int = 1
-@export var blitz_max_spawn_per_swipe: int = 8
-@export var blitz_spawn_interval: float = 0.8
-@export var blitz_spawn_level_weights: PackedFloat32Array = PackedFloat32Array(
-	[0.7, 0.25, 0.05]
-)
-@export var blitz_spawn_color_weights: PackedFloat32Array = PackedFloat32Array(
-	[1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-)
-@export var blitz_initial_occupancy: float = 0.35
-@export var blitz_target_occupancy: float = 0.40
-@export var blitz_refill_interval: float = 0.15
-@export var blitz_ready_time: float = 1.5
-@export var blitz_chain_window: float = 1.0
-@export var blitz_chain_idle: float = 2.0
-@export var blitz_chain_step: float = 0.25
-@export var blitz_chain_max_multiplier: float = 5.0
-@export var blitz_fever_chain: int = 8
-@export var blitz_fever_duration: float = 3.0
-@export var blitz_fever_multiplier: float = 2.0
-@export var blitz_time_bonus_blast_by_level: PackedFloat32Array = PackedFloat32Array(
-	[0.0, 0.0, 0.0, 0.5, 1.0, 2.0, 3.0]
-)
-@export var blitz_time_bonus_jackpot: float = 3.0
-@export var blitz_time_bonus_cap: float = 20.0
-@export var blitz_finale_interval: float = 0.3
 @export var fx_enabled: bool = true
 @export var fx_hitstop_enabled: bool = true
 @export var fx_hitstop_scale: float = 0.12
@@ -237,13 +201,6 @@ func blast_push_radius_factor_for_level(level: int) -> float:
 	if index < 0 or index >= blast_push_radius_by_level.size():
 		return 0.0
 	return maxf(blast_push_radius_by_level[index], 0.0)
-
-
-func blitz_blast_time_bonus_for_level(level: int) -> float:
-	var index: int = level - 1
-	if index < 0 or index >= blitz_time_bonus_blast_by_level.size():
-		return 0.0
-	return maxf(blitz_time_bonus_blast_by_level[index], 0.0)
 
 
 func spawn_count_for_turn(turn_index: int) -> int:

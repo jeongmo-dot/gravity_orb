@@ -128,30 +128,6 @@ func test_weighted_distribution_matches_config() -> void:
 	_restore_spawn_config(snapshot)
 
 
-func test_blitz_weighted_distribution_uses_all_six_colors() -> void:
-	var snapshot: Dictionary = _snapshot_spawn_config()
-	var spawner: Spawner = Spawner.new()
-	spawner.set_blitz_mode(true)
-	spawner.init_rng(3401)
-	var color_counts: Array[int] = []
-	color_counts.resize(Config.data.blitz_spawn_color_weights.size())
-	color_counts.fill(0)
-	for _index: int in range(DISTRIBUTION_COUNT):
-		var candidate: Dictionary = spawner._draw_candidate()
-		color_counts[int(candidate["color"])] += 1
-	for color: int in range(color_counts.size()):
-		assert_true(color_counts[color] > 0, "BLITZ color %d appears" % color)
-		assert_near(
-			float(color_counts[color]) / float(DISTRIBUTION_COUNT),
-			1.0 / float(color_counts.size()),
-			DISTRIBUTION_TOLERANCE,
-			"BLITZ color %d ratio" % color
-		)
-	print("BLITZ Spawner distribution: colors=%s" % str(color_counts))
-	spawner.free()
-	_restore_spawn_config(snapshot)
-
-
 func test_center_mode_consumes_position_and_preserves_item_sequence() -> void:
 	var snapshot: Dictionary = _snapshot_spawn_config()
 	var random_sequence: Array[Dictionary] = _draw_sequence(
@@ -205,20 +181,6 @@ func test_count_two_batch_sequence_matches_continuous_count_one_sequence() -> vo
 	var count_one: Array[Dictionary] = _draw_batched_sequence(2468, 1, 6)
 	var count_two: Array[Dictionary] = _draw_batched_sequence(2468, 2, 3)
 	assert_eq(count_two, count_one, "count 2 preserves level, color, t RNG order")
-	_restore_spawn_config(snapshot)
-
-
-func test_blitz_candidate_order_is_independent_of_batch_grouping() -> void:
-	var snapshot: Dictionary = _snapshot_spawn_config()
-	var first: Array[Dictionary] = await _draw_blitz_grouped_sequence(
-		3636,
-		[1, 3, 2]
-	)
-	var second: Array[Dictionary] = await _draw_blitz_grouped_sequence(
-		3636,
-		[3, 1, 2]
-	)
-	assert_eq(first, second, "BLITZ candidate line ignores batch grouping")
 	_restore_spawn_config(snapshot)
 
 
@@ -314,22 +276,6 @@ func test_turn_color_preview_uses_target_turn_and_forces_new_color_first() -> vo
 	_restore_spawn_config(snapshot)
 
 
-func test_turn_ramp_does_not_change_blitz_preview_sizes() -> void:
-	var snapshot: Dictionary = _snapshot_spawn_config()
-	Config.data.spawn_count_ramp_turns = 100
-	Config.data.spawn_count_max = 3
-	var spawner: Spawner = Spawner.new()
-	spawner.set_blitz_mode(true)
-	spawner.init_rng(5501)
-	spawner.sync_blitz_next_batch_size(4)
-	var preview: Array = spawner.peek_preview()
-	assert_eq((preview[0] as Array).size(), 4, "BLITZ NEXT follows density batch")
-	assert_eq((preview[1] as Array).size(), 1, "BLITZ THEN remains one candidate")
-	assert_eq(spawner._batch_size_for_index(201), 1, "BLITZ ignores turn ramp")
-	spawner.free()
-	_restore_spawn_config(snapshot)
-
-
 func test_default_classic_progression_hash() -> void:
 	var snapshot: Dictionary = _snapshot_spawn_config()
 	var spawner := Spawner.new()
@@ -412,27 +358,6 @@ func _draw_batched_sequence(seed: int, batch_size: int, batch_count: int) -> Arr
 	return sequence
 
 
-func _draw_blitz_grouped_sequence(seed: int, group_sizes: Array[int]) -> Array[Dictionary]:
-	var board: Board = BOARD_SCENE.instantiate() as Board
-	tree.root.add_child(board)
-	await tree.process_frame
-	var spawner: Spawner = Spawner.new()
-	spawner.set_blitz_mode(true)
-	spawner.init_rng(seed)
-	spawner.peek_blitz_candidates(Config.data.blitz_max_spawn_per_swipe)
-	var sequence: Array[Dictionary] = []
-	for group_size: int in group_sizes:
-		spawner.sync_blitz_next_batch_size(group_size)
-		var internal_batch: Array = spawner._preview_batches[0] as Array
-		for candidate: Dictionary in internal_batch:
-			sequence.append(candidate.duplicate())
-		spawner.try_spawn(board, Vector2i.DOWN)
-	board.queue_free()
-	await tree.process_frame
-	spawner.free()
-	return sequence
-
-
 func _draw_sequence(seed: int, count: int, mode: GameConfig.SpawnPositionMode) -> Array[Dictionary]:
 	Config.data.spawn_position_mode = mode
 	var spawner: Spawner = Spawner.new()
@@ -448,7 +373,6 @@ func _snapshot_spawn_config() -> Dictionary:
 	return {
 		"spawn_level_weights": Config.data.spawn_level_weights.duplicate(),
 		"spawn_color_weights": Config.data.spawn_color_weights.duplicate(),
-		"blitz_spawn_color_weights": Config.data.blitz_spawn_color_weights.duplicate(),
 		"spawn_position_mode": Config.data.spawn_position_mode,
 		"spawn_count_per_turn": Config.data.spawn_count_per_turn,
 		"preview_turns": Config.data.preview_turns,
@@ -462,9 +386,6 @@ func _snapshot_spawn_config() -> Dictionary:
 func _restore_spawn_config(snapshot: Dictionary) -> void:
 	Config.data.spawn_level_weights = snapshot["spawn_level_weights"] as PackedFloat32Array
 	Config.data.spawn_color_weights = snapshot["spawn_color_weights"] as PackedFloat32Array
-	Config.data.blitz_spawn_color_weights = (
-		snapshot["blitz_spawn_color_weights"] as PackedFloat32Array
-	)
 	Config.data.spawn_position_mode = int(snapshot["spawn_position_mode"]) as GameConfig.SpawnPositionMode
 	Config.data.spawn_count_per_turn = int(snapshot["spawn_count_per_turn"])
 	Config.data.preview_turns = int(snapshot["preview_turns"])

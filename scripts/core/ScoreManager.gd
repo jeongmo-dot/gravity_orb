@@ -110,16 +110,10 @@ static func points_for(reaction: Dictionary, cfg: GameConfig) -> int:
 		reaction.get("combo_multiplier", combo_multiplier_for(combo, cfg))
 	)
 	var danger_multiplier: float = danger_multiplier_for(occupancy, cfg)
-	var fever_multiplier: float = (
-		cfg.blitz_fever_multiplier if bool(reaction.get("fever", false)) else 1.0
-	)
 	if finale:
 		combo_multiplier = 1.0
 		danger_multiplier = 1.0
-		fever_multiplier = 1.0
-	var raw_points: float = (
-		float(base_points) * combo_multiplier * danger_multiplier * fever_multiplier
-	)
+	var raw_points: float = float(base_points) * combo_multiplier * danger_multiplier
 	var nearest_integer: float = round(raw_points)
 	if is_equal_approx(raw_points, nearest_integer):
 		raw_points = nearest_integer
@@ -127,7 +121,6 @@ static func points_for(reaction: Dictionary, cfg: GameConfig) -> int:
 	reaction["base_points"] = base_points
 	reaction["combo_multiplier"] = combo_multiplier
 	reaction["danger_multiplier"] = danger_multiplier
-	reaction["fever_multiplier"] = fever_multiplier
 	reaction["points"] = points
 	return points
 

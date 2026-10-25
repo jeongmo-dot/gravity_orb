@@ -200,24 +200,6 @@ func test_swipe_sfx_and_pc_haptics_use_specified_durations() -> void:
 	Config.data.haptics_enabled = original_haptics
 
 
-func test_gravity_switch_toggles_preserve_turn_and_blitz_state_hashes() -> void:
-	var original_trail: bool = Config.data.fx_swipe_trail_enabled
-	var original_stretch: bool = Config.data.fx_orb_stretch_enabled
-	var original_haptics: bool = Config.data.haptics_enabled
-	var original_sfx: bool = Config.data.sfx_enabled
-	Config.data.sfx_enabled = false
-	var turn_off: String = await _scripted_state_hash(false, false)
-	var turn_on: String = await _scripted_state_hash(true, false)
-	var blitz_off: String = await _scripted_state_hash(false, true)
-	var blitz_on: String = await _scripted_state_hash(true, true)
-	assert_eq(turn_on, turn_off, "20-turn state hash")
-	assert_eq(blitz_on, blitz_off, "20-second BLITZ state hash")
-	Config.data.fx_swipe_trail_enabled = original_trail
-	Config.data.fx_orb_stretch_enabled = original_stretch
-	Config.data.haptics_enabled = original_haptics
-	Config.data.sfx_enabled = original_sfx
-
-
 func test_gravity_switch_feedback_frame_cost_report() -> void:
 	var fixture: Dictionary = await _create_fixture()
 	var board: Board3D = fixture["board"] as Board3D
@@ -254,41 +236,6 @@ func _blue_merge_reaction() -> Dictionary:
 		"position": Vector2.ZERO,
 		"shock_targets": [],
 	}
-
-
-func _scripted_state_hash(enabled: bool, blitz: bool) -> String:
-	Config.data.fx_swipe_trail_enabled = enabled
-	Config.data.fx_orb_stretch_enabled = enabled
-	Config.data.haptics_enabled = enabled
-	var fixture: Dictionary = await _create_fixture()
-	var root: Node3D = fixture["root"] as Node3D
-	var board: Board3D = fixture["board"] as Board3D
-	var director: FeedbackDirector = fixture["director"] as FeedbackDirector
-	for index: int in range(20):
-		var direction: Vector2i = OrbTypes.DIRECTIONS[index % OrbTypes.DIRECTIONS.size()]
-		board.set_gravity(direction)
-		board.play_visual_tilt(direction)
-		director._on_turn_started(index + 1, direction)
-		var orb: Orb3D = board.spawn_orb(
-			(index + (2 if blitz else 0)) % Config.data.color_display.size(),
-			1 + index % (3 if blitz else 2),
-			Vector2(float(index % 5) * 100.0, float(index / 5) * 100.0)
-		)
-		orb.get_physics_body().freeze = true
-		orb.linear_velocity = Vector2(950.0 + float(index), 0.0)
-		orb._update_visual_transform()
-	var state: Array[Dictionary] = []
-	for orb: Orb3D in board.get_orbs():
-		state.append({
-			"id": orb.stable_spawn_id,
-			"color": orb.color,
-			"level": orb.level,
-			"position": orb.position,
-			"velocity": orb.linear_velocity,
-		})
-	var hash_value: String = JSON.stringify(state)
-	await _cleanup(root)
-	return hash_value
 
 
 func _create_fixture() -> Dictionary:

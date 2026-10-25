@@ -15,17 +15,8 @@ const CALLOUT_COSMIC_DURATION: float = 1.00
 const PLANET_UNLOCK_CALLOUT_DURATION: float = 1.20
 const PREVIEW_UNLOCK_FLASH_DURATION: float = 0.60
 const PLANET_UNLOCK_ORB_LEVEL: int = 2
-const SURVIVAL_BONUS_POST_WINDOW_HOLD: float = 0.45
-const SURVIVAL_BONUS_LABEL_FADE_DURATION: float = 0.20
 const CALLOUT_RISE_DISTANCE: float = 8.0
-const FEVER_ENTRY_DURATION: float = 0.30
-const FEVER_BAND_HOLD_DURATION: float = 0.50
-const FEVER_EXIT_DURATION: float = 0.30
-const FEVER_STREAK_DURATION: float = 0.40
-const FEVER_VIGNETTE_MAX_ALPHA: float = 0.12
-const TIME_BONUS_TRAVEL_DURATION: float = 0.50
 const TURN_CALLOUT_STEPS: Array[int] = [3, 5, 8, 12]
-const BLITZ_CALLOUT_STEPS: Array[int] = [5, 10, 15, 20, 30]
 const CALLOUT_WORDS: Array[String] = [
 	"NICE!", "GREAT!", "AMAZING!", "INCREDIBLE!", "UNSTOPPABLE!"
 ]
@@ -44,9 +35,6 @@ const JELLY_NAMES: Dictionary = {
 	OrbTypes.OrbColor.PURPLE: "보라",
 	OrbTypes.OrbColor.CYAN: "주황",
 }
-const TIMER_NORMAL_COLOR: Color = Color("#E8EEFF")
-const TIMER_DANGER_COLOR: Color = Color("#FF3B30")
-const TIMER_BONUS_COLOR: Color = Color("#30D158")
 const HUD_ACCENT_COLOR: Color = Color("#BFE9FF")
 const HUD_AMBER_COLOR: Color = Color("#FFB020")
 const HUD_PANEL_COLOR: Color = Color(0.0431373, 0.0941176, 0.2, 0.60)
@@ -57,7 +45,6 @@ const BEST_FONT_MIN: int = 18
 const NUMERIC_SIDE_PADDING: float = 8.0
 const HUD_MARGIN: float = 24.0
 const PREVIEW_SHELF_HEIGHT: float = 340.0
-const TIME_BAR_INSET: float = 4.0
 const HUD_THEME: Theme = preload("res://assets/ui/gravity_orb_theme.tres")
 const SPEAKER_ON_ICON: Texture2D = preload("res://assets/ui/speaker_on.svg")
 const SPEAKER_OFF_ICON: Texture2D = preload("res://assets/ui/speaker_off.svg")
@@ -79,15 +66,8 @@ const SPEAKER_OFF_ICON: Texture2D = preload("res://assets/ui/speaker_off.svg")
 @onready var _combo_label: Label = %ComboLabel
 @onready var _danger_label: Label = %DangerLabel
 @onready var _score_popup_layer: Control = %ScorePopupLayer
-@onready var _fever_vignette: ColorRect = %FeverVignette
-@onready var _fever_band: ColorRect = %FeverBand
-@onready var _fever_band_label: Label = %FeverBandLabel
 @onready var _callout_label: Label = %CalloutLabel
-@onready var _time_up_label: Label = %TimeUpLabel
 @onready var _blocked_label: Label = %BlockedLabel
-@onready var _timer_label: Label = %TimerLabel
-@onready var _drain_rate_label: Label = %DrainRateLabel
-@onready var _bonus_label: Label = %BonusLabel
 @onready var _game_over_panel: GameOverPanel = %GameOverPanel
 @onready var _sound_button: Button = %HudSoundButton
 @onready var _score_panel: PanelContainer = %ScorePanel
@@ -95,23 +75,13 @@ const SPEAKER_OFF_ICON: Texture2D = preload("res://assets/ui/speaker_off.svg")
 @onready var _danger_panel: PanelContainer = %DangerPanel
 @onready var _preview_shelf: PanelContainer = %PreviewShelf
 @onready var _blocked_panel: PanelContainer = %BlockedPanel
-@onready var _time_bar_track: Panel = %TimeBarTrack
-@onready var _time_bar_fill: BlitzTimeBar = %TimeBarFill
 @onready var _turn_input_indicator: TurnInputIndicator = %TurnInputIndicator
 
 var _spawner: Spawner
 var _score_manager: ScoreManager
-var _blitz_manager: BlitzManager
-var _bonus_tween: Tween
 var _callout_tween: Tween
 var _next_preview_flash_tween: Tween
 var _then_preview_flash_tween: Tween
-var _fever_tween: Tween
-var _fever_streak_tween: Tween
-var _timer_punch_tween: Tween
-var _timer_flash_tween: Tween
-var _time_up_tween: Tween
-var _blitz_mode: bool = false
 var _sfx_bank: SfxBank
 var _board: Variant
 var _active_popups: Array[ScorePopup] = []
@@ -132,12 +102,7 @@ var _danger_multiplier: float = 1.0
 var _danger_refresh_elapsed: float = 0.0
 var _pulse_elapsed: float = 0.0
 var _badge_punching: bool = false
-var _fever_active: bool = false
-var _fever_remaining: float = 0.0
-var _fever_band_base_position: Vector2 = Vector2.ZERO
 var _current_combo: int = 0
-var _previous_time_remaining: float = -1.0
-var _timer_flashing: bool = false
 var _callout_seen: Dictionary = {}
 var _callout_history: Array[int] = []
 var _planet_unlock_seen: Dictionary = {}
@@ -145,24 +110,12 @@ var _planet_unlock_history: Array[int] = []
 var _pending_planet_unlocks: Array[int] = []
 var _preview_unlock_seen: Dictionary = {}
 var _preview_unlock_flash_history: Array[int] = []
-var _timer_tick_history: Array[int] = []
-var _urgent_timer_tick_history: Array[int] = []
-var _timer_tick_seen: Dictionary = {}
-var _pending_time_bonuses: Array[Dictionary] = []
-var _time_bonus_accumulator: float = 0.0
-var _time_bonus_window_remaining: float = 0.0
-var _time_bonus_segment_start: float = 0.0
-var _last_bonus_target: Vector2 = Vector2.ZERO
-var _time_up_count: int = 0
 var _callout_base_position: Vector2 = Vector2.ZERO
 var _planet_callout_visual: OrbVisual
 var _planet_callout_base_position: Vector2 = Vector2.ZERO
 var _next_preview_flash: ReferenceRect
 var _then_preview_flash: ReferenceRect
 var _callout_sparkles: Array[CosmicSparkle] = []
-var _fever_sparkles: Array[CosmicSparkle] = []
-var _fever_streak: ColorRect
-var _time_up_ring: CosmicRing2D
 var _jelly_final_move_banner: JellyFinalMoveBanner
 
 
@@ -172,8 +125,6 @@ func _ready() -> void:
 	_sound_button.pressed.connect(_on_sound_pressed)
 	_sound_button.text = ""
 	_sound_button.icon = SPEAKER_ON_ICON
-	_fever_band_base_position = _fever_band.position
-	_configure_fever_vignette()
 	if not get_viewport().size_changed.is_connected(_apply_responsive_layout):
 		get_viewport().size_changed.connect(_apply_responsive_layout)
 	_apply_responsive_layout()
@@ -187,19 +138,10 @@ func _exit_tree() -> void:
 		_callout_tween,
 		_next_preview_flash_tween,
 		_then_preview_flash_tween,
-		_fever_tween,
-		_fever_streak_tween,
-		_time_up_tween,
-		_bonus_tween,
-		_timer_punch_tween,
-		_timer_flash_tween,
 	]:
 		if tween != null and tween.is_valid():
 			tween.kill()
 	_stop_sparkles(_callout_sparkles)
-	_stop_sparkles(_fever_sparkles)
-	if is_instance_valid(_time_up_ring):
-		_time_up_ring.stop()
 	_free_preview_pool(_next_preview_pool)
 	_free_preview_pool(_then_preview_pool)
 
@@ -223,38 +165,6 @@ func _create_v4_ui_effects() -> void:
 		callout_sparkle.z_index = 32
 		add_child(callout_sparkle)
 		_callout_sparkles.append(callout_sparkle)
-	for index: int in range(3):
-		var fever_sparkle: CosmicSparkle = CosmicSparkle.new()
-		fever_sparkle.name = "FeverSparkle%d" % index
-		fever_sparkle.z_index = 30
-		add_child(fever_sparkle)
-		_fever_sparkles.append(fever_sparkle)
-	_time_up_ring = CosmicRing2D.new()
-	_time_up_ring.name = "TimeUpRing"
-	_time_up_ring.z_index = 30
-	add_child(_time_up_ring)
-	_fever_streak = ColorRect.new()
-	_fever_streak.name = "FeverStreak"
-	_fever_streak.z_index = 26
-	_fever_streak.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var streak_shader: Shader = Shader.new()
-	streak_shader.code = "\n".join([
-		"shader_type canvas_item;",
-		"render_mode unshaded;",
-		"void fragment() {",
-		"  float tail = smoothstep(0.0, 0.72, UV.x);",
-		"  float head = 1.0 - smoothstep(0.80, 1.0, UV.x);",
-		"  float core = sin(UV.y * 3.14159265);",
-		"  float alpha = tail * head * core * 0.72;",
-		"  COLOR = vec4(1.0, 0.66, 0.18, alpha);",
-		"}",
-	])
-	var streak_material: ShaderMaterial = ShaderMaterial.new()
-	streak_material.shader = streak_shader
-	_fever_streak.material = streak_material
-	_fever_streak.color = Color.WHITE
-	add_child(_fever_streak)
-	_fever_streak.visible = false
 
 
 func _create_preview_flash(flash_name: String, region: Control) -> ReferenceRect:
@@ -267,18 +177,6 @@ func _create_preview_flash(flash_name: String, region: Control) -> ReferenceRect
 	region.add_child(flash)
 	flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	return flash
-
-
-func _layout_fever_streak(viewport_size: Vector2) -> void:
-	if not is_instance_valid(_fever_streak):
-		return
-	_fever_streak.size = Vector2(viewport_size.x * 0.72, 12.0)
-	_fever_streak.pivot_offset = _fever_streak.size * 0.5
-	if not _fever_streak.visible:
-		_fever_streak.position = Vector2(
-			-_fever_streak.size.x,
-			viewport_size.y * 0.5 + 48.0
-		)
 
 
 func _prewarm_score_popups() -> void:
@@ -309,11 +207,6 @@ func _apply_responsive_layout() -> void:
 	_set_control_rect(_multiplier_label, layout["multiplier"] as Rect2)
 	_set_control_rect(_combo_label, layout["combo"] as Rect2)
 	_set_control_rect(_max_combo_label, layout["max_combo"] as Rect2)
-	_set_control_rect(_timer_label, layout["timer"] as Rect2)
-	_set_control_rect(_drain_rate_label, layout["drain_rate"] as Rect2)
-	_set_control_rect(_bonus_label, layout["time_bonus"] as Rect2)
-	_set_control_rect(_time_bar_track, layout["time_bar"] as Rect2)
-	_layout_time_bar_fill()
 	_set_control_rect(_preview_shelf, layout["preview_shelf"] as Rect2)
 	_set_control_rect(_blocked_panel, layout["blocked_panel"] as Rect2)
 	_set_control_rect(_blocked_label, layout["blocked"] as Rect2)
@@ -326,29 +219,18 @@ func _apply_responsive_layout() -> void:
 	_next_preview.position = (layout["next"] as Rect2).get_center() + Vector2(0.0, 8.0)
 	_then_preview.position = (layout["then"] as Rect2).get_center() + Vector2(0.0, 8.0)
 	var center_y: float = viewport_size.y * 0.5
-	_set_control_rect(_fever_band, Rect2(0.0, center_y - 40.0, viewport_size.x, 80.0))
-	_fever_band.pivot_offset = _fever_band.size * 0.5
-	_fever_band_base_position = _fever_band.position
 	_set_control_rect(
 		_callout_label,
 		Rect2(40.0, center_y - 120.0, viewport_size.x - 80.0, 200.0)
 	)
 	_callout_base_position = _callout_label.position
-	_set_control_rect(
-		_time_up_label,
-		Rect2(40.0, center_y - 130.0, viewport_size.x - 80.0, 260.0)
-	)
-	_layout_fever_streak(viewport_size)
 	_score_label.pivot_offset = _score_label.size * 0.5
 	_best_label.pivot_offset = _best_label.size * 0.5
 	_multiplier_label.pivot_offset = _multiplier_label.size * 0.5
 	_combo_label.pivot_offset = _combo_label.size * 0.5
 	_danger_label.pivot_offset = _danger_label.size * 0.5
-	_timer_label.pivot_offset = _timer_label.size * 0.5
-	_fit_timer_label_to_text()
 	_fit_numeric_label(_score_label, _displayed_score, SCORE_FONT_MAX, SCORE_FONT_MIN)
 	_fit_numeric_label(_best_label, _best_target, BEST_FONT_MAX, BEST_FONT_MIN)
-	_update_time_bar(_previous_time_remaining if _previous_time_remaining >= 0.0 else 0.0)
 
 
 func _set_control_rect(control: Control, rect: Rect2) -> void:
@@ -410,15 +292,6 @@ static func hud_layout(viewport_size: Vector2, safe_area: Rect2 = Rect2()) -> Di
 		"multiplier": Rect2(center_x - 220.0, top + 160.0, 440.0, 66.0),
 		"combo": Rect2(center_x - 220.0, top + 226.0, 440.0, 46.0),
 		"max_combo": Rect2(safe.end.x - HUD_MARGIN - 236.0, top + 162.0, 236.0, 46.0),
-		"timer": Rect2(center_x - 150.0, top + 292.0, 300.0, 80.0),
-		"drain_rate": Rect2(safe.end.x - 88.0, top + 386.0, 72.0, 36.0),
-		"time_bonus": Rect2(center_x + 170.0, top + 308.0, 190.0, 50.0),
-		"time_bar": Rect2(
-			safe.position.x + 96.0,
-			top + 396.0,
-			maxf(safe.size.x - 192.0, 1.0),
-			26.0
-		),
 		"preview_shelf": shelf,
 		"blocked_panel": Rect2(center_x - 210.0, shelf_top + 8.0, 420.0, 56.0),
 		"blocked": Rect2(center_x - 198.0, shelf_top + 12.0, 396.0, 48.0),
@@ -439,9 +312,6 @@ static func hud_layout(viewport_size: Vector2, safe_area: Rect2 = Rect2()) -> Di
 func _process(delta: float) -> void:
 	_danger_refresh_elapsed += delta
 	_pulse_elapsed += delta
-	_advance_time_bonus_display(delta)
-	_time_bar_fill.advance_bonus(maxf(delta, 0.0) / maxf(Engine.time_scale, 0.001))
-	_update_fever_pulse()
 	if not Config.data.fx_callouts_enabled:
 		_hide_callout_visuals()
 	if _board != null and _danger_refresh_elapsed >= DANGER_REFRESH_INTERVAL:
@@ -494,19 +364,16 @@ func bind_game_state(
 ) -> void:
 	_board = board
 	_reset_callout_tracking()
-	_blitz_mode = game_manager is BlitzManager
-	_blitz_manager = game_manager as BlitzManager if _blitz_mode else null
-	if not _blitz_mode:
-		_turn_input_indicator.bind(game_manager, board)
-		var turn_manager: TurnManager = game_manager as TurnManager
-		if not turn_manager.planet_unlocked.is_connected(_on_planet_unlocked):
-			turn_manager.planet_unlocked.connect(_on_planet_unlocked)
-		if not turn_manager.final_move_changed.is_connected(_on_final_move_changed):
-			turn_manager.final_move_changed.connect(_on_final_move_changed)
-		_on_final_move_changed(
-			turn_manager.final_move_pending or turn_manager.final_move_active,
-			TurnManager.FINAL_MOVE_MESSAGE
-		)
+	_turn_input_indicator.bind(game_manager, board)
+	var turn_manager: TurnManager = game_manager as TurnManager
+	if not turn_manager.planet_unlocked.is_connected(_on_planet_unlocked):
+		turn_manager.planet_unlocked.connect(_on_planet_unlocked)
+	if not turn_manager.final_move_changed.is_connected(_on_final_move_changed):
+		turn_manager.final_move_changed.connect(_on_final_move_changed)
+	_on_final_move_changed(
+		turn_manager.final_move_pending or turn_manager.final_move_active,
+		TurnManager.FINAL_MOVE_MESSAGE
+	)
 	game_manager.warning_changed.connect(_on_warning_changed)
 	game_manager.combo_changed.connect(_on_combo_changed)
 	_game_over_panel.bind(game_manager, score_manager)
@@ -517,22 +384,6 @@ func bind_game_state(
 		game_manager.max_combo
 	)
 	board.set_warning_directions(game_manager.blocked_directions)
-	_timer_label.visible = _blitz_mode
-	_time_bar_track.visible = _blitz_mode
-	_time_bar_fill.visible = _blitz_mode
-	_drain_rate_label.visible = false
-	_bonus_label.visible = false
-	if _blitz_mode:
-		game_manager.time_changed.connect(_on_time_changed)
-		game_manager.ready_changed.connect(_on_ready_changed)
-		game_manager.fever_changed.connect(_on_fever_changed)
-		game_manager.time_bonus_awarded.connect(_on_time_bonus_awarded)
-		game_manager.finale_started.connect(_on_finale_started)
-		_on_time_changed(game_manager.remaining_time)
-		if game_manager.state == BlitzManager.State.READY:
-			_on_ready_changed(true, game_manager.ready_remaining)
-	else:
-		_update_time_bar(0.0)
 	_refresh_danger_badge()
 
 
@@ -784,7 +635,7 @@ static func numeric_font_size_for_width(
 
 func _on_combo_changed(combo: int, multiplier: float, max_combo: int) -> void:
 	_max_combo_label.text = "%s %d" % [
-		"MAX CHAIN" if _blitz_mode else "MAX COMBO",
+		"MAX COMBO",
 		max_combo,
 	]
 	var previous_multiplier: float = _current_multiplier
@@ -805,29 +656,13 @@ func _on_combo_changed(combo: int, multiplier: float, max_combo: int) -> void:
 
 func _refresh_combo_badge() -> void:
 	_multiplier_label.visible = _current_combo > 0
-	_combo_label.visible = _current_combo > 0 or (_blitz_mode and _fever_active)
+	_combo_label.visible = _current_combo > 0
 	if not _combo_label.visible:
 		return
-	var combo_text: String = (
-		"%s %d" % ["CHAIN" if _blitz_mode else "COMBO", _current_combo]
-		if _current_combo > 0
-		else ""
-	)
-	if _blitz_mode and _fever_active:
-		var fever_text: String = "FEVER ×%s  %.1fs" % [
-			_format_multiplier(Config.data.blitz_fever_multiplier),
-			_fever_remaining,
-		]
-		combo_text = (
-			"%s  ·  %s" % [combo_text, fever_text]
-			if not combo_text.is_empty()
-			else fever_text
-		)
-	_combo_label.text = combo_text
+	_combo_label.text = "COMBO %d" % _current_combo
 
 
 func _on_reaction_scored(reaction: Dictionary) -> void:
-	_play_pending_time_bonus(reaction)
 	var occupancy: float = float(reaction.get("occupancy", 0.0))
 	_set_danger_badge(
 		occupancy,
@@ -898,9 +733,6 @@ func _popup_formula(reaction: Dictionary) -> String:
 		factors.append("×%s" % _format_multiplier(combo_multiplier))
 	if danger_multiplier > 1.0:
 		factors.append("×%s" % _format_multiplier(danger_multiplier))
-	var fever_multiplier: float = float(reaction.get("fever_multiplier", 1.0))
-	if fever_multiplier > 1.0:
-		factors.append("×%s" % _format_multiplier(fever_multiplier))
 	return " ".join(factors)
 
 
@@ -948,7 +780,13 @@ func _clamp_popup_position(screen_position: Vector2) -> Vector2:
 	var viewport_size: Vector2 = get_viewport_rect().size
 	var layout: Dictionary = hud_layout(viewport_size, _logical_safe_area(viewport_size))
 	var half_size: Vector2 = ScorePopup.POPUP_SIZE * 0.5
-	var top_hud_end: float = (layout["time_bar"] as Rect2).end.y
+	var top_hud_end: float = maxf(
+		(layout["combo"] as Rect2).end.y,
+		maxf(
+			(layout["max_combo"] as Rect2).end.y,
+			(layout["danger_panel"] as Rect2).end.y
+		)
+	)
 	var preview_top: float = (layout["preview_shelf"] as Rect2).position.y
 	var minimum_y: float = top_hud_end + half_size.y + ScorePopup.RISE_DISTANCE + 12.0
 	var maximum_y: float = preview_top - half_size.y - 12.0
@@ -1002,7 +840,7 @@ func _set_danger_badge(occupancy: float, multiplier: float) -> void:
 	if _danger_label.visible:
 		_danger_label.text = "DANGER ×%s" % _format_multiplier(multiplier)
 		var danger_color: Color = (
-			TIMER_DANGER_COLOR if multiplier >= 4.0 else HUD_AMBER_COLOR
+			Color("#FF3B30") if multiplier >= 4.0 else HUD_AMBER_COLOR
 		)
 		_danger_label.add_theme_color_override("font_color", danger_color)
 		_apply_danger_panel_color(danger_color)
@@ -1109,7 +947,7 @@ func _on_warning_changed(directions: Array[Vector2i]) -> void:
 	var symbols: Array[String] = []
 	for direction: Vector2i in directions:
 		symbols.append(_direction_symbol(direction))
-	_blocked_label.visible = not _blitz_mode and not symbols.is_empty()
+	_blocked_label.visible = not symbols.is_empty()
 	_blocked_panel.visible = _blocked_label.visible
 	_blocked_label.text = "" if symbols.is_empty() else "%s 막힘" % " ".join(symbols)
 
@@ -1126,236 +964,13 @@ func _direction_symbol(direction: Vector2i) -> String:
 	return "?"
 
 
-func _on_time_changed(remaining: float) -> void:
-	var clamped_remaining: float = maxf(remaining, 0.0)
-	_timer_label.text = "%.1f" % clamped_remaining
-	_fit_timer_label_to_text()
-	_update_time_bar(clamped_remaining)
-	if not _timer_flashing:
-		_timer_label.modulate = _timer_color_for(clamped_remaining)
-	_record_timer_ticks(_previous_time_remaining, clamped_remaining)
-	_previous_time_remaining = clamped_remaining
-	_update_drain_rate_label()
-
-
-func _on_ready_changed(active: bool, remaining: float) -> void:
-	if active:
-		_drain_rate_label.visible = false
-		_timer_label.text = "READY %.1f" % remaining
-		_fit_timer_label_to_text()
-		if not _timer_flashing:
-			_timer_label.modulate = TIMER_NORMAL_COLOR
-
-
-func _update_time_bar(remaining: float) -> void:
-	if not is_instance_valid(_time_bar_track) or not is_instance_valid(_time_bar_fill):
-		return
-	_layout_time_bar_fill()
-	_time_bar_fill.set_time(remaining, Config.data.blitz_time_bar_reference)
-	_update_drain_rate_label()
-
-
-func _layout_time_bar_fill() -> void:
-	if not is_instance_valid(_time_bar_track) or not is_instance_valid(_time_bar_fill):
-		return
-	_set_control_rect(
-		_time_bar_fill,
-		Rect2(
-			_time_bar_track.position + Vector2(TIME_BAR_INSET, TIME_BAR_INSET),
-			Vector2(
-				maxf(_time_bar_track.size.x - TIME_BAR_INSET * 2.0, 0.0),
-				maxf(_time_bar_track.size.y - TIME_BAR_INSET * 2.0, 0.0)
-			)
-		)
-	)
-
-
-func _fit_timer_label_to_text() -> void:
-	if not is_instance_valid(_timer_label):
-		return
-	var font: Font = _timer_label.get_theme_font("font")
-	var font_size: int = _timer_label.get_theme_font_size("font_size")
-	var text_width: float = font.get_string_size(
-		_timer_label.text,
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1.0,
-		font_size
-	).x
-	var center_x: float = _timer_label.position.x + _timer_label.size.x * 0.5
-	var fitted_width: float = maxf(180.0, ceilf(text_width + NUMERIC_SIDE_PADDING * 4.0))
-	_timer_label.size.x = fitted_width
-	_timer_label.position.x = center_x - fitted_width * 0.5
-	_timer_label.pivot_offset = _timer_label.size * 0.5
-
-
-func _on_fever_changed(active: bool, remaining: float) -> void:
-	var was_active: bool = _fever_active
-	_fever_active = active
-	_fever_remaining = maxf(remaining, 0.0)
-	_refresh_combo_badge()
-	if active:
-		if not was_active:
-			if Config.data.fx_callouts_enabled:
-				_start_fever_presentation()
-		return
-	if not was_active:
-		return
-	if Config.data.fx_callouts_enabled:
-		_end_fever_presentation()
-	else:
-		_hide_fever_visuals()
-
-
-func _on_time_bonus_awarded(seconds: float, source: String) -> void:
-	if not Config.data.fx_callouts_enabled:
-		return
-	if Config.data.blitz_survival_enabled:
-		var added_seconds: float = maxf(seconds, 0.0)
-		if added_seconds <= 0.0:
-			return
-		var starts_window: bool = _time_bonus_window_remaining <= 0.0
-		if starts_window:
-			_time_bonus_segment_start = maxf(_previous_time_remaining - added_seconds, 0.0)
-		_time_bonus_accumulator += added_seconds
-		_time_bar_fill.show_bonus(
-			_time_bonus_segment_start,
-			_previous_time_remaining,
-			_fever_active
-		)
-		if starts_window:
-			_time_bonus_window_remaining = maxf(
-				Config.data.blitz_time_bonus_display_window,
-				0.0
-			)
-			_begin_survival_time_bonus()
-		else:
-			_update_survival_time_bonus_text()
-		if _time_bonus_window_remaining <= 0.0:
-			_flush_time_bonus_display()
-		return
-	_pending_time_bonuses.append({"seconds": seconds, "source": source})
-
-
-func _advance_time_bonus_display(delta: float) -> void:
-	if not Config.data.blitz_survival_enabled or _time_bonus_window_remaining <= 0.0:
-		return
-	var real_delta: float = maxf(delta, 0.0) / maxf(Engine.time_scale, 0.001)
-	_time_bonus_window_remaining = maxf(_time_bonus_window_remaining - real_delta, 0.0)
-	if _time_bonus_window_remaining <= 0.0:
-		_flush_time_bonus_display()
-
-
-func _flush_time_bonus_display() -> void:
-	_time_bonus_accumulator = 0.0
-	_time_bonus_window_remaining = 0.0
-	if not Config.data.fx_callouts_enabled:
-		return
-	_finish_survival_time_bonus()
-
-
-func _begin_survival_time_bonus() -> void:
-	if _bonus_tween != null and _bonus_tween.is_valid():
-		_bonus_tween.kill()
-	_bonus_label.visible = true
-	_bonus_label.modulate = Color.WHITE
-	_bonus_label.scale = Vector2.ONE
-	_last_bonus_target = _bonus_label.position
-	_update_survival_time_bonus_text()
-	_flash_timer_green()
-
-
-func _update_survival_time_bonus_text() -> void:
-	_bonus_label.text = "+%.1fs" % _time_bonus_accumulator
-
-
-func _finish_survival_time_bonus() -> void:
-	if not _bonus_label.visible:
-		return
-	_bonus_tween = create_tween()
-	_bonus_tween.tween_interval(SURVIVAL_BONUS_POST_WINDOW_HOLD)
-	_bonus_tween.tween_callback(_time_bar_fill.begin_bonus_fade)
-	_bonus_tween.tween_property(
-		_bonus_label,
-		"modulate:a",
-		0.0,
-		SURVIVAL_BONUS_LABEL_FADE_DURATION
-	)
-	_bonus_tween.tween_callback(_hide_bonus_label)
-
-
-func _update_drain_rate_label() -> void:
-	if (
-		_blitz_manager == null
-		or not Config.data.blitz_survival_enabled
-		or _blitz_manager.state != BlitzManager.State.RUNNING
-	):
-		_drain_rate_label.visible = false
-		return
-	var layers: int = _time_bar_fill.layer_count()
-	if layers >= 2:
-		_drain_rate_label.visible = true
-		_drain_rate_label.text = "×%d" % layers
-		_drain_rate_label.add_theme_color_override(
-			"font_color",
-			BlitzTimeBar.color_for_layer(layers - 1)
-		)
-		return
-	var multiplier: float = _blitz_manager.current_drain_multiplier()
-	_drain_rate_label.visible = multiplier >= 1.1
-	if _drain_rate_label.visible:
-		_drain_rate_label.text = "×%.1f" % multiplier
-		_drain_rate_label.add_theme_color_override("font_color", TIMER_NORMAL_COLOR)
-
-
-func _on_finale_started() -> void:
-	if not Config.data.fx_callouts_enabled:
-		return
-	_time_up_count += 1
-	if _sfx_bank != null:
-		_sfx_bank.play_time_up_buzzer()
-	if _time_up_tween != null and _time_up_tween.is_valid():
-		_time_up_tween.kill()
-	_time_up_label.add_theme_color_override("font_color", TIMER_DANGER_COLOR)
-	_time_up_label.add_theme_color_override(
-		"font_outline_color",
-		Color(0.08, 0.01, 0.01, 0.92)
-	)
-	_time_up_label.add_theme_color_override(
-		"font_shadow_color",
-		Color(TIMER_DANGER_COLOR.r, TIMER_DANGER_COLOR.g, TIMER_DANGER_COLOR.b, 0.24)
-	)
-	_time_up_label.add_theme_constant_override("outline_size", 4)
-	_time_up_label.add_theme_constant_override("shadow_outline_size", 14)
-	_time_up_label.visible = true
-	_time_up_label.modulate = Color.WHITE
-	_time_up_label.scale = Vector2.ONE * 0.90
-	_time_up_ring.play(
-		_time_up_label.position + _time_up_label.size * 0.5,
-		TIMER_DANGER_COLOR,
-		82.0,
-		220.0,
-		0.65,
-		3.0
-	)
-	_time_up_tween = create_tween()
-	_time_up_tween.set_parallel(true)
-	_time_up_tween.tween_property(
-		_time_up_label, "scale", Vector2.ONE, 0.28
-	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	_time_up_tween.tween_property(
-		_time_up_label, "modulate:a", 0.0, 0.25
-	).set_delay(0.75)
-	_time_up_tween.chain().tween_callback(_hide_time_up_label)
-
-
 func _update_callout(combo: int) -> void:
 	if combo <= 0:
 		_callout_seen.clear()
 		return
 	if not Config.data.fx_callouts_enabled:
 		return
-	var steps: Array[int] = BLITZ_CALLOUT_STEPS if _blitz_mode else TURN_CALLOUT_STEPS
-	var stage_index: int = steps.find(combo)
+	var stage_index: int = TURN_CALLOUT_STEPS.find(combo)
 	if stage_index < 0 or _callout_seen.has(combo):
 		return
 	_callout_seen[combo] = true
@@ -1558,249 +1173,9 @@ func _show_callout_sparkles(stage_index: int, duration: float) -> void:
 		)
 
 
-func _start_fever_presentation() -> void:
-	if _fever_tween != null and _fever_tween.is_valid():
-		_fever_tween.kill()
-	_fever_band_label.text = "FEVER ×%s" % _format_multiplier(
-		Config.data.blitz_fever_multiplier
-	)
-	_fever_band_label.add_theme_color_override("font_color", HUD_AMBER_COLOR)
-	_fever_band_label.add_theme_color_override(
-		"font_outline_color",
-		Color(0.08, 0.035, 0.0, 0.94)
-	)
-	_fever_band_label.add_theme_constant_override("outline_size", 4)
-	_fever_band.color = Color(0.0, 0.0, 0.0, 0.0)
-	_fever_band.position = _fever_band_base_position
-	_fever_band.modulate = Color.WHITE
-	_fever_band.scale = Vector2.ONE * 0.90
-	_fever_vignette.modulate = Color.WHITE
-	_fever_band.visible = true
-	_fever_vignette.visible = true
-	_play_fever_streak()
-	_show_fever_sparkles()
-	_fever_tween = create_tween()
-	_fever_tween.tween_property(
-		_fever_band, "scale", Vector2.ONE, FEVER_ENTRY_DURATION
-	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	_fever_tween.tween_interval(FEVER_BAND_HOLD_DURATION)
-	_fever_tween.tween_property(
-		_fever_band, "modulate:a", 0.0, FEVER_EXIT_DURATION
-	)
-	_fever_tween.tween_callback(_hide_fever_band)
-	if _sfx_bank != null:
-		_sfx_bank.play_fever_sweep(true)
-
-
-func _play_fever_streak() -> void:
-	if _fever_streak_tween != null and _fever_streak_tween.is_valid():
-		_fever_streak_tween.kill()
-	var viewport_size: Vector2 = get_viewport_rect().size
-	_layout_fever_streak(viewport_size)
-	_fever_streak.position = Vector2(
-		-_fever_streak.size.x,
-		viewport_size.y * 0.5 + 48.0
-	)
-	_fever_streak.rotation = -0.045
-	_fever_streak.modulate = Color.WHITE
-	_fever_streak.visible = true
-	_fever_streak_tween = create_tween()
-	_fever_streak_tween.set_parallel(true)
-	_fever_streak_tween.tween_property(
-		_fever_streak,
-		"position:x",
-		viewport_size.x,
-		FEVER_STREAK_DURATION
-	).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	_fever_streak_tween.tween_property(
-		_fever_streak, "modulate:a", 0.0, FEVER_STREAK_DURATION
-	).set_delay(FEVER_STREAK_DURATION * 0.55)
-	_fever_streak_tween.chain().tween_callback(func() -> void:
-		_fever_streak.visible = false
-	)
-
-
-func _show_fever_sparkles() -> void:
-	_stop_sparkles(_fever_sparkles)
-	var center: Vector2 = _fever_band.position + _fever_band.size * 0.5
-	var offsets: Array[Vector2] = [
-		Vector2(-150.0, -36.0),
-		Vector2(0.0, 50.0),
-		Vector2(154.0, -30.0),
-	]
-	for index: int in range(_fever_sparkles.size()):
-		_fever_sparkles[index].play(
-			center,
-			HUD_AMBER_COLOR,
-			0.85,
-			offsets[index],
-			offsets[index] * 1.16,
-			0.0,
-			13.0 + float(index)
-		)
-
-
-func _end_fever_presentation() -> void:
-	if _fever_tween != null and _fever_tween.is_valid():
-		_fever_tween.kill()
-	if _fever_streak_tween != null and _fever_streak_tween.is_valid():
-		_fever_streak_tween.kill()
-	_fever_tween = create_tween()
-	_fever_tween.set_parallel(true)
-	_fever_tween.tween_property(_fever_band, "modulate:a", 0.0, FEVER_EXIT_DURATION)
-	_fever_tween.tween_property(_fever_vignette, "modulate:a", 0.0, FEVER_EXIT_DURATION)
-	_fever_tween.tween_property(_fever_streak, "modulate:a", 0.0, FEVER_EXIT_DURATION)
-	_fever_tween.chain().tween_callback(_hide_fever_visuals)
-	if _sfx_bank != null:
-		_sfx_bank.play_fever_sweep(false)
-
-
-func _update_fever_pulse() -> void:
-	if not _fever_active or not Config.data.fx_callouts_enabled:
-		return
-	_fever_vignette.modulate.a = 1.0
-
-
 func _stop_sparkles(sparkles: Array[CosmicSparkle]) -> void:
 	for sparkle: CosmicSparkle in sparkles:
 		sparkle.stop()
-
-
-func _record_timer_ticks(previous: float, current: float) -> void:
-	if (
-		not Config.data.fx_callouts_enabled
-		or previous < 0.0
-		or current >= previous
-	):
-		return
-	for second: int in range(10, 0, -1):
-		if previous < float(second) or current >= float(second):
-			continue
-		if _timer_tick_seen.has(second):
-			continue
-		_timer_tick_seen[second] = true
-		_timer_tick_history.append(second)
-		var urgent: bool = second <= 3
-		if urgent:
-			_urgent_timer_tick_history.append(second)
-		_punch_timer(urgent)
-		if _sfx_bank != null:
-			_sfx_bank.play_timer_tick(urgent)
-
-
-func _punch_timer(urgent: bool) -> void:
-	if _timer_punch_tween != null and _timer_punch_tween.is_valid():
-		_timer_punch_tween.kill()
-	_timer_label.scale = Vector2.ONE
-	_timer_punch_tween = create_tween()
-	_timer_punch_tween.tween_property(
-		_timer_label,
-		"scale",
-		Vector2.ONE * (1.32 if urgent else 1.18),
-		0.08
-	).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_timer_punch_tween.tween_property(_timer_label, "scale", Vector2.ONE, 0.10)
-
-
-func _play_pending_time_bonus(reaction: Dictionary) -> void:
-	if Config.data.blitz_survival_enabled:
-		return
-	if _pending_time_bonuses.is_empty() or not Config.data.fx_callouts_enabled:
-		return
-	var reaction_type: ReactionRules.Type = reaction.get(
-		"type", ReactionRules.Type.NONE
-	) as ReactionRules.Type
-	if reaction_type not in [ReactionRules.Type.BLAST, ReactionRules.Type.MAX_CLEAR]:
-		return
-	var bonus: Dictionary = _pending_time_bonuses.pop_front() as Dictionary
-	_show_time_bonus(
-		_reaction_screen_position(reaction.get("position", Vector2.ZERO) as Vector2),
-		float(bonus["seconds"])
-	)
-
-
-func _show_time_bonus(screen_position: Vector2, seconds: float) -> void:
-	if _bonus_tween != null and _bonus_tween.is_valid():
-		_bonus_tween.kill()
-	_bonus_label.visible = true
-	_bonus_label.modulate = Color.WHITE
-	_bonus_label.scale = Vector2.ONE
-	_bonus_label.text = (
-		"+%ds" % roundi(seconds)
-		if is_equal_approx(seconds, float(roundi(seconds)))
-		else "+%.1fs" % seconds
-	)
-	_bonus_label.position = screen_position - _bonus_label.size * 0.5
-	_last_bonus_target = (
-		_timer_label.position
-		+ _timer_label.size * 0.5
-		- _bonus_label.size * 0.5
-	)
-	_bonus_tween = create_tween()
-	_bonus_tween.tween_property(
-		_bonus_label, "position", _last_bonus_target, TIME_BONUS_TRAVEL_DURATION
-	).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-	_bonus_tween.parallel().tween_property(
-		_bonus_label, "scale", Vector2.ONE * 0.82, TIME_BONUS_TRAVEL_DURATION
-	)
-	_bonus_tween.tween_callback(_flash_timer_green)
-	_bonus_tween.tween_interval(0.10)
-	_bonus_tween.tween_property(_bonus_label, "modulate:a", 0.0, 0.20)
-	_bonus_tween.tween_callback(_hide_bonus_label)
-
-
-func _flash_timer_green() -> void:
-	if _timer_flash_tween != null and _timer_flash_tween.is_valid():
-		_timer_flash_tween.kill()
-	_timer_flashing = true
-	_timer_label.modulate = TIMER_BONUS_COLOR
-	_timer_flash_tween = create_tween()
-	_timer_flash_tween.tween_interval(0.12)
-	_timer_flash_tween.tween_property(
-		_timer_label, "modulate", _timer_color_for(_previous_time_remaining), 0.18
-	)
-	_timer_flash_tween.tween_callback(_finish_timer_flash)
-
-
-func _finish_timer_flash() -> void:
-	_timer_flashing = false
-	_timer_label.modulate = _timer_color_for(_previous_time_remaining)
-
-
-func _timer_color_for(remaining: float) -> Color:
-	return TIMER_DANGER_COLOR if remaining <= 10.0 else TIMER_NORMAL_COLOR
-
-
-func _configure_fever_vignette() -> void:
-	var shader: Shader = Shader.new()
-	shader.code = "\n".join([
-		"shader_type canvas_item;",
-		"render_mode unshaded;",
-		"float hash21(vec2 p) {",
-		"  p = fract(p * vec2(123.34, 456.21));",
-		"  p += dot(p, p + 45.32);",
-		"  return fract(p.x * p.y);",
-		"}",
-		"float noise21(vec2 p) {",
-		"  vec2 i = floor(p);",
-		"  vec2 f = fract(p);",
-		"  f = f * f * (3.0 - 2.0 * f);",
-		"  return mix(mix(hash21(i), hash21(i + vec2(1.0, 0.0)), f.x),",
-		"    mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0)), f.x), f.y);",
-		"}",
-		"void fragment() {",
-		"  vec2 edge_distance = abs(UV - vec2(0.5)) * 2.0;",
-		"  float edge = smoothstep(0.66, 1.0, max(edge_distance.x, edge_distance.y));",
-		"  vec2 drift = vec2(TIME * 0.018, -TIME * 0.012);",
-		"  float cloud = noise21(UV * vec2(5.0, 8.0) + drift);",
-		"  cloud = mix(cloud, noise21(UV * vec2(10.0, 16.0) - drift), 0.35);",
-		"  float alpha = edge * (0.045 + cloud * 0.065);",
-		"  COLOR = vec4(1.0, 0.57, 0.12, alpha);",
-		"}",
-	])
-	var shader_material: ShaderMaterial = ShaderMaterial.new()
-	shader_material.shader = shader
-	_fever_vignette.material = shader_material
 
 
 func _reset_callout_tracking() -> void:
@@ -1811,32 +1186,11 @@ func _reset_callout_tracking() -> void:
 	_pending_planet_unlocks.clear()
 	_preview_unlock_seen.clear()
 	_preview_unlock_flash_history.clear()
-	_timer_tick_seen.clear()
-	_timer_tick_history.clear()
-	_urgent_timer_tick_history.clear()
-	_pending_time_bonuses.clear()
-	_time_bonus_accumulator = 0.0
-	_time_bonus_window_remaining = 0.0
-	_drain_rate_label.visible = false
-	_previous_time_remaining = -1.0
-	_fever_active = false
-	_fever_remaining = 0.0
-	_time_up_count = 0
 	_hide_callout_visuals()
 
 
 func _hide_callout_visuals() -> void:
-	if _bonus_tween != null and _bonus_tween.is_valid():
-		_bonus_tween.kill()
-	_bonus_tween = null
-	_time_bonus_accumulator = 0.0
-	_time_bonus_window_remaining = 0.0
-	if is_instance_valid(_time_bar_fill):
-		_time_bar_fill.clear_bonus()
 	_hide_callout_label()
-	_hide_time_up_label()
-	_bonus_label.visible = false
-	_hide_fever_visuals()
 
 
 func _hide_callout_label() -> void:
@@ -1847,46 +1201,6 @@ func _hide_callout_label() -> void:
 	_planet_callout_visual.scale = Vector2.ONE
 	_planet_callout_visual.position = _planet_callout_base_position
 	_stop_sparkles(_callout_sparkles)
-
-
-func _hide_time_up_label() -> void:
-	_time_up_label.visible = false
-	_time_up_label.scale = Vector2.ONE
-	_time_up_ring.stop()
-
-
-func _hide_bonus_label() -> void:
-	_bonus_label.visible = false
-	_bonus_label.scale = Vector2.ONE
-
-
-func _hide_fever_visuals() -> void:
-	_fever_vignette.visible = false
-	_fever_vignette.modulate = Color.WHITE
-	_fever_streak.visible = false
-	_fever_streak.modulate = Color.WHITE
-	_stop_sparkles(_fever_sparkles)
-	_hide_fever_band()
-
-
-func _hide_fever_band() -> void:
-	_fever_band.visible = false
-	_fever_band.modulate = Color.WHITE
-	_fever_band.scale = Vector2.ONE
-	_fever_band.position = _fever_band_base_position
-
-
-func fever_vignette_max_alpha() -> float:
-	return FEVER_VIGNETTE_MAX_ALPHA
-
-
-func active_ui_sparkle_count() -> int:
-	return CosmicSparkle.visible_count(get_tree())
-
-
-func fever_vignette_shader_code() -> String:
-	var shader_material: ShaderMaterial = _fever_vignette.material as ShaderMaterial
-	return shader_material.shader.code
 
 
 func callout_history() -> Array[int]:
@@ -1901,24 +1215,8 @@ func preview_unlock_flash_history() -> Array[int]:
 	return _preview_unlock_flash_history.duplicate()
 
 
-func timer_tick_history() -> Array[int]:
-	return _timer_tick_history.duplicate()
-
-
-func urgent_timer_tick_history() -> Array[int]:
-	return _urgent_timer_tick_history.duplicate()
-
-
-func last_bonus_target() -> Vector2:
-	return _last_bonus_target
-
-
-func timer_bonus_target() -> Vector2:
-	return _timer_label.position + _timer_label.size * 0.5 - _bonus_label.size * 0.5
-
-
-func time_up_count() -> int:
-	return _time_up_count
+func active_ui_sparkle_count() -> int:
+	return CosmicSparkle.visible_count(get_tree())
 
 
 func _on_sound_pressed() -> void:

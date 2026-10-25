@@ -8,13 +8,9 @@ const TURN_STATE_NAMES: Array[String] = [
 	"CHECK_GAMEOVER",
 	"GAME_OVER",
 ]
-const BLITZ_STATE_NAMES: Array[String] = [
-	"IDLE", "READY", "RUNNING", "FINALE", "FINISHED"
-]
 const ANNIHILATION_RULE_NAMES: Array[String] = ["A", "B", "C"]
 
 @onready var _turn_manager: TurnManager = %TurnManager
-@onready var _blitz_manager: BlitzManager = %BlitzManager
 @onready var _spawner: Spawner = %Spawner
 @onready var _score_manager: ScoreManager = %ScoreManager
 @onready var _board: Variant = %Board
@@ -38,11 +34,7 @@ var _ranking_return_to_start: bool = true
 
 
 func _ready() -> void:
-	_game_manager = (
-		_blitz_manager
-		if Config.data.game_mode == GameConfig.GameMode.BLITZ
-		else _turn_manager
-	)
+	_game_manager = _turn_manager
 	_hud.bind_spawner(_spawner)
 	_hud.bind_score_manager(_score_manager)
 	_hud.bind_game_state(_game_manager, _board, _score_manager)
@@ -174,22 +166,17 @@ func _on_combo_changed(combo: int, multiplier: float, max_combo: int) -> void:
 
 
 func _update_label() -> void:
-	var blitz_mode: bool = Config.data.game_mode == GameConfig.GameMode.BLITZ
-	var mode_name: String = "JELLY" if Config.data.game_mode == GameConfig.GameMode.JELLY else "TURN"
-	var state_names: Array[String] = BLITZ_STATE_NAMES if blitz_mode else TURN_STATE_NAMES
-	var spawn_amount: int = 1 if blitz_mode else Config.data.spawn_count_for_turn(
-		_game_manager.turn_index + 1
-	)
+	var spawn_amount: int = Config.data.spawn_count_for_turn(_game_manager.turn_index + 1)
 	_label.text = "Mode: %s\nState: %s\nGravity: %s\n%s: %d\n%s: %d (x%s)\n%s: %d\nRule: %s\nSpawn: %d\nElapsed: %.2f s\nSeed: %d" % [
-		"BLITZ" if blitz_mode else mode_name,
-		state_names[_state],
+		"JELLY",
+		TURN_STATE_NAMES[_state],
 		OrbTypes.dir_name(_gravity),
-		"Swipes" if blitz_mode else "Turn",
+		"Turn",
 		_turn_index,
-		"Chain" if blitz_mode else "Combo",
+		"Combo",
 		_turn_combo,
 		_format_multiplier(_combo_multiplier),
-		"Max Chain" if blitz_mode else "Max Combo",
+		"Max Combo",
 		_max_combo,
 		(
 			"off"

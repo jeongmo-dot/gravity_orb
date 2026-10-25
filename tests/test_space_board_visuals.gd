@@ -158,7 +158,7 @@ func test_gravity_wall_light_and_field_move_to_the_new_direction() -> void:
 	await _cleanup(board)
 
 
-func test_blocked_fever_and_danger_keep_distinct_frame_states() -> void:
+func test_blocked_and_danger_keep_distinct_frame_states() -> void:
 	var board: Board3D = await _create_board()
 	board.set_warning_directions([Vector2i.DOWN])
 	board._process(0.1)
@@ -182,16 +182,6 @@ func test_blocked_fever_and_danger_keep_distinct_frame_states() -> void:
 		"blocked direction does not add an outer warning band"
 	)
 	board.set_warning_directions([])
-	board.set_fever_active(true)
-	board._process(0.1)
-	for wall_name: String in ["VisualTop", "VisualBottom", "VisualLeft", "VisualRight"]:
-		var wall: MeshInstance3D = board.get_node("VisualTilt/%s" % wall_name) as MeshInstance3D
-		var material: StandardMaterial3D = wall.material_override as StandardMaterial3D
-		assert_true(
-			material.albedo_color.r > material.albedo_color.b,
-			"%s warms during fever" % wall_name
-		)
-	board.set_fever_active(false)
 	board.set_danger_state(Config.data.danger_start, 1.0)
 	board._process(0.1)
 	var threshold_glow: MeshInstance3D = board.get_node(

@@ -243,59 +243,11 @@ func test_pulse_outline_is_only_visible_for_level_four_and_above() -> void:
 	await _cleanup(board)
 
 
-func test_visual_layers_preserve_turn_and_blitz_state_hashes() -> void:
-	var turn_hidden: String = await _scripted_state_hash(false, false)
-	var turn_visible: String = await _scripted_state_hash(true, false)
-	var blitz_hidden: String = await _scripted_state_hash(false, true)
-	var blitz_visible: String = await _scripted_state_hash(true, true)
-	assert_eq(turn_visible, turn_hidden, "20-turn celestial visual state hash")
-	assert_eq(blitz_visible, blitz_hidden, "20-second BLITZ celestial visual state hash")
-	assert_eq(
-		turn_visible.sha256_text(),
-		"a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724",
-		"turn state hash remains identical to #74"
-	)
-	assert_eq(
-		blitz_visible.sha256_text(),
-		"92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80",
-		"BLITZ state hash remains identical to #74"
-	)
-	print("CELESTIAL_PHYSICS_HASH turn=%s blitz=%s" % [turn_visible.sha256_text(), blitz_visible.sha256_text()])
-
-
 func _create_board() -> Board3D:
 	var board: Board3D = BOARD_SCENE.instantiate() as Board3D
 	tree.root.add_child(board)
 	await tree.process_frame
 	return board
-
-
-func _scripted_state_hash(visuals_visible: bool, blitz: bool) -> String:
-	var board: Board3D = await _create_board()
-	for index: int in range(20):
-		var direction: Vector2i = OrbTypes.DIRECTIONS[index % OrbTypes.DIRECTIONS.size()]
-		board.set_gravity(direction)
-		var color: int = (index + (2 if blitz else 0)) % Config.data.color_display.size()
-		var level: int = 1 + index % Config.data.orb_max_level
-		var position: Vector2 = Vector2(float(index % 5) * 100.0, float(index / 5) * 100.0)
-		var orb: Orb3D = board.spawn_orb(color, level, position)
-		orb.get_physics_body().freeze = true
-		orb._mesh.visible = visuals_visible
-		orb._adornment.visible = visuals_visible and CelestialOrbArt.has_adornment(level)
-		orb._blast_outline.visible = visuals_visible and orb.is_blast_armed()
-		orb._symbol_mesh.visible = visuals_visible and Config.data.orb_symbols_enabled
-	var state: Array[Dictionary] = []
-	for orb: Orb3D in board.get_orbs():
-		state.append({
-			"id": orb.stable_spawn_id,
-			"color": orb.color,
-			"level": orb.level,
-			"position": orb.position,
-			"velocity": orb.linear_velocity,
-		})
-	var hash_value: String = JSON.stringify(state)
-	await _cleanup(board)
-	return hash_value
 
 
 func _cleanup(node: Node) -> void:

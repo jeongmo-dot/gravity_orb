@@ -12,7 +12,6 @@ const VISUAL_TILT_DEGREES: float = 6.0
 const VISUAL_TILT_DURATION: float = 0.3
 const WARNING_FRAME_COLOR: Color = Color("#FF3B30")
 const NORMAL_FRAME_COLOR: Color = Color("#8ec5ff")
-const FEVER_FRAME_COLOR: Color = Color("#FF9F0A")
 const METAL_FRAME_COLOR: Color = Color("#26384E")
 const GRAVITY_GLOW_COLOR: Color = Color("#D7EEFF")
 const DANGER_AMBER_COLOR: Color = Color("#FFB020")
@@ -38,7 +37,6 @@ var _wall_materials: Dictionary = {}
 var _wall_inner_glows: Dictionary = {}
 var _wall_outer_glows: Dictionary = {}
 var _tilt_tween: Tween
-var _fever_active: bool = false
 var _gravity_field_material: ShaderMaterial
 var _gravity_visual_from: Vector2i = Vector2i.DOWN
 var _gravity_visual_to: Vector2i = Vector2i.DOWN
@@ -472,11 +470,6 @@ func set_warning_directions(directions: Array[Vector2i]) -> void:
 	_update_warning_visuals()
 
 
-func set_fever_active(active: bool) -> void:
-	_fever_active = active
-	_update_warning_visuals()
-
-
 func set_danger_state(occupancy: float, multiplier: float) -> void:
 	var active: bool = occupancy >= Config.data.danger_start
 	var was_pulsing: bool = _danger_pulsing
@@ -764,9 +757,6 @@ func _update_warning_visuals() -> void:
 		var wall_gravity_direction: Vector2i = Vector2i(gravity_direction_by_name[wall_name])
 		var frame_color: Color = METAL_FRAME_COLOR
 		var emission: float = 0.08
-		if _fever_active:
-			frame_color = METAL_FRAME_COLOR.lerp(FEVER_FRAME_COLOR, 0.70)
-			emission = 0.48
 		var wall_material: StandardMaterial3D = _wall_materials.get(wall_name) as StandardMaterial3D
 		_set_standard_material_color(wall_material, frame_color, emission)
 
@@ -788,10 +778,6 @@ func _update_warning_visuals() -> void:
 		)
 		var inner_color: Color = GRAVITY_GLOW_COLOR
 		var inner_strength: float = gravity_weight
-		if _fever_active:
-			inner_color = FEVER_FRAME_COLOR
-			inner_strength = maxf(inner_strength, 0.72)
-			highlight_center = 0.5
 		var inner_glow: MeshInstance3D = _wall_inner_glows.get(wall_name) as MeshInstance3D
 		_set_gravity_glow_material(
 			inner_glow,
@@ -807,9 +793,6 @@ func _update_warning_visuals() -> void:
 			else 0.0
 		)
 		var outer_color: Color = danger_color
-		if _fever_active:
-			outer_color = FEVER_FRAME_COLOR
-			outer_strength = maxf(outer_strength, 0.58)
 		_set_outer_glow_material(outer_glow, outer_color, outer_strength)
 
 

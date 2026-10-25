@@ -49,7 +49,7 @@ func test_one_hundred_orbs_share_level_color_and_physics_resources() -> void:
 
 func test_blink_and_radius_mutation_use_copy_on_write() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
-	Config.data.game_mode = GameConfig.GameMode.BLITZ
+	Config.data.game_mode = GameConfig.GameMode.TURN
 	Orb3D.clear_shared_resource_cache()
 	var board: Board3D = BOARD_SCENE.instantiate() as Board3D
 	tree.root.add_child(board)
