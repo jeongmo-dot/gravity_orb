@@ -40,7 +40,7 @@
 
 ### [2026-10-25] 대상 #109 — JELLY 젤리 둘레 반투명 고리 제거
 - 상태: 완료 — 실제 창에서 원인 노드를 분리 재현하고 JELLY에서 해당 링 한 겹만 숨김
-- 브랜치 / PR: `jelly-halo-fix` / 생성 예정
+- 브랜치 / PR: `jelly-halo-fix` / https://github.com/jeongmo-dot/gravity_orb/pull/109
 - 변경 파일: `scripts/fx/{ColorEffectVisual,FeedbackDirector}.gd`, `tests/test_color_effect_visuals.gd`, `tests/spike/{JellyHaloDiagnostic.tscn,run_jelly_halo_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 최신 `origin/main`을 먼저 병합하고 Godot Standard 실제 창·그림 ON 상태에서 합체·흡수를 재현 — 자동 창 측정 + 캡처 직접 관측
