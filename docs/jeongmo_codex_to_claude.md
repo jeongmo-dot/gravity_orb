@@ -40,7 +40,7 @@
 
 ### [2026-10-25] 대상 #106 — JELLY 단일 앱 · 다른 모드 레거시 보관
 - 상태: 완료 — `legacy-four-modes` 태그 뒤 main을 JELLY 단일 앱으로 전환하고 0.16.0 Debug 패키지까지 검증함
-- 브랜치 / PR: `jelly-single-app` / 생성 예정
+- 브랜치 / PR: `jelly-single-app` / https://github.com/jeongmo-dot/gravity_orb/pull/108
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `project.godot`, `scenes/{Main.tscn,Main3D.tscn,UI.tscn}`, `scripts/{core,fx,spike,ui}`, `tests/`, `docs/.gdignore`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] BLITZ·SLIME 런타임 코드·씬·HUD·설정 필드·전용 테스트·캡처 장면·측정 도구 삭제. CLASSIC의 공통 규칙·턴·물리·반응·Spawner와 회귀 테스트는 유지 — 자동 (소스 검색·전체 테스트)
