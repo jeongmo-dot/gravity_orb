@@ -16,6 +16,7 @@ const JELLY_IMPACT_MINIMUM: float = 0.06
 const JELLY_IMPACT_DECAY: float = 4.8
 const JELLY_BREATH_BLEND_SPEED: float = 4.0
 const JELLY_ABSORPTION_GROWTH_DURATION: float = 0.10
+const JELLY_BLAST_GLOW_Z_OFFSET: float = -0.30
 
 static var _shared_physics_materials: Dictionary = {}
 static var _shared_shapes: Dictionary = {}
@@ -113,6 +114,23 @@ static func plane_position_to_world(value: Vector2, z: float = 0.0) -> Vector3:
 
 static func world_position_to_plane(value: Vector3) -> Vector2:
 	return Vector2(value.x, -value.y) * PIXELS_PER_METER
+
+
+static func jelly_upright_deform_basis(
+	frame_rotation: float,
+	deform: Vector2,
+	uniform_scale: float
+) -> Basis:
+	var cosine: float = cos(frame_rotation)
+	var sine: float = sin(frame_rotation)
+	var xx: float = cosine * cosine * deform.x + sine * sine * deform.y
+	var xy: float = cosine * sine * (deform.x - deform.y)
+	var yy: float = sine * sine * deform.x + cosine * cosine * deform.y
+	return Basis(
+		Vector3(xx * uniform_scale, xy * uniform_scale, 0.0),
+		Vector3(xy * uniform_scale, yy * uniform_scale, 0.0),
+		Vector3(0.0, 0.0, 1.0)
+	)
 
 
 static func plane_vector_to_world(value: Vector2) -> Vector3:
@@ -235,18 +253,20 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	_adornment.mesh = CelestialOrbArt.billboard_mesh(1)
 	_adornment.material_override = visual_material
 	_adornment.visible = not _is_jelly_visual and CelestialOrbArt.has_adornment(level)
-	_blast_outline.mesh = CelestialOrbArt.billboard_mesh(2)
+	_blast_outline.mesh = (
+		JellyOrbArt.face_mesh()
+		if _is_jelly_visual
+		else CelestialOrbArt.billboard_mesh(2)
+	)
 	_blast_outline.material_override = (
-		JellyOrbArt.outline_material_for(color, level)
+		JellyOrbArt.glow_material_for(color, level)
 		if _is_jelly_visual
 		else visual_material
 	)
 	_blast_outline.visible = _blast_armed
 	_face.mesh = JellyOrbArt.face_mesh()
-	_face.material_override = JellyOrbArt.face_material_for(color, level)
+	_face.material_override = JellyOrbArt.face_material_for(color, level, _blast_armed)
 	_face.visible = _is_jelly_visual
-	if _is_jelly_visual:
-		_blast_outline.material_override = JellyOrbArt.outline_material_for(color, level)
 	_apply_visual_transparency()
 	if _is_jelly_visual or _current_radius < _radius:
 		_ensure_unique_radius_resources()
@@ -343,8 +363,14 @@ func set_jelly_mass(
 	_mesh.material_override = visual_material
 	_adornment.material_override = visual_material
 	_adornment.visible = not _is_jelly_visual and CelestialOrbArt.has_adornment(level)
-	_face.material_override = JellyOrbArt.face_material_for(color, level)
+	_blast_outline.material_override = (
+		JellyOrbArt.glow_material_for(color, level)
+		if _is_jelly_visual
+		else visual_material
+	)
+	_face.material_override = JellyOrbArt.face_material_for(color, level, _blast_armed)
 	_face.visible = _is_jelly_visual
+	_apply_visual_transparency()
 	_ensure_unique_radius_resources()
 	_apply_current_radius_to_resources(_current_radius / PIXELS_PER_METER)
 	_update_visual_transform()
@@ -362,8 +388,23 @@ func is_blast_armed() -> bool:
 func blast_emission_strength() -> float:
 	if not _blast_armed:
 		return 0.08
+	if _is_jelly_visual:
+		return jelly_blast_glow_alpha()
 	return 0.20 + 0.80 * (
 		0.5 + 0.5 * sin(TAU * _blast_blink_elapsed / _blast_blink_period)
+	)
+
+
+func jelly_blast_glow_alpha() -> float:
+	if not _blast_armed or not _is_jelly_visual:
+		return 0.0
+	var wave: float = 0.5 + 0.5 * sin(
+		TAU * _blast_blink_elapsed / JellyOrbArt.BLAST_GLOW_PERIOD
+	)
+	return lerpf(
+		JellyOrbArt.BLAST_GLOW_ALPHA_MIN,
+		JellyOrbArt.BLAST_GLOW_ALPHA_MAX,
+		wave
 	)
 
 
@@ -568,6 +609,8 @@ func blast_outline_strength() -> float:
 
 
 func blast_pulse_scale() -> float:
+	if _blast_armed and _is_jelly_visual:
+		return JellyOrbArt.BLAST_GLOW_OUTER_SCALE
 	if not _blast_armed or level < 6:
 		return 1.0
 	return lerpf(0.94, 1.0, blast_emission_strength())
@@ -634,11 +677,18 @@ func _apply_visual_transparency() -> void:
 	_mesh.transparency = base_transparency
 	_adornment.transparency = base_transparency
 	_face.transparency = base_transparency
-	_blast_outline.transparency = 1.0 - clampf(
-		_visual_alpha * blast_emission_strength(),
-		0.0,
-		1.0
-	)
+	if _is_jelly_visual:
+		_blast_outline.transparency = 0.0
+		_blast_outline.set_instance_shader_parameter(
+			"glow_alpha",
+			clampf(_visual_alpha * blast_emission_strength(), 0.0, 1.0)
+		)
+	else:
+		_blast_outline.transparency = 1.0 - clampf(
+			_visual_alpha * blast_emission_strength(),
+			0.0,
+			1.0
+		)
 	_symbol_mesh.transparency = base_transparency
 
 
@@ -837,11 +887,15 @@ func _update_visual_transform() -> void:
 	_mesh.scale = _visual_punch_scale * stretch_scale * jelly_scale
 	_mesh.position = render_world_position
 	_adornment.position = render_world_position + Vector3(0.0, 0.0, 0.001)
-	_blast_outline.position = render_world_position + Vector3(0.0, 0.0, radius_m + 0.004)
 	var body_front_offset: float = (
 		radius_m * absf(_mesh.scale.z)
 		if _is_jelly_visual
 		else radius_m
+	)
+	_blast_outline.position = (
+		render_world_position + Vector3(0.0, 0.0, JELLY_BLAST_GLOW_Z_OFFSET)
+		if _is_jelly_visual
+		else render_world_position + Vector3(0.0, 0.0, radius_m + 0.004)
 	)
 	_face.position = render_world_position + Vector3(0.0, 0.0, body_front_offset + 0.006)
 	if _is_jelly_visual:
@@ -856,26 +910,39 @@ func _update_visual_transform() -> void:
 		0.0,
 		CelestialOrbArt.RING_TILT_RADIANS if level == 4 else 0.0
 	)
-	_blast_outline.rotation = Vector3.ZERO
-	_face.rotation = Vector3(0.0, 0.0, _jelly_frame_rotation)
+	_blast_outline.rotation = (
+		Vector3(0.0, 0.0, _jelly_frame_rotation)
+		if _is_jelly_visual
+		else Vector3.ZERO
+	)
 	var punch_scale: float = maxf(
 		_visual_punch_scale.x,
 		maxf(_visual_punch_scale.y, _visual_punch_scale.z)
 	)
 	_adornment.scale = Vector3(radius_m, radius_m, 1.0) * punch_scale
 	_blast_outline.scale = (
-		Vector3(radius_m, radius_m, 1.0)
+		Vector3(
+			radius_m * (jelly_deform.x if _is_jelly_visual else 1.0),
+			radius_m * (jelly_deform.y if _is_jelly_visual else 1.0),
+			1.0
+		)
 		* punch_scale
 		* blast_pulse_scale()
 	)
 	var face_radius_ratio: float = (
-		1.0 if _is_jelly_visual and level >= Config.data.orb_max_level else 0.62
+		1.0
+		if _is_jelly_visual and (level >= Config.data.orb_max_level or _blast_armed)
+		else 0.62
 	)
 	var face_scale_m: float = radius_m * face_radius_ratio * punch_scale
-	_face.scale = Vector3(
-		face_scale_m * jelly_deform.x,
-		face_scale_m * jelly_deform.y,
-		1.0
+	_face.basis = (
+		jelly_upright_deform_basis(
+			_jelly_frame_rotation,
+			jelly_deform,
+			face_scale_m
+		)
+		if _is_jelly_visual
+		else Basis.from_scale(Vector3(face_scale_m, face_scale_m, 1.0))
 	)
 	var symbol_y_offset: float = radius_m * 0.54 if _is_jelly_visual else 0.0
 	_symbol_mesh.position = (
