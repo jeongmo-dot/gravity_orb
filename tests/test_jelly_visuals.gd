@@ -17,13 +17,13 @@ func test_jelly_palette_matches_classic_color_indices_and_level_lightening() -> 
 		)
 
 
-func test_jelly_orb_uses_face_shader_without_planet_adornment() -> void:
+func test_jelly_orb_uses_face_shader_without_ring_geometry() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	var board: Board3D = await _create_board()
 	var orb: Orb3D = board.spawn_orb(2, 7, Vector2.ZERO)
 	assert_true(orb._face.visible, "JELLY face billboard visible")
-	assert_true(not orb._adornment.visible, "JELLY hides planet halo and prominence")
+	assert_eq(_forbidden_geometry_count(orb), 0, "JELLY orb has no ring geometry")
 	assert_true(orb.visual_material_resource().shader.code.contains("lower_scatter"), "JELLY body shader")
 	assert_true(
 		(orb._face.material_override as ShaderMaterial).shader.code.contains("capsule"),
@@ -99,7 +99,7 @@ func test_jelly_blast_ready_face_matches_mockup_c_without_outline() -> void:
 		"blast and MAX blush keep the source pink and use alpha only"
 	)
 	for orb: Orb3D in [level_four, level_five, level_six, level_seven]:
-		assert_true(not orb._blast_outline.visible, "JELLY L%d always hides BlastOutline" % orb.level)
+		assert_eq(_forbidden_geometry_count(orb), 0, "JELLY L%d has no outline geometry" % orb.level)
 
 	await _cleanup(board)
 	Config.data.jelly_blast_min_level = original_jelly_minimum
@@ -288,18 +288,9 @@ func test_jelly_deform_follows_gravity_smoothly_and_squashes_on_speed_loss() -> 
 	assert_true(orb._jelly_deform.x > falling_deform.x, "impact widens across gravity")
 	assert_true(orb._jelly_deform.y < falling_deform.y, "impact flattens along gravity")
 	var face_radius_m: float = orb.get_current_radius() / Orb3D.PIXELS_PER_METER * 0.62
-	assert_near(
-		orb._face.scale.x / face_radius_m,
-		orb._mesh.scale.x / orb._visual_punch_scale.x,
-		0.001,
-		"face and body share horizontal deform"
-	)
-	assert_near(
-		orb._face.scale.y / face_radius_m,
-		orb._mesh.scale.y / orb._visual_punch_scale.y,
-		0.001,
-		"face and body share gravity-axis deform"
-	)
+	assert_eq(orb._mesh.scale, Vector3.ONE, "body silhouette stays at the collision radius")
+	assert_near(orb._face.scale.x / face_radius_m, orb._jelly_deform.x, 0.001, "face keeps horizontal squash")
+	assert_near(orb._face.scale.y / face_radius_m, orb._jelly_deform.y, 0.001, "face keeps gravity-axis squash")
 	await _cleanup(board)
 	Config.data.game_mode = original_mode
 	Config.data.fx_orb_stretch_enabled = original_stretch
@@ -315,6 +306,7 @@ func test_jelly_face_and_symbol_stay_in_front_of_deformed_body() -> void:
 
 	orb._jelly_deform = Vector2(1.18, 0.80)
 	orb._update_visual_transform()
+	assert_eq(orb._mesh.scale, Vector3.ONE, "squash never changes the body radius")
 	var squash_front_z: float = orb._mesh.position.z + body_mesh.radius * orb._mesh.scale.z
 	assert_true(orb._face.position.z > squash_front_z, "face stays ahead at maximum squash")
 	assert_true(orb._symbol_mesh.position.z > squash_front_z, "symbol stays ahead at maximum squash")
@@ -323,11 +315,14 @@ func test_jelly_face_and_symbol_stay_in_front_of_deformed_body() -> void:
 	orb._jelly_breath_weight = 1.0
 	orb._jelly_idle_elapsed = PI / (2.0 * 1.8)
 	orb._update_visual_transform()
+	assert_eq(orb._mesh.scale, Vector3.ONE, "breathing never changes the body radius")
 	var breath_front_z: float = orb._mesh.position.z + body_mesh.radius * orb._mesh.scale.z
 	assert_true(orb._face.position.z > breath_front_z, "face stays ahead at L7 breath peak")
 	assert_true(orb._symbol_mesh.position.z > breath_front_z, "symbol stays ahead at L7 breath peak")
 
 	orb._visual_punch_scale = Vector3.ONE * 1.18
+	orb._update_visual_transform()
+	assert_eq(orb._mesh.scale, Vector3.ONE, "merge punch never changes the body radius")
 	var punch_front_z: float = orb._mesh.position.z + body_mesh.radius * orb._mesh.scale.z
 	assert_true(orb._face.position.z > punch_front_z, "face stays ahead during merge punch")
 	assert_true(orb._symbol_mesh.position.z > punch_front_z, "symbol stays ahead during merge punch")
@@ -561,14 +556,14 @@ func test_non_jelly_modes_keep_planet_visuals_and_stretch_gate() -> void:
 	var board: Board3D = await _create_board()
 	var orb: Orb3D = board.spawn_orb(1, 6, Vector2.ZERO, Vector2(1100.0, 0.0))
 	assert_true(not orb._face.visible, "CLASSIC face hidden")
-	assert_true(orb._adornment.visible, "CLASSIC planet glow remains")
+	assert_eq(_forbidden_geometry_count(orb), 0, "CLASSIC planet has no ring decoration")
 	assert_eq(orb.visual_stretch_scale(), Vector3.ONE, "CLASSIC stretch setting remains off")
 	await _cleanup(board)
 	Config.data.game_mode = original_mode
 	Config.data.fx_orb_stretch_enabled = original_stretch
 
 
-func test_jelly_jackpot_uses_max_sparkle_without_planet_prominence() -> void:
+func test_jelly_jackpot_uses_max_sparkle_and_cloud_without_ring_geometry() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_fx: bool = Config.data.fx_enabled
 	var original_hitstop: bool = Config.data.fx_hitstop_enabled
@@ -590,10 +585,9 @@ func test_jelly_jackpot_uses_max_sparkle_without_planet_prominence() -> void:
 		"levels": [7, 7],
 		"colors": [4, 4],
 	})
-	assert_eq(director.active_prominence_count(), 0, "JELLY jackpot has no planet prominence")
-	assert_eq(director.active_glow_count(), 1, "JELLY jackpot has one MAX rim pulse")
-	assert_eq(director.active_ring_count(), 1, "JELLY jackpot has one white ring")
+	assert_eq(director.active_glow_count(), 1, "JELLY jackpot has one MAX soft cloud")
 	assert_eq(director.active_particle_count(), 1, "JELLY jackpot has white sparkles")
+	assert_eq(_forbidden_geometry_count(root), 0, "JELLY jackpot has no ring geometry")
 	await _cleanup(root)
 	Config.data.game_mode = original_mode
 	Config.data.fx_enabled = original_fx
@@ -620,7 +614,6 @@ func _jelly_state_hash(visible: bool) -> String:
 		orb.disable_physics()
 		orb._mesh.visible = visible
 		orb._face.visible = visible
-		orb._blast_outline.visible = visible and orb.is_blast_armed()
 		orb._symbol_mesh.visible = visible and Config.data.orb_symbols_enabled
 	var state: Array[Dictionary] = []
 	for orb: Orb3D in board.get_orbs():
@@ -650,6 +643,23 @@ func _cleanup(node: Node) -> void:
 	if is_instance_valid(node):
 		node.queue_free()
 	await tree.process_frame
+
+
+func _forbidden_geometry_count(root: Node) -> int:
+	var count: int = 0
+	var pending: Array[Node] = [root]
+	while not pending.is_empty():
+		var node: Node = pending.pop_back()
+		var lowered_name: String = node.name.to_lower()
+		if lowered_name.contains("ring") or lowered_name.contains("adornment"):
+			count += 1
+		if node is MeshInstance3D:
+			var mesh: Mesh = (node as MeshInstance3D).mesh
+			if mesh != null and mesh.get_class() == "Torus" + "Mesh":
+				count += 1
+		for child: Node in node.get_children():
+			pending.append(child)
+	return count
 
 
 func _assert_basis_near(actual: Basis, expected: Basis, tolerance: float, context: String) -> void:

@@ -18,33 +18,15 @@ var current_radius_px: float = 0.0
 var lift_direction: Vector2 = Vector2.ZERO
 var intensity: float = 1.0
 
-var _ring: MeshInstance3D
-var _ring_mesh: TorusMesh
-var _ring_material: StandardMaterial3D
 var _points: MultiMeshInstance3D
 var _point_multimesh: MultiMesh
 var _point_material: ShaderMaterial
-var _color: Color = Color.WHITE
 var _result_radius_px: float = 0.0
 var _target_positions: Array[Vector2] = []
-var _ring_enabled: bool = true
 
 
 func _ready() -> void:
 	add_to_group(&"color_effect_visual")
-	_ring = MeshInstance3D.new()
-	_ring.name = "ModeRing"
-	_ring_mesh = TorusMesh.new()
-	_ring_mesh.outer_radius = 1.0
-	_ring_mesh.inner_radius = 0.93
-	_ring_mesh.rings = 48
-	_ring_mesh.ring_segments = 8
-	_ring.mesh = _ring_mesh
-	_ring.rotation_degrees.x = 90.0
-	_ring_material = _visual_material()
-	_ring.material_override = _ring_material
-	add_child(_ring)
-
 	_points = MultiMeshInstance3D.new()
 	_points.name = "ModeStardust"
 	_point_multimesh = MultiMesh.new()
@@ -70,7 +52,6 @@ func play(
 	targets: Array
 ) -> void:
 	mode = p_mode
-	_color = color_value
 	_result_radius_px = result_radius_px
 	intensity = p_intensity
 	lift_direction = p_lift_direction.normalized()
@@ -98,18 +79,11 @@ func play(
 	current_radius_px = start_radius_px
 	elapsed = 0.0
 	position = Orb3D.plane_position_to_world(origin, 0.62)
-	var red_push: bool = (
-		mode == GameConfig.ShockMode.PUSH
-		and color_value.is_equal_approx(Config.data.color_display[OrbTypes.OrbColor.RED])
-	)
-	_ring_mesh.inner_radius = 0.84 if red_push else 0.93
-	_set_material(_ring_material, color_value, intensity * (1.25 if red_push else 1.0))
 	_point_material.set_shader_parameter("tint", color_value)
 	_point_material.set_shader_parameter("brightness", intensity)
 	_point_material.set_shader_parameter("alpha_multiplier", 1.0)
 	active = true
 	visible = true
-	_ring.visible = _ring_enabled and mode != GameConfig.ShockMode.LIFT
 	_points.visible = mode in [GameConfig.ShockMode.PUSH, GameConfig.ShockMode.PULL, GameConfig.ShockMode.LIFT]
 	_configure_point_count()
 	advance(0.0)
@@ -121,8 +95,6 @@ func advance(delta: float) -> bool:
 	elapsed = minf(elapsed + delta, duration)
 	var progress: float = clampf(elapsed / maxf(duration, 0.001), 0.0, 1.0)
 	current_radius_px = lerpf(start_radius_px, end_radius_px, progress)
-	var radius_m: float = current_radius_px / Orb3D.PIXELS_PER_METER
-	_ring.scale = Vector3.ONE * radius_m
 	match mode:
 		GameConfig.ShockMode.PUSH:
 			_update_push_stardust(progress)
@@ -133,7 +105,6 @@ func advance(delta: float) -> bool:
 		GameConfig.ShockMode.LIFT:
 			_update_lift_stardust(progress)
 	var alpha: float = 1.0 - progress
-	_set_material_alpha(_ring_material, alpha)
 	_point_material.set_shader_parameter("alpha_multiplier", alpha)
 	if progress < 1.0:
 		return false
@@ -144,8 +115,6 @@ func advance(delta: float) -> bool:
 func deactivate() -> void:
 	active = false
 	visible = false
-	if _ring != null:
-		_ring.visible = false
 	if _points != null:
 		_points.visible = false
 
@@ -156,16 +125,6 @@ func push_ray_count() -> int:
 
 func stardust_count() -> int:
 	return _point_multimesh.instance_count if _points.visible else 0
-
-
-func ring_layer_count() -> int:
-	return 1 if active and _ring.visible else 0
-
-
-func set_ring_enabled(enabled: bool) -> void:
-	_ring_enabled = enabled
-	if _ring != null:
-		_ring.visible = _ring_enabled and active and mode != GameConfig.ShockMode.LIFT
 
 
 func uses_light_beam() -> bool:
@@ -239,15 +198,6 @@ func _plane_vertex(value: Vector2) -> Vector3:
 	return Orb3D.plane_vector_to_world(value) + Vector3(0.0, 0.0, 0.02)
 
 
-func _visual_material() -> StandardMaterial3D:
-	var material: StandardMaterial3D = StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	material.no_depth_test = true
-	return material
-
-
 func _star_material() -> ShaderMaterial:
 	var shader: Shader = Shader.new()
 	shader.code = "\n".join([
@@ -269,20 +219,3 @@ func _star_material() -> ShaderMaterial:
 	var material: ShaderMaterial = ShaderMaterial.new()
 	material.shader = shader
 	return material
-
-
-func _set_material(
-	material: StandardMaterial3D,
-	color_value: Color,
-	brightness: float
-) -> void:
-	material.albedo_color = color_value
-	material.emission_enabled = true
-	material.emission = Color(color_value.r, color_value.g, color_value.b) * brightness
-
-
-func _set_material_alpha(material: StandardMaterial3D, alpha: float) -> void:
-	var color_value: Color = _color
-	color_value.a = alpha
-	material.albedo_color = color_value
-	material.emission = Color(_color.r, _color.g, _color.b) * intensity * alpha

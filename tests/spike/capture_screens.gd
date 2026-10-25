@@ -18,6 +18,11 @@ const CAPTURE_FILES: Array[String] = [
 	"10_jelly_eat_00.png",
 	"11_jelly_eat_01.png",
 	"12_jelly_eat_02.png",
+	"13_jelly_merge_effect.png",
+	"14_jelly_absorption_effect.png",
+	"15_jelly_blast_effect.png",
+	"16_jelly_jackpot_effect.png",
+	"17_jelly_max_effect.png",
 ]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
@@ -157,7 +162,89 @@ func _capture_gameplay_scenes() -> void:
 	eater.set_jelly_mass(8.0, Config.data)
 	await get_tree().create_timer(Orb3D.JELLY_BELLY_TRANSITION_DURATION).timeout
 	await _capture("12_jelly_eat_02.png")
+	await _capture_effect_scenes(main, board)
 	await _destroy_main(main)
+
+
+func _capture_effect_scenes(main: Main, board: Board3D) -> void:
+	var director: FeedbackDirector = main.get_node("FeedbackDirector") as FeedbackDirector
+	board.clear()
+	director.clear_effects()
+	var result: Orb3D = board.spawn_orb(OrbTypes.OrbColor.BLUE, 3, Vector2.ZERO)
+	result.disable_physics()
+	director.play_reaction_visuals({
+		"type": ReactionRules.Type.MERGE,
+		"result_orb": result,
+		"result_level": 3,
+		"result_color": OrbTypes.OrbColor.BLUE,
+		"position": Vector2.ZERO,
+		"shock_targets": [],
+	})
+	await get_tree().create_timer(0.06).timeout
+	await _capture("13_jelly_merge_effect.png")
+
+	board.clear()
+	director.clear_effects()
+	result = board.spawn_orb(OrbTypes.OrbColor.GREEN, 3, Vector2.ZERO)
+	result.disable_physics()
+	director.play_reaction_visuals({
+		"type": ReactionRules.Type.MERGE,
+		"result_orb": result,
+		"result_level": 3,
+		"result_color": OrbTypes.OrbColor.GREEN,
+		"position": Vector2.ZERO,
+		"jelly_absorption": true,
+		"source_positions": [Vector2(-150.0, 0.0), Vector2(150.0, 0.0)],
+		"source_radii": [60.0, 25.0],
+		"colors": [OrbTypes.OrbColor.GREEN, OrbTypes.OrbColor.GREEN],
+		"levels": [3, 2],
+		"shock_targets": [],
+	})
+	await get_tree().create_timer(0.08).timeout
+	await _capture("14_jelly_absorption_effect.png")
+
+	board.clear()
+	director.clear_effects()
+	_spawn_specs(board, [
+		{"color": OrbTypes.OrbColor.RED, "level": 6, "mass": 32.0, "position": Vector2(-85.0, 0.0)},
+		{"color": OrbTypes.OrbColor.BLUE, "level": 6, "mass": 32.0, "position": Vector2(85.0, 0.0)},
+	])
+	director.play_reaction_visuals({
+		"type": ReactionRules.Type.BLAST,
+		"levels": [6, 6],
+		"colors": [OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE],
+		"position": Vector2.ZERO,
+	})
+	await get_tree().create_timer(0.06).timeout
+	await _capture("15_jelly_blast_effect.png")
+
+	board.clear()
+	director.clear_effects()
+	director.play_reaction_visuals({
+		"type": ReactionRules.Type.MAX_CLEAR,
+		"levels": [7, 7],
+		"colors": [OrbTypes.OrbColor.PURPLE, OrbTypes.OrbColor.PURPLE],
+		"result_color": OrbTypes.OrbColor.PURPLE,
+		"position": Vector2.ZERO,
+		"shock_targets": [],
+	})
+	await get_tree().create_timer(0.06).timeout
+	await _capture("16_jelly_jackpot_effect.png")
+
+	board.clear()
+	director.clear_effects()
+	result = board.spawn_orb(OrbTypes.OrbColor.YELLOW, 7, Vector2.ZERO)
+	result.disable_physics()
+	director.play_reaction_visuals({
+		"type": ReactionRules.Type.MERGE,
+		"result_orb": result,
+		"result_level": 7,
+		"result_color": OrbTypes.OrbColor.YELLOW,
+		"position": Vector2.ZERO,
+		"shock_targets": [],
+	})
+	await get_tree().create_timer(0.06).timeout
+	await _capture("17_jelly_max_effect.png")
 
 
 func _spawn_featured(board: Board3D) -> void:

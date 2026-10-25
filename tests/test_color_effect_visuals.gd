@@ -24,15 +24,15 @@ func test_six_colors_map_to_configured_visual_modes() -> void:
 	await _cleanup(fixture["root"] as Node)
 
 
-func test_push_and_pull_use_one_ring_with_directional_stardust() -> void:
+func test_push_and_pull_keep_directional_stardust_without_ring_geometry() -> void:
 	var fixture: Dictionary = await _create_fixture()
 	var director: FeedbackDirector = fixture["director"] as FeedbackDirector
 	director.play_reaction_visuals(_merge_reaction(OrbTypes.OrbColor.RED))
 	var push: ColorEffectVisual = director.active_color_effects()[0]
 	var push_start: float = push.current_radius_px
 	assert_eq(push.push_ray_count(), 0, "PUSH removes the old six rays")
-	assert_eq(push.ring_layer_count(), 1, "PUSH uses one ring layer")
 	assert_eq(push.stardust_count(), 12, "PUSH has outward stardust")
+	assert_eq(_forbidden_ring_geometry_count(fixture["root"] as Node), 0, "PUSH has no ring geometry")
 	assert_near(push_start, Config.data.radius_for_level(2), TOLERANCE, "PUSH starts at result radius")
 	assert_near(
 		push.intensity,
@@ -42,19 +42,18 @@ func test_push_and_pull_use_one_ring_with_directional_stardust() -> void:
 		"red PUSH uses physical strength and level scales"
 	)
 	director._process(0.15)
-	assert_true(push.current_radius_px > push_start, "PUSH ring expands")
-	var red_inner_radius: float = push._ring_mesh.inner_radius
+	assert_true(push.current_radius_px > push_start, "PUSH stardust radius expands")
 	director.clear_effects()
 
 	director.play_reaction_visuals(_merge_reaction(OrbTypes.OrbColor.GREEN))
 	var green: ColorEffectVisual = director.active_color_effects()[0]
-	assert_true(red_inner_radius < green._ring_mesh.inner_radius, "red ring is thicker than default PUSH")
+	assert_eq(green.stardust_count(), 12, "green PUSH keeps outward stardust")
+	assert_eq(_forbidden_ring_geometry_count(fixture["root"] as Node), 0, "pooled PUSH has no ring geometry")
 	director.clear_effects()
 
 	director.play_reaction_visuals(_merge_reaction(OrbTypes.OrbColor.PURPLE))
 	var pull: ColorEffectVisual = director.active_color_effects()[0]
 	var pull_start: float = pull.current_radius_px
-	assert_eq(pull.ring_layer_count(), 1, "PULL uses one ring layer")
 	assert_eq(pull.stardust_count(), 12, "PULL has inward spiral stardust")
 	assert_near(
 		pull_start,
@@ -63,33 +62,28 @@ func test_push_and_pull_use_one_ring_with_directional_stardust() -> void:
 		"PULL starts at effect radius"
 	)
 	director._process(0.15)
-	assert_true(pull.current_radius_px < pull_start, "PULL ring contracts")
+	assert_true(pull.current_radius_px < pull_start, "PULL stardust radius contracts")
+	assert_eq(_forbidden_ring_geometry_count(fixture["root"] as Node), 0, "PULL has no ring geometry")
 	await _cleanup(fixture["root"] as Node)
 
 
-func test_jelly_hides_color_mode_ring_but_keeps_other_feedback() -> void:
+func test_jelly_keeps_color_feedback_without_ring_geometry() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	var fixture: Dictionary = await _create_fixture()
 	var director: FeedbackDirector = fixture["director"] as FeedbackDirector
 	director.play_reaction_visuals(_merge_reaction(OrbTypes.OrbColor.GREEN))
 	var push: ColorEffectVisual = director.active_color_effects()[0]
-	assert_eq(push.ring_layer_count(), 0, "JELLY PUSH has no misleading body-size ring")
 	assert_eq(push.stardust_count(), 12, "JELLY PUSH keeps directional stardust")
 	assert_eq(director.active_particle_count(), 1, "JELLY merge keeps merge stardust")
 	director.clear_effects()
 	director.play_reaction_visuals(_merge_reaction(OrbTypes.OrbColor.BLUE))
 	var shake: ColorEffectVisual = director.active_color_effects()[0]
-	assert_eq(shake.ring_layer_count(), 0, "JELLY SHAKE has no misleading body-size ring")
 	assert_eq(director.active_color_frame_shake_count(), 1, "JELLY SHAKE keeps board motion")
 	director.clear_effects()
 	Config.data.game_mode = GameConfig.GameMode.TURN
 	director.play_reaction_visuals(_merge_reaction(OrbTypes.OrbColor.GREEN))
-	assert_eq(
-		director.active_color_effects()[0].ring_layer_count(),
-		1,
-		"pooled non-JELLY PUSH restores its ring"
-	)
+	assert_eq(_forbidden_ring_geometry_count(fixture["root"] as Node), 0, "all modes remain ring-free")
 	await _cleanup(fixture["root"] as Node)
 	Config.data.game_mode = original_mode
 
@@ -140,8 +134,8 @@ func test_lift_direction_opposes_each_gravity_direction() -> void:
 		)
 		assert_eq(lift.lift_target_count(), 2, "LIFT uses shock target positions")
 		assert_true(not lift.uses_light_beam(), "LIFT has no beam")
-		assert_eq(lift.ring_layer_count(), 0, "LIFT has no ring")
 		assert_eq(lift.stardust_count(), 6, "LIFT has three upward stars per target")
+		assert_eq(_forbidden_ring_geometry_count(fixture["root"] as Node), 0, "LIFT has no ring geometry")
 		director.clear_effects()
 	await _cleanup(fixture["root"] as Node)
 
@@ -154,8 +148,8 @@ func test_shake_moves_board_visual_frame_not_camera_and_restores() -> void:
 	var visual_frame: Node3D = board.get_node("VisualTilt") as Node3D
 	director.play_reaction_visuals(_merge_reaction(OrbTypes.OrbColor.BLUE))
 	var shake: ColorEffectVisual = director.active_color_effects()[0]
-	assert_eq(shake.ring_layer_count(), 1, "SHAKE uses one thin blue ring")
 	assert_eq(shake.stardust_count(), 0, "SHAKE adds no duplicate particles")
+	assert_eq(_forbidden_ring_geometry_count(fixture["root"] as Node), 0, "SHAKE has no ring geometry")
 	assert_eq(director.active_color_frame_shake_count(), 1, "SHAKE starts frame shake")
 	director._process(0.05)
 	assert_true(visual_frame.position.length() > 0.0, "board visual frame moves")
@@ -273,3 +267,20 @@ func _cleanup(node: Node) -> void:
 	if is_instance_valid(node):
 		node.queue_free()
 	await tree.process_frame
+
+
+func _forbidden_ring_geometry_count(root: Node) -> int:
+	var count: int = 0
+	var pending: Array[Node] = [root]
+	while not pending.is_empty():
+		var node: Node = pending.pop_back()
+		var lowered_name: String = node.name.to_lower()
+		if lowered_name.contains("ring") or lowered_name.contains("adornment"):
+			count += 1
+		if node is MeshInstance3D:
+			var mesh: Mesh = (node as MeshInstance3D).mesh
+			if mesh != null and mesh.get_class() == "Torus" + "Mesh":
+				count += 1
+		for child: Node in node.get_children():
+			pending.append(child)
+	return count

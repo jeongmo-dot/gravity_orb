@@ -38,6 +38,42 @@
 
 ## 미확인
 
+### [2026-10-25] 대상 #110 — 고리 연출·그림 전부 삭제 및 충돌 공간 일치
+- 상태: 완료 — #109 이전 실제 창 선행 측정 뒤 고리 생성 코드·노드·셰이더·장식·궤도선을 삭제하고, JELLY 몸통 외곽을 물리 충돌 반지름과 프레임마다 일치시킴
+- 브랜치 / PR: `remove-all-rings` / 생성 예정
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scenes/Orb3D.tscn`, `scripts/core/{Board,CelestialOrbArt,OrbVisual}.gd`, `scripts/fx/{ColorEffectVisual,FeedbackDirector}.gd`, `scripts/spike/Orb3D.gd`, `scripts/ui/{CosmicRing2D,OrbitStage}.gd`, `tests/`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] #109 이전 `9157b6c` 코드에서 실제 그래픽 창·실제 합체/흡수·후속 스와이프 5턴을 두 비율로 선행 측정 — 자동 창 측정 + 캡처 직접 관측
+  - [x] `ColorEffectVisual`·`FeedbackDirector`의 고리 메시·풀·그룹·API·호출, 빛 셰이더의 `shell`/`rim`, 행성 장식, `BlastOutline`, 2D 대폭발 원 테두리, `CosmicRing2D`, 시작 화면 타원 궤도선과 전용 진단을 코드째 삭제 — 자동 소스 검색 + 직접 관측
+  - [x] 합체·흡수·대폭발·잭팟·MAX 직후 씬 트리에서 이름에 ring/adornment가 있는 노드와 Torus 메시가 0인지 회귀 검사. 별가루·흡수 잔상·빛 구름·섬광·흔들림·멈칫·얼굴은 유지 — 자동 (`test_feedback`, `test_color_effect_visuals`, `test_jelly_visuals`, `test_celestial_orbs`)
+  - [x] 수정 뒤 두 비율 실제 창에서 물리/그림 반지름 차이 0px, 맞닿은 젤리 빈틈 0px, 합체·흡수와 후속 5턴 고리 0프레임 — 자동 창 측정
+  - [x] 두 비율 시작 화면·합체·흡수·대폭발·잭팟·MAX 순간 포함 전체 34장 캡처를 마지막으로 생성하고 직접 확인 — 자동 + 직접 관측
+  - [x] 전체 테스트·임포트·소스/Debug 패키지 스모크·Debug 빌드·사용자 저장 불변 — 자동
+- 삭제 전 원인·측정 (`9157b6c` + 측정 도구만 적용):
+  - 단일 `ModeRing`의 실제 수명은 합체 `293.069~294.185ms` (`46`프레임), 흡수 `234.240~240.594ms` (`35`프레임). 같은 노드가 5턴 남은 것은 아니지만, 후속 턴마다 새 반응이 고리를 다시 만들어 5개 턴의 가시 프레임이 각각 `12, 121, 93, 36, 75`, 입력 경계 가시는 `1, 0, 1, 1, 0`이었다. 5턴 뒤 씬 트리에 이름 고리 노드 `5`, 풀을 포함한 Torus 메시 `21`개가 남았다
+  - `Orb3D._mesh.scale`에 JELLY `deform`·펀치를 곱하면서 `SphereShape3D.radius`는 고정한 것이 숨은 공간의 원인. `1,007`프레임 중 반지름 차이 `899`프레임, 최대 `14.067139px`; 접촉 표본 `7,127`개에서 빈틈 프레임 `209`, 최대 `7.811546px`였다
+- 수정 뒤 실제 창 측정:
+  - `540×960`: `1,825`프레임, 접촉 표본 `9,522`; 반지름 차이 프레임/최대 `0 / 0.0px`, 빈틈 프레임/최대 `0 / 0.0px`, 합체·흡수 가시 고리 `0`프레임, 5턴 각 가시 고리 `0`프레임, 최종 이름 고리 노드/Torus `0 / 0`
+  - `540×1170`: `1,828`프레임, 접촉 표본 `9,487`; 반지름 차이 프레임/최대 `0 / 0.0px`, 빈틈 프레임/최대 `0 / 0.0px`, 합체·흡수 가시 고리 `0`프레임, 5턴 각 가시 고리 `0`프레임, 최종 이름 고리 노드/Torus `0 / 0`
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard (`C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`)
+  - `godot --headless --path . --import` → 종료 코드 0, `ERROR`·`SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` → 일반 `273/273` (`13.708초`), 장기 `5/5` (`47.695초`), 성능 `4/4` (`2.621초`), 합계 `282/282`, 종료 코드 0, 총 `64.023초`
+  - JELLY 시각 ON/OFF 상태 해시 → `5c96a80c71c632fb8e727cf1be541757c464b436dd83d6c8d0737b1211347df1`, #104·#106·#109 기준과 동일. CLASSIC staged difficulty 해시도 기존 `cf6172428c7901c43eb74f417e6880dc3ad375a329e669a8904234f5d38d1031` 유지
+  - `tests/capture_screens.ps1` → `540×960`, `540×1170` 각각 17장, 합계 34장, 종료 코드 0. `01_jelly_start`, `13_jelly_merge_effect`~`17_jelly_max_effect` 두 비율 12장을 직접 열어 고리·궤도선 0건, 유지 대상 연출·HUD 잘림/겹침 이상 0건 관측
+  - 소스 및 Debug 콘솔 exe의 기본·`--mode=jelly` 스모크 → 네 실행 모두 종료 코드 0, 오류 표식 0건
+  - `tools/build_windows.ps1 -Debug` → `version=0.16.0`, 종료 코드 0, `GravityOrb_v0.16.0.exe` `104,937,680`바이트, `.console.exe` `50,176`바이트
+  - 사용자 `save.cfg` → `1,488`바이트, SHA-256 `4D8C75B028AD8710E8B24779A35283848845F75D9A97D238B9D24419BD1FB14D`로 작업 전후 동일
+  - 지정 소스 검색 → `TorusMesh`, `_create_ring`, `ModeRing`, `Adornment`, `BlastOutline` 각 0건. `draw_arc`는 `OrbVisual.gd`에 10건 남으며 모두 MAX 입(반원 2개), 행성 표면 구름/명암의 열린 부분 선으로 시작·끝 각도가 `TAU` 전체가 아닌 비고리 그림이다. `SphereMesh.rings` 1건은 구의 세로 세그먼트 수 API로 고리 메시가 아니다
+  - 규칙 검사 → 허용 파일 외 `Input`/`InputEvent` 0건, Spawner 외 전역 난수 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. Debug 빌드 시작 화면을 연다 → 작은 천체는 계속 움직이되 그 경로를 두른 타원 선 두 줄은 보이지 않아야 한다.
+  2. JELLY에서 같은 색 합체와 한 단계 흡수를 만든다 → 별가루·흡수 이동 잔상은 보이되 젤리 바깥 원 테두리와 몸통-접촉 사이 빈 공간은 없어야 한다.
+  3. L6 다른 색 대폭발, L7 같은 색 잭팟, L7 결과 생성을 차례로 만든다 → 입자·부드러운 빛 구름·섬광·흔들림·터질 듯한/MAX 얼굴은 남고 원형 충격파/흰 고리/외곽선은 어느 프레임에도 없어야 한다.
+  4. 다섯 번 이상 중력을 바꾼다 → 이전 반응 위치나 젤리 둘레에 고리가 다시 나타나지 않고 서로 맞닿은 몸통 사이에 투명한 틈이 없어야 한다.
+- 결정 사항: 프레임마다 그림 반지름을 물리 반지름과 정확히 맞추기 위해 JELLY 몸통 외곽 메시 배율은 항상 1로 두고, 말랑함은 얼굴·배 속 젤리의 중력축 변형과 기존 입자/흔들림에 유지함. 밸런스·규칙·점수·질량·충돌 반지름 값은 변경하지 않음. 측정·캡처 산출물은 git 추적에서 제외함
+- 남은 것 · 질문: 자동 검증·실제 창 측정·전체 캡처·직접 관측 완료. 최종 합격/불합격 판정은 Claude에 남김
+
 ### [2026-10-25] 대상 #109 — JELLY 젤리 둘레 반투명 고리 제거
 - 상태: 완료 — 실제 창에서 원인 노드를 분리 재현하고 JELLY에서 해당 링 한 겹만 숨김
 - 브랜치 / PR: `jelly-halo-fix` / https://github.com/jeongmo-dot/gravity_orb/pull/109

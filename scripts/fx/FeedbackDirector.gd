@@ -1,30 +1,24 @@
 class_name FeedbackDirector
 extends Node
 
-const BLAST_RING_DURATION: float = 0.60
-const SECOND_RING_DELAY: float = 0.08
 const BLAST_LIGHT_DURATION: float = 0.20
 const DEBRIS_LIFETIME: float = 0.72
 const WHITE_SPARK_COUNT: int = 16
 const MERGE_STARDUST_COUNT: int = 12
 const BIRTH_ACCRETION_COUNT: int = 14
 const SUPERNOVA_STAR_COUNT: int = 10
-const MERGE_RING_DURATION: float = 0.50
 const BIRTH_ACCRETION_DURATION: float = 0.25
 const BIRTH_NOVA_DURATION: float = 0.80
-const SOLAR_PROMINENCE_DURATION: float = 1.00
 const LOCAL_FLASH_DURATION: float = 0.18
 const L4_NEBULA_DURATION: float = 0.40
 const SUPERNOVA_DURATION: float = 1.20
 const FULL_FLASH_WINDOW_MSEC: int = 1000
 const FULL_FLASH_LIMIT: int = 3
 const FULL_FLASH_MAX_ALPHA: float = 0.15
-const PREWARM_RING_COUNT: int = 16
 const PREWARM_PARTICLE_COUNT: int = 23
 const PREWARM_LIGHT_COUNT: int = 3
 const PREWARM_FLASH_COUNT: int = 3
 const PREWARM_GLOW_COUNT: int = 7
-const PREWARM_ARC_COUNT: int = 3
 const FINALE_INTENSITY: float = 0.6
 const COLOR_JACKPOT_INTENSITY: float = 1.5
 const COLOR_SHAKE_DURATION: float = 0.25
@@ -39,16 +33,12 @@ var _effects_root: Node3D
 var _overlay: CanvasLayer
 var _effects: Array[Dictionary] = []
 var _blast_effect_pools: Dictionary = {
-	"ring": [],
 	"particles": [],
 	"light": [],
 	"flash": [],
 	"glow": [],
-	"arc": [],
 }
-var _blast_ring_mesh: TorusMesh
 var _effect_quad_mesh: QuadMesh
-var _prominence_mesh: ArrayMesh
 var _effect_glow_shader: Shader
 var _effect_particle_shader: Shader
 var _resources_prewarmed: bool = false
@@ -243,10 +233,6 @@ func _release_hitstop_after(duration: float, generation: int) -> void:
 		Engine.time_scale = 1.0
 
 
-func active_ring_count() -> int:
-	return _active_effect_count("ring")
-
-
 func active_particle_count() -> int:
 	return _active_effect_count("particles")
 
@@ -261,10 +247,6 @@ func active_flash_count() -> int:
 
 func active_glow_count() -> int:
 	return _active_effect_count("glow")
-
-
-func active_prominence_count() -> int:
-	return _active_effect_count("arc")
 
 
 func full_screen_flash_count_last_second() -> int:
@@ -423,15 +405,6 @@ func _play_merge_feedback(reaction: Dictionary) -> void:
 			_create_jelly_absorption_trails(reaction, origin)
 		if result_level >= Config.data.orb_max_level:
 			_create_jelly_max_feedback(origin, color_value, result_radius_m)
-		elif not _color_effect_visuals_enabled():
-			_create_ring(
-				origin,
-				color_value.lightened(0.34),
-				result_radius_m * 2.0,
-				0.0,
-				MERGE_RING_DURATION,
-				result_radius_m
-			)
 	elif result_level <= 5:
 		_create_particles(
 			origin,
@@ -441,15 +414,6 @@ func _play_merge_feedback(reaction: Dictionary) -> void:
 			"MergeStardust",
 			"stardust"
 		)
-		if not _color_effect_visuals_enabled():
-			_create_ring(
-				origin,
-				Color(0.58, 0.90, 1.0, 1.0),
-				result_radius_m * 2.0,
-				0.0,
-				MERGE_RING_DURATION,
-				result_radius_m
-			)
 	else:
 		_create_birth_feedback(origin, color_value, result_level, result_radius_m)
 	_play_color_effect_visual(reaction)
@@ -490,24 +454,6 @@ func _create_birth_feedback(
 		result_radius_m * 0.48,
 		"BirthNova"
 	)
-	if level >= 7:
-		_create_ring(
-			origin,
-			color_value.lightened(0.34),
-			result_radius_m * 2.5,
-			BIRTH_ACCRETION_DURATION,
-			BIRTH_NOVA_DURATION,
-			result_radius_m
-		)
-	elif not _color_effect_visuals_enabled():
-		_create_ring(
-			origin,
-			Color(0.66, 0.92, 1.0, 1.0),
-			result_radius_m * 2.5,
-			BIRTH_ACCRETION_DURATION,
-			BIRTH_NOVA_DURATION,
-			result_radius_m
-		)
 	_start_reaction_shake(4, 0.5)
 
 
@@ -524,14 +470,6 @@ func _create_jelly_max_feedback(
 		"JellyMaxSparkle",
 		"stars"
 	)
-	_create_ring(
-		origin,
-		Color.WHITE,
-		radius_m * 2.35,
-		0.0,
-		BIRTH_NOVA_DURATION,
-		radius_m * 0.92
-	)
 	_create_glow(
 		origin,
 		Color.WHITE,
@@ -540,7 +478,7 @@ func _create_jelly_max_feedback(
 		0.0,
 		BIRTH_NOVA_DURATION,
 		radius_m * 0.72,
-		"JellyMaxRimPulse"
+		"JellyMaxCloudPulse"
 	)
 
 
@@ -639,10 +577,6 @@ func _play_color_effect_visual(
 		if board_gravity != null:
 			gravity_direction = Vector2(board_gravity).normalized()
 	var effect: ColorEffectVisual = _acquire_color_effect()
-	# JELLY's same-color reaction ring read as a larger, translucent next-stage
-	# body around moving orbs. Keep the color-mode particles and board motion,
-	# but suppress only that misleading ring layer in the JELLY presentation.
-	effect.set_ring_enabled(Config.data.game_mode != GameConfig.GameMode.JELLY)
 	effect.play(
 		color_mode,
 		reaction.get("position", Vector2.ZERO) as Vector2,
@@ -777,14 +711,6 @@ func _play_blast_feedback(
 		nebula_inner = _display_color(int(colors[0]), level)
 	if colors.size() > 1:
 		nebula_outer = _display_color(int(colors[1]), level)
-	_create_ring(origin, Color.WHITE, radius_m, 0.0, BLAST_RING_DURATION)
-	_create_ring(
-		origin,
-		Color(0.55, 0.88, 1.0, 1.0) if level == 4 else mixed_color,
-		radius_m,
-		SECOND_RING_DELAY,
-		BLAST_RING_DURATION
-	)
 	for color_value: Variant in colors:
 		var color_index: int = int(color_value)
 		_create_particles(
@@ -856,36 +782,6 @@ func _start_reaction_shake(level: int, intensity: float) -> void:
 	_shake_strength_m = (
 		Config.data.fx_shake_px / Orb3D.PIXELS_PER_METER * level_scale * intensity
 	)
-
-
-func _create_ring(
-	origin: Vector2,
-	color_value: Color,
-	final_radius: float,
-	delay: float,
-	duration: float = BLAST_RING_DURATION,
-	start_radius: float = 0.01
-) -> void:
-	var ring: MeshInstance3D = _acquire_blast_effect("ring") as MeshInstance3D
-	ring.name = "BlastRing"
-	var material: StandardMaterial3D = ring.material_override as StandardMaterial3D
-	material.albedo_color = color_value
-	material.emission_enabled = true
-	material.emission = color_value
-	ring.position = Orb3D.plane_position_to_world(origin, 0.45)
-	ring.rotation_degrees.x = 90.0
-	ring.scale = Vector3.ONE * start_radius
-	_effects.append({
-		"node": ring,
-		"kind": "ring",
-		"elapsed": 0.0,
-		"duration": duration,
-		"delay": delay,
-		"start_scale": start_radius,
-		"end_scale": final_radius,
-		"color": color_value,
-		"material": material,
-	})
 
 
 func _create_particles(
@@ -1011,36 +907,6 @@ func _create_glow(
 	})
 
 
-func _create_prominence(
-	origin: Vector2,
-	color_value: Color,
-	radius: float,
-	delay: float,
-	rotation_value: float,
-	phase: float
-) -> void:
-	var arc: MeshInstance3D = _acquire_blast_effect("arc") as MeshInstance3D
-	arc.name = "BirthSolarProminence"
-	arc.position = Orb3D.plane_position_to_world(origin, 0.02)
-	arc.rotation = Vector3(0.0, 0.0, rotation_value)
-	arc.scale = Vector3.ONE * radius
-	var material: StandardMaterial3D = arc.material_override as StandardMaterial3D
-	material.albedo_color = color_value
-	material.emission = color_value
-	_effects.append({
-		"node": arc,
-		"kind": "arc",
-		"elapsed": 0.0,
-		"duration": SOLAR_PROMINENCE_DURATION,
-		"delay": delay,
-		"base_scale": radius,
-		"base_rotation": rotation_value,
-		"phase": phase,
-		"color": color_value,
-		"material": material,
-	})
-
-
 func _create_flash(intensity: float) -> void:
 	if _overlay == null:
 		return
@@ -1078,18 +944,10 @@ func _prune_full_flash_history(now_msec: int) -> void:
 
 
 func _initialize_blast_effect_pool() -> void:
-	_blast_ring_mesh = TorusMesh.new()
-	_blast_ring_mesh.inner_radius = 0.96
-	_blast_ring_mesh.outer_radius = 1.0
-	_blast_ring_mesh.rings = 48
-	_blast_ring_mesh.ring_segments = 8
 	_effect_quad_mesh = QuadMesh.new()
 	_effect_quad_mesh.size = Vector2(2.0, 2.0)
 	_effect_glow_shader = _new_effect_glow_shader()
 	_effect_particle_shader = _new_effect_particle_shader()
-	_prominence_mesh = _new_prominence_mesh()
-	for _index: int in range(PREWARM_RING_COUNT):
-		_pool_blast_node("ring", _new_ring_node())
 	for _index: int in range(PREWARM_PARTICLE_COUNT):
 		_pool_blast_node("particles", _new_particle_node())
 	for _index: int in range(PREWARM_LIGHT_COUNT):
@@ -1099,21 +957,6 @@ func _initialize_blast_effect_pool() -> void:
 			_pool_blast_node("flash", _new_flash_node())
 	for _index: int in range(PREWARM_GLOW_COUNT):
 		_pool_blast_node("glow", _new_glow_node())
-	for _index: int in range(PREWARM_ARC_COUNT):
-		_pool_blast_node("arc", _new_prominence_node())
-
-
-func _new_ring_node() -> MeshInstance3D:
-	var ring: MeshInstance3D = MeshInstance3D.new()
-	ring.mesh = _blast_ring_mesh
-	var material: StandardMaterial3D = StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	material.emission_enabled = true
-	ring.material_override = material
-	_effects_root.add_child(ring)
-	return ring
 
 
 func _new_particle_node() -> CPUParticles3D:
@@ -1168,19 +1011,6 @@ func _new_glow_node() -> MeshInstance3D:
 	return glow
 
 
-func _new_prominence_node() -> MeshInstance3D:
-	var arc: MeshInstance3D = MeshInstance3D.new()
-	arc.mesh = _prominence_mesh
-	var material: StandardMaterial3D = StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	material.emission_enabled = true
-	arc.material_override = material
-	_effects_root.add_child(arc)
-	return arc
-
-
 func _new_effect_glow_shader() -> Shader:
 	var shader: Shader = Shader.new()
 	shader.code = """
@@ -1215,12 +1045,10 @@ void fragment() {
 	float fine = value_noise2(p * 7.3 + vec2(8.4 - noise_seed, 3.7 + noise_seed));
 	float mottle = coarse * 0.68 + fine * 0.32;
 	float soft_cloud = (1.0 - smoothstep(0.04, 0.96, radius)) * 0.09;
-	float shell = smoothstep(0.48, 0.72, radius) * (1.0 - smoothstep(0.78, 1.0, radius));
-	float rim = smoothstep(0.68, 0.84, radius) * (1.0 - smoothstep(0.86, 1.0, radius));
-	float mask = (soft_cloud + shell * 0.16 + rim * 0.14) * mix(0.72, 1.0, mottle);
+	float mask = soft_cloud * mix(0.72, 1.0, mottle);
 	vec3 color = mix(inner_color.rgb, outer_color.rgb, smoothstep(0.24, 0.76, mottle));
 	ALBEDO = color;
-	EMISSION = color * (0.62 + shell * 0.38 + rim * 0.62);
+	EMISSION = color * 0.62;
 	ALPHA = mask * effect_alpha;
 }
 """
@@ -1256,43 +1084,6 @@ void fragment() {
 	return shader
 
 
-func _new_prominence_mesh() -> ArrayMesh:
-	var vertices: PackedVector3Array = PackedVector3Array()
-	var indices: PackedInt32Array = PackedInt32Array()
-	var segment_count: int = 28
-	for segment: int in range(segment_count + 1):
-		var progress: float = float(segment) / float(segment_count)
-		var angle: float = lerpf(-PI * 0.5, PI * 0.5, progress)
-		var centerline: Vector2 = Vector2(
-			0.70 + cos(angle) * 0.47,
-			sin(angle) * 0.15
-		)
-		var tangent: Vector2 = Vector2(
-			-sin(angle) * 0.47,
-			cos(angle) * 0.15
-		).normalized()
-		var normal: Vector2 = tangent.orthogonal()
-		var taper: float = pow(sin(progress * PI), 0.72)
-		var half_width: float = lerpf(0.0015, 0.018, taper)
-		var inner: Vector2 = centerline - normal * half_width
-		var outer: Vector2 = centerline + normal * half_width
-		vertices.append(Vector3(inner.x, inner.y, 0.0))
-		vertices.append(Vector3(outer.x, outer.y, 0.0))
-		if segment < segment_count:
-			var base: int = segment * 2
-			indices.append_array(PackedInt32Array([
-				base, base + 1, base + 2,
-				base + 1, base + 3, base + 2,
-			]))
-	var arrays: Array = []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = vertices
-	arrays[Mesh.ARRAY_INDEX] = indices
-	var mesh: ArrayMesh = ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	return mesh
-
-
 func _acquire_blast_effect(kind: String) -> Node:
 	var pool: Array = _effect_pool(kind)
 	var node: Node
@@ -1300,8 +1091,6 @@ func _acquire_blast_effect(kind: String) -> Node:
 		node = pool.pop_back() as Node
 	else:
 		match kind:
-			"ring":
-				node = _new_ring_node()
 			"particles":
 				node = _new_particle_node()
 			"light":
@@ -1310,8 +1099,6 @@ func _acquire_blast_effect(kind: String) -> Node:
 				node = _new_flash_node()
 			"glow":
 				node = _new_glow_node()
-			"arc":
-				node = _new_prominence_node()
 	_set_effect_node_visible(node, true)
 	var group_name: StringName = _effect_group(kind)
 	if not node.is_in_group(group_name):
@@ -1352,8 +1139,6 @@ func _effect_pool(kind: String) -> Array:
 
 func _effect_group(kind: String) -> StringName:
 	match kind:
-		"ring":
-			return &"feedback_ring"
 		"particles":
 			return &"feedback_particles"
 		"light":
@@ -1363,7 +1148,7 @@ func _effect_group(kind: String) -> StringName:
 		"glow":
 			return &"feedback_glow"
 		_:
-			return &"feedback_prominence"
+			return &"feedback_effect"
 
 
 func _active_effect_count(kind: String) -> int:
@@ -1417,14 +1202,6 @@ func _prewarm_visual_resources_offscreen(force_render_path: bool = false) -> voi
 			mesh_instance.scale = Vector3.ONE * 0.15
 			prewarm_root.add_child(mesh_instance)
 			combination_index += 1
-	var ring_pool: Array = _effect_pool("ring")
-	if not ring_pool.is_empty():
-		var pooled_ring: MeshInstance3D = ring_pool[0] as MeshInstance3D
-		var ring_sample: MeshInstance3D = MeshInstance3D.new()
-		ring_sample.mesh = pooled_ring.mesh
-		ring_sample.material_override = pooled_ring.material_override
-		ring_sample.position = Vector3(-4.0, 4.0, 0.0)
-		prewarm_root.add_child(ring_sample)
 	var particle_pool: Array = _effect_pool("particles")
 	if not particle_pool.is_empty():
 		var pooled_particles: CPUParticles3D = particle_pool[0] as CPUParticles3D
@@ -1440,14 +1217,6 @@ func _prewarm_visual_resources_offscreen(force_render_path: bool = false) -> voi
 		glow_sample.material_override = pooled_glow.material_override
 		glow_sample.position = Vector3(0.0, 4.0, 0.0)
 		prewarm_root.add_child(glow_sample)
-	var arc_pool: Array = _effect_pool("arc")
-	if not arc_pool.is_empty():
-		var pooled_arc: MeshInstance3D = arc_pool[0] as MeshInstance3D
-		var arc_sample: MeshInstance3D = MeshInstance3D.new()
-		arc_sample.mesh = pooled_arc.mesh
-		arc_sample.material_override = pooled_arc.material_override
-		arc_sample.position = Vector3(0.0, 3.5, 0.0)
-		prewarm_root.add_child(arc_sample)
 	var color_effects: Array[ColorEffectVisual] = []
 	for mode_value: int in range(4):
 		var color_effect: ColorEffectVisual = ColorEffectVisual.new()
@@ -1478,20 +1247,7 @@ func _prewarm_visual_resources_offscreen(force_render_path: bool = false) -> voi
 
 func _update_effect(effect: Dictionary, progress: float) -> void:
 	var kind: String = str(effect["kind"])
-	if kind == "ring":
-		var ring: MeshInstance3D = effect["node"] as MeshInstance3D
-		var radius: float = lerpf(
-			float(effect.get("start_scale", 0.01)),
-			float(effect["end_scale"]),
-			progress
-		)
-		ring.scale = Vector3.ONE * radius
-		var material: StandardMaterial3D = effect["material"] as StandardMaterial3D
-		var color_value: Color = effect["color"] as Color
-		color_value.a = 1.0 - progress
-		material.albedo_color = color_value
-		material.emission = Color(color_value.r, color_value.g, color_value.b) * (1.0 - progress)
-	elif kind == "light":
+	if kind == "light":
 		var light: OmniLight3D = effect["node"] as OmniLight3D
 		light.light_energy = float(effect["start_energy"]) * (1.0 - progress)
 	elif kind == "flash":
@@ -1518,24 +1274,6 @@ func _update_effect(effect: Dictionary, progress: float) -> void:
 			* (1.0 - smoothstep(0.42, 1.0, progress))
 		)
 		glow_material.set_shader_parameter("effect_alpha", alpha)
-	elif kind == "arc":
-		var arc: MeshInstance3D = effect["node"] as MeshInstance3D
-		var phase: float = float(effect.get("phase", 0.0))
-		var slow_wave: float = sin(progress * TAU * 0.42 + phase)
-		var arc_scale: float = float(effect["base_scale"])
-		arc.scale = Vector3(
-			arc_scale * (1.0 + slow_wave * 0.018),
-			arc_scale * (1.0 - slow_wave * 0.032),
-			1.0
-		)
-		arc.rotation.z = float(effect["base_rotation"]) + slow_wave * 0.045
-		var arc_material: StandardMaterial3D = effect["material"] as StandardMaterial3D
-		var arc_color: Color = effect["color"] as Color
-		arc_color.a = sin(progress * PI) * 0.52
-		arc_material.albedo_color = arc_color
-		arc_material.emission = Color(arc_color.r, arc_color.g, arc_color.b) * (
-			0.72 + arc_color.a * 0.55
-		)
 
 
 func _update_shake(delta: float) -> void:

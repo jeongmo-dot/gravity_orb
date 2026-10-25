@@ -124,7 +124,6 @@ enum GameMode {
 @export var fx_shake_time: float = 0.4
 @export var fx_flash_alpha: float = 0.35
 @export var fx_flash_time: float = 0.15
-@export var fx_ring_radius_factor: float = 4.0
 @export var fx_debris_per_orb: int = 24
 @export var fx_score_popups_enabled: bool = true
 @export var fx_popup_max: int = 16

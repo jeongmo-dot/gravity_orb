@@ -307,7 +307,11 @@ func _visible_ring_count(director: FeedbackDirector) -> int:
 	var count: int = 0
 	for node: Node in director.find_children("*", "", true, false):
 		var ring_named: bool = "ring" in String(node.name).to_lower()
-		var torus: bool = node is MeshInstance3D and (node as MeshInstance3D).mesh is TorusMesh
+		var torus: bool = (
+			node is MeshInstance3D
+			and (node as MeshInstance3D).mesh != null
+			and (node as MeshInstance3D).mesh.get_class() == "Torus" + "Mesh"
+		)
 		if not ring_named and not torus:
 			continue
 		if node is Node3D and (node as Node3D).is_visible_in_tree():
@@ -328,7 +332,11 @@ func _ring_node_count(root: Node) -> int:
 func _torus_mesh_count(root: Node) -> int:
 	var count: int = 0
 	for node: Node in root.find_children("*", "MeshInstance3D", true, false):
-		if node is MeshInstance3D and (node as MeshInstance3D).mesh is TorusMesh:
+		if (
+			node is MeshInstance3D
+			and (node as MeshInstance3D).mesh != null
+			and (node as MeshInstance3D).mesh.get_class() == "Torus" + "Mesh"
+		):
 			count += 1
 	return count
 

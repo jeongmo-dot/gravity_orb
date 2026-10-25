@@ -6,7 +6,7 @@ const TOLERANCE: float = 1.0e-3
 var _observed_play_calls: Array[Dictionary] = []
 
 
-func test_blast_feedback_creates_and_cleans_all_effects() -> void:
+func test_blast_feedback_creates_and_cleans_non_ring_effects() -> void:
 	var original_fx: bool = Config.data.fx_enabled
 	var original_hitstop: bool = Config.data.fx_hitstop_enabled
 	var original_sfx: bool = Config.data.sfx_enabled
@@ -22,18 +22,17 @@ func test_blast_feedback_creates_and_cleans_all_effects() -> void:
 		"colors": [OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE],
 		"position": Vector2.ZERO,
 	})
-	assert_eq(director.active_ring_count(), 2, "blast ring count")
 	assert_eq(director.active_particle_count(), 3, "two debris colors plus white sparks")
 	assert_eq(director.active_light_count(), 1, "blast light count")
 	assert_eq(director.active_glow_count(), 1, "L4 local nebula count")
 	assert_eq(director.active_flash_count(), 0, "L4 has no full-screen flash")
+	assert_eq(_forbidden_geometry_count(fixture["root"] as Node), 0, "blast creates no ring geometry")
 	await tree.process_frame
 	assert_true(
 		absf(camera.h_offset) > 0.0 or absf(camera.v_offset) > 0.0,
 		"camera shake offsets are applied"
 	)
 	await tree.create_timer(1.1, true, false, true).timeout
-	assert_eq(director.active_ring_count(), 0, "rings clean before 1.5 seconds")
 	assert_eq(director.active_particle_count(), 0, "particles clean before 1.5 seconds")
 	assert_eq(director.active_light_count(), 0, "light cleans before 1.5 seconds")
 	assert_eq(director.active_flash_count(), 0, "flash cleans before 1.5 seconds")
@@ -45,53 +44,13 @@ func test_blast_feedback_creates_and_cleans_all_effects() -> void:
 	Config.data.sfx_enabled = original_sfx
 
 
-func test_blast_ring_max_radius_matches_level_push_range() -> void:
+func test_merge_birth_blast_jackpot_and_max_create_no_ring_geometry() -> void:
 	var original_fx: bool = Config.data.fx_enabled
 	var original_hitstop: bool = Config.data.fx_hitstop_enabled
 	Config.data.fx_enabled = true
 	Config.data.fx_hitstop_enabled = false
 	var fixture: Dictionary = await _create_director_fixture()
 	var director: FeedbackDirector = fixture["director"] as FeedbackDirector
-	var expected_by_level: Dictionary = {
-		4: 0.3 * Config.data.board_size / Orb3D.PIXELS_PER_METER,
-		5: 0.55 * Config.data.board_size / Orb3D.PIXELS_PER_METER,
-		6: Config.data.board_size / Orb3D.PIXELS_PER_METER,
-		7: Config.data.board_size / Orb3D.PIXELS_PER_METER,
-	}
-	for level_value: Variant in expected_by_level.keys():
-		var level: int = int(level_value)
-		director.play_reaction_visuals({
-			"type": ReactionRules.Type.BLAST,
-			"levels": [level, level],
-			"colors": [OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE],
-			"position": Vector2.ZERO,
-		})
-		var ring_scales: Array[float] = []
-		for effect: Dictionary in director._effects:
-			if str(effect.get("kind", "")) == "ring":
-				ring_scales.append(float(effect.get("end_scale", 0.0)))
-		assert_eq(ring_scales.size(), 2, "two rings for L%d" % level)
-		for scale: float in ring_scales:
-			assert_near(
-				scale,
-				float(expected_by_level[level]),
-				TOLERANCE,
-				"L%d ring radius matches push range" % level
-			)
-		director.clear_effects()
-	await _cleanup(fixture["root"] as Node)
-	Config.data.fx_enabled = original_fx
-	Config.data.fx_hitstop_enabled = original_hitstop
-
-
-func test_merge_birth_and_blast_rings_project_as_board_circles() -> void:
-	var original_fx: bool = Config.data.fx_enabled
-	var original_hitstop: bool = Config.data.fx_hitstop_enabled
-	Config.data.fx_enabled = true
-	Config.data.fx_hitstop_enabled = false
-	var fixture: Dictionary = await _create_director_fixture()
-	var director: FeedbackDirector = fixture["director"] as FeedbackDirector
-	var camera: Camera3D = fixture["camera"] as Camera3D
 	var reactions: Array[Dictionary] = [
 		{
 			"type": ReactionRules.Type.MERGE,
@@ -106,36 +65,25 @@ func test_merge_birth_and_blast_rings_project_as_board_circles() -> void:
 			"position": Vector2.ZERO,
 		},
 		_blast_reaction_for_level(6),
+		{
+			"type": ReactionRules.Type.MAX_CLEAR,
+			"levels": [7, 7],
+			"colors": [OrbTypes.OrbColor.RED, OrbTypes.OrbColor.RED],
+			"result_color": OrbTypes.OrbColor.RED,
+			"position": Vector2.ZERO,
+			"shock_targets": [],
+		},
 	]
 	for reaction: Dictionary in reactions:
 		director.play_reaction_visuals(reaction)
-		for effect: Dictionary in director._effects:
-			if str(effect.get("kind", "")) != "ring":
-				continue
-			director._update_effect(effect, 0.55)
-			var ring: MeshInstance3D = effect["node"] as MeshInstance3D
-			var horizontal: float = camera.unproject_position(
-				ring.to_global(Vector3(1.0, 0.0, 0.0))
-			).distance_to(camera.unproject_position(
-				ring.to_global(Vector3(-1.0, 0.0, 0.0))
-			))
-			var vertical: float = camera.unproject_position(
-				ring.to_global(Vector3(0.0, 0.0, 1.0))
-			).distance_to(camera.unproject_position(
-				ring.to_global(Vector3(0.0, 0.0, -1.0))
-			))
-			var aspect_ratio: float = horizontal / maxf(vertical, 0.001)
-			assert_true(
-				aspect_ratio >= 0.95 and aspect_ratio <= 1.05,
-				"projected reaction ring aspect %.4f is within 1 +/- 0.05" % aspect_ratio
-			)
+		assert_eq(_forbidden_geometry_count(fixture["root"] as Node), 0, "reaction creates no ring geometry")
 		director.clear_effects()
 	await _cleanup(fixture["root"] as Node)
 	Config.data.fx_enabled = original_fx
 	Config.data.fx_hitstop_enabled = original_hitstop
 
 
-func test_supernova_shell_is_mottled_and_rendered_behind_orbs() -> void:
+func test_supernova_soft_cloud_is_mottled_and_rendered_behind_orbs() -> void:
 	var original_fx: bool = Config.data.fx_enabled
 	var original_hitstop: bool = Config.data.fx_hitstop_enabled
 	Config.data.fx_enabled = true
@@ -152,10 +100,11 @@ func test_supernova_shell_is_mottled_and_rendered_behind_orbs() -> void:
 		assert_true(glow.position.z < 0.0, "supernova glow is behind the orb plane")
 		assert_true(glow.position.z > -0.31, "supernova glow stays above board glass")
 	var shader_code: String = director._effect_glow_shader.code
-	assert_true(shader_code.contains("mottle"), "supernova shell mixes colors with mottle noise")
-	assert_true(shader_code.contains("float shell"), "supernova has a distinct expanding shell")
+	assert_true(shader_code.contains("mottle"), "supernova cloud mixes colors with mottle noise")
+	assert_true(shader_code.contains("soft_cloud"), "supernova keeps a soft cloud")
+	assert_true(not shader_code.contains("float shell"), "supernova has no shell band")
 	assert_true(not shader_code.contains("atan("), "supernova has no angle-based pinwheel")
-	assert_eq(glow_count, 2, "L6 has shell and local glow behind orbs")
+	assert_eq(glow_count, 2, "L6 keeps the supernova and core as soft clouds behind orbs")
 	await _cleanup(fixture["root"] as Node)
 	Config.data.fx_enabled = original_fx
 	Config.data.fx_hitstop_enabled = original_hitstop
@@ -223,7 +172,7 @@ func test_blast_effect_nodes_return_to_pool_and_are_reused() -> void:
 	Config.data.fx_hitstop_enabled = original_hitstop
 
 
-func test_merge_punch_scales_visual_and_emits_stardust_ring() -> void:
+func test_merge_punch_scales_visual_and_emits_stardust() -> void:
 	var original_fx: bool = Config.data.fx_enabled
 	var original_sfx: bool = Config.data.sfx_enabled
 	Config.data.fx_enabled = true
@@ -251,13 +200,8 @@ func test_merge_punch_scales_visual_and_emits_stardust_ring() -> void:
 		"chain": 1,
 	})
 	assert_eq(director.active_particle_count(), 1, "one stardust merge emitter")
-	assert_eq(director.active_ring_count(), 0, "V4-1 merge ring is replaced")
 	assert_eq(director.active_color_effect_count(), 1, "one color-mode merge effect")
-	assert_eq(
-		director.active_color_effects()[0].ring_layer_count(),
-		1,
-		"merge has exactly one visible ring layer"
-	)
+	assert_eq(_forbidden_geometry_count(root), 0, "merge has no ring geometry")
 	var particles: CPUParticles3D = (
 		tree.get_nodes_in_group(&"feedback_particles")[0] as CPUParticles3D
 	)
@@ -273,7 +217,7 @@ func test_merge_punch_scales_visual_and_emits_stardust_ring() -> void:
 	Config.data.sfx_enabled = original_sfx
 
 
-func test_l6_l7_birth_effects_and_l7_planet_light_ring_are_pooled() -> void:
+func test_l6_l7_birth_effects_keep_particles_and_cloud_without_ring_geometry() -> void:
 	var original_fx: bool = Config.data.fx_enabled
 	var original_hitstop: bool = Config.data.fx_hitstop_enabled
 	var original_sfx: bool = Config.data.sfx_enabled
@@ -290,35 +234,9 @@ func test_l6_l7_birth_effects_and_l7_planet_light_ring_are_pooled() -> void:
 			"position": Vector2.ZERO,
 		})
 		assert_eq(director.active_particle_count(), 2, "L%d color+white accretion" % level)
-		assert_eq(
-			director.active_ring_count(),
-			1 if level == 7 else 0,
-			"only L7 adds one planet-color birth light ring"
-		)
 		assert_eq(director.active_color_effect_count(), 1, "L%d uses color effect" % level)
-		assert_eq(
-			director.active_color_effects()[0].ring_layer_count(),
-			0,
-			"yellow LIFT birth has no ring or beam"
-		)
 		assert_eq(director.active_glow_count(), 1, "L%d nova" % level)
-		assert_eq(
-			director.active_prominence_count(),
-			0,
-			"planet births no longer use solar prominence arcs"
-		)
-		if level == 7:
-			var light_ring: MeshInstance3D = (
-				tree.get_nodes_in_group(&"feedback_ring")[0] as MeshInstance3D
-			)
-			var ring_material: StandardMaterial3D = (
-				light_ring.material_override as StandardMaterial3D
-			)
-			assert_eq(
-				ring_material.emission,
-				Config.data.color_display[OrbTypes.OrbColor.YELLOW].lightened(0.34),
-				"L7 birth ring follows its planet display color"
-			)
+		assert_eq(_forbidden_geometry_count(fixture["root"] as Node), 0, "L%d birth has no ring geometry" % level)
 		director.clear_effects()
 	await _cleanup(fixture["root"] as Node)
 	Config.data.fx_enabled = original_fx
@@ -361,7 +279,7 @@ func test_maximum_reaction_burst_uses_only_prewarmed_nodes() -> void:
 	var fixture: Dictionary = await _create_director_fixture()
 	var director: FeedbackDirector = fixture["director"] as FeedbackDirector
 	var totals_before: Dictionary = {}
-	for kind: String in ["ring", "particles", "light", "flash", "glow", "arc"]:
+	for kind: String in ["particles", "light", "flash", "glow"]:
 		totals_before[kind] = director.blast_effect_pool_count(kind)
 	for blast_level: int in [4, 5, 6]:
 		director.play_reaction_visuals(_blast_reaction_for_level(blast_level))
@@ -373,12 +291,10 @@ func test_maximum_reaction_burst_uses_only_prewarmed_nodes() -> void:
 			"position": Vector2.ZERO,
 		})
 	var active_by_kind: Dictionary = {
-		"ring": director.active_ring_count(),
 		"particles": director.active_particle_count(),
 		"light": director.active_light_count(),
 		"flash": director.active_flash_count(),
 		"glow": director.active_glow_count(),
-		"arc": director.active_prominence_count(),
 	}
 	for kind: String in totals_before:
 		assert_eq(
@@ -538,6 +454,23 @@ func _cleanup(node: Node) -> void:
 	if is_instance_valid(node):
 		node.queue_free()
 	await tree.process_frame
+
+
+func _forbidden_geometry_count(root: Node) -> int:
+	var count: int = 0
+	var pending: Array[Node] = [root]
+	while not pending.is_empty():
+		var node: Node = pending.pop_back()
+		var lowered_name: String = node.name.to_lower()
+		if lowered_name.contains("ring") or lowered_name.contains("adornment"):
+			count += 1
+		if node is MeshInstance3D:
+			var mesh: Mesh = (node as MeshInstance3D).mesh
+			if mesh != null and mesh.get_class() == "Torus" + "Mesh":
+				count += 1
+		for child: Node in node.get_children():
+			pending.append(child)
+	return count
 
 
 func _record_play_called(

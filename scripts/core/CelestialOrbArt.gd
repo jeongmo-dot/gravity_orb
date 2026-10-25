@@ -21,20 +21,16 @@ const BODY_RADIUS_RATIOS: Array[float] = [
 	0.86,
 	0.82,
 ]
-const RING_TILT_RADIANS: float = deg_to_rad(20.0)
 const CAPTURE_ANIMATION_TIME: float = 4.25
 
 static var _shader: Shader
 static var _materials: Dictionary = {}
-static var _billboard_meshes: Dictionary = {}
 static var _animation_time: float = 0.0
 static var _animation_frozen: bool = false
 static var _last_animation_frame: int = -1
 
 
 static func prewarm(cfg: GameConfig) -> void:
-	_billboard(1)
-	_billboard(2)
 	for color_index: int in range(cfg.color_display.size()):
 		for level_index: int in range(1, cfg.orb_max_level + 1):
 			material_for(cfg, color_index, level_index)
@@ -43,7 +39,6 @@ static func prewarm(cfg: GameConfig) -> void:
 static func clear_cache() -> void:
 	_materials.clear()
 	_shader = null
-	_billboard_meshes.clear()
 	_last_animation_frame = -1
 	if not _animation_frozen:
 		_animation_time = 0.0
@@ -51,10 +46,6 @@ static func clear_cache() -> void:
 
 static func shared_material_count() -> int:
 	return _materials.size()
-
-
-static func shared_mesh_count() -> int:
-	return _billboard_meshes.size()
 
 
 static func level_name(level: int) -> String:
@@ -67,18 +58,6 @@ static func body_radius_ratio(level: int) -> float:
 	if level < 1 or level >= BODY_RADIUS_RATIOS.size():
 		return 1.0
 	return BODY_RADIUS_RATIOS[level]
-
-
-static func has_adornment(level: int) -> bool:
-	return level >= 6
-
-
-static func blast_pulse_style(level: int) -> String:
-	if level == 4 or level == 5:
-		return "rim"
-	if level >= 6:
-		return "glow"
-	return ""
 
 
 static func advance_animation(delta: float) -> void:
@@ -111,10 +90,6 @@ static func is_animation_frozen() -> bool:
 	return _animation_frozen
 
 
-static func billboard_mesh(layer: int) -> ArrayMesh:
-	return _billboard(layer)
-
-
 static func material_for(
 	cfg: GameConfig,
 	color_index: int,
@@ -129,7 +104,6 @@ static func material_for(
 		material.set_shader_parameter("base_color", display_color)
 		material.set_shader_parameter("color_id", color_index)
 		material.set_shader_parameter("level_id", level)
-		material.set_shader_parameter("body_ratio", body_radius_ratio(level))
 		material.set_shader_parameter("animation_time", _animation_time)
 		_materials[key] = material
 	return _materials[key] as ShaderMaterial
@@ -139,37 +113,6 @@ static func _apply_animation_time() -> void:
 	for material_value: Variant in _materials.values():
 		var material: ShaderMaterial = material_value as ShaderMaterial
 		material.set_shader_parameter("animation_time", _animation_time)
-
-
-static func _billboard(layer: int) -> ArrayMesh:
-	if not _billboard_meshes.has(layer):
-		var mesh: ArrayMesh = ArrayMesh.new()
-		mesh.resource_name = "planet_camera_fixed_layer_%d" % layer
-		var arrays: Array = []
-		arrays.resize(Mesh.ARRAY_MAX)
-		arrays[Mesh.ARRAY_VERTEX] = PackedVector3Array([
-			Vector3(-1.0, 1.0, 0.0),
-			Vector3(1.0, 1.0, 0.0),
-			Vector3(1.0, -1.0, 0.0),
-			Vector3(-1.0, -1.0, 0.0),
-		])
-		arrays[Mesh.ARRAY_NORMAL] = PackedVector3Array([
-			Vector3.FORWARD,
-			Vector3.FORWARD,
-			Vector3.FORWARD,
-			Vector3.FORWARD,
-		])
-		var uv_offset: float = float(layer) * 2.0
-		arrays[Mesh.ARRAY_TEX_UV] = PackedVector2Array([
-			Vector2(uv_offset, 0.0),
-			Vector2(uv_offset + 1.0, 0.0),
-			Vector2(uv_offset + 1.0, 1.0),
-			Vector2(uv_offset, 1.0),
-		])
-		arrays[Mesh.ARRAY_INDEX] = PackedInt32Array([0, 1, 2, 0, 2, 3])
-		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-		_billboard_meshes[layer] = mesh
-	return _billboard_meshes[layer] as ArrayMesh
 
 
 static func _celestial_shader() -> Shader:
@@ -184,7 +127,6 @@ render_mode unshaded, cull_disabled, depth_prepass_alpha;
 uniform vec4 base_color : source_color = vec4(1.0);
 uniform int color_id = 0;
 uniform int level_id = 1;
-uniform float body_ratio = 0.94;
 uniform float animation_time = 0.0;
 
 varying vec3 local_surface_position;
@@ -249,20 +191,7 @@ void vertex() {
 }
 
 void fragment() {
-	float art_layer = 0.0;
-	vec2 art_uv = UV;
-	if (UV.x >= 3.5) {
-		art_layer = 2.0;
-		art_uv.x -= 4.0;
-	} else if (UV.x >= 1.5) {
-		art_layer = 1.0;
-		art_uv.x -= 2.0;
-	}
-	vec2 p = art_uv - vec2(0.5);
-	float radial = length(p) * 2.0;
 	vec3 base = base_color.rgb;
-
-	if (art_layer < 0.5) {
 		vec3 body_position = normalize(local_surface_position);
 		float detail = step(2.5, float(level_id));
 		float animated = step(5.5, float(level_id));
@@ -386,13 +315,8 @@ void fragment() {
 			);
 			float uranus_band_contrast = 0.05;
 			surface = base * (1.0 - uranus_band_contrast * 0.5 + broad_band * uranus_band_contrast);
-			float ring_x = body_position.x * 0.94 + body_position.y * 0.342;
-			float ring_y = -body_position.x * 0.342 + body_position.y * 0.94;
-			float ring_radius = length(vec2(ring_x, ring_y / 0.30));
-			float ring_line = (1.0 - smoothstep(0.018, 0.050, abs(ring_radius - 0.78))) * detail;
 			vec3 atmosphere_color = mix(base, vec3(0.78, 1.0, 0.92), 0.42);
 			surface += atmosphere_color * atmosphere * 0.18;
-			surface = mix(surface, vec3(0.88, 1.0, 0.95), ring_line * 0.72);
 		} else if (color_id == 3) {
 			float cloud_a = 0.5 + 0.5 * sin(body_position.y * 16.0 + n1 * 2.4 + drift * 0.32);
 			float cloud_b = 0.5 + 0.5 * sin(body_position.y * 31.0 - n2 * 3.1 - drift * 0.20);
@@ -429,48 +353,6 @@ void fragment() {
 		ROUGHNESS = color_id == 5 ? 0.72 : 0.48;
 		EMISSION = surface * (0.012 + animated * 0.075 + legendary * 0.055);
 		ALPHA = 1.0;
-	} else if (art_layer < 1.5) {
-		float alpha = 0.0;
-		float energy = 0.0;
-		if (level_id == 6 || level_id == 7) {
-			float halo = smoothstep(body_ratio * 0.96, body_ratio + 0.025, radial)
-				* (1.0 - smoothstep(body_ratio + 0.025, 0.985, radial));
-			float twinkle = 0.88 + 0.12 * sin(animation_time * (level_id == 7 ? 1.24 : 0.62));
-			float rays = 0.0;
-			if (level_id == 7) {
-				float horizontal_ray = exp(-abs(p.y) * 76.0) * (1.0 - smoothstep(0.15, 0.49, abs(p.x)));
-				float vertical_ray = exp(-abs(p.x) * 76.0) * (1.0 - smoothstep(0.15, 0.49, abs(p.y)));
-				rays = max(horizontal_ray, vertical_ray) * smoothstep(body_ratio * 0.74, body_ratio + 0.12, radial);
-				alpha = max(halo * 0.94, rays * 0.58) * twinkle;
-				energy = 1.04;
-			} else {
-				alpha = halo * 0.52 * twinkle;
-				energy = 0.50;
-			}
-		}
-		vec3 glow_color = mix(base, vec3(1.0), level_id == 7 ? 0.24 : 0.10);
-		ALBEDO = glow_color;
-		EMISSION = glow_color * energy;
-		ROUGHNESS = 0.16;
-		ALPHA = alpha;
-	} else {
-		float alpha = 0.0;
-		float energy = 0.0;
-		if (level_id == 4 || level_id == 5) {
-			float distance_to_edge = abs(radial - body_ratio);
-			alpha = (1.0 - smoothstep(0.018, 0.090, distance_to_edge)) * 0.72;
-			energy = 0.46;
-		} else if (level_id == 6 || level_id == 7) {
-			float pulse_halo = smoothstep(body_ratio * 0.94, body_ratio + 0.02, radial)
-				* (1.0 - smoothstep(body_ratio + 0.02, 0.995, radial));
-			alpha = pulse_halo * (level_id == 7 ? 0.96 : 0.78);
-			energy = level_id == 7 ? 0.86 : 0.66;
-		}
-		ALBEDO = base;
-		EMISSION = base * energy;
-		ROUGHNESS = 0.12;
-		ALPHA = alpha;
-	}
 }
 """
 	return _shader

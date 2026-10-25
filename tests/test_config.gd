@@ -307,7 +307,6 @@ func test_m8_feedback_defaults() -> void:
 	assert_near(config.fx_shake_time, 0.4, TOLERANCE, "camera shake duration")
 	assert_near(config.fx_flash_alpha, 0.35, TOLERANCE, "flash alpha")
 	assert_near(config.fx_flash_time, 0.15, TOLERANCE, "flash duration")
-	assert_near(config.fx_ring_radius_factor, 4.0, TOLERANCE, "ring radius factor")
 	assert_eq(config.fx_debris_per_orb, 24, "debris count per orb")
 	assert_true(config.fx_score_popups_enabled, "score popups enabled")
 	assert_eq(config.fx_popup_max, 16, "score popup capacity")

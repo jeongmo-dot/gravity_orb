@@ -157,8 +157,7 @@ func test_3d_symbol_follows_position_without_inheriting_roll_and_keeps_blink() -
 	assert_near(symbol.position.y, body.position.y, 0.0001, "symbol follows body y")
 	var orb_material: ShaderMaterial = orb._mesh.material_override as ShaderMaterial
 	assert_true(orb_material != null, "orb keeps celestial body material")
-	assert_true(orb._blast_outline.visible, "armed pulse outline remains visible")
-	assert_true(orb.blast_outline_strength() > 0.0, "armed pulse strength remains visible")
+	assert_true(orb.is_blast_armed(), "blast readiness remains independent of symbols")
 	board.queue_free()
 	await tree.process_frame
 	Config.data.orb_symbols_enabled = original_enabled
