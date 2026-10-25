@@ -6,7 +6,6 @@ const HERO_RADIUS: float = 177.0
 const HERO_DIAMETER: float = HERO_RADIUS * 2.0
 const HERO_ROTATION_SECONDS: float = 20.0
 const ORBIT_SECONDS: float = 12.0
-const ORBIT_COLOR: Color = Color(0.27, 0.91, 1.0, 0.38)
 const HERO_VIEWPORT_SIZE: int = 320
 const HERO_CAMERA_SIZE: float = 2.93
 const OUTER_ORBIT_RADII: Vector2 = Vector2(420.0, 168.0)
@@ -16,12 +15,10 @@ const INNER_ORBIT_ROTATION: float = 0.22
 const OUTER_ORBITER_RADIUS: float = 24.0
 const INNER_ORBITER_RADIUS: float = 34.0
 const ORBIT_SAMPLE_COUNT: int = 64
-const RING_MINOR_TO_MAJOR_RATIO: float = 0.135 / 0.49
 
 var _hero_viewport: SubViewport
 var _hero_texture: TextureRect
 var _hero_mesh: MeshInstance3D
-var _hero_adornment: MeshInstance3D
 var _hero_symbol: MeshInstance3D
 var _orbiter_one: OrbVisual
 var _orbiter_two: OrbVisual
@@ -36,7 +33,6 @@ func _ready() -> void:
 	visibility_changed.connect(_sync_render_activity)
 	_sync_render_activity()
 	_apply_animation_pose()
-	queue_redraw()
 
 
 func set_symbols_enabled(enabled: bool) -> void:
@@ -50,13 +46,11 @@ func set_symbols_enabled(enabled: bool) -> void:
 func set_animation_elapsed(seconds: float) -> void:
 	_elapsed = maxf(seconds, 0.0)
 	_apply_animation_pose()
-	queue_redraw()
 
 
 func _process(delta: float) -> void:
 	_elapsed += delta
 	_apply_animation_pose()
-	queue_redraw()
 
 
 func _apply_animation_pose() -> void:
@@ -81,29 +75,6 @@ func _apply_animation_pose() -> void:
 	)
 
 
-func _draw() -> void:
-	var center: Vector2 = size * 0.5
-	_draw_orbit(center, OUTER_ORBIT_RADII, OUTER_ORBIT_ROTATION, ORBIT_COLOR)
-	_draw_orbit(
-		center,
-		INNER_ORBIT_RADII,
-		INNER_ORBIT_ROTATION,
-		Color(0.27, 0.91, 1.0, 0.28)
-	)
-
-
-func _draw_orbit(center: Vector2, radii: Vector2, rotation_angle: float, color: Color) -> void:
-	var points: PackedVector2Array = PackedVector2Array()
-	for index: int in range(ORBIT_SAMPLE_COUNT + 1):
-		var angle: float = TAU * float(index) / float(ORBIT_SAMPLE_COUNT)
-		points.append(
-			center + Vector2(cos(angle) * radii.x, sin(angle) * radii.y).rotated(
-				rotation_angle
-			)
-		)
-	draw_polyline(points, color, 2.0, true)
-
-
 func uses_celestial_shader() -> bool:
 	if _hero_mesh == null:
 		return false
@@ -118,14 +89,7 @@ func hero_rect() -> Rect2:
 
 
 static func hero_rotation_axis() -> Vector3:
-	var projected_length: float = sqrt(
-		1.0 - RING_MINOR_TO_MAJOR_RATIO * RING_MINOR_TO_MAJOR_RATIO
-	)
-	return Vector3(
-		-sin(CelestialOrbArt.RING_TILT_RADIANS) * projected_length,
-		cos(CelestialOrbArt.RING_TILT_RADIANS) * projected_length,
-		RING_MINOR_TO_MAJOR_RATIO
-	).normalized()
+	return Vector3.UP
 
 
 static func hero_body_diameter() -> float:
@@ -207,17 +171,6 @@ func _create_shader_hero() -> void:
 	_hero_viewport.add_child(_hero_mesh)
 
 	var radius_m: float = Config.data.radius_for_level(HERO_LEVEL) / Orb3D.PIXELS_PER_METER
-	_hero_adornment = MeshInstance3D.new()
-	_hero_adornment.name = "HeroRing"
-	_hero_adornment.mesh = CelestialOrbArt.billboard_mesh(1)
-	_hero_adornment.material_override = material
-	_hero_adornment.position = Vector3(0.0, 0.0, 0.001)
-	_hero_adornment.rotation.z = CelestialOrbArt.RING_TILT_RADIANS
-	_hero_adornment.scale = Vector3(radius_m, radius_m, 1.0)
-	_hero_adornment.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_hero_adornment.visible = CelestialOrbArt.has_adornment(HERO_LEVEL)
-	_hero_viewport.add_child(_hero_adornment)
-
 	_hero_symbol = MeshInstance3D.new()
 	_hero_symbol.name = "HeroSymbol"
 	_hero_symbol.mesh = OrbSymbols.mesh_for_color(OrbTypes.OrbColor.BLUE)

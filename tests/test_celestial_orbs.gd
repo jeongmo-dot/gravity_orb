@@ -28,15 +28,7 @@ func test_all_levels_keep_celestial_art_inside_collision_radius() -> void:
 		)
 		var expected_ratio: float = 0.94 if level <= 5 else (0.86 if level == 6 else 0.82)
 		assert_near(CelestialOrbArt.body_radius_ratio(level), expected_ratio, 0.0001, "L%d body ratio" % level)
-		assert_true(
-			orb._adornment.visible == (level >= 6),
-			"L%d camera-fixed planet glow visibility" % level
-		)
-		if orb._adornment.visible:
-			assert_true(
-				orb._adornment.scale.x <= collision_radius,
-				"L%d adornment stays inside collision radius" % level
-			)
+		assert_eq(_forbidden_geometry_count(orb), 0, "L%d has no ring decoration" % level)
 	await _cleanup(board)
 
 
@@ -100,9 +92,9 @@ func test_reviewed_planets_use_soft_surface_landmarks() -> void:
 	)
 	assert_true(
 		shader_code.contains("uranus_band_contrast = 0.05")
-		and shader_code.contains("ring_radius - 0.78")
+		and not shader_code.contains("ring_radius")
 		and not shader_code.contains("vertical_bands"),
-		"Uranus uses subtle atmosphere bands and a tilted ellipse ring"
+		"Uranus keeps subtle atmosphere bands without a ring"
 	)
 	await _cleanup(board)
 
@@ -122,7 +114,7 @@ func test_mars_preview_polar_cap_is_an_inset_flattened_round_piece() -> void:
 	)
 
 
-func test_l6_l7_shader_uses_deterministic_planet_glow() -> void:
+func test_l6_l7_shader_uses_deterministic_surface_animation() -> void:
 	var board: Board3D = await _create_board()
 	var orb: Orb3D = board.spawn_orb(OrbTypes.OrbColor.YELLOW, 7, Vector2.ZERO)
 	var shader_code: String = orb.visual_material_resource().shader.code
@@ -133,10 +125,6 @@ func test_l6_l7_shader_uses_deterministic_planet_glow() -> void:
 	assert_true(
 		not shader_code.contains("TIME"),
 		"planet shader has no nondeterministic engine TIME dependency"
-	)
-	assert_true(
-		shader_code.contains("level_id == 7 ? 0.96 : 0.78"),
-		"L7 outline glow is brighter than L6"
 	)
 	CelestialOrbArt.freeze_animation_for_capture()
 	assert_near(
@@ -149,28 +137,25 @@ func test_l6_l7_shader_uses_deterministic_planet_glow() -> void:
 	await _cleanup(board)
 
 
-func test_body_rolls_while_glow_symbol_and_outline_face_camera() -> void:
+func test_body_rolls_while_symbol_faces_camera_without_ring_layers() -> void:
 	var board: Board3D = await _create_board()
 	var planet: Orb3D = board.spawn_orb(OrbTypes.OrbColor.PURPLE, 4, Vector2.ZERO)
 	var body: RigidBody3D = planet.get_physics_body()
 	body.rotation = Vector3(0.0, 0.0, 1.1)
 	planet._process(0.0)
 	assert_eq(planet._mesh.rotation, body.rotation, "body art follows physical roll")
-	assert_true(not planet._adornment.visible, "L4 no longer uses a planetary ring adornment")
 	assert_eq(planet._symbol_mesh.rotation, Vector3.ZERO, "symbol faces camera")
-	assert_eq(planet._blast_outline.rotation, Vector3.ZERO, "pulse outline faces camera")
 	var star: Orb3D = board.spawn_orb(OrbTypes.OrbColor.CYAN, 6, Vector2.ZERO)
 	star.get_physics_body().rotation = Vector3(0.0, 0.0, 0.9)
 	star._process(0.0)
-	assert_eq(star._adornment.rotation, Vector3.ZERO, "L6 planet glow does not roll")
+	assert_eq(_forbidden_geometry_count(board), 0, "all celestial levels have no ring layers")
 	await _cleanup(board)
 
 
-func test_celestial_materials_and_adornments_remain_shared() -> void:
+func test_celestial_materials_remain_shared() -> void:
 	Orb3D.clear_shared_resource_cache()
 	var board: Board3D = await _create_board()
 	var materials: Dictionary = {}
-	var adornment_meshes: Dictionary = {}
 	for color: int in range(Config.data.color_display.size()):
 		for level: int in range(1, Config.data.orb_max_level + 1):
 			var first: Orb3D = board.spawn_orb(color, level, Vector2.ZERO)
@@ -181,12 +166,11 @@ func test_celestial_materials_and_adornments_remain_shared() -> void:
 				"color %d L%d shares material" % [color, level]
 			)
 			materials[first.visual_material_resource().get_instance_id()] = true
-			adornment_meshes[first.adornment_mesh_resource().get_instance_id()] = true
 	assert_true(
 		materials.size() <= Config.data.color_display.size() * Config.data.orb_max_level,
 		"celestial materials are bounded by color times level"
 	)
-	assert_eq(adornment_meshes.size(), 1, "all camera-fixed layers share one mesh")
+	assert_eq(_forbidden_geometry_count(board), 0, "shared resources contain no ring geometry")
 	await _cleanup(board)
 
 
@@ -212,34 +196,16 @@ func test_preview_uses_same_level_and_color_art_profile() -> void:
 	await _cleanup(board)
 
 
-func test_pulse_outline_is_only_visible_for_level_four_and_above() -> void:
+func test_all_levels_keep_blast_readiness_without_outline_geometry() -> void:
 	var board: Board3D = await _create_board()
 	for level: int in range(1, Config.data.orb_max_level + 1):
 		var orb: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, level, Vector2.ZERO)
-		assert_true(
-			orb._blast_outline.visible == (level >= Config.data.active_blast_min_level()),
-			"L%d outline visibility" % level
-		)
 		assert_eq(
-			CelestialOrbArt.blast_pulse_style(level),
-			"" if level < 4 else ("rim" if level <= 5 else "glow"),
-			"L%d uses the specified integrated pulse style" % level
+			orb.is_blast_armed(),
+			level >= Config.data.active_blast_min_level(),
+			"L%d blast readiness remains data-driven" % level
 		)
-		if orb._blast_outline.visible:
-			var before: float = orb.blast_outline_strength()
-			var scale_before: float = orb.blast_pulse_scale()
-			orb._physics_process(Config.data.blast_blink_period * 0.25)
-			assert_true(
-				not is_equal_approx(orb.blast_outline_strength(), before),
-				"L%d outline pulses" % level
-			)
-			if level >= 6:
-				assert_true(
-					not is_equal_approx(orb.blast_pulse_scale(), scale_before),
-					"L%d glow size pulses" % level
-				)
-			else:
-				assert_eq(orb.blast_pulse_scale(), 1.0, "L%d rim does not detach" % level)
+		assert_eq(_forbidden_geometry_count(orb), 0, "L%d has no blast outline geometry" % level)
 	await _cleanup(board)
 
 
@@ -254,3 +220,20 @@ func _cleanup(node: Node) -> void:
 	if is_instance_valid(node):
 		node.queue_free()
 	await tree.process_frame
+
+
+func _forbidden_geometry_count(root: Node) -> int:
+	var count: int = 0
+	var pending: Array[Node] = [root]
+	while not pending.is_empty():
+		var node: Node = pending.pop_back()
+		var lowered_name: String = node.name.to_lower()
+		if lowered_name.contains("ring") or lowered_name.contains("adornment"):
+			count += 1
+		if node is MeshInstance3D:
+			var mesh: Mesh = (node as MeshInstance3D).mesh
+			if mesh != null and mesh.get_class() == "Torus" + "Mesh":
+				count += 1
+		for child: Node in node.get_children():
+			pending.append(child)
+	return count

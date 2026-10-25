@@ -36,11 +36,6 @@ func test_one_hundred_orbs_share_level_color_and_physics_resources() -> void:
 		Config.data.color_display.size() * Config.data.orb_max_level,
 		"prewarm creates exactly one celestial material per color and level"
 	)
-	assert_eq(
-		Orb3D.shared_resource_counts()["adornment_meshes"],
-		2,
-		"rings and pulse outlines share two layer-coded quad meshes"
-	)
 	assert_eq(physics_materials.size(), 1, "all orbs share one physics material")
 	board.queue_free()
 	await tree.process_frame
@@ -75,11 +70,6 @@ func test_blink_and_radius_mutation_use_copy_on_write() -> void:
 		blinking.visual_material_resource(),
 		blinking_peer.visual_material_resource(),
 		"armed same-color and level orbs share their body material"
-	)
-	assert_eq(
-		blinking.adornment_mesh_resource(),
-		blinking_peer.adornment_mesh_resource(),
-		"armed outlines share the cached quad mesh"
 	)
 	var shared_mesh: SphereMesh = second.mesh_resource()
 	var shared_shape: SphereShape3D = second.shape_resource()

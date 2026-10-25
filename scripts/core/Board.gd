@@ -34,9 +34,7 @@ var ghost_completed_count: int = 0
 var ghost_total_duration: float = 0.0
 var diagnostic_warnings_enabled: bool = true
 var _warning_directions: Array[Vector2i] = []
-var _blast_flash_position: Vector2 = Vector2.ZERO
 var _blast_flash_remaining: float = 0.0
-var _blast_flash_radius: float = 0.0
 
 
 func _ready() -> void:
@@ -225,14 +223,8 @@ func apply_blast(origin: Vector2, blast_level: int) -> Array[Dictionary]:
 	return targets
 
 
-func _play_blast_effect(origin: Vector2, blast_level: int) -> void:
-	_blast_flash_position = origin
-	_blast_flash_radius = (
-		Config.data.board_size
-		* Config.data.blast_push_radius_factor_for_level(blast_level)
-	)
+func _play_blast_effect(_origin: Vector2, _blast_level: int) -> void:
 	_blast_flash_remaining = BLAST_FLASH_DURATION
-	queue_redraw()
 
 
 func _update_blast_effect(delta: float) -> void:
@@ -248,7 +240,6 @@ func _update_blast_effect(delta: float) -> void:
 			sin(progress * TAU * 3.0),
 			cos(progress * TAU * 4.0)
 		) * strength
-	queue_redraw()
 
 
 func _shock_mode_for_color(color: int) -> GameConfig.ShockMode:
@@ -910,18 +901,6 @@ func _configure_frame() -> void:
 
 
 func _draw() -> void:
-	if _blast_flash_remaining > 0.0:
-		var progress: float = 1.0 - _blast_flash_remaining / BLAST_FLASH_DURATION
-		draw_arc(
-			_blast_flash_position,
-			lerpf(12.0, _blast_flash_radius, progress),
-			0.0,
-			TAU,
-			64,
-			Color(1.0, 1.0, 1.0, 1.0 - progress),
-			8.0,
-			true
-		)
 	var half: float = half_size()
 	for direction: Vector2i in _warning_directions:
 		var wall_center: Vector2 = -Vector2(direction) * half

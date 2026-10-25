@@ -673,14 +673,6 @@ func _wait_for_turn_end(
 						_seed_jelly_visible_mesh_frames[mesh_name] = int(
 							_seed_jelly_visible_mesh_frames.get(mesh_name, 0)
 						) + 1
-				if orb._blast_outline.visible:
-					_seed_jelly_outline_visible_frames += 1
-					_seed_jelly_outline_max_alpha = maxf(
-						_seed_jelly_outline_max_alpha,
-						1.0 - orb._blast_outline.transparency
-					)
-					if not orb.is_blast_armed():
-						_seed_jelly_unarmed_outline_visible_frames += 1
 			var finite: bool = orb.position.is_finite() and orb.linear_velocity.is_finite()
 			var center_extent: float = maxf(absf(orb.position.x), absf(orb.position.y)) if finite else INF
 			if finite:

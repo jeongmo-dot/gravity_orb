@@ -180,7 +180,7 @@ func test_new_color_3d_materials_match_display_table() -> void:
 	_cleanup(board)
 
 
-func test_3d_blast_armed_orb_blinks_emission_by_level() -> void:
+func test_3d_blast_armed_orb_keeps_readiness_without_outline() -> void:
 	var board: Board3D = await _create_board()
 	var level_four: Orb3D = board.spawn_orb(0, 4, Vector2(-100.0, 0.0))
 	var level_five: Orb3D = board.spawn_orb(1, 5, Vector2(100.0, 0.0))
@@ -188,19 +188,10 @@ func test_3d_blast_armed_orb_blinks_emission_by_level() -> void:
 	assert_true(level_four.is_blast_armed(), "3D L4 is armed")
 	assert_true(level_five.is_blast_armed(), "3D L5 is armed")
 	assert_true(level_six.is_blast_armed(), "3D L6 is armed")
-	assert_true(level_four._blast_outline.visible, "L4 uses a visible pulse outline")
-	assert_true(level_five._blast_outline.visible, "L5 uses a visible pulse outline")
-	assert_true(level_six._blast_outline.visible, "L6 uses a visible pulse outline")
-	var initial_strength: float = level_four.blast_outline_strength()
-	level_four._physics_process(Config.data.blast_blink_period * 0.25)
-	assert_true(
-		not is_equal_approx(level_four.blast_outline_strength(), initial_strength),
-		"3D armed outline oscillates"
-	)
 	_cleanup(board)
 
 
-func test_classic_3d_blast_blink_starts_at_level_four() -> void:
+func test_classic_3d_blast_readiness_starts_at_level_four() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	for mode: GameConfig.GameMode in [GameConfig.GameMode.TURN]:
 		Config.data.game_mode = mode
@@ -209,19 +200,11 @@ func test_classic_3d_blast_blink_starts_at_level_four() -> void:
 		var level_four: Orb3D = board.spawn_orb(1, 4, Vector2(180.0, 0.0))
 		assert_true(not level_three.is_blast_armed(), "L3 is not armed in mode %d" % mode)
 		assert_true(level_four.is_blast_armed(), "L4 is armed in mode %d" % mode)
-		assert_true(not level_three._blast_outline.visible, "L3 outline is hidden")
-		assert_true(level_four._blast_outline.visible, "L4 outline is visible")
-		var initial_strength: float = level_four.blast_outline_strength()
-		level_four._physics_process(Config.data.blast_blink_period * 0.25)
-		assert_true(
-			not is_equal_approx(level_four.blast_outline_strength(), initial_strength),
-			"L4 outline oscillates in mode %d" % mode
-		)
 		_cleanup(board)
 	Config.data.game_mode = original_mode
 
 
-func test_jelly_blast_face_follows_threshold_while_outline_stays_hidden() -> void:
+func test_jelly_blast_face_follows_threshold_without_outline_geometry() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_jelly_minimum: int = Config.data.jelly_blast_min_level
 	Config.data.game_mode = GameConfig.GameMode.JELLY
@@ -234,8 +217,6 @@ func test_jelly_blast_face_follows_threshold_while_outline_stays_hidden() -> voi
 	level_four.set_jelly_mass(16.0, Config.data)
 	assert_eq(level_four.level, 5, "mass update reaches displayed L5")
 	assert_true(level_four.is_blast_armed(), "mass-updated displayed L5 arms BLAST")
-	assert_true(not level_four._blast_outline.visible, "JELLY mass-updated L5 keeps outline hidden")
-	assert_true(not level_five._blast_outline.visible, "JELLY spawned L5 keeps outline hidden")
 	assert_true(
 		bool((level_four._face.material_override as ShaderMaterial).get_shader_parameter("is_blast_ready")),
 		"mass-updated L5 switches to the blast-ready face"

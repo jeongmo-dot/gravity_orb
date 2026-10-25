@@ -25,8 +25,6 @@ static var _shared_meshes: Dictionary = {}
 @onready var _body: RigidBody3D = %Body
 @onready var _collision_shape: CollisionShape3D = %CollisionShape3D
 @onready var _mesh: MeshInstance3D = %Mesh
-@onready var _adornment: MeshInstance3D = %Adornment
-@onready var _blast_outline: MeshInstance3D = %BlastOutline
 @onready var _belly: MeshInstance3D = %Belly
 @onready var _face: MeshInstance3D = %Face
 @onready var _symbol_mesh: MeshInstance3D = %Symbol
@@ -54,8 +52,6 @@ var _continuous_cd_enabled: bool = true
 var _allow_sleep: bool = false
 var _progressive_growth_enabled: bool = false
 var _blast_armed: bool = false
-var _blast_blink_period: float = 0.8
-var _blast_blink_elapsed: float = 0.0
 var _visual_punch_tween: Tween
 var _visual_punch_scale: Vector3 = Vector3.ONE:
 	set(value):
@@ -187,7 +183,6 @@ static func shared_resource_counts() -> Dictionary:
 		"meshes": _shared_meshes.size(),
 		"visual_materials": CelestialOrbArt.shared_material_count(),
 		"jelly_visual_materials": JellyOrbArt.shared_material_count(),
-		"adornment_meshes": CelestialOrbArt.shared_mesh_count(),
 	}
 
 
@@ -224,8 +219,6 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	_jelly_belly_target = 0.0
 	_jelly_belly_elapsed = 0.0
 	_blast_armed = cfg.blast_enabled_for_level(level)
-	_blast_blink_period = maxf(cfg.blast_blink_period, 0.001)
-	_blast_blink_elapsed = 0.0
 	_radius = cfg.radius_for_level(level)
 	_growth_duration = maxf(cfg.grow_duration, 0.0) if _progressive_growth_enabled else 0.0
 	_growth_start_radius = _radius * clampf(cfg.grow_start_ratio, 0.0, 1.0)
@@ -259,12 +252,6 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 		else CelestialOrbArt.material_for(cfg, color, level)
 	)
 	_mesh.material_override = visual_material
-	_adornment.mesh = CelestialOrbArt.billboard_mesh(1)
-	_adornment.material_override = visual_material
-	_adornment.visible = not _is_jelly_visual and CelestialOrbArt.has_adornment(level)
-	_blast_outline.mesh = CelestialOrbArt.billboard_mesh(2)
-	_blast_outline.material_override = visual_material
-	_blast_outline.visible = _blast_armed and not _is_jelly_visual
 	_belly.mesh = JellyOrbArt.face_mesh()
 	_belly.material_override = JellyOrbArt.belly_material_for(color, level)
 	_belly.visible = false
@@ -290,7 +277,6 @@ func set_symbols_enabled(enabled: bool) -> void:
 func _physics_process(delta: float) -> void:
 	_sample_physics_position()
 	_advance_growth(delta)
-	_advance_blast_blink(delta)
 	_advance_jelly_impact(delta)
 
 
@@ -359,16 +345,12 @@ func set_jelly_mass(
 			cfg.gravity_strength
 		)
 	_blast_armed = cfg.blast_enabled_for_level(level)
-	_blast_outline.visible = _blast_armed and not _is_jelly_visual
 	var visual_material: ShaderMaterial = (
 		JellyOrbArt.body_material_for(color, level)
 		if _is_jelly_visual
 		else CelestialOrbArt.material_for(cfg, color, level)
 	)
 	_mesh.material_override = visual_material
-	_adornment.material_override = visual_material
-	_adornment.visible = not _is_jelly_visual and CelestialOrbArt.has_adornment(level)
-	_blast_outline.material_override = visual_material
 	_belly.material_override = JellyOrbArt.belly_material_for(color, level)
 	_set_jelly_belly_target(_jelly_fill_fraction_for_mass(jelly_mass, cfg))
 	_face.material_override = JellyOrbArt.face_material_for(color, level, _blast_armed)
@@ -388,25 +370,30 @@ func is_blast_armed() -> bool:
 	return _blast_armed
 
 
-func blast_emission_strength() -> float:
-	if not _blast_armed:
-		return 0.08
-	if _is_jelly_visual:
-		return 0.0
-	return 0.20 + 0.80 * (
-		0.5 + 0.5 * sin(TAU * _blast_blink_elapsed / _blast_blink_period)
-	)
-
-
 func play_visual_punch(scale_factor: float = 1.18, duration: float = 0.14) -> void:
 	if _visual_punch_tween != null and _visual_punch_tween.is_valid():
 		_visual_punch_tween.kill()
+	if _is_jelly_visual:
+		_visual_punch_scale = Vector3.ONE
+		_visual_punch_tween = create_tween()
+		_visual_punch_tween.set_trans(Tween.TRANS_QUAD)
+		_visual_punch_tween.set_ease(Tween.EASE_OUT)
+		_visual_punch_tween.tween_method(
+			_set_visual_punch_scale,
+			Vector3.ONE,
+			Vector3.ONE * 1.06,
+			0.08
+		)
+		_visual_punch_tween.set_ease(Tween.EASE_IN_OUT)
+		_visual_punch_tween.tween_method(
+			_set_visual_punch_scale,
+			Vector3.ONE * 1.06,
+			Vector3.ONE,
+			0.10
+		)
+		return
 	var target_scale: Vector3 = Vector3.ONE * scale_factor
-	var start_scale: Vector3 = (
-		Vector3.ONE * 0.88
-		if _is_jelly_visual
-		else Vector3.ONE.lerp(target_scale, 0.02)
-	)
+	var start_scale: Vector3 = Vector3.ONE.lerp(target_scale, 0.02)
 	_visual_punch_scale = start_scale
 	_visual_punch_tween = create_tween()
 	_visual_punch_tween.set_trans(Tween.TRANS_BACK)
@@ -590,26 +577,25 @@ func celestial_art_key() -> String:
 	return "%s:%d" % [CelestialOrbArt.level_name(level), color]
 
 
-func adornment_mesh_resource() -> Mesh:
-	return _adornment.mesh
-
-
-func blast_outline_strength() -> float:
-	return blast_emission_strength() if _blast_armed else 0.0
-
-
-func blast_pulse_scale() -> float:
-	if _is_jelly_visual:
-		return 1.0
-	if not _blast_armed or level < 6:
-		return 1.0
-	return lerpf(0.94, 1.0, blast_emission_strength())
-
-
 func visual_stretch_scale() -> Vector3:
 	if _is_jelly_visual:
-		return Vector3(_jelly_deform.x, _jelly_deform.y, _jelly_deform.x)
+		return _jelly_body_scale()
 	return _stretch_scale_for_ratio(_visual_stretch_ratio())
+
+
+func _jelly_body_scale() -> Vector3:
+	var deform: Vector2 = _jelly_render_deform()
+	var non_shrinking_deform: Vector3 = Vector3(
+		maxf(1.0, deform.x),
+		maxf(1.0, deform.y),
+		maxf(1.0, deform.x)
+	)
+	var non_shrinking_punch: Vector3 = Vector3(
+		maxf(1.0, _visual_punch_scale.x),
+		maxf(1.0, _visual_punch_scale.y),
+		maxf(1.0, _visual_punch_scale.z)
+	)
+	return non_shrinking_deform * non_shrinking_punch
 
 
 func _visual_stretch_ratio() -> float:
@@ -655,31 +641,15 @@ func _set_visual_alpha(alpha: float) -> void:
 	_apply_visual_transparency()
 
 
-func _advance_blast_blink(delta: float) -> void:
-	if not _blast_armed:
-		return
-	_blast_blink_elapsed += delta
-	_apply_visual_transparency()
-
-
 func _apply_visual_transparency() -> void:
 	var base_transparency: float = 1.0 - clampf(_visual_alpha, 0.0, 1.0)
 	_mesh.transparency = base_transparency
-	_adornment.transparency = base_transparency
 	_face.transparency = base_transparency
 	_belly.transparency = 0.0
 	_belly.set_instance_shader_parameter(
 		"visual_alpha",
 		clampf(_visual_alpha, 0.0, 1.0)
 	)
-	if _is_jelly_visual:
-		_blast_outline.transparency = 1.0
-	else:
-		_blast_outline.transparency = 1.0 - clampf(
-			_visual_alpha * blast_emission_strength(),
-			0.0,
-			1.0
-		)
 	_symbol_mesh.transparency = base_transparency
 
 
@@ -909,16 +879,10 @@ func _update_visual_transform() -> void:
 	var stretch_ratio: float = _visual_stretch_ratio()
 	var stretch_scale: Vector3 = _stretch_scale_for_ratio(stretch_ratio)
 	var jelly_deform: Vector2 = _jelly_render_deform() if _is_jelly_visual else Vector2.ONE
-	var jelly_scale: Vector3 = Vector3(jelly_deform.x, jelly_deform.y, jelly_deform.x)
-	_mesh.scale = _visual_punch_scale * stretch_scale * jelly_scale
+	var jelly_body_scale: Vector3 = _jelly_body_scale() if _is_jelly_visual else Vector3.ONE
+	_mesh.scale = jelly_body_scale if _is_jelly_visual else _visual_punch_scale * stretch_scale
 	_mesh.position = render_world_position
-	_adornment.position = render_world_position + Vector3(0.0, 0.0, 0.001)
-	var body_front_offset: float = (
-		radius_m * absf(_mesh.scale.z)
-		if _is_jelly_visual
-		else radius_m
-	)
-	_blast_outline.position = render_world_position + Vector3(0.0, 0.0, radius_m + 0.004)
+	var body_front_offset: float = radius_m * _mesh.scale.z
 	_belly.position = render_world_position + Vector3(0.0, 0.0, body_front_offset + 0.003)
 	_face.position = render_world_position + Vector3(0.0, 0.0, body_front_offset + 0.006)
 	if _is_jelly_visual:
@@ -928,48 +892,38 @@ func _update_visual_transform() -> void:
 	else:
 		var world_velocity: Vector3 = _body.linear_velocity
 		_mesh.rotation = Vector3(0.0, 0.0, atan2(world_velocity.y, world_velocity.x))
-	_adornment.rotation = Vector3(
-		0.0,
-		0.0,
-		CelestialOrbArt.RING_TILT_RADIANS if level == 4 else 0.0
-	)
-	_blast_outline.rotation = (
-		Vector3.ZERO
-	)
 	_belly.rotation = Vector3(0.0, 0.0, _jelly_frame_rotation)
 	var punch_scale: float = maxf(
 		_visual_punch_scale.x,
 		maxf(_visual_punch_scale.y, _visual_punch_scale.z)
 	)
-	_adornment.scale = Vector3(radius_m, radius_m, 1.0) * punch_scale
-	_blast_outline.scale = (
-		Vector3(
-			radius_m * (jelly_deform.x if _is_jelly_visual else 1.0),
-			radius_m * (jelly_deform.y if _is_jelly_visual else 1.0),
-			1.0
-		)
-		* punch_scale
-		* blast_pulse_scale()
-	)
+	var jelly_content_deform: Vector2 = Vector2(
+		jelly_body_scale.x,
+		jelly_body_scale.y
+	) if _is_jelly_visual else jelly_deform * punch_scale
 	_belly.scale = Vector3(
-		radius_m * jelly_deform.x,
-		radius_m * jelly_deform.y,
+		radius_m * jelly_content_deform.x,
+		radius_m * jelly_content_deform.y,
 		1.0
-	) * punch_scale
+	)
 	var face_radius_ratio: float = (
 		1.0
 		if _is_jelly_visual and (level >= Config.data.orb_max_level or _blast_armed)
 		else 0.62
 	)
-	var face_scale_m: float = radius_m * face_radius_ratio * punch_scale
+	var face_scale_m: float = radius_m * face_radius_ratio
 	_face.basis = (
 		jelly_upright_deform_basis(
 			_jelly_frame_rotation,
-			jelly_deform,
+			jelly_content_deform,
 			face_scale_m
 		)
 		if _is_jelly_visual
-		else Basis.from_scale(Vector3(face_scale_m, face_scale_m, 1.0))
+		else Basis.from_scale(Vector3(
+			face_scale_m * punch_scale,
+			face_scale_m * punch_scale,
+			1.0
+		))
 	)
 	var symbol_y_offset: float = radius_m * 0.54 if _is_jelly_visual else 0.0
 	_symbol_mesh.position = (

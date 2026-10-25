@@ -15,14 +15,6 @@ unique_name_in_owner = true
 unique_name_in_owner = true
 cast_shadow = 1
 
-[node name="Adornment" type="MeshInstance3D" parent="."]
-unique_name_in_owner = true
-cast_shadow = 0
-
-[node name="BlastOutline" type="MeshInstance3D" parent="."]
-unique_name_in_owner = true
-cast_shadow = 0
-
 [node name="Belly" type="MeshInstance3D" parent="."]
 unique_name_in_owner = true
 cast_shadow = 0
