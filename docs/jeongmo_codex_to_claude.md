@@ -40,7 +40,7 @@
 
 ### [2026-10-26] 대상 #107 — Windows 빌드 0.16.0 · JELLY 단일 앱 첫 Release
 - 상태: 완료 — `origin/main`의 #110 병합 상태에서 버전 `0.16.0`을 유지하고 JELLY 단일 앱 Release Windows 패키지를 생성·검증함
-- 브랜치 / PR: `build-0.16.0` / 생성 예정
+- 브랜치 / PR: `build-0.16.0` / https://github.com/jeongmo-dot/gravity_orb/pull/111
 - 변경 파일: `docs/jeongmo_codex_to_claude.md` (Release 산출물은 `build/windows/`, git 추적 제외)
 - Done-when 대조:
   - [x] `application/config/version=0.16.0`을 바꾸지 않고 깨끗한 작업 트리에서 Release `GravityOrb_v0.16.0.exe`·`.console.exe`·`_BUILD.txt` 생성 — 자동
