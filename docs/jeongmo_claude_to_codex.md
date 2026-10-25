@@ -11,6 +11,7 @@
 - Codex는 「대기 중」에서 **번호가 가장 낮은 항목 하나만** 처리한다 (항목에 "먼저"라고 적힌 예외는 그것부터)
 - 항목 검증용 Windows 빌드는 `-Debug`로 (`build/windows-debug/`). 릴리스 이름 파일은 빌드 항목에서만 만든다 ([technical_design.md](technical_design.md) §10.5.1)
 - 완료 항목이 30건을 넘으면 `docs/archive/`로 옮긴다
+- **고리 모양 연출·그림 금지** (사용자 2026-10-25 "고리를 그리는 거 다 지워", "다시 사용하지 마") — 도넛·원 테두리·타원 선 모양은 만들지 않는다. **명세에 없는 연출·기능은 넣지 않는다** ([technical_design.md](technical_design.md) §12-ONE.4)
 
 ## 항목 양식
 
@@ -31,8 +32,26 @@
 
 ## 대기 중
 
+### [2026-10-25 #110] 고리 연출·그림 전부 삭제 — 다시 쓰지 않는다
+- 상태: 대기 (**먼저** — #107 빌드보다 먼저 한다. 먼저 `origin/main` 병합)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.4**
+- 배경: 사용자 (2026-10-25) "완전히 삭제하고 다시 사용하지 마", "다 지워", "고리를 그리는 거 다 지워" — #109에서 JELLY의 `ModeRing`만 끈 것으로 끝내지 않고, 고리를 그리는 코드를 모두 지운다
+- 요구 (코드째 삭제 — 숨기기·끄기 아님):
+  1. `ColorEffectVisual`의 `ModeRing` — 노드·`TorusMesh`·재질·`ring_layer_count`·`set_ring_enabled`·빨강 밀기 두께 분기. 색 효과 별가루 (`ModeStardust`)·보드 흔들림·당김 펀치·물리 효과는 그대로
+  2. `FeedbackDirector`의 고리 연출 전부 — `_create_ring`·`_new_ring_node`·`_blast_ring_mesh`·"ring" 풀·그룹·`active_ring_count`와 모든 호출 (합체 고리 대체 경로, CLASSIC 합체 고리, 탄생 고리, JELLY MAX 흰 고리, 대폭발·잭팟 충격파 고리 두 겹). 같은 연출의 별가루·빛·섬광·흔들림·멈칫은 그대로
+  3. 연출 빛 셰이더 (`_new_effect_glow_shader`)의 고리 띠 `shell`·`rim` — 부드러운 구름만 남긴다 (흡수 잔상·탄생 빛 등이 테두리 고리 원판으로 보이지 않게)
+  4. 행성 고리 — `CelestialOrbArt` 고리 장식 (`has_adornment`·`RING_TILT_RADIANS`·고리 셰이더), `OrbVisual._draw_planet_ring`·`_draw_tilted_atmosphere_ring`, `Orb3D`의 `Adornment` 노드
+  5. `BlastOutline` 고리 셰이더와 노드 (CLASSIC·BLITZ용 대폭발 가능 고리 — JELLY는 이미 숨김)
+  6. 아무도 쓰지 않는 `scripts/ui/CosmicRing2D.gd`
+  7. 시작 화면 `OrbitStage`의 궤도 선 (타원 두 줄) — 도는 작은 천체는 그대로, 선만 지운다
+  8. 이 고리들만 확인하던 테스트·캡처 검사는 지우고, 대신 다시 생기지 않게 하는 테스트를 넣는다
+- 검수: 소스 검색 `TorusMesh`·`_create_ring`·`ModeRing`·`draw_arc`·`Adornment`·`BlastOutline` 0건 (남는 것이 있으면 이유), 테스트 (합체·흡수·대폭발·잭팟·MAX 직후 씬 트리에 고리 노드·`TorusMesh` 0), #109 실제 창 고리 측정 0, 캡처 두 비율 (합체·흡수·대폭발·잭팟·MAX 순간, 시작 화면), 모든 해시 그대로 (그림만 바뀜)
+- 건드리지 말 것: 규칙·물리·수치, 고리가 아닌 연출 (§12-ONE.4 "남기는 것"), 사용자 저장 파일, `docs/` (회신 파일 제외)
+- Done-when: 테스트 통과(`.\tests\run_tests.ps1`), 캡처 보고 (마지막은 전체 캡처), 스모크 2종 (기본·jelly), 검증 빌드는 `-Debug`만
+- 커밋: 항목 단위 브랜치, **push·PR까지**
+
 ### [2026-10-25 #107] Windows 빌드 0.16.0 — JELLY 단일 앱 첫 빌드
-- 상태: 대기 (**다음 차례** — #109 고리 고침 병합됨. 먼저 `origin/main` 병합)
+- 상태: 대기 (#110 다음 — 고리를 다 지운 뒤 빌드. 먼저 `origin/main` 병합)
 - 근거: [technical_design.md](technical_design.md) **§10.5·§10.5.1** (버전 기록 0.16.0 줄), §12-ONE
 - 요구:
   1. 버전은 **`0.16.0` 그대로** (#106에서 이미 올림 — 바꾸지 않는다)
