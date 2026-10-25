@@ -195,9 +195,7 @@ static func record_key_for_mode(mode: GameConfig.GameMode) -> String:
 	if mode == GameConfig.GameMode.JELLY:
 		return JELLY_BEST_KEY
 	if mode == GameConfig.GameMode.BLITZ:
-		if Config.data.blitz_survival_enabled:
-			return BLITZ_SURVIVAL_BEST_KEY
-		return BLITZ_BEST_KEY
+		return BLITZ_SURVIVAL_BEST_KEY
 	return TURN_BEST_KEY
 
 
@@ -207,9 +205,7 @@ static func ranking_key_for_mode(mode: GameConfig.GameMode) -> String:
 	if mode == GameConfig.GameMode.JELLY:
 		return JELLY_RANKING_KEY
 	if mode == GameConfig.GameMode.BLITZ:
-		if Config.data.blitz_survival_enabled:
-			return BLITZ_SURVIVAL_RANKING_KEY
-		return BLITZ_RANKING_KEY
+		return BLITZ_SURVIVAL_RANKING_KEY
 	return TURN_RANKING_KEY
 
 

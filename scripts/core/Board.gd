@@ -7,7 +7,6 @@ const ORB_SCENE: PackedScene = preload("res://scenes/Orb.tscn")
 const FRAME_WIDTH: float = 4.0
 const WARNING_FRAME_WIDTH: float = 12.0
 const WARNING_FRAME_COLOR: Color = Color("#FF3B30")
-const FEVER_FRAME_COLOR: Color = Color("#FF9F0A")
 const BLAST_FLASH_DURATION: float = 0.18
 const BLAST_SHAKE_DISTANCE: float = 6.0
 
@@ -38,7 +37,6 @@ var _warning_directions: Array[Vector2i] = []
 var _blast_flash_position: Vector2 = Vector2.ZERO
 var _blast_flash_remaining: float = 0.0
 var _blast_flash_radius: float = 0.0
-var _fever_active: bool = false
 
 
 func _ready() -> void:
@@ -394,11 +392,6 @@ func set_warning_directions(directions: Array[Vector2i]) -> void:
 	_warning_directions.clear()
 	_warning_directions.append_array(directions)
 	queue_redraw()
-
-
-func set_fever_active(active: bool) -> void:
-	_fever_active = active
-	_frame_border.default_color = FEVER_FRAME_COLOR if active else Color.WHITE
 
 
 func _batch_fits_spawn_line(

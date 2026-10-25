@@ -38,6 +38,42 @@
 
 ## 미확인
 
+### [2026-10-25] 대상 #106 — JELLY 단일 앱 · 다른 모드 레거시 보관
+- 상태: 완료 — `legacy-four-modes` 태그 뒤 main을 JELLY 단일 앱으로 전환하고 0.16.0 Debug 패키지까지 검증함
+- 브랜치 / PR: `jelly-single-app` / 생성 예정
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `project.godot`, `scenes/{Main.tscn,Main3D.tscn,UI.tscn}`, `scripts/{core,fx,spike,ui}`, `tests/`, `docs/.gdignore`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] BLITZ·SLIME 런타임 코드·씬·HUD·설정 필드·전용 테스트·캡처 장면·측정 도구 삭제. CLASSIC의 공통 규칙·턴·물리·반응·Spawner와 회귀 테스트는 유지 — 자동 (소스 검색·전체 테스트)
+  - [x] `GameMode` 숫자 `TURN=0`, `BLITZ=1`, `SLIME=2`, `JELLY=3` 고정 및 레거시 주석. 앱 시작·즉시 실행·재시작은 JELLY로 강제하고 CLI는 없음/`jelly`만 허용 — 자동 (`test_frontend`)
+  - [x] 기존 로고·부제·행성 그림 아래 936×200 기준의 L3 분홍 JELLY 단일 버튼과 랭킹·소리·설정 아이콘 줄 구성. 랭킹은 탭 없는 JELLY 열만, 결과 버튼은 `처음 화면` — 자동 레이아웃 테스트 + 두 비율 캡처 직접 관측
+  - [x] 다른 모드 저장 키를 삭제·변경하지 않고 JELLY 저장 시에도 그대로 보존 — 자동 (`test_frontend`, `test_rankings`) + 실제 사용자 저장 바이트 비교
+  - [x] 빈 `docs/.gdignore` 추가, 프로젝트 버전은 §12-ONE.2 결정 값 `0.16.0` 적용 — 자동
+  - [x] JELLY 그림 ON/OFF 상태 해시가 #104 기준과 동일하고, 전체 테스트·두 스모크·Debug 빌드·패키지 문자열 검사·최종 전체 캡처 통과 — 자동
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard (`C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`)
+  - `godot --headless --path . --import` 최종 정상 권한 실행 → 종료 코드 0, `ERROR`·`SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` → 일반 `273/273` (`14.307초`), 장기 `5/5` (`43.423초`), 성능 `4/4` (`3.393초`), 합계 `282/282`, 종료 코드 0, 총 `61.123초`
+  - JELLY 시각 ON/OFF 상태 해시 → 두 경로 모두 `5c96a80c71c632fb8e727cf1be541757c464b436dd83d6c8d0737b1211347df1`; #104 기준과 동일
+  - 소스와 내보낸 Debug 콘솔 exe의 기본·`--mode=jelly` `--quit-after 300` → 네 실행 모두 종료 코드 0, 오류 표식 0건
+  - 최종 `tests/capture_screens.ps1` → `540×960`, `540×1170` 각각 시작·랭킹·결과·게임플레이·FINAL MOVE·대폭발 얼굴 2방향·배 속 젤리 2방향·흡수 3단계의 12장, 합계 24장, 종료 코드 0. 시작/랭킹/결과/게임플레이를 직접 열어 레거시 카드·탭·HUD 0건, 잘림·겹침 0건 관측
+  - `tools/build_windows.ps1 -Debug` → `version=0.16.0`, 종료 코드 0, `build/windows-debug/GravityOrb_v0.16.0.exe` `104,959,904`바이트, `.console.exe` `50,176`바이트
+  - 내보낸 exe 문자열 검사 → `BlitzManager`, `BlitzTimeBar`, `SlimeMain`, `SlimeConfig`, `SlimeGame/Hud/Sim/View`, `SlimeCardIcon`, `scripts/slime`, `slime_config.tres` 각 0건. `res://tests/`, `res://artifacts/`, `res://docs/` 각 0건. 저장 호환용 키 문자열은 의도대로 유지
+  - 사용자 `save.cfg`는 전후 `1,488`바이트, SHA-256 `4D8C75B028AD8710E8B24779A35283848845F75D9A97D238B9D24419BD1FB14D` 동일
+  - 규칙 검사 → 허용 파일 외 `Input`/`InputEvent` 0건, Spawner 외 전역 난수 0건, `git diff --check` 오류 0건
+- 삭제 파일 목록 (`76`개):
+  - 설정·씬·런타임 `18`개: `config/SlimeConfig.gd{,.uid}`, `config/slime_config.tres`, `scenes/SlimeMain.tscn`, `scripts/core/BlitzManager.gd{,.uid}`, `scripts/slime/{SlimeGame,SlimeHud,SlimeSim,SlimeView}.gd{,.uid}`, `scripts/ui/BlitzTimeBar.gd{,.uid}`, `scripts/ui/SlimeCardIcon.gd{,.uid}`
+  - 전용 테스트 `19`개: `tests/test_{blitz_manager,blitz_time_bar,slime_config,slime_game,slime_shell,slime_sim,slime_visuals}.gd{,.uid}`, `tests/test_callouts.gd{,.uid}`, `tests/spike/{BlitzMeasurement,RunBlitzResponsivenessMeasurement,SlimeWindowMeasurement}.tscn`
+  - 루트 측정 도구 `9`개: `tests/run_{blast_l4_range,blitz_clock,blitz,blitz_responsiveness,blitz_survival,gravity_comparison,jolt_rid_robustness,slime_visual_render_test,slime_window}_measurement.ps1`
+  - spike 측정 `10`개: `tests/spike/run_{blitz_measurement,blitz_responsiveness_measurement,jolt_rid_robustness,reaction_latency_measurement,slime_window_measurement}.gd{,.uid}`
+  - tools 측정·비교 `20`개: `tests/tools/capture_slime_original_comparison.ps1`, `run_mode_preview_measurement.ps1`, `run_mode_skill_measurement.ps1`, `run_mode_skill_slime_measurement.gd{,.uid}`, `run_slime_bot_measurement.{gd,gd.uid,ps1}`, `run_slime_parity.ps1`, `run_staged_difficulty_measurement.ps1`, `slime_original_capture_{driver,game}.gd{,.uid}`, `slime_parity_{candidate,original_driver,original_game}.gd{,.uid}`
+- 수동 확인 절차:
+  1. `build/windows-debug/GravityOrb_v0.16.0.exe` 실행 → 로고 아래 큰 JELLY 버튼 하나와 랭킹·소리·설정 아이콘만 보여야 한다.
+  2. JELLY 버튼 클릭 → 즉시 JELLY 판이 열리고 기존 JELLY 규칙·말랑함·얼굴·배 속 젤리가 유지되어야 한다.
+  3. 시작 화면의 랭킹 아이콘 클릭 → 탭 없이 JELLY 순위·점수·최대 콤보·FINAL MOVE·날짜 열만 보여야 한다.
+  4. 게임 오버 뒤 `처음 화면` 클릭 → 단일 JELLY 시작 화면으로 돌아와야 한다.
+- 결정 사항: BLITZ·SLIME save key 읽기/쓰기 호환 코드는 실제 사용자 파일 보존을 위해 남겼고 앱 경로에서는 호출하지 않음. CLASSIC 전용 정리는 §12-ONE.3 다음 항목으로 남김. 캡처 산출물은 git 추적 대상에서 제외함
+- 남은 것 · 질문: 자동 검증과 화면 직접 관측 완료. 최종 합격/불합격 판정은 Claude에 남김
+
 ### [2026-10-25] 대상 #105 — Windows 빌드 0.15.2
 - 상태: 완료 — 최신 `origin/main`의 #104 반영 상태에서 프로젝트 버전을 `0.15.2`로 올리고, 네 모드가 포함된 마지막 보관용 Godot 4.8 Standard Release Windows 패키지를 생성·검증함
 - 브랜치 / PR: `build-0.15.2` / https://github.com/jeongmo-dot/gravity_orb/pull/107

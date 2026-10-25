@@ -234,12 +234,7 @@ func begin_hitstop(duration: float) -> void:
 
 
 func _hitstop_enabled_for_mode() -> bool:
-	if not Config.data.fx_hitstop_enabled:
-		return false
-	return (
-		Config.data.game_mode != GameConfig.GameMode.BLITZ
-		or Config.data.blitz_hitstop_enabled
-	)
+	return Config.data.fx_hitstop_enabled
 
 
 func _release_hitstop_after(duration: float, generation: int) -> void:

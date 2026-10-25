@@ -306,6 +306,10 @@ func _run_directory(directory: String, test_suite: String = "") -> void:
 
 func _run_test_file(path: String, test_suite: String = "") -> void:
 	Engine.physics_ticks_per_second = 120 if path.contains("jolt") else 240
+	# Keep retained CLASSIC regression suites independent from JELLY-only UI tests.
+	var config_node: Node = root.get_node("Config")
+	var config_data: GameConfig = config_node.get("data") as GameConfig
+	config_data.game_mode = GameConfig.GameMode.TURN
 	var test_script: Script = load(path) as Script
 	if test_script == null:
 		_record_runner_failure(path, "could not load script")

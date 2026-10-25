@@ -200,9 +200,9 @@ func test_3d_blast_armed_orb_blinks_emission_by_level() -> void:
 	_cleanup(board)
 
 
-func test_3d_blast_blink_starts_at_shared_level_four_in_both_modes() -> void:
+func test_classic_3d_blast_blink_starts_at_level_four() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
-	for mode: GameConfig.GameMode in [GameConfig.GameMode.TURN, GameConfig.GameMode.BLITZ]:
+	for mode: GameConfig.GameMode in [GameConfig.GameMode.TURN]:
 		Config.data.game_mode = mode
 		var board: Board3D = await _create_board()
 		var level_three: Orb3D = board.spawn_orb(0, 3, Vector2(-180.0, 0.0))

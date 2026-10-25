@@ -188,23 +188,6 @@ func test_toggle_blast_exclusion_jackpot_intensity_and_pool_cleanup() -> void:
 	Config.data.fx_color_effect_visuals_enabled = original_enabled
 
 
-func test_color_effect_toggle_preserves_turn_and_blitz_state_hashes() -> void:
-	var original_enabled: bool = Config.data.fx_color_effect_visuals_enabled
-	var original_fx: bool = Config.data.fx_enabled
-	var original_hitstop: bool = Config.data.fx_hitstop_enabled
-	Config.data.fx_enabled = true
-	Config.data.fx_hitstop_enabled = false
-	var turn_off: String = await _scripted_state_hash(false, false)
-	var turn_on: String = await _scripted_state_hash(true, false)
-	var blitz_off: String = await _scripted_state_hash(false, true)
-	var blitz_on: String = await _scripted_state_hash(true, true)
-	assert_eq(turn_on, turn_off, "20-turn color visual state hash")
-	assert_eq(blitz_on, blitz_off, "20-second BLITZ color visual state hash")
-	Config.data.fx_color_effect_visuals_enabled = original_enabled
-	Config.data.fx_enabled = original_fx
-	Config.data.fx_hitstop_enabled = original_hitstop
-
-
 func test_color_effect_frame_cost_report() -> void:
 	var original_enabled: bool = Config.data.fx_color_effect_visuals_enabled
 	Config.data.fx_color_effect_visuals_enabled = true
@@ -257,42 +240,6 @@ func _create_fixture() -> Dictionary:
 	await tree.process_frame
 	director._board = board
 	return {"root": root, "camera": camera, "board": board, "director": director}
-
-
-func _scripted_state_hash(enabled: bool, blitz: bool) -> String:
-	Config.data.fx_color_effect_visuals_enabled = enabled
-	var fixture: Dictionary = await _create_fixture()
-	var root: Node3D = fixture["root"] as Node3D
-	var board: Board3D = fixture["board"] as Board3D
-	var director: FeedbackDirector = fixture["director"] as FeedbackDirector
-	for index: int in range(20):
-		var direction: Vector2i = OrbTypes.DIRECTIONS[index % OrbTypes.DIRECTIONS.size()]
-		board.set_gravity(direction)
-		var color: int = (index + (2 if blitz else 0)) % Config.data.color_display.size()
-		var level: int = 1 + index % (3 if blitz else 2)
-		var position: Vector2 = Vector2(float(index % 5) * 100.0, float(index / 5) * 100.0)
-		var orb: Orb3D = board.spawn_orb(color, level, position)
-		orb.get_physics_body().freeze = true
-		director.play_reaction_visuals({
-			"type": ReactionRules.Type.MERGE,
-			"result_orb": orb,
-			"result_level": level,
-			"result_color": color,
-			"position": position,
-			"shock_targets": [{"position": position + Vector2(50.0, 0.0)}],
-		})
-	var state: Array[Dictionary] = []
-	for orb: Orb3D in board.get_orbs():
-		state.append({
-			"id": orb.stable_spawn_id,
-			"color": orb.color,
-			"level": orb.level,
-			"position": orb.position,
-			"velocity": orb.linear_velocity,
-		})
-	var hash_value: String = JSON.stringify(state)
-	await _cleanup(root)
-	return hash_value
 
 
 func _cleanup(node: Node) -> void:

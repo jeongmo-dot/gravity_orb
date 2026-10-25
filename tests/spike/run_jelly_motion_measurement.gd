@@ -80,7 +80,6 @@ func _run() -> void:
 	await get_tree().process_frame
 	_board = main.get_node("Board") as Board3D
 	(main.get_node("TurnManager") as TurnManager).set_physics_process(false)
-	(main.get_node("BlitzManager") as BlitzManager).set_physics_process(false)
 	for existing: Orb3D in _board.get_orbs().duplicate():
 		_board.remove_orb(existing)
 	_board.orb_contact.connect(_on_orb_contact)

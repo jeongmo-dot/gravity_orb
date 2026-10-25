@@ -6,11 +6,7 @@ var _observed_reactions: Array[Dictionary] = []
 
 
 func test_turn_dense_contact_merges_within_one_physics_tick() -> void:
-	await _assert_dense_contact_reacts_within_one_tick(false)
-
-
-func test_blitz_dense_contact_merges_within_one_physics_tick() -> void:
-	await _assert_dense_contact_reacts_within_one_tick(true)
+	await _assert_dense_contact_reacts_within_one_tick()
 
 
 func test_proximity_reaction_order_is_deterministic() -> void:
@@ -20,7 +16,7 @@ func test_proximity_reaction_order_is_deterministic() -> void:
 
 
 func test_two_hundred_orb_proximity_scan_best_of_five_p95_is_at_most_one_point_five_milliseconds() -> void:
-	var fixture: Dictionary = await _create_fixture(false, false)
+	var fixture: Dictionary = await _create_fixture()
 	var root: Node = fixture["root"] as Node
 	var board: Board3D = fixture["board"] as Board3D
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
@@ -62,8 +58,8 @@ func test_two_hundred_orb_proximity_scan_best_of_five_p95_is_at_most_one_point_f
 	await _cleanup(root)
 
 
-func _assert_dense_contact_reacts_within_one_tick(blitz: bool) -> void:
-	var fixture: Dictionary = await _create_fixture(blitz, true)
+func _assert_dense_contact_reacts_within_one_tick() -> void:
+	var fixture: Dictionary = await _create_fixture()
 	var root: Node = fixture["root"] as Node
 	var board: Board3D = fixture["board"] as Board3D
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
@@ -104,7 +100,7 @@ func _assert_dense_contact_reacts_within_one_tick(blitz: bool) -> void:
 
 
 func _deterministic_reaction_sequence() -> String:
-	var fixture: Dictionary = await _create_fixture(false, true)
+	var fixture: Dictionary = await _create_fixture()
 	var root: Node = fixture["root"] as Node
 	var board: Board3D = fixture["board"] as Board3D
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
@@ -137,7 +133,7 @@ func _deterministic_reaction_sequence() -> String:
 	return result
 
 
-func _create_fixture(blitz: bool, active_manager: bool) -> Dictionary:
+func _create_fixture() -> Dictionary:
 	InputRouter.set_locked(false)
 	var root: Node3D = Node3D.new()
 	var board: Board3D = BOARD_SCENE.instantiate() as Board3D
@@ -162,21 +158,12 @@ func _create_fixture(blitz: bool, active_manager: bool) -> Dictionary:
 	score.save_path = ""
 	root.add_child(score)
 	score.owner = root
-	var manager: Node
-	if blitz:
-		var blitz_manager: BlitzManager = BlitzManager.new()
-		blitz_manager.name = "BlitzManager"
-		manager = blitz_manager
-	else:
-		var turn_manager: TurnManager = TurnManager.new()
-		turn_manager.name = "TurnManager"
-		manager = turn_manager
+	var manager: TurnManager = TurnManager.new()
+	manager.name = "TurnManager"
 	root.add_child(manager)
 	manager.owner = root
 	tree.root.add_child(root)
 	await tree.process_frame
-	if blitz and active_manager:
-		(manager as BlitzManager).start_game()
 	return {
 		"root": root,
 		"board": board,

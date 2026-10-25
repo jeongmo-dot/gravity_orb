@@ -1528,11 +1528,6 @@ func _copy_preview_state(
 	target_spawner._preview_batches.assign(
 		source_spawner._preview_batches.duplicate(true)
 	)
-	target_spawner._blitz_mode = source_spawner._blitz_mode
-	target_spawner._blitz_candidate_queue.assign(
-		source_spawner._blitz_candidate_queue.duplicate(true)
-	)
-	target_spawner._blitz_next_batch_size = source_spawner._blitz_next_batch_size
 	target_manager.state = TurnManager.State.WAITING_INPUT
 	target_manager.gravity = source_manager.gravity
 	target_manager.turn_index = source_manager.turn_index

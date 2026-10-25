@@ -118,7 +118,7 @@ func test_popup_colors_follow_merge_blast_and_finale_rules() -> void:
 
 
 func test_large_popup_formats_formula_without_horizontal_shake_and_caps_sparkles() -> void:
-	var main: Main = await _create_main(GameConfig.GameMode.BLITZ)
+	var main: Main = await _create_main(GameConfig.GameMode.JELLY)
 	var hud: Hud = main.get_node("UI/Hud") as Hud
 	hud._on_reaction_scored({
 		"type": ReactionRules.Type.BLAST,
@@ -150,8 +150,6 @@ func test_large_popup_formats_formula_without_horizontal_shake_and_caps_sparkles
 			Vector2(float(index) + 8.0, 0.0)
 		)
 	assert_eq(hud.active_ui_sparkle_count(), 20, "UI sparkle cap stops at exactly twenty")
-	hud._on_fever_changed(true, 3.0)
-	assert_eq(hud.active_ui_sparkle_count(), 20, "fever cannot exceed the global sparkle cap")
 	await _destroy_main(main)
 
 
@@ -254,23 +252,6 @@ func test_score_popup_nodes_return_to_pool_before_one_point_five_seconds() -> vo
 	)
 	await _destroy_main(main)
 	Config.data.fx_score_popups_enabled = original_enabled
-
-
-func test_score_popup_toggle_preserves_turn_and_blitz_state_hashes() -> void:
-	var original_enabled: bool = Config.data.fx_score_popups_enabled
-	var original_seed: int = Config.data.rng_seed
-	var original_hitstop: bool = Config.data.fx_hitstop_enabled
-	Config.data.rng_seed = 4501
-	Config.data.fx_hitstop_enabled = false
-	var turn_off: String = await _scripted_state_hash(false, GameConfig.GameMode.TURN)
-	var turn_on: String = await _scripted_state_hash(true, GameConfig.GameMode.TURN)
-	var blitz_off: String = await _scripted_state_hash(false, GameConfig.GameMode.BLITZ)
-	var blitz_on: String = await _scripted_state_hash(true, GameConfig.GameMode.BLITZ)
-	assert_eq(turn_on, turn_off, "20-turn score popup state hash")
-	assert_eq(blitz_on, blitz_off, "20-second BLITZ score popup state hash")
-	Config.data.fx_score_popups_enabled = original_enabled
-	Config.data.rng_seed = original_seed
-	Config.data.fx_hitstop_enabled = original_hitstop
 
 
 func test_score_popup_frame_cost_report() -> void:

@@ -29,14 +29,11 @@ const ORBIT_TRAIL_SAMPLES: int = 18
 
 var _manager: TurnManager
 var _board: Board3D
-var _custom_board_rect: Rect2 = Rect2()
-var _custom_orbit_rect: Rect2 = Rect2()
 var _ready_state: bool = false
 var _cues_visible: bool = false
 var _arrow_alpha: float = 0.0
 var _breath_elapsed: float = 0.0
 var _orbit_progress: float = 0.0
-var _slime_mode: bool = false
 var _rejected_remaining: float = 0.0
 var _rejected_direction: Vector2i = Vector2i.ZERO
 var _rejection_flash_count: int = 0
@@ -50,9 +47,6 @@ func _ready() -> void:
 
 
 func bind(manager: Variant, board: Variant) -> void:
-	_slime_mode = false
-	_custom_board_rect = Rect2()
-	_custom_orbit_rect = Rect2()
 	_manager = manager as TurnManager
 	_board = board as Board3D
 	if _manager == null or _board == null:
@@ -73,46 +67,6 @@ func bind(manager: Variant, board: Variant) -> void:
 	_on_state_changed(int(_manager.state))
 
 
-func bind_slime(board_rect: Rect2) -> void:
-	_slime_mode = true
-	_manager = null
-	_board = null
-	_custom_board_rect = board_rect
-	_custom_orbit_rect = board_rect
-	_blocked_directions.clear()
-	visible = true
-	set_process(true)
-	if not InputRouter.swipe_rejected.is_connected(_on_swipe_rejected):
-		InputRouter.swipe_rejected.connect(_on_swipe_rejected)
-	set_slime_state(false, true)
-
-
-func set_slime_board_rect(board_rect: Rect2, orbit_rect: Rect2 = Rect2()) -> void:
-	_custom_board_rect = board_rect
-	_custom_orbit_rect = board_rect if orbit_rect.size == Vector2.ZERO else orbit_rect
-	queue_redraw()
-
-
-func set_slime_state(
-	ready: bool,
-	cues_visible: bool = true,
-	busy_progress: float = 0.0
-) -> void:
-	_cues_visible = cues_visible
-	var was_ready: bool = _ready_state
-	_ready_state = ready and cues_visible
-	if _ready_state and not was_ready:
-		_breath_elapsed = 0.0
-	elif not _ready_state:
-		var next_progress: float = clampf(busy_progress, 0.0, 1.0)
-		_orbit_progress = next_progress if was_ready else maxf(_orbit_progress, next_progress)
-	if not cues_visible:
-		_arrow_alpha = 0.0
-		_rejected_remaining = 0.0
-		_rejected_direction = Vector2i.ZERO
-	queue_redraw()
-
-
 func _exit_tree() -> void:
 	if InputRouter.swipe_rejected.is_connected(_on_swipe_rejected):
 		InputRouter.swipe_rejected.disconnect(_on_swipe_rejected)
@@ -127,7 +81,7 @@ func _process(delta: float) -> void:
 	_arrow_alpha = move_toward(_arrow_alpha, target_alpha, real_delta / fade_duration)
 	if _ready_state:
 		_breath_elapsed = fmod(_breath_elapsed + real_delta, BREATH_DURATION)
-	elif not _slime_mode and _manager != null:
+	elif _manager != null:
 		_orbit_progress = _classic_busy_progress()
 	if _rejected_remaining > 0.0:
 		_rejected_remaining = maxf(_rejected_remaining - real_delta, 0.0)
@@ -137,30 +91,29 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	if not _cues_visible or (_board == null and _custom_board_rect.size == Vector2.ZERO):
+	if not _cues_visible or _board == null:
 		return
 	var board_rect: Rect2 = _projected_board_rect()
 	if board_rect.size.x <= 0.0 or board_rect.size.y <= 0.0:
 		return
 	var border_color: Color = current_border_color()
 	draw_rect(board_rect, border_color, false, BORDER_WIDTH, true)
-	if not _slime_mode:
-		for direction: Vector2i in OrbTypes.DIRECTIONS:
-			var alpha: float = _arrow_alpha
-			var scale_value: float = arrow_scale()
-			var color: Color = arrow_color(direction)
-			if direction == _rejected_direction and _rejected_remaining > 0.0:
-				alpha = _rejected_remaining / REJECTED_FLASH_DURATION
-				scale_value = 1.0
-				color = REJECTED_COLOR
-			elif _ready_state:
-				alpha *= breathing_alpha()
-			if alpha <= 0.001:
-				continue
-			color.a *= alpha
-			_draw_arrow(board_rect, direction, color, scale_value)
-			if direction in _blocked_directions and _ready_state:
-				_draw_blocked_mark(board_rect, direction, color, scale_value)
+	for direction: Vector2i in OrbTypes.DIRECTIONS:
+		var alpha: float = _arrow_alpha
+		var scale_value: float = arrow_scale()
+		var color: Color = arrow_color(direction)
+		if direction == _rejected_direction and _rejected_remaining > 0.0:
+			alpha = _rejected_remaining / REJECTED_FLASH_DURATION
+			scale_value = 1.0
+			color = REJECTED_COLOR
+		elif _ready_state:
+			alpha *= breathing_alpha()
+		if alpha <= 0.001:
+			continue
+		color.a *= alpha
+		_draw_arrow(board_rect, direction, color, scale_value)
+		if direction in _blocked_directions and _ready_state:
+			_draw_blocked_mark(board_rect, direction, color, scale_value)
 	if not _ready_state:
 		_draw_orbit_light(board_rect)
 
@@ -197,7 +150,7 @@ func _on_warning_changed(directions: Array[Vector2i]) -> void:
 func _on_swipe_rejected(direction: Vector2i) -> void:
 	if not _cues_visible or _ready_state or direction == Vector2i.ZERO:
 		return
-	_rejected_direction = Vector2i.ZERO if _slime_mode else direction
+	_rejected_direction = direction
 	_rejected_remaining = REJECTED_FLASH_DURATION
 	_rejection_flash_count += 1
 	queue_redraw()
@@ -250,27 +203,21 @@ func border_alpha() -> float:
 
 func current_border_color() -> Color:
 	var color: Color = READY_COLOR
-	if _slime_mode and _rejected_remaining > 0.0:
-		color = REJECTED_COLOR
-		color.a = maxf(
-			BUSY_BORDER_ALPHA,
-			_rejected_remaining / REJECTED_FLASH_DURATION
-		)
-	elif _ready_state:
-		color.a = breathing_alpha() if _slime_mode else 1.0
+	if _ready_state:
+		color.a = 1.0
 	else:
 		color.a = BUSY_BORDER_ALPHA
 	return color
 
 
 func direction_arrows_visible() -> bool:
-	return not _slime_mode and _cues_visible and (
+	return _cues_visible and (
 		_arrow_alpha > 0.001 or _rejected_remaining > 0.0
 	)
 
 
 func uses_direction_arrows() -> bool:
-	return not _slime_mode
+	return true
 
 
 func rejection_flash_count() -> int:
@@ -296,8 +243,6 @@ func _classic_busy_progress() -> float:
 
 
 func _projected_board_rect() -> Rect2:
-	if _custom_board_rect.size != Vector2.ZERO:
-		return _custom_board_rect
 	var camera: Camera3D = get_viewport().get_camera_3d()
 	if camera == null:
 		return Rect2()
@@ -338,8 +283,6 @@ func arrow_bounds(board_rect: Rect2, direction: Vector2i, scale_value: float = 1
 
 
 func orbit_path_rect(board_rect: Rect2) -> Rect2:
-	if _slime_mode:
-		return _custom_orbit_rect if _custom_orbit_rect.size != Vector2.ZERO else board_rect
 	return board_rect.grow(ORBIT_RADIUS + ORBIT_OUTSIDE_GAP)
 
 

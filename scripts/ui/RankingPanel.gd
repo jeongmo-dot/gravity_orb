@@ -3,32 +3,26 @@ extends Control
 
 signal closed
 
-const GOLD: Color = Color("#FFD54A")
-const SILVER: Color = Color("#D5DEE8")
-const BRONZE: Color = Color("#CD8B62")
-const DEFAULT_ROW_COLOR: Color = Color("#E5EDF8")
-const HEADER_COLOR: Color = Color("#8CAED6")
-const COLUMN_NAMES: Array[String] = ["Rank", "Score", "Stat", "Turns", "Chain", "Max", "Date"]
-const COLUMN_WIDTHS: Array[float] = [82.0, 220.0, 210.0, 120.0, 120.0, 100.0, 220.0]
 const TRANSITION_SECONDS: float = 0.25
-const SLIDE_OFFSET: float = 180.0
-const PANEL_VERTICAL_CONTENT_MARGIN: float = 56.0
+const SLIDE_OFFSET: float = 48.0
+const COLUMN_NAMES: Array[String] = ["Rank", "Score", "Stat", "Turns", "Chain", "Max", "Date"]
+const COLUMN_WIDTHS: Array[float] = [78.0, 250.0, 190.0, 150.0, 130.0, 110.0, 180.0]
+const HEADER_COLOR: Color = Color("#8CA7CC")
+const GOLD: Color = Color("#FFD54A")
+const SILVER: Color = Color("#C9D3E6")
+const BRONZE: Color = Color("#D89A68")
+const DEFAULT_ROW_COLOR: Color = Color("#E8EEFF")
+const PANEL_VERTICAL_CONTENT_MARGIN: float = 72.0
 
 @export var row_style: StyleBoxFlat
 @export var highlight_style: StyleBoxFlat
 
-@onready var _blitz_tab: Button = %RankingBlitzTab
-@onready var _classic_tab: Button = %RankingClassicTab
-@onready var _slime_tab: Button = %RankingSlimeTab
-@onready var _jelly_tab: Button = %RankingJellyTab
+@onready var _panel: PanelContainer = $Panel
 @onready var _header: Label = %RankingHeader
 @onready var _close_button: Button = %RankingCloseButton
-@onready var _panel: PanelContainer = $Panel
 @onready var _content: VBoxContainer = $Panel/Content
 
 var _save_path: String = ""
-var _mode: GameConfig.GameMode = GameConfig.GameMode.TURN
-var _highlight_mode: GameConfig.GameMode = GameConfig.GameMode.TURN
 var _highlight_rank: int = 0
 var _rows: Array[PanelContainer] = []
 var _header_columns: Dictionary = {}
@@ -39,7 +33,6 @@ var _rest_position: Vector2 = Vector2.ZERO
 
 
 func _ready() -> void:
-	_jelly_tab.get_parent().move_child(_jelly_tab, 2)
 	_header.text = ""
 	_header_columns = _create_columns(_header, true)
 	for rank: int in range(1, SaveStore.RANKING_LIMIT + 1):
@@ -49,15 +42,8 @@ func _ready() -> void:
 		) as Label
 		row_host.text = ""
 		_row_columns.append(_create_columns(row_host, false))
-	_blitz_tab.pressed.connect(func() -> void: _show_mode(GameConfig.GameMode.BLITZ))
-	_classic_tab.pressed.connect(func() -> void: _show_mode(GameConfig.GameMode.TURN))
-	_slime_tab.pressed.connect(func() -> void: _show_mode(GameConfig.GameMode.SLIME))
-	_jelly_tab.pressed.connect(func() -> void: _show_mode(GameConfig.GameMode.JELLY))
 	_close_button.pressed.connect(_on_close_pressed)
-	for button: Button in [
-		_blitz_tab, _classic_tab, _jelly_tab, _slime_tab, _close_button
-	]:
-		ButtonMotion.bind(button)
+	ButtonMotion.bind(_close_button)
 	if not resized.is_connected(_apply_layout):
 		resized.connect(_apply_layout)
 	_apply_layout()
@@ -69,13 +55,8 @@ func bind(save_path: String) -> void:
 	_save_path = save_path
 
 
-func open(
-	mode: GameConfig.GameMode,
-	highlight_rank: int = 0
-) -> void:
+func open(_mode: GameConfig.GameMode, highlight_rank: int = 0) -> void:
 	var was_visible: bool = visible
-	_mode = mode
-	_highlight_mode = mode
 	_highlight_rank = highlight_rank
 	_pulse_elapsed = 0.0
 	visible = true
@@ -96,80 +77,56 @@ func open(
 
 
 func current_mode() -> GameConfig.GameMode:
-	return _mode
+	return GameConfig.GameMode.JELLY
 
 
 func highlighted_rank() -> int:
-	return _highlight_rank if _mode == _highlight_mode else 0
+	return _highlight_rank
 
 
 func _process(delta: float) -> void:
 	_pulse_elapsed += delta
-	var active_rank: int = highlighted_rank()
 	for index: int in range(_rows.size()):
-		if index + 1 == active_rank:
+		if index + 1 == _highlight_rank:
 			var alpha: float = 0.88 + 0.12 * (0.5 + 0.5 * sin(_pulse_elapsed * TAU * 1.5))
 			_rows[index].modulate = Color(1.0, 1.0, 1.0, alpha)
 		else:
 			_rows[index].modulate = Color.WHITE
 
 
-func _show_mode(mode: GameConfig.GameMode) -> void:
-	_mode = mode
-	_refresh()
-
-
 func _refresh() -> void:
-	var blitz_mode: bool = _mode == GameConfig.GameMode.BLITZ
-	var slime_mode: bool = _mode == GameConfig.GameMode.SLIME
-	var jelly_mode: bool = _mode == GameConfig.GameMode.JELLY
-	_blitz_tab.set_pressed_no_signal(blitz_mode)
-	_classic_tab.set_pressed_no_signal(not blitz_mode and not slime_mode and not jelly_mode)
-	_slime_tab.set_pressed_no_signal(slime_mode)
-	_jelly_tab.set_pressed_no_signal(jelly_mode)
-	_set_column_visibility(slime_mode, jelly_mode)
+	_set_jelly_column_visibility()
 	(_header_columns["Rank"] as Label).text = "순위"
 	(_header_columns["Score"] as Label).text = "점수"
-	(_header_columns["Stat"] as Label).text = "최대 체인" if blitz_mode else "최대 콤보"
-	(_header_columns["Turns"] as Label).text = "FINAL MOVE" if jelly_mode else "턴"
-	(_header_columns["Chain"] as Label).text = "연쇄"
-	(_header_columns["Max"] as Label).text = "MAX"
+	(_header_columns["Stat"] as Label).text = "최대 콤보"
+	(_header_columns["Turns"] as Label).text = "FINAL MOVE"
 	(_header_columns["Date"] as Label).text = "날짜"
-	var rankings: Array[Dictionary] = SaveStore.load_rankings(_save_path, _mode)
-	var active_rank: int = highlighted_rank()
+	var rankings: Array[Dictionary] = SaveStore.load_rankings(
+		_save_path, GameConfig.GameMode.JELLY
+	)
 	for index: int in range(_rows.size()):
 		var rank: int = index + 1
 		var row: PanelContainer = _rows[index]
 		var columns: Dictionary = _row_columns[index]
 		row.add_theme_stylebox_override(
-			"panel",
-			highlight_style if rank == active_rank else row_style
+			"panel", highlight_style if rank == _highlight_rank else row_style
 		)
 		(columns["Rank"] as Label).text = str(rank)
 		if index >= rankings.size():
 			for column_name: String in COLUMN_NAMES:
-				(columns[column_name] as Label).text = "—" if column_name in ["Rank", "Score"] else ""
+				(columns[column_name] as Label).text = (
+					"—" if column_name in ["Rank", "Score"] else ""
+				)
 			(columns["Rank"] as Label).text = str(rank)
 		else:
 			var record: Dictionary = rankings[index]
 			(columns["Score"] as Label).text = _format_score(int(record["score"]))
-			if slime_mode:
-				(columns["Turns"] as Label).text = str(int(record["turns"]))
-				(columns["Chain"] as Label).text = str(int(record["max_chain"]))
-				(columns["Max"] as Label).text = "%d/7" % int(record["max_colors"])
-			else:
-				var stat_key: String = "max_chain" if blitz_mode else "max_combo"
-				(columns["Stat"] as Label).text = "%s %d" % [
-					"체인" if blitz_mode else "콤보",
-					int(record[stat_key]),
-				]
-				if jelly_mode:
-					(columns["Turns"] as Label).text = str(int(record["final_moves"]))
+			(columns["Stat"] as Label).text = "콤보 %d" % int(record["max_combo"])
+			(columns["Turns"] as Label).text = str(int(record["final_moves"]))
 			(columns["Date"] as Label).text = _short_date(str(record["date"]))
 		for column_name: String in COLUMN_NAMES:
 			(columns[column_name] as Label).add_theme_color_override(
-				"font_color",
-				_rank_color(rank)
+				"font_color", _rank_color(rank)
 			)
 
 
@@ -213,12 +170,12 @@ func _create_columns(host: Control, header: bool) -> Dictionary:
 	return columns
 
 
-func _set_column_visibility(slime_mode: bool, jelly_mode: bool) -> void:
+func _set_jelly_column_visibility() -> void:
 	for columns: Dictionary in [_header_columns] + _row_columns:
-		(columns["Stat"] as Label).visible = not slime_mode
-		(columns["Turns"] as Label).visible = slime_mode or jelly_mode
-		for column_name: String in ["Chain", "Max"]:
-			(columns[column_name] as Label).visible = slime_mode
+		(columns["Stat"] as Label).visible = true
+		(columns["Turns"] as Label).visible = true
+		(columns["Chain"] as Label).visible = false
+		(columns["Max"] as Label).visible = false
 
 
 func _on_close_pressed() -> void:
@@ -256,10 +213,7 @@ func _apply_layout() -> void:
 	)
 	var margin_y: float = (viewport_size.y - panel_height) * 0.5
 	_panel.position = Vector2(margin_x, margin_y)
-	_panel.size = Vector2(
-		viewport_size.x - margin_x * 2.0,
-		panel_height
-	)
+	_panel.size = Vector2(viewport_size.x - margin_x * 2.0, panel_height)
 	_rest_position = _panel.position
 
 

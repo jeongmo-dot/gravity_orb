@@ -29,20 +29,12 @@ const DIM_ANIMATION_SECONDS: float = 0.2
 var _game_manager: Variant
 var _score_manager: ScoreManager
 var _action_taken: bool = false
-var _slime_mode: bool = false
-var _slime_rank: int = 0
-var _result_mode: GameConfig.GameMode = GameConfig.GameMode.TURN
 
 
 func bind(game_manager: Variant, score_manager: ScoreManager) -> void:
 	_game_manager = game_manager
 	_score_manager = score_manager
 	_game_manager.game_over.connect(_on_game_over)
-	_bind_buttons()
-
-
-func bind_slime() -> void:
-	_slime_mode = true
 	_bind_buttons()
 
 
@@ -60,14 +52,11 @@ func _bind_buttons() -> void:
 
 
 func _on_game_over() -> void:
-	_slime_mode = false
-	_result_mode = Config.data.game_mode
 	_action_taken = false
 	_set_actions_enabled(false)
-	var blitz_mode: bool = _game_manager is BlitzManager
-	_title_label.text = "TIME UP" if blitz_mode else "GAME OVER"
+	_title_label.text = "GAME OVER"
 	_score_label.text = "0"
-	_set_stat_text(blitz_mode)
+	_set_stat_text()
 	var ranking: Dictionary = _game_manager.game_over_details.get("ranking", {}) as Dictionary
 	var rank: int = int(ranking.get("rank", 0))
 	_ranking_result_badge.visible = rank > 0
@@ -106,112 +95,23 @@ func _on_game_over() -> void:
 	_set_actions_enabled(true)
 
 
-func show_slime_result(
-	score: int,
-	turns: int,
-	max_chain: int,
-	max_colors: int,
-	ranking: Dictionary,
-	records: Dictionary
-) -> void:
-	_slime_mode = true
-	_slime_rank = int(ranking.get("rank", 0))
-	_action_taken = false
-	_set_actions_enabled(false)
-	_title_label.text = "GAME OVER"
-	_score_label.text = "0"
-	_survived_time_label.text = "턴"
-	_survived_time_value.text = str(turns)
+func _set_stat_text() -> void:
+	var level: int = clampi(
+		_score_manager.max_level_reached, 0, Config.data.orb_max_level
+	)
+	_survived_time_label.text = "턴 수"
+	_survived_time_value.text = str(_game_manager.turn_index)
 	_survived_time_value.add_theme_color_override("font_color", Color("#E8EEFF"))
-	_max_combo_label.text = "최고 연쇄"
-	_max_combo_value.text = str(max_chain)
-	_blocked_label.text = "MAX 완성"
-	_blocked_value.text = "%d/7" % max_colors
-	_extra_label.visible = false
-	_extra_value.visible = true
-	_extra_value.text = "ALL TIME  %s · T %d · C %d" % [
-		_format_score(int(records.get("score", 0))),
-		int(records.get("turns", 0)),
-		int(records.get("max_chain", 0)),
-	]
-	_extra_value.position = Vector2(12.0, 552.0)
-	_extra_value.size = Vector2(668.0, 46.0)
-	_extra_value.add_theme_font_size_override("font_size", 22)
-	_ranking_result_badge.visible = _slime_rank > 0
-	_ranking_result_label.visible = _slime_rank > 0
-	_ranking_result_label.text = "새 기록! %d위" % _slime_rank
-	_best_label.visible = _slime_rank <= 0
-	_best_label.text = "BEST %s" % _format_score(int(records.get("score", 0)))
-	_dimmer.visible = true
-	_dimmer.modulate.a = 0.0
-	visible = true
-	pivot_offset = size * 0.5
-	scale = Vector2(0.92, 0.92)
-	modulate.a = 0.0
-	var dim_tween: Tween = _dimmer.create_tween()
-	dim_tween.tween_property(_dimmer, "modulate:a", 1.0, DIM_ANIMATION_SECONDS)
-	var panel_tween: Tween = create_tween().set_parallel(true)
-	panel_tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	panel_tween.tween_property(self, "scale", Vector2.ONE, PANEL_ANIMATION_SECONDS)
-	panel_tween.tween_property(self, "modulate:a", 1.0, PANEL_ANIMATION_SECONDS)
-	var score_tween: Tween = create_tween()
-	score_tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	score_tween.tween_method(_set_animated_score, 0, maxi(score, 0), SCORE_ANIMATION_SECONDS)
-	if _slime_rank > 0:
-		_ranking_result_badge.scale = Vector2(0.72, 0.72)
-		_ranking_result_badge.pivot_offset = _ranking_result_badge.size * 0.5
-		var badge_tween: Tween = _ranking_result_badge.create_tween()
-		badge_tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		badge_tween.tween_interval(SCORE_ANIMATION_SECONDS)
-		badge_tween.tween_property(
-			_ranking_result_badge, "scale", Vector2.ONE, PANEL_ANIMATION_SECONDS
-		)
-	await panel_tween.finished
-	_set_actions_enabled(true)
-
-
-func _set_stat_text(blitz_mode: bool) -> void:
-	if blitz_mode:
-		_survived_time_label.text = "버틴 시간"
-		_survived_time_value.text = _format_survived_time(
-			float(_game_manager.game_over_details.get(
-				"survived_time", _game_manager.play_time_elapsed
-			))
-		)
-		_survived_time_value.add_theme_color_override("font_color", Color("#30D16F"))
-		_max_combo_label.text = "최대 체인"
-		_max_combo_value.text = str(_game_manager.max_combo)
-		_blocked_label.text = "대폭발"
-		_blocked_value.text = str(_game_manager.blast_count)
-		_extra_label.text = "피버"
-		_extra_value.text = str(_game_manager.fever_count)
-	else:
-		var level: int = clampi(
-			_score_manager.max_level_reached, 0, Config.data.orb_max_level
-		)
-		var jelly_mode: bool = Config.data.game_mode == GameConfig.GameMode.JELLY
-		_survived_time_label.text = "턴 수"
-		_survived_time_value.text = str(_game_manager.turn_index)
-		_survived_time_value.add_theme_color_override("font_color", Color("#E8EEFF"))
-		_max_combo_label.text = "최대 콤보"
-		_max_combo_value.text = str(_game_manager.max_combo)
-		_blocked_label.text = "최고 젤리" if jelly_mode else "최고 레벨"
-		_blocked_value.text = (
-			"L%d MAX" % level
-			if jelly_mode and level == Config.data.orb_max_level
-			else "L%d" % level
-		)
-		var blocked_direction: Vector2i = _game_manager.game_over_details.get(
-			"direction", _game_manager.gravity
-		) as Vector2i
-		if jelly_mode:
-			_extra_label.text = "FINAL MOVE"
-			_extra_value.text = "%d번 버팀" % int(
-				_game_manager.game_over_details.get("final_move_successes", 0)
-			)
-		else:
-			_extra_label.text = "막힌 방향"
-			_extra_value.text = OrbTypes.dir_name(blocked_direction)
+	_max_combo_label.text = "최대 콤보"
+	_max_combo_value.text = str(_game_manager.max_combo)
+	_blocked_label.text = "최고 젤리"
+	_blocked_value.text = (
+		"L%d MAX" % level if level == Config.data.orb_max_level else "L%d" % level
+	)
+	_extra_label.text = "FINAL MOVE"
+	_extra_value.text = "%d번 버팀" % int(
+		_game_manager.game_over_details.get("final_move_successes", 0)
+	)
 	for label: Label in [
 		_survived_time_label,
 		_survived_time_value,
@@ -227,17 +127,6 @@ func _set_stat_text(blitz_mode: bool) -> void:
 
 func _set_animated_score(value: int) -> void:
 	_score_label.text = _format_score(value)
-
-
-func _format_survived_time(seconds: float) -> String:
-	var total_seconds: int = maxi(floori(maxf(seconds, 0.0)), 0)
-	if total_seconds >= 3600:
-		return "%d:%02d:%02d" % [
-			total_seconds / 3600,
-			(total_seconds % 3600) / 60,
-			total_seconds % 60,
-		]
-	return "%d:%02d" % [total_seconds / 60, total_seconds % 60]
 
 
 func _format_score(score: int) -> String:
@@ -284,11 +173,5 @@ func _on_mode_select_pressed() -> void:
 func _on_ranking_pressed() -> void:
 	if not _take_action():
 		return
-	if _slime_mode:
-		ranking_requested.emit(GameConfig.GameMode.SLIME, _slime_rank)
-		return
-	var mode: GameConfig.GameMode = (
-		GameConfig.GameMode.BLITZ if _game_manager is BlitzManager else _result_mode
-	)
 	var ranking: Dictionary = _game_manager.game_over_details.get("ranking", {}) as Dictionary
-	ranking_requested.emit(mode, int(ranking.get("rank", 0)))
+	ranking_requested.emit(GameConfig.GameMode.JELLY, int(ranking.get("rank", 0)))
