@@ -38,6 +38,39 @@
 
 ## 미확인
 
+### [2026-10-25] 대상 #105 — Windows 빌드 0.15.2
+- 상태: 완료 — 최신 `origin/main`의 #104 반영 상태에서 프로젝트 버전을 `0.15.2`로 올리고, 네 모드가 포함된 마지막 보관용 Godot 4.8 Standard Release Windows 패키지를 생성·검증함
+- 브랜치 / PR: `build-0.15.2` / https://github.com/jeongmo-dot/gravity_orb/pull/107
+- 변경 파일: `project.godot`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 최신 `origin/main` `18073c2`에서 전용 브랜치를 만들고 `application/config/version`을 `0.15.1`에서 Claude 결정 값 `0.15.2`로 변경 — 자동
+  - [x] 버전 변경을 먼저 독립 커밋한 뒤 깨끗한 작업 트리에서 Release `GravityOrb_v0.15.2.exe`·`.console.exe`·`_BUILD.txt` 생성 — 자동
+  - [x] 소스 및 내보낸 콘솔 exe의 기본·TURN·BLITZ·SLIME·JELLY 다섯 경로 종료 코드 0, `ERROR`·`SCRIPT ERROR`·`Parse Error` 0건 — 자동
+  - [x] 격리 `APPDATA`에서 시작 화면과 JELLY 직접 실행 창을 각각 5초 확인: 두 프로세스 생존, 창 제목 `Gravity Orb`, 창 핸들 0 아님, `godot.log` 오류 0건 — 자동. 시작 화면 JELLY 카드 실제 클릭은 아래 수동 절차로 남김
+  - [x] 사용자 `save.cfg` 크기·SHA-256 불변, 패키지에서 `tests/`·`artifacts/`·`docs/`와 테스트·캡처·인박스·설계 문서 표식 각 0건 — 자동
+  - [x] 0.15.0·0.15.1 Release 산출물 6개를 유지하고 전체 테스트·규칙 검사를 통과 — 자동
+  - [x] 회신 커밋 뒤 깨끗한 작업 트리에서 최종 재빌드해 `_BUILD.txt` 커밋과 브랜치 마지막 커밋 일치 확인 — 자동
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard (`C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`)
+  - `godot --headless --path . --import` → 종료 코드 0, `ERROR`·`SCRIPT ERROR`·`Parse Error` 각 0건
+  - `tests/run_tests.ps1` → 일반 `371/371` (`26.125초`), 장기 `5/5` (`42.675초`), 성능 `5/5` (`3.890초`), 합계 `381/381`, 종료 코드 0, 총 `72.690초`
+  - Godot 소스 기본·TURN·BLITZ·SLIME·JELLY `--quit-after 300` → 5개 모두 종료 코드 0, 오류 표식 0건
+  - `tools/build_windows.ps1` Release → 종료 코드 0, 결과 줄 `version=0.15.2 mode=Release exit=0 bytes=111221024`
+  - 산출물 → `GravityOrb_v0.15.2.exe` `111,221,024`바이트, `.console.exe` `50,176`바이트, `_BUILD.txt` `159`바이트; PE 파일·제품 버전 `0.15.2.0`, 제품 이름 `Gravity Orb`
+  - 내보낸 콘솔 exe 기본·TURN·BLITZ·SLIME·JELLY → 5개 모두 종료 코드 0, `ERROR`·`SCRIPT ERROR`·`Parse Error` 0건
+  - 격리 GUI → 시작 화면·`--mode=jelly` 각각 5초 생존, 창 제목 `Gravity Orb`, 창 핸들 각각 0 아님, 로그 파일 각각 1개, 오류 표식 각 0건; 임시 `APPDATA` 두 폴더는 확인 뒤 삭제
+  - 패키지 문자열 검사 → `res://tests/`·`res://artifacts/`·`res://docs/`·`run_tests.gd`·`capture_screens.gd`·인박스·설계 문서 표식 각 0건; `JellyOrbArt.gdc`·`Main3D.scn`·`StartScreen.gdc` 각 2건
+  - 이전 0.15.0·0.15.1의 exe·console exe·BUILD txt 6개 유지, 삭제 0건
+  - 사용자 `save.cfg`는 검증 전후 `1,488`바이트, SHA-256 `4D8C75B028AD8710E8B24779A35283848845F75D9A97D238B9D24419BD1FB14D` 동일
+  - 규칙 검사 → 코드 변경이 없어 신규 `Input`/`InputEvent`·전역 난수 호출 0건, `git diff --check` 오류 0건. 버전·회신만 바꿔 화면 캡처는 미실행
+- 수동 확인 절차:
+  1. `build/windows/GravityOrb_v0.15.2.exe`를 실행한다 → 시작 화면에 BLITZ·CLASSIC·JELLY·SLIME 카드 4장이 보이고 .NET 폴더 확인 경고가 없어야 한다.
+  2. JELLY 카드를 누른다 → JELLY 판이 열리고 레벨 고정 크기·배 속 젤리·터질 듯한 얼굴이 표시되며 창이 종료되지 않아야 한다.
+  3. 같은 색 L3이 L2를 두 번 먹게 하고 여러 번 중력을 바꾼다 → 크기는 60→60→85로 바뀌고 배 속 젤리가 중력 쪽을 따르며, 몸통 바깥 뒤 빛·어두운 띠는 다시 나타나지 않아야 한다.
+  4. BLITZ·CLASSIC·SLIME 카드도 각각 연다 → 0.15.2가 네 모드를 포함한 마지막 보관 버전으로 모두 실행되어야 한다.
+- 결정 사항: 명세대로 버전 한 줄과 Codex 회신만 변경함. 규칙·물리·그림·밸런스·사용자 저장 파일·기존 빌드 파일은 변경하지 않음
+- 남은 것 · 질문: `computer-use` 스킬의 Windows 제어 런타임이 `kernel assets` 경로 오류로 초기화와 재시도 모두 실패해 시작 화면에서 JELLY 카드를 실제 포인터로 누르는 동작은 자동화하지 못함. 대신 격리 시작 화면 창과 격리 `--mode=jelly` 실제 Release 창을 각각 실행해 생존·창·로그를 확인함. 최종 합격/불합격 판정은 Claude에 남김
+
 ### [2026-10-25] 대상 #104 — JELLY 레벨 고정 크기 · 배 속 젤리 · 뒤 빛 삭제 · 어두운 띠 조사
 - 상태: 완료 — JELLY의 물리·그림 반지름을 표시 레벨에 고정하고, 흡수한 질량은 배 속 젤리로 표시함. JELLY `BlastOutline`은 대폭발 가능 여부와 관계없이 숨기고, 어두운 띠 재현 계측·60판 규칙 측정·두 비율 전체 캡처까지 완료함
 - 브랜치 / PR: `jelly-level-fixed-belly` / https://github.com/jeongmo-dot/gravity_orb/pull/106
