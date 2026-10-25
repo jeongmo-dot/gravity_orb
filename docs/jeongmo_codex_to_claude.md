@@ -40,7 +40,7 @@
 
 ### [2026-10-25] 대상 #110 — 고리 연출·그림 전부 삭제 및 충돌 공간 일치
 - 상태: 완료 — #109 이전 실제 창 선행 측정 뒤 고리 생성 코드·노드·셰이더·장식·궤도선을 삭제하고, JELLY 몸통 외곽을 물리 충돌 반지름과 프레임마다 일치시킴
-- 브랜치 / PR: `remove-all-rings` / 생성 예정
+- 브랜치 / PR: `remove-all-rings` / https://github.com/jeongmo-dot/gravity_orb/pull/110
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scenes/Orb3D.tscn`, `scripts/core/{Board,CelestialOrbArt,OrbVisual}.gd`, `scripts/fx/{ColorEffectVisual,FeedbackDirector}.gd`, `scripts/spike/Orb3D.gd`, `scripts/ui/{CosmicRing2D,OrbitStage}.gd`, `tests/`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] #109 이전 `9157b6c` 코드에서 실제 그래픽 창·실제 합체/흡수·후속 스와이프 5턴을 두 비율로 선행 측정 — 자동 창 측정 + 캡처 직접 관측
