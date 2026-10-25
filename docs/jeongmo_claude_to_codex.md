@@ -31,8 +31,28 @@
 
 ## 대기 중
 
-### [2026-10-25 #102] JELLY 대폭발 가능 표시 — 터질 듯한 얼굴
-- 상태: **추가 요구 1** (2026-10-25 Claude 검수 — [PR #104](https://github.com/jeongmo-dot/gravity_orb/pull/104) 위에서 이어서, 병합 보류. **다음 차례**)
+### [2026-10-25 #103] Windows 빌드 0.15.1
+- 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합)
+- 근거: [technical_design.md](technical_design.md) **§10.5·§10.5.1** (버전 기록 0.15.1 줄)
+- 배경: 0.15.0 플레이 뒤 JELLY 움직임 (#101)·대폭발 가능 얼굴 (#102)을 고쳤다 — 사용자가 직접 확인할 빌드
+- 요구:
+  1. `project.godot` `application/config/version` `0.15.0` → **`0.15.1`** (Claude 결정 값 — 기획서 0.15.1, PATCH +1)
+  2. 버전을 커밋한 뒤 **깨끗한 작업 트리에서** 릴리스 빌드 `.\tools\build_windows.ps1` → `build/windows/GravityOrb_v0.15.1.exe` + `.console.exe` + `_BUILD.txt`. 다른 버전 파일은 남긴다
+  3. 내보낸 콘솔 exe로 스모크 5종 (기본·turn·blitz·slime·jelly) 종료 코드 0·`SCRIPT ERROR` 0
+  4. 격리 창에서 시작 화면·JELLY 직접 실행 확인 (실제 클릭이 안 되면 그 사실과 대신 확인한 방법)
+- 검수: 빌드 결과 줄·파일 크기, `_BUILD.txt` 커밋 = 이 브랜치 마지막 커밋, 사용자 `save.cfg` 해시 전후 동일, 묶음에 `tests/`·`artifacts/`·`docs/` 없음, 래퍼 통과
+- 건드리지 말 것: 버전 외 모든 파일, 사용자 저장 파일, 다른 버전 빌드 파일, `docs/` (회신 파일 제외)
+- Done-when: 위 검수 보고
+- 커밋: 항목 단위 브랜치 (`build-0.15.1`), **push·PR까지**
+
+---
+
+## 처리 완료
+
+### [2026-10-25 #102] JELLY 대폭발 가능 표시 — 터질 듯한 얼굴 — 완료
+- 상태: 완료 (2026-10-25 Claude 검수 · [PR #104](https://github.com/jeongmo-dot/gravity_orb/pull/104) 병합 `d06d898`)
+- 검수: 추가 요구 1의 1~4 반영 확인 (Codex 캡처 `56_jelly_blast_face_down`·`_right`·`_glow_min/max`, 볼·빛 픽셀 값) — 시안 C와 같음, 빛 보임 (휘도 0.17~0.25 / 배경 0.08), 볼 분홍, 얼굴 늘 똑바로. 래퍼 380/380, 모든 해시 그대로 (Codex). Claude 재실행 없음
+- 1차 상태: 추가 요구 1 (2026-10-25)
 - 추가 요구 1: [technical_design.md](technical_design.md) §12-JE.8 "#102 1차 결과" 1~4
   1. 뒤 빛이 안 보임 — 빛 판이 `−(앞면 + 0.004)`라 L5~L7 (반지름 1.0 m 이상)은 보드 배경판 (z −0.34 m)보다 뒤 → 배경판·격자보다 앞, 몸통 앞면보다 뒤로 (예: z −0.30 m)
   2. 볼이 탁함 (초록 L5 볼 `(147,133,137)`) — 볼 색을 얼굴 어두운 색과 섞음 → 볼 색 그대로·알파로만, MAX 얼굴도
@@ -50,11 +70,6 @@
 - 건드리지 말 것: 규칙·물리, 보통·MAX 얼굴 그림, 다른 모드 그림, 사용자 저장 파일, `docs/` (회신 파일 제외)
 - Done-when: 테스트 통과(`.\tests\run_tests.ps1`), 캡처 보고 (마지막은 전체 캡처), 검증 빌드는 `-Debug`만
 - 커밋: 항목 단위 브랜치, **push·PR까지**
-
-
----
-
-## 처리 완료
 
 ### [2026-10-25 #101] JELLY 움직임 다듬기 — 지글거림·툭툭 튐 — 완료
 - 상태: 완료 (2026-10-25 Claude 검수 · [PR #103](https://github.com/jeongmo-dot/gravity_orb/pull/103) 병합 `f02e8ad`)
