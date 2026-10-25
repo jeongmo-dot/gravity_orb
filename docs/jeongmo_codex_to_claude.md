@@ -38,6 +38,39 @@
 
 ## 미확인
 
+### [2026-10-26] 대상 #107 — Windows 빌드 0.16.0 · JELLY 단일 앱 첫 Release
+- 상태: 완료 — `origin/main`의 #110 병합 상태에서 버전 `0.16.0`을 유지하고 JELLY 단일 앱 Release Windows 패키지를 생성·검증함
+- 브랜치 / PR: `build-0.16.0` / 생성 예정
+- 변경 파일: `docs/jeongmo_codex_to_claude.md` (Release 산출물은 `build/windows/`, git 추적 제외)
+- Done-when 대조:
+  - [x] `application/config/version=0.16.0`을 바꾸지 않고 깨끗한 작업 트리에서 Release `GravityOrb_v0.16.0.exe`·`.console.exe`·`_BUILD.txt` 생성 — 자동
+  - [x] 내보낸 콘솔 exe 기본·`--mode=jelly` 스모크가 격리 `APPDATA`에서 종료 코드 0, `ERROR`·`SCRIPT ERROR`·`Parse Error` 0건 — 자동
+  - [x] 내보낸 Release의 기본 실행 시작 화면과 `--mode=jelly` 직접 실행을 각각 격리 `APPDATA`에서 실제 GPU 렌더 5프레임으로 캡처해 직접 확인 — 자동 캡처 + 직접 관측. 실제 JELLY 버튼 클릭은 아래 제한 때문에 미실행
+  - [x] 사용자 `save.cfg` 크기·SHA-256 불변, 패키지에서 `tests/`·`artifacts/`·`docs/`·BLITZ·SLIME 표식 각 0건 — 자동
+  - [x] 0.15.0·0.15.1·0.15.2 Release 산출물 9개를 유지하고 전체 테스트·소스 스모크·규칙 검사를 통과 — 자동
+  - [x] 회신 커밋 뒤 깨끗한 작업 트리에서 최종 재빌드해 `_BUILD.txt` 커밋과 브랜치 마지막 커밋 일치 확인 — 자동
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard (`C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`)
+  - `godot --headless --path . --import` → 정상 권한 재실행 종료 코드 0, `ERROR`·`SCRIPT ERROR`·`Parse Error` 0건. 샌드박스 실행은 AppData·`artifacts/` 쓰기 거부로 오류 7건이어서 결과에서 제외
+  - `tests/run_tests.ps1` → 일반 `275/275` (`11.699초`), 장기 `5/5` (`40.266초`), 성능 `4/4` (`2.708초`), 합계 `284/284`, 종료 코드 0, 총 `54.673초`
+  - JELLY 시각 ON/OFF 상태 해시 → `5c96a80c71c632fb8e727cf1be541757c464b436dd83d6c8d0737b1211347df1`, #104·#106·#109·#110 기준과 동일
+  - 소스 기본·`--mode=jelly` `--quit-after 300` → 둘 다 격리 `APPDATA`에서 종료 코드 0, 오류 표식 0건
+  - `tools/build_windows.ps1` Release → 종료 코드 0, 결과 줄 `version=0.16.0 mode=Release exit=0 bytes=111069840`
+  - 산출물 → `GravityOrb_v0.16.0.exe` `111,069,840`바이트, `.console.exe` `50,176`바이트, `_BUILD.txt` `159`바이트, PCK 별도 파일 0개
+  - 내보낸 콘솔 exe 기본·JELLY → 둘 다 격리 `APPDATA`에서 종료 코드 0, `ERROR`·`SCRIPT ERROR`·`Parse Error` 0건
+  - 내보낸 Release GPU 렌더 → 기본·JELLY 직접 실행 각각 OpenGL 3.3 / NVIDIA GeForce RTX 4070 Ti SUPER, `540×960`, 60 FPS 고정, 5프레임 PNG 기록, 종료 코드 0. 기본 마지막 프레임은 로고·큰 JELLY 버튼 하나·아이콘 3개, JELLY 직접 실행 마지막 프레임은 점수 HUD·보드·분홍 젤리 2개·NEXT/THEN 미리보기로 관측
+  - 실제 버튼 클릭은 미실행 — 컴퓨터 사용 스킬의 기본 CUA와 보조 Sky 경로가 모두 `failed to write kernel assets: 지정된 경로를 찾을 수 없습니다. (os error 3)`로 초기화되지 않음. 대신 같은 Release exe의 기본 시작 프레임, `test_frontend`의 단일 JELLY 버튼·모드 파서, `--mode=jelly` 직접 실행 프레임을 확인
+  - 패키지 문자열 검사 → `res://tests/`·`res://artifacts/`·`res://docs/`·`BLITZ`·`SLIME`·`BlitzManager`·`BlitzTimeBar`·`SlimeMain`·`SlimeConfig`·`scripts/slime`·`slime_config.tres` 각 0건
+  - 이전 버전 유지 → 0.15.0 `111,213,584`바이트, 0.15.1 `111,219,904`바이트, 0.15.2 `111,221,024`바이트의 exe와 각 `.console.exe` `50,176`바이트·`_BUILD.txt`를 그대로 보존, 삭제 0건
+  - 사용자 `save.cfg`는 검증 전후 `1,488`바이트, SHA-256 `4D8C75B028AD8710E8B24779A35283848845F75D9A97D238B9D24419BD1FB14D` 동일
+  - 규칙 검사 → 허용 파일 외 `Input`/`InputEvent` 0건, Spawner 외 전역 난수 호출 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. `build/windows/GravityOrb_v0.16.0.exe`를 실행 → 로고 아래 큰 JELLY 버튼 하나와 랭킹·소리·설정 아이콘만 보여야 한다.
+  2. JELLY 버튼을 실제 클릭 → 점수 HUD·젤리 보드·NEXT/THEN이 있는 JELLY 게임으로 바로 진입해야 한다.
+  3. 앱을 닫고 `GravityOrb_v0.16.0.console.exe -- --mode=jelly` 실행 → 시작 화면을 거치지 않고 같은 JELLY 보드로 직접 진입해야 한다.
+- 결정 사항: 버전·게임 코드·설정·다른 빌드 파일은 바꾸지 않았다. GUI 대체 검증용 GPU 프레임과 격리 AppData는 git 추적 대상에서 제외하고, 프로젝트가 임포트하지 않도록 작업 폴더 밖 임시 경로로 옮긴 뒤 작업 폴더의 임시 폴더만 삭제했다
+- 남은 것 · 질문: 실제 JELLY 버튼 클릭만 컴퓨터 사용 커널 초기화 실패로 미실행이며 위 수동 절차로 남김. 나머지 자동 검증과 두 실행 경로의 실제 GPU 프레임 직접 관측 완료. 최종 합격/불합격 판정은 Claude에 남김
+
 ### [2026-10-25] 대상 #110 — 고리 연출·그림 전부 삭제 및 충돌 공간 일치
 - 상태: 완료 — 1차 고리 삭제를 유지하고 추가 요구 1의 비축소 말랑 변형·합체 펀치·별가루 산개·공간 재측정·캡처를 반영함
 - 브랜치 / PR: `remove-all-rings` / https://github.com/jeongmo-dot/gravity_orb/pull/110
