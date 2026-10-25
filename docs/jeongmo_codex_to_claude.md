@@ -38,6 +38,38 @@
 
 ## 미확인
 
+### [2026-10-25] 대상 #103 — Windows 빌드 0.15.1
+- 상태: 완료 — 최신 `origin/main`의 #101·#102 반영 상태에서 프로젝트 버전을 `0.15.1`로 올리고 Godot 4.8 Standard Release Windows 패키지를 생성·검증함
+- 브랜치 / PR: `build-0.15.1` / https://github.com/jeongmo-dot/gravity_orb/pull/105
+- 변경 파일: `project.godot`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 최신 `origin/main` `e925494`에서 전용 브랜치를 만들고 `application/config/version`을 `0.15.0`에서 Claude 결정 값 `0.15.1`로 변경 — 자동
+  - [x] 버전 변경을 먼저 독립 커밋한 뒤 깨끗한 작업 트리에서 Release `GravityOrb_v0.15.1.exe`·`.console.exe`·`_BUILD.txt` 생성 — 자동
+  - [x] 내보낸 콘솔 exe 기본·TURN·BLITZ·SLIME·JELLY 다섯 경로 종료 코드 0, `ERROR`·`SCRIPT ERROR`·`Parse Error` 0건 — 자동
+  - [x] 격리 `APPDATA`에서 시작 화면과 JELLY 직접 실행 창을 각각 5초 확인: 두 프로세스 생존, 창 제목 `Gravity Orb`, 창 핸들 0 아님, `godot.log` 오류 0건 — 자동. 시작 화면 JELLY 카드 실제 클릭은 아래 수동 절차로 남김
+  - [x] 사용자 `save.cfg` 크기·SHA-256 불변, 패키지에서 `tests/`·`artifacts/`·`docs/`와 테스트·캡처·인박스·설계 문서 표식 각 0건 — 자동
+  - [x] 0.15.0 Release 산출물 3개를 유지하고 전체 테스트·소스 5경로 스모크·규칙 검사를 통과 — 자동
+  - [x] 회신 커밋 뒤 깨끗한 작업 트리에서 최종 재빌드해 `_BUILD.txt` 커밋과 브랜치 마지막 커밋 일치 확인 — 자동
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard (`C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`)
+  - `godot --headless --path . --import` → 종료 코드 0, `ERROR`·`SCRIPT ERROR`·`Parse Error` 각 0건
+  - `tests/run_tests.ps1` → 일반 `370/370` (`28.015초`), 장기 `5/5` (`52.133초`), 성능 `5/5` (`3.466초`), 합계 `380/380`, 종료 코드 0, 총 `83.614초`
+  - Godot 소스 기본·TURN·BLITZ·SLIME·JELLY `--quit-after 300` → 5개 모두 종료 코드 0, `ERROR`·`SCRIPT ERROR`·`Parse Error` 0건
+  - `tools/build_windows.ps1` Release → 종료 코드 0, 결과 줄 `version=0.15.1 mode=Release exit=0 bytes=111219904`
+  - 산출물 → `GravityOrb_v0.15.1.exe` `111,219,904`바이트, `.console.exe` `50,176`바이트, `_BUILD.txt` `159`바이트; PE 파일·제품 버전 `0.15.1.0`, 제품 이름 `Gravity Orb`
+  - 내보낸 콘솔 exe 기본·TURN·BLITZ·SLIME·JELLY → 5개 모두 종료 코드 0, `ERROR`·`SCRIPT ERROR`·`Parse Error` 0건
+  - 격리 GUI → 시작 화면·`--mode=jelly` 각각 5초 생존, 창 제목 `Gravity Orb`, 창 핸들 각각 0 아님, 로그 파일 각각 1개, 오류 표식 각 0건; 임시 `APPDATA` 두 폴더는 확인 뒤 삭제
+  - 패키지 문자열 검사 → `res://tests/`·`res://artifacts/`·`res://docs/`·`run_tests.gd`·`capture_screens.gd`·인박스·설계 문서 표식 각 0건; `JellyOrbArt.gdc`·`Main3D.scn`·`StartScreen.gdc` 각 2건
+  - 이전 `0.15.0`의 exe·console exe·BUILD txt 3개 유지, 삭제 0건
+  - 사용자 `save.cfg`는 검증 전후 `1,488`바이트, SHA-256 `4D8C75B028AD8710E8B24779A35283848845F75D9A97D238B9D24419BD1FB14D` 동일
+  - 규칙 검사 → 허용 파일 외 신규 `Input`/`InputEvent` 0건, 신규 전역 난수 호출 0건, `git diff --check` 오류 0건. 버전·회신만 바꿔 화면 캡처는 미실행
+- 수동 확인 절차:
+  1. `build/windows/GravityOrb_v0.15.1.exe`를 실행한다 → 시작 화면에 BLITZ·CLASSIC·JELLY·SLIME 카드 4장이 보여야 한다.
+  2. JELLY 카드를 누른다 → JELLY 판이 열리고 젤리 얼굴·대폭발 가능 얼굴·뒤 빛이 보이며 창이 종료되지 않아야 한다.
+  3. JELLY에서 중력을 여러 번 바꾼다 → 젤리 움직임이 지글거리거나 툭 튀지 않고 얼굴·문양은 화면 위쪽을 유지해야 한다.
+- 결정 사항: 명세대로 버전 한 줄과 Codex 회신만 변경함. 규칙·물리·그림·밸런스·사용자 저장 파일·기존 빌드 파일은 변경하지 않음
+- 남은 것 · 질문: 시작 화면과 JELLY 직접 실행 창은 각각 검증했으나 시작 화면에서 JELLY 카드를 실제 포인터로 누르는 동작은 자동화하지 않음. 최종 합격/불합격 판정은 Claude에 남김
+
 ### [2026-10-25] 대상 #102 — JELLY 대폭발 가능 표시: 터질 듯한 얼굴
 - 상태: 완료 — 추가 요구 1까지 반영. JELLY의 어두운 대폭발 링을 제거하고, L5·L6에는 시안 C의 얼굴, L5·L6·L7에는 보드보다 앞·몸통보다 뒤인 제 색 빛을 적용함. 모든 JELLY 얼굴·문양은 화면 위쪽으로 고정하고 중력 기준 말랑함만 유지함
 - 브랜치 / PR: `jelly-blast-face` / https://github.com/jeongmo-dot/gravity_orb/pull/104
