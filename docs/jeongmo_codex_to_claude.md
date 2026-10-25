@@ -38,6 +38,39 @@
 
 ## 미확인
 
+### [2026-10-25] 대상 #109 — JELLY 젤리 둘레 반투명 고리 제거
+- 상태: 완료 — 실제 창에서 원인 노드를 분리 재현하고 JELLY에서 해당 링 한 겹만 숨김
+- 브랜치 / PR: `jelly-halo-fix` / https://github.com/jeongmo-dot/gravity_orb/pull/109
+- 변경 파일: `scripts/fx/{ColorEffectVisual,FeedbackDirector}.gd`, `tests/test_color_effect_visuals.gd`, `tests/spike/{JellyHaloDiagnostic.tscn,run_jelly_halo_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 최신 `origin/main`을 먼저 병합하고 Godot Standard 실제 창·그림 ON 상태에서 합체·흡수를 재현 — 자동 창 측정 + 캡처 직접 관측
+  - [x] 원인은 `FeedbackDirector`가 합체마다 만드는 `ColorEffectVisual/ModeRing`. 파랑(SHAKE)·초록(PUSH)은 링이 있고 노랑(LIFT)은 원래 숨기는 분기가 사용자 화면과 일치 — 후보별 숨김 비교
+  - [x] JELLY에서 `ModeRing`만 숨기고 합체 별가루·방향 별가루·보드 흔들림·PULL 메시 펀치·물리 색 효과는 유지. 비-JELLY 경로 링은 유지 — 자동 (`test_jelly_hides_color_mode_ring_but_keeps_other_feedback` + 기존 색 효과 테스트)
+  - [x] 수정 후 합체·흡수 20회와 각 반응 뒤 실제 스와이프 3턴(총 60턴)에서 링 재등장 0회. 고리 영역 픽셀 수정 전 8,120 → 수정 후 0 — 자동 실제 창 측정
+  - [x] 두 비율 전·후 캡처와 마지막 전체 캡처 완료, JELLY 그림 ON/OFF 해시는 #104 기준 그대로 — 자동 + 직접 관측
+  - [x] 전체 테스트·소스/Debug 패키지 스모크·Debug 빌드·사용자 저장 불변 — 자동
+- 원인 관측:
+  - `ColorEffectVisual.play()`가 LIFT 외 색 효과에서 `ModeRing`을 보이게 하고, 결과 반지름에서 색 효과 반지름까지 PUSH/SHAKE는 `0.3/0.4초` 동안 확장, PULL은 `0.3초` 동안 수축시켰다. 링 색은 결과 젤리색이고 알파는 `1-progress`라 반응 직후 `1.0r~1.3r` 구간에서 다음 크기 예고처럼 보였다
+  - 실제 창 80ms 후보 분리: `JellyAbsorptionTrail`만 숨겨도 큰 고리는 남고 `ColorEffectVisual/ModeRing`을 숨기면 사라짐. 보이는 다른 후보는 몸통·배·얼굴, 합체 별가루였음
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard (`C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`)
+  - `godot --headless --path . --import` → 종료 코드 0, `ERROR`·`SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` → 일반 `274/274` (`12.246초`), 장기 `5/5` (`41.569초`), 성능 `4/4` (`2.918초`), 합계 `283/283`, 종료 코드 0, 총 `56.732초`
+  - JELLY 시각 ON/OFF 상태 해시 → `5c96a80c71c632fb8e727cf1be541757c464b436dd83d6c8d0737b1211347df1`, #104·#106 기준과 동일
+  - `JellyHaloDiagnostic.tscn` 실제 창 `540×960` → 합체/흡수 20회, 후속 실제 턴 60회, 수정 전 고리 영역 차이 8,120픽셀, 수정 상태·재숨김 차이 0픽셀, `normal_ring_occurrences=0`, 종료 코드 0
+  - 같은 실제 창 `540×1170` → 합체/흡수 20회, 수정 전 고리 영역 차이 7,975픽셀, 수정 상태·재숨김 차이 0픽셀, `normal_ring_occurrences=0`, 종료 코드 0
+  - `tests/capture_screens.ps1` 최종 → 두 비율 각 12장, 합계 24장, 종료 코드 0. `04_jelly_gameplay`·`11_jelly_eat_01` 두 비율을 직접 열어 고리 0건, 다른 젤리 그림·HUD 잘림/겹침 0건 관측
+  - 소스와 Debug 콘솔 exe의 기본·`--mode=jelly` 스모크 → 네 실행 모두 종료 코드 0, 오류 표식 0건
+  - `tools/build_windows.ps1 -Debug` → `version=0.16.0`, 종료 코드 0, `GravityOrb_v0.16.0.exe` `104,960,320`바이트, `.console.exe` `50,176`바이트
+  - 사용자 `save.cfg` → `1,488`바이트, SHA-256 `4D8C75B028AD8710E8B24779A35283848845F75D9A97D238B9D24419BD1FB14D`로 작업 전과 동일
+  - 규칙 검사 → 허용 파일 외 `Input`/`InputEvent` 0건, Spawner 외 전역 난수 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. Debug 빌드에서 JELLY를 시작하고 같은 색 젤리를 합체·흡수 → 젤리 둘레에 제 색 원형 고리가 생기지 않아야 한다
+  2. 분홍·파랑·초록 합체 → 합체 별가루와 PUSH 방향 별가루 또는 파랑 보드 흔들림은 기존대로 보여야 한다
+  3. 세 번 더 스와이프 → 이전 반응 위치나 움직이는 젤리 둘레에 고리가 남거나 다시 나타나지 않아야 한다
+- 결정 사항: 규칙·물리·수치와 다른 연출은 바꾸지 않고 JELLY 표시에서 `ModeRing` 가시성만 끔. 측정 캡처 산출물은 git 추적에서 제외함
+- 남은 것 · 질문: 자동 검증과 화면 직접 관측 완료. 최종 합격/불합격 판정은 Claude에 남김
+
 ### [2026-10-25] 대상 #106 — JELLY 단일 앱 · 다른 모드 레거시 보관
 - 상태: 완료 — `legacy-four-modes` 태그 뒤 main을 JELLY 단일 앱으로 전환하고 0.16.0 Debug 패키지까지 검증함
 - 브랜치 / PR: `jelly-single-app` / https://github.com/jeongmo-dot/gravity_orb/pull/108

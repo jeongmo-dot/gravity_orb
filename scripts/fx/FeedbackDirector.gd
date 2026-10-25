@@ -639,6 +639,10 @@ func _play_color_effect_visual(
 		if board_gravity != null:
 			gravity_direction = Vector2(board_gravity).normalized()
 	var effect: ColorEffectVisual = _acquire_color_effect()
+	# JELLY's same-color reaction ring read as a larger, translucent next-stage
+	# body around moving orbs. Keep the color-mode particles and board motion,
+	# but suppress only that misleading ring layer in the JELLY presentation.
+	effect.set_ring_enabled(Config.data.game_mode != GameConfig.GameMode.JELLY)
 	effect.play(
 		color_mode,
 		reaction.get("position", Vector2.ZERO) as Vector2,
