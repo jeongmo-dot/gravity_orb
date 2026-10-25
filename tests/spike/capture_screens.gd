@@ -128,8 +128,11 @@ const CAPTURE_FILES: Array[String] = [
 	"55_jelly_motion_right.png",
 	"56_jelly_blast_face_down.png",
 	"56_jelly_blast_face_right.png",
-	"56_jelly_blast_glow_min.png",
-	"56_jelly_blast_glow_max.png",
+	"57_jelly_full_down.png",
+	"57_jelly_full_right.png",
+	"57_jelly_full_eat_00.png",
+	"57_jelly_full_eat_01.png",
+	"57_jelly_full_eat_02.png",
 ]
 const HUD_CAPTURE_FILES: Array[String] = [
 	"02_turn_early.png",
@@ -173,8 +176,11 @@ const HUD_CAPTURE_FILES: Array[String] = [
 	"55_jelly_motion_right.png",
 	"56_jelly_blast_face_down.png",
 	"56_jelly_blast_face_right.png",
-	"56_jelly_blast_glow_min.png",
-	"56_jelly_blast_glow_max.png",
+	"57_jelly_full_down.png",
+	"57_jelly_full_right.png",
+	"57_jelly_full_eat_00.png",
+	"57_jelly_full_eat_01.png",
+	"57_jelly_full_eat_02.png",
 ]
 
 var _failed: bool = false
@@ -422,6 +428,7 @@ func _capture_turn_scenes() -> void:
 	board.remove_orb(jelly_level_four)
 	board.remove_orb(jelly_level_five)
 	await _capture_jelly_blast_face(main, board)
+	await _capture_jelly_full(main, board)
 	await _capture_jelly_look(main, board)
 	Config.data.jelly_blast_min_level = 5
 	Config.data.game_mode = GameConfig.GameMode.TURN
@@ -449,6 +456,7 @@ func _capture_turn_scenes() -> void:
 	score.score = TURN_CAPTURE_SCORE
 	score.best_score = TURN_CAPTURE_BEST
 	score.max_level_reached = Config.data.orb_max_level
+	score.score_changed.emit(score.score, score.best_score)
 	manager.max_combo = 4
 	manager.gravity = TURN_GAME_OVER_DIRECTION
 	manager.blocked_directions.clear()
@@ -1564,43 +1572,6 @@ func _capture_jelly_blast_face(main: Main, board: Board3D) -> void:
 			crowd_positions.size(),
 		]
 	)
-
-	_clear_capture_board(board)
-	board.set_gravity(Vector2i.DOWN)
-	var ui: CanvasLayer = main.get_node("UI") as CanvasLayer
-	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
-	var original_ui_visible: bool = ui.visible
-	var original_camera_z: float = camera.position.z
-	ui.visible = false
-	camera.position.z = original_camera_z / 2.2
-	var glow_orb: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 5, Vector2.ZERO)
-	glow_orb.disable_physics()
-	glow_orb.set_render_clamp_enabled(false)
-	glow_orb._blast_blink_elapsed = JellyOrbArt.BLAST_GLOW_PERIOD * 0.75
-	glow_orb._apply_visual_transparency()
-	await _capture("56_jelly_blast_glow_min.png")
-	var min_metrics: Dictionary = _jelly_glow_pixel_metrics(main, glow_orb)
-	glow_orb._blast_blink_elapsed = JellyOrbArt.BLAST_GLOW_PERIOD * 0.25
-	glow_orb._apply_visual_transparency()
-	await _capture("56_jelly_blast_glow_max.png")
-	var max_metrics: Dictionary = _jelly_glow_pixel_metrics(main, glow_orb)
-	print(
-		"JELLY_BLAST_GLOW_PIXEL min_rgb=%s min_luma=%.5f min_bg=%.5f max_rgb=%s max_luma=%.5f max_bg=%.5f" % [
-			min_metrics["rgb"],
-			float(min_metrics["glow_luma"]),
-			float(min_metrics["background_luma"]),
-			max_metrics["rgb"],
-			float(max_metrics["glow_luma"]),
-			float(max_metrics["background_luma"]),
-		]
-	)
-	if float(min_metrics["glow_luma"]) <= float(min_metrics["background_luma"]):
-		_fail("JELLY blast glow minimum must be brighter than board background")
-	if float(max_metrics["glow_luma"]) <= float(min_metrics["glow_luma"]):
-		_fail("JELLY blast glow maximum must be brighter than minimum")
-	ui.visible = original_ui_visible
-	camera.position.z = original_camera_z
-	print("SCREEN_CAPTURE_CHECK scene=jelly_blast_glow scale=2.2x alpha=min,max visible=yes")
 	_clear_capture_board(board)
 
 
@@ -1626,7 +1597,188 @@ func _spawn_jelly_blast_featured(
 			_fail("JELLY blast-face capture L7 must keep MAX face")
 		if absf(orb._face.rotation.z) > 0.0001:
 			_fail("JELLY blast-face capture L%d face must stay upright" % orb.level)
+		if orb._blast_outline.visible:
+			_fail("JELLY blast-face capture L%d must hide BlastOutline" % orb.level)
 	return orbs
+
+
+func _capture_jelly_full(main: Main, board: Board3D) -> void:
+	_clear_capture_board(board)
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_blast_min_level = 5
+	board.set_gravity(Vector2i.DOWN)
+	var down_specs: Array[Dictionary] = [
+		{"color": OrbTypes.OrbColor.BLUE, "level": 3, "mass": 4.0, "position": Vector2(-300.0, -190.0)},
+		{"color": OrbTypes.OrbColor.BLUE, "level": 3, "mass": 6.0, "position": Vector2(-100.0, -190.0)},
+		{"color": OrbTypes.OrbColor.BLUE, "level": 3, "mass": 7.0, "position": Vector2(100.0, -190.0)},
+		{"color": OrbTypes.OrbColor.YELLOW, "level": 5, "mass": 24.0, "position": Vector2(270.0, 130.0)},
+	]
+	var down_orbs: Array[Orb3D] = _spawn_jelly_full_specs(board, down_specs)
+	await get_tree().create_timer(Orb3D.JELLY_BELLY_TRANSITION_DURATION).timeout
+	_validate_jelly_full_specs(down_orbs, [0.0, 0.5, 0.75, 0.5], "down")
+	await _capture("57_jelly_full_down.png")
+	print("SCREEN_CAPTURE_CHECK scene=jelly_full_down l3_fill=0,0.5,0.75 l5_fill=0.5 outline=off")
+
+	_clear_capture_board(board)
+	board.set_gravity(Vector2i.RIGHT)
+	var right_orbs: Array[Orb3D] = _spawn_jelly_full_specs(board, down_specs)
+	var crowd_positions: Array[Vector2] = [
+		Vector2(-340.0, 270.0), Vector2(-220.0, 285.0), Vector2(-100.0, 270.0),
+		Vector2(20.0, 285.0), Vector2(140.0, 270.0), Vector2(260.0, 285.0),
+	]
+	for index: int in range(crowd_positions.size()):
+		var crowd_orb: Orb3D = board.spawn_orb(
+			index % JellyOrbArt.PALETTE.size(),
+			1 + index % 3,
+			crowd_positions[index]
+		)
+		crowd_orb.disable_physics()
+	await get_tree().create_timer(Orb3D.JELLY_BELLY_TRANSITION_DURATION).timeout
+	_validate_jelly_full_specs(right_orbs, [0.0, 0.5, 0.75, 0.5], "right")
+	await _capture("57_jelly_full_right.png")
+	print("SCREEN_CAPTURE_CHECK scene=jelly_full_right gravity=right crowd=6 belly_follows_frame=yes")
+
+	_clear_capture_board(board)
+	board.set_gravity(Vector2i.DOWN)
+	var resolver: CollisionResolver = main.get_node("CollisionResolver") as CollisionResolver
+	var feedback: FeedbackDirector = main.get_node("FeedbackDirector") as FeedbackDirector
+	# Static comparison layouts can emit contacts before they are removed. They are
+	# not part of the absorption strip and must not outlive their freed fixture orbs.
+	resolver._pending.clear()
+	feedback.clear_effects()
+	var eater: Orb3D = board.spawn_orb(OrbTypes.OrbColor.BLUE, 3, Vector2(-90.0, 40.0))
+	var first_food: Orb3D = board.spawn_orb(OrbTypes.OrbColor.BLUE, 2, Vector2(90.0, 40.0))
+	eater.disable_physics()
+	first_food.disable_physics()
+	await _capture("57_jelly_full_eat_00.png")
+	resolver.report_contact(eater, first_food, "capture_first_absorption")
+	if resolver.flush() != 1:
+		_fail("first JELLY full capture absorption must apply once")
+		return
+	var first_result: Orb3D = board.get_orbs()[0]
+	first_result.disable_physics()
+	var first_band: Dictionary = await _observe_jelly_band_candidates(board, feedback)
+	_validate_jelly_absorption_capture(first_result, 3, 6.0, 60.0, 0.5, "first")
+	await _capture("57_jelly_full_eat_01.png")
+
+	resolver.flush(Config.data.chain_reaction_delay)
+	var second_food: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.BLUE,
+		2,
+		first_result.position + Vector2(130.0, 0.0)
+	)
+	second_food.disable_physics()
+	resolver.report_contact(first_result, second_food, "capture_second_absorption")
+	if resolver.flush() != 1:
+		_fail("second JELLY full capture absorption must apply once")
+		return
+	var second_result: Orb3D = board.get_orbs()[0]
+	second_result.disable_physics()
+	var second_band: Dictionary = await _observe_jelly_band_candidates(board, feedback)
+	_validate_jelly_absorption_capture(second_result, 4, 8.0, 85.0, 0.0, "second")
+	await _capture("57_jelly_full_eat_02.png")
+	var outline_frames: int = int(first_band["outline_visible_frames"]) + int(second_band["outline_visible_frames"])
+	var long_feedback: int = int(first_band["long_feedback_count"]) + int(second_band["long_feedback_count"])
+	if outline_frames != 0 or long_feedback != 0:
+		_fail("JELLY dark-band reproduction must finish with zero outline and long feedback occurrences")
+	print(
+		"JELLY_DARK_BAND_REPRO absorptions=2 outline_visible_frames=%d unarmed_outline_frames=%d feedback_over_0_5s=%d" % [
+			outline_frames,
+			int(first_band["unarmed_outline_frames"]) + int(second_band["unarmed_outline_frames"]),
+			long_feedback,
+		]
+	)
+	print("SCREEN_CAPTURE_CHECK scene=jelly_full_eat mass=4,6,8 radius=60,60,85 belly=0,0.5,0")
+	_clear_capture_board(board)
+
+
+func _spawn_jelly_full_specs(board: Board3D, specs: Array[Dictionary]) -> Array[Orb3D]:
+	var orbs: Array[Orb3D] = []
+	for spec: Dictionary in specs:
+		var orb: Orb3D = board.spawn_orb(
+			int(spec["color"]),
+			int(spec["level"]),
+			spec["position"] as Vector2
+		)
+		orb.set_jelly_mass(float(spec["mass"]), Config.data)
+		orb.disable_physics()
+		orbs.append(orb)
+	return orbs
+
+
+func _validate_jelly_full_specs(orbs: Array[Orb3D], fills: Array[float], context: String) -> void:
+	for index: int in range(mini(orbs.size(), fills.size())):
+		var orb: Orb3D = orbs[index]
+		var expected_radius: float = Config.data.radius_for_level(orb.level)
+		if not is_equal_approx(orb.get_radius(), expected_radius):
+			_fail("%s JELLY L%d radius must stay level-fixed" % [context, orb.level])
+		if absf(orb._jelly_belly_fraction - fills[index]) > 0.001:
+			_fail("%s JELLY L%d belly fill mismatch" % [context, orb.level])
+		if orb._blast_outline.visible:
+			_fail("%s JELLY L%d BlastOutline must stay hidden" % [context, orb.level])
+
+
+func _validate_jelly_absorption_capture(
+	orb: Orb3D,
+	expected_level: int,
+	expected_mass: float,
+	expected_radius: float,
+	expected_fill: float,
+	context: String
+) -> void:
+	if orb.level != expected_level or not is_equal_approx(orb.jelly_mass, expected_mass):
+		_fail("%s absorption level or mass mismatch" % context)
+	if absf(orb.get_current_radius() - expected_radius) > 0.001:
+		_fail("%s absorption radius mismatch" % context)
+	if absf(orb._jelly_belly_fraction - expected_fill) > 0.001:
+		_fail("%s absorption belly fill mismatch" % context)
+	if orb._blast_outline.visible:
+		_fail("%s absorption must not show BlastOutline" % context)
+
+
+func _observe_jelly_band_candidates(board: Board3D, feedback: FeedbackDirector) -> Dictionary:
+	var outline_visible_frames: int = 0
+	var unarmed_outline_frames: int = 0
+	var visible_mesh_frames: Dictionary = {}
+	var feedback_near_seconds: Dictionary = {}
+	var long_feedback_ids: Dictionary = {}
+	var frame_seconds: float = 1.0 / float(Engine.physics_ticks_per_second)
+	var frame_count: int = ceili(0.5 / frame_seconds) + 2
+	for _frame: int in range(frame_count):
+		await get_tree().physics_frame
+		for orb: Orb3D in board.get_orbs():
+			for child: Node in orb.get_children():
+				if child is MeshInstance3D and (child as MeshInstance3D).visible:
+					var mesh_name: String = child.name
+					visible_mesh_frames[mesh_name] = int(visible_mesh_frames.get(mesh_name, 0)) + 1
+			if orb._blast_outline.visible:
+				outline_visible_frames += 1
+				if not orb.is_blast_armed():
+					unarmed_outline_frames += 1
+		for effect: Dictionary in feedback._effects:
+			var kind: String = str(effect.get("kind", ""))
+			if kind not in ["glow", "ring"]:
+				continue
+			var node: Node3D = effect.get("node") as Node3D
+			if not is_instance_valid(node) or not node.visible:
+				continue
+			var effect_position: Vector2 = Orb3D.world_position_to_plane(node.position)
+			for orb: Orb3D in board.get_orbs():
+				if effect_position.distance_to(orb.position) > orb.get_current_radius() * 1.4:
+					continue
+				var effect_id: int = node.get_instance_id()
+				var near_seconds: float = float(feedback_near_seconds.get(effect_id, 0.0)) + frame_seconds
+				feedback_near_seconds[effect_id] = near_seconds
+				if near_seconds > 0.5:
+					long_feedback_ids[effect_id] = node.name
+				break
+	return {
+		"outline_visible_frames": outline_visible_frames,
+		"unarmed_outline_frames": unarmed_outline_frames,
+		"long_feedback_count": long_feedback_ids.size(),
+		"long_feedback_names": Array(long_feedback_ids.values()),
+		"visible_mesh_frames": visible_mesh_frames,
+	}
 
 
 func _report_jelly_blast_blush_pixels(main: Main, orbs: Array[Orb3D]) -> void:
@@ -1671,30 +1823,6 @@ func _report_jelly_blast_blush_pixels(main: Main, orbs: Array[Orb3D]) -> void:
 		if maxf(delta_rgb.x, maxf(delta_rgb.y, delta_rgb.z)) > 12.0:
 			_fail("JELLY L5 blush color %d differs from alpha composite by more than 12" % orb.color)
 	await get_tree().process_frame
-
-
-func _jelly_glow_pixel_metrics(main: Main, orb: Orb3D) -> Dictionary:
-	var image: Image = get_viewport().get_texture().get_image()
-	var radius: float = orb.get_current_radius()
-	var glow_position: Vector2 = orb.position + Vector2(radius * 1.10, 0.0)
-	var background_position: Vector2 = orb.position + Vector2(radius * 1.38, 0.0)
-	var glow_pixel: Vector2 = _project_world_point(
-		main,
-		Orb3D.plane_position_to_world(glow_position, Orb3D.JELLY_BLAST_GLOW_Z_OFFSET),
-		image
-	)
-	var background_pixel: Vector2 = _project_world_point(
-		main,
-		Orb3D.plane_position_to_world(background_position, Orb3D.JELLY_BLAST_GLOW_Z_OFFSET),
-		image
-	)
-	var glow_color: Color = _average_pixel_color(image, glow_pixel, 2)
-	var background_color: Color = _average_pixel_color(image, background_pixel, 2)
-	return {
-		"rgb": _color_rgb8(glow_color),
-		"glow_luma": glow_color.get_luminance(),
-		"background_luma": background_color.get_luminance(),
-	}
 
 
 func _project_node_point(main: Main, node: Node3D, point: Vector3, image: Image) -> Vector2:

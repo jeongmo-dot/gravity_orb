@@ -40,19 +40,20 @@ const BLAST_MOUTH_COLOR: Color = Color("3a1530")
 const BLAST_BLUSH_CENTER: Vector2 = Vector2(0.48, 0.18)
 const BLAST_BLUSH_RADII: Vector2 = Vector2(0.16, 0.10)
 const BLAST_BLUSH_ALPHA: float = 0.60
-const BLAST_GLOW_OUTER_SCALE: float = 1.25
-const BLAST_GLOW_ALPHA_MIN: float = 0.22
-const BLAST_GLOW_ALPHA_MAX: float = 0.40
-const BLAST_GLOW_PERIOD: float = 1.6
+const BELLY_CENTER: Vector2 = Vector2(0.12, 0.44)
+const BELLY_RADIUS_SCALE: float = 0.54
+const BELLY_LIGHTEN_AMOUNT: float = 0.35
+const BELLY_ALPHA: float = 0.85
+const BELLY_HIGHLIGHT_ALPHA: float = 0.70
 const PREVIEW_TEXTURE_SIZE: int = 384
 const PREVIEW_MAX_TEXTURE_SIZE: int = 512
 
 static var _body_shader: Shader
 static var _face_shader: Shader
-static var _glow_shader: Shader
+static var _belly_shader: Shader
 static var _body_materials: Dictionary = {}
 static var _face_materials: Dictionary = {}
-static var _glow_materials: Dictionary = {}
+static var _belly_materials: Dictionary = {}
 static var _preview_textures: Dictionary = {}
 static var _face_mesh: ArrayMesh
 static var _animation_time: float = 0.0
@@ -72,17 +73,17 @@ static func prewarm(cfg: GameConfig) -> void:
 		for level_index: int in range(1, cfg.orb_max_level + 1):
 			body_material_for(color_index, level_index)
 			face_material_for(color_index, level_index)
-			glow_material_for(color_index, level_index)
+			belly_material_for(color_index, level_index)
 
 
 static func clear_cache() -> void:
 	_body_materials.clear()
 	_face_materials.clear()
-	_glow_materials.clear()
+	_belly_materials.clear()
 	_preview_textures.clear()
 	_body_shader = null
 	_face_shader = null
-	_glow_shader = null
+	_belly_shader = null
 	_face_mesh = null
 	_last_animation_frame = -1
 	if not _animation_frozen:
@@ -90,7 +91,7 @@ static func clear_cache() -> void:
 
 
 static func shared_material_count() -> int:
-	return _body_materials.size() + _face_materials.size() + _glow_materials.size()
+	return _body_materials.size() + _face_materials.size() + _belly_materials.size()
 
 
 static func advance_animation(delta: float) -> void:
@@ -228,18 +229,22 @@ static func face_material_for(
 	return _face_materials[key] as ShaderMaterial
 
 
-static func glow_material_for(color_index: int, level: int) -> ShaderMaterial:
+static func belly_material_for(color_index: int, level: int) -> ShaderMaterial:
 	var key: String = "%d:%d" % [color_index, level]
-	if not _glow_materials.has(key):
+	if not _belly_materials.has(key):
 		var material: ShaderMaterial = ShaderMaterial.new()
-		material.resource_name = "jelly_blast_glow_c%d_l%d" % [color_index, level]
-		material.shader = _get_glow_shader()
+		material.resource_name = "jelly_belly_c%d_l%d" % [color_index, level]
+		material.shader = _get_belly_shader()
 		material.set_shader_parameter(
-			"glow_color",
-			color_for(color_index, level).lightened(LEVEL_LIGHTEN_AMOUNT)
+			"belly_color",
+			color_for(color_index, level).lightened(BELLY_LIGHTEN_AMOUNT)
 		)
-		_glow_materials[key] = material
-	return _glow_materials[key] as ShaderMaterial
+		material.set_shader_parameter("belly_center", BELLY_CENTER)
+		material.set_shader_parameter("belly_radius_scale", BELLY_RADIUS_SCALE)
+		material.set_shader_parameter("belly_alpha", BELLY_ALPHA)
+		material.set_shader_parameter("highlight_alpha", BELLY_HIGHLIGHT_ALPHA)
+		_belly_materials[key] = material
+	return _belly_materials[key] as ShaderMaterial
 
 
 static func face_mesh() -> ArrayMesh:
@@ -474,25 +479,43 @@ void fragment() {
 	return _face_shader
 
 
-static func _get_glow_shader() -> Shader:
-	if _glow_shader != null:
-		return _glow_shader
-	_glow_shader = Shader.new()
-	_glow_shader.resource_name = "jelly_blast_glow_shader"
-	_glow_shader.code = """
+static func _get_belly_shader() -> Shader:
+	if _belly_shader != null:
+		return _belly_shader
+	_belly_shader = Shader.new()
+	_belly_shader.resource_name = "jelly_belly_shader"
+	_belly_shader.code = """
 shader_type spatial;
 render_mode unshaded, cull_disabled, depth_prepass_alpha;
 
-uniform vec4 glow_color : source_color = vec4(1.0);
-instance uniform float glow_alpha = 1.0;
+uniform vec4 belly_color : source_color = vec4(1.0);
+uniform vec2 belly_center = vec2(0.12, 0.44);
+uniform float belly_radius_scale = 0.54;
+uniform float belly_alpha = 0.85;
+uniform float highlight_alpha = 0.70;
+instance uniform float fill_fraction = 0.0;
+instance uniform float visual_alpha = 1.0;
 
 void fragment() {
 	vec2 p = UV * 2.0 - 1.0;
-	float radial = length(p);
-	float glow = 1.0 - smoothstep(0.80, 1.0, radial);
-	ALBEDO = glow_color.rgb;
-	EMISSION = glow_color.rgb * 0.70;
-	ALPHA = glow * glow_alpha;
+	float fraction = clamp(fill_fraction, 0.0, 0.999999);
+	float radius = belly_radius_scale * sqrt(fraction);
+	vec2 local = (p - belly_center) / max(radius, 0.000001);
+	float belly_distance = length(local);
+	float body_distance = length(p);
+	float belly_width = max(fwidth(belly_distance), 0.000001);
+	float body_width = max(fwidth(body_distance), 0.000001);
+	float belly_mask = 1.0 - smoothstep(1.0 - belly_width, 1.0 + belly_width, belly_distance);
+	float body_mask = 1.0 - smoothstep(1.0 - body_width, 1.0 + body_width, body_distance);
+	float z = sqrt(max(1.0 - dot(local, local), 0.0));
+	vec3 normal = normalize(vec3(local.x, -local.y, z));
+	vec3 light_dir = normalize(vec3(-0.24, 0.66, 0.71));
+	vec3 half_dir = normalize(light_dir + vec3(0.0, 0.0, 1.0));
+	float reflection = pow(max(dot(normal, half_dir), 0.0), 72.0);
+	vec3 color = mix(belly_color.rgb, vec3(1.0), reflection * highlight_alpha);
+	ALBEDO = color;
+	EMISSION = color * 0.08;
+	ALPHA = belly_mask * body_mask * belly_alpha * visual_alpha;
 }
 """
-	return _glow_shader
+	return _belly_shader

@@ -205,17 +205,7 @@ func jelly_radius_for_mass(mass: float) -> float:
 		jelly_mass_for_level(1),
 		jelly_mass_for_level(orb_max_level)
 	)
-	var lower_level: int = jelly_level_for_mass(clamped_mass)
-	if lower_level >= orb_max_level:
-		return radius_for_level(orb_max_level)
-	var lower_mass: float = jelly_mass_for_level(lower_level)
-	var upper_mass: float = jelly_mass_for_level(lower_level + 1)
-	var fraction: float = inverse_lerp(lower_mass, upper_mass, clamped_mass)
-	return lerpf(
-		radius_for_level(lower_level),
-		radius_for_level(lower_level + 1),
-		fraction
-	)
+	return radius_for_level(jelly_level_for_mass(clamped_mass))
 
 
 func mass_for_radius(radius: float) -> float:

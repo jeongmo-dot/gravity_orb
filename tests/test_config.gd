@@ -46,7 +46,7 @@ func test_mass_for_candidate_exponents() -> void:
 	)
 
 
-func test_jelly_mass_level_and_radius_interpolation() -> void:
+func test_jelly_mass_level_and_level_fixed_radius() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	assert_eq(int(GameConfig.GameMode.JELLY), 3, "JELLY enum keeps prior values stable")
 	for level: int in range(1, config.orb_max_level + 1):
@@ -60,7 +60,18 @@ func test_jelly_mass_level_and_radius_interpolation() -> void:
 			"exact mass radius L%d" % level
 		)
 	assert_eq(config.jelly_level_for_mass(6.0), 3, "mass 6 remains L3")
-	assert_near(config.jelly_radius_for_mass(6.0), 72.5, TOLERANCE, "mass 6 is halfway L3-L4")
+	assert_near(
+		config.jelly_radius_for_mass(6.0),
+		config.radius_for_level(3),
+		TOLERANCE,
+		"mass 6 keeps the L3 radius"
+	)
+	assert_near(
+		config.jelly_radius_for_mass(7.0),
+		config.radius_for_level(3),
+		TOLERANCE,
+		"mass 7 still keeps the L3 radius"
+	)
 
 
 func test_m2_swipe_defaults() -> void:

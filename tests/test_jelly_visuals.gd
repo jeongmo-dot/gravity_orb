@@ -48,7 +48,7 @@ func test_jelly_max_face_uses_body_radius_while_regular_faces_keep_original_scal
 	Config.data.game_mode = original_mode
 
 
-func test_jelly_blast_ready_face_and_glow_match_mockup_c() -> void:
+func test_jelly_blast_ready_face_matches_mockup_c_without_outline() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_jelly_minimum: int = Config.data.jelly_blast_min_level
 	Config.data.game_mode = GameConfig.GameMode.JELLY
@@ -98,65 +98,63 @@ func test_jelly_blast_ready_face_and_glow_match_mockup_c() -> void:
 		),
 		"blast and MAX blush keep the source pink and use alpha only"
 	)
-	assert_true(not level_four._blast_outline.visible, "L4 has no blast glow")
-	for orb: Orb3D in [level_five, level_six, level_seven]:
-		assert_true(orb._blast_outline.visible, "L%d blast glow visible" % orb.level)
-		assert_eq(orb._blast_outline.mesh, JellyOrbArt.face_mesh(), "JELLY glow uses zero-to-one UV mesh")
-		var glow_material: ShaderMaterial = orb._blast_outline.material_override as ShaderMaterial
-		assert_true(not glow_material.shader.code.contains("ring"), "JELLY ring shader removed")
-		assert_true(glow_material.shader.code.contains("instance uniform float glow_alpha"), "glow alpha is per orb")
-		assert_eq(
-			glow_material.get_shader_parameter("glow_color"),
-			JellyOrbArt.color_for(orb.color, orb.level).lightened(JellyOrbArt.LEVEL_LIGHTEN_AMOUNT),
-			"L%d glow uses a slightly brighter body color" % orb.level
-		)
-		assert_true(orb._blast_outline.position.z < orb._mesh.position.z, "glow plate stays behind body")
-		assert_true(
-			orb._blast_outline.position.z > -0.31,
-			"glow plate stays in front of board grid and backing"
-		)
-		assert_near(
-			orb._blast_outline.scale.x / (orb.get_current_radius() / Orb3D.PIXELS_PER_METER),
-			JellyOrbArt.BLAST_GLOW_OUTER_SCALE,
-			0.001,
-			"glow reaches 0.25r beyond body"
-		)
+	for orb: Orb3D in [level_four, level_five, level_six, level_seven]:
+		assert_true(not orb._blast_outline.visible, "JELLY L%d always hides BlastOutline" % orb.level)
 
 	await _cleanup(board)
 	Config.data.jelly_blast_min_level = original_jelly_minimum
 	Config.data.game_mode = original_mode
 
 
-func test_jelly_blast_glow_alpha_is_smooth_and_disabled_threshold_keeps_normal_face() -> void:
+func test_jelly_belly_uses_mass_fraction_and_transitions_over_point_fifteen_seconds() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
-	var original_jelly_minimum: int = Config.data.jelly_blast_min_level
 	Config.data.game_mode = GameConfig.GameMode.JELLY
-	Config.data.jelly_blast_min_level = 5
 	var board: Board3D = await _create_board()
-	var armed: Orb3D = board.spawn_orb(3, 5, Vector2.ZERO)
-	var before: float = armed.jelly_blast_glow_alpha()
-	armed._physics_process(1.0 / 120.0)
-	var after: float = armed.jelly_blast_glow_alpha()
-	assert_true(after >= JellyOrbArt.BLAST_GLOW_ALPHA_MIN, "glow stays above minimum alpha")
-	assert_true(after <= JellyOrbArt.BLAST_GLOW_ALPHA_MAX, "glow stays below maximum alpha")
-	assert_true(absf(after - before) <= 0.02, "glow alpha changes by at most 0.02 per frame")
-	assert_near(
-		float(armed._blast_outline.get_instance_shader_parameter("glow_alpha")),
-		after,
-		0.0001,
-		"glow shader receives the exact animated alpha"
+	board.set_gravity(Vector2i.RIGHT)
+	var orb: Orb3D = board.spawn_orb(2, 3, Vector2.ZERO)
+	var belly_material: ShaderMaterial = orb._belly.material_override as ShaderMaterial
+	assert_true(not orb._belly.visible, "base L3 mass has no belly jelly")
+	assert_eq(belly_material.get_shader_parameter("belly_center"), Vector2(0.12, 0.44), "belly position")
+	assert_near(float(belly_material.get_shader_parameter("belly_radius_scale")), 0.54, 0.0001, "belly radius scale")
+	assert_eq(
+		belly_material.get_shader_parameter("belly_color"),
+		JellyOrbArt.color_for(2, 3).lightened(0.35),
+		"belly color is body color lightened by 0.35"
 	)
-	await _cleanup(board)
+	assert_near(float(belly_material.get_shader_parameter("belly_alpha")), 0.85, 0.0001, "belly alpha")
+	assert_near(
+		float(belly_material.get_shader_parameter("highlight_alpha")),
+		0.70,
+		0.0001,
+		"belly highlight alpha"
+	)
+	assert_true(belly_material.shader.code.contains("sqrt(fraction)"), "belly radius uses square-root fill")
 
-	Config.data.jelly_blast_min_level = 0
-	board = await _create_board()
-	var disabled: Orb3D = board.spawn_orb(4, 6, Vector2.ZERO)
-	var disabled_material: ShaderMaterial = disabled._face.material_override as ShaderMaterial
-	assert_true(not disabled.is_blast_armed(), "zero threshold disables JELLY blast mark")
-	assert_true(not disabled._blast_outline.visible, "zero threshold hides JELLY glow")
-	assert_true(not bool(disabled_material.get_shader_parameter("is_blast_ready")), "zero threshold keeps normal face")
+	orb.set_jelly_mass(6.0, Config.data)
+	assert_near(orb._jelly_belly_target, 0.5, 0.0001, "mass six targets half-full belly")
+	assert_near(orb.get_radius(), Config.data.radius_for_level(3), 0.001, "partial L3 keeps L3 radius")
+	orb._process(0.075)
+	assert_near(orb._jelly_belly_fraction, 0.25, 0.0001, "belly reaches midpoint after 0.075 seconds")
+	assert_true(orb._belly.visible, "belly appears during fill transition")
+	orb._process(0.075)
+	assert_near(orb._jelly_belly_fraction, 0.5, 0.0001, "belly reaches target after 0.15 seconds")
+	assert_near(orb._belly.rotation.z, orb._jelly_frame_rotation, 0.0001, "belly follows gravity frame")
+	assert_true(orb._belly.position.z < orb._face.position.z, "belly stays behind face")
+	assert_true(orb._belly.position.z > orb._mesh.position.z, "belly stays in front of body center")
+
+	orb.set_jelly_mass(8.0, Config.data)
+	assert_near(orb.get_current_radius(), Config.data.radius_for_level(3), 0.001, "level-up starts at old level radius")
+	orb._physics_process(0.05)
+	assert_near(orb.get_current_radius(), 72.5, 0.001, "level-up radius is halfway after 0.05 seconds")
+	orb._physics_process(0.05)
+	assert_near(orb.get_current_radius(), Config.data.radius_for_level(4), 0.001, "level-up radius finishes at 0.10 seconds")
+	orb._process(0.15)
+	assert_near(orb._jelly_belly_fraction, 0.0, 0.0001, "new exact level clears belly over 0.15 seconds")
+	assert_true(not orb._belly.visible, "zero fill hides belly mesh")
+	orb.set_jelly_mass(64.0, Config.data)
+	assert_eq(orb.level, Config.data.orb_max_level, "mass cap displays L7")
+	assert_near(orb._jelly_belly_target, 0.0, 0.0001, "L7 mass cap always has zero belly fill")
 	await _cleanup(board)
-	Config.data.jelly_blast_min_level = original_jelly_minimum
 	Config.data.game_mode = original_mode
 
 

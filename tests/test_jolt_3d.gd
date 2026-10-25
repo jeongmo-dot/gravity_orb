@@ -221,7 +221,7 @@ func test_3d_blast_blink_starts_at_shared_level_four_in_both_modes() -> void:
 	Config.data.game_mode = original_mode
 
 
-func test_jelly_blast_glow_follows_candidate_threshold_and_mass_level() -> void:
+func test_jelly_blast_face_follows_threshold_while_outline_stays_hidden() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_jelly_minimum: int = Config.data.jelly_blast_min_level
 	Config.data.game_mode = GameConfig.GameMode.JELLY
@@ -234,7 +234,8 @@ func test_jelly_blast_glow_follows_candidate_threshold_and_mass_level() -> void:
 	level_four.set_jelly_mass(16.0, Config.data)
 	assert_eq(level_four.level, 5, "mass update reaches displayed L5")
 	assert_true(level_four.is_blast_armed(), "mass-updated displayed L5 arms BLAST")
-	assert_true(level_four._blast_outline.visible, "mass-updated L5 shows color glow")
+	assert_true(not level_four._blast_outline.visible, "JELLY mass-updated L5 keeps outline hidden")
+	assert_true(not level_five._blast_outline.visible, "JELLY spawned L5 keeps outline hidden")
 	assert_true(
 		bool((level_four._face.material_override as ShaderMaterial).get_shader_parameter("is_blast_ready")),
 		"mass-updated L5 switches to the blast-ready face"
@@ -290,7 +291,44 @@ func test_jolt_reaction_uses_shared_rules_and_spawns_3d_result() -> void:
 	_cleanup(fixture_root)
 
 
-func test_jelly_absorption_keeps_larger_position_mass_and_interpolated_radius() -> void:
+func test_jelly_same_level_absorption_keeps_radius_and_fills_belly() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var fixture_root: Node = Node.new()
+	fixture_root.name = "JellySameLevelAbsorptionFixture"
+	var board: Board3D = BOARD_SCENE.instantiate() as Board3D
+	board.name = "Board"
+	board.unique_name_in_owner = true
+	fixture_root.add_child(board)
+	board.owner = fixture_root
+	var resolver: CollisionResolver = RESOLVER_SCRIPT.new() as CollisionResolver
+	resolver.name = "CollisionResolver"
+	resolver.unique_name_in_owner = true
+	fixture_root.add_child(resolver)
+	resolver.owner = fixture_root
+	tree.root.add_child(fixture_root)
+	await tree.process_frame
+	var larger: Orb3D = board.spawn_orb(2, 3, Vector2(-30.0, 0.0))
+	var smaller: Orb3D = board.spawn_orb(2, 2, Vector2(30.0, 0.0))
+	resolver.report_contact(larger, smaller)
+	assert_eq(resolver.flush(), 1, "L3 absorbs L2 once")
+	var active: Array[Orb3D] = board.get_orbs()
+	assert_eq(active.size(), 1, "same-level absorption leaves one orb")
+	if active.size() == 1:
+		var result: Orb3D = active[0]
+		assert_eq(result.level, 3, "mass six remains L3")
+		assert_near(result.jelly_mass, 6.0, 0.001, "absorbed mass is preserved")
+		assert_near(result.get_radius(), 60.0, 0.001, "partial L3 target radius stays fixed")
+		assert_near(result.get_current_radius(), 60.0, 0.001, "partial L3 has no radius tween")
+		assert_near(result.shape_resource().radius * Orb3D.PIXELS_PER_METER, 60.0, 0.001, "collision radius stays L3")
+		assert_near(result._jelly_belly_target, 0.5, 0.001, "mass six targets half-full belly")
+		result._process(0.15)
+		assert_near(result._jelly_belly_fraction, 0.5, 0.001, "belly fills over 0.15 seconds")
+	await _cleanup(fixture_root)
+	Config.data.game_mode = original_mode
+
+
+func test_jelly_level_up_absorption_grows_from_old_to_new_level_radius() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	var fixture_root: Node = Node.new()
@@ -311,7 +349,7 @@ func test_jelly_absorption_keeps_larger_position_mass_and_interpolated_radius() 
 	var larger_position: Vector2 = Vector2(-120.0, 25.0)
 	var larger: Orb3D = board.spawn_orb(2, 3, larger_position, Vector2(30.0, 0.0))
 	larger.set_jelly_mass(6.0, Config.data)
-	larger._physics_process(0.10)
+	assert_near(larger.get_radius(), 60.0, 0.001, "mass-six absorber stays at L3 radius")
 	var smaller: Orb3D = board.spawn_orb(2, 2, Vector2(-60.0, 25.0), Vector2.ZERO)
 	resolver.report_contact(larger, smaller)
 	assert_eq(resolver.flush(), 1, "JELLY adjacent levels absorb once")
@@ -323,14 +361,14 @@ func test_jelly_absorption_keeps_larger_position_mass_and_interpolated_radius() 
 		assert_near(active[0].get_radius(), 85.0, 0.001, "mass eight uses the L4 radius")
 		assert_near(
 			active[0].get_current_radius(),
-			72.5,
+			60.0,
 			0.001,
-			"level-up absorption starts from the mass-six absorber radius"
+			"level-up absorption starts from the fixed L3 absorber radius"
 		)
 		active[0]._physics_process(0.05)
 		assert_near(
 			active[0].get_current_radius(),
-			(72.5 + 85.0) * 0.5,
+			(60.0 + 85.0) * 0.5,
 			0.001,
 			"absorption radius is halfway after 0.05 seconds"
 		)
