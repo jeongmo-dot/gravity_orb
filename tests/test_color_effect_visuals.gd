@@ -67,6 +67,71 @@ func test_push_and_pull_keep_directional_stardust_without_ring_geometry() -> voi
 	await _cleanup(fixture["root"] as Node)
 
 
+func test_stardust_uses_seeded_scatter_with_bounded_distance_and_speed() -> void:
+	var root: Node3D = Node3D.new()
+	tree.root.add_child(root)
+	var first: ColorEffectVisual = ColorEffectVisual.new()
+	var second: ColorEffectVisual = ColorEffectVisual.new()
+	root.add_child(first)
+	root.add_child(second)
+	await tree.process_frame
+	var targets: Array[Dictionary] = []
+	first.play(
+		GameConfig.ShockMode.PUSH,
+		Vector2.ZERO,
+		Color.WHITE,
+		40.0,
+		160.0,
+		1.0,
+		Vector2.UP,
+		targets,
+		11001
+	)
+	second.play(
+		GameConfig.ShockMode.PUSH,
+		Vector2.ZERO,
+		Color.WHITE,
+		40.0,
+		160.0,
+		1.0,
+		Vector2.UP,
+		targets,
+		11001
+	)
+	assert_eq(first._stardust_directions, second._stardust_directions, "same local seed repeats directions")
+	assert_eq(first._stardust_distance_factors, second._stardust_distance_factors, "same seed repeats distances")
+	assert_eq(first._stardust_speed_factors, second._stardust_speed_factors, "same seed repeats speeds")
+	var evenly_spaced: bool = true
+	var first_gap: float = -1.0
+	var angles: Array[float] = []
+	for index: int in range(first._stardust_directions.size()):
+		var direction: Vector2 = first._stardust_directions[index]
+		var distance_factor: float = first._stardust_distance_factors[index]
+		var speed_factor: float = first._stardust_speed_factors[index]
+		angles.append(fposmod(direction.angle(), TAU))
+		assert_near(direction.length(), 1.0, TOLERANCE, "direction %d is normalized" % index)
+		assert_true(distance_factor >= 0.6 and distance_factor <= 1.0, "distance %d stays in range" % index)
+		assert_true(speed_factor >= 0.7 and speed_factor <= 1.0, "speed %d stays in range" % index)
+	angles.sort()
+	for index: int in range(angles.size()):
+		var next_index: int = (index + 1) % angles.size()
+		var gap: float = fposmod(angles[next_index] - angles[index], TAU)
+		if first_gap < 0.0:
+			first_gap = gap
+		elif not is_equal_approx(gap, first_gap):
+			evenly_spaced = false
+	assert_true(not evenly_spaced, "seeded directions do not form an evenly spaced dotted circle")
+	first.advance(0.15)
+	second.advance(0.15)
+	for index: int in range(first.stardust_count()):
+		assert_eq(
+			first._point_multimesh.get_instance_transform(index),
+			second._point_multimesh.get_instance_transform(index),
+			"seeded point %d remains deterministic" % index
+		)
+	await _cleanup(root)
+
+
 func test_jelly_keeps_color_feedback_without_ring_geometry() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	Config.data.game_mode = GameConfig.GameMode.JELLY
@@ -88,7 +153,9 @@ func test_jelly_keeps_color_feedback_without_ring_geometry() -> void:
 	Config.data.game_mode = original_mode
 
 
-func test_pull_shrinks_only_result_mesh_before_punching() -> void:
+func test_pull_keeps_jelly_result_at_collision_radius_before_punching() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.JELLY
 	var fixture: Dictionary = await _create_fixture()
 	var board: Board3D = fixture["board"] as Board3D
 	var director: FeedbackDirector = fixture["director"] as FeedbackDirector
@@ -100,11 +167,12 @@ func test_pull_shrinks_only_result_mesh_before_punching() -> void:
 	reaction["result_orb"] = orb
 	director.play_reaction_visuals(reaction)
 	await tree.create_timer(0.05, true, false, true).timeout
-	assert_true(orb._mesh.scale.x < 1.0, "PULL result mesh shrinks first")
+	assert_true(orb._mesh.scale.x >= 1.0, "PULL never draws JELLY inside collision radius")
 	assert_near(collision.radius, collision_radius, TOLERANCE, "PULL collision radius unchanged")
 	await tree.create_timer(0.30, true, false, true).timeout
 	assert_near(orb._mesh.scale.x, 1.0, 0.01, "PULL result mesh returns after punch")
 	await _cleanup(fixture["root"] as Node)
+	Config.data.game_mode = original_mode
 
 
 func test_lift_direction_opposes_each_gravity_direction() -> void:

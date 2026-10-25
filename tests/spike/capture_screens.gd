@@ -23,6 +23,8 @@ const CAPTURE_FILES: Array[String] = [
 	"15_jelly_blast_effect.png",
 	"16_jelly_jackpot_effect.png",
 	"17_jelly_max_effect.png",
+	"18_jelly_landing_strip.png",
+	"19_jelly_crowded_rest.png",
 ]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
@@ -163,6 +165,7 @@ func _capture_gameplay_scenes() -> void:
 	await get_tree().create_timer(Orb3D.JELLY_BELLY_TRANSITION_DURATION).timeout
 	await _capture("12_jelly_eat_02.png")
 	await _capture_effect_scenes(main, board)
+	await _capture_deform_scenes(main, board)
 	await _destroy_main(main)
 
 
@@ -245,6 +248,51 @@ func _capture_effect_scenes(main: Main, board: Board3D) -> void:
 	})
 	await get_tree().create_timer(0.06).timeout
 	await _capture("17_jelly_max_effect.png")
+
+
+func _capture_deform_scenes(main: Main, board: Board3D) -> void:
+	(main.get_node("FeedbackDirector") as FeedbackDirector).clear_effects()
+	board.clear()
+	board.set_gravity(Vector2i.DOWN)
+	var landing_specs: Array[Dictionary] = [
+		{"position": Vector2(-220.0, 50.0), "deform": Vector2(0.84, 1.18)},
+		{"position": Vector2(0.0, 50.0), "deform": Vector2.ONE},
+		{"position": Vector2(220.0, 50.0), "deform": Vector2(1.18, 0.80)},
+	]
+	for index: int in range(landing_specs.size()):
+		var spec: Dictionary = landing_specs[index]
+		var orb: Orb3D = board.spawn_orb(
+			index,
+			3,
+			spec["position"] as Vector2
+		)
+		orb.disable_physics()
+		orb._jelly_deform = spec["deform"] as Vector2
+		orb._update_visual_transform()
+	await _capture("18_jelly_landing_strip.png")
+
+	board.clear()
+	var level: int = 2
+	var radius_px: float = Config.data.radius_for_level(level)
+	var spacing_px: float = radius_px * 2.0
+	var orb_index: int = 0
+	for row: int in range(4):
+		for column: int in range(5):
+			var resting: Orb3D = board.spawn_orb(
+				(row + column) % JellyOrbArt.PALETTE.size(),
+				level,
+				Vector2(
+					(float(column) - 2.0) * spacing_px,
+					(float(row) - 1.5) * spacing_px
+				)
+			)
+			resting.disable_physics()
+			resting.set_turn_resting(true)
+			resting._jelly_breath_weight = 1.0
+			resting._jelly_idle_elapsed = float(orb_index) * 0.37
+			resting._update_visual_transform()
+			orb_index += 1
+	await _capture("19_jelly_crowded_rest.png")
 
 
 func _spawn_featured(board: Board3D) -> void:

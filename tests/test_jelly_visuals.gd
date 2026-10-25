@@ -288,9 +288,23 @@ func test_jelly_deform_follows_gravity_smoothly_and_squashes_on_speed_loss() -> 
 	assert_true(orb._jelly_deform.x > falling_deform.x, "impact widens across gravity")
 	assert_true(orb._jelly_deform.y < falling_deform.y, "impact flattens along gravity")
 	var face_radius_m: float = orb.get_current_radius() / Orb3D.PIXELS_PER_METER * 0.62
-	assert_eq(orb._mesh.scale, Vector3.ONE, "body silhouette stays at the collision radius")
-	assert_near(orb._face.scale.x / face_radius_m, orb._jelly_deform.x, 0.001, "face keeps horizontal squash")
-	assert_near(orb._face.scale.y / face_radius_m, orb._jelly_deform.y, 0.001, "face keeps gravity-axis squash")
+	var expected_body_scale: Vector3 = orb._jelly_body_scale()
+	assert_eq(orb._mesh.scale, expected_body_scale, "body keeps expansion without shrinking")
+	assert_true(orb._mesh.scale.x >= 1.0, "body never narrows below collision radius")
+	assert_true(orb._mesh.scale.y >= 1.0, "body never flattens below collision radius")
+	assert_true(orb._mesh.scale.z >= 1.0, "body depth never shrinks below collision radius")
+	assert_near(
+		orb._face.scale.x / face_radius_m,
+		expected_body_scale.x,
+		0.001,
+		"face uses the same horizontal body scale"
+	)
+	assert_near(
+		orb._face.scale.y / face_radius_m,
+		expected_body_scale.y,
+		0.001,
+		"face uses the same gravity-axis body scale"
+	)
 	await _cleanup(board)
 	Config.data.game_mode = original_mode
 	Config.data.fx_orb_stretch_enabled = original_stretch
@@ -306,7 +320,7 @@ func test_jelly_face_and_symbol_stay_in_front_of_deformed_body() -> void:
 
 	orb._jelly_deform = Vector2(1.18, 0.80)
 	orb._update_visual_transform()
-	assert_eq(orb._mesh.scale, Vector3.ONE, "squash never changes the body radius")
+	assert_eq(orb._mesh.scale, Vector3(1.18, 1.0, 1.18), "squash preserves widening only")
 	var squash_front_z: float = orb._mesh.position.z + body_mesh.radius * orb._mesh.scale.z
 	assert_true(orb._face.position.z > squash_front_z, "face stays ahead at maximum squash")
 	assert_true(orb._symbol_mesh.position.z > squash_front_z, "symbol stays ahead at maximum squash")
@@ -315,14 +329,17 @@ func test_jelly_face_and_symbol_stay_in_front_of_deformed_body() -> void:
 	orb._jelly_breath_weight = 1.0
 	orb._jelly_idle_elapsed = PI / (2.0 * 1.8)
 	orb._update_visual_transform()
-	assert_eq(orb._mesh.scale, Vector3.ONE, "breathing never changes the body radius")
+	assert_true(orb._mesh.scale.x >= 1.0, "breathing never narrows the body")
+	assert_true(orb._mesh.scale.y >= 1.0, "breathing never shortens the body")
+	assert_true(orb._mesh.scale != Vector3.ONE, "breathing expansion remains visible")
 	var breath_front_z: float = orb._mesh.position.z + body_mesh.radius * orb._mesh.scale.z
 	assert_true(orb._face.position.z > breath_front_z, "face stays ahead at L7 breath peak")
 	assert_true(orb._symbol_mesh.position.z > breath_front_z, "symbol stays ahead at L7 breath peak")
 
-	orb._visual_punch_scale = Vector3.ONE * 1.18
+	orb._jelly_breath_weight = 0.0
+	orb._visual_punch_scale = Vector3.ONE * 1.06
 	orb._update_visual_transform()
-	assert_eq(orb._mesh.scale, Vector3.ONE, "merge punch never changes the body radius")
+	assert_eq(orb._mesh.scale, Vector3.ONE * 1.06, "merge punch expands body uniformly")
 	var punch_front_z: float = orb._mesh.position.z + body_mesh.radius * orb._mesh.scale.z
 	assert_true(orb._face.position.z > punch_front_z, "face stays ahead during merge punch")
 	assert_true(orb._symbol_mesh.position.z > punch_front_z, "symbol stays ahead during merge punch")
@@ -376,9 +393,13 @@ func test_jelly_frame_rotation_and_breath_weight_change_without_jumps() -> void:
 		"JELLY frame does not jump to the target rotation"
 	)
 	assert_near(orb._mesh.rotation.z, orb._jelly_frame_rotation, 0.0001, "body uses frame rotation")
+	var expected_deform: Vector2 = Vector2(
+		orb._jelly_body_scale().x,
+		orb._jelly_body_scale().y
+	)
 	var expected_face_basis: Basis = Orb3D.jelly_upright_deform_basis(
 		orb._jelly_frame_rotation,
-		orb._jelly_render_deform(),
+		expected_deform,
 		orb.get_current_radius() / Orb3D.PIXELS_PER_METER * 0.62
 	)
 	_assert_basis_near(orb._face.basis, expected_face_basis, 0.0001, "face counter-rotates frame")
@@ -417,9 +438,10 @@ func test_all_jelly_faces_and_symbols_stay_upright_with_screen_axis_deform() -> 
 		assert_near(orb._face.rotation.z, 0.0, 0.0001, "%s face remains upright" % direction)
 		assert_near(orb._symbol_mesh.rotation.z, 0.0, 0.0001, "%s symbol remains upright" % direction)
 		var face_radius_m: float = orb.get_current_radius() / Orb3D.PIXELS_PER_METER
+		var body_scale: Vector3 = orb._jelly_body_scale()
 		var expected_basis: Basis = Orb3D.jelly_upright_deform_basis(
 			orb._jelly_frame_rotation,
-			orb._jelly_render_deform(),
+			Vector2(body_scale.x, body_scale.y),
 			face_radius_m
 		)
 		_assert_basis_near(orb._face.basis, expected_basis, 0.0001, "%s face deform" % direction)
@@ -432,13 +454,30 @@ func test_all_jelly_faces_and_symbols_stay_upright_with_screen_axis_deform() -> 
 			)
 			assert_near(
 				Vector2(orb._face.basis.y.x, orb._face.basis.y.y).length() / face_radius_m,
-				0.82,
+				1.0,
 				0.001,
 				"right gravity maps cross-axis deform to screen vertical"
 			)
 		board.remove_orb(orb)
 	await _cleanup(board)
 	Config.data.jelly_blast_min_level = original_minimum
+	Config.data.game_mode = original_mode
+
+
+func test_jelly_merge_punch_uses_non_shrinking_006_peak_timing() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var board: Board3D = await _create_board()
+	var orb: Orb3D = board.spawn_orb(0, 3, Vector2.ZERO)
+	orb.disable_physics()
+	orb.play_visual_punch()
+	assert_eq(orb._visual_punch_scale, Vector3.ONE, "JELLY punch begins at one")
+	await tree.create_timer(0.08, true, false, true).timeout
+	assert_near(orb._visual_punch_scale.x, 1.06, 0.012, "JELLY punch peaks at 1.06 after 0.08s")
+	await tree.create_timer(0.10, true, false, true).timeout
+	assert_near(orb._visual_punch_scale.x, 1.0, 0.012, "JELLY punch returns after 0.10s")
+	assert_true(orb._mesh.scale.x >= 1.0, "punch never shrinks rendered body")
+	await _cleanup(board)
 	Config.data.game_mode = original_mode
 
 

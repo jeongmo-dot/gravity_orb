@@ -22,10 +22,18 @@ var _geometry: Dictionary = {
 	"sample_frames": 0,
 	"radius_mismatch_frames": 0,
 	"max_radius_mismatch_px": 0.0,
+	"radius_undersize_frames": 0,
+	"max_radius_undersize_px": 0.0,
+	"max_radius_oversize_px": 0.0,
 	"contact_pair_samples": 0,
 	"gap_frames": 0,
 	"max_contact_gap_px": 0.0,
+	"overlap_frames": 0,
+	"overlap_pair_samples": 0,
+	"max_contact_overlap_px": 0.0,
+	"max_overlap_duration_msec": 0.0,
 }
+var _overlap_started_usec: Dictionary = {}
 
 
 func _ready() -> void:
@@ -211,7 +219,11 @@ func _sample_geometry(board: Board3D) -> void:
 	var orbs: Array[Orb3D] = board.get_orbs()
 	_geometry["sample_frames"] = int(_geometry["sample_frames"]) + 1
 	var frame_mismatch: bool = false
+	var frame_undersize: bool = false
 	var frame_gap: bool = false
+	var frame_overlap: bool = false
+	var active_overlap_keys: Dictionary = {}
+	var sample_usec: int = Time.get_ticks_usec()
 	for orb: Orb3D in orbs:
 		if not is_instance_valid(orb) or orb.consumed:
 			continue
@@ -230,8 +242,26 @@ func _sample_geometry(board: Board3D) -> void:
 			float(_geometry["max_radius_mismatch_px"]),
 			mismatch_px
 		)
+		var undersize_px: float = maxf(
+			physical_radius_px - minf(drawn_x_px, drawn_y_px),
+			0.0
+		)
+		var oversize_px: float = maxf(
+			maxf(drawn_x_px, drawn_y_px) - physical_radius_px,
+			0.0
+		)
+		_geometry["max_radius_undersize_px"] = maxf(
+			float(_geometry["max_radius_undersize_px"]),
+			undersize_px
+		)
+		_geometry["max_radius_oversize_px"] = maxf(
+			float(_geometry["max_radius_oversize_px"]),
+			oversize_px
+		)
 		if mismatch_px > PIXEL_TOLERANCE:
 			frame_mismatch = true
+		if undersize_px > PIXEL_TOLERANCE:
+			frame_undersize = true
 	for first_index: int in range(orbs.size()):
 		var first: Orb3D = orbs[first_index]
 		if not is_instance_valid(first) or first.consumed:
@@ -265,10 +295,44 @@ func _sample_geometry(board: Board3D) -> void:
 			)
 			if gap_px > PIXEL_TOLERANCE:
 				frame_gap = true
+			var overlap_px: float = maxf(drawn_sum_px - delta.length(), 0.0)
+			_geometry["max_contact_overlap_px"] = maxf(
+				float(_geometry["max_contact_overlap_px"]),
+				overlap_px
+			)
+			if overlap_px > PIXEL_TOLERANCE:
+				frame_overlap = true
+				_geometry["overlap_pair_samples"] = int(
+					_geometry["overlap_pair_samples"]
+				) + 1
+				var pair_key: String = _pair_key(first, second)
+				active_overlap_keys[pair_key] = true
+				if not _overlap_started_usec.has(pair_key):
+					_overlap_started_usec[pair_key] = sample_usec
+				var duration_msec: float = float(
+					sample_usec - int(_overlap_started_usec[pair_key])
+				) / 1000.0
+				_geometry["max_overlap_duration_msec"] = maxf(
+					float(_geometry["max_overlap_duration_msec"]),
+					duration_msec
+				)
+	for pair_key: Variant in _overlap_started_usec.keys():
+		if not active_overlap_keys.has(pair_key):
+			_overlap_started_usec.erase(pair_key)
 	if frame_mismatch:
 		_geometry["radius_mismatch_frames"] = int(_geometry["radius_mismatch_frames"]) + 1
+	if frame_undersize:
+		_geometry["radius_undersize_frames"] = int(_geometry["radius_undersize_frames"]) + 1
 	if frame_gap:
 		_geometry["gap_frames"] = int(_geometry["gap_frames"]) + 1
+	if frame_overlap:
+		_geometry["overlap_frames"] = int(_geometry["overlap_frames"]) + 1
+
+
+func _pair_key(first: Orb3D, second: Orb3D) -> String:
+	var first_id: int = first.get_instance_id()
+	var second_id: int = second.get_instance_id()
+	return "%d:%d" % [mini(first_id, second_id), maxi(first_id, second_id)]
 
 
 func _drawn_radius_in_direction(orb: Orb3D, world_direction: Vector2) -> float:

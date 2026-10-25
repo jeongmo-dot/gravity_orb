@@ -23,6 +23,10 @@ var _point_multimesh: MultiMesh
 var _point_material: ShaderMaterial
 var _result_radius_px: float = 0.0
 var _target_positions: Array[Vector2] = []
+var _stardust_directions: Array[Vector2] = []
+var _stardust_distance_factors: Array[float] = []
+var _stardust_speed_factors: Array[float] = []
+var _stardust_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 
 func _ready() -> void:
@@ -49,7 +53,8 @@ func play(
 	effect_radius_px: float,
 	p_intensity: float,
 	p_lift_direction: Vector2,
-	targets: Array
+	targets: Array,
+	p_seed: int = 1
 ) -> void:
 	mode = p_mode
 	_result_radius_px = result_radius_px
@@ -86,6 +91,7 @@ func play(
 	visible = true
 	_points.visible = mode in [GameConfig.ShockMode.PUSH, GameConfig.ShockMode.PULL, GameConfig.ShockMode.LIFT]
 	_configure_point_count()
+	_configure_stardust(p_seed)
 	advance(0.0)
 
 
@@ -146,25 +152,54 @@ func _configure_point_count() -> void:
 		_point_multimesh.instance_count = 0
 
 
+func _configure_stardust(seed_value: int) -> void:
+	_stardust_directions.clear()
+	_stardust_distance_factors.clear()
+	_stardust_speed_factors.clear()
+	_stardust_rng.seed = seed_value
+	for _index: int in range(_point_multimesh.instance_count):
+		_stardust_directions.append(
+			Vector2.RIGHT.rotated(_stardust_rng.randf_range(0.0, TAU))
+		)
+		_stardust_distance_factors.append(_stardust_rng.randf_range(0.6, 1.0))
+		_stardust_speed_factors.append(_stardust_rng.randf_range(0.7, 1.0))
+
+
 func _update_push_stardust(progress: float) -> void:
 	for index: int in range(PUSH_STARDUST_COUNT):
-		var phase: float = float(index) / float(PUSH_STARDUST_COUNT)
-		var direction: Vector2 = Vector2.RIGHT.rotated(TAU * phase)
-		var stagger: float = fmod(progress + phase * 0.22, 1.0)
-		var radius_px: float = lerpf(_result_radius_px, current_radius_px, stagger)
-		_set_point_transform(index, direction * radius_px, 0.65 + 0.35 * (1.0 - stagger))
+		var travel_ratio: float = clampf(
+			progress * _stardust_speed_factors[index],
+			0.0,
+			1.0
+		)
+		var radius_px: float = _result_radius_px + (
+			end_radius_px - _result_radius_px
+		) * _stardust_distance_factors[index] * travel_ratio
+		_set_point_transform(
+			index,
+			_stardust_directions[index] * radius_px,
+			0.65 + 0.35 * (1.0 - travel_ratio)
+		)
 
 
 func _update_pull_stardust(progress: float) -> void:
 	for index: int in range(PULL_STARDUST_COUNT):
-		var phase: float = float(index) / float(PULL_STARDUST_COUNT)
-		var angle: float = TAU * phase + progress * TAU * 0.85
-		var stagger: float = fmod(progress + phase * 0.18, 1.0)
-		var radius_px: float = lerpf(start_radius_px, _result_radius_px, stagger)
+		var travel_ratio: float = clampf(
+			progress * _stardust_speed_factors[index],
+			0.0,
+			1.0
+		)
+		var angle: float = (
+			_stardust_directions[index].angle()
+			+ progress * TAU * 0.85 * _stardust_speed_factors[index]
+		)
+		var radius_px: float = start_radius_px + (
+			_result_radius_px - start_radius_px
+		) * _stardust_distance_factors[index] * travel_ratio
 		_set_point_transform(
 			index,
 			Vector2.RIGHT.rotated(angle) * radius_px,
-			0.55 + 0.45 * (1.0 - stagger)
+			0.55 + 0.45 * (1.0 - travel_ratio)
 		)
 
 
@@ -172,15 +207,27 @@ func _update_lift_stardust(progress: float) -> void:
 	var point_index: int = 0
 	for target_position: Vector2 in _target_positions:
 		for step: int in range(LIFT_POINTS_PER_TARGET):
-			var phase: float = float(step) / float(LIFT_POINTS_PER_TARGET)
-			var travel_ratio: float = clampf(progress - phase * 0.18, 0.0, 1.0)
-			var travel_px: float = end_radius_px * travel_ratio
+			var travel_ratio: float = clampf(
+				progress * _stardust_speed_factors[point_index],
+				0.0,
+				1.0
+			)
+			var travel_px: float = (
+				end_radius_px
+				* _stardust_distance_factors[point_index]
+				* travel_ratio
+			)
 			var sideways: Vector2 = lift_direction.rotated(PI * 0.5) * sin(
-				(progress + phase) * TAU
-			) * 5.0
+				progress * TAU + _stardust_directions[point_index].angle()
+			) * 5.0 * _stardust_distance_factors[point_index]
 			_set_point_transform(
 				point_index,
-				target_position + lift_direction * travel_px + sideways,
+				(
+					target_position
+					+ _stardust_directions[point_index] * 4.0
+					+ lift_direction * travel_px
+					+ sideways
+				),
 				0.70 + 0.30 * (1.0 - travel_ratio)
 			)
 			point_index += 1

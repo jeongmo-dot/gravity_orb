@@ -55,6 +55,7 @@ var _finale_sfx_index: int = 0
 var _full_flash_times_msec: Array[int] = []
 var _full_flash_accepted_total: int = 0
 var _full_flash_skipped_total: int = 0
+var _color_effect_sequence: int = 0
 
 
 func _ready() -> void:
@@ -577,6 +578,7 @@ func _play_color_effect_visual(
 		if board_gravity != null:
 			gravity_direction = Vector2(board_gravity).normalized()
 	var effect: ColorEffectVisual = _acquire_color_effect()
+	_color_effect_sequence += 1
 	effect.play(
 		color_mode,
 		reaction.get("position", Vector2.ZERO) as Vector2,
@@ -585,11 +587,25 @@ func _play_color_effect_visual(
 		effect_radius_px,
 		visual_intensity * strength_scale,
 		-gravity_direction,
-		reaction.get("shock_targets", []) as Array
+		reaction.get("shock_targets", []) as Array,
+		_color_effect_seed(reaction, color_index, level)
 	)
 	_active_color_effects.append(effect)
 	if color_mode == GameConfig.ShockMode.SHAKE:
 		_color_frame_shakes.append({"elapsed": 0.0, "duration": COLOR_SHAKE_DURATION})
+
+
+func _color_effect_seed(reaction: Dictionary, color_index: int, level: int) -> int:
+	var origin: Vector2 = reaction.get("position", Vector2.ZERO) as Vector2
+	var reaction_type: int = int(reaction.get("type", ReactionRules.Type.NONE))
+	var seed_value: int = 146959810
+	seed_value = (seed_value * 16777619) ^ reaction_type
+	seed_value = (seed_value * 16777619) ^ color_index
+	seed_value = (seed_value * 16777619) ^ level
+	seed_value = (seed_value * 16777619) ^ roundi(origin.x * 1000.0)
+	seed_value = (seed_value * 16777619) ^ roundi(origin.y * 1000.0)
+	seed_value = (seed_value * 16777619) ^ _color_effect_sequence
+	return absi(seed_value) + 1
 
 
 func _color_effect_visuals_enabled() -> bool:

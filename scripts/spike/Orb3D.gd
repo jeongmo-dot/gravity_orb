@@ -373,12 +373,27 @@ func is_blast_armed() -> bool:
 func play_visual_punch(scale_factor: float = 1.18, duration: float = 0.14) -> void:
 	if _visual_punch_tween != null and _visual_punch_tween.is_valid():
 		_visual_punch_tween.kill()
+	if _is_jelly_visual:
+		_visual_punch_scale = Vector3.ONE
+		_visual_punch_tween = create_tween()
+		_visual_punch_tween.set_trans(Tween.TRANS_QUAD)
+		_visual_punch_tween.set_ease(Tween.EASE_OUT)
+		_visual_punch_tween.tween_method(
+			_set_visual_punch_scale,
+			Vector3.ONE,
+			Vector3.ONE * 1.06,
+			0.08
+		)
+		_visual_punch_tween.set_ease(Tween.EASE_IN_OUT)
+		_visual_punch_tween.tween_method(
+			_set_visual_punch_scale,
+			Vector3.ONE * 1.06,
+			Vector3.ONE,
+			0.10
+		)
+		return
 	var target_scale: Vector3 = Vector3.ONE * scale_factor
-	var start_scale: Vector3 = (
-		Vector3.ONE * 0.88
-		if _is_jelly_visual
-		else Vector3.ONE.lerp(target_scale, 0.02)
-	)
+	var start_scale: Vector3 = Vector3.ONE.lerp(target_scale, 0.02)
 	_visual_punch_scale = start_scale
 	_visual_punch_tween = create_tween()
 	_visual_punch_tween.set_trans(Tween.TRANS_BACK)
@@ -564,8 +579,23 @@ func celestial_art_key() -> String:
 
 func visual_stretch_scale() -> Vector3:
 	if _is_jelly_visual:
-		return Vector3.ONE
+		return _jelly_body_scale()
 	return _stretch_scale_for_ratio(_visual_stretch_ratio())
+
+
+func _jelly_body_scale() -> Vector3:
+	var deform: Vector2 = _jelly_render_deform()
+	var non_shrinking_deform: Vector3 = Vector3(
+		maxf(1.0, deform.x),
+		maxf(1.0, deform.y),
+		maxf(1.0, deform.x)
+	)
+	var non_shrinking_punch: Vector3 = Vector3(
+		maxf(1.0, _visual_punch_scale.x),
+		maxf(1.0, _visual_punch_scale.y),
+		maxf(1.0, _visual_punch_scale.z)
+	)
+	return non_shrinking_deform * non_shrinking_punch
 
 
 func _visual_stretch_ratio() -> float:
@@ -849,9 +879,10 @@ func _update_visual_transform() -> void:
 	var stretch_ratio: float = _visual_stretch_ratio()
 	var stretch_scale: Vector3 = _stretch_scale_for_ratio(stretch_ratio)
 	var jelly_deform: Vector2 = _jelly_render_deform() if _is_jelly_visual else Vector2.ONE
-	_mesh.scale = Vector3.ONE if _is_jelly_visual else _visual_punch_scale * stretch_scale
+	var jelly_body_scale: Vector3 = _jelly_body_scale() if _is_jelly_visual else Vector3.ONE
+	_mesh.scale = jelly_body_scale if _is_jelly_visual else _visual_punch_scale * stretch_scale
 	_mesh.position = render_world_position
-	var body_front_offset: float = radius_m
+	var body_front_offset: float = radius_m * _mesh.scale.z
 	_belly.position = render_world_position + Vector3(0.0, 0.0, body_front_offset + 0.003)
 	_face.position = render_world_position + Vector3(0.0, 0.0, body_front_offset + 0.006)
 	if _is_jelly_visual:
@@ -866,25 +897,33 @@ func _update_visual_transform() -> void:
 		_visual_punch_scale.x,
 		maxf(_visual_punch_scale.y, _visual_punch_scale.z)
 	)
+	var jelly_content_deform: Vector2 = Vector2(
+		jelly_body_scale.x,
+		jelly_body_scale.y
+	) if _is_jelly_visual else jelly_deform * punch_scale
 	_belly.scale = Vector3(
-		radius_m * jelly_deform.x,
-		radius_m * jelly_deform.y,
+		radius_m * jelly_content_deform.x,
+		radius_m * jelly_content_deform.y,
 		1.0
-	) * punch_scale
+	)
 	var face_radius_ratio: float = (
 		1.0
 		if _is_jelly_visual and (level >= Config.data.orb_max_level or _blast_armed)
 		else 0.62
 	)
-	var face_scale_m: float = radius_m * face_radius_ratio * punch_scale
+	var face_scale_m: float = radius_m * face_radius_ratio
 	_face.basis = (
 		jelly_upright_deform_basis(
 			_jelly_frame_rotation,
-			jelly_deform,
+			jelly_content_deform,
 			face_scale_m
 		)
 		if _is_jelly_visual
-		else Basis.from_scale(Vector3(face_scale_m, face_scale_m, 1.0))
+		else Basis.from_scale(Vector3(
+			face_scale_m * punch_scale,
+			face_scale_m * punch_scale,
+			1.0
+		))
 	)
 	var symbol_y_offset: float = radius_m * 0.54 if _is_jelly_visual else 0.0
 	_symbol_mesh.position = (

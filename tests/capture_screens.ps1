@@ -29,7 +29,9 @@ $expectedFiles = @(
     "14_jelly_absorption_effect.png",
     "15_jelly_blast_effect.png",
     "16_jelly_jackpot_effect.png",
-    "17_jelly_max_effect.png"
+    "17_jelly_max_effect.png",
+    "18_jelly_landing_strip.png",
+    "19_jelly_crowded_rest.png"
 )
 
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {
