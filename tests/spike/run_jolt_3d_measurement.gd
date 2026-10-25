@@ -58,6 +58,10 @@ var _preview_fixture_serial: int = 0
 var _seed_seen_colors: Dictionary = {}
 var _seed_merge_count: int = 0
 var _seed_absorption_count: int = 0
+var _seed_jelly_outline_visible_frames: int = 0
+var _seed_jelly_unarmed_outline_visible_frames: int = 0
+var _seed_jelly_outline_max_alpha: float = 0.0
+var _seed_jelly_visible_mesh_frames: Dictionary = {}
 
 
 func _ready() -> void:
@@ -248,6 +252,10 @@ func _run_seed(
 	_seed_seen_colors.clear()
 	_seed_merge_count = 0
 	_seed_absorption_count = 0
+	_seed_jelly_outline_visible_frames = 0
+	_seed_jelly_unarmed_outline_visible_frames = 0
+	_seed_jelly_outline_max_alpha = 0.0
+	_seed_jelly_visible_mesh_frames.clear()
 	_current_measurement_turn = 0
 	var fixture: Dictionary = await _create_fixture(seed)
 	var fixture_root: Node = fixture["root"] as Node
@@ -420,6 +428,10 @@ func _run_seed(
 			if _seed_merge_count > 0
 			else 0.0
 		),
+		"jelly_outline_visible_frames": _seed_jelly_outline_visible_frames,
+		"jelly_unarmed_outline_visible_frames": _seed_jelly_unarmed_outline_visible_frames,
+		"jelly_outline_max_alpha": _seed_jelly_outline_max_alpha,
+		"jelly_visible_mesh_frames": _seed_jelly_visible_mesh_frames.duplicate(),
 		"reached_level_seven": score_manager.max_level_reached >= Config.data.orb_max_level,
 		"final_move_count": manager.final_move_count,
 		"final_move_success_count": manager.final_move_success_count,
@@ -654,6 +666,21 @@ func _wait_for_turn_end(
 		metrics["physics_ms_samples"] = int(metrics["physics_ms_samples"]) + 1
 		metrics["physics_ms_max"] = maxf(float(metrics["physics_ms_max"]), measured_ms)
 		for orb: Orb3D in board.get_orbs():
+			if _measurement_mode == GameConfig.GameMode.JELLY:
+				for child: Node in orb.get_children():
+					if child is MeshInstance3D and (child as MeshInstance3D).visible:
+						var mesh_name: String = child.name
+						_seed_jelly_visible_mesh_frames[mesh_name] = int(
+							_seed_jelly_visible_mesh_frames.get(mesh_name, 0)
+						) + 1
+				if orb._blast_outline.visible:
+					_seed_jelly_outline_visible_frames += 1
+					_seed_jelly_outline_max_alpha = maxf(
+						_seed_jelly_outline_max_alpha,
+						1.0 - orb._blast_outline.transparency
+					)
+					if not orb.is_blast_armed():
+						_seed_jelly_unarmed_outline_visible_frames += 1
 			var finite: bool = orb.position.is_finite() and orb.linear_velocity.is_finite()
 			var center_extent: float = maxf(absf(orb.position.x), absf(orb.position.y)) if finite else INF
 			if finite:
@@ -1476,6 +1503,9 @@ func _copy_preview_state(
 			source_orb.linear_velocity,
 			source_orb.generation
 		)
+		# Preview worlds only need physics and rules. Orb3D._process() updates
+		# interpolation, shaders, and meshes without changing the simulation.
+		target_orb.set_process(false)
 		target_orb.stable_spawn_id = source_orb.stable_spawn_id
 		if _measurement_mode == GameConfig.GameMode.JELLY:
 			target_orb.set_jelly_mass(source_orb.jelly_mass, Config.data)
@@ -1530,6 +1560,9 @@ func _wait_for_preview_turns(previews: Array[Dictionary]) -> void:
 		await get_tree().physics_frame
 		var all_finished: bool = true
 		for preview: Dictionary in previews:
+			var preview_board: Board3D = preview["board"] as Board3D
+			for preview_orb: Orb3D in preview_board.get_orbs():
+				preview_orb.set_process(false)
 			var manager: TurnManager = preview["manager"] as TurnManager
 			if (
 				manager.state != TurnManager.State.WAITING_INPUT

@@ -2,7 +2,7 @@ param(
     [string]$GodotPath = "",
     [ValidateRange(1, 20)]
     [int]$SeedCount = 20,
-    [ValidateRange(1, 4)]
+    [ValidateRange(1, 8)]
     [int]$Parallelism = 3,
     [ValidateRange(1, 600)]
     [int]$TurnCap = 600,
@@ -35,7 +35,9 @@ function Get-SeedShards([int]$Count, [int]$Size) {
 if (-not $AggregateOnly) {
     $tasks = @()
     foreach ($strategy in @("r", "g", "l_merge")) {
-        $shardSize = if ($strategy -eq "l_merge") { 1 } else { 5 }
+        # Keep each Godot worker below the desktop task runner's process window.
+        # A single 600-turn seed can already take more than one minute.
+        $shardSize = 1
         foreach ($shard in @(Get-SeedShards $SeedCount $shardSize)) {
             $name = "jelly_${strategy}_part$($shard.Start)-$($shard.End)"
             $output = Join-Path $outputDirectory "$name.json"
@@ -117,6 +119,9 @@ function Get-Summary($Rows) {
     $absorptions = [double](($Rows | Measure-Object -Property one_level_absorption_count -Sum).Sum)
     $decisions = [double](($Rows | Measure-Object -Property preview_decision_turns -Sum).Sum)
     $fatalAvoidance = [double](($Rows | Measure-Object -Property preview_fatal_avoidance_turns -Sum).Sum)
+    $outlineFrames = [double](($Rows | Measure-Object -Property jelly_outline_visible_frames -Sum).Sum)
+    $unarmedOutlineFrames = [double](($Rows | Measure-Object -Property jelly_unarmed_outline_visible_frames -Sum).Sum)
+    $outlineMaxAlpha = [double](($Rows | Measure-Object -Property jelly_outline_max_alpha -Maximum).Maximum)
     return [ordered]@{
         games = @($Rows).Count
         turns_median = Get-Median @($Rows | ForEach-Object { $_.completed_turns })
@@ -126,6 +131,9 @@ function Get-Summary($Rows) {
         final_move_successes = [int]$finalSuccess
         final_move_success_rate = Get-Ratio $finalSuccess $finalMoves
         one_level_absorption_fraction = Get-Ratio $absorptions $merges
+        blast_outline_visible_frames = [int]$outlineFrames
+        unarmed_blast_outline_visible_frames = [int]$unarmedOutlineFrames
+        blast_outline_max_alpha = $outlineMaxAlpha
         level_seven_game_rate = Get-Ratio @($Rows | Where-Object { $_.reached_level_seven }).Count @($Rows).Count
         jackpots = [int](($Rows | Measure-Object -Property max_clear_count -Sum).Sum)
         preview_fatal_avoidance_turns = [int]$fatalAvoidance
@@ -135,7 +143,7 @@ function Get-Summary($Rows) {
 
 $rows = [ordered]@{ r = @(); g = @(); l_merge = @() }
 foreach ($strategy in @($rows.Keys)) {
-    $shardSize = if ($strategy -eq "l_merge") { 1 } else { 5 }
+    $shardSize = 1
     foreach ($shard in @(Get-SeedShards $SeedCount $shardSize)) {
         $filePath = Join-Path $outputDirectory "jelly_${strategy}_part$($shard.Start)-$($shard.End).json"
         if (-not (Test-Path -LiteralPath $filePath)) { throw "Missing $filePath" }
@@ -171,6 +179,8 @@ $report = [ordered]@{
     comparison = [ordered]@{
         classic_c2 = [ordered]@{ r_turns = 221.0; r_score = 124262.5; l_turns = 327.0; l_score = 338539.5; skill_length_ratio = 1.479638009; early_merge_rate = 0.595 }
         slime_s2 = [ordered]@{ r_turns = 52.0; r_score = 103232.0; l_turns = 60.0; l_score = 151202.0; skill_length_ratio = 1.153846154; early_merge_rate = 2.966431688 }
+        jelly_j5_98 = [ordered]@{ r_turns = 223.5; l_turns = 328.0; skill_length_ratio = 1.467561521; skill_score_ratio = 4.15; early_merge_rate = 0.725 }
+        jelly_motion_101 = [ordered]@{ r_turns = 230.5 }
     }
     desired_range = [ordered]@{
         random_length_150_to_300 = $strategies.r.turns_median -ge 150 -and $strategies.r.turns_median -le 300

@@ -131,8 +131,11 @@ $expectedFiles = @(
 	"55_jelly_motion_right.png",
 	"56_jelly_blast_face_down.png",
 	"56_jelly_blast_face_right.png",
-	"56_jelly_blast_glow_min.png",
-	"56_jelly_blast_glow_max.png"
+	"57_jelly_full_down.png",
+	"57_jelly_full_right.png",
+	"57_jelly_full_eat_00.png",
+	"57_jelly_full_eat_01.png",
+	"57_jelly_full_eat_02.png"
 )
 $hudExpectedFiles = @(
     "02_turn_early.png",
@@ -176,8 +179,11 @@ $hudExpectedFiles = @(
 	"55_jelly_motion_right.png",
 	"56_jelly_blast_face_down.png",
 	"56_jelly_blast_face_right.png",
-	"56_jelly_blast_glow_min.png",
-	"56_jelly_blast_glow_max.png"
+	"57_jelly_full_down.png",
+	"57_jelly_full_right.png",
+	"57_jelly_full_eat_00.png",
+	"57_jelly_full_eat_01.png",
+	"57_jelly_full_eat_02.png"
 )
 $capturedFileCount = 0
 $boardReports = @()

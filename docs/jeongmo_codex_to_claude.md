@@ -38,6 +38,46 @@
 
 ## 미확인
 
+### [2026-10-25] 대상 #104 — JELLY 레벨 고정 크기 · 배 속 젤리 · 뒤 빛 삭제 · 어두운 띠 조사
+- 상태: 완료 — JELLY의 물리·그림 반지름을 표시 레벨에 고정하고, 흡수한 질량은 배 속 젤리로 표시함. JELLY `BlastOutline`은 대폭발 가능 여부와 관계없이 숨기고, 어두운 띠 재현 계측·60판 규칙 측정·두 비율 전체 캡처까지 완료함
+- 브랜치 / PR: `jelly-level-fixed-belly` / push·PR 생성 뒤 링크 반영 예정
+- 변경 파일: `config/GameConfig.gd`, `scenes/Orb3D.tscn`, `scripts/core/JellyOrbArt.gd`, `scripts/spike/Orb3D.gd`, `tests/{capture_screens.ps1,test_config.gd,test_jelly_visuals.gd,test_jolt_3d.gd}`, `tests/spike/{capture_screens.gd,run_jolt_3d_measurement.gd}`, `tests/tools/run_jelly_measurement.ps1`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `jelly_radius_for_mass(m)`을 `radius_for_level(jelly_level_for_mass(m))`으로 변경해 물리·그림 크기를 레벨 반지름에 고정. 같은 레벨 흡수는 60→60으로 크기 불변, L3 질량 6이 L2를 한 번 더 먹어 L4 질량 8이 될 때만 60→85를 0.10초 성장 — 자동 (`test_config`, `test_jolt_3d`)
+  - [x] 배 속 젤리 채움 `f=(m-base)/base`, 틀 기준 위치 `(가로 +0.12r, 중력 +0.44r)`, 반지름 `0.54r×sqrt(f)`, 몸통색 0.35 밝게·알파 0.85·좌상단 흰 반사점 알파 0.70, 몸통 앞/얼굴 뒤·몸통 원 안 클립·몸통과 같은 틀/`deform`·0.15초 전환 적용. L7은 질량 상한으로 `f=0` — 자동 (`test_jelly_visuals`, `test_jolt_3d`) + 캡처 직접 관측
+  - [x] JELLY에서는 L4~L7 및 armed/unarmed 모두 `BlastOutline`을 숨기고 터질 듯한 얼굴은 유지. CLASSIC·BLITZ 외곽 표시는 기존 경로 유지 — 자동 (`test_jelly_visuals`, `test_jolt_3d`) + 캡처 직접 관측
+  - [x] 프레임마다 보이는 자식 메시 수·외곽 표시 프레임·비무장 외곽 표시·최대 알파와 0.5초 초과 피드백 노드를 계측. R/G/L-합체 60판에서 JELLY 외곽 표시 프레임 0·비무장 표시 0·최대 알파 0, 실제 두 번 흡수 캡처에서 0.5초 초과 피드백 0 — 자동 측정
+  - [x] R·G·L-합체 × 시드 1~20 × 600턴 측정 완료. 무작위 판 길이 중앙 256.5, 실력 비 길이 1.446·점수 2.800, 초반 합체율 0.738로 §12-JE.4 바라는 범위 세 항목 모두 충족 — 자동 측정
+  - [x] `57_jelly_full_{down,right,eat_00,eat_01,eat_02}`를 두 비율에서 마지막 전체 캡처. 아래 중력 L3 f=0/0.5/0.75와 L5 f=0.5, 오른쪽 중력 추종, 실제 L3+L2 두 번의 60→60→85를 총 10장에서 직접 확인 — 자동 캡처 + 직접 관측
+  - [x] CLASSIC·BLITZ·SLIME 회귀 해시 유지, JELLY 시각 ON/OFF 해시 동일. 전체 테스트·5경로 스모크·Debug Windows 빌드·사용자 저장 불변 확인 — 자동
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard (`C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`), 작업 시작 기준 `origin/main`과 브랜치 기준 모두 `b57a372`
+  - `godot --headless --path . --import` 최종 실행 → 종료 코드 0, `ERROR`·`SCRIPT ERROR`·`Parse Error` 각 0건
+  - `tests/run_tests.ps1` → 일반 `371/371` (`24.743초`), 장기 `5/5` (`43.247초`), 성능 `5/5` (`3.268초`), 합계 `381/381`, 종료 코드 0, 총 `71.258초`
+  - JELLY 단일 회귀 재확인 → `18/18`, 시각 ON/OFF 상태 해시 `5c96a80c71c632fb8e727cf1be541757c464b436dd83d6c8d0737b1211347df1`. TURN `a27323b13e998dd0f41ff351aec47262dbe08108184d2d988af79aa829e8a724`, BLITZ `92eedf120de217f8760de532bd55bf12ad1ae82dff9bd4bc218e42a553ccbc80`; 기존 CLASSIC·SLIME 회귀 테스트도 통과
+  - 규칙 측정 60판 결과:
+
+    | 전략 | 턴 중앙 | 점수 중앙 | 1~30턴 합체/턴 | FINAL MOVE 성공/발생 | 한 단계 흡수 비율 | L7 판 비율 | 외곽 표시 프레임/비무장/최대 알파 |
+    |---|---:|---:|---:|---:|---:|---:|---:|
+    | R | 256.5 | 200,746 | 0.7383 | 1/21 (4.76%) | 0.5479 | 0.00 | 0 / 0 / 0.0 |
+    | G | 327.0 | 301,083.5 | 0.7617 | 0/20 | 0.5423 | 0.05 | 0 / 0 / 0.0 |
+    | L-합체 | 371.0 | 562,031.5 | 0.7800 | 0/20 | 0.5487 | 0.30 | 0 / 0 / 0.0 |
+
+  - 비교 → #98 J5 `R 223.5 / L 328 / 길이비 1.468 / 점수비 4.15 / 초반 0.725`, #101 뒤 `R 230.5`; 현재 `R 256.5 / L 371 / 길이비 1.446 / 점수비 2.800 / 초반 0.738`. 같은 시드 L 우세율 길이 95%, 점수 90%; 길이비 1.3 이상·R 150~300·초반 CLASSIC C2 0.595 초과 모두 관측됨
+  - 어두운 띠 조사 → 사용자 묘사와 크기·색이 일치하는 가장 강한 코드 후보는 #102의 `BlastOutline` 1.25r 제 색 빛 판이었으나, 이전 코드의 가시 조건은 armed뿐이라 “보통 얼굴”에서 켜진 정확한 경로는 재현하지 못함. 변경 뒤 R/G/L 60판 프레임 계측과 실제 흡수 2회에서 외곽 표시 0회, 비무장 표시 0회, 최대 알파 0, 0.5초 초과 근접 피드백 노드 0회; 두 비율 직접 관측에서도 띠 0건
+  - `tests/capture_screens.ps1` 최종 전체 실행 → 두 비율×105개=`210`개 요구 캡처, 종료 코드 0. #104 10장 직접 확인: L3 f 증가에 따른 내부 젤리 증가, L5 얼굴 뒤 배치, 오른쪽 중력 쪽 이동·변형 추종, 실제 흡수 60→60→85, 외곽 빛·어두운 띠·얼굴 가림 각 0건. 캡처 테스트의 기존 TURN 점수 직접 대입 뒤 HUD 신호 누락도 함께 보강
+  - 기본·TURN·BLITZ·SLIME·JELLY `--quit-after 300` → 5개 모두 종료 코드 0, 오류 표식 0건
+  - `tools/build_windows.ps1 -Debug` → 종료 코드 0, `build/windows-debug/GravityOrb_v0.15.1.exe` `105,090,848`바이트; Release 미실행
+  - 사용자 `save.cfg`는 검증 전후 `1,488`바이트, SHA-256 `4D8C75B028AD8710E8B24779A35283848845F75D9A97D238B9D24419BD1FB14D` 동일
+  - 규칙 검사 → 허용 파일 외 신규 `Input`/`InputEvent` 0건, 본 변경의 신규 전역 난수 호출 0건, `git diff --check` 오류 0건. 전체 검색의 `SlimeSim`/`SlimeGame` 명시적 RNG는 기존 코드이며 diff 없음
+- 수동 확인 절차:
+  1. `--mode=jelly`에서 같은 색 L3과 L2를 한 번 합친다 → 먹는 L3의 몸통·충돌 크기는 L3 그대로이고, 배 속 중력 쪽에 밝은 같은 색 젤리가 약 0.15초에 걸쳐 나타나야 한다.
+  2. 같은 L3이 같은 색 L2를 한 번 더 먹게 한다 → 표시 레벨이 L4로 바뀌면서 몸통·물리 반지름이 L3 60에서 L4 85로 약 0.10초 성장하고, 새 레벨의 `f=0`이 되어 배 속 젤리는 약 0.15초에 걸쳐 사라져야 한다.
+  3. 중력을 네 방향으로 바꾼다 → 배 속 젤리는 몸통과 함께 변형되며 항상 중력 쪽으로 돌고, 얼굴은 화면 위를 유지하며 배 속 젤리보다 앞에 보여야 한다.
+  4. L5·L6·L7을 만들고 여러 번 움직인다 → L5·L6의 터질 듯한 얼굴은 남지만 몸통 뒤 제 색 빛·어두운 외곽 띠는 어느 프레임에도 보이지 않아야 한다. CLASSIC·BLITZ 대폭발 표시는 기존처럼 보여야 한다.
+- 결정 사항: 명세 수치만 사용했고 밸런스·규칙·점수·질량 계산·공개 API는 변경하지 않음. 측정의 60개 미리보기 월드는 시각 `_process`만 끄고 물리·규칙은 유지해 병렬 실행 시간을 줄였으며, 결과 판단은 Claude에 남김
+- 남은 것 · 질문: 자동 검증·측정·전체 캡처·직접 관측을 완료함. 사용자 보고의 “보통 얼굴에서 나타난” 정확한 과거 활성화 경로는 재현되지 않았고, 시각적 후보인 `BlastOutline`을 JELLY에서 무조건 숨긴 뒤 재현 0회를 관측함. 최종 합격/불합격 판정은 Claude에 남김
+
 ### [2026-10-25] 대상 #103 — Windows 빌드 0.15.1
 - 상태: 완료 — 최신 `origin/main`의 #101·#102 반영 상태에서 프로젝트 버전을 `0.15.1`로 올리고 Godot 4.8 Standard Release Windows 패키지를 생성·검증함
 - 브랜치 / PR: `build-0.15.1` / https://github.com/jeongmo-dot/gravity_orb/pull/105
