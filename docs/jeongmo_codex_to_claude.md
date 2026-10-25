@@ -40,7 +40,7 @@
 
 ### [2026-10-26] 대상 #108 — JELLY 테스트·캡처 복원과 검수 빈틈 보완
 - 상태: 완료 — 레거시 네 모드 태그에서 JELLY에 필요한 호령 테스트와 화면을 선별 복원하고, 규칙 경로 해시·누수 진단·HUD 겹침 계측·빌드 보존 장치를 추가함. 런타임 코드·수치·사용자 저장 파일은 변경하지 않음
-- 브랜치 / PR: `jelly-test-capture-recovery` / PR 생성 예정
+- 브랜치 / PR: `jelly-test-capture-recovery` / https://github.com/jeongmo-dot/gravity_orb/pull/113
 - 변경 파일: `tests/{test_callouts.gd,test_jelly_regression.gd,test_build_script.gd,capture_screens.ps1}`, `tests/spike/capture_screens.gd`, `tools/build_windows.ps1`, `docs/{jeongmo_codex_to_claude.md,archive/codex_to_claude_001-100.md}`
 - Done-when 대조:
   - [x] BLITZ 전용 검사는 되살리지 않고 JELLY 호령 5종을 복원 — 자동. 턴 호령 연쇄당 1회, JELLY 미리보기·새 젤리 이름/그림, SFX 음소거·단계별 음높이, 호령 끄기와 상태 보존, 프레임 비용을 각각 검사
