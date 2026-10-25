@@ -76,7 +76,7 @@
   - 소스 기본·`--mode=jelly` `--quit-after 300` → 각각 종료 코드 0, 오류 표식 0건
   - `tests/run_jelly_edge_rendering_diagnostic.ps1` → 두 비율 종료 코드 0; 위치 9개·후보 11개·움직임 전후·림 전후 보고서와 캡처 생성
   - `tests/capture_screens.ps1` → 두 비율 각 19장, 총 38장, 종료 코드 0. `04_jelly_gameplay`, `18_jelly_landing_strip`, `19_jelly_crowded_rest` 포함 직접 확인: 끝·구석·쌓인 젤리 바깥 어두운 띠 0, 얼굴 중심 일치, 기존 반투명 밝기 유지
-  - `tools/build_windows.ps1 -Debug` → 종료 코드 0, `build/windows-debug/GravityOrb_v0.16.0.exe` `104,940,160`바이트; Release 미실행. 내보낸 Debug 기본·JELLY 스모크 각각 종료 코드 0
+  - `tools/build_windows.ps1 -Debug` → 종료 코드 0, `build/windows-debug/GravityOrb_v0.16.0.exe` `104,940,144`바이트; Release 미실행. 내보낸 Debug 기본·JELLY 스모크 각각 종료 코드 0
   - 그림자 검색 `shadow_enabled = true`·`cast_shadow = 1`·`SHADOW_CASTING_SETTING_ON` → `scenes/`, `scripts/`, `tests/` 0건
   - 사용자 `save.cfg`는 검증 전후 `1,488`바이트, SHA-256 `4D8C75B028AD8710E8B24779A35283848845F75D9A97D238B9D24419BD1FB14D` 동일
   - 규칙 검사 → 허용 파일 외 `Input`/`InputEvent` 0건, Spawner 외 신규 전역 난수 호출 0건, `git diff --check` 오류 0건
