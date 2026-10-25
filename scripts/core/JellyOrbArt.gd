@@ -164,6 +164,7 @@ static func body_material_for(color_index: int, level: int) -> ShaderMaterial:
 	if not _body_materials.has(key):
 		var material: ShaderMaterial = ShaderMaterial.new()
 		material.resource_name = "jelly_body_c%d_l%d" % [color_index, level]
+		material.render_priority = 10
 		material.shader = _get_body_shader()
 		material.set_shader_parameter("base_color", color_for(color_index, level))
 		material.set_shader_parameter("level_id", level)
@@ -186,6 +187,7 @@ static func face_material_for(
 			level,
 			uses_blast_face,
 		]
+		material.render_priority = 12
 		material.shader = _get_face_shader()
 		material.set_shader_parameter("jelly_color", color_for(color_index, level))
 		material.set_shader_parameter("color_id", color_index)
@@ -234,6 +236,7 @@ static func belly_material_for(color_index: int, level: int) -> ShaderMaterial:
 	if not _belly_materials.has(key):
 		var material: ShaderMaterial = ShaderMaterial.new()
 		material.resource_name = "jelly_belly_c%d_l%d" % [color_index, level]
+		material.render_priority = 11
 		material.shader = _get_belly_shader()
 		material.set_shader_parameter(
 			"belly_color",

@@ -25,6 +25,12 @@ const CAPTURE_FILES: Array[String] = [
 	"17_jelly_max_effect.png",
 	"18_jelly_landing_strip.png",
 	"19_jelly_crowded_rest.png",
+	"20_jelly_yellow_cheek_zoom.png",
+	"21_jelly_green_cheek_zoom.png",
+	"22_jelly_blue_cheek_zoom.png",
+	"23_jelly_belly_half_zoom.png",
+	"24_jelly_belly_three_quarter_zoom.png",
+	"25_jelly_max_effect_zoom.png",
 ]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
@@ -165,6 +171,7 @@ func _capture_gameplay_scenes() -> void:
 	await get_tree().create_timer(Orb3D.JELLY_BELLY_TRANSITION_DURATION).timeout
 	await _capture("12_jelly_eat_02.png")
 	await _capture_effect_scenes(main, board)
+	await _capture_overlay_detail_scenes(main, board)
 	await _capture_deform_scenes(main, board)
 	await _destroy_main(main)
 
@@ -248,6 +255,112 @@ func _capture_effect_scenes(main: Main, board: Board3D) -> void:
 	})
 	await get_tree().create_timer(0.06).timeout
 	await _capture("17_jelly_max_effect.png")
+
+
+func _capture_overlay_detail_scenes(main: Main, board: Board3D) -> void:
+	var director: FeedbackDirector = main.get_node("FeedbackDirector") as FeedbackDirector
+	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
+	director.clear_effects()
+	board.clear()
+	board.set_gravity(Vector2i.DOWN)
+	var cheek_specs: Array[Dictionary] = [
+		{
+			"color": OrbTypes.OrbColor.YELLOW,
+			"position": Vector2(-220.0, 0.0),
+			"expected": Color8(247, 133, 126),
+			"file": "20_jelly_yellow_cheek_zoom.png",
+		},
+		{
+			"color": OrbTypes.OrbColor.GREEN,
+			"position": Vector2.ZERO,
+			"expected": Color8(192, 131, 142),
+			"file": "21_jelly_green_cheek_zoom.png",
+		},
+		{
+			"color": OrbTypes.OrbColor.BLUE,
+			"position": Vector2(220.0, 0.0),
+			"expected": Color8(200, 112, 170),
+			"file": "22_jelly_blue_cheek_zoom.png",
+		},
+	]
+	var cheek_orbs: Array[Orb3D] = []
+	for spec: Dictionary in cheek_specs:
+		var orb: Orb3D = board.spawn_orb(
+			int(spec["color"]),
+			5,
+			spec["position"] as Vector2
+		)
+		orb.disable_physics()
+		cheek_orbs.append(orb)
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var cheek_image: Image = get_viewport().get_texture().get_image()
+	for index: int in range(cheek_orbs.size()):
+		var orb: Orb3D = cheek_orbs[index]
+		var spec: Dictionary = cheek_specs[index]
+		var cheek_point: Vector2 = camera.unproject_position(
+			orb._face.global_transform * Vector3(
+				JellyOrbArt.BLAST_BLUSH_CENTER.x,
+				-JellyOrbArt.BLAST_BLUSH_CENTER.y,
+				0.0
+			)
+		)
+		var actual: Color = _pixel_at(cheek_image, cheek_point)
+		var expected: Color = spec["expected"] as Color
+		print(
+			"JELLY_OVERLAY_PIXEL kind=cheek color=%d actual=%s expected=%s tolerance=12" % [
+				int(spec["color"]),
+				_rgb8_text(actual),
+				_rgb8_text(expected),
+			]
+		)
+		if not _color_within_rgb8(actual, expected, 12):
+			_fail("Cheek pixel outside tolerance for color %d" % int(spec["color"]))
+		await _capture_zoom(
+			spec["file"] as String,
+			camera.unproject_position(orb._mesh.global_position),
+			76
+		)
+
+	board.clear()
+	var belly_half: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 3, Vector2(-100.0, 0.0))
+	var belly_three_quarter: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 3, Vector2(100.0, 0.0))
+	belly_half.set_jelly_mass(6.0, Config.data)
+	belly_three_quarter.set_jelly_mass(7.0, Config.data)
+	belly_half.disable_physics()
+	belly_three_quarter.disable_physics()
+	await get_tree().create_timer(Orb3D.JELLY_BELLY_TRANSITION_DURATION).timeout
+	await _capture_zoom(
+		"23_jelly_belly_half_zoom.png",
+		camera.unproject_position(belly_half._mesh.global_position),
+		76
+	)
+	await _capture_zoom(
+		"24_jelly_belly_three_quarter_zoom.png",
+		camera.unproject_position(belly_three_quarter._mesh.global_position),
+		76
+	)
+	await _verify_belly_pixel(camera, belly_half, "0.50")
+	await _verify_belly_pixel(camera, belly_three_quarter, "0.75")
+
+	board.clear()
+	director.clear_effects()
+	var maximum: Orb3D = board.spawn_orb(OrbTypes.OrbColor.YELLOW, 7, Vector2.ZERO)
+	maximum.disable_physics()
+	director.play_reaction_visuals({
+		"type": ReactionRules.Type.MERGE,
+		"result_orb": maximum,
+		"result_level": 7,
+		"result_color": OrbTypes.OrbColor.YELLOW,
+		"position": Vector2.ZERO,
+		"shock_targets": [],
+	})
+	await get_tree().create_timer(0.14).timeout
+	await _capture_zoom(
+		"25_jelly_max_effect_zoom.png",
+		camera.unproject_position(maximum._mesh.global_position),
+		132
+	)
 
 
 func _capture_deform_scenes(main: Main, board: Board3D) -> void:
@@ -351,6 +464,95 @@ func _capture(file_name: String) -> void:
 		_fail("Could not save %s: %s" % [path, error_string(error)])
 		return
 	print("SCREEN_CAPTURE file=%s size=%dx%d" % [path, image.get_width(), image.get_height()])
+
+
+func _capture_zoom(file_name: String, center: Vector2, half_size: int) -> void:
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var image: Image = get_viewport().get_texture().get_image()
+	center = _image_point(image, center)
+	var size: int = half_size * 2
+	var x: int = clampi(roundi(center.x) - half_size, 0, image.get_width() - size)
+	var y: int = clampi(roundi(center.y) - half_size, 0, image.get_height() - size)
+	var zoom: Image = image.get_region(Rect2i(x, y, size, size))
+	zoom.resize(480, 480, Image.INTERPOLATE_LANCZOS)
+	var path: String = _output_directory.path_join(file_name)
+	var error: Error = zoom.save_png(path)
+	if error != OK:
+		_fail("Could not save %s: %s" % [path, error_string(error)])
+		return
+	print("SCREEN_CAPTURE_ZOOM file=%s source=%dx%d output=480x480" % [path, size, size])
+
+
+func _verify_belly_pixel(camera: Camera3D, orb: Orb3D, fraction_label: String) -> void:
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var point: Vector2 = camera.unproject_position(
+		orb._belly.global_transform * Vector3(
+			JellyOrbArt.BELLY_CENTER.x,
+			-JellyOrbArt.BELLY_CENTER.y,
+			0.0
+		)
+	)
+	var visible_image: Image = get_viewport().get_texture().get_image()
+	var visible_color: Color = _pixel_at(visible_image, point)
+	orb._belly.visible = false
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var hidden_image: Image = get_viewport().get_texture().get_image()
+	var hidden_color: Color = _pixel_at(hidden_image, point)
+	orb._belly.visible = true
+	var difference: int = maxi(
+		absi(roundi((visible_color.r - hidden_color.r) * 255.0)),
+		maxi(
+			absi(roundi((visible_color.g - hidden_color.g) * 255.0)),
+			absi(roundi((visible_color.b - hidden_color.b) * 255.0))
+		)
+	)
+	print(
+		"JELLY_OVERLAY_PIXEL kind=belly fraction=%s visible=%s hidden=%s max_delta=%d" % [
+			fraction_label,
+			_rgb8_text(visible_color),
+			_rgb8_text(hidden_color),
+			difference,
+		]
+	)
+	if difference <= 12:
+		_fail("Belly fill %s is not visibly different from the body" % fraction_label)
+
+
+func _pixel_at(image: Image, point: Vector2) -> Color:
+	point = _image_point(image, point)
+	return image.get_pixel(
+		clampi(roundi(point.x), 0, image.get_width() - 1),
+		clampi(roundi(point.y), 0, image.get_height() - 1)
+	)
+
+
+func _image_point(image: Image, viewport_point: Vector2) -> Vector2:
+	var logical_size: Vector2 = get_viewport().get_visible_rect().size
+	if logical_size.x <= 0.0 or logical_size.y <= 0.0:
+		return viewport_point
+	return viewport_point * Vector2(
+		float(image.get_width()) / logical_size.x,
+		float(image.get_height()) / logical_size.y
+	)
+
+
+func _color_within_rgb8(actual: Color, expected: Color, tolerance: int) -> bool:
+	return (
+		absi(roundi((actual.r - expected.r) * 255.0)) <= tolerance
+		and absi(roundi((actual.g - expected.g) * 255.0)) <= tolerance
+		and absi(roundi((actual.b - expected.b) * 255.0)) <= tolerance
+	)
+
+
+func _rgb8_text(color_value: Color) -> String:
+	return "%d,%d,%d" % [
+		roundi(color_value.r * 255.0),
+		roundi(color_value.g * 255.0),
+		roundi(color_value.b * 255.0),
+	]
 
 
 func _parse_arguments() -> void:

@@ -1,6 +1,56 @@
 extends TestCase
 
 const BOARD_SCENE: PackedScene = preload("res://scenes/Board3D.tscn")
+const MAIN_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
+
+
+func test_jelly_scene_lighting_and_all_orb_meshes_disable_shadows() -> void:
+	var main: Main = MAIN_SCENE.instantiate() as Main
+	var key_light: DirectionalLight3D = main.get_node("KeyLight") as DirectionalLight3D
+	assert_true(not key_light.shadow_enabled, "main key light does not render unrequested shadows")
+	main.free()
+
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var board: Board3D = await _create_board()
+	var orb: Orb3D = board.spawn_orb(2, 3, Vector2.ZERO)
+	for node: Node in orb.find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance: MeshInstance3D = node as MeshInstance3D
+		assert_eq(
+			mesh_instance.cast_shadow,
+			GeometryInstance3D.SHADOW_CASTING_SETTING_OFF,
+			"%s cannot cast a shadow outside the JELLY body" % mesh_instance.name
+		)
+	await _cleanup(board)
+	Config.data.game_mode = original_mode
+
+
+func test_jelly_face_and_belly_centers_keep_body_screen_position_at_board_edge() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var root: Node3D = Node3D.new()
+	var camera: Camera3D = Camera3D.new()
+	camera.position = Vector3(0.0, 0.0, 20.0)
+	camera.current = true
+	root.add_child(camera)
+	var board: Board3D = BOARD_SCENE.instantiate() as Board3D
+	root.add_child(board)
+	tree.root.add_child(root)
+	await tree.process_frame
+	var orb: Orb3D = board.spawn_orb(2, 3, Vector2(405.0, 405.0))
+	orb.disable_physics()
+	orb._update_visual_transform()
+	var body_center: Vector2 = camera.unproject_position(orb._mesh.global_position)
+	assert_true(
+		body_center.distance_to(camera.unproject_position(orb._face.global_position)) < 0.001,
+		"face plate has no perspective parallax at a board corner"
+	)
+	assert_true(
+		body_center.distance_to(camera.unproject_position(orb._belly.global_position)) < 0.001,
+		"belly plate has no perspective parallax at a board corner"
+	)
+	await _cleanup(root)
+	Config.data.game_mode = original_mode
 
 
 func test_jelly_palette_matches_classic_color_indices_and_level_lightening() -> void:
@@ -25,6 +75,22 @@ func test_jelly_orb_uses_face_shader_without_ring_geometry() -> void:
 	assert_true(orb._face.visible, "JELLY face billboard visible")
 	assert_eq(_forbidden_geometry_count(orb), 0, "JELLY orb has no ring geometry")
 	assert_true(orb.visual_material_resource().shader.code.contains("lower_scatter"), "JELLY body shader")
+	assert_eq(orb.visual_material_resource().render_priority, 10, "JELLY body renders after board glass")
+	assert_eq(
+		(orb._belly.material_override as ShaderMaterial).render_priority,
+		11,
+		"JELLY belly renders after the translucent body"
+	)
+	assert_eq(
+		(orb._face.material_override as ShaderMaterial).render_priority,
+		12,
+		"JELLY face renders after the belly"
+	)
+	assert_eq(
+		(orb._symbol_mesh.mesh as QuadMesh).material.render_priority,
+		13,
+		"JELLY symbol renders after the face"
+	)
 	assert_true(
 		(orb._face.material_override as ShaderMaterial).shader.code.contains("capsule"),
 		"JELLY capsule-eye face shader"
@@ -347,7 +413,7 @@ func test_jelly_face_and_symbol_stay_in_front_of_deformed_body() -> void:
 	Config.data.game_mode = original_mode
 
 
-func test_new_jelly_frame_starts_at_first_gravity_then_turns_smoothly() -> void:
+func test_jelly_frame_stays_aligned_with_current_gravity() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	var board: Board3D = await _create_board()
@@ -369,28 +435,54 @@ func test_new_jelly_frame_starts_at_first_gravity_then_turns_smoothly() -> void:
 
 	board.set_gravity(Vector2i.DOWN)
 	var turning: Orb3D = board.spawn_orb(0, 3, Vector2.ZERO)
+	var initial_belly_rotation: float = turning._jelly_belly_rotation
 	board.set_gravity(Vector2i.RIGHT)
+	assert_near(
+		turning._jelly_frame_rotation,
+		turning._jelly_frame_target_rotation,
+		0.0001,
+		"existing JELLY deform frame snaps before the next render frame"
+	)
+	assert_near(
+		turning._jelly_belly_rotation,
+		initial_belly_rotation,
+		0.0001,
+		"belly position does not snap with the deform frame"
+	)
 	turning._process(1.0 / 120.0)
-	assert_true(turning._jelly_frame_rotation > 0.0, "existing JELLY begins turning")
+	assert_near(
+		turning._jelly_frame_rotation,
+		turning._jelly_frame_target_rotation,
+		0.0001,
+		"existing JELLY deform frame immediately aligns with changed gravity"
+	)
 	assert_true(
-		turning._jelly_frame_rotation < turning._jelly_frame_target_rotation,
-		"existing JELLY does not jump when gravity changes"
+		turning._jelly_belly_rotation > initial_belly_rotation
+		and turning._jelly_belly_rotation < turning._jelly_frame_target_rotation,
+		"belly position rotates smoothly at delta times eight"
+	)
+	assert_near(
+		turning._belly.rotation.z,
+		turning._jelly_belly_rotation,
+		0.0001,
+		"belly mesh uses the smoothed rotation"
 	)
 	await _cleanup(board)
 	Config.data.game_mode = original_mode
 
 
-func test_jelly_frame_rotation_and_breath_weight_change_without_jumps() -> void:
+func test_jelly_frame_rotation_and_breath_weight_follow_current_state() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	var board: Board3D = await _create_board()
 	var orb: Orb3D = board.spawn_orb(0, 3, Vector2.ZERO)
 	orb.set_gravity(Vector2i.RIGHT, Config.data.gravity_strength)
 	orb._process(1.0 / 120.0)
-	assert_true(orb._jelly_frame_rotation > 0.0, "JELLY frame begins turning toward gravity")
-	assert_true(
-		orb._jelly_frame_rotation < orb._jelly_frame_target_rotation,
-		"JELLY frame does not jump to the target rotation"
+	assert_near(
+		orb._jelly_frame_rotation,
+		orb._jelly_frame_target_rotation,
+		0.0001,
+		"JELLY deform frame immediately follows gravity"
 	)
 	assert_near(orb._mesh.rotation.z, orb._jelly_frame_rotation, 0.0001, "body uses frame rotation")
 	var expected_deform: Vector2 = Vector2(

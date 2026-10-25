@@ -994,6 +994,7 @@ func _new_particle_node() -> CPUParticles3D:
 	var quad: QuadMesh = QuadMesh.new()
 	quad.size = Vector2(0.12, 0.12)
 	var material: ShaderMaterial = ShaderMaterial.new()
+	material.render_priority = 14
 	material.shader = _effect_particle_shader
 	quad.material = material
 	particles.mesh = quad
@@ -1075,7 +1076,7 @@ func _new_effect_particle_shader() -> Shader:
 	var shader: Shader = Shader.new()
 	shader.code = """
 shader_type spatial;
-render_mode unshaded, blend_add, depth_draw_never, cull_disabled;
+render_mode unshaded, blend_add, depth_draw_never, depth_test_disabled, cull_disabled;
 uniform vec4 particle_color : source_color = vec4(1.0);
 void vertex() {
 	MODELVIEW_MATRIX = VIEW_MATRIX * mat4(

@@ -206,6 +206,17 @@ func test_merge_punch_scales_visual_and_emits_stardust() -> void:
 		tree.get_nodes_in_group(&"feedback_particles")[0] as CPUParticles3D
 	)
 	assert_eq(particles.amount, 12, "merge stardust amount")
+	assert_eq(
+		((particles.mesh as QuadMesh).material as ShaderMaterial).render_priority,
+		14,
+		"merge and MAX foreground stars render after JELLY overlays"
+	)
+	assert_true(
+		((particles.mesh as QuadMesh).material as ShaderMaterial).shader.code.contains(
+			"depth_test_disabled"
+		),
+		"merge and MAX foreground stars stay visible across JELLY bodies"
+	)
 	await tree.create_timer(0.05, true, false, true).timeout
 	assert_true(orb._mesh.scale.x > 1.0, "visual mesh punches outward")
 	assert_near(collision.radius, collision_radius, TOLERANCE, "collision radius is unchanged")

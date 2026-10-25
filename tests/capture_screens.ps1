@@ -31,7 +31,13 @@ $expectedFiles = @(
     "16_jelly_jackpot_effect.png",
     "17_jelly_max_effect.png",
     "18_jelly_landing_strip.png",
-    "19_jelly_crowded_rest.png"
+    "19_jelly_crowded_rest.png",
+    "20_jelly_yellow_cheek_zoom.png",
+    "21_jelly_green_cheek_zoom.png",
+    "22_jelly_blue_cheek_zoom.png",
+    "23_jelly_belly_half_zoom.png",
+    "24_jelly_belly_three_quarter_zoom.png",
+    "25_jelly_max_effect_zoom.png"
 )
 
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {

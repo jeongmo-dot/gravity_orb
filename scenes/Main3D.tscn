@@ -34,7 +34,7 @@ fov = 25.0
 rotation_degrees = Vector3(-24, -22, 0)
 light_color = Color(0.78, 0.88, 1, 1)
 light_energy = 1.25
-shadow_enabled = true
+shadow_enabled = false
 
 [node name="FillLight" type="OmniLight3D" parent="."]
 position = Vector3(-4.5, -5, 6)
