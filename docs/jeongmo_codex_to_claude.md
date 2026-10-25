@@ -62,7 +62,7 @@
   - JELLY 시각 ON/OFF 상태 해시 → `5c96a80c71c632fb8e727cf1be541757c464b436dd83d6c8d0737b1211347df1`, #104·#106·#109 기준과 동일. CLASSIC staged difficulty 해시도 기존 `cf6172428c7901c43eb74f417e6880dc3ad375a329e669a8904234f5d38d1031` 유지
   - `tests/capture_screens.ps1` → `540×960`, `540×1170` 각각 17장, 합계 34장, 종료 코드 0. `01_jelly_start`, `13_jelly_merge_effect`~`17_jelly_max_effect` 두 비율 12장을 직접 열어 고리·궤도선 0건, 유지 대상 연출·HUD 잘림/겹침 이상 0건 관측
   - 소스 및 Debug 콘솔 exe의 기본·`--mode=jelly` 스모크 → 네 실행 모두 종료 코드 0, 오류 표식 0건
-  - `tools/build_windows.ps1 -Debug` → `version=0.16.0`, 종료 코드 0, `GravityOrb_v0.16.0.exe` `104,937,680`바이트, `.console.exe` `50,176`바이트
+  - `tools/build_windows.ps1 -Debug` → `version=0.16.0`, 종료 코드 0, `GravityOrb_v0.16.0.exe` `104,937,632`바이트, `.console.exe` `50,176`바이트
   - 사용자 `save.cfg` → `1,488`바이트, SHA-256 `4D8C75B028AD8710E8B24779A35283848845F75D9A97D238B9D24419BD1FB14D`로 작업 전후 동일
   - 지정 소스 검색 → `TorusMesh`, `_create_ring`, `ModeRing`, `Adornment`, `BlastOutline` 각 0건. `draw_arc`는 `OrbVisual.gd`에 10건 남으며 모두 MAX 입(반원 2개), 행성 표면 구름/명암의 열린 부분 선으로 시작·끝 각도가 `TAU` 전체가 아닌 비고리 그림이다. `SphereMesh.rings` 1건은 구의 세로 세그먼트 수 API로 고리 메시가 아니다
   - 규칙 검사 → 허용 파일 외 `Input`/`InputEvent` 0건, Spawner 외 전역 난수 0건, `git diff --check` 오류 0건
