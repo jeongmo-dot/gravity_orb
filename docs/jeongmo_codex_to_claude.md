@@ -40,7 +40,7 @@
 
 ### [2026-10-26] 대상 #111 — 가장자리 젤리 어두운 띠 원인 분리·제거
 - 상태: 완료 — 실제 창 두 비율에서 후보를 하나씩 비교해 보드 반투명판과 몸통의 거리 정렬, 몸통 그림자, 얼굴·배 판 원근 시차, 중력 전환 중 변형틀 회전 지연을 분리하고 비의도 항목을 제거함
-- 브랜치 / PR: `jelly-edge-dark-rim` / 생성 예정
+- 브랜치 / PR: `jelly-edge-dark-rim` / https://github.com/jeongmo-dot/gravity_orb/pull/112
 - 변경 파일: `scenes/{Main3D,Orb3D}.tscn`, `scripts/core/JellyOrbArt.gd`, `scripts/spike/Orb3D.gd`, `tests/test_jelly_visuals.gd`, `tests/run_jelly_edge_rendering_diagnostic.ps1`, `tests/spike/{JellyEdgeRenderingDiagnostic.tscn,run_jelly_edge_rendering_diagnostic.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 같은 초록 L3를 가운데·네 변·네 구석에 두고 실제 창 `540×960`·`540×1170`에서 몸통 바깥 `1.0r~1.3r`, 안쪽 `0.7r~1.0r`, 몸통 중심을 픽셀 계측 — 자동 실제 창 진단 + 직접 관측
