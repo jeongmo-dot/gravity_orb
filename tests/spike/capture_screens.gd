@@ -216,7 +216,7 @@ func _capture_gameplay_scenes() -> void:
 	await _capture_effect_scenes(main, board)
 	await _capture_overlay_detail_scenes(main, board)
 	await _capture_deform_scenes(main, board)
-	await _capture_recovered_jelly_scenes(main, board, hud)
+	await _capture_recovered_jelly_scenes(main, manager, board, hud)
 	await _destroy_main(main)
 
 
@@ -537,7 +537,12 @@ func _capture_recovered_hud_scenes(
 	)
 
 
-func _capture_recovered_jelly_scenes(main: Main, board: Board3D, hud: Hud) -> void:
+func _capture_recovered_jelly_scenes(
+	main: Main,
+	manager: TurnManager,
+	board: Board3D,
+	hud: Hud
+) -> void:
 	var feedback: FeedbackDirector = main.get_node("FeedbackDirector") as FeedbackDirector
 	board.clear()
 	feedback.clear_effects()
@@ -650,24 +655,65 @@ func _capture_recovered_jelly_scenes(main: Main, board: Board3D, hud: Hud) -> vo
 		hud._callout_tween.kill()
 	hud._hide_callout_label()
 
+	await _capture_recovered_jelly_motion(main, manager, board)
+	print(
+		"SCREEN_CAPTURE_CHECK scene=recovered_jelly levels=7 crowded=25 max=true "
+		+ "stretch=true absorption=true unlock=true land_frames=10 breathe=true "
+		+ "physical_pile=true right_motion=true"
+	)
+
+
+func _capture_recovered_jelly_motion(
+	main: Main,
+	manager: TurnManager,
+	board: Board3D
+) -> void:
+	var resolver: CollisionResolver = main.get_node("CollisionResolver") as CollisionResolver
+	resolver.set_physics_process(false)
+	resolver._pending.clear()
 	board.clear()
+	manager._set_state(TurnManager.State.SIMULATING)
 	board.set_turn_resting(false)
 	board.set_gravity(Vector2i.DOWN)
-	var landing: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, 7, Vector2.ZERO)
-	landing.disable_physics()
-	landing.set_gravity(Vector2i.DOWN, Config.data.gravity_strength)
-	for frame_index: int in range(10):
-		if frame_index < 4:
-			landing.linear_velocity = Vector2(0.0, 1100.0 - float(frame_index) * 120.0)
-		else:
-			if frame_index == 4:
-				landing.linear_velocity = Vector2(0.0, 1100.0)
-			landing.get_physics_body().linear_velocity = Vector3.ZERO
-			landing._physics_process(0.025)
-		landing._process(0.025)
-		await _capture("%02d_jelly_motion_land_%02d.png" % [44 + frame_index, frame_index + 1])
+	var landing: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		7,
+		Vector2(0.0, -330.0)
+	)
+	var landing_states: Dictionary = {}
+	var landing_scales: Dictionary = {}
+	await _wait_physics_seconds(0.08)
+	for falling_index: int in range(4):
+		await _capture_landing_frame(landing, falling_index, landing_states, landing_scales)
+		if falling_index < 3:
+			await _wait_physics_seconds(0.12)
+
+	var contact_wait_frames: int = 0
+	while (
+		landing.get_physics_body().get_colliding_bodies().is_empty()
+		and contact_wait_frames < Engine.physics_ticks_per_second
+	):
+		await get_tree().physics_frame
+		contact_wait_frames += 1
+	if landing.get_physics_body().get_colliding_bodies().is_empty():
+		_fail("JELLY landing capture did not reach the physical floor")
+	await _capture_landing_frame(landing, 4, landing_states, landing_scales)
+	var recovery_frame_steps: Array[int] = [2, 4, 8, 14, 24]
+	for recovery_index: int in range(recovery_frame_steps.size()):
+		await _wait_physics_frames(recovery_frame_steps[recovery_index])
+		await _capture_landing_frame(
+			landing,
+			5 + recovery_index,
+			landing_states,
+			landing_scales
+		)
+	if landing_states.size() != 10:
+		_fail("JELLY landing captures must contain ten distinct physical states")
+	if landing_scales.size() < 5:
+		_fail("JELLY landing captures must show at least five distinct body scales")
 
 	board.clear()
+	board.set_gravity(Vector2i.DOWN)
 	var breathing: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, 7, Vector2.ZERO)
 	breathing.disable_physics()
 	breathing.set_turn_resting(true)
@@ -677,31 +723,156 @@ func _capture_recovered_jelly_scenes(main: Main, board: Board3D, hud: Hud) -> vo
 	await _capture("54_jelly_motion_breathe_max.png")
 
 	board.clear()
-	var rest_radius: float = Config.data.radius_for_level(2)
-	for rest_index: int in range(40):
-		var column: int = rest_index % 8
-		var row: int = rest_index / 8
-		var resting: Orb3D = board.spawn_orb(
-			rest_index % JellyOrbArt.PALETTE.size(),
-			2,
-			Vector2(
-				(float(column) - 3.5) * rest_radius * 1.72,
-				(float(row) - 2.0) * rest_radius * 1.72
-			)
+	board.set_turn_resting(false)
+	board.set_gravity(Vector2i.DOWN)
+	for orb_index: int in range(40):
+		var column: int = orb_index % 8
+		var row: int = orb_index / 8
+		board.spawn_orb(
+			orb_index % JellyOrbArt.PALETTE.size(),
+			1,
+			Vector2(-315.0 + float(column) * 90.0, -360.0 + float(row) * 78.0)
 		)
-		resting.disable_physics()
-		resting.set_turn_resting(true)
+	var settle_directions: Array[Vector2i] = [
+		Vector2i.DOWN,
+		Vector2i.RIGHT,
+		Vector2i.UP,
+		Vector2i.LEFT,
+		Vector2i.DOWN,
+	]
+	for direction: Vector2i in settle_directions:
+		board.set_gravity(direction)
+		await _wait_physics_seconds(1.2)
+	board.set_gravity(Vector2i.DOWN)
+	await _wait_physics_seconds(1.8)
+	var resting_pairs: int = _count_actual_orb_contact_pairs(board)
+	var boundary_contacts: Dictionary = _count_pile_boundary_contacts(board)
+	if resting_pairs <= 0:
+		_fail("JELLY rest capture must contain actual orb contact pairs")
+	if (
+		int(boundary_contacts["floor"]) <= 0
+		or int(boundary_contacts["walls"]) <= 0
+		or int(boundary_contacts["corners"]) <= 0
+	):
+		_fail("JELLY rest capture must physically touch floor, walls, and corners")
+	board.set_turn_resting(true)
+	await get_tree().create_timer(0.25).timeout
 	await _capture("55_jelly_motion_rest.png")
+
+	board.set_turn_resting(false)
 	board.set_gravity(Vector2i.RIGHT)
+	await _wait_physics_seconds(0.22)
+	var moving_count: int = 0
+	var maximum_speed: float = 0.0
 	for moving: Orb3D in board.get_orbs():
-		moving.set_turn_resting(false)
-		moving.linear_velocity = Vector2.RIGHT * 1100.0
-		moving._process(0.12)
+		var speed: float = moving.linear_velocity.length()
+		maximum_speed = maxf(maximum_speed, speed)
+		if speed > Config.data.stable_linear_speed:
+			moving_count += 1
+	var moving_pairs: int = _count_actual_orb_contact_pairs(board)
+	if moving_count <= 0:
+		_fail("JELLY right-gravity capture must contain moving physical orbs")
+	if moving_pairs <= 0:
+		_fail("JELLY right-gravity capture must retain actual pile contacts")
 	await _capture("56_jelly_motion_right.png")
 	print(
-		"SCREEN_CAPTURE_CHECK scene=recovered_jelly levels=7 crowded=25 max=true "
-		+ "stretch=true absorption=true unlock=true land_frames=10 breathe=true rest=40 right=true"
+		(
+			"JELLY_MOTION_PILE orbs=%d rest_pairs=%d floor=%d walls=%d corners=%d "
+			+ "right_moving=%d right_pairs=%d right_max_speed=%.3f"
+		) % [
+			board.get_orbs().size(),
+			resting_pairs,
+			int(boundary_contacts["floor"]),
+			int(boundary_contacts["walls"]),
+			int(boundary_contacts["corners"]),
+			moving_count,
+			moving_pairs,
+			maximum_speed,
+		]
 	)
+	resolver._pending.clear()
+	manager._set_state(TurnManager.State.WAITING_INPUT)
+	InputRouter.set_locked(false)
+
+
+func _capture_landing_frame(
+	landing: Orb3D,
+	frame_index: int,
+	state_keys: Dictionary,
+	scale_keys: Dictionary
+) -> void:
+	await _capture("%02d_jelly_motion_land_%02d.png" % [44 + frame_index, frame_index + 1])
+	var body_scale: Vector3 = landing.visual_stretch_scale()
+	var position_value: Vector2 = landing.position
+	var velocity_value: Vector2 = landing.linear_velocity
+	var contact_count: int = landing.get_physics_body().get_colliding_bodies().size()
+	var state_key: String = "%.3f|%.3f|%.4f|%.4f" % [
+		position_value.x,
+		position_value.y,
+		body_scale.x,
+		body_scale.y,
+	]
+	var scale_key: String = "%.4f|%.4f" % [body_scale.x, body_scale.y]
+	state_keys[state_key] = true
+	scale_keys[scale_key] = true
+	print(
+		(
+			"JELLY_LANDING_FRAME index=%02d position_y=%.3f speed=%.3f "
+			+ "scale_x=%.6f scale_y=%.6f contacts=%d"
+		) % [
+			frame_index + 1,
+			position_value.y,
+			velocity_value.length(),
+			body_scale.x,
+			body_scale.y,
+			contact_count,
+		]
+	)
+
+
+func _wait_physics_frames(frame_count: int) -> void:
+	for _frame_index: int in range(maxi(frame_count, 0)):
+		await get_tree().physics_frame
+
+
+func _wait_physics_seconds(duration: float) -> void:
+	await _wait_physics_frames(ceili(maxf(duration, 0.0) * Engine.physics_ticks_per_second))
+
+
+func _count_actual_orb_contact_pairs(board: Board3D) -> int:
+	var pair_keys: Dictionary = {}
+	for first: Orb3D in board.get_orbs():
+		for second: Orb3D in first.get_colliding_orbs():
+			if not is_instance_valid(second) or second.consumed:
+				continue
+			var first_id: int = first.get_instance_id()
+			var second_id: int = second.get_instance_id()
+			var pair_key: String = "%d:%d" % [mini(first_id, second_id), maxi(first_id, second_id)]
+			pair_keys[pair_key] = true
+	return pair_keys.size()
+
+
+func _count_pile_boundary_contacts(board: Board3D) -> Dictionary:
+	var half_size: float = Config.data.board_size * 0.5
+	var tolerance: float = Config.data.floor_contact_tolerance + 4.0
+	var floor_contacts: int = 0
+	var wall_contacts: int = 0
+	var corner_contacts: int = 0
+	for orb: Orb3D in board.get_orbs():
+		var radius: float = orb.get_current_radius()
+		var touches_floor: bool = orb.position.y + radius >= half_size - tolerance
+		var touches_side: bool = absf(orb.position.x) + radius >= half_size - tolerance
+		if touches_floor:
+			floor_contacts += 1
+		if touches_side:
+			wall_contacts += 1
+		if touches_floor and touches_side:
+			corner_contacts += 1
+	return {
+		"floor": floor_contacts,
+		"walls": wall_contacts,
+		"corners": corner_contacts,
+	}
 
 
 func _measure_hud_face_overlap(main: Main, board: Board3D, hud: Hud) -> void:

@@ -108,6 +108,26 @@ foreach ($captureSpec in $captureSpecs) {
         Write-Output ("SCREEN_CAPTURE_RESULT ratio={0} file={1}" -f $captureSpec.Name, $filePath)
         $capturedFileCount += 1
     }
+    $landingFiles = @(1..10 | ForEach-Object {
+        Join-Path $outputPath ("{0:D2}_jelly_motion_land_{1:D2}.png" -f (43 + $_), $_)
+    })
+    $uniqueLandingHashes = @(
+        $landingFiles |
+            ForEach-Object { (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash } |
+            Sort-Object -Unique
+    )
+    if ($uniqueLandingHashes.Count -ne $landingFiles.Count) {
+        throw (
+            "JELLY landing strip must contain 10 distinct frames for {0}; found {1}" -f `
+                $captureSpec.Name,
+                $uniqueLandingHashes.Count
+        )
+    }
+    Write-Output (
+        "SCREEN_CAPTURE_MOTION_CHECK ratio={0} landing_unique={1}/10" -f `
+            $captureSpec.Name,
+            $uniqueLandingHashes.Count
+    )
     $temporarySave = Join-Path $outputPath "capture_save.tmp.cfg"
     if (Test-Path -LiteralPath $temporarySave) {
         Remove-Item -LiteralPath $temporarySave -Force
