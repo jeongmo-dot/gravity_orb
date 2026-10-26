@@ -62,6 +62,10 @@ const CAPTURE_FILES: Array[String] = [
 	"54_jelly_motion_breathe_max.png",
 	"55_jelly_motion_rest.png",
 	"56_jelly_motion_right.png",
+	"57_callout_nice.png",
+	"58_callout_amazing.png",
+	"59_callout_unstoppable.png",
+	"60_popup_crowded.png",
 ]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
@@ -508,6 +512,7 @@ func _capture_recovered_hud_scenes(
 	hud._on_reaction_scored({
 		"type": ReactionRules.Type.MERGE,
 		"result_color": OrbTypes.OrbColor.CYAN,
+		"result_level": 3,
 		"position": Vector2(-80.0, -40.0),
 		"points": 1280,
 		"base_points": 1280,
@@ -519,6 +524,7 @@ func _capture_recovered_hud_scenes(
 		popup.deactivate()
 	hud._on_reaction_scored({
 		"type": ReactionRules.Type.BLAST,
+		"levels": [5, 5],
 		"position": Vector2(80.0, -40.0),
 		"points": 48600,
 		"base_points": 6075,
@@ -531,9 +537,23 @@ func _capture_recovered_hud_scenes(
 	await _capture("37_popup_blast_big.png")
 	for popup: ScorePopup in hud.active_score_popups():
 		popup.deactivate()
+
+	var extra_callouts: Array[Dictionary] = [
+		{"text": "NICE!", "stage": 0, "file": "57_callout_nice.png"},
+		{"text": "AMAZING!", "stage": 2, "file": "58_callout_amazing.png"},
+		{"text": "UNSTOPPABLE!", "stage": 4, "file": "59_callout_unstoppable.png"},
+	]
+	for callout: Dictionary in extra_callouts:
+		hud._show_callout(str(callout["text"]), int(callout["stage"]))
+		await get_tree().create_timer(0.10).timeout
+		await _capture(str(callout["file"]))
+	if hud._callout_tween != null and hud._callout_tween.is_valid():
+		hud._callout_tween.kill()
+	hud._hide_callout_label()
 	print(
 		"SCREEN_CAPTURE_CHECK scene=recovered_hud gravity=true danger=true blocked=true "
-		+ "input=ready,busy,rejected callouts=great,incredible popups=merge,blast"
+		+ "input=ready,busy,rejected callouts=nice,great,amazing,incredible,unstoppable "
+		+ "popups=merge,blast"
 	)
 
 
@@ -577,6 +597,17 @@ func _capture_recovered_jelly_scenes(
 			crowded_orb.disable_physics()
 			crowded_index += 1
 	await _capture("39_jelly_look_crowded.png")
+	hud._on_reaction_scored({
+		"type": ReactionRules.Type.MERGE,
+		"result_color": OrbTypes.OrbColor.GREEN,
+		"result_level": 3,
+		"position": Vector2.ZERO,
+		"points": 1280,
+		"base_points": 1280,
+		"combo_multiplier": 1.0,
+	})
+	await get_tree().create_timer(0.10).timeout
+	await _capture("60_popup_crowded.png")
 	await _measure_hud_face_overlap(main, board, hud)
 
 	board.clear()
@@ -875,58 +906,114 @@ func _count_pile_boundary_contacts(board: Board3D) -> Dictionary:
 	}
 
 
-func _measure_hud_face_overlap(main: Main, board: Board3D, hud: Hud) -> void:
-	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
+func _measure_hud_face_overlap(_main: Main, _board: Board3D, hud: Hud) -> void:
+	for popup: ScorePopup in hud.active_score_popups():
+		popup.deactivate()
 	if hud._callout_tween != null and hud._callout_tween.is_valid():
 		hud._callout_tween.kill()
 	hud._show_callout("NICE!", 0)
+	var callout_face_maximum: float = 0.0
+	var callout_face_frames: int = 0
+	var callout_board_maximum: float = 0.0
+	var callout_board_frames: int = 0
+	var sample_frames: int = 120
+	var board_rect: Rect2 = hud._projected_board_rect()
+	for _frame_index: int in range(sample_frames):
+		await get_tree().process_frame
+		if not hud._callout_label.visible:
+			continue
+		var callout_rect: Rect2 = hud._callout_label.get_global_rect()
+		var face_ratio: float = _maximum_face_overlap_ratio(
+			hud._orb_face_rects(),
+			callout_rect
+		)
+		callout_face_maximum = maxf(callout_face_maximum, face_ratio)
+		if face_ratio > 0.0:
+			callout_face_frames += 1
+		var board_overlap: Rect2 = callout_rect.intersection(board_rect)
+		var board_ratio: float = (
+			board_overlap.get_area() / maxf(callout_rect.get_area(), 1.0)
+			if board_overlap.has_area()
+			else 0.0
+		)
+		callout_board_maximum = maxf(callout_board_maximum, board_ratio)
+		if board_ratio > 0.0:
+			callout_board_frames += 1
+	print(
+		(
+			"JELLY_CALLOUT_OVERLAP face_max_ratio=%.4f face_seconds=%.3f "
+			+ "board_max_ratio=%.4f board_seconds=%.3f sampled_seconds=1.000"
+		) % [
+			callout_face_maximum,
+			float(callout_face_frames) / 120.0,
+			callout_board_maximum,
+			float(callout_board_frames) / 120.0,
+		]
+	)
+	if callout_face_maximum > 0.0 or callout_board_maximum > 0.0:
+		_fail("JELLY callout must not overlap faces or the board")
+	if hud._callout_tween != null and hud._callout_tween.is_valid():
+		hud._callout_tween.kill()
+	hud._hide_callout_label()
+
 	hud._on_reaction_scored({
 		"type": ReactionRules.Type.MERGE,
 		"result_color": OrbTypes.OrbColor.GREEN,
+		"result_level": 3,
 		"position": Vector2.ZERO,
 		"points": 1280,
 		"base_points": 1280,
 		"combo_multiplier": 1.0,
 	})
-	var maximum_ratio: float = 0.0
-	var overlap_frames: int = 0
-	var sample_frames: int = 120
+	var popup_maximum_ratio: float = 0.0
+	var popup_overlap_frames: int = 0
+	var popup_outside_maximum: float = 0.0
 	for _frame_index: int in range(sample_frames):
 		await get_tree().process_frame
-		var hud_rects: Array[Rect2] = []
-		if hud._callout_label.visible:
-			hud_rects.append(hud._callout_label.get_global_rect())
-		for popup: ScorePopup in hud.active_score_popups():
-			hud_rects.append(popup.get_global_rect())
 		var frame_overlap: bool = false
-		for orb: Orb3D in board.get_orbs():
-			var center: Vector2 = camera.unproject_position(orb._face.global_position)
-			var edge: Vector2 = camera.unproject_position(
-				orb._face.global_position + Vector3(orb.get_current_radius() * 0.0045, 0.0, 0.0)
+		for popup: ScorePopup in hud.active_score_popups():
+			var popup_rect: Rect2 = popup.visual_global_rect()
+			var popup_ratio: float = _maximum_face_overlap_ratio(
+				hud._orb_face_rects(),
+				popup_rect
 			)
-			var half_size: float = maxf(center.distance_to(edge), 1.0)
-			var face_rect: Rect2 = Rect2(center - Vector2.ONE * half_size, Vector2.ONE * half_size * 2.0)
-			for hud_rect: Rect2 in hud_rects:
-				var overlap: Rect2 = face_rect.intersection(hud_rect)
-				if overlap.has_area():
-					frame_overlap = true
-					maximum_ratio = maxf(
-						maximum_ratio,
-						overlap.get_area() / maxf(face_rect.get_area(), 1.0)
-					)
+			popup_maximum_ratio = maxf(popup_maximum_ratio, popup_ratio)
+			frame_overlap = frame_overlap or popup_ratio > 0.0
+			popup_outside_maximum = maxf(
+				popup_outside_maximum,
+				maxf(
+					popup_rect.get_area() - popup_rect.intersection(board_rect).get_area(),
+					0.0
+				)
+			)
 		if frame_overlap:
-			overlap_frames += 1
+			popup_overlap_frames += 1
 	print(
-		"JELLY_HUD_FACE_OVERLAP max_ratio=%.4f overlap_seconds=%.3f sampled_seconds=1.000" % [
-			maximum_ratio,
-			float(overlap_frames) / 120.0,
+		(
+			"JELLY_POPUP_FACE_OVERLAP max_ratio=%.4f overlap_seconds=%.3f "
+			+ "outside_max_area=%.3f sampled_seconds=1.000"
+		) % [
+			popup_maximum_ratio,
+			float(popup_overlap_frames) / 120.0,
+			popup_outside_maximum,
 		]
 	)
+	if popup_outside_maximum > 0.01:
+		_fail("JELLY popup must remain inside the physical board")
 	for popup: ScorePopup in hud.active_score_popups():
 		popup.deactivate()
-	if hud._callout_tween != null and hud._callout_tween.is_valid():
-		hud._callout_tween.kill()
-	hud._hide_callout_label()
+
+
+func _maximum_face_overlap_ratio(face_rects: Array[Rect2], target_rect: Rect2) -> float:
+	var maximum_ratio: float = 0.0
+	for face_rect: Rect2 in face_rects:
+		var overlap: Rect2 = face_rect.intersection(target_rect)
+		if overlap.has_area():
+			maximum_ratio = maxf(
+				maximum_ratio,
+				overlap.get_area() / maxf(face_rect.get_area(), 1.0)
+			)
+	return maximum_ratio
 
 
 func _spawn_featured(board: Board3D) -> void:

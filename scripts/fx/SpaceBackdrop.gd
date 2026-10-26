@@ -5,8 +5,6 @@ const PARALLAX_DURATION: float = 0.30
 const FAR_PARALLAX_PIXELS: float = 2.0
 const NEAR_PARALLAX_PIXELS: float = 8.0
 const REFERENCE_VIEWPORT_SIZE: Vector2 = Vector2(1080.0, 1920.0)
-const METEOR_INTERVAL_SECONDS: float = 30.0
-const METEOR_DURATION_SECONDS: float = 0.6
 
 var _material: ShaderMaterial
 var _gravity_direction: Vector2i = Vector2i.DOWN
@@ -33,8 +31,6 @@ func _ready() -> void:
 		FAR_PARALLAX_PIXELS / NEAR_PARALLAX_PIXELS
 	)
 	_material.set_shader_parameter("danger_tint", 0.0)
-	_material.set_shader_parameter("meteor_cycle_seconds", METEOR_INTERVAL_SECONDS)
-	_material.set_shader_parameter("meteor_duration_seconds", METEOR_DURATION_SECONDS)
 	material_override = _material
 	set_process(true)
 
@@ -86,8 +82,6 @@ render_mode unshaded, cull_disabled, depth_draw_never;
 uniform vec2 parallax_uv = vec2(0.0);
 uniform float far_parallax_ratio = 0.25;
 uniform float danger_tint : hint_range(0.0, 1.0) = 0.0;
-uniform float meteor_cycle_seconds = 30.0;
-uniform float meteor_duration_seconds = 0.6;
 
 float hash21(vec2 value) {
 	value = fract(value * vec2(123.34, 456.21));
@@ -126,12 +120,6 @@ float star_layer(vec2 uv, float scale, float threshold, float radius, float phas
 	return star * twinkle;
 }
 
-float segment_distance(vec2 point, vec2 start, vec2 end) {
-	vec2 segment = end - start;
-	float amount = clamp(dot(point - start, segment) / dot(segment, segment), 0.0, 1.0);
-	return length(point - (start + segment * amount));
-}
-
 void fragment() {
 	vec2 uv = UV;
 	float vignette = 1.0 - smoothstep(0.18, 0.78, length((uv - vec2(0.5)) * vec2(0.75, 1.0)));
@@ -152,19 +140,6 @@ void fragment() {
 	color += vec3(0.34, 0.40, 0.54) * far_stars;
 	color += vec3(0.43, 0.50, 0.60) * middle_stars;
 	color += vec3(0.54, 0.56, 0.58) * near_stars;
-
-	float cycle = max(meteor_cycle_seconds, 20.0);
-	float meteor_phase = fract(TIME / cycle);
-	float active_span = max(meteor_duration_seconds / cycle, 0.001);
-	float meteor_progress = clamp(meteor_phase / active_span, 0.0, 1.0);
-	float cycle_index = floor(TIME / cycle);
-	float meteor_y = 0.12 + hash21(vec2(cycle_index, 27.0)) * 0.26;
-	vec2 meteor_direction = normalize(vec2(1.0, 0.28));
-	vec2 meteor_head = vec2(-0.12, meteor_y) + meteor_direction * meteor_progress * 1.45;
-	vec2 meteor_tail = meteor_head - meteor_direction * 0.18;
-	float meteor = smoothstep(0.010, 0.0, segment_distance(uv, meteor_tail, meteor_head));
-	meteor *= 1.0 - smoothstep(active_span * 0.80, active_span, meteor_phase);
-	color += vec3(0.48, 0.55, 0.58) * meteor;
 
 	color += vec3(0.120, 0.0, 0.0) * danger_tint;
 	ALBEDO = clamp(color, vec3(0.0), vec3(0.58));
