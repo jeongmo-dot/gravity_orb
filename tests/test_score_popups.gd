@@ -30,7 +30,8 @@ func test_each_scored_reaction_shows_matching_popup_and_conditional_formula() ->
 	var capped_popup: ScorePopup = hud.active_score_popups()[2]
 	assert_eq(capped_popup.score_text(), "+16,384", "large popup uses comma separators")
 	assert_eq(capped_popup.formula_text(), "128 ×128", "popup shows actual capped multiplier")
-	assert_eq(ScorePopup.popup_font_size(10), 34, "base popup font size")
+	assert_eq(ScorePopup.popup_font_size(10), 24, "popup text is seventy percent size")
+	assert_eq(ScorePopup.POPUP_SIZE, Vector2(308.0, 126.0), "popup bounds scale to seventy percent")
 	assert_true(
 		ScorePopup.popup_font_size(1000) > ScorePopup.popup_font_size(10),
 		"popup font grows logarithmically"
@@ -206,7 +207,7 @@ func test_danger_refreshes_from_board_without_reaction() -> void:
 	await _destroy_main(main)
 
 
-func test_3d_reaction_position_is_unprojected_to_popup_anchor() -> void:
+func test_3d_reaction_popup_starts_right_of_orb_and_stays_inside_board() -> void:
 	var main: Main = MAIN_3D_SCENE.instantiate() as Main
 	main.launch_immediately(GameConfig.GameMode.TURN)
 	var score: ScoreManager = main.get_node("ScoreManager") as ScoreManager
@@ -228,11 +229,47 @@ func test_3d_reaction_position_is_unprojected_to_popup_anchor() -> void:
 		0.1,
 		"3D board center projects to viewport center y"
 	)
-	hud._on_reaction_scored(_display_reaction(Vector2.ZERO, 64))
+	var reaction: Dictionary = _display_reaction(Vector2.ZERO, 64)
+	reaction["result_level"] = 2
+	hud._on_reaction_scored(reaction)
 	assert_eq(hud.active_score_popup_count(), 1, "3D reaction creates popup")
 	var popup: ScorePopup = hud.active_score_popups()[0]
-	assert_near(popup.anchor_position.x, projected_center.x, TOLERANCE, "popup anchor x")
-	assert_near(popup.anchor_position.y, projected_center.y, TOLERANCE, "popup anchor y")
+	var radius_px: float = hud._reaction_screen_radius(Vector2.ZERO, reaction)
+	var popup_motion: Rect2 = popup.motion_offset_rect_for(
+		popup.points,
+		popup.formula_text()
+	)
+	popup_motion.position += popup.anchor_position
+	assert_near(
+		popup_motion.position.x,
+		projected_center.x + radius_px + Hud.POPUP_ORB_GAP,
+		TOLERANCE,
+		"popup visible path uses right edge plus twelve pixel gap"
+	)
+	assert_near(popup_motion.get_center().y, projected_center.y, TOLERANCE, "popup path center y")
+	assert_true(
+		hud._projected_board_rect().encloses(popup_motion),
+		"full rising popup path stays inside board"
+	)
+	popup.deactivate()
+	var edge_position: Vector2 = Vector2(Config.data.board_size * 0.40, 0.0)
+	var edge_reaction: Dictionary = _display_reaction(edge_position, 64)
+	edge_reaction["result_level"] = 2
+	hud._on_reaction_scored(edge_reaction)
+	var edge_popup: ScorePopup = hud.active_score_popups()[0]
+	var edge_motion: Rect2 = edge_popup.motion_offset_rect_for(
+		edge_popup.points,
+		edge_popup.formula_text()
+	)
+	edge_motion.position += edge_popup.anchor_position
+	assert_true(
+		edge_popup.anchor_position.x < hud._reaction_screen_position(edge_position).x,
+		"right-edge reaction chooses the left side instead of leaving the board"
+	)
+	assert_true(
+		hud._projected_board_rect().encloses(edge_motion),
+		"fallback popup path stays inside board"
+	)
 	await _destroy_main(main)
 
 

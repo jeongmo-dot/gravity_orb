@@ -124,6 +124,39 @@ func test_callout_toggle_hides_callout_and_preserves_jelly_state_hash() -> void:
 	Config.data.sfx_enabled = original_sfx_enabled
 
 
+func test_jelly_callout_sits_between_combo_and_board() -> void:
+	var original_sfx_enabled: bool = Config.data.sfx_enabled
+	Config.data.sfx_enabled = false
+	var main: Main = await _create_main()
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	var callout: Label = main.get_node("UI/Hud/CalloutLabel") as Label
+	var combo: Label = main.get_node("UI/Hud/ComboLabel") as Label
+	hud._show_callout("INCREDIBLE!", 3)
+	var callout_path: Rect2 = Rect2(
+		hud._callout_base_position + Vector2.UP * Hud.CALLOUT_RISE_DISTANCE,
+		callout.size + Vector2(0.0, Hud.CALLOUT_RISE_DISTANCE)
+	)
+	var board_rect: Rect2 = hud._projected_board_rect()
+	assert_true(
+		callout_path.position.y >= combo.get_global_rect().end.y,
+		"callout rise path starts below the combo label"
+	)
+	assert_true(
+		callout_path.end.y <= board_rect.position.y,
+		"callout rise path ends above the board"
+	)
+	assert_true(
+		not callout_path.intersects(board_rect),
+		"callout never overlays the board"
+	)
+	assert_true(
+		callout.get_theme_font_size("font_size") <= Hud.CALLOUT_FONT_MAX,
+		"callout font shrinks to the available gap"
+	)
+	await _destroy_main(main)
+	Config.data.sfx_enabled = original_sfx_enabled
+
+
 func test_callout_frame_cost_report() -> void:
 	var original_enabled: bool = Config.data.fx_callouts_enabled
 	var original_sfx_enabled: bool = Config.data.sfx_enabled

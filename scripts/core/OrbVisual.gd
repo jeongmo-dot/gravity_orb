@@ -572,35 +572,6 @@ func _draw_mercury(radius: float, base: Color, detail: bool, phase: float) -> vo
 	draw_circle(Vector2(-0.28, -0.31) * radius, radius * 0.24, _with_alpha(Color.WHITE, reflection * base.a))
 
 
-func _draw_meteor(radius: float, base: Color) -> void:
-	var points: PackedVector2Array = PackedVector2Array()
-	var factors: Array[float] = [0.92, 1.04, 0.91, 1.01, 0.93, 1.05, 0.94, 1.06, 0.91, 1.02, 0.92, 1.04]
-	for index: int in range(factors.size()):
-		var angle: float = -PI * 0.5 + TAU * float(index) / float(factors.size())
-		points.append(Vector2(cos(angle), sin(angle)) * radius * factors[index])
-	draw_colored_polygon(points, _with_alpha(base.darkened(0.54), base.a))
-	var spot_color: Color = _with_alpha(base.darkened(0.72), 0.70 * base.a)
-	draw_circle(Vector2(-0.34, -0.22) * radius, radius * 0.19, spot_color)
-	draw_circle(Vector2(0.35, 0.25) * radius, radius * 0.14, spot_color)
-	draw_circle(Vector2(0.18, -0.48) * radius, radius * 0.09, spot_color)
-	draw_circle(Vector2(-0.46, 0.42) * radius, radius * 0.08, spot_color)
-	var scratch_color: Color = _with_alpha(base.lightened(0.18), 0.34 * base.a)
-	draw_line(
-		Vector2(-0.10, -0.14) * radius,
-		Vector2(0.20, 0.04) * radius,
-		scratch_color,
-		maxf(0.8, radius * 0.026),
-		true
-	)
-	draw_line(
-		Vector2(-0.48, 0.16) * radius,
-		Vector2(-0.30, 0.34) * radius,
-		scratch_color,
-		maxf(0.7, radius * 0.022),
-		true
-	)
-
-
 func _draw_moon(radius: float, base: Color) -> void:
 	draw_circle(Vector2.ZERO, radius, _with_alpha(base.lightened(0.17), base.a))
 	var crater_color: Color = _with_alpha(base.darkened(0.33), 0.72 * base.a)

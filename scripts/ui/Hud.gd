@@ -16,6 +16,12 @@ const PLANET_UNLOCK_CALLOUT_DURATION: float = 1.20
 const PREVIEW_UNLOCK_FLASH_DURATION: float = 0.60
 const PLANET_UNLOCK_ORB_LEVEL: int = 2
 const CALLOUT_RISE_DISTANCE: float = 8.0
+const CALLOUT_SIDE_MARGIN: float = 40.0
+const CALLOUT_GAP_PADDING: float = 12.0
+const CALLOUT_FONT_MAX: int = 64
+const CALLOUT_FONT_MIN: int = 28
+const POPUP_ORB_GAP: float = 12.0
+const JELLY_FACE_RADIUS_RATIO: float = 0.45
 const TURN_CALLOUT_STEPS: Array[int] = [3, 5, 8, 12]
 const CALLOUT_WORDS: Array[String] = [
 	"NICE!", "GREAT!", "AMAZING!", "INCREDIBLE!", "UNSTOPPABLE!"
@@ -218,11 +224,13 @@ func _apply_responsive_layout() -> void:
 	_set_control_rect(_then_count_label, layout["then_count"] as Rect2)
 	_next_preview.position = (layout["next"] as Rect2).get_center() + Vector2(0.0, 8.0)
 	_then_preview.position = (layout["then"] as Rect2).get_center() + Vector2(0.0, 8.0)
-	var center_y: float = viewport_size.y * 0.5
-	_set_control_rect(
-		_callout_label,
-		Rect2(40.0, center_y - 120.0, viewport_size.x - 80.0, 200.0)
+	var callout_rect: Rect2 = _callout_layout_rect(viewport_size, layout)
+	_set_control_rect(_callout_label, callout_rect)
+	_callout_label.add_theme_font_size_override(
+		"font_size",
+		clampi(roundi(callout_rect.size.y * 0.48), CALLOUT_FONT_MIN, CALLOUT_FONT_MAX)
 	)
+	_callout_label.pivot_offset = _callout_label.size * 0.5
 	_callout_base_position = _callout_label.position
 	_score_label.pivot_offset = _score_label.size * 0.5
 	_best_label.pivot_offset = _best_label.size * 0.5
@@ -309,6 +317,66 @@ static func hud_layout(viewport_size: Vector2, safe_area: Rect2 = Rect2()) -> Di
 	}
 
 
+func _callout_layout_rect(viewport_size: Vector2, layout: Dictionary) -> Rect2:
+	var combo_rect: Rect2 = layout["combo"] as Rect2
+	var board_rect: Rect2 = _projected_board_rect()
+	var board_top: float = (
+		board_rect.position.y
+		if board_rect.has_area()
+		else viewport_size.y * 0.32
+	)
+	var top: float = combo_rect.end.y + CALLOUT_GAP_PADDING + CALLOUT_RISE_DISTANCE
+	var bottom: float = board_top - CALLOUT_GAP_PADDING
+	if bottom <= top:
+		bottom = top + float(CALLOUT_FONT_MIN) * 1.35
+	return Rect2(
+		CALLOUT_SIDE_MARGIN,
+		top,
+		maxf(viewport_size.x - CALLOUT_SIDE_MARGIN * 2.0, 1.0),
+		bottom - top
+	)
+
+
+func _projected_board_rect() -> Rect2:
+	if _board is Board3D:
+		var camera: Camera3D = get_viewport().get_camera_3d()
+		var board_3d: Board3D = _board as Board3D
+		if camera == null:
+			return Rect2()
+		var half_m: float = board_3d.half_size() / Board3D.PIXELS_PER_METER
+		var minimum: Vector2 = Vector2(INF, INF)
+		var maximum: Vector2 = Vector2(-INF, -INF)
+		for corner: Vector2 in [
+			Vector2(-half_m, -half_m),
+			Vector2(half_m, -half_m),
+			Vector2(half_m, half_m),
+			Vector2(-half_m, half_m),
+		]:
+			var projected: Vector2 = camera.unproject_position(
+				board_3d.to_global(Vector3(corner.x, corner.y, 0.0))
+			)
+			minimum = minimum.min(projected)
+			maximum = maximum.max(projected)
+		return Rect2(minimum, maximum - minimum)
+	if _board is Board:
+		var board_2d: Board = _board as Board
+		var half_px: float = board_2d.half_size()
+		var board_transform: Transform2D = board_2d.get_global_transform_with_canvas()
+		var minimum_2d: Vector2 = Vector2(INF, INF)
+		var maximum_2d: Vector2 = Vector2(-INF, -INF)
+		for corner: Vector2 in [
+			Vector2(-half_px, -half_px),
+			Vector2(half_px, -half_px),
+			Vector2(half_px, half_px),
+			Vector2(-half_px, half_px),
+		]:
+			var projected_2d: Vector2 = board_transform * corner
+			minimum_2d = minimum_2d.min(projected_2d)
+			maximum_2d = maximum_2d.max(projected_2d)
+		return Rect2(minimum_2d, maximum_2d - minimum_2d)
+	return Rect2()
+
+
 func _process(delta: float) -> void:
 	_danger_refresh_elapsed += delta
 	_pulse_elapsed += delta
@@ -363,6 +431,7 @@ func bind_game_state(
 	score_manager: ScoreManager
 ) -> void:
 	_board = board
+	_apply_responsive_layout()
 	_reset_callout_tracking()
 	_turn_input_indicator.bind(game_manager, board)
 	var turn_manager: TurnManager = game_manager as TurnManager
@@ -680,32 +749,40 @@ func _show_score_popup(reaction: Dictionary) -> void:
 	var points: int = int(reaction.get("points", 0))
 	if points <= 0 or Config.data.fx_popup_max <= 0:
 		return
-	var screen_position: Vector2 = _reaction_screen_position(
-		reaction.get("position", Vector2.ZERO) as Vector2
-	)
-	screen_position = _clamp_popup_position(screen_position)
+	var local_position: Vector2 = reaction.get("position", Vector2.ZERO) as Vector2
+	var reaction_position: Vector2 = _reaction_screen_position(local_position)
 	var process_frame: int = Engine.get_process_frames()
 	for popup: ScorePopup in _active_popups:
 		if (
 			popup.started_process_frame == process_frame
-			and popup.anchor_position.distance_to(screen_position) <= POPUP_MERGE_DISTANCE
+			and popup.source_position.distance_to(reaction_position) <= POPUP_MERGE_DISTANCE
 		):
 			popup.merge_score(points)
 			return
 	while _active_popups.size() >= Config.data.fx_popup_max:
 		_active_popups[0].deactivate()
 	var popup: ScorePopup = _acquire_popup()
+	var formula: String = _popup_formula(reaction)
+	var screen_position: Vector2 = _popup_anchor_for_reaction(
+		reaction,
+		local_position,
+		reaction_position,
+		popup,
+		points,
+		formula
+	)
 	var appearance: Dictionary = _popup_appearance(reaction)
 	popup.activate(
 		screen_position,
 		points,
-		_popup_formula(reaction),
+		formula,
 		appearance["color"] as Color,
 		appearance["outline_color"] as Color,
 		int(appearance["outline_size"]),
 		process_frame,
 		bool(appearance["cosmic"])
 	)
+	popup.source_position = reaction_position
 	_active_popups.append(popup)
 
 
@@ -776,28 +853,151 @@ func _popup_appearance(reaction: Dictionary) -> Dictionary:
 	}
 
 
-func _clamp_popup_position(screen_position: Vector2) -> Vector2:
-	var viewport_size: Vector2 = get_viewport_rect().size
-	var layout: Dictionary = hud_layout(viewport_size, _logical_safe_area(viewport_size))
-	var half_size: Vector2 = ScorePopup.POPUP_SIZE * 0.5
-	var top_hud_end: float = maxf(
-		(layout["combo"] as Rect2).end.y,
-		maxf(
-			(layout["max_combo"] as Rect2).end.y,
-			(layout["danger_panel"] as Rect2).end.y
+func _popup_anchor_for_reaction(
+	reaction: Dictionary,
+	local_position: Vector2,
+	reaction_position: Vector2,
+	popup: ScorePopup,
+	points: int,
+	formula: String
+) -> Vector2:
+	var board_rect: Rect2 = _projected_board_rect()
+	if not board_rect.has_area():
+		board_rect = get_viewport_rect()
+	var radius_px: float = _reaction_screen_radius(local_position, reaction)
+	var motion_offset: Rect2 = popup.motion_offset_rect_for(points, formula)
+	var motion_center: Vector2 = motion_offset.get_center()
+	var anchors: Array[Vector2] = [
+		Vector2(
+			reaction_position.x + radius_px + POPUP_ORB_GAP - motion_offset.position.x,
+			reaction_position.y - motion_center.y
+		),
+		Vector2(
+			reaction_position.x - radius_px - POPUP_ORB_GAP - motion_offset.end.x,
+			reaction_position.y - motion_center.y
+		),
+		Vector2(
+			reaction_position.x - motion_center.x,
+			reaction_position.y - radius_px - POPUP_ORB_GAP - motion_offset.end.y
+		),
+		Vector2(
+			reaction_position.x - motion_center.x,
+			reaction_position.y + radius_px + POPUP_ORB_GAP - motion_offset.position.y
+		),
+	]
+	var face_rects: Array[Rect2] = _orb_face_rects()
+	var candidates: Array[Dictionary] = []
+	for index: int in range(anchors.size()):
+		var anchor: Vector2 = anchors[index]
+		var motion_rect: Rect2 = Rect2(
+			anchor + motion_offset.position,
+			motion_offset.size
 		)
+		var board_intersection: Rect2 = motion_rect.intersection(board_rect)
+		var outside_area: float = maxf(
+			motion_rect.get_area() - board_intersection.get_area(),
+			0.0
+		)
+		var face_overlap_area: float = 0.0
+		for face_rect: Rect2 in face_rects:
+			face_overlap_area += motion_rect.intersection(face_rect).get_area()
+		candidates.append({
+			"anchor": anchor,
+			"outside": outside_area,
+			"overlap": face_overlap_area,
+		})
+
+	var minimum_valid_overlap: float = INF
+	for candidate: Dictionary in candidates:
+		if float(candidate["outside"]) <= 0.01:
+			minimum_valid_overlap = minf(
+				minimum_valid_overlap,
+				float(candidate["overlap"])
+			)
+	var right: Dictionary = candidates[0]
+	if (
+		float(right["outside"]) <= 0.01
+		and float(right["overlap"]) <= minimum_valid_overlap + 0.01
+	):
+		return right["anchor"] as Vector2
+
+	var best: Dictionary = candidates[0]
+	for candidate: Dictionary in candidates:
+		var candidate_valid: bool = float(candidate["outside"]) <= 0.01
+		var best_valid: bool = float(best["outside"]) <= 0.01
+		if candidate_valid != best_valid:
+			if candidate_valid:
+				best = candidate
+			continue
+		if not candidate_valid:
+			if (
+				float(candidate["outside"]) < float(best["outside"]) - 0.01
+				or (
+					absf(float(candidate["outside"]) - float(best["outside"])) <= 0.01
+					and float(candidate["overlap"]) < float(best["overlap"]) - 0.01
+				)
+			):
+				best = candidate
+			continue
+		if float(candidate["overlap"]) < float(best["overlap"]) - 0.01:
+			best = candidate
+	return best["anchor"] as Vector2
+
+
+func _reaction_screen_radius(local_position: Vector2, reaction: Dictionary) -> float:
+	var level: int = int(reaction.get("result_level", 0))
+	if level <= 0:
+		var levels: Array = reaction.get("levels", []) as Array
+		for source_level: Variant in levels:
+			level = maxi(level, int(source_level))
+	level = clampi(level if level > 0 else 1, 1, Config.data.orb_max_level)
+	var radius: float = Config.data.radius_for_level(level)
+	var center_position: Vector2 = _reaction_screen_position(local_position)
+	var edge_position: Vector2 = _reaction_screen_position(
+		local_position + Vector2.RIGHT * radius
 	)
-	var preview_top: float = (layout["preview_shelf"] as Rect2).position.y
-	var minimum_y: float = top_hud_end + half_size.y + ScorePopup.RISE_DISTANCE + 12.0
-	var maximum_y: float = preview_top - half_size.y - 12.0
-	if maximum_y < minimum_y:
-		var fallback_y: float = (top_hud_end + preview_top) * 0.5
-		minimum_y = fallback_y
-		maximum_y = fallback_y
-	return Vector2(
-		clampf(screen_position.x, half_size.x, viewport_size.x - half_size.x),
-		clampf(screen_position.y, minimum_y, maximum_y)
-	)
+	return maxf(center_position.distance_to(edge_position), 1.0)
+
+
+func _orb_face_rects() -> Array[Rect2]:
+	var result: Array[Rect2] = []
+	if _board is Board3D:
+		var camera: Camera3D = get_viewport().get_camera_3d()
+		if camera == null:
+			return result
+		for orb: Orb3D in (_board as Board3D).get_orbs():
+			if orb.consumed or not orb._face.visible:
+				continue
+			var center: Vector2 = camera.unproject_position(orb._face.global_position)
+			var edge: Vector2 = camera.unproject_position(
+				orb._face.global_position
+				+ Vector3.RIGHT * (
+					orb.get_current_radius()
+					* JELLY_FACE_RADIUS_RATIO
+					/ Orb3D.PIXELS_PER_METER
+				)
+			)
+			var half_size: float = maxf(center.distance_to(edge), 1.0)
+			result.append(Rect2(
+				center - Vector2.ONE * half_size,
+				Vector2.ONE * half_size * 2.0
+			))
+	elif _board is Board:
+		var board_2d: Board = _board as Board
+		var board_transform: Transform2D = board_2d.get_global_transform_with_canvas()
+		for orb: Orb in board_2d.get_orbs():
+			if orb.consumed:
+				continue
+			var center_2d: Vector2 = board_transform * orb.position
+			var edge_2d: Vector2 = board_transform * (
+				orb.position + Vector2.RIGHT * orb.get_current_radius() * JELLY_FACE_RADIUS_RATIO
+			)
+			var half_size_2d: float = maxf(center_2d.distance_to(edge_2d), 1.0)
+			result.append(Rect2(
+				center_2d - Vector2.ONE * half_size_2d,
+				Vector2.ONE * half_size_2d * 2.0
+			))
+	return result
 
 
 func _reaction_screen_position(local_position: Vector2) -> Vector2:
@@ -981,6 +1181,7 @@ func _update_callout(combo: int) -> void:
 
 
 func _show_callout(text: String, stage_index: int = 0) -> void:
+	_apply_responsive_layout()
 	if _callout_tween != null and _callout_tween.is_valid():
 		_callout_tween.kill()
 	_stop_sparkles(_callout_sparkles)
@@ -1047,6 +1248,7 @@ func _show_next_planet_unlock() -> void:
 
 
 func _show_planet_unlock(color_index: int) -> void:
+	_apply_responsive_layout()
 	if _callout_tween != null and _callout_tween.is_valid():
 		_callout_tween.kill()
 	_stop_sparkles(_callout_sparkles)
@@ -1151,17 +1353,21 @@ func _complete_callout() -> void:
 
 func _show_callout_sparkles(stage_index: int, duration: float) -> void:
 	var center: Vector2 = _callout_label.position + _callout_label.size * 0.5
+	var horizontal_span: float = minf(_callout_label.size.x * 0.27, 270.0)
+	var vertical_span: float = maxf(_callout_label.size.y * 0.28, 12.0)
 	var offsets: Array[Vector2] = [
-		Vector2(-260.0, -42.0),
-		Vector2(-145.0, 70.0),
-		Vector2(18.0, -84.0),
-		Vector2(166.0, 62.0),
-		Vector2(270.0, -28.0),
+		Vector2(-horizontal_span, -vertical_span * 0.50),
+		Vector2(-horizontal_span * 0.54, vertical_span * 0.82),
+		Vector2(horizontal_span * 0.07, -vertical_span),
+		Vector2(horizontal_span * 0.61, vertical_span * 0.74),
+		Vector2(horizontal_span, -vertical_span * 0.34),
 	]
 	var count: int = 5 if stage_index >= 4 else 3
 	for index: int in range(count):
 		var turns: float = 1.0 if stage_index >= 4 else 0.0
 		var end_offset: Vector2 = offsets[index] * (1.38 if stage_index >= 4 else 1.10)
+		end_offset.x = clampf(end_offset.x, -horizontal_span, horizontal_span)
+		end_offset.y = clampf(end_offset.y, -vertical_span, vertical_span)
 		_callout_sparkles[index].play(
 			center,
 			GOLD_COLOR,

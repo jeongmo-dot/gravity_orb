@@ -3,7 +3,7 @@ extends TestCase
 const BOARD_SCENE: PackedScene = preload("res://scenes/Board3D.tscn")
 
 
-func test_space_backdrop_has_three_star_depths_nebula_and_timed_meteor() -> void:
+func test_space_backdrop_has_three_star_depths_nebula_and_no_meteor() -> void:
 	var backdrop: SpaceBackdrop = SpaceBackdrop.new()
 	tree.root.add_child(backdrop)
 	await tree.process_frame
@@ -18,11 +18,9 @@ func test_space_backdrop_has_three_star_depths_nebula_and_timed_meteor() -> void
 	assert_eq(SpaceBackdrop.FAR_PARALLAX_PIXELS, 2.0, "far parallax is two pixels")
 	assert_eq(SpaceBackdrop.NEAR_PARALLAX_PIXELS, 8.0, "near parallax is eight pixels")
 	assert_true(
-		SpaceBackdrop.METEOR_INTERVAL_SECONDS >= 20.0
-		and SpaceBackdrop.METEOR_INTERVAL_SECONDS <= 40.0,
-		"meteor interval stays within the specified range"
+		not shader_code.to_lower().contains("meteor"),
+		"space backdrop removes the meteor shader code"
 	)
-	assert_eq(SpaceBackdrop.METEOR_DURATION_SECONDS, 0.6, "meteor lasts 0.6 seconds")
 	assert_true(
 		shader_code.contains("vec3(0.120, 0.0, 0.0) * danger_tint"),
 		"danger state adds a visible red nebula tint"
