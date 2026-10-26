@@ -37,7 +37,38 @@ $expectedFiles = @(
     "22_jelly_blue_cheek_zoom.png",
     "23_jelly_belly_half_zoom.png",
     "24_jelly_belly_three_quarter_zoom.png",
-    "25_jelly_max_effect_zoom.png"
+    "25_jelly_max_effect_zoom.png",
+    "26_settings.png",
+    "27_start_no_record.png",
+    "28_gravity_switch.png",
+    "29_board_danger.png",
+    "30_board_blocked.png",
+    "31_turn_input_ready.png",
+    "32_turn_input_busy.png",
+    "33_turn_input_rejected.png",
+    "34_callout_great.png",
+    "35_callout_incredible.png",
+    "36_popup_merge.png",
+    "37_popup_blast_big.png",
+    "38_jelly_look_levels.png",
+    "39_jelly_look_crowded.png",
+    "40_jelly_look_max.png",
+    "41_jelly_look_stretch.png",
+    "42_jelly_look_absorption.png",
+    "43_jelly_look_unlock.png",
+    "44_jelly_motion_land_01.png",
+    "45_jelly_motion_land_02.png",
+    "46_jelly_motion_land_03.png",
+    "47_jelly_motion_land_04.png",
+    "48_jelly_motion_land_05.png",
+    "49_jelly_motion_land_06.png",
+    "50_jelly_motion_land_07.png",
+    "51_jelly_motion_land_08.png",
+    "52_jelly_motion_land_09.png",
+    "53_jelly_motion_land_10.png",
+    "54_jelly_motion_breathe_max.png",
+    "55_jelly_motion_rest.png",
+    "56_jelly_motion_right.png"
 )
 
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {
@@ -77,6 +108,26 @@ foreach ($captureSpec in $captureSpecs) {
         Write-Output ("SCREEN_CAPTURE_RESULT ratio={0} file={1}" -f $captureSpec.Name, $filePath)
         $capturedFileCount += 1
     }
+    $landingFiles = @(1..10 | ForEach-Object {
+        Join-Path $outputPath ("{0:D2}_jelly_motion_land_{1:D2}.png" -f (43 + $_), $_)
+    })
+    $uniqueLandingHashes = @(
+        $landingFiles |
+            ForEach-Object { (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash } |
+            Sort-Object -Unique
+    )
+    if ($uniqueLandingHashes.Count -ne $landingFiles.Count) {
+        throw (
+            "JELLY landing strip must contain 10 distinct frames for {0}; found {1}" -f `
+                $captureSpec.Name,
+                $uniqueLandingHashes.Count
+        )
+    }
+    Write-Output (
+        "SCREEN_CAPTURE_MOTION_CHECK ratio={0} landing_unique={1}/10" -f `
+            $captureSpec.Name,
+            $uniqueLandingHashes.Count
+    )
     $temporarySave = Join-Path $outputPath "capture_save.tmp.cfg"
     if (Test-Path -LiteralPath $temporarySave) {
         Remove-Item -LiteralPath $temporarySave -Force

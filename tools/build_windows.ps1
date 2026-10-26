@@ -107,6 +107,19 @@ $legacyPaths = @(
     (Join-Path $outputDirectory "GravityOrb.console.exe")
     (Join-Path $outputDirectory "BUILD.txt")
 )
+$preservedArtifacts = @(
+    Get-ChildItem -LiteralPath $outputDirectory -File -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.Name -like "GravityOrb_v*" -and
+            $_.FullName -notin $sameVersionPaths
+        } |
+        ForEach-Object {
+            [ordered]@{
+                Path = $_.FullName
+                Length = $_.Length
+            }
+        }
+)
 foreach ($stalePath in @($sameVersionPaths + $legacyPaths)) {
     if (Test-Path -LiteralPath $stalePath -PathType Leaf) {
         Remove-Item -LiteralPath $stalePath -Force
@@ -132,6 +145,16 @@ if (-not (Test-Path -LiteralPath $consoleWrapper -PathType Leaf)) {
 if (Test-Path -LiteralPath $sidecarPck) {
     throw "Expected an embedded PCK, but Godot created $sidecarPck"
 }
+foreach ($preservedArtifact in $preservedArtifacts) {
+    $preservedPath = [string]$preservedArtifact.Path
+    if (-not (Test-Path -LiteralPath $preservedPath -PathType Leaf)) {
+        throw "Build removed a different-version artifact: $preservedPath"
+    }
+    $preservedLength = (Get-Item -LiteralPath $preservedPath).Length
+    if ($preservedLength -ne [long]$preservedArtifact.Length) {
+        throw "Build changed a different-version artifact: $preservedPath"
+    }
+}
 
 $commitHash = (& git -C $repoPath rev-parse HEAD | Out-String).Trim()
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($commitHash)) {
@@ -148,10 +171,11 @@ Set-Content -LiteralPath $buildInfoPath -Value $buildInfo -Encoding UTF8
 
 $executableSize = (Get-Item -LiteralPath $outputExecutable).Length
 Write-Output (
-    "WINDOWS_BUILD_RESULT version={0} mode={1} exit=0 bytes={2} exe={3} wrapper={4} build_info={5}" -f `
+    "WINDOWS_BUILD_RESULT version={0} mode={1} exit=0 bytes={2} preserved={3} exe={4} wrapper={5} build_info={6}" -f `
         $projectVersion,
         $modeName,
         $executableSize,
+        $preservedArtifacts.Count,
         $outputExecutable,
         $consoleWrapper,
         $buildInfoPath

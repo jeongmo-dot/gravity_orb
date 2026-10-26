@@ -31,6 +31,37 @@ const CAPTURE_FILES: Array[String] = [
 	"23_jelly_belly_half_zoom.png",
 	"24_jelly_belly_three_quarter_zoom.png",
 	"25_jelly_max_effect_zoom.png",
+	"26_settings.png",
+	"27_start_no_record.png",
+	"28_gravity_switch.png",
+	"29_board_danger.png",
+	"30_board_blocked.png",
+	"31_turn_input_ready.png",
+	"32_turn_input_busy.png",
+	"33_turn_input_rejected.png",
+	"34_callout_great.png",
+	"35_callout_incredible.png",
+	"36_popup_merge.png",
+	"37_popup_blast_big.png",
+	"38_jelly_look_levels.png",
+	"39_jelly_look_crowded.png",
+	"40_jelly_look_max.png",
+	"41_jelly_look_stretch.png",
+	"42_jelly_look_absorption.png",
+	"43_jelly_look_unlock.png",
+	"44_jelly_motion_land_01.png",
+	"45_jelly_motion_land_02.png",
+	"46_jelly_motion_land_03.png",
+	"47_jelly_motion_land_04.png",
+	"48_jelly_motion_land_05.png",
+	"49_jelly_motion_land_06.png",
+	"50_jelly_motion_land_07.png",
+	"51_jelly_motion_land_08.png",
+	"52_jelly_motion_land_09.png",
+	"53_jelly_motion_land_10.png",
+	"54_jelly_motion_breathe_max.png",
+	"55_jelly_motion_rest.png",
+	"56_jelly_motion_right.png",
 ]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
@@ -52,10 +83,13 @@ func _run() -> void:
 		return
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_output_directory))
 	_snapshot_user_save()
+	var original_sfx_enabled: bool = Config.data.sfx_enabled
+	Config.data.sfx_enabled = false
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.rng_seed = 5050
 	await _capture_shell_scenes()
 	await _capture_gameplay_scenes()
+	Config.data.sfx_enabled = original_sfx_enabled
 	_verify_user_save_unchanged()
 	_remove_file(_temp_save_path)
 	for file_name: String in CAPTURE_FILES:
@@ -66,6 +100,14 @@ func _run() -> void:
 
 
 func _capture_shell_scenes() -> void:
+	_remove_file(_temp_save_path)
+	var main: Main = await _create_main(false)
+	await _capture("27_start_no_record.png")
+	(main.get_node("UI") as DebugHud).show_settings()
+	await get_tree().create_timer(0.30).timeout
+	await _capture("26_settings.png")
+	await _destroy_main(main)
+
 	SaveStore.add_ranking(
 		_temp_save_path,
 		GameConfig.GameMode.JELLY,
@@ -80,7 +122,7 @@ func _capture_shell_scenes() -> void:
 		{"max_combo": 8, "turns": 61, "max_level": 6, "final_moves": 1},
 		"2026-10-25 18:40"
 	)
-	var main: Main = await _create_main(false)
+	main = await _create_main(false)
 	await _capture("01_jelly_start.png")
 	(main.get_node("UI") as DebugHud).show_ranking(GameConfig.GameMode.JELLY, 1)
 	await get_tree().create_timer(0.25).timeout
@@ -135,6 +177,7 @@ func _capture_gameplay_scenes() -> void:
 	hud._on_final_move_changed(true, TurnManager.FINAL_MOVE_MESSAGE)
 	await _capture("05_jelly_final_move.png")
 	hud._on_final_move_changed(false, "")
+	await _capture_recovered_hud_scenes(main, manager, board, hud)
 
 	board.clear()
 	_spawn_featured(board)
@@ -173,6 +216,7 @@ func _capture_gameplay_scenes() -> void:
 	await _capture_effect_scenes(main, board)
 	await _capture_overlay_detail_scenes(main, board)
 	await _capture_deform_scenes(main, board)
+	await _capture_recovered_jelly_scenes(main, manager, board, hud)
 	await _destroy_main(main)
 
 
@@ -406,6 +450,483 @@ func _capture_deform_scenes(main: Main, board: Board3D) -> void:
 			resting._update_visual_transform()
 			orb_index += 1
 	await _capture("19_jelly_crowded_rest.png")
+
+
+func _capture_recovered_hud_scenes(
+	main: Main,
+	manager: TurnManager,
+	board: Board3D,
+	hud: Hud
+) -> void:
+	board.clear()
+	board.set_gravity(Vector2i.RIGHT)
+	board.play_visual_tilt(Vector2i.RIGHT)
+	_spawn_featured(board)
+	await get_tree().create_timer(0.12).timeout
+	await _capture("28_gravity_switch.png")
+
+	hud._set_danger_badge(0.70, 4.0)
+	board.set_danger_state(0.70, 4.0)
+	await get_tree().create_timer(0.18).timeout
+	await _capture("29_board_danger.png")
+	hud._set_danger_badge(0.0, 1.0)
+	board.set_danger_state(0.0, 1.0)
+
+	manager.blocked_directions.assign([Vector2i.DOWN])
+	manager.warning_changed.emit(manager.blocked_directions)
+	board.set_warning_directions(manager.blocked_directions)
+	manager._set_state(TurnManager.State.WAITING_INPUT)
+	InputRouter.set_locked(false)
+	await get_tree().create_timer(TurnInputIndicator.READY_FADE_DURATION + 0.02).timeout
+	await _capture("30_board_blocked.png")
+	await _capture("31_turn_input_ready.png")
+
+	manager._set_state(TurnManager.State.SIMULATING)
+	manager.settle_elapsed = 0.5
+	await get_tree().create_timer(TurnInputIndicator.BUSY_FADE_DURATION + 0.02).timeout
+	await _capture("32_turn_input_busy.png")
+	InputRouter.swipe_rejected.emit(Vector2i.LEFT)
+	await get_tree().create_timer(0.04).timeout
+	await _capture("33_turn_input_rejected.png")
+	manager.blocked_directions.clear()
+	var no_blocked_directions: Array[Vector2i] = []
+	manager.warning_changed.emit(no_blocked_directions)
+	board.set_warning_directions(no_blocked_directions)
+	manager._set_state(TurnManager.State.WAITING_INPUT)
+	InputRouter.set_locked(false)
+
+	hud._show_callout("GREAT!", 1)
+	await get_tree().create_timer(0.10).timeout
+	await _capture("34_callout_great.png")
+	hud._show_callout("INCREDIBLE!", 3)
+	await get_tree().create_timer(0.10).timeout
+	await _capture("35_callout_incredible.png")
+	if hud._callout_tween != null and hud._callout_tween.is_valid():
+		hud._callout_tween.kill()
+	hud._hide_callout_label()
+
+	hud._on_reaction_scored({
+		"type": ReactionRules.Type.MERGE,
+		"result_color": OrbTypes.OrbColor.CYAN,
+		"position": Vector2(-80.0, -40.0),
+		"points": 1280,
+		"base_points": 1280,
+		"combo_multiplier": 1.0,
+	})
+	await get_tree().create_timer(0.10).timeout
+	await _capture("36_popup_merge.png")
+	for popup: ScorePopup in hud.active_score_popups():
+		popup.deactivate()
+	hud._on_reaction_scored({
+		"type": ReactionRules.Type.BLAST,
+		"position": Vector2(80.0, -40.0),
+		"points": 48600,
+		"base_points": 6075,
+		"combo_multiplier": 8.0,
+	})
+	await get_tree().create_timer(0.10).timeout
+	var big_popup: ScorePopup = hud.active_score_popups()[0]
+	if big_popup.score_text() != "+48,600" or big_popup.formula_text() != "6,075 ×8":
+		_fail("restored JELLY big popup comma/formula mismatch")
+	await _capture("37_popup_blast_big.png")
+	for popup: ScorePopup in hud.active_score_popups():
+		popup.deactivate()
+	print(
+		"SCREEN_CAPTURE_CHECK scene=recovered_hud gravity=true danger=true blocked=true "
+		+ "input=ready,busy,rejected callouts=great,incredible popups=merge,blast"
+	)
+
+
+func _capture_recovered_jelly_scenes(
+	main: Main,
+	manager: TurnManager,
+	board: Board3D,
+	hud: Hud
+) -> void:
+	var feedback: FeedbackDirector = main.get_node("FeedbackDirector") as FeedbackDirector
+	board.clear()
+	feedback.clear_effects()
+	var level_positions: Array[Vector2] = [
+		Vector2(-330.0, -230.0),
+		Vector2(-225.0, -230.0),
+		Vector2(-100.0, -225.0),
+		Vector2(45.0, -215.0),
+		Vector2(220.0, -195.0),
+		Vector2(-155.0, 105.0),
+		Vector2(135.0, 120.0),
+	]
+	for index: int in range(level_positions.size()):
+		var level_orb: Orb3D = board.spawn_orb(
+			index % JellyOrbArt.PALETTE.size(),
+			index + 1,
+			level_positions[index]
+		)
+		level_orb.disable_physics()
+	await _capture("38_jelly_look_levels.png")
+
+	board.clear()
+	var crowded_coordinates: Array[float] = [-320.0, -160.0, 0.0, 160.0, 320.0]
+	var crowded_index: int = 0
+	for y: float in crowded_coordinates:
+		for x: float in crowded_coordinates:
+			var crowded_orb: Orb3D = board.spawn_orb(
+				crowded_index % JellyOrbArt.PALETTE.size(),
+				1 + crowded_index % 3,
+				Vector2(x, y)
+			)
+			crowded_orb.disable_physics()
+			crowded_index += 1
+	await _capture("39_jelly_look_crowded.png")
+	await _measure_hud_face_overlap(main, board, hud)
+
+	board.clear()
+	feedback.clear_effects()
+	var maximum: Orb3D = board.spawn_orb(OrbTypes.OrbColor.PURPLE, 7, Vector2.ZERO)
+	maximum.disable_physics()
+	feedback.play_reaction_visuals({
+		"type": ReactionRules.Type.MERGE,
+		"position": Vector2.ZERO,
+		"result_level": 7,
+		"result_color": OrbTypes.OrbColor.PURPLE,
+		"result_orb": maximum,
+		"levels": [6, 6],
+		"colors": [OrbTypes.OrbColor.PURPLE, OrbTypes.OrbColor.PURPLE],
+		"shock_targets": [],
+	})
+	hud._on_preview_changed([
+		[{"color": OrbTypes.OrbColor.PURPLE, "level": 7}],
+		[{"color": OrbTypes.OrbColor.RED, "level": 7}],
+	])
+	await get_tree().create_timer(0.16).timeout
+	await _capture("40_jelly_look_max.png")
+
+	board.clear()
+	feedback.clear_effects()
+	var stretch_values: Array[Vector2] = [
+		Vector2(1.18, 1.0),
+		Vector2(1.0, 1.19),
+		Vector2(1.14, 1.10),
+	]
+	for index: int in range(stretch_values.size()):
+		var stretch_orb: Orb3D = board.spawn_orb(
+			index,
+			3 + index,
+			Vector2(-240.0 + float(index) * 240.0, 0.0)
+		)
+		stretch_orb.disable_physics()
+		stretch_orb._jelly_deform = stretch_values[index]
+		stretch_orb._update_visual_transform()
+	await _capture("41_jelly_look_stretch.png")
+
+	board.clear()
+	var absorber: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 4, Vector2(115.0, 0.0))
+	absorber.disable_physics()
+	feedback.play_reaction_visuals({
+		"type": ReactionRules.Type.MERGE,
+		"position": Vector2(115.0, 0.0),
+		"result_level": 4,
+		"result_color": OrbTypes.OrbColor.GREEN,
+		"result_orb": absorber,
+		"jelly_absorption": true,
+		"source_positions": [Vector2(-180.0, 0.0), Vector2(115.0, 0.0)],
+		"source_radii": [Config.data.radius_for_level(3), Config.data.radius_for_level(4)],
+		"levels": [3, 4],
+		"colors": [OrbTypes.OrbColor.GREEN, OrbTypes.OrbColor.GREEN],
+		"shock_targets": [],
+	})
+	await get_tree().create_timer(0.05).timeout
+	await _capture("42_jelly_look_absorption.png")
+
+	board.clear()
+	feedback.clear_effects()
+	if hud._callout_tween != null and hud._callout_tween.is_valid():
+		hud._callout_tween.kill()
+	hud._hide_callout_label()
+	hud._planet_unlock_seen.erase(OrbTypes.OrbColor.PURPLE)
+	hud._preview_unlock_seen.erase(OrbTypes.OrbColor.PURPLE)
+	hud._on_preview_changed([
+		[{"color": OrbTypes.OrbColor.PURPLE, "level": 2}],
+		[{"color": OrbTypes.OrbColor.BLUE, "level": 1}],
+	])
+	hud._on_planet_unlocked(OrbTypes.OrbColor.PURPLE)
+	await get_tree().create_timer(0.08).timeout
+	await _capture("43_jelly_look_unlock.png")
+	if hud._callout_tween != null and hud._callout_tween.is_valid():
+		hud._callout_tween.kill()
+	hud._hide_callout_label()
+
+	await _capture_recovered_jelly_motion(main, manager, board)
+	print(
+		"SCREEN_CAPTURE_CHECK scene=recovered_jelly levels=7 crowded=25 max=true "
+		+ "stretch=true absorption=true unlock=true land_frames=10 breathe=true "
+		+ "physical_pile=true right_motion=true"
+	)
+
+
+func _capture_recovered_jelly_motion(
+	main: Main,
+	manager: TurnManager,
+	board: Board3D
+) -> void:
+	var resolver: CollisionResolver = main.get_node("CollisionResolver") as CollisionResolver
+	resolver.set_physics_process(false)
+	resolver._pending.clear()
+	board.clear()
+	manager._set_state(TurnManager.State.SIMULATING)
+	board.set_turn_resting(false)
+	board.set_gravity(Vector2i.DOWN)
+	var landing: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		7,
+		Vector2(0.0, -330.0)
+	)
+	var landing_states: Dictionary = {}
+	var landing_scales: Dictionary = {}
+	await _wait_physics_seconds(0.08)
+	for falling_index: int in range(4):
+		await _capture_landing_frame(landing, falling_index, landing_states, landing_scales)
+		if falling_index < 3:
+			await _wait_physics_seconds(0.12)
+
+	var contact_wait_frames: int = 0
+	while (
+		landing.get_physics_body().get_colliding_bodies().is_empty()
+		and contact_wait_frames < Engine.physics_ticks_per_second
+	):
+		await get_tree().physics_frame
+		contact_wait_frames += 1
+	if landing.get_physics_body().get_colliding_bodies().is_empty():
+		_fail("JELLY landing capture did not reach the physical floor")
+	await _capture_landing_frame(landing, 4, landing_states, landing_scales)
+	var recovery_frame_steps: Array[int] = [2, 4, 8, 14, 24]
+	for recovery_index: int in range(recovery_frame_steps.size()):
+		await _wait_physics_frames(recovery_frame_steps[recovery_index])
+		await _capture_landing_frame(
+			landing,
+			5 + recovery_index,
+			landing_states,
+			landing_scales
+		)
+	if landing_states.size() != 10:
+		_fail("JELLY landing captures must contain ten distinct physical states")
+	if landing_scales.size() < 5:
+		_fail("JELLY landing captures must show at least five distinct body scales")
+
+	board.clear()
+	board.set_gravity(Vector2i.DOWN)
+	var breathing: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, 7, Vector2.ZERO)
+	breathing.disable_physics()
+	breathing.set_turn_resting(true)
+	breathing._jelly_breath_weight = 1.0
+	breathing._jelly_idle_elapsed = PI / (2.0 * 1.8)
+	breathing._process(0.0)
+	await _capture("54_jelly_motion_breathe_max.png")
+
+	board.clear()
+	board.set_turn_resting(false)
+	board.set_gravity(Vector2i.DOWN)
+	for orb_index: int in range(40):
+		var column: int = orb_index % 8
+		var row: int = orb_index / 8
+		board.spawn_orb(
+			orb_index % JellyOrbArt.PALETTE.size(),
+			1,
+			Vector2(-315.0 + float(column) * 90.0, -360.0 + float(row) * 78.0)
+		)
+	var settle_directions: Array[Vector2i] = [
+		Vector2i.DOWN,
+		Vector2i.RIGHT,
+		Vector2i.UP,
+		Vector2i.LEFT,
+		Vector2i.DOWN,
+	]
+	for direction: Vector2i in settle_directions:
+		board.set_gravity(direction)
+		await _wait_physics_seconds(1.2)
+	board.set_gravity(Vector2i.DOWN)
+	await _wait_physics_seconds(1.8)
+	var resting_pairs: int = _count_actual_orb_contact_pairs(board)
+	var boundary_contacts: Dictionary = _count_pile_boundary_contacts(board)
+	if resting_pairs <= 0:
+		_fail("JELLY rest capture must contain actual orb contact pairs")
+	if (
+		int(boundary_contacts["floor"]) <= 0
+		or int(boundary_contacts["walls"]) <= 0
+		or int(boundary_contacts["corners"]) <= 0
+	):
+		_fail("JELLY rest capture must physically touch floor, walls, and corners")
+	board.set_turn_resting(true)
+	await get_tree().create_timer(0.25).timeout
+	await _capture("55_jelly_motion_rest.png")
+
+	board.set_turn_resting(false)
+	board.set_gravity(Vector2i.RIGHT)
+	await _wait_physics_seconds(0.22)
+	var moving_count: int = 0
+	var maximum_speed: float = 0.0
+	for moving: Orb3D in board.get_orbs():
+		var speed: float = moving.linear_velocity.length()
+		maximum_speed = maxf(maximum_speed, speed)
+		if speed > Config.data.stable_linear_speed:
+			moving_count += 1
+	var moving_pairs: int = _count_actual_orb_contact_pairs(board)
+	if moving_count <= 0:
+		_fail("JELLY right-gravity capture must contain moving physical orbs")
+	if moving_pairs <= 0:
+		_fail("JELLY right-gravity capture must retain actual pile contacts")
+	await _capture("56_jelly_motion_right.png")
+	print(
+		(
+			"JELLY_MOTION_PILE orbs=%d rest_pairs=%d floor=%d walls=%d corners=%d "
+			+ "right_moving=%d right_pairs=%d right_max_speed=%.3f"
+		) % [
+			board.get_orbs().size(),
+			resting_pairs,
+			int(boundary_contacts["floor"]),
+			int(boundary_contacts["walls"]),
+			int(boundary_contacts["corners"]),
+			moving_count,
+			moving_pairs,
+			maximum_speed,
+		]
+	)
+	resolver._pending.clear()
+	manager._set_state(TurnManager.State.WAITING_INPUT)
+	InputRouter.set_locked(false)
+
+
+func _capture_landing_frame(
+	landing: Orb3D,
+	frame_index: int,
+	state_keys: Dictionary,
+	scale_keys: Dictionary
+) -> void:
+	await _capture("%02d_jelly_motion_land_%02d.png" % [44 + frame_index, frame_index + 1])
+	var body_scale: Vector3 = landing.visual_stretch_scale()
+	var position_value: Vector2 = landing.position
+	var velocity_value: Vector2 = landing.linear_velocity
+	var contact_count: int = landing.get_physics_body().get_colliding_bodies().size()
+	var state_key: String = "%.3f|%.3f|%.4f|%.4f" % [
+		position_value.x,
+		position_value.y,
+		body_scale.x,
+		body_scale.y,
+	]
+	var scale_key: String = "%.4f|%.4f" % [body_scale.x, body_scale.y]
+	state_keys[state_key] = true
+	scale_keys[scale_key] = true
+	print(
+		(
+			"JELLY_LANDING_FRAME index=%02d position_y=%.3f speed=%.3f "
+			+ "scale_x=%.6f scale_y=%.6f contacts=%d"
+		) % [
+			frame_index + 1,
+			position_value.y,
+			velocity_value.length(),
+			body_scale.x,
+			body_scale.y,
+			contact_count,
+		]
+	)
+
+
+func _wait_physics_frames(frame_count: int) -> void:
+	for _frame_index: int in range(maxi(frame_count, 0)):
+		await get_tree().physics_frame
+
+
+func _wait_physics_seconds(duration: float) -> void:
+	await _wait_physics_frames(ceili(maxf(duration, 0.0) * Engine.physics_ticks_per_second))
+
+
+func _count_actual_orb_contact_pairs(board: Board3D) -> int:
+	var pair_keys: Dictionary = {}
+	for first: Orb3D in board.get_orbs():
+		for second: Orb3D in first.get_colliding_orbs():
+			if not is_instance_valid(second) or second.consumed:
+				continue
+			var first_id: int = first.get_instance_id()
+			var second_id: int = second.get_instance_id()
+			var pair_key: String = "%d:%d" % [mini(first_id, second_id), maxi(first_id, second_id)]
+			pair_keys[pair_key] = true
+	return pair_keys.size()
+
+
+func _count_pile_boundary_contacts(board: Board3D) -> Dictionary:
+	var half_size: float = Config.data.board_size * 0.5
+	var tolerance: float = Config.data.floor_contact_tolerance + 4.0
+	var floor_contacts: int = 0
+	var wall_contacts: int = 0
+	var corner_contacts: int = 0
+	for orb: Orb3D in board.get_orbs():
+		var radius: float = orb.get_current_radius()
+		var touches_floor: bool = orb.position.y + radius >= half_size - tolerance
+		var touches_side: bool = absf(orb.position.x) + radius >= half_size - tolerance
+		if touches_floor:
+			floor_contacts += 1
+		if touches_side:
+			wall_contacts += 1
+		if touches_floor and touches_side:
+			corner_contacts += 1
+	return {
+		"floor": floor_contacts,
+		"walls": wall_contacts,
+		"corners": corner_contacts,
+	}
+
+
+func _measure_hud_face_overlap(main: Main, board: Board3D, hud: Hud) -> void:
+	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
+	if hud._callout_tween != null and hud._callout_tween.is_valid():
+		hud._callout_tween.kill()
+	hud._show_callout("NICE!", 0)
+	hud._on_reaction_scored({
+		"type": ReactionRules.Type.MERGE,
+		"result_color": OrbTypes.OrbColor.GREEN,
+		"position": Vector2.ZERO,
+		"points": 1280,
+		"base_points": 1280,
+		"combo_multiplier": 1.0,
+	})
+	var maximum_ratio: float = 0.0
+	var overlap_frames: int = 0
+	var sample_frames: int = 120
+	for _frame_index: int in range(sample_frames):
+		await get_tree().process_frame
+		var hud_rects: Array[Rect2] = []
+		if hud._callout_label.visible:
+			hud_rects.append(hud._callout_label.get_global_rect())
+		for popup: ScorePopup in hud.active_score_popups():
+			hud_rects.append(popup.get_global_rect())
+		var frame_overlap: bool = false
+		for orb: Orb3D in board.get_orbs():
+			var center: Vector2 = camera.unproject_position(orb._face.global_position)
+			var edge: Vector2 = camera.unproject_position(
+				orb._face.global_position + Vector3(orb.get_current_radius() * 0.0045, 0.0, 0.0)
+			)
+			var half_size: float = maxf(center.distance_to(edge), 1.0)
+			var face_rect: Rect2 = Rect2(center - Vector2.ONE * half_size, Vector2.ONE * half_size * 2.0)
+			for hud_rect: Rect2 in hud_rects:
+				var overlap: Rect2 = face_rect.intersection(hud_rect)
+				if overlap.has_area():
+					frame_overlap = true
+					maximum_ratio = maxf(
+						maximum_ratio,
+						overlap.get_area() / maxf(face_rect.get_area(), 1.0)
+					)
+		if frame_overlap:
+			overlap_frames += 1
+	print(
+		"JELLY_HUD_FACE_OVERLAP max_ratio=%.4f overlap_seconds=%.3f sampled_seconds=1.000" % [
+			maximum_ratio,
+			float(overlap_frames) / 120.0,
+		]
+	)
+	for popup: ScorePopup in hud.active_score_popups():
+		popup.deactivate()
+	if hud._callout_tween != null and hud._callout_tween.is_valid():
+		hud._callout_tween.kill()
+	hud._hide_callout_label()
 
 
 func _spawn_featured(board: Board3D) -> void:
