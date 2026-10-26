@@ -40,7 +40,7 @@
 
 ### [2026-10-27] 대상 #112 — 호령·점수 팝업 얼굴 밖 배치와 배경 유성 삭제
 - 상태: 완료 — `origin/main` 최신 상태에서 호령을 보드 위 빈 공간으로 옮기고, 점수 팝업 글자 크기를 70%로 줄여 합쳐진 젤리의 오른쪽을 우선하되 보드·얼굴 겹침이 더 적은 방향을 고르도록 변경함. 배경 유성 및 남아 있던 미사용 동명 함수까지 삭제함
-- 브랜치 / PR: `codex/callout-popup-layout` / 생성 예정
+- 브랜치 / PR: `codex/callout-popup-layout` / https://github.com/jeongmo-dot/gravity_orb/pull/114
 - 변경 파일: `scripts/core/OrbVisual.gd`, `scripts/fx/SpaceBackdrop.gd`, `scripts/ui/{Hud,ScorePopup}.gd`, `tests/{capture_screens.ps1,test_callouts.gd,test_score_popups.gd,test_space_board_visuals.gd}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 호령 NICE/GREAT/AMAZING/INCREDIBLE/UNSTOPPABLE을 콤보 아래와 투영된 보드 위 사이 가운데에 배치하고, 상승 경로 전체가 콤보·보드와 겹치지 않게 가용 높이에 맞춰 글자 크기를 제한 — 자동 배치 테스트 + 두 비율 실제 창 캡처 + 직접 관측
