@@ -91,7 +91,7 @@ func test_level_gravity_scale_accelerates_large_orbs() -> void:
 	_cleanup(board)
 
 
-func test_jelly_orbs_lock_plane_rotation_without_changing_classic() -> void:
+func test_jelly_and_classic_orbs_keep_plane_rotation_unlocked() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	var jelly_board: Board3D = await _create_board()
@@ -100,10 +100,12 @@ func test_jelly_orbs_lock_plane_rotation_without_changing_classic() -> void:
 		1,
 		Vector2.ZERO
 	)
+	var jelly_body: RigidBody3D = jelly_orb.get_physics_body()
 	assert_true(
-		jelly_orb.get_physics_body().axis_lock_angular_z,
-		"JELLY bodies do not roll in the play plane"
+		not jelly_body.axis_lock_angular_z,
+		"JELLY bodies roll in the play plane"
 	)
+	assert_near(jelly_body.angular_damp, 15.0, 0.001, "JELLY angular damp")
 	_cleanup(jelly_board)
 
 	Config.data.game_mode = GameConfig.GameMode.TURN
@@ -115,7 +117,7 @@ func test_jelly_orbs_lock_plane_rotation_without_changing_classic() -> void:
 	)
 	assert_true(
 		not classic_orb.get_physics_body().axis_lock_angular_z,
-		"classic bodies retain their existing plane rotation"
+		"classic bodies retain plane rotation"
 	)
 	_cleanup(classic_board)
 	Config.data.game_mode = original_mode

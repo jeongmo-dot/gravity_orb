@@ -88,6 +88,7 @@ func test_m3_turn_defaults() -> void:
 	assert_near(config.wall_bounce, 0.06, TOLERANCE, "wall bounce")
 	assert_near(config.orb_friction, 0.3, TOLERANCE, "orb friction")
 	assert_near(config.wall_friction, 0.3, TOLERANCE, "wall friction")
+	assert_near(config.orb_angular_damp, 15.0, TOLERANCE, "orb angular damp")
 	assert_near(
 		config.gravity_for_level(1),
 		config.gravity_strength,

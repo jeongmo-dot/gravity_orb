@@ -784,6 +784,8 @@ func _capture_recovered_jelly_motion(
 	await _wait_physics_seconds(1.8)
 	var resting_pairs: int = _count_actual_orb_contact_pairs(board)
 	var boundary_contacts: Dictionary = _count_pile_boundary_contacts(board)
+	var resting_height: float = _pile_height(board)
+	var resting_longest_line: int = _longest_pile_support_line(board, Vector2i.DOWN)
 	if resting_pairs <= 0:
 		_fail("JELLY rest capture must contain actual orb contact pairs")
 	if (
@@ -815,13 +817,16 @@ func _capture_recovered_jelly_motion(
 	print(
 		(
 			"JELLY_MOTION_PILE orbs=%d rest_pairs=%d floor=%d walls=%d corners=%d "
-			+ "right_moving=%d right_pairs=%d right_max_speed=%.3f jitter_seed=%d"
+			+ "rest_height=%.3f longest_line=%d right_moving=%d right_pairs=%d "
+			+ "right_max_speed=%.3f jitter_seed=%d"
 		) % [
 			board.get_orbs().size(),
 			resting_pairs,
 			int(boundary_contacts["floor"]),
 			int(boundary_contacts["walls"]),
 			int(boundary_contacts["corners"]),
+			resting_height,
+			resting_longest_line,
 			moving_count,
 			moving_pairs,
 			maximum_speed,
@@ -911,6 +916,62 @@ func _count_pile_boundary_contacts(board: Board3D) -> Dictionary:
 		"walls": wall_contacts,
 		"corners": corner_contacts,
 	}
+
+
+func _pile_height(board: Board3D) -> float:
+	var minimum_y: float = INF
+	var maximum_y: float = -INF
+	for orb: Orb3D in board.get_orbs():
+		var radius: float = orb.get_current_radius()
+		minimum_y = minf(minimum_y, orb.position.y - radius)
+		maximum_y = maxf(maximum_y, orb.position.y + radius)
+	return maximum_y - minimum_y
+
+
+func _longest_pile_support_line(board: Board3D, gravity_direction: Vector2i) -> int:
+	var orbs: Array[Orb3D] = board.get_orbs()
+	var orb_by_id: Dictionary = {}
+	var support_by_id: Dictionary = {}
+	var gravity: Vector2 = Vector2(gravity_direction).normalized()
+	var minimum_alignment: float = cos(deg_to_rad(10.0))
+	for orb: Orb3D in orbs:
+		orb_by_id[orb.get_instance_id()] = orb
+		var best_support: Orb3D = null
+		var best_distance: float = INF
+		for candidate: Orb3D in orbs:
+			if candidate == orb:
+				continue
+			var delta: Vector2 = candidate.position - orb.position
+			var distance: float = delta.length()
+			var contact_distance: float = (
+				orb.get_current_radius()
+				+ candidate.get_current_radius()
+				+ Config.data.floor_contact_tolerance
+			)
+			if (
+				distance > 0.001
+				and distance <= contact_distance
+				and delta.normalized().dot(gravity) >= minimum_alignment
+				and distance < best_distance
+			):
+				best_support = candidate
+				best_distance = distance
+		if best_support != null:
+			support_by_id[orb.get_instance_id()] = best_support.get_instance_id()
+	var longest: int = 0
+	for orb: Orb3D in orbs:
+		var line_length: int = 1
+		var current_id: int = orb.get_instance_id()
+		var visited: Dictionary = {current_id: true}
+		while support_by_id.has(current_id):
+			var support_id: int = int(support_by_id[current_id])
+			if visited.has(support_id) or not orb_by_id.has(support_id):
+				break
+			visited[support_id] = true
+			line_length += 1
+			current_id = support_id
+		longest = maxi(longest, line_length)
+	return longest
 
 
 func _measure_hud_face_overlap(_main: Main, _board: Board3D, hud: Hud) -> void:

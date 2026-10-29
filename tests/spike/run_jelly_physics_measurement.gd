@@ -10,6 +10,7 @@ const BEFORE_PROFILE: Dictionary = {
 	"orb_bounce": 0.15,
 	"wall_friction": 0.3,
 	"wall_bounce": 0.1,
+	"orb_angular_damp": 1.0,
 	"rotation_lock": false,
 }
 const AFTER_PROFILE: Dictionary = {
@@ -19,6 +20,7 @@ const AFTER_PROFILE: Dictionary = {
 	"orb_bounce": 0.06,
 	"wall_friction": 0.6,
 	"wall_bounce": 0.06,
+	"orb_angular_damp": 1.0,
 	"rotation_lock": true,
 }
 
@@ -26,6 +28,8 @@ var _profile_name: String = "after"
 var _output_path: String = DEFAULT_OUTPUT_PATH
 var _rotation_lock: bool = true
 var _friction_override: float = -1.0
+var _angular_damp_override: float = -1.0
+var _rotation_lock_override: int = -1
 
 
 func _ready() -> void:
@@ -41,6 +45,16 @@ func _run() -> void:
 		profile["orb_friction"] = _friction_override
 		profile["wall_friction"] = _friction_override
 		_profile_name = "friction_%s" % _friction_tag(_friction_override)
+	if _angular_damp_override >= 0.0:
+		profile["orb_angular_damp"] = _angular_damp_override
+	if _rotation_lock_override >= 0:
+		profile["rotation_lock"] = _rotation_lock_override == 1
+	if _angular_damp_override >= 0.0 or _rotation_lock_override >= 0:
+		_profile_name = (
+			"rolling_locked"
+			if bool(profile["rotation_lock"])
+			else "rolling_damp_%s" % _number_tag(float(profile["orb_angular_damp"]))
+		)
 	_apply_profile(profile)
 	Engine.physics_ticks_per_second = 120
 	var report: Dictionary = {
@@ -80,6 +94,12 @@ func _apply_arguments() -> bool:
 			_output_path = argument.trim_prefix("--output=")
 		elif argument.begins_with("--friction="):
 			_friction_override = argument.trim_prefix("--friction=").to_float()
+		elif argument.begins_with("--angular-damp="):
+			_angular_damp_override = argument.trim_prefix("--angular-damp=").to_float()
+		elif argument == "--rotation-lock=on":
+			_rotation_lock_override = 1
+		elif argument == "--rotation-lock=off":
+			_rotation_lock_override = 0
 	if _profile_name not in ["before", "after"]:
 		push_error("Unknown JELLY physics profile: %s" % _profile_name)
 		get_tree().quit(1)
@@ -88,6 +108,10 @@ func _apply_arguments() -> bool:
 		_friction_override <= 0.0 or _friction_override > 1.0
 	):
 		push_error("JELLY friction must be greater than 0 and at most 1")
+		get_tree().quit(1)
+		return false
+	if _angular_damp_override != -1.0 and _angular_damp_override < 0.0:
+		push_error("JELLY angular damp must be non-negative")
 		get_tree().quit(1)
 		return false
 	return true
@@ -101,6 +125,7 @@ func _apply_profile(profile: Dictionary) -> void:
 	Config.data.orb_bounce = float(profile["orb_bounce"])
 	Config.data.wall_friction = float(profile["wall_friction"])
 	Config.data.wall_bounce = float(profile["wall_bounce"])
+	Config.data.orb_angular_damp = float(profile["orb_angular_damp"])
 	_rotation_lock = bool(profile["rotation_lock"])
 	Orb3D.clear_shared_resource_cache()
 
@@ -204,13 +229,21 @@ func _measure_pile() -> Dictionary:
 		Vector2i.RIGHT,
 		Vector2i.UP,
 		Vector2i.LEFT,
-		Vector2i.DOWN,
 	]
 	for direction: Vector2i in settle_directions:
 		board.set_gravity(direction)
 		await _wait_seconds(1.2)
 	board.set_gravity(Vector2i.DOWN)
-	await _wait_seconds(1.8)
+	var timeline: Array[Dictionary] = []
+	var sample_frames: Array[int] = [60, 120, 180, 360]
+	for frame_index: int in range(1, sample_frames[-1] + 1):
+		await get_tree().physics_frame
+		if frame_index in sample_frames:
+			var snapshot: Dictionary = _pile_snapshot(board, Vector2i.DOWN)
+			snapshot["seconds_after_down"] = (
+				float(frame_index) / float(Engine.physics_ticks_per_second)
+			)
+			timeline.append(snapshot)
 	var extents: Dictionary = _pile_extents(board)
 	board.set_gravity(Vector2i.RIGHT)
 	var settle_frames: int = await _wait_until_stable(board, 5.0)
@@ -222,6 +255,7 @@ func _measure_pile() -> Dictionary:
 		"right_forced_settle": settle_frames >= Engine.physics_ticks_per_second * 5,
 		"jitter_seed": PILE_JITTER_SEED,
 		"horizontal_jitter_px": 10.0,
+		"down_timeline": timeline,
 	}
 	await _free_board(board)
 	return result
@@ -234,26 +268,44 @@ func _measure_floor_slide() -> Dictionary:
 	var orb: Orb3D = _spawn_orb(board, 1, Vector2(-300.0, floor_y))
 	await _wait_seconds(0.5)
 	orb.linear_velocity = Vector2(500.0, 0.0)
+	orb.angular_velocity = 0.0
 	var start_x: float = orb.position.x
 	var maximum_distance: float = 0.0
-	var stopped_frames: int = 0
+	var below_one_frames: int = 0
 	var elapsed_frames: int = 0
-	var maximum_frames: int = Engine.physics_ticks_per_second * 3
+	var below_thirty_frame: int = -1
+	var below_thirty_distance: float = -1.0
+	var below_one_frame: int = -1
+	var below_one_distance: float = -1.0
+	var maximum_frames: int = Engine.physics_ticks_per_second * 12
 	for frame_index: int in range(maximum_frames):
 		await get_tree().physics_frame
 		elapsed_frames = frame_index + 1
-		maximum_distance = maxf(maximum_distance, absf(orb.position.x - start_x))
-		if absf(orb.linear_velocity.x) <= 1.0:
-			stopped_frames += 1
+		var distance: float = absf(orb.position.x - start_x)
+		var speed: float = absf(orb.linear_velocity.x)
+		maximum_distance = maxf(maximum_distance, distance)
+		if below_thirty_frame < 0 and speed <= 30.0:
+			below_thirty_frame = elapsed_frames
+			below_thirty_distance = distance
+		if speed <= 1.0:
+			if below_one_frame < 0:
+				below_one_frame = elapsed_frames
+				below_one_distance = distance
+			below_one_frames += 1
 		else:
-			stopped_frames = 0
-		if stopped_frames >= 12:
+			below_one_frames = 0
+		if below_one_frames >= 12:
 			break
 	var result: Dictionary = {
-		"stop_seconds": float(elapsed_frames) / float(Engine.physics_ticks_per_second),
+		"below_30_px_s": _threshold_result(below_thirty_frame, below_thirty_distance),
+		"below_1_px_s": _threshold_result(below_one_frame, below_one_distance),
+		"stop_seconds": (
+			float(below_one_frame) / float(Engine.physics_ticks_per_second)
+			if below_one_frame >= 0 else -1.0
+		),
 		"distance_px": maximum_distance,
 		"final_speed_px_s": absf(orb.linear_velocity.x),
-		"forced_stop": elapsed_frames >= maximum_frames,
+		"forced_stop": below_one_frame < 0,
 	}
 	await _free_board(board)
 	return result
@@ -350,6 +402,61 @@ func _pile_extents(board: Board3D) -> Dictionary:
 	return {"width": maximum.x - minimum.x, "height": maximum.y - minimum.y}
 
 
+func _pile_snapshot(board: Board3D, gravity_direction: Vector2i) -> Dictionary:
+	var extents: Dictionary = _pile_extents(board)
+	return {
+		"width_px": extents["width"],
+		"height_px": extents["height"],
+		"longest_line": _longest_support_line(board, gravity_direction),
+	}
+
+
+func _longest_support_line(board: Board3D, gravity_direction: Vector2i) -> int:
+	var orbs: Array[Orb3D] = board.get_orbs()
+	var orb_by_id: Dictionary = {}
+	var support_by_id: Dictionary = {}
+	var gravity: Vector2 = Vector2(gravity_direction).normalized()
+	var minimum_alignment: float = cos(deg_to_rad(10.0))
+	for orb: Orb3D in orbs:
+		orb_by_id[orb.get_instance_id()] = orb
+		var best_support: Orb3D = null
+		var best_distance: float = INF
+		for candidate: Orb3D in orbs:
+			if candidate == orb:
+				continue
+			var delta: Vector2 = candidate.position - orb.position
+			var distance: float = delta.length()
+			var contact_distance: float = (
+				orb.get_current_radius()
+				+ candidate.get_current_radius()
+				+ Config.data.floor_contact_tolerance
+			)
+			if (
+				distance > 0.001
+				and distance <= contact_distance
+				and delta.normalized().dot(gravity) >= minimum_alignment
+				and distance < best_distance
+			):
+				best_support = candidate
+				best_distance = distance
+		if best_support != null:
+			support_by_id[orb.get_instance_id()] = best_support.get_instance_id()
+	var longest: int = 0
+	for orb: Orb3D in orbs:
+		var line_length: int = 1
+		var current_id: int = orb.get_instance_id()
+		var visited: Dictionary = {current_id: true}
+		while support_by_id.has(current_id):
+			var support_id: int = int(support_by_id[current_id])
+			if visited.has(support_id) or not orb_by_id.has(support_id):
+				break
+			visited[support_id] = true
+			line_length += 1
+			current_id = support_id
+		longest = maxi(longest, line_length)
+	return longest
+
+
 func _free_board(board: Board3D) -> void:
 	board.queue_free()
 	await get_tree().process_frame
@@ -360,8 +467,23 @@ func _safe_ratio(numerator: float, denominator: float) -> float:
 	return numerator / denominator if denominator > 0.000001 else 0.0
 
 
+func _threshold_result(frame_index: int, distance: float) -> Dictionary:
+	return {
+		"reached": frame_index >= 0,
+		"seconds": (
+			float(frame_index) / float(Engine.physics_ticks_per_second)
+			if frame_index >= 0 else -1.0
+		),
+		"distance_px": distance,
+	}
+
+
 func _friction_tag(value: float) -> String:
 	return ("%.2f" % value).replace(".", "p")
+
+
+func _number_tag(value: float) -> String:
+	return ("%.2f" % value).trim_suffix("0").trim_suffix("0").trim_suffix(".")
 
 
 func _write_report(report: Dictionary) -> void:
