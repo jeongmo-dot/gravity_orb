@@ -1,16 +1,24 @@
 param(
     [string]$GodotPath = "C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe",
     [string]$RepoPath = "",
-    [ValidateSet("before", "after")]
     [string]$Label = "after",
     [ValidateRange(1, 8)]
     [int]$Parallelism = 4,
+    [double]$Friction = -1.0,
     [switch]$AggregateOnly
 )
 
 $ErrorActionPreference = "Stop"
 if ([string]::IsNullOrWhiteSpace($RepoPath)) {
     $RepoPath = Split-Path -Parent $PSScriptRoot
+}
+if ($Friction -ne -1.0 -and ($Friction -le 0.0 -or $Friction -gt 1.0)) {
+    throw "Friction must be greater than 0 and at most 1"
+}
+$culture = [Globalization.CultureInfo]::InvariantCulture
+$physicsArguments = @()
+if ($Friction -gt 0.0) {
+    $physicsArguments += "--physics-friction=$($Friction.ToString($culture))"
 }
 $outputDirectory = Join-Path $RepoPath "artifacts\jelly_physics_autoplay_$Label"
 New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
@@ -29,7 +37,7 @@ foreach ($seed in 101..120) {
             "--game-mode=jelly", "--jolt-ticks=120", "--jolt-seeds=$seed",
             "--jolt-max-turns=400", "--jolt-no-determinism",
             "--jolt-output=res://artifacts/jelly_physics_autoplay_$Label/$name.json"
-        )
+        ) + $physicsArguments
     }
 }
 
@@ -125,6 +133,7 @@ $summary = [ordered]@{
     seeds = @(101..120)
     fixed_fps = 120
     max_turns = 400
+    friction = if ($Friction -gt 0.0) { $Friction } else { $null }
     game_over_count = $completedGames.Count
     average_game_over_turns = if ($gameOverTurns.Count -gt 0) { ($gameOverTurns | Measure-Object -Average).Average } else { 0.0 }
     average_game_over_score = if ($gameOverScores.Count -gt 0) { ($gameOverScores | Measure-Object -Average).Average } else { 0.0 }
