@@ -32,7 +32,19 @@
 
 ## 대기 중
 
-- 없음 (다음 항목은 사용자 결정 뒤)
+### [2026-10-29 #115] JELLY 물리 — 단단한 구슬에서 젤리로 (더 빠르게·살짝만 튀게·구르지 않게)
+- 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합. 번호 #113·#114는 PR 번호와 겹쳐 건너뜀)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.8**
+- 배경: 사용자 (2026-10-29) 편집기 플레이에서 "물리 엔진이 좀 이상해" — 튕김·미끄러짐, 속도·무게감 (중력 바꿔 떨어질 때). JELLY 물리값이 모두 CLASSIC (M1) 그대로다. 튕김은 섞으면 0.25~0.30, 구체가 구르는데 그림은 돌지 않아 얼음처럼 미끄러져 보이고, L1이 판을 가로지르는 데 1.0초 걸린다
+- 앵커: `config/default_config.tres`·`config/GameConfig.gd` 기본값, `scripts/spike/Orb3D.gd` `setup()` (회전 잠금)
+- 수치: `gravity_strength` 3600, `gravity_level_scale` 0.05, `orb_bounce` 0.06, `wall_bounce` 0.06, `orb_friction` 0.6, `wall_friction` 0.6, 회전 잠금 (`axis_lock_angular_z = true` — 새 설정 필드 없음)
+- 요구:
+  1. 위 값으로 바꾸기
+  2. 젤리 몸 회전 잠금
+  3. §12-ONE.8 측정 1~8 (바꾸기 전 → 후)
+- 건드리지 말 것: 젤리 말랑함 상수 (`JELLY_*`), 규칙·점수·흡수, `orb_linear_damp`·`stable_*`·`max_settle_time`, 색 효과 세기, 다른 연출, 사용자 저장 파일, `docs/` (회신 파일 제외). 측정 2의 튕김 비율이 0.12 ± 0.03을 벗어나도 값은 그대로 두고 보고한다
+- Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), 새 JELLY 기준 해시 (같은 조건을 모두 지나는 시드), 측정·캡처 보고 (마지막은 전체 캡처), 검증 빌드는 `-Debug`만
+- 커밋: 항목 단위 브랜치, **push·PR까지**
 
 ---
 
