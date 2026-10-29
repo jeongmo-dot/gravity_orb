@@ -91,6 +91,36 @@ func test_level_gravity_scale_accelerates_large_orbs() -> void:
 	_cleanup(board)
 
 
+func test_jelly_orbs_lock_plane_rotation_without_changing_classic() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var jelly_board: Board3D = await _create_board()
+	var jelly_orb: Orb3D = jelly_board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		1,
+		Vector2.ZERO
+	)
+	assert_true(
+		jelly_orb.get_physics_body().axis_lock_angular_z,
+		"JELLY bodies do not roll in the play plane"
+	)
+	_cleanup(jelly_board)
+
+	Config.data.game_mode = GameConfig.GameMode.TURN
+	var classic_board: Board3D = await _create_board()
+	var classic_orb: Orb3D = classic_board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		1,
+		Vector2.ZERO
+	)
+	assert_true(
+		not classic_orb.get_physics_body().axis_lock_angular_z,
+		"classic bodies retain their existing plane rotation"
+	)
+	_cleanup(classic_board)
+	Config.data.game_mode = original_mode
+
+
 func test_merged_result_uses_new_level_gravity() -> void:
 	var fixture_root: Node = Node.new()
 	fixture_root.name = "JoltMergedGravityFixture"
