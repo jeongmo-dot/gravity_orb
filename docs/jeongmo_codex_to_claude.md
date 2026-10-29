@@ -40,7 +40,7 @@
 
 ### [2026-10-30] 대상 #117 — 다시 구르게, 금방 멈추게
 - 상태: 완료 — 최신 `origin/main` `d71df79`에서 항목 브랜치를 만들고 JELLY 평면 회전 잠금을 해제했으며 `orb_angular_damp`를 명세값 `15.0`으로 변경함. 회전 잠금 기준과 감쇠 `5/15/30`의 물리·20시드 자동 플레이, 새 해시, 전체 테스트·Debug 빌드·두 화면비 전체 캡처를 완료함
-- 브랜치 / PR: `codex/jelly-rolling-damp` / 생성 예정
+- 브랜치 / PR: `codex/jelly-rolling-damp` / https://github.com/jeongmo-dot/gravity_orb/pull/117
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/spike/Orb3D.gd`, `tests/{test_config.gd,test_jelly_regression.gd,test_jolt_3d.gd,run_jelly_physics_autoplay.ps1,run_jelly_rolling_measurement.ps1,run_jelly_rolling_candidates.ps1}`, `tests/spike/{capture_screens.gd,run_jelly_physics_measurement.gd,run_jolt_3d_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `Orb3D.setup()`의 JELLY `axis_lock_angular_z` 설정을 제거해 JELLY와 숨겨진 CLASSIC 모두 평면 회전 잠금 없음 — 자동 (`test_jelly_and_classic_orbs_keep_plane_rotation_unlocked`)
