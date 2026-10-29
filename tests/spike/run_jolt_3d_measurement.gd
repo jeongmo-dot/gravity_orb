@@ -83,6 +83,7 @@ func _run() -> void:
 		"gravity_level_scale": Config.data.gravity_level_scale,
 		"orb_friction": Config.data.orb_friction,
 		"wall_friction": Config.data.wall_friction,
+		"orb_angular_damp": Config.data.orb_angular_damp,
 		"mass_exponent": Config.data.mass_exponent,
 		"shock_impulse": Config.data.shock_impulse,
 		"shock_radius_factor": Config.data.shock_radius_factor,
@@ -1739,6 +1740,10 @@ func _apply_arguments() -> void:
 			var friction: float = argument.trim_prefix("--physics-friction=").to_float()
 			Config.data.orb_friction = friction
 			Config.data.wall_friction = friction
+		elif argument.begins_with("--physics-angular-damp="):
+			Config.data.orb_angular_damp = argument.trim_prefix(
+				"--physics-angular-damp="
+			).to_float()
 		elif argument.begins_with("--shock-impulse="):
 			Config.data.shock_impulse = argument.trim_prefix("--shock-impulse=").to_float()
 		elif argument.begins_with("--shock-radius-factor="):
