@@ -40,7 +40,7 @@
 
 ### [2026-10-30] 대상 #116 — JELLY 마찰 낮추기
 - 상태: 완료 — 최신 `origin/main` `da19a0b`에서 항목 브랜치를 만들고 `orb_friction`·`wall_friction`만 `0.6 → 0.3`으로 변경함. 고정 시드 가로 흐트림 더미, 네 마찰 후보 물리·20시드 자동 플레이, 새 해시, 전체 테스트·Debug 빌드·두 비율 전체 캡처를 완료함
-- 브랜치 / PR: `codex/lower-jelly-friction` / PR 생성 후 링크 갱신
+- 브랜치 / PR: `codex/lower-jelly-friction` / https://github.com/jeongmo-dot/gravity_orb/pull/116
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `tests/{test_config.gd,test_jelly_regression.gd,run_jelly_physics_measurement.ps1,run_jelly_physics_autoplay.ps1,run_jelly_friction_sweep.ps1}`, `tests/spike/{capture_screens.gd,run_jelly_physics_measurement.gd,run_jolt_3d_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `orb_friction=0.3`, `wall_friction=0.3`을 리소스와 `GameConfig.gd` 기본값에 동일 적용 — 자동 설정 회귀
