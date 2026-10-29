@@ -40,7 +40,7 @@
 
 ### [2026-10-30] 대상 #115 — JELLY 물리: 빠른 낙하·작은 반동·회전 잠금
 - 상태: 완료 — `origin/main` `7730c00`에서 항목 브랜치를 만들고 명세의 중력·반발·마찰 6개 값과 JELLY 평면 회전 잠금만 반영함. 물리값 전후 측정, 같은 20시드 자동 플레이, 두 비율 전체 캡처, 새 물리 기준 해시, 전체 테스트와 Debug 빌드를 완료함
-- 브랜치 / PR: `codex/jelly-physics` / PR 생성 후 링크 갱신
+- 브랜치 / PR: `codex/jelly-physics` / https://github.com/jeongmo-dot/gravity_orb/pull/115
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/spike/Orb3D.gd`, `tests/{test_config.gd,test_jelly_regression.gd,test_jolt_3d.gd,run_jelly_physics_measurement.ps1,run_jelly_physics_autoplay.ps1}`, `tests/spike/{JellyPhysicsMeasurement.tscn,run_jelly_physics_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `gravity_strength=3600`, `gravity_level_scale=0.05`, `orb_bounce=0.06`, `wall_bounce=0.06`, `orb_friction=0.6`, `wall_friction=0.6`을 리소스와 `GameConfig.gd` 기본값에 동일 적용 — 자동 설정 회귀
