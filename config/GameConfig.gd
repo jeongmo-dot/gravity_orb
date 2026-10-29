@@ -22,9 +22,9 @@ enum GameMode {
 @export var mass_exponent: float = 2.0
 @export var gravity_strength: float = 3600.0
 @export var gravity_level_scale: float = 0.05
-@export var orb_friction: float = 0.6
+@export var orb_friction: float = 0.3
 @export var orb_bounce: float = 0.06
-@export var wall_friction: float = 0.6
+@export var wall_friction: float = 0.3
 @export var wall_bounce: float = 0.06
 @export var orb_linear_damp: float = 0.1
 @export var orb_angular_damp: float = 1.0

@@ -81,6 +81,8 @@ func _run() -> void:
 		"pixels_per_meter": Orb3D.PIXELS_PER_METER,
 		"gravity_px_s2": Config.data.gravity_strength,
 		"gravity_level_scale": Config.data.gravity_level_scale,
+		"orb_friction": Config.data.orb_friction,
+		"wall_friction": Config.data.wall_friction,
 		"mass_exponent": Config.data.mass_exponent,
 		"shock_impulse": Config.data.shock_impulse,
 		"shock_radius_factor": Config.data.shock_radius_factor,
@@ -1733,6 +1735,10 @@ func _apply_arguments() -> void:
 			Config.data.gravity_strength = argument.trim_prefix(
 				"--gravity-strength="
 			).to_float()
+		elif argument.begins_with("--physics-friction="):
+			var friction: float = argument.trim_prefix("--physics-friction=").to_float()
+			Config.data.orb_friction = friction
+			Config.data.wall_friction = friction
 		elif argument.begins_with("--shock-impulse="):
 			Config.data.shock_impulse = argument.trim_prefix("--shock-impulse=").to_float()
 		elif argument.begins_with("--shock-radius-factor="):

@@ -2,6 +2,7 @@ extends Node
 
 const BOARD_SCENE: PackedScene = preload("res://scenes/Board3D.tscn")
 const DEFAULT_OUTPUT_PATH: String = "res://artifacts/jelly_physics_metrics.json"
+const PILE_JITTER_SEED: int = 11620261030
 const BEFORE_PROFILE: Dictionary = {
 	"gravity_strength": 1800.0,
 	"gravity_level_scale": 0.25,
@@ -24,6 +25,7 @@ const AFTER_PROFILE: Dictionary = {
 var _profile_name: String = "after"
 var _output_path: String = DEFAULT_OUTPUT_PATH
 var _rotation_lock: bool = true
+var _friction_override: float = -1.0
 
 
 func _ready() -> void:
@@ -34,6 +36,11 @@ func _run() -> void:
 	if not _apply_arguments():
 		return
 	var profile: Dictionary = BEFORE_PROFILE if _profile_name == "before" else AFTER_PROFILE
+	if _friction_override >= 0.0:
+		profile = AFTER_PROFILE.duplicate(true)
+		profile["orb_friction"] = _friction_override
+		profile["wall_friction"] = _friction_override
+		_profile_name = "friction_%s" % _friction_tag(_friction_override)
 	_apply_profile(profile)
 	Engine.physics_ticks_per_second = 120
 	var report: Dictionary = {
@@ -51,6 +58,7 @@ func _run() -> void:
 			"L1": await _measure_bounce(1),
 			"L7": await _measure_bounce(7),
 		},
+		"floor_slide_500_px_s": await _measure_floor_slide(),
 		"color_effect_displacement_px": {
 			"push_red": await _measure_color_effect(OrbTypes.OrbColor.RED),
 			"shake_blue": await _measure_color_effect(OrbTypes.OrbColor.BLUE),
@@ -70,8 +78,16 @@ func _apply_arguments() -> bool:
 			_profile_name = argument.trim_prefix("--profile=").to_lower()
 		elif argument.begins_with("--output="):
 			_output_path = argument.trim_prefix("--output=")
+		elif argument.begins_with("--friction="):
+			_friction_override = argument.trim_prefix("--friction=").to_float()
 	if _profile_name not in ["before", "after"]:
 		push_error("Unknown JELLY physics profile: %s" % _profile_name)
+		get_tree().quit(1)
+		return false
+	if _friction_override != -1.0 and (
+		_friction_override <= 0.0 or _friction_override > 1.0
+	):
+		push_error("JELLY friction must be greater than 0 and at most 1")
 		get_tree().quit(1)
 		return false
 	return true
@@ -169,13 +185,18 @@ func _measure_bounce(level: int) -> Dictionary:
 
 func _measure_pile() -> Dictionary:
 	var board: Board3D = await _create_board()
+	var pile_rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	pile_rng.seed = PILE_JITTER_SEED
 	for orb_index: int in range(40):
 		var column: int = orb_index % 8
 		var row: int = orb_index / 8
 		_spawn_orb(
 			board,
 			1,
-			Vector2(-315.0 + float(column) * 90.0, -360.0 + float(row) * 78.0),
+			Vector2(
+				-315.0 + float(column) * 90.0 + pile_rng.randf_range(-10.0, 10.0),
+				-360.0 + float(row) * 78.0
+			),
 			orb_index % JellyOrbArt.PALETTE.size()
 		)
 	var settle_directions: Array[Vector2i] = [
@@ -199,6 +220,40 @@ func _measure_pile() -> Dictionary:
 		"rest_height_px": extents["height"],
 		"right_settle_seconds": float(settle_frames) / float(Engine.physics_ticks_per_second),
 		"right_forced_settle": settle_frames >= Engine.physics_ticks_per_second * 5,
+		"jitter_seed": PILE_JITTER_SEED,
+		"horizontal_jitter_px": 10.0,
+	}
+	await _free_board(board)
+	return result
+
+
+func _measure_floor_slide() -> Dictionary:
+	var board: Board3D = await _create_board()
+	var radius: float = Config.data.radius_for_level(1)
+	var floor_y: float = board.half_size() - radius
+	var orb: Orb3D = _spawn_orb(board, 1, Vector2(-300.0, floor_y))
+	await _wait_seconds(0.5)
+	orb.linear_velocity = Vector2(500.0, 0.0)
+	var start_x: float = orb.position.x
+	var maximum_distance: float = 0.0
+	var stopped_frames: int = 0
+	var elapsed_frames: int = 0
+	var maximum_frames: int = Engine.physics_ticks_per_second * 3
+	for frame_index: int in range(maximum_frames):
+		await get_tree().physics_frame
+		elapsed_frames = frame_index + 1
+		maximum_distance = maxf(maximum_distance, absf(orb.position.x - start_x))
+		if absf(orb.linear_velocity.x) <= 1.0:
+			stopped_frames += 1
+		else:
+			stopped_frames = 0
+		if stopped_frames >= 12:
+			break
+	var result: Dictionary = {
+		"stop_seconds": float(elapsed_frames) / float(Engine.physics_ticks_per_second),
+		"distance_px": maximum_distance,
+		"final_speed_px_s": absf(orb.linear_velocity.x),
+		"forced_stop": elapsed_frames >= maximum_frames,
 	}
 	await _free_board(board)
 	return result
@@ -303,6 +358,10 @@ func _free_board(board: Board3D) -> void:
 
 func _safe_ratio(numerator: float, denominator: float) -> float:
 	return numerator / denominator if denominator > 0.000001 else 0.0
+
+
+func _friction_tag(value: float) -> String:
+	return ("%.2f" % value).replace(".", "p")
 
 
 func _write_report(report: Dictionary) -> void:

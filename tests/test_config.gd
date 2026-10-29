@@ -86,8 +86,8 @@ func test_m3_turn_defaults() -> void:
 	assert_near(config.gravity_level_scale, 0.05, TOLERANCE, "gravity level scale")
 	assert_near(config.orb_bounce, 0.06, TOLERANCE, "orb bounce")
 	assert_near(config.wall_bounce, 0.06, TOLERANCE, "wall bounce")
-	assert_near(config.orb_friction, 0.6, TOLERANCE, "orb friction")
-	assert_near(config.wall_friction, 0.6, TOLERANCE, "wall friction")
+	assert_near(config.orb_friction, 0.3, TOLERANCE, "orb friction")
+	assert_near(config.wall_friction, 0.3, TOLERANCE, "wall friction")
 	assert_near(
 		config.gravity_for_level(1),
 		config.gravity_strength,

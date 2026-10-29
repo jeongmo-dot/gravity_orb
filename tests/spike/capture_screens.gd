@@ -5,6 +5,7 @@ const DEFAULT_OUTPUT_DIRECTORY: String = "res://artifacts/screens"
 const DEFAULT_USER_SAVE: String = "user://save.cfg"
 const OUTPUT_PREFIX: String = "--capture-output-directory="
 const SAVE_PREFIX: String = "--capture-save-path="
+const PILE_JITTER_SEED: int = 11620261030
 const CAPTURE_FILES: Array[String] = [
 	"01_jelly_start.png",
 	"02_jelly_ranking.png",
@@ -756,13 +757,18 @@ func _capture_recovered_jelly_motion(
 	board.clear()
 	board.set_turn_resting(false)
 	board.set_gravity(Vector2i.DOWN)
+	var pile_rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	pile_rng.seed = PILE_JITTER_SEED
 	for orb_index: int in range(40):
 		var column: int = orb_index % 8
 		var row: int = orb_index / 8
 		board.spawn_orb(
 			orb_index % JellyOrbArt.PALETTE.size(),
 			1,
-			Vector2(-315.0 + float(column) * 90.0, -360.0 + float(row) * 78.0)
+			Vector2(
+				-315.0 + float(column) * 90.0 + pile_rng.randf_range(-10.0, 10.0),
+				-360.0 + float(row) * 78.0
+			)
 		)
 	var settle_directions: Array[Vector2i] = [
 		Vector2i.DOWN,
@@ -809,7 +815,7 @@ func _capture_recovered_jelly_motion(
 	print(
 		(
 			"JELLY_MOTION_PILE orbs=%d rest_pairs=%d floor=%d walls=%d corners=%d "
-			+ "right_moving=%d right_pairs=%d right_max_speed=%.3f"
+			+ "right_moving=%d right_pairs=%d right_max_speed=%.3f jitter_seed=%d"
 		) % [
 			board.get_orbs().size(),
 			resting_pairs,
@@ -819,6 +825,7 @@ func _capture_recovered_jelly_motion(
 			moving_count,
 			moving_pairs,
 			maximum_speed,
+			PILE_JITTER_SEED,
 		]
 	)
 	resolver._pending.clear()

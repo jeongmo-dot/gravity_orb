@@ -1,7 +1,7 @@
 extends TestCase
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
-const EXPECTED_REGRESSION_HASH: String = "88cc180cae29a69f766a3ad87f9faabfccfd7edf6592ab218988f6346a84c7a0"
+const EXPECTED_REGRESSION_HASH: String = "d1f7ca9a50c6da515e15421bcea76ed96f6f15fad2e2498cc6626e4aa3cca3a1"
 
 
 func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
