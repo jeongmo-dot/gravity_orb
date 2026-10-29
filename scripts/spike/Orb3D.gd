@@ -241,6 +241,7 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	_body.axis_lock_linear_z = true
 	_body.axis_lock_angular_x = true
 	_body.axis_lock_angular_y = true
+	_body.axis_lock_angular_z = _is_jelly_visual
 	_body.collision_layer = 2
 	_body.collision_mask = 3
 
