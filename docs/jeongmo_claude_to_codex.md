@@ -32,7 +32,20 @@
 
 ## 대기 중
 
-- 없음
+### [2026-10-30 #119] 공이 빨리 늘어나게, 시작은 색마다 하나씩
+- 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.12**
+- 배경: 지금은 50턴마다 공이 1개씩 늘어나고, 무작위 구체 2개로 시작한다. 사용자 (2026-10-30) "첫번째 1개씩 5턴 그 다음부터 매 5턴 마다 공 한개씩 추가", "시작할 때 아래에 색깔별로 공 하나씩 배치된 상태로 시작"
+- 앵커: `config/default_config.tres`·`config/GameConfig.gd`의 `spawn_count_ramp_turns`, `scripts/core/Spawner.gd` `spawn_initial()`
+- 수치: `spawn_count_ramp_turns` 5 (상한 없음 그대로). 시작은 시작 색 (4색)마다 L1 하나씩
+- 요구:
+  1. `spawn_count_ramp_turns` 50 → 5
+  2. 시작 배치: `color_count_for_turn(1)`의 색마다 L1 하나씩, 바닥 줄에 지금 `spawn_initial()`과 같은 간격으로 놓는다. 색 순서는 Spawner 시드 RNG로 섞는다. `initial_orb_count`는 쓰지 않는다 (필드를 지울지는 Codex 판단, 남기면 회신에 적는다)
+  3. 테스트: 1·5·6·10·11·50·51·100턴의 생성 수 1/1/2/2/3/10/11/20, 시작 배치 (4개, 색이 모두 다름, 모두 L1, 바닥 줄), 같은 시드면 같은 시작 순서
+  4. §12-ONE.12 측정 1~3
+- 건드리지 말 것: 물리 값, 색 해금 턴, 크기 비율, 미리보기 개수·모양, 규칙·점수·FINAL MOVE, `stable_*`·`max_settle_time`, 그림·연출, 사용자 저장 파일, `docs/` (회신 파일 제외). 판이 너무 짧아져도 값은 그대로 두고 보고한다
+- Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), 새 JELLY 기준 해시, 측정 표·캡처 보고 (마지막은 전체 캡처), 검증 빌드는 `-Debug`만
+- 커밋: 항목 단위 브랜치, **push·PR까지**
 
 ---
 
