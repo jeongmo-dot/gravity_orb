@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/spike/run_gravity_turn_measurement.gd" id="1_measurement"]
+
+[node name="GravityTurnMeasurement" type="Node"]
+script = ExtResource("1_measurement")

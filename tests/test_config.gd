@@ -84,6 +84,7 @@ func test_m3_turn_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	assert_near(config.gravity_strength, 3600.0, TOLERANCE, "gravity strength")
 	assert_near(config.gravity_level_scale, 0.05, TOLERANCE, "gravity level scale")
+	assert_near(config.gravity_turn_diagonal_time, 0.15, TOLERANCE, "gravity diagonal time")
 	assert_near(config.orb_bounce, 0.06, TOLERANCE, "orb bounce")
 	assert_near(config.wall_bounce, 0.06, TOLERANCE, "wall bounce")
 	assert_near(config.orb_friction, 0.3, TOLERANCE, "orb friction")

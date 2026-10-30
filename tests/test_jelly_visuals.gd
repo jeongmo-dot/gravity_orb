@@ -415,7 +415,9 @@ func test_jelly_face_and_symbol_stay_in_front_of_deformed_body() -> void:
 
 func test_jelly_frame_stays_aligned_with_current_gravity() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_diagonal_time: float = Config.data.gravity_turn_diagonal_time
 	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.gravity_turn_diagonal_time = 0.0
 	var board: Board3D = await _create_board()
 	var directions: Array[Vector2i] = [
 		Vector2i.UP,
@@ -468,6 +470,7 @@ func test_jelly_frame_stays_aligned_with_current_gravity() -> void:
 		"belly mesh uses the smoothed rotation"
 	)
 	await _cleanup(board)
+	Config.data.gravity_turn_diagonal_time = original_diagonal_time
 	Config.data.game_mode = original_mode
 
 
@@ -513,8 +516,10 @@ func test_jelly_frame_rotation_and_breath_weight_follow_current_state() -> void:
 func test_all_jelly_faces_and_symbols_stay_upright_with_screen_axis_deform() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_minimum: int = Config.data.jelly_blast_min_level
+	var original_diagonal_time: float = Config.data.gravity_turn_diagonal_time
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.jelly_blast_min_level = 5
+	Config.data.gravity_turn_diagonal_time = 0.0
 	var board: Board3D = await _create_board()
 	var directions: Array[Vector2i] = [
 		Vector2i.DOWN,
@@ -552,6 +557,7 @@ func test_all_jelly_faces_and_symbols_stay_upright_with_screen_axis_deform() -> 
 			)
 		board.remove_orb(orb)
 	await _cleanup(board)
+	Config.data.gravity_turn_diagonal_time = original_diagonal_time
 	Config.data.jelly_blast_min_level = original_minimum
 	Config.data.game_mode = original_mode
 

@@ -342,10 +342,7 @@ func set_jelly_mass(
 	_current_radius = previous_radius if _growth_duration > 0.0 else _radius
 	_body.mass = cfg.mass_for_radius(_radius)
 	if not gravity_direction.is_zero_approx():
-		set_gravity(
-			Vector2i(roundi(gravity_direction.x), roundi(gravity_direction.y)),
-			cfg.gravity_strength
-		)
+		set_gravity_vector(gravity_direction, cfg.gravity_strength)
 	_blast_armed = cfg.blast_enabled_for_level(level)
 	var visual_material: ShaderMaterial = (
 		JellyOrbArt.body_material_for(color, level)
@@ -495,16 +492,24 @@ func note_diagnostic_event(event_name: String, physics_frame: int = -1) -> void:
 
 
 func set_gravity(direction: Vector2i, strength: float) -> void:
+	set_gravity_vector(Vector2(direction), strength)
+
+
+func set_gravity_vector(direction: Vector2, strength: float) -> void:
 	if is_waiting_at_entrance:
 		_body.constant_force = Vector3.ZERO
 		return
+	var normalized_direction: Vector2 = direction.normalized()
 	var level_strength: float = strength * (
 		1.0 + Config.data.gravity_level_scale * float(level - 1)
 	)
-	var acceleration_px: Vector2 = Vector2(direction) * level_strength
+	var acceleration_px: Vector2 = normalized_direction * level_strength
 	_body.constant_force = plane_vector_to_world(acceleration_px) * _body.mass
-	if _is_jelly_visual and direction != Vector2i.ZERO:
-		_jelly_frame_target_rotation = atan2(float(direction.x), float(direction.y))
+	if _is_jelly_visual and not normalized_direction.is_zero_approx():
+		_jelly_frame_target_rotation = atan2(
+			normalized_direction.x,
+			normalized_direction.y
+		)
 		if not _jelly_frame_initialized:
 			_jelly_belly_rotation = _jelly_frame_target_rotation
 		_jelly_frame_rotation = _jelly_frame_target_rotation

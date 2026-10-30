@@ -81,6 +81,7 @@ func _run() -> void:
 		"pixels_per_meter": Orb3D.PIXELS_PER_METER,
 		"gravity_px_s2": Config.data.gravity_strength,
 		"gravity_level_scale": Config.data.gravity_level_scale,
+		"gravity_turn_diagonal_time": Config.data.gravity_turn_diagonal_time,
 		"orb_friction": Config.data.orb_friction,
 		"wall_friction": Config.data.wall_friction,
 		"orb_angular_damp": Config.data.orb_angular_damp,
@@ -1743,6 +1744,10 @@ func _apply_arguments() -> void:
 		elif argument.begins_with("--physics-angular-damp="):
 			Config.data.orb_angular_damp = argument.trim_prefix(
 				"--physics-angular-damp="
+			).to_float()
+		elif argument.begins_with("--physics-gravity-turn-diagonal-time="):
+			Config.data.gravity_turn_diagonal_time = argument.trim_prefix(
+				"--physics-gravity-turn-diagonal-time="
 			).to_float()
 		elif argument.begins_with("--shock-impulse="):
 			Config.data.shock_impulse = argument.trim_prefix("--shock-impulse=").to_float()
