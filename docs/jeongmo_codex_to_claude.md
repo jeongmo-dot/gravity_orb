@@ -40,7 +40,7 @@
 
 ### [2026-10-30] 대상 #118 — 90° 중력 전환을 대각선으로 구분
 - 상태: 완료 — 최신 `origin/main` `9d84937`에서 항목 브랜치를 만들고 90° 전환에만 명세값 `0.15초`(120Hz 18프레임)의 정규화 대각선 중력을 적용함. 같은·반대 방향은 즉시 전환하며, 최종 4방향과 공에 거는 실제 방향을 분리해 전환 중 생성·성장·입장 해제 공까지 실제 방향을 받도록 구현함
-- 브랜치 / PR: `codex/gravity-diagonal-transition` / 생성 예정
+- 브랜치 / PR: `codex/gravity-diagonal-transition` / https://github.com/jeongmo-dot/gravity_orb/pull/118
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/{core/TurnManager.gd,spike/Board3D.gd,spike/Orb3D.gd}`, `tests/{test_config.gd,test_gravity_turn_transition.gd,test_jelly_regression.gd,test_jelly_visuals.gd,test_jolt_3d.gd,run_jelly_physics_autoplay.ps1,run_gravity_turn_measurements.ps1,run_gravity_turn_candidates.ps1,capture_screens.ps1}`, `tests/spike/{GravityTurnMeasurement.tscn,run_gravity_turn_measurement.gd,run_jolt_3d_measurement.gd,capture_screens.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 8가지 90° 꺾기에서 이전+최종 방향의 정규화 대각선을 같은 세기로 적용하고 0.15초 뒤 최종 방향으로 전환 — 자동 (`test_eight_quarter_turns_use_normalized_diagonal_then_final_direction`)
