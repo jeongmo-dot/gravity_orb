@@ -67,6 +67,9 @@ const CAPTURE_FILES: Array[String] = [
 	"58_callout_amazing.png",
 	"59_callout_unstoppable.png",
 	"60_popup_crowded.png",
+	"61_jelly_gravity_left_down_diagonal.png",
+	"62_jelly_gravity_left_down_rest.png",
+	"63_jelly_gravity_right_down_rest.png",
 ]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
@@ -688,10 +691,11 @@ func _capture_recovered_jelly_scenes(
 	hud._hide_callout_label()
 
 	await _capture_recovered_jelly_motion(main, manager, board)
+	await _capture_gravity_turn_scenes(main, manager, board)
 	print(
 		"SCREEN_CAPTURE_CHECK scene=recovered_jelly levels=7 crowded=25 max=true "
 		+ "stretch=true absorption=true unlock=true land_frames=10 breathe=true "
-		+ "physical_pile=true right_motion=true"
+		+ "physical_pile=true right_motion=true gravity_turn_scenes=3"
 	)
 
 
@@ -838,6 +842,154 @@ func _capture_recovered_jelly_motion(
 	InputRouter.set_locked(false)
 
 
+func _capture_gravity_turn_scenes(
+	main: Main,
+	manager: TurnManager,
+	board: Board3D
+) -> void:
+	var resolver: CollisionResolver = main.get_node("CollisionResolver") as CollisionResolver
+	resolver.set_physics_process(false)
+	resolver._pending.clear()
+	manager._set_state(TurnManager.State.SIMULATING)
+	board.set_turn_resting(false)
+	board.clear()
+	var configured_time: float = Config.data.gravity_turn_diagonal_time
+	Config.data.gravity_turn_diagonal_time = 0.0
+	board.set_gravity(Vector2i.LEFT)
+	var diagonal_orb: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.GREEN,
+		1,
+		Vector2(0.0, -300.0)
+	)
+	var diagonal_body: RigidBody3D = diagonal_orb.get_physics_body()
+	diagonal_body.freeze = true
+	diagonal_orb.linear_velocity = Vector2.ZERO
+	Config.data.gravity_turn_diagonal_time = configured_time
+	board.set_gravity(Vector2i.DOWN)
+	diagonal_body.freeze = false
+	diagonal_body.sleeping = false
+	await _wait_physics_frames(
+		maxi(ceili(configured_time * float(Engine.physics_ticks_per_second)) / 2, 1)
+	)
+	var diagonal_direction: Vector2 = board.actual_gravity_direction()
+	if diagonal_direction.distance_to(Vector2(-1.0, 1.0).normalized()) > 0.001:
+		_fail("JELLY left-to-down capture must use left-down gravity")
+	await _capture("61_jelly_gravity_left_down_diagonal.png")
+	print(
+		"JELLY_GRAVITY_DIAGONAL direction=(%.6f,%.6f) position=(%.3f,%.3f) speed=%.3f" % [
+			diagonal_direction.x,
+			diagonal_direction.y,
+			diagonal_orb.position.x,
+			diagonal_orb.position.y,
+			diagonal_orb.linear_velocity.length(),
+		]
+	)
+
+	var left_pile: Dictionary = await _capture_gravity_turn_pile(
+		board,
+		Vector2i.LEFT,
+		"62_jelly_gravity_left_down_rest.png"
+	)
+	var right_pile: Dictionary = await _capture_gravity_turn_pile(
+		board,
+		Vector2i.RIGHT,
+		"63_jelly_gravity_right_down_rest.png"
+	)
+	print(
+		(
+			"JELLY_GRAVITY_PILES left_com_x=%.3f left_width=%.3f left_height=%.3f "
+			+ "left_line=%d right_com_x=%.3f right_width=%.3f right_height=%.3f "
+			+ "right_line=%d jitter_seed=%d"
+		) % [
+			float(left_pile["center_of_mass_x"]),
+			float(left_pile["width"]),
+			float(left_pile["height"]),
+			int(left_pile["longest_line"]),
+			float(right_pile["center_of_mass_x"]),
+			float(right_pile["width"]),
+			float(right_pile["height"]),
+			int(right_pile["longest_line"]),
+			PILE_JITTER_SEED,
+		]
+	)
+	Config.data.gravity_turn_diagonal_time = configured_time
+	resolver._pending.clear()
+	manager._set_state(TurnManager.State.WAITING_INPUT)
+	InputRouter.set_locked(false)
+
+
+func _capture_gravity_turn_pile(
+	board: Board3D,
+	initial_direction: Vector2i,
+	file_name: String
+) -> Dictionary:
+	board.clear()
+	board.set_turn_resting(false)
+	var pile_rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	pile_rng.seed = PILE_JITTER_SEED
+	for orb_index: int in range(40):
+		var column: int = orb_index % 8
+		var row: int = orb_index / 8
+		board.spawn_orb(
+			orb_index % JellyOrbArt.PALETTE.size(),
+			1,
+			Vector2(
+				-315.0 + float(column) * 90.0 + pile_rng.randf_range(-10.0, 10.0),
+				-360.0 + float(row) * 78.0
+			)
+		)
+	var settle_directions: Array[Vector2i] = [
+		Vector2i.DOWN,
+		-initial_direction,
+		Vector2i.UP,
+		initial_direction,
+	]
+	for direction: Vector2i in settle_directions:
+		board.set_gravity(direction)
+		await _wait_physics_seconds(1.2)
+	board.set_gravity(Vector2i.DOWN)
+	var settle_frames: int = await _wait_gravity_pile_stable(board, 5.0)
+	if settle_frames >= Engine.physics_ticks_per_second * 5:
+		_fail("JELLY gravity turn pile did not settle before timeout")
+	var contacts: int = _count_actual_orb_contact_pairs(board)
+	if contacts <= 0:
+		_fail("JELLY gravity turn pile must retain physical contacts")
+	board.set_turn_resting(true)
+	await get_tree().create_timer(0.25).timeout
+	await _capture(file_name)
+	return {
+		"center_of_mass_x": _pile_center_of_mass_x(board),
+		"width": _pile_width(board),
+		"height": _pile_height(board),
+		"longest_line": _longest_pile_support_line(board, Vector2i.DOWN),
+		"contacts": contacts,
+		"settle_frames": settle_frames,
+	}
+
+
+func _wait_gravity_pile_stable(board: Board3D, timeout_seconds: float) -> int:
+	var stable_frames: int = 0
+	var required_frames: int = ceili(
+		Config.data.stable_duration * float(Engine.physics_ticks_per_second)
+	)
+	var maximum_frames: int = ceili(timeout_seconds * float(Engine.physics_ticks_per_second))
+	for frame_index: int in range(maximum_frames):
+		await get_tree().physics_frame
+		var stable: bool = not board.is_gravity_transition_active()
+		if stable:
+			for orb: Orb3D in board.get_orbs():
+				if (
+					orb.linear_velocity.length() > Config.data.stable_linear_speed
+					or absf(orb.angular_velocity) > Config.data.stable_angular_speed
+				):
+					stable = false
+					break
+		stable_frames = stable_frames + 1 if stable else 0
+		if stable_frames >= required_frames:
+			return frame_index + 1
+	return maximum_frames
+
+
 func _capture_landing_frame(
 	landing: Orb3D,
 	frame_index: int,
@@ -926,6 +1078,26 @@ func _pile_height(board: Board3D) -> float:
 		minimum_y = minf(minimum_y, orb.position.y - radius)
 		maximum_y = maxf(maximum_y, orb.position.y + radius)
 	return maximum_y - minimum_y
+
+
+func _pile_width(board: Board3D) -> float:
+	var minimum_x: float = INF
+	var maximum_x: float = -INF
+	for orb: Orb3D in board.get_orbs():
+		var radius: float = orb.get_current_radius()
+		minimum_x = minf(minimum_x, orb.position.x - radius)
+		maximum_x = maxf(maximum_x, orb.position.x + radius)
+	return maximum_x - minimum_x
+
+
+func _pile_center_of_mass_x(board: Board3D) -> float:
+	var weighted_x: float = 0.0
+	var total_mass: float = 0.0
+	for orb: Orb3D in board.get_orbs():
+		var mass: float = orb.get_physics_body().mass
+		weighted_x += orb.position.x * mass
+		total_mass += mass
+	return weighted_x / total_mass if total_mass > 0.0 else 0.0
 
 
 func _longest_pile_support_line(board: Board3D, gravity_direction: Vector2i) -> int:

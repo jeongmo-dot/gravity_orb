@@ -6,6 +6,7 @@ param(
     [int]$Parallelism = 4,
     [double]$Friction = -1.0,
     [double]$AngularDamp = -1.0,
+    [double]$GravityTurnDiagonalTime = -1.0,
     [switch]$AggregateOnly
 )
 
@@ -19,6 +20,9 @@ if ($Friction -ne -1.0 -and ($Friction -le 0.0 -or $Friction -gt 1.0)) {
 if ($AngularDamp -lt -1.0) {
     throw "AngularDamp must be non-negative or -1 for the config default"
 }
+if ($GravityTurnDiagonalTime -lt -1.0) {
+    throw "GravityTurnDiagonalTime must be non-negative or -1 for the config default"
+}
 $culture = [Globalization.CultureInfo]::InvariantCulture
 $physicsArguments = @()
 if ($Friction -gt 0.0) {
@@ -26,6 +30,9 @@ if ($Friction -gt 0.0) {
 }
 if ($AngularDamp -ge 0.0) {
     $physicsArguments += "--physics-angular-damp=$($AngularDamp.ToString($culture))"
+}
+if ($GravityTurnDiagonalTime -ge 0.0) {
+    $physicsArguments += "--physics-gravity-turn-diagonal-time=$($GravityTurnDiagonalTime.ToString($culture))"
 }
 $outputDirectory = Join-Path $RepoPath "artifacts\jelly_physics_autoplay_$Label"
 New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
@@ -142,6 +149,7 @@ $summary = [ordered]@{
     max_turns = 400
     friction = if ($Friction -gt 0.0) { $Friction } else { $null }
     angular_damp = if ($AngularDamp -ge 0.0) { $AngularDamp } else { $null }
+    gravity_turn_diagonal_time = if ($GravityTurnDiagonalTime -ge 0.0) { $GravityTurnDiagonalTime } else { $null }
     game_over_count = $completedGames.Count
     average_game_over_turns = if ($gameOverTurns.Count -gt 0) { ($gameOverTurns | Measure-Object -Average).Average } else { 0.0 }
     average_game_over_score = if ($gameOverScores.Count -gt 0) { ($gameOverScores | Measure-Object -Average).Average } else { 0.0 }

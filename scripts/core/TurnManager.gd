@@ -122,7 +122,12 @@ func _physics_process(delta: float) -> void:
 		_stable_time = 0.0
 
 	settle_elapsed += delta
-	if _all_below_threshold():
+	if (
+		_board.has_method("is_gravity_transition_active")
+		and bool(_board.is_gravity_transition_active())
+	):
+		_stable_time = 0.0
+	elif _all_below_threshold():
 		_stable_time += delta
 	else:
 		_stable_time = 0.0

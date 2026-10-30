@@ -31,6 +31,10 @@ static var _active_board_count: int = 0
 var _orbs: Array[Orb3D] = []
 var _next_orb_spawn_id: int = 1
 var _gravity_direction: Vector2i = Vector2i.DOWN
+var _actual_gravity_direction: Vector2 = Vector2.DOWN
+var _gravity_transition_frames_remaining: int = 0
+var _gravity_transition_finish_pending: bool = false
+var _gravity_transition_id: int = 0
 var _warning_directions: Array[Vector2i] = []
 var _visual_walls: Dictionary = {}
 var _wall_materials: Dictionary = {}
@@ -75,6 +79,7 @@ func _exit_tree() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_advance_gravity_transition()
 	_update_entrance_waiters()
 	_update_ghost_orbs(delta)
 
@@ -99,6 +104,18 @@ func set_gravity(direction: Vector2i) -> void:
 	var previous_direction: Vector2i = _gravity_direction
 	var current_light_position: float = _gravity_light_position()
 	_gravity_direction = direction
+	_gravity_transition_id += 1
+	_gravity_transition_finish_pending = false
+	var diagonal_frames: int = ceili(
+		maxf(Config.data.gravity_turn_diagonal_time, 0.0)
+		* float(Engine.physics_ticks_per_second)
+	)
+	if _is_quarter_turn(previous_direction, direction) and diagonal_frames > 0:
+		_actual_gravity_direction = Vector2(previous_direction + direction).normalized()
+		_gravity_transition_frames_remaining = diagonal_frames
+	else:
+		_actual_gravity_direction = Vector2(direction).normalized()
+		_gravity_transition_frames_remaining = 0
 	if previous_direction != direction:
 		_gravity_visual_from = previous_direction
 		_gravity_visual_to = direction
@@ -108,12 +125,56 @@ func set_gravity(direction: Vector2i) -> void:
 			_gravity_perimeter_position(direction)
 		)
 		_gravity_visual_elapsed = 0.0
-	for orb: Orb3D in _orbs:
-		orb.set_gravity(direction, Config.data.gravity_strength)
+	_apply_actual_gravity_to_orbs()
 	if previous_direction != direction:
 		visual_gravity_changed.emit(direction)
 	_update_gravity_field_transition()
 	_update_warning_visuals()
+
+
+func gravity_direction() -> Vector2i:
+	return _gravity_direction
+
+
+func actual_gravity_direction() -> Vector2:
+	return _actual_gravity_direction
+
+
+func is_gravity_transition_active() -> bool:
+	return _gravity_transition_frames_remaining > 0 or _gravity_transition_finish_pending
+
+
+func _is_quarter_turn(from_direction: Vector2i, to_direction: Vector2i) -> bool:
+	return (
+		from_direction != Vector2i.ZERO
+		and to_direction != Vector2i.ZERO
+		and (
+			from_direction.x * to_direction.x
+			+ from_direction.y * to_direction.y
+		) == 0
+	)
+
+
+func _advance_gravity_transition() -> void:
+	if _gravity_transition_frames_remaining <= 0:
+		return
+	_gravity_transition_frames_remaining -= 1
+	if _gravity_transition_frames_remaining == 0:
+		_gravity_transition_finish_pending = true
+		call_deferred("_finish_gravity_transition", _gravity_transition_id)
+
+
+func _finish_gravity_transition(transition_id: int) -> void:
+	if transition_id != _gravity_transition_id or not _gravity_transition_finish_pending:
+		return
+	_gravity_transition_finish_pending = false
+	_actual_gravity_direction = Vector2(_gravity_direction).normalized()
+	_apply_actual_gravity_to_orbs()
+
+
+func _apply_actual_gravity_to_orbs() -> void:
+	for orb: Orb3D in _orbs:
+		orb.set_gravity_vector(_actual_gravity_direction, Config.data.gravity_strength)
 
 
 func play_visual_tilt(direction: Vector2i) -> void:
@@ -170,7 +231,7 @@ func spawn_orb(
 	orb.position = p_position
 	orb.linear_velocity = p_velocity
 	orb.generation = p_generation
-	orb.set_gravity(_gravity_direction, Config.data.gravity_strength)
+	orb.set_gravity_vector(_actual_gravity_direction, Config.data.gravity_strength)
 	orb.set_turn_resting(_turn_resting)
 	orb.get_physics_body().body_entered.connect(_on_orb_body_entered.bind(orb))
 	_orbs.append(orb)
@@ -543,6 +604,7 @@ func _update_entrance_waiters() -> void:
 			orb.entrance_gravity,
 			Config.data.gravity_strength
 		)
+		orb.set_gravity_vector(_actual_gravity_direction, Config.data.gravity_strength)
 		placed.append({"position": spawn_position, "radius": orb.get_radius()})
 
 

@@ -399,16 +399,27 @@ func test_jelly_level_up_absorption_grows_from_old_to_new_level_radius() -> void
 		assert_true(not active[0].is_blast_armed(), "JELLY result never arms BLAST")
 		assert_near(
 			active[0]._jelly_frame_rotation,
-			-PI * 0.5,
+			-PI * 0.25,
 			0.0001,
-			"absorption result starts at the current left-gravity frame"
+			"absorption result keeps the active left-down diagonal frame"
 		)
 		var result_body: RigidBody3D = active[0].get_physics_body()
+		var acceleration: Vector2 = Orb3D.world_vector_to_plane(
+			result_body.constant_force / result_body.mass
+		)
+		var expected_acceleration: Vector2 = Vector2(-1.0, 1.0).normalized() \
+			* Config.data.gravity_for_level(4)
 		assert_near(
-			(result_body.constant_force / result_body.mass).x,
-			-Config.data.gravity_for_level(4) / Orb3D.PIXELS_PER_METER,
+			acceleration.x,
+			expected_acceleration.x,
 			0.001,
-			"interpolated physical mass keeps level-four gravity acceleration"
+			"interpolated physical mass keeps level-four diagonal gravity x acceleration"
+		)
+		assert_near(
+			acceleration.y,
+			expected_acceleration.y,
+			0.001,
+			"interpolated physical mass keeps level-four diagonal gravity y acceleration"
 		)
 	_cleanup(fixture_root)
 	Config.data.game_mode = original_mode

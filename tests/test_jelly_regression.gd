@@ -1,7 +1,7 @@
 extends TestCase
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
-const EXPECTED_REGRESSION_HASH: String = "a1f643025855fac9ea3f4d43b6880f155dd750991fc4eba4123e930694cd7230"
+const EXPECTED_REGRESSION_HASH: String = "58e00b4bf0898e7d5994cd045c35f276764a00ba42b9afbc5c7da0a5c8fdff7a"
 
 
 func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
@@ -163,6 +163,7 @@ func _run_rule_path(visuals_enabled: bool) -> Dictionary:
 		"physics": {
 			"gravity_strength": Config.data.gravity_strength,
 			"gravity_level_scale": Config.data.gravity_level_scale,
+			"gravity_turn_diagonal_time": Config.data.gravity_turn_diagonal_time,
 			"orb_friction": Config.data.orb_friction,
 			"orb_bounce": Config.data.orb_bounce,
 			"wall_friction": Config.data.wall_friction,
