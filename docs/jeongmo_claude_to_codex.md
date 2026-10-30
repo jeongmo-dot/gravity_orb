@@ -32,8 +32,15 @@
 
 ## 대기 중
 
-### [2026-10-30 #118] 90° 꺾을 때 대각선을 지나게 — 왼→아래와 오른→아래를 다르게
-- 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합)
+- 없음
+
+---
+
+## 처리 완료
+
+### [2026-10-30 #118] 90° 꺾을 때 대각선을 지나게 — 왼→아래와 오른→아래를 다르게 — 완료
+- 상태: 완료 (2026-10-30 Claude 검수 · [PR #118](https://github.com/jeongmo-dot/gravity_orb/pull/118) 병합 `e8450cc`)
+- 검수: 최종 방향과 실제 방향을 분리하고, 90° 꺾기만 0.15초 대각선 (정규화, 세기 같음)을 건다. 같은·반대 방향은 곧장 바꾸고, 전환 중에는 안정 시간을 쌓지 않는다. 공 하나가 234px 옆으로 휘고 왼→아래·오른→아래가 정확히 대칭이다. 더미 무게중심도 −84 / +107px로 갈린다 (0은 −59 / +69). 봇 20판은 337턴·점수 46만·턴당 합체 3.53으로 #117과 비슷하다 (§12-ONE.11 결과). 새 해시 `58e00b4b…`, 래퍼 299/299 (Codex). Claude가 캡처 `61`~`63`을 직접 확인했다. 남은 것: 최대 관통 38.3px (합체 직후). 대각선이 실제로는 17스텝일 수 있다 (`call_deferred` 끝내기, 체감 차이 없음). Claude 재실행 없음
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.11**
 - 배경: 지금은 스와이프하면 공의 중력이 그 프레임에 바로 새 방향이 되어, 왼→아래와 오른→아래가 같은 과정 (곧장 아래)을 거친다. 사용자 (2026-10-30) "8방향으로 늘려서 좌에서 하로 갈 때와 우에서 하로 갈 때가 다른 중력 변화 과정을 거치게", 반대 방향은 "곧장 뒤집기"
 - 앵커: `scripts/spike/Board3D.gd` `set_gravity()`·`spawn_orb()`·`_update_entrance_waiters()`, `scripts/spike/Orb3D.gd` `set_gravity()`·`set_jelly_mass()` (`constant_force`에서 방향을 되찾는 부분)·`release_entrance_wait()`, `scripts/core/TurnManager.gd` `on_swipe()`·`_physics_process()` (안정 판정), `config/GameConfig.gd`·`config/default_config.tres`
@@ -48,10 +55,6 @@
 - 건드리지 말 것: 중력·튕김·마찰·회전 감쇠, 스와이프 판정 (4방향), `JELLY_*`, 규칙·점수·난도, `stable_*`·`max_settle_time`, 색 효과 세기, 그림·연출 (새 연출 없음), CLASSIC (`scripts/core/Board.gd`), 사용자 저장 파일, `docs/` (회신 파일 제외). 0.15에서 너무 휘거나 덜 휘어도 값은 그대로 두고 보고한다
 - Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), 새 JELLY 기준 해시, 측정 표 (대각선 시간마다 한 줄)·캡처 보고 (새 캡처 3장, 마지막은 전체 캡처), 검증 빌드는 `-Debug`만
 - 커밋: 항목 단위 브랜치, **push·PR까지**
-
----
-
-## 처리 완료
 
 ### [2026-10-30 #117] 다시 구르게, 금방 멈추게 — 벽에 선 젤리 탑 없애기 — 완료
 - 상태: 완료 (2026-10-30 Claude 검수 · [PR #117](https://github.com/jeongmo-dot/gravity_orb/pull/117) 병합 `ab4a7d8`)
