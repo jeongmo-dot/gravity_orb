@@ -47,6 +47,21 @@
 - Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), 새 JELLY 기준 해시, 측정 표·캡처 보고 (마지막은 전체 캡처), 검증 빌드는 `-Debug`만
 - 커밋: 항목 단위 브랜치, **push·PR까지**
 
+### [2026-10-31 #120] 대폭발은 L7끼리만
+- 상태: 대기 (**#119 다음**. #119 병합 뒤 `origin/main` 병합)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.13**
+- 배경: 지금 JELLY는 다른 색·같은 레벨 젤리가 둘 다 L5 이상이면 닿을 때 대폭발한다 (`jelly_blast_min_level` 5). 사용자 (2026-10-31) "폭발이 L7 이었으면 L7과 L7이 만났을 때만 폭발"
+- 앵커: `config/default_config.tres`·`config/GameConfig.gd`의 `jelly_blast_min_level`, `scripts/core/ReactionRules.gd` `_classify_jelly()`, `GameConfig.blast_enabled_for_level()`, `tests/test_config.gd` (기본값 5 확인), `tests/test_rules.gd`, JELLY 회귀 (`test_jelly_regression`), `tests/tools/run_jelly_blast_measurement.ps1`
+- 수치: `jelly_blast_min_level` 5 → 7. 나머지 그대로
+- 요구:
+  1. `jelly_blast_min_level` 5 → 7 (규칙 코드는 그대로)
+  2. 테스트 (기본값에서): 다른 색 L5+L5·L6+L6 반응 없음, 다른 색 L7+L7 대폭발, 같은 색 L7+L7 잭팟, L5·L6 보통 얼굴 (`is_blast_armed()` 거짓), L7 MAX 얼굴 그대로
+  3. JELLY 회귀 7가지 사건의 "L5 대폭발"을 "L7 대폭발 (다른 색 L7+L7)"로 바꾼다. 새 기준 해시
+  4. §12-ONE.13 측정 1~4
+- 건드리지 말 것: 흡수·잭팟 규칙, 대폭발 범위·속도·점수, 물리 값, #119 값, 색 해금, 그림·연출 (새 연출 없음, 얼굴 코드 지우지 않음), CLASSIC `blast_min_level`, 사용자 저장 파일, `docs/` (회신 파일 제외). 판이 짧아지거나 실력 비가 떨어져도 값은 그대로 두고 보고한다
+- Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), 새 JELLY 기준 해시, 측정 표·캡처 보고 (마지막은 전체 캡처), 검증 빌드는 `-Debug`만
+- 커밋: 항목 단위 브랜치, **push·PR까지**
+
 ---
 
 ## 처리 완료
