@@ -106,8 +106,17 @@ func test_turn_input_cues_rejection_release_policy_and_ready_tick() -> void:
 		Haptics.TURN_READY_DURATION_MS,
 		"ready haptic is the short variant"
 	)
+	assert_true(
+		not indicator.is_direction_selectable(Vector2i.DOWN),
+		"initial gravity direction has no ready arrow"
+	)
+	for direction: Vector2i in [Vector2i.UP, Vector2i.LEFT, Vector2i.RIGHT]:
+		assert_true(
+			indicator.is_direction_selectable(direction),
+			"%s remains selectable" % OrbTypes.dir_name(direction)
+		)
 
-	var blocked: Array[Vector2i] = [Vector2i.LEFT]
+	var blocked: Array[Vector2i] = [Vector2i.DOWN, Vector2i.LEFT]
 	manager.blocked_directions = blocked.duplicate()
 	manager.warning_changed.emit(blocked)
 	assert_eq(
@@ -119,6 +128,10 @@ func test_turn_input_cues_rejection_release_policy_and_ready_tick() -> void:
 		indicator.arrow_color(Vector2i.RIGHT),
 		TurnInputIndicator.READY_COLOR,
 		"available direction arrow stays sky blue"
+	)
+	assert_true(
+		not indicator.is_direction_selectable(Vector2i.DOWN),
+		"current direction hides its blocked mark with the arrow"
 	)
 
 	manager.on_swipe(Vector2i.RIGHT)
@@ -154,7 +167,7 @@ func test_turn_input_cues_rejection_release_policy_and_ready_tick() -> void:
 	InputRouter._handle_event(_mouse_button(Vector2(100.0, 300.0), true))
 	assert_true(await _wait_for_turn_input(manager), "first turn settles")
 	assert_eq(_turn_ready_sound_count, 2, "first turn unlock adds one ready tick")
-	InputRouter._handle_event(_mouse_button(Vector2(300.0, 300.0), false))
+	InputRouter._handle_event(_mouse_button(Vector2(100.0, 100.0), false))
 	assert_eq(
 		manager.turn_index,
 		2,

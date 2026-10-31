@@ -63,7 +63,7 @@ func _run() -> void:
 	var divergences: int = 0
 	var completed_turns: int = 0
 	for turn_offset: int in range(SAMPLE_TURNS):
-		manager.on_swipe(DIRECTION_PATTERN[turn_offset % DIRECTION_PATTERN.size()])
+		manager.on_swipe(_next_pattern_direction(turn_offset, manager.gravity))
 		var max_frames: int = ceili(float(Engine.physics_ticks_per_second) * WAIT_TIMEOUT_SECONDS)
 		for _frame: int in range(max_frames):
 			var started_usec: int = Time.get_ticks_usec()
@@ -127,6 +127,15 @@ func _mean(values: Array[float]) -> float:
 	for value: float in values:
 		total += value
 	return total / float(values.size())
+
+
+func _next_pattern_direction(turn_offset: int, current_gravity: Vector2i) -> Vector2i:
+	for pattern_step: int in range(DIRECTION_PATTERN.size()):
+		var pattern_index: int = (turn_offset + pattern_step) % DIRECTION_PATTERN.size()
+		var direction: Vector2i = DIRECTION_PATTERN[pattern_index]
+		if direction != current_gravity:
+			return direction
+	return Vector2i.ZERO
 
 
 func _percentile(values: Array[float], ratio: float) -> float:

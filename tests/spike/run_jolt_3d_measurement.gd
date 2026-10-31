@@ -285,6 +285,7 @@ func _run_seed(
 	var seed_max_wall: float = 0.0
 	var entrance_blocked_turns: int = 0
 	var blocked_choice_count: int = 0
+	var same_direction_input_count: int = 0
 	var blocked_direction_game_over: bool = false
 	var preview_decision_turns: int = 0
 	var preview_fatal_avoidance_turns: int = 0
@@ -300,7 +301,7 @@ func _run_seed(
 		_turn_merge_count = 0
 		_turn_blast_count = 0
 		var score_before: int = score_manager.score
-		var direction: Vector2i = DIRECTION_PATTERN[turn_offset % DIRECTION_PATTERN.size()]
+		var direction: Vector2i = _next_pattern_direction(turn_offset, manager.gravity)
 		if _skill_strategy in ["l_space", "l_merge"]:
 			var preview_decision: Dictionary = await _choose_preview_direction(
 				board,
@@ -326,6 +327,8 @@ func _run_seed(
 		if chose_blocked_direction:
 			blocked_choice_count += 1
 		var same_direction: bool = direction == manager.gravity
+		if same_direction:
+			same_direction_input_count += 1
 		var before: Dictionary = _snapshot_orbs(board)
 		var start_occupancy: float = _snapshot_occupancy(before)
 		manager.on_swipe(direction)
@@ -476,6 +479,7 @@ func _run_seed(
 		"first_blast_turn": _seed_first_blast_turn,
 		"entrance_blocked_turns": entrance_blocked_turns,
 		"blocked_choice_count": blocked_choice_count,
+		"same_direction_input_count": same_direction_input_count,
 		"blocked_direction_game_over": blocked_direction_game_over,
 		"preview_decision_turns": preview_decision_turns,
 		"preview_fatal_avoidance_turns": preview_fatal_avoidance_turns,
@@ -1309,9 +1313,7 @@ func _state_hash(board: Board3D) -> String:
 
 
 func _choose_skill_direction(board: Board3D, manager: TurnManager) -> Vector2i:
-	var candidates: Array[Vector2i] = []
-	for direction: Vector2i in OrbTypes.DIRECTIONS:
-		candidates.append(direction)
+	var candidates: Array[Vector2i] = _directions_except(manager.gravity)
 	if _skill_strategy == "r":
 		return _random_direction(candidates)
 	var safe_candidates: Array[Vector2i] = []
@@ -1323,11 +1325,6 @@ func _choose_skill_direction(board: Board3D, manager: TurnManager) -> Vector2i:
 		safe_candidates = candidates
 	if _skill_strategy == "s":
 		return _random_direction(safe_candidates)
-	if found_safe_candidate:
-		safe_candidates = _without_current_gravity_when_possible(
-			safe_candidates,
-			manager.gravity
-		)
 	var best_count: int = -1
 	var best_directions: Array[Vector2i] = []
 	for direction: Vector2i in safe_candidates:
@@ -1340,19 +1337,6 @@ func _choose_skill_direction(board: Board3D, manager: TurnManager) -> Vector2i:
 	return _random_direction(best_directions)
 
 
-func _without_current_gravity_when_possible(
-	candidates: Array[Vector2i],
-	current_gravity: Vector2i
-) -> Array[Vector2i]:
-	if candidates.size() <= 1 or not candidates.has(current_gravity):
-		return candidates
-	var alternatives: Array[Vector2i] = []
-	for direction: Vector2i in candidates:
-		if direction != current_gravity:
-			alternatives.append(direction)
-	return alternatives if not alternatives.is_empty() else candidates
-
-
 func _choose_preview_direction(
 	board: Board3D,
 	manager: TurnManager,
@@ -1360,15 +1344,17 @@ func _choose_preview_direction(
 	strategy: String
 ) -> Dictionary:
 	var decision_started_usec: int = Time.get_ticks_usec()
+	var candidate_directions: Array[Vector2i] = _directions_except(manager.gravity)
 	var previews: Array[Dictionary] = await _create_preview_fixtures(
 		board,
 		manager,
-		score_manager
+		score_manager,
+		candidate_directions
 	)
 	for index: int in range(previews.size()):
 		var preview: Dictionary = previews[index]
 		var preview_manager: TurnManager = preview["manager"] as TurnManager
-		preview_manager.on_swipe(OrbTypes.DIRECTIONS[index])
+		preview_manager.on_swipe(candidate_directions[index])
 	await _wait_for_preview_turns(previews)
 
 	var evaluations: Array[Dictionary] = []
@@ -1376,7 +1362,7 @@ func _choose_preview_direction(
 	var best_directions: Array[Vector2i] = []
 	var has_fatal: bool = false
 	var has_survivor: bool = false
-	var minimum_unblocked: int = 4
+	var minimum_unblocked: int = candidate_directions.size()
 	var maximum_unblocked: int = 0
 	var minimum_score_gain: int = 2147483647
 	var maximum_score_gain: int = -2147483648
@@ -1388,7 +1374,7 @@ func _choose_preview_direction(
 		var game_over: bool = preview_manager.state == TurnManager.State.GAME_OVER
 		var final_move_pending: bool = preview_manager.final_move_pending
 		var fatal: bool = game_over or final_move_pending
-		var unblocked_count: int = 4 - preview_manager.blocked_directions.size()
+		var unblocked_count: int = _unblocked_selectable_count(preview_manager)
 		var score_gain: int = preview_score.score - int(preview["score_before"])
 		var space_value: float = (
 			float(unblocked_count) * 1000.0
@@ -1400,7 +1386,7 @@ func _choose_preview_direction(
 		if not game_over and strategy == "l_merge":
 			value += float(score_gain)
 		evaluations.append({
-			"direction": OrbTypes.DIRECTIONS[index],
+			"direction": candidate_directions[index],
 			"game_over": game_over,
 			"final_move_pending": final_move_pending,
 			"unblocked_direction_count": unblocked_count,
@@ -1417,9 +1403,9 @@ func _choose_preview_direction(
 		var tie_broken_value: float = value + _skill_rng.randf() * 0.01
 		if tie_broken_value > best_value:
 			best_value = tie_broken_value
-			best_directions = [OrbTypes.DIRECTIONS[index]]
+			best_directions = [candidate_directions[index]]
 		elif is_equal_approx(tie_broken_value, best_value):
-			best_directions.append(OrbTypes.DIRECTIONS[index])
+			best_directions.append(candidate_directions[index])
 
 	for preview: Dictionary in previews:
 		var viewport: SubViewport = preview["viewport"] as SubViewport
@@ -1440,10 +1426,11 @@ func _choose_preview_direction(
 func _create_preview_fixtures(
 	source_board: Board3D,
 	source_manager: TurnManager,
-	source_score: ScoreManager
+	source_score: ScoreManager,
+	candidate_directions: Array[Vector2i]
 ) -> Array[Dictionary]:
 	var previews: Array[Dictionary] = []
-	for _direction: Vector2i in OrbTypes.DIRECTIONS:
+	for _direction: Vector2i in candidate_directions:
 		previews.append(_create_preview_fixture_shell())
 	await get_tree().process_frame
 	for preview: Dictionary in previews:
@@ -1604,6 +1591,31 @@ func _random_direction(candidates: Array[Vector2i]) -> Vector2i:
 	if candidates.is_empty():
 		return Vector2i.DOWN
 	return candidates[_skill_rng.randi_range(0, candidates.size() - 1)]
+
+
+func _next_pattern_direction(turn_offset: int, current_gravity: Vector2i) -> Vector2i:
+	for pattern_step: int in range(DIRECTION_PATTERN.size()):
+		var pattern_index: int = (turn_offset + pattern_step) % DIRECTION_PATTERN.size()
+		var direction: Vector2i = DIRECTION_PATTERN[pattern_index]
+		if direction != current_gravity:
+			return direction
+	return Vector2i.ZERO
+
+
+func _directions_except(current_gravity: Vector2i) -> Array[Vector2i]:
+	var candidates: Array[Vector2i] = []
+	for direction: Vector2i in OrbTypes.DIRECTIONS:
+		if direction != current_gravity:
+			candidates.append(direction)
+	return candidates
+
+
+func _unblocked_selectable_count(manager: TurnManager) -> int:
+	var count: int = 0
+	for direction: Vector2i in _directions_except(manager.gravity):
+		if not manager.blocked_directions.has(direction):
+			count += 1
+	return count
 
 
 func _count_skill_reaction_pairs(board: Board3D, direction: Vector2i) -> int:

@@ -5,11 +5,11 @@ const DEFAULT_OUTPUT_DIRECTORY: String = "res://artifacts/measurements/jelly_rin
 const TEMP_SAVE_PATH: String = "res://artifacts/measurements/jelly_ring_space_save.tmp.cfg"
 const OUTPUT_PREFIX: String = "--ring-space-output-directory="
 const POST_REACTION_DIRECTIONS: Array[Vector2i] = [
-	Vector2i.DOWN,
 	Vector2i.RIGHT,
 	Vector2i.UP,
 	Vector2i.LEFT,
 	Vector2i.DOWN,
+	Vector2i.RIGHT,
 ]
 const RING_SETTLED_FRAMES: int = 8
 const MAX_EFFECT_FRAMES: int = 300

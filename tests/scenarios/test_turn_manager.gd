@@ -148,13 +148,31 @@ func test_t6_disallowed_same_direction_swipe_is_ignored_without_lock() -> void:
 	var snapshot: Dictionary = _snapshot_m3_config()
 	Config.data.stable_linear_speed = HIGH_THRESHOLD
 	Config.data.stable_angular_speed = HIGH_THRESHOLD
-	Config.data.allow_same_direction_swipe = false
 	var fixture: Dictionary = await _create_ready_fixture(FIXTURE_SEED + 6)
 	var manager: TurnManager = fixture["manager"] as TurnManager
+	var board: Board = fixture["board"] as Board
+	var spawner: Spawner = fixture["spawner"] as Spawner
+	var turn_start_count: int = 0
+	var gravity_change_count: int = 0
+	manager.turn_started.connect(
+		func(_turn_index: int, _direction: Vector2i) -> void:
+			turn_start_count += 1
+	)
+	manager.gravity_changed.connect(
+		func(_direction: Vector2i) -> void:
+			gravity_change_count += 1
+	)
+	var orb_count_before: int = board.get_orbs().size()
+	var preview_before: Array = spawner.peek_preview()
 
 	manager.on_swipe(Vector2i.DOWN)
 	assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "same direction state")
 	assert_eq(manager.turn_index, 0, "same direction turn index")
+	assert_eq(manager.gravity, Vector2i.DOWN, "same direction keeps gravity")
+	assert_eq(board.get_orbs().size(), orb_count_before, "same direction spawns nothing")
+	assert_eq(spawner.peek_preview(), preview_before, "same direction preserves preview")
+	assert_eq(turn_start_count, 0, "same direction emits no turn start")
+	assert_eq(gravity_change_count, 0, "same direction emits no gravity change")
 	assert_eq(InputRouter.is_locked(), false, "same direction does not lock input")
 	await _cleanup_fixture(fixture, snapshot)
 
@@ -276,6 +294,47 @@ func test_t10_planet_unlock_emits_on_spawn_frame_and_not_at_turn_end() -> void:
 	await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
 	assert_eq(unlocked_colors.size(), 2, "turn 60 settlement emits no second signal")
 	assert_eq(lock_states, [true, true], "both guides start while input remains locked")
+	await _cleanup_fixture(fixture, snapshot)
+
+
+func test_t11_default_accepts_each_other_direction_from_initial_down() -> void:
+	var snapshot: Dictionary = _snapshot_m3_config()
+	Config.data.stable_linear_speed = HIGH_THRESHOLD
+	Config.data.stable_angular_speed = HIGH_THRESHOLD
+	for direction: Vector2i in [Vector2i.UP, Vector2i.LEFT, Vector2i.RIGHT]:
+		var fixture: Dictionary = await _create_ready_fixture(
+			FIXTURE_SEED + 20 + OrbTypes.DIRECTIONS.find(direction)
+		)
+		var manager: TurnManager = fixture["manager"] as TurnManager
+		manager.on_swipe(direction)
+		assert_eq(manager.turn_index, 1, "%s starts a turn" % OrbTypes.dir_name(direction))
+		assert_eq(manager.gravity, direction, "%s changes gravity" % OrbTypes.dir_name(direction))
+		assert_eq(manager.state, TurnManager.State.SPAWNING, "%s enters spawning" % OrbTypes.dir_name(direction))
+		await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
+		await _cleanup_fixture(fixture, snapshot)
+
+
+func test_t12_same_direction_is_ignored_while_final_move_is_pending() -> void:
+	var snapshot: Dictionary = _snapshot_m3_config()
+	Config.data.stable_linear_speed = HIGH_THRESHOLD
+	Config.data.stable_angular_speed = HIGH_THRESHOLD
+	var fixture: Dictionary = await _create_ready_fixture(FIXTURE_SEED + 30)
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	manager.final_move_pending = true
+
+	manager.on_swipe(Vector2i.DOWN)
+	assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "same FINAL MOVE direction waits")
+	assert_eq(manager.turn_index, 0, "same FINAL MOVE direction keeps turn")
+	assert_true(manager.final_move_pending, "same direction preserves pending FINAL MOVE")
+	assert_true(not manager.final_move_active, "same direction does not activate FINAL MOVE")
+	assert_eq(InputRouter.is_locked(), false, "same FINAL MOVE direction stays unlocked")
+
+	manager.on_swipe(Vector2i.RIGHT)
+	assert_eq(manager.turn_index, 1, "different direction consumes FINAL MOVE")
+	assert_true(not manager.final_move_pending, "accepted direction clears pending FINAL MOVE")
+	assert_true(manager.final_move_active, "accepted direction activates FINAL MOVE")
+	assert_eq(manager.state, TurnManager.State.SIMULATING, "FINAL MOVE skips spawning")
+	await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
 	await _cleanup_fixture(fixture, snapshot)
 
 

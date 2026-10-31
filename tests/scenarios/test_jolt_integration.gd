@@ -139,6 +139,8 @@ func test_reaction_ghost_times_out_without_position_correction() -> void:
 
 
 func test_shared_turn_path_completes_twenty_3d_turns() -> void:
+	var previous_allow_same_direction: bool = Config.data.allow_same_direction_swipe
+	Config.data.allow_same_direction_swipe = true
 	var fixture: Dictionary = await _create_fixture(true, false)
 	var board: Board3D = fixture["board"] as Board3D
 	var manager: TurnManager = fixture["manager"] as TurnManager
@@ -195,9 +197,12 @@ func test_shared_turn_path_completes_twenty_3d_turns() -> void:
 		assert_true(center_extent <= board.half_size() + 25.0, "3D orb remains near board")
 		assert_true(orb.position.is_finite(), "3D position remains finite")
 	await _cleanup_fixture(fixture)
+	Config.data.allow_same_direction_swipe = previous_allow_same_direction
 
 
 func test_seed_101_runs_until_game_over_without_3d_divergence() -> void:
+	var previous_allow_same_direction: bool = Config.data.allow_same_direction_swipe
+	Config.data.allow_same_direction_swipe = true
 	var fixture: Dictionary = await _create_fixture(true, false)
 	var board: Board3D = fixture["board"] as Board3D
 	var manager: TurnManager = fixture["manager"] as TurnManager
@@ -259,6 +264,7 @@ func test_seed_101_runs_until_game_over_without_3d_divergence() -> void:
 			"seed 101 orb remains near board"
 		)
 	await _cleanup_fixture(fixture)
+	Config.data.allow_same_direction_swipe = previous_allow_same_direction
 
 
 func test_twenty_two_seed_3d_gravity_cycles_have_no_departures_or_divergence() -> void:
@@ -514,6 +520,8 @@ func test_blocked_3d_spawn_reaches_game_over_without_red_warning_wall() -> void:
 		"blocked fixture initial settle"
 	)
 	board.set_warning_directions([Vector2i.DOWN])
+	manager.gravity = Vector2i.UP
+	board.set_gravity(Vector2i.UP)
 	var top_wall: MeshInstance3D = board.get_node("VisualTilt/VisualTop") as MeshInstance3D
 	var top_material: StandardMaterial3D = top_wall.material_override as StandardMaterial3D
 	assert_eq(
