@@ -40,7 +40,7 @@
 
 ### [2026-10-31] 대상 #124 — 같은 방향으로는 밀 수 없게
 - 상태: 완료 — `origin/main` `c0033f0`에서 `allow_same_direction_swipe` 기본값을 `false`로 바꾸고, 입력 대기 중 현재 중력 방향 안내를 숨겼다. 같은 방향 입력은 기존 `TurnManager` 판정대로 상태·턴·중력·생성·잠금·신호를 바꾸지 않으며, 다른 세 방향과 네 방향 막힘 계산은 유지한다
-- 브랜치 / PR: `codex/block-same-direction-swipe` / PR 생성 후 갱신
+- 브랜치 / PR: `codex/block-same-direction-swipe` / https://github.com/jeongmo-dot/gravity_orb/pull/123
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/ui/TurnInputIndicator.gd`, `tests/{test_config.gd,test_jelly_regression.gd,test_turn_input_indicator.gd}`, `tests/scenarios/{test_game_over.gd,test_game_over_measurement.gd,test_jolt_integration.gd,test_merge_scenario.gd,test_spawn_flow.gd,test_turn_manager.gd,test_turn_time.gd}`, `tests/spike/{CaptureJolt3D.gd,Profile2DBaseline.gd,capture_screens.gd,run_jelly_ring_space_measurement.gd,run_jolt_3d_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `allow_same_direction_swipe=false`; 현재 중력과 같은 입력은 턴·중력·공 수·미리보기·신호가 그대로이고 입력 잠금도 걸리지 않음 — 자동 (`test_t6_disallowed_same_direction_swipe_is_ignored_without_lock`)
