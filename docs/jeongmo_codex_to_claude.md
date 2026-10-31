@@ -40,7 +40,7 @@
 
 ### [2026-10-31] 대상 #121 — 공이 많을 때 느려짐 경량화
 - 상태: 완료 — `origin/main` `e247957`에서 시작해 규칙·수치·물리 주기·그림을 바꾸지 않고, 반복 전수 탐색과 반응 판정 할당을 줄였다. 실제 `540×960` 창·VSync 끔·단일 프로세스에서 같은 세 장면을 변경 전/후로 측정했다
-- 브랜치 / PR: `codex/full-board-performance` / PR 생성 예정
+- 브랜치 / PR: `codex/full-board-performance` / https://github.com/jeongmo-dot/gravity_orb/pull/120
 - 변경 파일: `scripts/core/{CollisionResolver.gd,Main.gd,ReactionRules.gd}`, `scripts/spike/Board3D.gd`, `scripts/platform/FullBoardPerformanceMeasurement.gd`, `tests/test_full_board_performance_equivalence.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 고치기 전 실제 창 장면 ① 정지 공 120개, ② 같은 판+입구 대기 16개, ③ 75턴 합체 집중 장면의 프레임·Jolt 포함 물리 모니터·스크립트 앵커·그리기 호출·물리 스텝/그리기·게임/실시간을 측정 — 자동 측정 도구 + 아래 표
