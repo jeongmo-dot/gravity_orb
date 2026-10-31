@@ -32,24 +32,8 @@
 
 ## 대기 중
 
-### [2026-10-31 #122] 미리보기를 판과 같은 크기로
-- 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합)
-- 근거: [technical_design.md](technical_design.md) **§12-ONE.15**
-- 배경: 미리보기가 칸에 맞춰 최대 2배로 커지고 개수에 따라 배율이 달라, NEXT의 L2가 판 위 L4처럼 보였다. 사용자 (2026-10-31) "이렇게 나오는데 L1, L2 만 들어온다고?" → 시안 A 선택, "A로 해줘. NEXT도 같은 크기로"
-- 앵커: `scripts/ui/Hud.gd` `_render_preview()`·`PREVIEW_REGION_SIZE`·`PREVIEW_GAP`·`_projected_board_rect()`, `scenes/UI.tscn` `ThenPreview` (scale 0.6, modulate 알파 0.5)
-- 수치: 미리보기 배율 = 판 투영 너비 ÷ `board_size` (고정, 개수와 무관). THEN 0.6배 → 1.0, 알파 0.5 그대로
-- 요구:
-  1. NEXT·THEN 젤리를 판 위 같은 레벨과 같은 화면 크기로 그린다. 창 크기·비율이 바뀌면 다시 계산
-  2. THEN도 같은 크기, 흐림 그대로
-  3. 칸이 모자라면 간격을 줄이고, 그래도 넘치면 크기는 그대로 겹쳐 놓는다 (배율을 줄이지 않는다)
-  4. 테스트: 개수 1·2·5개에서 같은 레벨의 그린 크기가 같음, 배율이 판 투영과 같음, 넘칠 때 크기 그대로·칸 안
-  5. 캡처 (두 비율): ① 판 위 L1·L2와 NEXT·THEN의 L1·L2가 한 화면에 (판 위와 미리보기 몸통 화면 지름을 픽셀로 재서 회신에) ② NEXT 1개·2개·5개 ③ THEN에 L2 5개 (겹침). 기존 미리보기 캡처는 다시 찍는다. 두 비율 전체 캡처 (마지막에)
-- 건드리지 말 것: 미리보기 개수·`×n` 규칙, 미리보기 젤리 그림, 판·규칙·물리·생성, 사용자 저장 파일, `docs/` (회신 파일 제외)
-- Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), 판 위와 미리보기 크기 차이 5% 이내, JELLY 기준 해시 그대로, 캡처 보고, 검증 빌드는 `-Debug`만
-- 커밋: 항목 단위 브랜치, **push·PR까지**
-
 ### [2026-10-31 #123] 공 늘어나는 간격 5턴 → 10턴
-- 상태: 대기 (**#122 다음**. #122 병합 뒤 `origin/main` 병합)
+- 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합 — #122 `6469966` 포함)
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.16**
 - 배경: #119부터 5턴마다 공이 1개씩 늘어 봇 기준 한 판이 약 80턴이다. 사용자 (2026-10-31) "들어오는 공의 수가 늘어나는 턴 기준도 5턴이 아니라 10턴 단위로 바꿔줘"
 - 앵커: `config/default_config.tres`·`config/GameConfig.gd`의 `spawn_count_ramp_turns`, `tests/test_config.gd`·`tests/test_spawner.gd` (5턴 램프 확인), JELLY 회귀 (`test_jelly_regression`), 캡처 `65_jelly_preview_double_digit`
@@ -96,6 +80,23 @@
 ---
 
 ## 처리 완료
+
+### [2026-10-31 #122] 미리보기를 판과 같은 크기로 — 완료
+- 상태: 완료 (2026-10-31 Claude 검수 · [PR #121](https://github.com/jeongmo-dot/gravity_orb/pull/121) 병합 `6469966`)
+- 검수: 미리보기 배율 = 판 투영 너비 ÷ `board_size` (개수와 무관), THEN 0.6배 삭제·알파 0.5 그대로, 칸이 모자라면 간격을 줄이고 그다음 겹침. 판 위와 NEXT·THEN의 L1·L2 화면 지름이 두 비율 모두 같다 (51.551 / 82.482px, 차이 0%). 해시 `ce7054b6…` 그대로, 래퍼 306/306 (Codex). Claude가 캡처 `66`·`70`을 직접 확인했다. 겹침은 명세와 달리 뒤 젤리가 위지만 일정해서 받아들임 (§12-ONE.15 결과). Claude 재실행 없음
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.15**
+- 배경: 미리보기가 칸에 맞춰 최대 2배로 커지고 개수에 따라 배율이 달라, NEXT의 L2가 판 위 L4처럼 보였다. 사용자 (2026-10-31) "이렇게 나오는데 L1, L2 만 들어온다고?" → 시안 A 선택, "A로 해줘. NEXT도 같은 크기로"
+- 앵커: `scripts/ui/Hud.gd` `_render_preview()`·`PREVIEW_REGION_SIZE`·`PREVIEW_GAP`·`_projected_board_rect()`, `scenes/UI.tscn` `ThenPreview` (scale 0.6, modulate 알파 0.5)
+- 수치: 미리보기 배율 = 판 투영 너비 ÷ `board_size` (고정, 개수와 무관). THEN 0.6배 → 1.0, 알파 0.5 그대로
+- 요구:
+  1. NEXT·THEN 젤리를 판 위 같은 레벨과 같은 화면 크기로 그린다. 창 크기·비율이 바뀌면 다시 계산
+  2. THEN도 같은 크기, 흐림 그대로
+  3. 칸이 모자라면 간격을 줄이고, 그래도 넘치면 크기는 그대로 겹쳐 놓는다 (배율을 줄이지 않는다)
+  4. 테스트: 개수 1·2·5개에서 같은 레벨의 그린 크기가 같음, 배율이 판 투영과 같음, 넘칠 때 크기 그대로·칸 안
+  5. 캡처 (두 비율): ① 판 위 L1·L2와 NEXT·THEN의 L1·L2가 한 화면에 (판 위와 미리보기 몸통 화면 지름을 픽셀로 재서 회신에) ② NEXT 1개·2개·5개 ③ THEN에 L2 5개 (겹침). 기존 미리보기 캡처는 다시 찍는다. 두 비율 전체 캡처 (마지막에)
+- 건드리지 말 것: 미리보기 개수·`×n` 규칙, 미리보기 젤리 그림, 판·규칙·물리·생성, 사용자 저장 파일, `docs/` (회신 파일 제외)
+- Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), 판 위와 미리보기 크기 차이 5% 이내, JELLY 기준 해시 그대로, 캡처 보고, 검증 빌드는 `-Debug`만
+- 커밋: 항목 단위 브랜치, **push·PR까지**
 
 ### [2026-10-31 #121] 공이 많을 때 느려짐 — 가볍게 — 완료
 - 상태: 완료 (2026-10-31 Claude 검수 · [PR #120](https://github.com/jeongmo-dot/gravity_orb/pull/120) 병합 `12bf7a3`)
