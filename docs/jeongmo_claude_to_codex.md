@@ -32,24 +32,8 @@
 
 ## 대기 중
 
-### [2026-10-31 #124] 같은 방향으로는 밀 수 없게
-- 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합 — #123 `3336886` 포함)
-- 근거: [technical_design.md](technical_design.md) **§12-ONE.17**
-- 배경: 지금은 지금 중력과 같은 방향으로 밀어도 턴이 넘어가 새 공만 들어온다. 사용자 (2026-10-31) "방향 입력 할 때 이전에 입력한 방향을 그대로 유지는 못하게 막아줘"
-- 앵커: `config/default_config.tres`·`config/GameConfig.gd`의 `allow_same_direction_swipe`, `scripts/core/TurnManager.gd` `on_swipe()`, `scripts/ui/TurnInputIndicator.gd` `_draw()`, `tests/test_config.gd` (기본값 true 확인), `tests/scenarios/test_turn_manager.gd`, `tests/spike/run_jolt_3d_measurement.gd` `DIRECTION_PATTERN`, 전략 봇 (`tests/tools/run_jelly_blast_measurement.ps1`이 쓰는 경로), JELLY 회귀 (`test_jelly_regression`)
-- 수치: `allow_same_direction_swipe` true → false
-- 요구:
-  1. `allow_same_direction_swipe` true → false (판정은 지금 코드 그대로 — 지금 중력과 같으면 잠그지 않고 무시)
-  2. 입력을 기다리는 동안 지금 중력 방향의 화살표·막힘 표시를 그리지 않는다. 같은 방향 입력에 새 소리·연출 없음
-  3. 봇: 자동 플레이는 차례 방향이 지금 중력과 같으면 순서의 다음 방향, 전략 봇은 지금 방향을 후보에서 뺀다
-  4. 테스트 (기본값에서): 같은 방향 입력은 턴·중력·생성이 그대로이고 입력 잠금도 안 걸림, 첫 턴 아래 막힘, FINAL MOVE에서도 막힘, 다른 세 방향은 지금처럼, 입력 대기 중 지금 방향 화살표 없음
-  5. §12-ONE.17 측정 1·2
-- 건드리지 말 것: 스와이프 판정 (4방향·거리·우세 비율), 중력 전환 (#118), 생성·규칙·점수·물리, 그림·연출 (화살표 하나 숨기기 말고는), 사용자 저장 파일, `docs/` (회신 파일 제외). 판 길이가 어떻게 나와도 값은 그대로 두고 보고한다
-- Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), 새 JELLY 기준 해시, 측정 표·캡처 보고 (마지막은 전체 캡처), 검증 빌드는 `-Debug`만
-- 커밋: 항목 단위 브랜치, **push·PR까지**
-
 ### [2026-10-31 #120] 대폭발은 L7끼리만
-- 상태: 대기 (**#124 다음**. #122~#124 병합 뒤 `origin/main` 병합 — 생성 10턴마다·같은 방향 막힘 위에서 잰다)
+- 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합 — #122~#124 포함, 생성 10턴마다·같은 방향 막힘 위에서 잰다. 지금 JELLY 해시 `935908ce…`)
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.13**
 - 배경: 지금 JELLY는 다른 색·같은 레벨 젤리가 둘 다 L5 이상이면 닿을 때 대폭발한다 (`jelly_blast_min_level` 5). 사용자 (2026-10-31) "폭발이 L7 이었으면 L7과 L7이 만났을 때만 폭발"
 - 앵커: `config/default_config.tres`·`config/GameConfig.gd`의 `jelly_blast_min_level`, `scripts/core/ReactionRules.gd` `_classify_jelly()`, `GameConfig.blast_enabled_for_level()`, `tests/test_config.gd` (기본값 5 확인), `tests/test_rules.gd`, JELLY 회귀 (`test_jelly_regression`), `tests/tools/run_jelly_blast_measurement.ps1`
@@ -66,6 +50,23 @@
 ---
 
 ## 처리 완료
+
+### [2026-10-31 #124] 같은 방향으로는 밀 수 없게 — 완료
+- 상태: 완료 (2026-10-31 Claude 검수 · [PR #123](https://github.com/jeongmo-dot/gravity_orb/pull/123) 병합 `99240c2`)
+- 검수: `allow_same_direction_swipe` false, 같은 방향 입력은 잠그지 않고 무시 (턴·중력·생성·미리보기·신호 그대로, 첫 턴 아래·FINAL MOVE도 막힘), 입력 대기 중 지금 방향 화살표·막힘 표시 숨김. 봇은 같은 방향 입력 0. 봇 20판 111.1 → 112.8턴, 점수 37.4만 → 41.4만, 최대 관통 31.6px (#118 범위 안). 새 해시 `935908ce…`, 래퍼 308/308 (Codex). Claude가 캡처 `31` 두 비율 중 540×960을 직접 확인했다. Claude 재실행 없음
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.17**
+- 배경: 지금은 지금 중력과 같은 방향으로 밀어도 턴이 넘어가 새 공만 들어온다. 사용자 (2026-10-31) "방향 입력 할 때 이전에 입력한 방향을 그대로 유지는 못하게 막아줘"
+- 앵커: `config/default_config.tres`·`config/GameConfig.gd`의 `allow_same_direction_swipe`, `scripts/core/TurnManager.gd` `on_swipe()`, `scripts/ui/TurnInputIndicator.gd` `_draw()`, `tests/test_config.gd` (기본값 true 확인), `tests/scenarios/test_turn_manager.gd`, `tests/spike/run_jolt_3d_measurement.gd` `DIRECTION_PATTERN`, 전략 봇 (`tests/tools/run_jelly_blast_measurement.ps1`이 쓰는 경로), JELLY 회귀 (`test_jelly_regression`)
+- 수치: `allow_same_direction_swipe` true → false
+- 요구:
+  1. `allow_same_direction_swipe` true → false (판정은 지금 코드 그대로 — 지금 중력과 같으면 잠그지 않고 무시)
+  2. 입력을 기다리는 동안 지금 중력 방향의 화살표·막힘 표시를 그리지 않는다. 같은 방향 입력에 새 소리·연출 없음
+  3. 봇: 자동 플레이는 차례 방향이 지금 중력과 같으면 순서의 다음 방향, 전략 봇은 지금 방향을 후보에서 뺀다
+  4. 테스트 (기본값에서): 같은 방향 입력은 턴·중력·생성이 그대로이고 입력 잠금도 안 걸림, 첫 턴 아래 막힘, FINAL MOVE에서도 막힘, 다른 세 방향은 지금처럼, 입력 대기 중 지금 방향 화살표 없음
+  5. §12-ONE.17 측정 1·2
+- 건드리지 말 것: 스와이프 판정 (4방향·거리·우세 비율), 중력 전환 (#118), 생성·규칙·점수·물리, 그림·연출 (화살표 하나 숨기기 말고는), 사용자 저장 파일, `docs/` (회신 파일 제외). 판 길이가 어떻게 나와도 값은 그대로 두고 보고한다
+- Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), 새 JELLY 기준 해시, 측정 표·캡처 보고 (마지막은 전체 캡처), 검증 빌드는 `-Debug`만
+- 커밋: 항목 단위 브랜치, **push·PR까지**
 
 ### [2026-10-31 #123] 공 늘어나는 간격 5턴 → 10턴 — 완료
 - 상태: 완료 (2026-10-31 Claude 검수 · [PR #122](https://github.com/jeongmo-dot/gravity_orb/pull/122) 병합 `3336886`)
