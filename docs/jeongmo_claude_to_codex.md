@@ -32,7 +32,21 @@
 
 ## 대기 중
 
-- 없음
+### [2026-10-31 #127] 합쳐지는 과정이 보이게
+- 상태: 대기 (**다음 차례**. 최신 `origin/main` 위에서)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.20**
+- 배경: 지금은 닿은 물리 프레임에 두 젤리를 지우고 결과를 만들어 "닿음 → 결과"가 한 프레임에 끝난다. 같은 레벨은 중점에 다 큰 결과가 바로 나타나고, 흡수는 작은 쪽 대신 빛 덩어리가 미끄러진다. 사용자 (2026-10-31) "공과 공이 합쳐질 때 너무 순식간에 합쳐지는 느낌이야. 합쳐지는 과정이 눈에 보였으면 좋겠어"
+- 앵커: `scripts/core/CollisionResolver.gd` `flush()`·`has_pending_reactions()`·`_lock_reaction_result()`, `scripts/core/TurnManager.gd` 안정·1.5초 상한 판정, `scripts/spike/Orb3D.gd` `set_jelly_mass()`·`_advance_growth()`·`JELLY_ABSORPTION_GROWTH_DURATION`·`disable_physics()`, `scripts/spike/Board3D.gd` `spawn_orb()`·`remove_orb()`, `scripts/fx/FeedbackDirector.gd` 합체 연출 (`play_visual_punch`·`_create_jelly_absorption_trails`), `config/GameConfig.gd` (새 필드)·`config/default_config.tres`, 테스트·봇 (`tests/run_jelly_physics_autoplay.ps1`)·캡처 (`tests/spike/capture_screens.gd`)
+- 수치: 새 필드 `jelly_merge_duration` 기본 **0.3** (후보). 측정은 0·0.3
+- 요구:
+  1. 닿음 (규칙 판정·두 젤리 예약) → 과정 T → 완성 (지금 닿는 순간 하던 일 전부). T = 0이면 지금과 같다
+  2. 과정: 먹히는 쪽은 물리를 끄고 그림만 결과의 지금 위치로 `p²`로 끌려가며 크기 1 → 0.2, 늘어남 `1 + 0.25p`·옆 `1 − 0.15p`, 결과 뒤에 그린다. 같은 레벨은 중점에 결과를 `R[L]` → `R[L+1]`로 키우며 둘 다 끌려간다. 흡수로 레벨이 오르면 먹는 쪽을 T 동안 키운다. 커지는 반지름은 매 프레임 그림 = 물리
+  3. 반응 잠금은 닿는 순간부터 센다. 턴은 진행 중 합체가 완성된 뒤 끝난다 (1.5초 상한 포함, 상한 뒤 새 합체 없음)
+  4. `JellyAbsorptionTrail` 삭제
+  5. §12-ONE.20 측정 1~5
+- 건드리지 말 것: 규칙·점수·콤보 배수·결과 위치 규칙, 대폭발, `chain_reaction_delay` 값, 생성·FINAL MOVE·게임 오버 판정, 젤리 그림·다른 연출 (새 연출 없음, 고리 모양 금지), 다른 모드, 사용자 저장 파일, `docs/` (회신 파일 제외). 측정이 어떻게 나와도 기본값은 0.3으로 두고 보고한다
+- Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), 해시 보고 (0에서 그대로), 측정 표·캡처 (실제 창 포함, 마지막은 전체 캡처) 보고, 검증 빌드는 `-Debug`만
+- 커밋: 항목 단위 브랜치, **push·PR까지**
 
 ---
 
