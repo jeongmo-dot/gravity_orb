@@ -40,7 +40,7 @@
 
 ### [2026-10-31] 대상 #119 — 공이 빨리 늘어나게, 시작은 색마다 하나씩
 - 상태: 완료 — 최신 `origin/main` `f05299f`에서 항목 브랜치를 만들고 생성 증가 간격을 `50 → 5턴`으로 바꿨다. 시작 배치는 첫 턴의 4색을 시드 RNG로 섞은 뒤 색마다 L1 하나씩 바닥에 등간격 배치한다
-- 브랜치 / PR: `codex/spawn-ramp-five-turns` / push 후 생성 예정
+- 브랜치 / PR: `codex/spawn-ramp-five-turns` / https://github.com/jeongmo-dot/gravity_orb/pull/119
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/Spawner.gd`, `tests/{capture_screens.ps1,run_jelly_physics_autoplay.ps1,run_tests.gd,test_config.gd,test_jelly_regression.gd,test_spawner.gd}`, `tests/scenarios/{test_game_over.gd,test_jolt_integration.gd,test_merge_scenario.gd,test_spawn_flow.gd}`, `tests/spike/{capture_screens.gd,run_jolt_3d_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `spawn_count_ramp_turns=5`, `spawn_count_per_turn=1`, `spawn_count_max=0` — 자동 (`test_m4_spawn_defaults`, `test_default_five_turn_ramp_has_no_maximum`)
