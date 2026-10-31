@@ -40,7 +40,7 @@
 
 ### [2026-10-31] 대상 #125 — 위에 턴 수·막힘 글자 삭제·랭킹은 턴
 - 상태: 완료 — 상단 소리 버튼과 SCORE 사이에 BEST와 같은 `TURN` 판을 추가하고, 상태에 따라 다음 입력 턴 또는 진행·종료 턴을 표시한다. 미리보기 위 막힘 글자 판은 삭제했으며 판 둘레 화살표·✕와 막힘 계산은 유지했다. JELLY 랭킹은 저장된 `turns`를 표시하고 `final_moves` 저장 형식은 그대로다
-- 브랜치 / PR: `codex/jelly-turn-hud-ranking` / 생성 예정
+- 브랜치 / PR: `codex/jelly-turn-hud-ranking` / https://github.com/jeongmo-dot/gravity_orb/pull/125
 - 변경 파일: `scenes/UI.tscn`, `scripts/ui/{Hud.gd,RankingPanel.gd}`, `tests/{test_screen_layout.gd,test_rankings.gd,test_jelly_shell.gd,capture_screens.ps1}`, `tests/scenarios/test_score_flow.gd`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `TurnPanel`은 1080 기준 `x=156~288`, `y=24~174`; SCORE·BEST·소리 버튼과 다른 HUD 배치는 그대로. BEST와 같은 판·제목·숫자 글꼴, 숫자 40~18 자동 맞춤 — 자동 (`test_turn_panel_fills_sound_to_score_gap_without_moving_existing_hud`) + 캡처 직접 관측
