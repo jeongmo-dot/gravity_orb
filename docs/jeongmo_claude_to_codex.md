@@ -32,22 +32,8 @@
 
 ## 대기 중
 
-### [2026-10-31 #123] 공 늘어나는 간격 5턴 → 10턴
-- 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합 — #122 `6469966` 포함)
-- 근거: [technical_design.md](technical_design.md) **§12-ONE.16**
-- 배경: #119부터 5턴마다 공이 1개씩 늘어 봇 기준 한 판이 약 80턴이다. 사용자 (2026-10-31) "들어오는 공의 수가 늘어나는 턴 기준도 5턴이 아니라 10턴 단위로 바꿔줘"
-- 앵커: `config/default_config.tres`·`config/GameConfig.gd`의 `spawn_count_ramp_turns`, `tests/test_config.gd`·`tests/test_spawner.gd` (5턴 램프 확인), JELLY 회귀 (`test_jelly_regression`), 캡처 `65_jelly_preview_double_digit`
-- 수치: `spawn_count_ramp_turns` 5 → 10 (상한 없음 그대로)
-- 요구:
-  1. `spawn_count_ramp_turns` 5 → 10
-  2. 테스트: 1·10·11·20·21·50·51·100·101턴의 생성 수 1/1/2/2/3/5/6/10/11
-  3. §12-ONE.16 측정 1·2 (새 해시, `65` 캡처는 91턴 이후로)
-- 건드리지 말 것: 시작 배치, 색 해금, 크기 비율, 미리보기, 물리 값, 규칙·점수·대폭발, 사용자 저장 파일, `docs/` (회신 파일 제외). 판 길이가 어떻게 나와도 값은 그대로 두고 보고한다
-- Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), 새 JELLY 기준 해시, 측정 표·캡처 보고 (마지막은 전체 캡처), 검증 빌드는 `-Debug`만
-- 커밋: 항목 단위 브랜치, **push·PR까지**
-
 ### [2026-10-31 #124] 같은 방향으로는 밀 수 없게
-- 상태: 대기 (**#123 다음**. #123 병합 뒤 `origin/main` 병합)
+- 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합 — #123 `3336886` 포함)
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.17**
 - 배경: 지금은 지금 중력과 같은 방향으로 밀어도 턴이 넘어가 새 공만 들어온다. 사용자 (2026-10-31) "방향 입력 할 때 이전에 입력한 방향을 그대로 유지는 못하게 막아줘"
 - 앵커: `config/default_config.tres`·`config/GameConfig.gd`의 `allow_same_direction_swipe`, `scripts/core/TurnManager.gd` `on_swipe()`, `scripts/ui/TurnInputIndicator.gd` `_draw()`, `tests/test_config.gd` (기본값 true 확인), `tests/scenarios/test_turn_manager.gd`, `tests/spike/run_jolt_3d_measurement.gd` `DIRECTION_PATTERN`, 전략 봇 (`tests/tools/run_jelly_blast_measurement.ps1`이 쓰는 경로), JELLY 회귀 (`test_jelly_regression`)
@@ -80,6 +66,21 @@
 ---
 
 ## 처리 완료
+
+### [2026-10-31 #123] 공 늘어나는 간격 5턴 → 10턴 — 완료
+- 상태: 완료 (2026-10-31 Claude 검수 · [PR #122](https://github.com/jeongmo-dot/gravity_orb/pull/122) 병합 `3336886`)
+- 검수: `spawn_count_ramp_turns` 10, 경계 테스트 1/1/2/2/3/5/6/10/11. 봇 20판 약 80 → 111.1턴 (99~124턴, 턴당 10~13개가 들어올 때 끝남), 점수 37.4만 (#119 60.5만), 턴당 합체 4.85, FINAL MOVE 성공 9.1%. JELLY 해시는 회귀 장면이 생성 램프와 무관해 그대로 (`ce7054b6…`). `65` 캡처는 91턴 `×10`. 래퍼 306/306 (Codex). Claude 재실행 없음
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.16**
+- 배경: #119부터 5턴마다 공이 1개씩 늘어 봇 기준 한 판이 약 80턴이다. 사용자 (2026-10-31) "들어오는 공의 수가 늘어나는 턴 기준도 5턴이 아니라 10턴 단위로 바꿔줘"
+- 앵커: `config/default_config.tres`·`config/GameConfig.gd`의 `spawn_count_ramp_turns`, `tests/test_config.gd`·`tests/test_spawner.gd` (5턴 램프 확인), JELLY 회귀 (`test_jelly_regression`), 캡처 `65_jelly_preview_double_digit`
+- 수치: `spawn_count_ramp_turns` 5 → 10 (상한 없음 그대로)
+- 요구:
+  1. `spawn_count_ramp_turns` 5 → 10
+  2. 테스트: 1·10·11·20·21·50·51·100·101턴의 생성 수 1/1/2/2/3/5/6/10/11
+  3. §12-ONE.16 측정 1·2 (새 해시, `65` 캡처는 91턴 이후로)
+- 건드리지 말 것: 시작 배치, 색 해금, 크기 비율, 미리보기, 물리 값, 규칙·점수·대폭발, 사용자 저장 파일, `docs/` (회신 파일 제외). 판 길이가 어떻게 나와도 값은 그대로 두고 보고한다
+- Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), 새 JELLY 기준 해시, 측정 표·캡처 보고 (마지막은 전체 캡처), 검증 빌드는 `-Debug`만
+- 커밋: 항목 단위 브랜치, **push·PR까지**
 
 ### [2026-10-31 #122] 미리보기를 판과 같은 크기로 — 완료
 - 상태: 완료 (2026-10-31 Claude 검수 · [PR #121](https://github.com/jeongmo-dot/gravity_orb/pull/121) 병합 `6469966`)
