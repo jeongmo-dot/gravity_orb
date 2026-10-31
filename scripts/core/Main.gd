@@ -4,6 +4,10 @@ extends Node
 const BACKGROUND_COLOR: Color = Color.BLACK
 const SEED_PREFIX: String = "--jolt-seed="
 const MODE_PREFIX: String = "--mode="
+const FULL_BOARD_PERFORMANCE_ARGUMENT: String = "--full-board-performance"
+const FULL_BOARD_PERFORMANCE_RUNNER: Script = preload(
+	"res://scripts/platform/FullBoardPerformanceMeasurement.gd"
+)
 const NO_MODE: int = -1
 const BASE_VERTICAL_FOV_DEGREES: float = 25.0
 const BASE_ASPECT_WIDTH_OVER_HEIGHT: float = 9.0 / 16.0
@@ -43,6 +47,9 @@ func _enter_tree() -> void:
 	if argument_mode != NO_MODE:
 		_launch_game_on_ready = true
 		return
+	if _full_board_performance_requested():
+		_launch_game_on_ready = true
+		return
 	_prepare_start_screen()
 
 
@@ -76,6 +83,8 @@ func _ready() -> void:
 		_ui.show_start_screen()
 		return
 	_start_gameplay()
+	if _full_board_performance_requested():
+		call_deferred("_start_full_board_performance_measurement")
 
 
 func _exit_tree() -> void:
@@ -220,3 +229,16 @@ func _mode_from_arguments(arguments: PackedStringArray) -> int:
 func _save_path() -> String:
 	var score_manager: ScoreManager = get_node_or_null("ScoreManager") as ScoreManager
 	return score_manager.save_path if score_manager != null else ""
+
+
+func _full_board_performance_requested() -> bool:
+	return (
+		OS.is_debug_build()
+		and OS.get_cmdline_user_args().has(FULL_BOARD_PERFORMANCE_ARGUMENT)
+	)
+
+
+func _start_full_board_performance_measurement() -> void:
+	var runner: Node = FULL_BOARD_PERFORMANCE_RUNNER.new() as Node
+	add_child(runner)
+	runner.call("configure", self)
