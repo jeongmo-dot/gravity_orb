@@ -9,6 +9,11 @@ param(
     [double]$GravityTurnDiagonalTime = -1.0,
     [ValidateRange(-1, 7)]
     [int]$JellyBlastMinLevel = -1,
+    [ValidateRange(1, 600)]
+    [int]$MaxTurns = 400,
+    [ValidateRange(-1, 100)]
+    [int]$SpawnCountMax = -1,
+    [string]$SpawnLevelCosts = "",
     [switch]$AggregateOnly
 )
 
@@ -39,6 +44,15 @@ if ($GravityTurnDiagonalTime -ge 0.0) {
 if ($JellyBlastMinLevel -ge 0) {
     $physicsArguments += "--jelly-blast-min-level=$JellyBlastMinLevel"
 }
+if ($SpawnCountMax -ge 0) {
+    $physicsArguments += "--spawn-count-max=$SpawnCountMax"
+}
+if (-not [string]::IsNullOrWhiteSpace($SpawnLevelCosts)) {
+    if ($SpawnLevelCosts -notmatch '^\d+(,\d+)*$') {
+        throw "SpawnLevelCosts must be comma-separated non-negative integers"
+    }
+    $physicsArguments += "--spawn-level-costs=$SpawnLevelCosts"
+}
 $outputDirectory = Join-Path $RepoPath "artifacts\jelly_physics_autoplay_$Label"
 New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
 
@@ -56,7 +70,7 @@ foreach ($seed in 101..120) {
             "--log-file", (Join-Path $outputDirectory "$name.godot.log"),
             "res://tests/spike/JoltMeasurement.tscn", "--",
             "--game-mode=jelly", "--jolt-ticks=120", "--jolt-seeds=$seed",
-            "--jolt-max-turns=400", "--jolt-no-determinism",
+            "--jolt-max-turns=$MaxTurns", "--jolt-no-determinism",
             "--jolt-output=res://artifacts/jelly_physics_autoplay_$Label/$name.json"
         ) + $physicsArguments
     }
@@ -107,6 +121,8 @@ $totalLevelSevenCreations = 0
 $departures = 0
 $maxTurnEndPairPenetration = 0.0
 $spawnedOrbCounts = @()
+$spawnedLevelOneCount = 0
+$spawnedLevelTwoCount = 0
 $finalMoveCount = 0
 $finalMoveSuccessCount = 0
 $peakActiveOrbs = @()
@@ -130,6 +146,8 @@ foreach ($task in $tasks) {
         $blastCountByLevel[$level] += [int]$levelProperty.Value
     }
     $spawnedOrbCounts += [double]$seedRow.spawned_orb_count
+    $spawnedLevelOneCount += [int]$seedRow.spawned_orb_count_by_level.L1
+    $spawnedLevelTwoCount += [int]$seedRow.spawned_orb_count_by_level.L2
     $finalMoveCount += [int]$seedRow.final_move_count
     $finalMoveSuccessCount += [int]$seedRow.final_move_success_count
     $peakActiveOrbs += [double]$seedRow.max_active_orbs
@@ -175,6 +193,7 @@ $gameOverTurns = @($completedGames | ForEach-Object { [double]$_.completed_turns
 $scores = @($seedRows | ForEach-Object { [double]$_.score })
 $gameOverScores = @($completedGames | ForEach-Object { [double]$_.score })
 $gameOverSpawnCounts = @($completedGames | ForEach-Object { [double]$_.game_over_spawn_count })
+$gameOverSpawnedJellyCounts = @($completedGames | ForEach-Object { [double]$_.game_over_spawned_jelly_count })
 $gameOverSpawnedTotals = @($completedGames | ForEach-Object { [double]$_.spawned_orb_count })
 $gameOverHighLevelCounts = @(
     $completedGames | ForEach-Object {
@@ -194,11 +213,13 @@ $summary = [ordered]@{
     engine = "Godot 4.8-dev3 standard"
     seeds = @(101..120)
     fixed_fps = 120
-    max_turns = 400
+    max_turns = $MaxTurns
     friction = if ($Friction -gt 0.0) { $Friction } else { $null }
     angular_damp = if ($AngularDamp -ge 0.0) { $AngularDamp } else { $null }
     gravity_turn_diagonal_time = if ($GravityTurnDiagonalTime -ge 0.0) { $GravityTurnDiagonalTime } else { $null }
     jelly_blast_min_level = if ($JellyBlastMinLevel -ge 0) { $JellyBlastMinLevel } else { $null }
+    spawn_count_max = if ($SpawnCountMax -ge 0) { $SpawnCountMax } else { $null }
+    spawn_level_costs = if ([string]::IsNullOrWhiteSpace($SpawnLevelCosts)) { $null } else { $SpawnLevelCosts }
     game_over_count = $completedGames.Count
     average_game_over_turns = if ($gameOverTurns.Count -gt 0) { ($gameOverTurns | Measure-Object -Average).Average } else { 0.0 }
     minimum_game_over_turns = if ($gameOverTurns.Count -gt 0) { ($gameOverTurns | Measure-Object -Minimum).Minimum } else { 0.0 }
@@ -209,10 +230,16 @@ $summary = [ordered]@{
     average_score_all = ($scores | Measure-Object -Average).Average
     total_spawned_orbs = ($spawnedOrbCounts | Measure-Object -Sum).Sum
     average_spawned_orbs_all = ($spawnedOrbCounts | Measure-Object -Average).Average
+    spawned_level_one_count = $spawnedLevelOneCount
+    spawned_level_two_count = $spawnedLevelTwoCount
+    spawned_level_two_ratio = if (($spawnedLevelOneCount + $spawnedLevelTwoCount) -gt 0) { [double]$spawnedLevelTwoCount / ($spawnedLevelOneCount + $spawnedLevelTwoCount) } else { 0.0 }
     average_game_over_spawned_orbs = if ($gameOverSpawnedTotals.Count -gt 0) { ($gameOverSpawnedTotals | Measure-Object -Average).Average } else { 0.0 }
     average_game_over_spawn_count = if ($gameOverSpawnCounts.Count -gt 0) { ($gameOverSpawnCounts | Measure-Object -Average).Average } else { 0.0 }
     minimum_game_over_spawn_count = if ($gameOverSpawnCounts.Count -gt 0) { ($gameOverSpawnCounts | Measure-Object -Minimum).Minimum } else { 0.0 }
     maximum_game_over_spawn_count = if ($gameOverSpawnCounts.Count -gt 0) { ($gameOverSpawnCounts | Measure-Object -Maximum).Maximum } else { 0.0 }
+    average_game_over_spawned_jelly_count = if ($gameOverSpawnedJellyCounts.Count -gt 0) { ($gameOverSpawnedJellyCounts | Measure-Object -Average).Average } else { 0.0 }
+    minimum_game_over_spawned_jelly_count = if ($gameOverSpawnedJellyCounts.Count -gt 0) { ($gameOverSpawnedJellyCounts | Measure-Object -Minimum).Minimum } else { 0.0 }
+    maximum_game_over_spawned_jelly_count = if ($gameOverSpawnedJellyCounts.Count -gt 0) { ($gameOverSpawnedJellyCounts | Measure-Object -Maximum).Maximum } else { 0.0 }
     final_move_count = $finalMoveCount
     final_move_success_count = $finalMoveSuccessCount
     final_move_success_rate = if ($finalMoveCount -gt 0) { [double]$finalMoveSuccessCount / $finalMoveCount } else { 0.0 }

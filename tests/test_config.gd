@@ -123,6 +123,7 @@ func test_m4_spawn_defaults() -> void:
 	for color_index: int in range(planet_colors.size()):
 		assert_eq(config.color_display[color_index], planet_colors[color_index], "planet display %d" % color_index)
 	assert_eq(config.spawn_level_weights, PackedFloat32Array([0.9, 0.1]), "level weights")
+	assert_eq(config.spawn_level_costs, PackedInt32Array([1, 2]), "level costs")
 	assert_eq(
 		config.spawn_color_weights,
 		PackedFloat32Array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0]),
@@ -131,7 +132,7 @@ func test_m4_spawn_defaults() -> void:
 	assert_eq(config.spawn_count_per_turn, 1, "spawn count per turn")
 	assert_eq(config.preview_turns, 2, "preview turns")
 	assert_eq(config.spawn_count_ramp_turns, 10, "spawn count ramp interval")
-	assert_eq(config.spawn_count_max, 0, "non-positive spawn count maximum is uncapped")
+	assert_eq(config.spawn_count_max, 5, "spawn count maximum")
 	assert_eq(config.turn_start_colors, 4, "turn mode starts with four colors")
 	assert_eq(config.turn_color_unlock_turns, [30, 60], "turn color unlock schedule")
 	assert_eq(config.spawn_position_mode, GameConfig.SpawnPositionMode.RANDOM, "position mode")
@@ -144,15 +145,10 @@ func test_m4_spawn_defaults() -> void:
 func test_spawn_count_ramp_turn_boundaries() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	var expected: Dictionary = {
-		1: 1,
-		10: 1,
-		11: 2,
-		20: 2,
-		21: 3,
-		50: 5,
-		51: 6,
-		100: 10,
-		101: 11,
+		40: 4,
+		41: 5,
+		100: 5,
+		500: 5,
 	}
 	for turn_value: Variant in expected:
 		var turn_index: int = int(turn_value)
@@ -167,6 +163,16 @@ func test_spawn_count_ramp_turn_boundaries() -> void:
 	assert_eq(config.spawn_count_for_turn(101), 3, "positive maximum permits third orb")
 	assert_eq(config.spawn_count_for_turn(151), 3, "positive maximum caps later turns")
 	assert_eq(config.spawn_count_for_turn(201), 3, "positive maximum remains capped")
+
+
+func test_spawn_level_cost_defaults_and_fallbacks() -> void:
+	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
+	assert_eq(config.spawn_cost_for_level(1), 1, "L1 default cost")
+	assert_eq(config.spawn_cost_for_level(2), 2, "L2 default cost")
+	assert_eq(config.spawn_cost_for_level(3), 1, "missing level cost falls back to one")
+	config.spawn_level_costs = PackedInt32Array([0, -3])
+	assert_eq(config.spawn_cost_for_level(1), 1, "zero cost falls back to one")
+	assert_eq(config.spawn_cost_for_level(2), 1, "negative cost falls back to one")
 
 
 func test_turn_color_unlock_boundaries_follow_color_order() -> void:

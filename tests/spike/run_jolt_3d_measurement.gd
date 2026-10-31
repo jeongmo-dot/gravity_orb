@@ -60,6 +60,7 @@ var _seed_merge_count: int = 0
 var _seed_absorption_count: int = 0
 var _seed_level_seven_creation_count: int = 0
 var _seed_spawn_count: int = 0
+var _seed_spawn_count_by_level: Dictionary = {}
 var _seed_jelly_outline_visible_frames: int = 0
 var _seed_jelly_unarmed_outline_visible_frames: int = 0
 var _seed_jelly_outline_max_alpha: float = 0.0
@@ -111,6 +112,7 @@ func _run() -> void:
 		"spawn_count_per_turn": Config.data.spawn_count_per_turn,
 		"spawn_count_ramp_turns": Config.data.spawn_count_ramp_turns,
 		"spawn_count_max": Config.data.spawn_count_max,
+		"spawn_level_costs": Array(Config.data.spawn_level_costs),
 		"turn_start_colors": Config.data.turn_start_colors,
 		"turn_color_unlock_turns": Config.data.turn_color_unlock_turns,
 		"preview_turns": Config.data.preview_turns,
@@ -260,6 +262,7 @@ func _run_seed(
 	_seed_absorption_count = 0
 	_seed_level_seven_creation_count = 0
 	_seed_spawn_count = 0
+	_seed_spawn_count_by_level.clear()
 	_seed_jelly_outline_visible_frames = 0
 	_seed_jelly_unarmed_outline_visible_frames = 0
 	_seed_jelly_outline_max_alpha = 0.0
@@ -303,6 +306,7 @@ func _run_seed(
 		_turn_merge_count = 0
 		_turn_blast_count = 0
 		var score_before: int = score_manager.score
+		var spawned_before: int = _seed_spawn_count
 		var direction: Vector2i = _next_pattern_direction(turn_offset, manager.gravity)
 		if _skill_strategy in ["l_space", "l_merge"]:
 			var preview_decision: Dictionary = await _choose_preview_direction(
@@ -367,6 +371,7 @@ func _run_seed(
 		turn_rows.append({
 			"turn": completed_turns,
 			"spawn_count": Config.data.spawn_count_for_turn(completed_turns),
+			"spawned_count": _seed_spawn_count - spawned_before,
 			"spawned_total": _seed_spawn_count,
 			"occupancy": occupancy,
 			"reactions": _turn_reaction_count,
@@ -443,9 +448,15 @@ func _run_seed(
 		"final_orb_count": board.get_orbs().size(),
 		"score": score_manager.score,
 		"spawned_orb_count": _seed_spawn_count,
+		"spawned_orb_count_by_level": _seed_spawn_count_by_level.duplicate(true),
 		"game_over_spawn_count": (
 			Config.data.spawn_count_for_turn(completed_turns)
 			if manager.state == TurnManager.State.GAME_OVER
+			else 0
+		),
+		"game_over_spawned_jelly_count": (
+			int(turn_rows[-1]["spawned_count"])
+			if manager.state == TurnManager.State.GAME_OVER and not turn_rows.is_empty()
 			else 0
 		),
 		"max_active_orbs": max_active_orbs,
@@ -886,8 +897,10 @@ func _projection_item_less(first: Dictionary, second: Dictionary) -> bool:
 	return int(first["id"]) < int(second["id"])
 
 
-func _record_spawned_orb(_level: int) -> void:
+func _record_spawned_orb(level: int) -> void:
 	_seed_spawn_count += 1
+	var level_key: String = "L%d" % level
+	_seed_spawn_count_by_level[level_key] = int(_seed_spawn_count_by_level.get(level_key, 0)) + 1
 
 
 func _record_shock_event(reaction: Dictionary) -> void:
@@ -1761,6 +1774,10 @@ func _apply_arguments() -> void:
 			Config.data.spawn_count_max = maxi(
 				argument.trim_prefix("--spawn-count-max=").to_int(),
 				0
+			)
+		elif argument.begins_with("--spawn-level-costs="):
+			Config.data.spawn_level_costs = PackedInt32Array(
+				_parse_int_list(argument.trim_prefix("--spawn-level-costs="))
 			)
 		elif argument.begins_with("--turn-start-colors="):
 			Config.data.turn_start_colors = maxi(

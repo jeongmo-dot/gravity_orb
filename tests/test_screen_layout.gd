@@ -46,7 +46,7 @@ func test_turn_panel_fills_sound_to_score_gap_without_moving_existing_hud() -> v
 		assert_eq((layout["best_panel"] as Rect2), Rect2(820.0, 24.0, 236.0, 150.0), "best unchanged")
 
 
-func test_preview_orbs_match_board_scale_for_one_two_and_five_items() -> void:
+func test_preview_orbs_match_board_scale_and_count_uses_actual_jelly_items() -> void:
 	var main: Main = MAIN_SCENE.instantiate() as Main
 	main.launch_immediately(GameConfig.GameMode.JELLY)
 	tree.root.add_child(main)
@@ -55,13 +55,18 @@ func test_preview_orbs_match_board_scale_for_one_two_and_five_items() -> void:
 	var hud: Hud = main.get_node("UI/Hud") as Hud
 	var board_rect: Rect2 = hud._projected_board_rect()
 	var expected_scale: float = board_rect.size.x / Config.data.board_size
-	for count: int in [1, 2, 5]:
+	for count: int in [1, 2, 5, 6]:
 		var next_batch: Array = []
 		for index: int in range(count):
 			next_batch.append({"color": index % 4, "level": 2})
 		hud._on_preview_changed([next_batch, next_batch])
-		assert_eq(hud._next_preview.get_child_count(), count, "NEXT item count")
-		assert_eq(hud._then_preview.get_child_count(), count, "THEN item count")
+		var rendered_count: int = mini(count, Hud.MAX_PREVIEW_COUNT)
+		assert_eq(hud._next_preview.get_child_count(), rendered_count, "NEXT rendered item count")
+		assert_eq(hud._then_preview.get_child_count(), rendered_count, "THEN rendered item count")
+		assert_eq(hud._next_count_label.text, "×%d" % count, "NEXT actual jelly count")
+		assert_eq(hud._then_count_label.text, "×%d" % count, "THEN actual jelly count")
+		assert_eq(hud._next_count_label.visible, count > Hud.MAX_PREVIEW_COUNT, "NEXT count visibility")
+		assert_eq(hud._then_count_label.visible, count > Hud.MAX_PREVIEW_COUNT, "THEN count visibility")
 		for preview_root: Node2D in [hud._next_preview, hud._then_preview]:
 			for child: Node in preview_root.get_children():
 				var visual: OrbVisual = child as OrbVisual
