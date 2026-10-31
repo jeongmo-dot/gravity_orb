@@ -7,6 +7,8 @@ param(
     [double]$Friction = -1.0,
     [double]$AngularDamp = -1.0,
     [double]$GravityTurnDiagonalTime = -1.0,
+    [ValidateRange(-1, 7)]
+    [int]$JellyBlastMinLevel = -1,
     [switch]$AggregateOnly
 )
 
@@ -34,6 +36,9 @@ if ($AngularDamp -ge 0.0) {
 if ($GravityTurnDiagonalTime -ge 0.0) {
     $physicsArguments += "--physics-gravity-turn-diagonal-time=$($GravityTurnDiagonalTime.ToString($culture))"
 }
+if ($JellyBlastMinLevel -ge 0) {
+    $physicsArguments += "--jelly-blast-min-level=$JellyBlastMinLevel"
+}
 $outputDirectory = Join-Path $RepoPath "artifacts\jelly_physics_autoplay_$Label"
 New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
 
@@ -45,8 +50,10 @@ foreach ($seed in 101..120) {
         Output = Join-Path $outputDirectory "$name.json"
         Stdout = Join-Path $outputDirectory "$name.stdout.log"
         Stderr = Join-Path $outputDirectory "$name.stderr.log"
+        GodotLog = Join-Path $outputDirectory "$name.godot.log"
         Arguments = @(
             "--headless", "--path", $RepoPath, "--fixed-fps", "120", "--audio-driver", "Dummy",
+            "--log-file", (Join-Path $outputDirectory "$name.godot.log"),
             "res://tests/spike/JoltMeasurement.tscn", "--",
             "--game-mode=jelly", "--jolt-ticks=120", "--jolt-seeds=$seed",
             "--jolt-max-turns=400", "--jolt-no-determinism",
@@ -60,7 +67,7 @@ if (-not $AggregateOnly) {
         $end = [Math]::Min($offset + $Parallelism - 1, $tasks.Count - 1)
         $running = @()
         foreach ($task in @($tasks[$offset..$end])) {
-            Remove-Item -LiteralPath $task.Output, $task.Stdout, $task.Stderr -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $task.Output, $task.Stdout, $task.Stderr, $task.GodotLog -Force -ErrorAction SilentlyContinue
             $process = Start-Process -FilePath $GodotPath -ArgumentList $task.Arguments `
                 -WindowStyle Hidden -PassThru -RedirectStandardOutput $task.Stdout `
                 -RedirectStandardError $task.Stderr
@@ -93,6 +100,10 @@ $turnFrameCounts = @()
 $forcedTurnCount = 0
 $totalTurns = 0
 $totalMerges = 0
+$totalBlasts = 0
+$blastCountByLevel = @{}
+$totalJackpots = 0
+$totalLevelSevenCreations = 0
 $departures = 0
 $maxTurnEndPairPenetration = 0.0
 $spawnedOrbCounts = @()
@@ -110,6 +121,14 @@ foreach ($task in $tasks) {
     $seedRows += $seedRow
     $totalTurns += [int]$seedRow.completed_turns
     $totalMerges += [int]$seedRow.merge_count
+    $totalBlasts += [int]$seedRow.blast_count
+    $totalJackpots += [int]$seedRow.max_clear_count
+    $totalLevelSevenCreations += [int]$seedRow.level_seven_creation_count
+    foreach ($levelProperty in $seedRow.blast_count_by_level.PSObject.Properties) {
+        $level = $levelProperty.Name
+        if (-not $blastCountByLevel.ContainsKey($level)) { $blastCountByLevel[$level] = 0 }
+        $blastCountByLevel[$level] += [int]$levelProperty.Value
+    }
     $spawnedOrbCounts += [double]$seedRow.spawned_orb_count
     $finalMoveCount += [int]$seedRow.final_move_count
     $finalMoveSuccessCount += [int]$seedRow.final_move_success_count
@@ -157,6 +176,11 @@ $scores = @($seedRows | ForEach-Object { [double]$_.score })
 $gameOverScores = @($completedGames | ForEach-Object { [double]$_.score })
 $gameOverSpawnCounts = @($completedGames | ForEach-Object { [double]$_.game_over_spawn_count })
 $gameOverSpawnedTotals = @($completedGames | ForEach-Object { [double]$_.spawned_orb_count })
+$gameOverHighLevelCounts = @(
+    $completedGames | ForEach-Object {
+        @($_.final_state | Where-Object { [int]$_.level -ge 5 }).Count
+    }
+)
 $shockSummary = [ordered]@{}
 foreach ($level in @($shockTotals.Keys | Sort-Object)) {
     $samples = [int]$shockTotals[$level].samples
@@ -174,6 +198,7 @@ $summary = [ordered]@{
     friction = if ($Friction -gt 0.0) { $Friction } else { $null }
     angular_damp = if ($AngularDamp -ge 0.0) { $AngularDamp } else { $null }
     gravity_turn_diagonal_time = if ($GravityTurnDiagonalTime -ge 0.0) { $GravityTurnDiagonalTime } else { $null }
+    jelly_blast_min_level = if ($JellyBlastMinLevel -ge 0) { $JellyBlastMinLevel } else { $null }
     game_over_count = $completedGames.Count
     average_game_over_turns = if ($gameOverTurns.Count -gt 0) { ($gameOverTurns | Measure-Object -Average).Average } else { 0.0 }
     minimum_game_over_turns = if ($gameOverTurns.Count -gt 0) { ($gameOverTurns | Measure-Object -Minimum).Minimum } else { 0.0 }
@@ -195,6 +220,13 @@ $summary = [ordered]@{
     forced_settle_turns = $forcedTurnCount
     forced_settle_ratio = if ($turnFrameCounts.Count -gt 0) { [double]$forcedTurnCount / $turnFrameCounts.Count } else { 0.0 }
     merges_per_turn = if ($totalTurns -gt 0) { [double]$totalMerges / $totalTurns } else { 0.0 }
+    blast_count = $totalBlasts
+    blast_count_by_level = $blastCountByLevel
+    jackpot_count = $totalJackpots
+    level_seven_creation_count = $totalLevelSevenCreations
+    average_game_over_level_five_plus_count = if ($gameOverHighLevelCounts.Count -gt 0) { ($gameOverHighLevelCounts | Measure-Object -Average).Average } else { 0.0 }
+    minimum_game_over_level_five_plus_count = if ($gameOverHighLevelCounts.Count -gt 0) { ($gameOverHighLevelCounts | Measure-Object -Minimum).Minimum } else { 0.0 }
+    maximum_game_over_level_five_plus_count = if ($gameOverHighLevelCounts.Count -gt 0) { ($gameOverHighLevelCounts | Measure-Object -Maximum).Maximum } else { 0.0 }
     max_turn_end_pair_penetration_px = $maxTurnEndPairPenetration
     departures = $departures
     average_peak_active_orbs = ($peakActiveOrbs | Measure-Object -Average).Average

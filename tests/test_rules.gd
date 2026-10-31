@@ -266,13 +266,19 @@ func test_jelly_level_seven_jackpot_and_capped_absorption() -> void:
 	assert_near(float(capped["result_mass"]), 64.0, 0.001, "JELLY mass caps at 64")
 
 
-func test_jelly_blast_default_threshold_and_absorption_precedence() -> void:
+func test_jelly_blast_default_l6_threshold_and_absorption_precedence() -> void:
 	var cfg: GameConfig = GameConfig.new()
 	cfg.game_mode = GameConfig.GameMode.JELLY
 	cfg.blast_enabled = true
 	cfg.opposite_pairs = [Vector2i(0, 1)]
-	var default_result: Dictionary = ReactionRules.classify(0, 6, 1, 6, cfg, 32.0, 32.0)
-	assert_eq(default_result["type"], ReactionRules.Type.BLAST, "default J5 blasts L6")
+	var level_five_default: Dictionary = ReactionRules.classify(0, 5, 1, 5, cfg, 16.0, 16.0)
+	var level_six_default: Dictionary = ReactionRules.classify(0, 6, 1, 6, cfg, 32.0, 32.0)
+	var level_seven_default: Dictionary = ReactionRules.classify(0, 7, 1, 7, cfg, 64.0, 64.0)
+	var level_seven_jackpot: Dictionary = ReactionRules.classify(0, 7, 0, 7, cfg, 64.0, 64.0)
+	assert_eq(level_five_default["type"], ReactionRules.Type.NONE, "default J6 leaves different-color L5")
+	assert_eq(level_six_default["type"], ReactionRules.Type.BLAST, "default J6 blasts different-color L6")
+	assert_eq(level_seven_default["type"], ReactionRules.Type.BLAST, "default J6 blasts different-color L7")
+	assert_eq(level_seven_jackpot["type"], ReactionRules.Type.MAX_CLEAR, "same-color L7 keeps jackpot precedence")
 	cfg.jelly_blast_min_level = 0
 	var disabled_result: Dictionary = ReactionRules.classify(0, 6, 1, 6, cfg, 32.0, 32.0)
 	assert_eq(disabled_result["type"], ReactionRules.Type.NONE, "explicit J0 disables BLAST")

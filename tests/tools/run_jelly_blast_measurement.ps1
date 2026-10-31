@@ -14,7 +14,7 @@ $ErrorActionPreference = "Stop"
 $repoPath = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $outputDirectory = Join-Path $repoPath "artifacts\measurements"
 $summaryPath = Join-Path $outputDirectory "jelly_blast_candidates_measurement.json"
-$candidateLevels = @(4, 5)
+$candidateLevels = @(5, 6, 7)
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {
     if (-not [string]::IsNullOrWhiteSpace($env:GODOT)) {
         $GodotPath = $env:GODOT
@@ -126,6 +126,7 @@ function Get-Summary($Rows) {
     $absorptions = [double](($Rows | Measure-Object -Property one_level_absorption_count -Sum).Sum)
     $decisions = [double](($Rows | Measure-Object -Property preview_decision_turns -Sum).Sum)
     $fatalAvoidance = [double](($Rows | Measure-Object -Property preview_fatal_avoidance_turns -Sum).Sum)
+    $levelSevenCreations = [double](($Rows | Measure-Object -Property level_seven_creation_count -Sum).Sum)
     return [ordered]@{
         games = @($Rows).Count
         turns_median = Get-Median @($Rows | ForEach-Object { $_.completed_turns })
@@ -138,6 +139,7 @@ function Get-Summary($Rows) {
         one_level_absorption_fraction = Get-Ratio $absorptions $merges
         level_seven_game_rate = Get-Ratio @($Rows | Where-Object { $_.reached_level_seven }).Count @($Rows).Count
         jackpots = [int](($Rows | Measure-Object -Property max_clear_count -Sum).Sum)
+        level_seven_creations = [int]$levelSevenCreations
         preview_fatal_avoidance_turns = [int]$fatalAvoidance
         preview_fatal_avoidance_ratio = Get-Ratio $fatalAvoidance $decisions
     }
@@ -176,28 +178,13 @@ function Get-CandidateReport([int]$CandidateLevel) {
     }
 }
 
-$j0 = [ordered]@{
-    blast_min_level = 0
-    strategies = [ordered]@{
-        r = [ordered]@{ games = 20; turns_median = 154.0; score_median = 9073.5; early_merges_per_turn_1_30 = 0.725; blast_count = 0; final_move_occurrences = 21; final_move_successes = 1; final_move_success_rate = 0.047619047619047616; one_level_absorption_fraction = 0.5401443391971132; level_seven_game_rate = 0.0; jackpots = 0; preview_fatal_avoidance_turns = 0; preview_fatal_avoidance_ratio = 0.0 }
-        g = [ordered]@{ games = 20; turns_median = 159.0; score_median = 9595.0; early_merges_per_turn_1_30 = 0.7433333333333333; blast_count = 0; final_move_occurrences = 21; final_move_successes = 1; final_move_success_rate = 0.047619047619047616; one_level_absorption_fraction = 0.5493840050114847; level_seven_game_rate = 0.0; jackpots = 0; preview_fatal_avoidance_turns = 0; preview_fatal_avoidance_ratio = 0.0 }
-        l_merge = [ordered]@{ games = 20; turns_median = 158.5; score_median = 10600.5; early_merges_per_turn_1_30 = 0.7933333333333333; blast_count = 0; final_move_occurrences = 23; final_move_successes = 3; final_move_success_rate = 0.13043478260869565; one_level_absorption_fraction = 0.5510204081632653; level_seven_game_rate = 0.0; jackpots = 0; preview_fatal_avoidance_turns = 50; preview_fatal_avoidance_ratio = 0.015817779183802595 }
-    }
-    skill_length_ratio_l_merge_over_r = 1.0292207792207793
-    skill_score_ratio_l_merge_over_r = 1.1682922797156554
-    same_seed_length_win_rate = 0.9
-    same_seed_score_win_rate = 0.7
-    criteria = [ordered]@{ random_length_150_to_300 = $true; skill_length_ratio_at_least_1_3 = $false; early_merge_above_classic_c2 = $true }
-    source = "Reused #95 J0 aggregate"
-}
-
 $report = [ordered]@{
     generated_at = (Get-Date).ToUniversalTime().ToString("o")
-    conditions = "J4/J5 R/G/L-merge, seeds 1-$SeedCount, $TurnCap turns, fixed 120 fps; J0 reused from #95"
+    conditions = "J5/J6/J7 R/G/L-merge, seeds 1-$SeedCount, $TurnCap turns, fixed 120 fps"
     candidates = [ordered]@{
-        j0 = $j0
-        j4 = $(Get-CandidateReport 4)
         j5 = $(Get-CandidateReport 5)
+        j6 = $(Get-CandidateReport 6)
+        j7 = $(Get-CandidateReport 7)
     }
     comparison = [ordered]@{
         classic_c2 = [ordered]@{ r_turns = 221.0; r_score = 124262.5; l_turns = 327.0; l_score = 338539.5; skill_length_ratio = 1.479638009; early_merge_rate = 0.595 }
