@@ -99,6 +99,8 @@ func _draw() -> void:
 	var border_color: Color = current_border_color()
 	draw_rect(board_rect, border_color, false, BORDER_WIDTH, true)
 	for direction: Vector2i in OrbTypes.DIRECTIONS:
+		if _ready_state and not is_direction_selectable(direction):
+			continue
 		var alpha: float = _arrow_alpha
 		var scale_value: float = arrow_scale()
 		var color: Color = arrow_color(direction)
@@ -158,6 +160,14 @@ func _on_swipe_rejected(direction: Vector2i) -> void:
 
 func arrow_color(direction: Vector2i) -> Color:
 	return BLOCKED_COLOR if direction in _blocked_directions else READY_COLOR
+
+
+func is_direction_selectable(direction: Vector2i) -> bool:
+	return (
+		_manager == null
+		or Config.data.allow_same_direction_swipe
+		or direction != _manager.gravity
+	)
 
 
 func is_ready_cue() -> bool:

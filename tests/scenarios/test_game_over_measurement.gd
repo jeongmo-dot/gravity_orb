@@ -53,7 +53,7 @@ func test_game_over_distribution_warning_accuracy_and_density_metrics() -> void:
 		var aborted: bool = false
 		var seed_turn_seconds: Array[float] = []
 		for turn_offset: int in range(MAX_TURNS):
-			var direction: Vector2i = DIRECTION_PATTERN[turn_offset % DIRECTION_PATTERN.size()]
+			var direction: Vector2i = _next_pattern_direction(turn_offset, manager.gravity)
 			var same_direction: bool = direction == manager.gravity
 			var warned: bool = manager.blocked_directions.has(direction)
 			if warned:
@@ -770,6 +770,15 @@ func _cause_summary(events: Array[Dictionary]) -> Array[Dictionary]:
 
 func _increment(counts: Dictionary, key: String) -> void:
 	counts[key] = int(counts.get(key, 0)) + 1
+
+
+func _next_pattern_direction(turn_offset: int, current_gravity: Vector2i) -> Vector2i:
+	for pattern_step: int in range(DIRECTION_PATTERN.size()):
+		var pattern_index: int = (turn_offset + pattern_step) % DIRECTION_PATTERN.size()
+		var direction: Vector2i = DIRECTION_PATTERN[pattern_index]
+		if direction != current_gravity:
+			return direction
+	return Vector2i.ZERO
 
 
 func _average(values: Array[float]) -> float:

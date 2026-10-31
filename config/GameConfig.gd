@@ -46,7 +46,7 @@ enum GameMode {
 @export var stable_angular_speed: float = 1.0
 @export var stable_duration: float = 0.33
 @export var max_settle_time: float = 3.0
-@export var allow_same_direction_swipe: bool = true
+@export var allow_same_direction_swipe: bool = false
 @export var spawn_level_weights: PackedFloat32Array = PackedFloat32Array([0.9, 0.1])
 @export var spawn_color_weights: PackedFloat32Array = PackedFloat32Array(
 	[1.0, 1.0, 1.0, 1.0, 1.0, 1.0]

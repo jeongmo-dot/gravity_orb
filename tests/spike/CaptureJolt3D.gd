@@ -14,7 +14,7 @@ const DIRECTION_PATTERN: Array[Vector2i] = [
 	Vector2i.RIGHT,
 ]
 const WAIT_TIMEOUT_SECONDS: float = 3.5
-const DOWN_AFTER_CAPTURE_DELAY: float = 0.35
+const FIRST_TURN_CAPTURE_DELAY: float = 0.35
 
 var _failed: bool = false
 var _max_capture_turn: int = CAPTURE_TURNS[-1]
@@ -38,17 +38,17 @@ func _capture_sequence() -> void:
 		return
 
 	for turn_number: int in range(1, _max_capture_turn + 1):
-		var direction: Vector2i = DIRECTION_PATTERN[(turn_number - 1) % DIRECTION_PATTERN.size()]
+		var direction: Vector2i = _next_pattern_direction(turn_number - 1, manager.gravity)
 		if turn_number == 1:
 			await get_tree().process_frame
 			await RenderingServer.frame_post_draw
-			_capture("jolt3d_seed101_down_before.png")
+			_capture("jolt3d_seed101_right_before.png")
 		manager.on_swipe(direction)
 		if turn_number == 1:
-			await get_tree().create_timer(DOWN_AFTER_CAPTURE_DELAY).timeout
+			await get_tree().create_timer(FIRST_TURN_CAPTURE_DELAY).timeout
 			await get_tree().process_frame
 			await RenderingServer.frame_post_draw
-			_capture("jolt3d_seed101_down_after.png")
+			_capture("jolt3d_seed101_right_after.png")
 		if turn_number == 60:
 			await get_tree().create_timer(0.08).timeout
 			await get_tree().process_frame
@@ -94,6 +94,15 @@ func _capture(file_name: String) -> void:
 		push_error("Could not save capture %s: %s" % [path, error_string(error)])
 		return
 	print("JOLT3D_CAPTURE %s %dx%d" % [path, image.get_width(), image.get_height()])
+
+
+func _next_pattern_direction(turn_offset: int, current_gravity: Vector2i) -> Vector2i:
+	for pattern_step: int in range(DIRECTION_PATTERN.size()):
+		var pattern_index: int = (turn_offset + pattern_step) % DIRECTION_PATTERN.size()
+		var direction: Vector2i = DIRECTION_PATTERN[pattern_index]
+		if direction != current_gravity:
+			return direction
+	return Vector2i.ZERO
 
 
 func _apply_arguments() -> void:

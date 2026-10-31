@@ -38,6 +38,56 @@
 
 ## 미확인
 
+### [2026-10-31] 대상 #124 — 같은 방향으로는 밀 수 없게
+- 상태: 완료 — `origin/main` `c0033f0`에서 `allow_same_direction_swipe` 기본값을 `false`로 바꾸고, 입력 대기 중 현재 중력 방향 안내를 숨겼다. 같은 방향 입력은 기존 `TurnManager` 판정대로 상태·턴·중력·생성·잠금·신호를 바꾸지 않으며, 다른 세 방향과 네 방향 막힘 계산은 유지한다
+- 브랜치 / PR: `codex/block-same-direction-swipe` / PR 생성 후 갱신
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/ui/TurnInputIndicator.gd`, `tests/{test_config.gd,test_jelly_regression.gd,test_turn_input_indicator.gd}`, `tests/scenarios/{test_game_over.gd,test_game_over_measurement.gd,test_jolt_integration.gd,test_merge_scenario.gd,test_spawn_flow.gd,test_turn_manager.gd,test_turn_time.gd}`, `tests/spike/{CaptureJolt3D.gd,Profile2DBaseline.gd,capture_screens.gd,run_jelly_ring_space_measurement.gd,run_jolt_3d_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `allow_same_direction_swipe=false`; 현재 중력과 같은 입력은 턴·중력·공 수·미리보기·신호가 그대로이고 입력 잠금도 걸리지 않음 — 자동 (`test_t6_disallowed_same_direction_swipe_is_ignored_without_lock`)
+  - [x] 첫 턴 DOWN과 FINAL MOVE의 현재 방향은 막히고, 다른 세 방향은 각각 턴을 시작함 — 자동 (`test_t11_default_accepts_each_other_direction_from_initial_down`, `test_t12_same_direction_is_ignored_while_final_move_is_pending`, `test_jelly_final_move_failure_spawns_nothing_and_preserves_preview`)
+  - [x] 입력 대기 중 현재 중력 방향의 화살표·막힘 표시를 숨기고 다른 세 방향만 표시. 막힘 계산은 네 방향 그대로 — 자동 (`test_turn_input_cues_rejection_release_policy_and_ready_tick`) + 두 비율 캡처 직접 관측
+  - [x] 자동 순서가 현재 중력과 같으면 다음 패턴 방향을 고르고, R·G·L-merge 전략은 현재 방향을 후보에서 제외 — 자동 플레이 실측: 20시드 순서 봇 및 세 전략 5턴 표본 모두 같은 방향 입력 `0회`
+  - [x] #123과 같은 시드 `101~120`, 400턴 상한으로 판 길이·점수·합체·생성·FINAL MOVE·안정·침투·이탈·최대 활성 공 비교 — 자동, 아래 표
+  - [x] 시드 `1085050`이 JELLY 사건 7종을 각각 1회 지나며 새 기준 해시가 렌더링 켬/끔에서 동일 — 자동
+  - [x] 마지막 전체 캡처 `540×960`·`540×1170` 각 70장 생성, 입력 대기 장면 직접 확인 — 자동 캡처 + 직접 관측
+  - [x] 일반·장기·성능 테스트, import, 소스/내보낸 Debug 스모크, Debug 빌드 통과. Release 빌드는 미실행
+- 20시드 자동 플레이 비교 (`Godot 4.8-dev3 Standard`, Jolt, 120Hz, 시드 `101~120`, 400턴 상한):
+
+  | 항목 | #123 같은 방향 허용 | #124 같은 방향 차단 |
+  |---|---:|---:|
+  | 게임오버 | `20/20` | `20/20` |
+  | 게임오버 턴 평균 / 최소 / 최대 | `111.100 / 99 / 124` | `112.750 / 102 / 129` |
+  | 게임오버 점수 평균 / 최소 / 최대 | `374,038.10 / 121,571 / 784,590` | `414,217.30 / 123,276 / 961,645` |
+  | 턴당 합체 | `4.8537` | `4.9007` |
+  | 게임오버 턴 생성 수 평균 / 최소 / 최대 | `11.550 / 10 / 13` | `11.700 / 11 / 13` |
+  | 전체 생성 합계 / 판당 평균 | `13,357 / 667.85` | `13,732 / 686.60` |
+  | FINAL MOVE 횟수 / 성공 | `22 / 2` (`9.091%`) | `22 / 2` (`9.091%`) |
+  | 1.5초 강제 안정 | `2,144/2,222` (`96.490%`) | `2,194/2,255` (`97.295%`) |
+  | 최대 턴 끝 쌍 관통 | `20.419px` | `31.581px` |
+  | 판 밖 이탈 | `0` | `0` |
+  | 시드별 최대 활성 공 평균 / 전체 최대 | `109.95 / 130` | `114.20 / 128` |
+
+  - #124는 #123보다 게임오버가 평균 `1.65턴` 늦고 점수 평균이 `40,179.20` 높았다. 턴당 합체는 `0.0469` 늘고 판당 생성은 `18.75개` 늘었다. 수치 조정은 하지 않았다
+  - 순서 봇 20시드의 `same_direction_input_count` 합계는 `0`; R·G·L-merge 각 시드 1, 5턴 표본도 각각 `0`이었다
+- 해시: JELLY 시드 `1085050`, SHA-256 `935908ce0fed6a141611ad2621d13bbc4a7d75252a43568301c0261be9c9a3cc`, 렌더링 켬/끔 동일. 흡수 레벨 유지·상승, 대폭발, L7→L6 흡수, MAX CLEAR, FINAL MOVE 성공·실패가 각각 1회
+- 최종 캡처 관측:
+  - `tests/capture_screens.ps1` → `540×960`, `540×1170` 각 70장, 합계 `140장`, 종료 코드 0, 누락 0건
+  - 두 비율 `31_turn_input_ready`: 현재 중력 RIGHT의 화살표·막힘 표시는 없고 UP·LEFT와 막힌 DOWN(X)만 보인다. 보드·HUD·방향 안내 잘림 없음
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard (`C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`)
+  - `godot --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` 최종 → 일반 `298/298`, 장기 `5/5`, 성능 `5/5`, 합계 `308/308`, 종료 코드 0, `76.749초`; 이탈·발산 0
+  - 소스 기본·`--mode=blitz` 및 내보낸 Debug 기본·BLITZ `--quit-after 300` → 네 실행 모두 종료 코드 0, 오류 표식 0건
+  - `tools/build_windows.ps1 -Debug` → 종료 코드 0, `version=0.16.0`, Debug exe `104,963,696`바이트. Release 미실행
+  - 규칙 검색 → `Input`/`InputEvent`는 `InputRouter.gd`와 허용된 `Haptics.gd`만, 난수 호출은 기존 전용 RNG 경로만. `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. 새 JELLY 게임의 첫 입력 대기 화면에서 아래로 스와이프한다 → 턴·중력·NEXT/THEN·공 수가 그대로이고 입력이 잠기거나 소리·연출이 새로 나오지 않아야 한다.
+  2. 오른쪽으로 한 턴을 끝낸 뒤 오른쪽으로 다시 스와이프한다 → 같은 항목이 그대로이고, 위·아래·왼쪽 중 하나를 입력하면 그때만 다음 턴이 시작돼야 한다.
+  3. FINAL MOVE 배너가 나온 상태에서 현재 중력과 같은 방향을 입력한다 → 마지막 기회를 소비하지 않고 기다리며, 다른 방향을 입력할 때만 진행해야 한다.
+  4. `31_turn_input_ready.png` 두 비율을 연다 → 현재 RIGHT 안내는 없고 다른 세 방향만 보이며, DOWN의 막힘 X와 나머지 화살표가 잘리지 않아야 한다.
+- 결정 사항: 순서 봇은 예정 인덱스부터 패턴을 앞으로 훑어 첫 번째 다른 방향을 사용한다. 전략 미리보기는 처음부터 선택 가능한 세 방향만 생성·평가한다. 입력 정책과 무관한 기존 Jolt 장기 물리 기준 두 시나리오는 과거 궤적을 비교하도록 `allow_same_direction_swipe=true`를 테스트 내부에서만 명시하고 복구한다
+- 남은 것 · 질문: 최대 턴 끝 쌍 관통이 `20.419 → 31.581px`, 1.5초 강제 안정이 `96.490% → 97.295%`로 관측됐다. 명세대로 물리·밸런스 값은 바꾸지 않았으며 최종 판정을 요청한다
+
 ### [2026-10-31] 대상 #123 — 공 늘어나는 간격 5턴 → 10턴
 - 상태: 완료 — 최신 `origin/main` `27810ea`에서 `spawn_count_ramp_turns`만 `5 → 10`으로 바꾸고, 턴 경계·진행 해시·두 자리 미리보기 캡처를 새 간격에 맞췄다. 시작 배치·색 해금·레벨 비율·규칙·점수·물리는 바꾸지 않았다
 - 브랜치 / PR: `codex/spawn-ramp-ten-turns` / https://github.com/jeongmo-dot/gravity_orb/pull/122

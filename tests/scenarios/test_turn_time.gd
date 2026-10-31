@@ -120,7 +120,7 @@ func _measure_current_config() -> Dictionary:
 		var saturated_at: int = -1
 		var completed_turns: int = 0
 		for turn_offset: int in range(turns_per_seed):
-			var direction: Vector2i = DIRECTION_PATTERN[turn_offset % DIRECTION_PATTERN.size()]
+			var direction: Vector2i = _next_pattern_direction(turn_offset, manager.gravity)
 			manager.on_swipe(direction)
 			var turn_metrics: Dictionary = await _wait_for_state_with_metrics(
 				manager,
@@ -640,6 +640,15 @@ func _spawn_case_name() -> String:
 		if argument.begins_with("--spawn-case="):
 			return argument.trim_prefix("--spawn-case=").to_upper()
 	return ""
+
+
+func _next_pattern_direction(turn_offset: int, current_gravity: Vector2i) -> Vector2i:
+	for pattern_step: int in range(DIRECTION_PATTERN.size()):
+		var pattern_index: int = (turn_offset + pattern_step) % DIRECTION_PATTERN.size()
+		var direction: Vector2i = DIRECTION_PATTERN[pattern_index]
+		if direction != current_gravity:
+			return direction
+	return Vector2i.ZERO
 
 
 func _active_color_count() -> int:

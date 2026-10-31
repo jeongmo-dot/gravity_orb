@@ -476,6 +476,7 @@ func _capture_recovered_hud_scenes(
 ) -> void:
 	board.clear()
 	board.set_gravity(Vector2i.RIGHT)
+	manager.gravity = Vector2i.RIGHT
 	board.play_visual_tilt(Vector2i.RIGHT)
 	_spawn_featured(board)
 	await get_tree().create_timer(0.12).timeout
@@ -496,6 +497,12 @@ func _capture_recovered_hud_scenes(
 	await get_tree().create_timer(TurnInputIndicator.READY_FADE_DURATION + 0.02).timeout
 	await _capture("30_board_blocked.png")
 	await _capture("31_turn_input_ready.png")
+	var indicator: TurnInputIndicator = main.get_node(
+		"UI/Hud/TurnInputIndicator"
+	) as TurnInputIndicator
+	if indicator.is_direction_selectable(Vector2i.RIGHT):
+		_fail("current RIGHT gravity arrow is still selectable in the ready capture")
+	print("SCREEN_CAPTURE_CHECK scene=input_ready current=RIGHT visible=UP,DOWN,LEFT hidden=RIGHT")
 
 	manager._set_state(TurnManager.State.SIMULATING)
 	manager.settle_elapsed = 0.5

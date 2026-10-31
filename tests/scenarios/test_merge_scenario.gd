@@ -602,6 +602,8 @@ func test_turn_manager_finishes_turn_after_merge() -> void:
 		Vector2(80.0, 0.0),
 		Vector2(-400.0, 0.0)
 	)
+	manager.gravity = Vector2i.UP
+	board.set_gravity(Vector2i.UP)
 	manager.on_swipe(Vector2i.DOWN)
 	await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
 
@@ -642,6 +644,8 @@ func test_waiting_input_flush_continues_previous_turn_combo() -> void:
 		Vector2(80.0, 0.0),
 		Vector2(-400.0, 0.0)
 	)
+	manager.gravity = Vector2i.UP
+	board.set_gravity(Vector2i.UP)
 	manager.on_swipe(Vector2i.DOWN)
 	await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
 

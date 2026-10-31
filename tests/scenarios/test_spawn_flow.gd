@@ -16,11 +16,11 @@ const CONTINUOUS_PENETRATION_LIMIT: float = 14.0
 const DIVERGENCE_SPEED: float = 5000.0
 const DIVERGENCE_MARGIN: float = 100.0
 const REPRO_DIRECTIONS: Array[Vector2i] = [
+	Vector2i.RIGHT,
+	Vector2i.UP,
 	Vector2i.DOWN,
 	Vector2i.LEFT,
-	Vector2i.UP,
 	Vector2i.RIGHT,
-	Vector2i.DOWN,
 ]
 
 var _states: Array[TurnManager.State] = []
@@ -408,10 +408,10 @@ func test_seed_4242_completes_twenty_turns_without_departures() -> void:
 	var board: Board = fixture["board"] as Board
 	var manager: TurnManager = fixture["manager"] as TurnManager
 	var directions: Array[Vector2i] = [
-		Vector2i.DOWN,
 		Vector2i.RIGHT,
 		Vector2i.UP,
 		Vector2i.LEFT,
+		Vector2i.DOWN,
 	]
 	var total_departures: int = 0
 	var total_divergences: int = 0

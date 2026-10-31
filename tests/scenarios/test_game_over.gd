@@ -49,6 +49,8 @@ func test_full_spawn_wall_waits_without_falling_then_game_over() -> void:
 	var manager: TurnManager = fixture["manager"] as TurnManager
 	_fill_spawn_wall(board, Vector2i.DOWN, true)
 	_set_next_level_one_batch(spawner, [0.5])
+	manager.gravity = Vector2i.UP
+	board.set_gravity(Vector2i.UP)
 
 	manager.on_swipe(Vector2i.DOWN)
 	await tree.physics_frame
@@ -171,6 +173,8 @@ func test_jelly_final_move_failure_spawns_nothing_and_preserves_preview() -> voi
 	var manager: TurnManager = fixture["manager"] as TurnManager
 	_fill_spawn_wall(board, Vector2i.DOWN, true)
 	_set_next_level_one_batch(spawner, [0.5])
+	manager.gravity = Vector2i.UP
+	board.set_gravity(Vector2i.UP)
 
 	manager.on_swipe(Vector2i.DOWN)
 	await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
@@ -178,6 +182,13 @@ func test_jelly_final_move_failure_spawns_nothing_and_preserves_preview() -> voi
 	assert_eq(manager.final_move_count, 1, "FINAL MOVE occurrence counted")
 	var preview_before: Array = spawner.peek_preview()
 	var orb_count_before: int = board.get_orbs().size()
+	manager.on_swipe(Vector2i.DOWN)
+	assert_true(manager.final_move_pending, "same direction preserves pending FINAL MOVE")
+	assert_true(not manager.final_move_active, "same direction does not activate FINAL MOVE")
+	assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "same direction keeps input waiting")
+	assert_eq(board.get_orbs().size(), orb_count_before, "same FINAL MOVE direction creates no orb")
+	assert_eq(spawner.peek_preview(), preview_before, "same FINAL MOVE direction preserves preview")
+	assert_eq(InputRouter.is_locked(), false, "same FINAL MOVE direction stays unlocked")
 	manager.on_swipe(Vector2i.RIGHT)
 	assert_true(manager.final_move_active, "next swipe activates FINAL MOVE")
 	assert_eq(manager.state, TurnManager.State.SIMULATING, "FINAL MOVE skips SPAWNING")
