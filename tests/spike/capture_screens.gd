@@ -13,8 +13,8 @@ const CAPTURE_FILES: Array[String] = [
 	"03_jelly_result.png",
 	"04_jelly_gameplay.png",
 	"05_jelly_final_move.png",
-	"06_jelly_l5_l6_no_blast.png",
-	"07_jelly_l7_blast.png",
+	"06_jelly_l5_no_blast_l6_face.png",
+	"07_jelly_l6_blast.png",
 	"08_jelly_full_down.png",
 	"09_jelly_full_right.png",
 	"10_jelly_eat_00.png",
@@ -197,26 +197,26 @@ func _capture_gameplay_scenes() -> void:
 	await _capture_recovered_hud_scenes(main, manager, board, hud)
 
 	board.clear()
-	_spawn_no_blast_pairs(board)
-	await _capture("06_jelly_l5_l6_no_blast.png")
+	_spawn_l5_no_blast_and_l6_faces(board)
+	await _capture("06_jelly_l5_no_blast_l6_face.png")
 	board.clear()
-	var first_maximum: Orb3D = board.spawn_orb(
+	var first_blast: Orb3D = board.spawn_orb(
 		OrbTypes.OrbColor.RED,
-		7,
-		Vector2(-140.0, 0.0)
+		6,
+		Vector2(-120.0, 0.0)
 	)
-	var second_maximum: Orb3D = board.spawn_orb(
+	var second_blast: Orb3D = board.spawn_orb(
 		OrbTypes.OrbColor.BLUE,
-		7,
-		Vector2(140.0, 0.0)
+		6,
+		Vector2(120.0, 0.0)
 	)
-	first_maximum.disable_physics()
-	second_maximum.disable_physics()
-	resolver.report_contact(first_maximum, second_maximum, "capture_l7_blast")
+	first_blast.disable_physics()
+	second_blast.disable_physics()
+	resolver.report_contact(first_blast, second_blast, "capture_l6_blast")
 	if resolver.flush() != 1:
-		_fail("different-color L7 pair did not produce one capture reaction")
+		_fail("different-color L6 pair did not produce one capture reaction")
 	await get_tree().create_timer(0.06).timeout
-	await _capture("07_jelly_l7_blast.png")
+	await _capture("07_jelly_l6_blast.png")
 
 	board.clear()
 	board.set_gravity(Vector2i.DOWN)
@@ -291,12 +291,12 @@ func _capture_effect_scenes(main: Main, board: Board3D) -> void:
 	board.clear()
 	director.clear_effects()
 	_spawn_specs(board, [
-		{"color": OrbTypes.OrbColor.RED, "level": 7, "mass": 64.0, "position": Vector2(-140.0, 0.0)},
-		{"color": OrbTypes.OrbColor.BLUE, "level": 7, "mass": 64.0, "position": Vector2(140.0, 0.0)},
+		{"color": OrbTypes.OrbColor.RED, "level": 6, "mass": 32.0, "position": Vector2(-120.0, 0.0)},
+		{"color": OrbTypes.OrbColor.BLUE, "level": 6, "mass": 32.0, "position": Vector2(120.0, 0.0)},
 	])
 	director.play_reaction_visuals({
 		"type": ReactionRules.Type.BLAST,
-		"levels": [7, 7],
+		"levels": [6, 6],
 		"colors": [OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE],
 		"position": Vector2.ZERO,
 	})
@@ -1465,12 +1465,12 @@ func _spawn_featured(board: Board3D) -> void:
 		orb.disable_physics()
 
 
-func _spawn_no_blast_pairs(board: Board3D) -> void:
+func _spawn_l5_no_blast_and_l6_faces(board: Board3D) -> void:
 	_spawn_specs(board, [
 		{"color": OrbTypes.OrbColor.RED, "level": 5, "mass": 16.0, "position": Vector2(-260.0, -150.0)},
 		{"color": OrbTypes.OrbColor.BLUE, "level": 5, "mass": 16.0, "position": Vector2(-60.0, -150.0)},
-		{"color": OrbTypes.OrbColor.GREEN, "level": 6, "mass": 32.0, "position": Vector2(-120.0, 150.0)},
-		{"color": OrbTypes.OrbColor.YELLOW, "level": 6, "mass": 32.0, "position": Vector2(120.0, 150.0)},
+		{"color": OrbTypes.OrbColor.GREEN, "level": 6, "mass": 32.0, "position": Vector2(-180.0, 150.0)},
+		{"color": OrbTypes.OrbColor.YELLOW, "level": 6, "mass": 32.0, "position": Vector2(180.0, 150.0)},
 	])
 
 

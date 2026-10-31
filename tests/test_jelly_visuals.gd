@@ -114,11 +114,11 @@ func test_jelly_max_face_uses_body_radius_while_regular_faces_keep_original_scal
 	Config.data.game_mode = original_mode
 
 
-func test_jelly_default_l7_faces_and_lowered_threshold_mockup_c_without_outline() -> void:
+func test_jelly_default_l6_faces_match_mockup_c_without_outline() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_jelly_minimum: int = Config.data.jelly_blast_min_level
 	Config.data.game_mode = GameConfig.GameMode.JELLY
-	Config.data.jelly_blast_min_level = 7
+	Config.data.jelly_blast_min_level = 6
 	var board: Board3D = await _create_board()
 	var level_four: Orb3D = board.spawn_orb(0, 4, Vector2(-270.0, 0.0))
 	var level_five: Orb3D = board.spawn_orb(3, 5, Vector2(-90.0, 0.0))
@@ -130,36 +130,30 @@ func test_jelly_default_l7_faces_and_lowered_threshold_mockup_c_without_outline(
 	var max_material: ShaderMaterial = level_seven._face.material_override as ShaderMaterial
 
 	assert_true(not bool(regular_material.get_shader_parameter("is_blast_ready")), "L4 keeps normal face")
-	assert_true(not bool(level_five_material.get_shader_parameter("is_blast_ready")), "J7 leaves L5 face normal")
-	assert_true(not bool(level_six_material.get_shader_parameter("is_blast_ready")), "J7 leaves L6 face normal")
+	assert_true(not bool(level_five_material.get_shader_parameter("is_blast_ready")), "J6 leaves L5 face normal")
+	assert_true(bool(level_six_material.get_shader_parameter("is_blast_ready")), "J6 gives L6 the blast-ready face")
 	assert_true(not bool(max_material.get_shader_parameter("is_blast_ready")), "L7 keeps MAX face")
 	assert_true(bool(max_material.get_shader_parameter("is_max")), "L7 remains MAX")
-	assert_true(not level_five.is_blast_armed(), "J7 leaves L5 unarmed")
-	assert_true(not level_six.is_blast_armed(), "J7 leaves L6 unarmed")
-	assert_true(level_seven.is_blast_armed(), "J7 arms only L7")
-	for orb: Orb3D in [level_four, level_five, level_six]:
+	assert_true(not level_five.is_blast_armed(), "J6 leaves L5 unarmed")
+	assert_true(level_six.is_blast_armed(), "J6 arms L6")
+	assert_true(level_seven.is_blast_armed(), "J6 arms L7")
+	for orb: Orb3D in [level_four, level_five]:
 		assert_near(
 			orb._face.scale.x / (orb.get_current_radius() / Orb3D.PIXELS_PER_METER),
 			0.62,
 			0.001,
 			"L%d keeps regular face scale" % orb.level
 		)
-	assert_near(
-		level_seven._face.scale.x / (level_seven.get_current_radius() / Orb3D.PIXELS_PER_METER),
-		1.0,
-		0.001,
-		"L7 MAX face uses full body-radius plate"
-	)
+	for orb: Orb3D in [level_six, level_seven]:
+		assert_near(
+			orb._face.scale.x / (orb.get_current_radius() / Orb3D.PIXELS_PER_METER),
+			1.0,
+			0.001,
+			"L%d special face uses full body-radius plate" % orb.level
+		)
 	for orb: Orb3D in [level_four, level_five, level_six, level_seven]:
 		assert_eq(_forbidden_geometry_count(orb), 0, "JELLY L%d has no outline geometry" % orb.level)
-	await _cleanup(board)
-
-	Config.data.jelly_blast_min_level = 5
-	board = await _create_board()
-	var lowered_threshold: Orb3D = board.spawn_orb(3, 5, Vector2.ZERO)
-	var blast_material: ShaderMaterial = lowered_threshold._face.material_override as ShaderMaterial
-	assert_true(lowered_threshold.is_blast_armed(), "lowered threshold keeps blast face code available")
-	assert_true(bool(blast_material.get_shader_parameter("is_blast_ready")), "lowered threshold uses blast-ready face")
+	var blast_material: ShaderMaterial = level_six_material
 	assert_eq(blast_material.get_shader_parameter("blast_eye_outer_top"), Vector2(0.32, -0.16), "blast eye outer top")
 	assert_eq(blast_material.get_shader_parameter("blast_eye_inner"), Vector2(0.16, -0.04), "blast eye inner corner")
 	assert_eq(blast_material.get_shader_parameter("blast_eye_outer_bottom"), Vector2(0.32, 0.08), "blast eye outer bottom")
@@ -176,7 +170,6 @@ func test_jelly_default_l7_faces_and_lowered_threshold_mockup_c_without_outline(
 		),
 		"blast and MAX blush keep the source pink and use alpha only"
 	)
-	assert_eq(_forbidden_geometry_count(lowered_threshold), 0, "lowered threshold has no outline geometry")
 	await _cleanup(board)
 	Config.data.jelly_blast_min_level = original_jelly_minimum
 	Config.data.game_mode = original_mode

@@ -293,7 +293,7 @@ func test_m9_blast_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	assert_true(config.blast_enabled, "blast enabled")
 	assert_eq(config.blast_min_level, 4, "shared blast minimum level")
-	assert_eq(config.jelly_blast_min_level, 7, "JELLY blast starts at L7 by default")
+	assert_eq(config.jelly_blast_min_level, 6, "JELLY blast starts at L6 by default")
 	assert_eq(
 		config.blast_push_radius_by_level,
 		PackedFloat32Array([0.0, 0.0, 0.0, 0.3, 0.55, 1.0, 1.0]),

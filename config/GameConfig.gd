@@ -109,7 +109,7 @@ enum GameMode {
 @export var chain_reaction_delay: float = 0.2
 @export var blast_enabled: bool = true
 @export var blast_min_level: int = 4
-@export var jelly_blast_min_level: int = 7
+@export var jelly_blast_min_level: int = 6
 @export var blast_push_radius_by_level: PackedFloat32Array = PackedFloat32Array(
 	[0.0, 0.0, 0.0, 0.3, 0.55, 1.0, 1.0]
 )

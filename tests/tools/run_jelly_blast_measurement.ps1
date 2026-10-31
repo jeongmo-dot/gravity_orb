@@ -14,7 +14,7 @@ $ErrorActionPreference = "Stop"
 $repoPath = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $outputDirectory = Join-Path $repoPath "artifacts\measurements"
 $summaryPath = Join-Path $outputDirectory "jelly_blast_candidates_measurement.json"
-$candidateLevels = @(5, 7)
+$candidateLevels = @(5, 6, 7)
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {
     if (-not [string]::IsNullOrWhiteSpace($env:GODOT)) {
         $GodotPath = $env:GODOT
@@ -180,9 +180,10 @@ function Get-CandidateReport([int]$CandidateLevel) {
 
 $report = [ordered]@{
     generated_at = (Get-Date).ToUniversalTime().ToString("o")
-    conditions = "J5/J7 R/G/L-merge, seeds 1-$SeedCount, $TurnCap turns, fixed 120 fps"
+    conditions = "J5/J6/J7 R/G/L-merge, seeds 1-$SeedCount, $TurnCap turns, fixed 120 fps"
     candidates = [ordered]@{
         j5 = $(Get-CandidateReport 5)
+        j6 = $(Get-CandidateReport 6)
         j7 = $(Get-CandidateReport 7)
     }
     comparison = [ordered]@{
