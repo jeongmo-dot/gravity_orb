@@ -247,6 +247,14 @@ func remove_orb(orb: Orb3D) -> void:
 	orb.queue_free()
 
 
+func detach_orb_for_merge_visual(orb: Orb3D) -> void:
+	if not is_instance_valid(orb) or orb.consumed:
+		return
+	orb.consumed = true
+	_orbs.erase(orb)
+	orb.begin_merge_visual()
+
+
 func get_orbs() -> Array[Orb3D]:
 	var active: Array[Orb3D] = []
 	for orb: Orb3D in _orbs:

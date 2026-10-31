@@ -75,6 +75,7 @@ shock_color_radius_factor = PackedFloat32Array(3, 0, 2.5, 3, 3, 2.5)
 green_shake_speed = 150.0
 green_shake_max_speed = 600.0
 chain_reaction_delay = 0.2
+jelly_merge_duration = 0.3
 blast_enabled = true
 blast_min_level = 4
 jelly_blast_min_level = 6

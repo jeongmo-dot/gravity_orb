@@ -2,6 +2,7 @@ extends Node
 
 const OUTPUT_PREFIX: String = "--full-board-performance-output="
 const LABEL_PREFIX: String = "--full-board-performance-label="
+const MERGE_DURATION_PREFIX: String = "--jelly-merge-duration="
 const WINDOW_SIZE: Vector2i = Vector2i(540, 960)
 const WARMUP_SECONDS: float = 0.75
 const SAMPLE_SECONDS: float = 4.0
@@ -84,6 +85,13 @@ func _process(_delta: float) -> void:
 
 
 func _run() -> void:
+	Config.data.jelly_merge_duration = maxf(
+		_argument_value(
+			MERGE_DURATION_PREFIX,
+			str(Config.data.jelly_merge_duration)
+		).to_float(),
+		0.0
+	)
 	DisplayServer.window_set_size(WINDOW_SIZE)
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 	_turn_manager.set_physics_process(false)
@@ -95,6 +103,7 @@ func _run() -> void:
 		"window": [WINDOW_SIZE.x, WINDOW_SIZE.y],
 		"vsync": "disabled",
 		"physics_ticks_per_second": Engine.physics_ticks_per_second,
+		"jelly_merge_duration": Config.data.jelly_merge_duration,
 		"scenarios": [],
 	}
 	await _prepare_full_board(false)

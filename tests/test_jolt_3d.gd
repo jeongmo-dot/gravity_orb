@@ -3,6 +3,7 @@ extends TestCase
 const BOARD_SCENE: PackedScene = preload("res://scenes/Board3D.tscn")
 const RESOLVER_SCRIPT: Script = preload("res://scripts/core/CollisionResolver.gd")
 const SPAWNER_SCRIPT: Script = preload("res://scripts/core/Spawner.gd")
+const TURN_MANAGER_SCRIPT: Script = preload("res://scripts/core/TurnManager.gd")
 
 
 func test_project_uses_jolt_with_3d_main_and_keeps_2d_scene() -> void:
@@ -319,7 +320,9 @@ func test_jolt_reaction_uses_shared_rules_and_spawns_3d_result() -> void:
 
 func test_jelly_same_level_absorption_keeps_radius_and_fills_belly() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_merge_duration: float = Config.data.jelly_merge_duration
 	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_merge_duration = 0.0
 	var fixture_root: Node = Node.new()
 	fixture_root.name = "JellySameLevelAbsorptionFixture"
 	var board: Board3D = BOARD_SCENE.instantiate() as Board3D
@@ -352,11 +355,14 @@ func test_jelly_same_level_absorption_keeps_radius_and_fills_belly() -> void:
 		assert_near(result._jelly_belly_fraction, 0.5, 0.001, "belly fills over 0.15 seconds")
 	await _cleanup(fixture_root)
 	Config.data.game_mode = original_mode
+	Config.data.jelly_merge_duration = original_merge_duration
 
 
 func test_jelly_level_up_absorption_grows_from_old_to_new_level_radius() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_merge_duration: float = Config.data.jelly_merge_duration
 	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_merge_duration = 0.0
 	var fixture_root: Node = Node.new()
 	fixture_root.name = "JellyAbsorptionFixture"
 	var board: Board3D = BOARD_SCENE.instantiate() as Board3D
@@ -436,6 +442,233 @@ func test_jelly_level_up_absorption_grows_from_old_to_new_level_radius() -> void
 		)
 	_cleanup(fixture_root)
 	Config.data.game_mode = original_mode
+	Config.data.jelly_merge_duration = original_merge_duration
+
+
+func test_delayed_jelly_merge_reserves_sources_grows_and_emits_on_completion() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_duration: float = Config.data.jelly_merge_duration
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_merge_duration = 0.3
+	var fixture_root: Node = Node.new()
+	var board: Board3D = BOARD_SCENE.instantiate() as Board3D
+	board.name = "Board"
+	board.unique_name_in_owner = true
+	fixture_root.add_child(board)
+	board.owner = fixture_root
+	var resolver: CollisionResolver = RESOLVER_SCRIPT.new() as CollisionResolver
+	resolver.name = "CollisionResolver"
+	resolver.unique_name_in_owner = true
+	fixture_root.add_child(resolver)
+	resolver.owner = fixture_root
+	tree.root.add_child(fixture_root)
+	await tree.process_frame
+	resolver.proximity_reaction_scan_enabled = false
+	var first: Orb3D = board.spawn_orb(2, 2, Vector2(-35.0, 0.0))
+	var second: Orb3D = board.spawn_orb(2, 2, Vector2(35.0, 0.0))
+	var reactions: Array[Dictionary] = []
+	resolver.reaction_applied.connect(
+		func(reaction: Dictionary) -> void: reactions.append(reaction)
+	)
+	resolver.report_contact(first, second, "delayed_test")
+	assert_eq(resolver.flush(), 0, "touch starts a process without applying the reaction")
+	assert_eq(resolver.active_jelly_merge_count(), 1, "one merge process is active")
+	assert_eq(reactions.size(), 0, "reaction signal waits for completion")
+	assert_true(first.consumed and second.consumed, "both equal-level sources are reserved")
+	assert_eq(first.get_physics_body().collision_layer, 0, "first source collision is disabled")
+	assert_eq(second.get_physics_body().collision_layer, 0, "second source collision is disabled")
+	var active: Array[Orb3D] = board.get_orbs()
+	assert_eq(active.size(), 1, "result exists immediately")
+	var result: Orb3D = active[0]
+	assert_near(result.get_current_radius(), 40.0, 0.001, "result starts at source radius")
+	var merge_tick: float = Config.data.jelly_merge_duration / 36.0
+	for frame_index: int in range(18):
+		assert_eq(resolver.flush(merge_tick), 0, "first-half frame %d emits nothing" % frame_index)
+		result._physics_process(merge_tick)
+		_assert_orb_visual_and_collision_radius(result, "equal merge frame %d" % frame_index)
+	assert_near(result.get_current_radius(), 50.0, 0.001, "smoothstep midpoint is half grown")
+	assert_near(first.merge_visual_scale().x, 0.9, 0.001, "source shrinks and stretches along pull")
+	assert_near(first.merge_visual_scale().y, 0.74, 0.001, "source narrows across pull")
+	var third: Orb3D = board.spawn_orb(2, 3, Vector2(300.0, 0.0))
+	resolver.report_contact(result, third, "reserved_test")
+	assert_eq(resolver.flush(), 0, "reserved result cannot join another reaction")
+	var capped_first: Orb3D = board.spawn_orb(1, 1, Vector2(-300.0, 250.0))
+	var capped_second: Orb3D = board.spawn_orb(1, 1, Vector2(-250.0, 250.0))
+	resolver.set_accepting_new_jelly_merges(false)
+	resolver.report_contact(capped_first, capped_second, "after_cap_test")
+	assert_eq(resolver.flush(), 0, "turn cap rejects a new merge process")
+	assert_eq(resolver.active_jelly_merge_count(), 1, "only the pre-cap process remains")
+	var completion_count: int = 0
+	for frame_index: int in range(18, 36):
+		completion_count += resolver.flush(merge_tick)
+		result._physics_process(merge_tick)
+		_assert_orb_visual_and_collision_radius(result, "equal merge frame %d" % frame_index)
+	assert_eq(completion_count, 1, "completion applies exactly one reaction")
+	assert_eq(reactions.size(), 1, "reaction signal emits once at completion")
+	assert_eq(resolver.active_jelly_merge_count(), 0, "process is removed after completion")
+	assert_near(result.get_current_radius(), 60.0, 0.001, "physical and visual radius finish together")
+	await tree.process_frame
+	assert_true(not is_instance_valid(first), "first pulled visual is removed")
+	assert_true(not is_instance_valid(second), "second pulled visual is removed")
+	resolver.set_accepting_new_jelly_merges(true)
+	assert_eq(resolver.deferred_jelly_merge_count, 1, "one post-cap merge is counted as deferred")
+	board.clear()
+	await tree.process_frame
+	var absorber: Orb3D = board.spawn_orb(3, 3, Vector2(-30.0, 0.0))
+	absorber.set_jelly_mass(6.0, Config.data)
+	var absorbed: Orb3D = board.spawn_orb(3, 2, Vector2(30.0, 0.0))
+	resolver.report_contact(absorber, absorbed, "absorption_growth_test")
+	assert_eq(resolver.flush(), 0, "level-up absorption starts a delayed process")
+	assert_eq(absorbed.get_physics_body().collision_layer, 0, "absorbed source collision is disabled")
+	var absorption_completion_count: int = 0
+	for frame_index: int in range(36):
+		absorption_completion_count += resolver.flush(merge_tick)
+		absorber._physics_process(merge_tick)
+		_assert_orb_visual_and_collision_radius(
+			absorber,
+			"level-up absorption frame %d" % frame_index
+		)
+	assert_eq(absorption_completion_count, 1, "level-up absorption completes once")
+	assert_eq(reactions.size(), 2, "absorption emits once after its process")
+	board.clear()
+	await tree.process_frame
+	var max_first: Orb3D = board.spawn_orb(4, 7, Vector2(-60.0, 0.0))
+	var max_second: Orb3D = board.spawn_orb(4, 7, Vector2(60.0, 0.0))
+	resolver.report_contact(max_first, max_second, "max_clear_completion_test")
+	assert_eq(resolver.flush(), 0, "MAX clear also starts as a process")
+	assert_eq(resolver.active_jelly_merge_count(), 1, "MAX process is active")
+	assert_eq(resolver.flush(Config.data.jelly_merge_duration), 1, "MAX clear completes after its process")
+	assert_eq(reactions.size(), 3, "MAX clear emits its jackpot reaction once")
+	assert_eq(reactions[-1]["type"], ReactionRules.Type.MAX_CLEAR, "completed MAX process is jackpot")
+	await tree.process_frame
+	var restart_first: Orb3D = board.spawn_orb(5, 7, Vector2(-60.0, 0.0))
+	var restart_second: Orb3D = board.spawn_orb(5, 7, Vector2(60.0, 0.0))
+	resolver.report_contact(restart_first, restart_second, "restart_cleanup_test")
+	assert_eq(resolver.flush(), 0, "restart fixture starts another MAX process")
+	assert_eq(resolver.active_jelly_merge_count(), 1, "restart MAX process is active")
+	resolver.cancel_active_jelly_merges()
+	await tree.process_frame
+	assert_eq(resolver.active_jelly_merge_count(), 0, "restart clears active process state")
+	assert_true(not is_instance_valid(restart_first), "restart removes first MAX visual")
+	assert_true(not is_instance_valid(restart_second), "restart removes second MAX visual")
+	assert_eq(reactions.size(), 3, "cancelled process emits no reaction")
+	_cleanup(fixture_root)
+	Config.data.game_mode = original_mode
+	Config.data.jelly_merge_duration = original_duration
+
+
+func test_turn_manager_stable_sweep_waits_for_delayed_merge_completion() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_duration: float = Config.data.jelly_merge_duration
+	var original_stable_duration: float = Config.data.stable_duration
+	var original_max_settle_time: float = Config.data.max_settle_time
+	var original_linear_speed: float = Config.data.stable_linear_speed
+	var original_angular_speed: float = Config.data.stable_angular_speed
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_merge_duration = 0.3
+	Config.data.stable_duration = 0.001
+	Config.data.max_settle_time = 1.5
+	Config.data.stable_linear_speed = 1.0e9
+	Config.data.stable_angular_speed = 1.0e9
+	var fixture: Dictionary = await _create_turn_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	resolver.proximity_reaction_scan_enabled = false
+	manager.set_physics_process(false)
+	board.set_gravity(Vector2i.ZERO)
+	var first: Orb3D = board.spawn_orb(2, 2, Vector2(-39.5, 0.0))
+	var second: Orb3D = board.spawn_orb(2, 2, Vector2(39.5, 0.0))
+	first.linear_velocity = Vector2.ZERO
+	second.linear_velocity = Vector2.ZERO
+	await tree.physics_frame
+	await tree.physics_frame
+	resolver._pending.clear()
+	assert_true(
+		not first.get_colliding_orbs().is_empty(),
+		"stable-path fixture exposes the pair only through the resting sweep"
+	)
+	var order: Array[String] = []
+	resolver.reaction_applied.connect(
+		func(_reaction: Dictionary) -> void: order.append("reaction")
+	)
+	manager.turn_finished.connect(
+		func(_turn: int, _combo: int) -> void: order.append("finished")
+	)
+	manager.state = TurnManager.State.SIMULATING
+	manager._is_initial_settle = false
+	manager._begin_settle()
+	manager.set_physics_process(true)
+	await tree.physics_frame
+	assert_eq(manager.state, TurnManager.State.SIMULATING, "sweep-started merge keeps the turn active")
+	assert_eq(resolver.active_jelly_merge_count(), 1, "resting sweep starts one delayed process")
+	for _frame: int in range(120):
+		if manager.state == TurnManager.State.WAITING_INPUT:
+			break
+		await tree.physics_frame
+	assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "stable path ends after merge completion")
+	assert_eq(order, ["reaction", "finished"], "completion signal precedes settled turn")
+	Config.data.game_mode = original_mode
+	Config.data.jelly_merge_duration = original_duration
+	Config.data.stable_duration = original_stable_duration
+	Config.data.max_settle_time = original_max_settle_time
+	Config.data.stable_linear_speed = original_linear_speed
+	Config.data.stable_angular_speed = original_angular_speed
+	await _cleanup(fixture["root"] as Node)
+
+
+func test_turn_manager_cap_finishes_active_merge_without_starting_a_new_one() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_duration: float = Config.data.jelly_merge_duration
+	var original_stable_duration: float = Config.data.stable_duration
+	var original_max_settle_time: float = Config.data.max_settle_time
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_merge_duration = 0.3
+	Config.data.stable_duration = 10.0
+	Config.data.max_settle_time = 0.05
+	var fixture: Dictionary = await _create_turn_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	resolver.proximity_reaction_scan_enabled = false
+	manager.set_physics_process(false)
+	var first: Orb3D = board.spawn_orb(2, 2, Vector2(-35.0, 0.0))
+	var second: Orb3D = board.spawn_orb(2, 2, Vector2(35.0, 0.0))
+	var order: Array[String] = []
+	resolver.reaction_applied.connect(
+		func(_reaction: Dictionary) -> void: order.append("reaction")
+	)
+	manager.turn_finished.connect(
+		func(_turn: int, _combo: int) -> void: order.append("finished")
+	)
+	manager.state = TurnManager.State.SIMULATING
+	manager._is_initial_settle = false
+	manager._begin_settle()
+	resolver.report_contact(first, second, "cap_active")
+	assert_eq(resolver.flush(), 0, "pre-cap merge starts")
+	manager.set_physics_process(true)
+	for _frame: int in range(30):
+		if not resolver._accepting_new_jelly_merges:
+			break
+		await tree.physics_frame
+	assert_true(not resolver._accepting_new_jelly_merges, "settle cap stops new delayed merges")
+	var deferred_first: Orb3D = board.spawn_orb(1, 1, Vector2(-325.0, 250.0))
+	var deferred_second: Orb3D = board.spawn_orb(1, 1, Vector2(-275.0, 250.0))
+	resolver.report_contact(deferred_first, deferred_second, "after_cap")
+	for _frame: int in range(120):
+		if manager.state == TurnManager.State.WAITING_INPUT:
+			break
+		await tree.physics_frame
+	assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "cap path waits for the active process")
+	assert_eq(order, ["reaction", "finished"], "cap path completes reaction before turn end")
+	assert_true(is_instance_valid(deferred_first), "post-cap first source is not consumed")
+	assert_true(is_instance_valid(deferred_second), "post-cap second source is not consumed")
+	assert_eq(resolver.active_jelly_merge_count(), 0, "no post-cap process starts")
+	Config.data.game_mode = original_mode
+	Config.data.jelly_merge_duration = original_duration
+	Config.data.stable_duration = original_stable_duration
+	Config.data.max_settle_time = original_max_settle_time
+	await _cleanup(fixture["root"] as Node)
 
 
 func test_spawner_3d_reuses_spawner_rng_sequence() -> void:
@@ -458,6 +691,54 @@ func _create_board() -> Board3D:
 	tree.root.add_child(board)
 	await tree.process_frame
 	return board
+
+
+func _create_turn_fixture() -> Dictionary:
+	var root: Node3D = Node3D.new()
+	var board: Board3D = BOARD_SCENE.instantiate() as Board3D
+	board.name = "Board"
+	board.unique_name_in_owner = true
+	root.add_child(board)
+	board.owner = root
+	var resolver: CollisionResolver = RESOLVER_SCRIPT.new() as CollisionResolver
+	resolver.name = "CollisionResolver"
+	resolver.unique_name_in_owner = true
+	root.add_child(resolver)
+	resolver.owner = root
+	var spawner: Spawner = SPAWNER_SCRIPT.new() as Spawner
+	spawner.name = "Spawner"
+	spawner.unique_name_in_owner = true
+	root.add_child(spawner)
+	spawner.owner = root
+	var manager: TurnManager = TURN_MANAGER_SCRIPT.new() as TurnManager
+	manager.name = "TurnManager"
+	root.add_child(manager)
+	manager.owner = root
+	tree.root.add_child(root)
+	await tree.process_frame
+	return {
+		"root": root,
+		"board": board,
+		"resolver": resolver,
+		"spawner": spawner,
+		"manager": manager,
+	}
+
+
+func _assert_orb_visual_and_collision_radius(orb: Orb3D, context: String) -> void:
+	var radius: float = orb.get_current_radius()
+	assert_near(
+		orb.shape_resource().radius * Orb3D.PIXELS_PER_METER,
+		radius,
+		0.001,
+		"%s collision radius" % context
+	)
+	assert_near(
+		orb.mesh_resource().radius * Orb3D.PIXELS_PER_METER,
+		radius,
+		0.001,
+		"%s visual radius" % context
+	)
 
 
 func _cleanup(node: Node) -> void:

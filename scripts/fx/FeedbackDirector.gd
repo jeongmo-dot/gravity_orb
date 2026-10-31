@@ -402,8 +402,6 @@ func _play_merge_feedback(reaction: Dictionary) -> void:
 			"JellyMergeStardust",
 			"stardust"
 		)
-		if bool(reaction.get("jelly_absorption", false)):
-			_create_jelly_absorption_trails(reaction, origin)
 		if result_level >= Config.data.orb_max_level:
 			_create_jelly_max_feedback(origin, color_value, result_radius_m)
 	elif result_level <= 5:
@@ -481,54 +479,6 @@ func _create_jelly_max_feedback(
 		radius_m * 0.72,
 		"JellyMaxCloudPulse"
 	)
-
-
-func _create_jelly_absorption_trails(reaction: Dictionary, target: Vector2) -> void:
-	var positions: Array = reaction.get("source_positions", []) as Array
-	var radii: Array = reaction.get("source_radii", []) as Array
-	var colors: Array = reaction.get("colors", []) as Array
-	var levels: Array = reaction.get("levels", []) as Array
-	for index: int in range(mini(positions.size(), radii.size())):
-		var start: Vector2 = positions[index] as Vector2
-		if start.distance_squared_to(target) < 1.0:
-			continue
-		var color_index: int = int(colors[index]) if index < colors.size() else 0
-		var source_level: int = int(levels[index]) if index < levels.size() else 1
-		_create_jelly_absorption_trail(
-			start,
-			target,
-			float(radii[index]) / Orb3D.PIXELS_PER_METER,
-			_display_color(color_index, source_level)
-		)
-
-
-func _create_jelly_absorption_trail(
-	start: Vector2,
-	target: Vector2,
-	radius_m: float,
-	color_value: Color
-) -> void:
-	var glow: MeshInstance3D = _acquire_blast_effect("glow") as MeshInstance3D
-	glow.name = "JellyAbsorptionTrail"
-	glow.position = Orb3D.plane_position_to_world(start, -0.22)
-	glow.scale = Vector3.ONE * radius_m
-	var material: ShaderMaterial = glow.material_override as ShaderMaterial
-	material.set_shader_parameter("inner_color", color_value.lightened(0.34))
-	material.set_shader_parameter("outer_color", color_value)
-	material.set_shader_parameter("effect_alpha", 0.82)
-	material.set_shader_parameter("noise_seed", float(_effects.size() % 11) * 0.37)
-	_effects.append({
-		"node": glow,
-		"kind": "glow",
-		"elapsed": 0.0,
-		"duration": 0.24,
-		"delay": 0.0,
-		"start_scale": radius_m,
-		"end_scale": radius_m * 0.36,
-		"material": material,
-		"motion_start": start,
-		"motion_target": target,
-	})
 
 
 func _play_color_effect_visual(

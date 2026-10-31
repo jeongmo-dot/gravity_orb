@@ -16,6 +16,12 @@ const FORWARD_CELL_OFFSETS: Array[Vector2i] = [
 
 var _pending: Array[Array] = []
 var _reaction_locks: Dictionary = {}
+var _active_jelly_merges: Array[Dictionary] = []
+var _merge_reserved: Dictionary = {}
+var _accepting_new_jelly_merges: bool = true
+var max_concurrent_jelly_merges: int = 0
+var deferred_jelly_merge_count: int = 0
+var _deferred_jelly_merge_pairs: Dictionary = {}
 var _spawner: Spawner = null
 var proximity_reaction_scan_enabled: bool = true
 var latency_measurement_enabled: bool = false
@@ -53,11 +59,11 @@ func flush(delta: float = 0.0) -> int:
 	if latency_measurement_enabled:
 		_scan_geometric_contacts(false, true)
 	_advance_reaction_locks(delta)
+	var applied: int = _advance_active_jelly_merges(delta)
 	_queue_released_reaction_contacts()
 	var pending: Array[Array] = _pending
 	_pending = []
 	pending.sort_custom(_pair_less)
-	var applied: int = 0
 	var visited_pairs: Dictionary = {}
 	var occupied_area: float = _board_occupied_area()
 	for pair: Array in pending:
@@ -114,6 +120,40 @@ func flush(delta: float = 0.0) -> int:
 			reaction_position = position_a
 		elif absorber == 2:
 			reaction_position = position_b
+
+		if (
+			Config.data.game_mode == GameConfig.GameMode.JELLY
+			and Config.data.jelly_merge_duration > 0.0
+			and _board.has_method("detach_orb_for_merge_visual")
+			and reaction_type in [ReactionRules.Type.MERGE, ReactionRules.Type.MAX_CLEAR]
+		):
+			if not _accepting_new_jelly_merges:
+				_deferred_jelly_merge_pairs[pair_key] = true
+				continue
+			_start_delayed_jelly_merge(
+				a,
+				b,
+				classified,
+				contact_path,
+				chain,
+				levels,
+				colors,
+				stable_spawn_ids,
+				position_a,
+				position_b,
+				source_radii,
+				velocity_a,
+				velocity_b,
+				reaction_position,
+				result_level,
+				result_color,
+				result_mass,
+				jelly_absorption,
+				absorber,
+				occupancy
+			)
+			occupied_area = _board_occupied_area()
+			continue
 
 		_board.remove_orb(a)
 		_board.remove_orb(b)
@@ -231,6 +271,224 @@ func flush(delta: float = 0.0) -> int:
 	return applied
 
 
+func set_accepting_new_jelly_merges(accepting: bool) -> void:
+	if accepting and not _accepting_new_jelly_merges:
+		deferred_jelly_merge_count += _deferred_jelly_merge_pairs.size()
+		_deferred_jelly_merge_pairs.clear()
+	elif not accepting and _accepting_new_jelly_merges:
+		_deferred_jelly_merge_pairs.clear()
+	_accepting_new_jelly_merges = accepting
+
+
+func active_jelly_merge_count() -> int:
+	return _active_jelly_merges.size()
+
+
+func cancel_active_jelly_merges() -> void:
+	for entry: Dictionary in _active_jelly_merges:
+		var reaction: Dictionary = entry.get("reaction", {}) as Dictionary
+		var result_orb: Variant = reaction.get("result_orb")
+		if is_instance_valid(result_orb):
+			result_orb.finish_radius_growth()
+		for source_value: Variant in entry.get("visual_sources", []) as Array:
+			var source_entry: Dictionary = source_value as Dictionary
+			var source: Variant = source_entry.get("orb")
+			if is_instance_valid(source):
+				source.queue_free()
+	_active_jelly_merges.clear()
+	_merge_reserved.clear()
+	_pending.clear()
+	_reaction_locks.clear()
+	_accepting_new_jelly_merges = true
+	max_concurrent_jelly_merges = 0
+	deferred_jelly_merge_count = 0
+	_deferred_jelly_merge_pairs.clear()
+
+
+func _start_delayed_jelly_merge(
+	a: Variant,
+	b: Variant,
+	classified: Dictionary,
+	contact_path: String,
+	chain: int,
+	levels: Array[int],
+	colors: Array[int],
+	stable_spawn_ids: Array[int],
+	position_a: Vector2,
+	position_b: Vector2,
+	source_radii: Array[float],
+	velocity_a: Vector2,
+	velocity_b: Vector2,
+	reaction_position: Vector2,
+	result_level: int,
+	result_color: int,
+	result_mass: float,
+	jelly_absorption: bool,
+	absorber: int,
+	occupancy: float
+) -> void:
+	var reaction_type: ReactionRules.Type = classified["type"] as ReactionRules.Type
+	var duration: float = maxf(Config.data.jelly_merge_duration, 0.0)
+	var result_orb: Variant = null
+	var visual_sources: Array[Dictionary] = []
+	if reaction_type == ReactionRules.Type.MAX_CLEAR:
+		_board.detach_orb_for_merge_visual(a)
+		_board.detach_orb_for_merge_visual(b)
+		visual_sources = [
+			{"orb": a, "start": position_a},
+			{"orb": b, "start": position_b},
+		]
+	else:
+		if jelly_absorption:
+			var absorber_orb: Variant = a if absorber == 1 else b
+			var absorbed_orb: Variant = b if absorber == 1 else a
+			var absorbed_position: Vector2 = position_b if absorber == 1 else position_a
+			var start_radius: float = source_radii[absorber - 1]
+			_board.detach_orb_for_merge_visual(absorbed_orb)
+			visual_sources = [{"orb": absorbed_orb, "start": absorbed_position}]
+			result_orb = absorber_orb
+			result_orb.generation = chain
+			result_orb.set_jelly_mass(
+				result_mass,
+				Config.data,
+				start_radius,
+				duration,
+				true
+			)
+		else:
+			_board.detach_orb_for_merge_visual(a)
+			_board.detach_orb_for_merge_visual(b)
+			visual_sources = [
+				{"orb": a, "start": position_a},
+				{"orb": b, "start": position_b},
+			]
+			var result_radius: float = Config.data.jelly_radius_for_mass(result_mass)
+			reaction_position = _clamp_inside(reaction_position, result_radius)
+			result_orb = _board.spawn_orb(
+				result_color,
+				result_level,
+				reaction_position,
+				(velocity_a + velocity_b) * 0.5,
+				chain
+			)
+			result_orb.set_jelly_mass(
+				result_mass,
+				Config.data,
+				Config.data.radius_for_level(levels[0]),
+				duration,
+				true
+			)
+		if result_orb != null:
+			result_orb.note_diagnostic_event("merge_result")
+			if _board.should_ghost_reaction_results():
+				result_orb.enter_ghost_state(Config.data.ghost_alpha)
+			_merge_reserved[result_orb.get_instance_id()] = result_orb
+			_lock_reaction_result(result_orb)
+	var shock_level: int = (
+		Config.data.orb_max_level
+		if reaction_type == ReactionRules.Type.MAX_CLEAR
+		else result_level
+	)
+	var reaction: Dictionary = {
+		"type": reaction_type,
+		"chain": chain,
+		"occupancy": occupancy,
+		"levels": levels,
+		"colors": colors,
+		"stable_spawn_ids": stable_spawn_ids,
+		"position": reaction_position,
+		"source_positions": [position_a, position_b],
+		"source_radii": source_radii,
+		"result_level": result_level,
+		"result_color": result_color,
+		"result_orb": result_orb,
+		"result_mass": result_mass,
+		"jelly_absorption": jelly_absorption,
+		"absorbed_level": int(classified.get("absorbed_level", 0)),
+		"absorber": absorber,
+		"shock_level": shock_level,
+		"shock_targets": [],
+		"blast_targets": [],
+		"contact_path": contact_path,
+	}
+	_record_measured_reaction(a, b, contact_path)
+	_active_jelly_merges.append({
+		"elapsed": 0.0,
+		"duration": duration,
+		"reaction": reaction,
+		"visual_sources": visual_sources,
+		"fixed_target": reaction_position,
+	})
+	max_concurrent_jelly_merges = maxi(
+		max_concurrent_jelly_merges,
+		_active_jelly_merges.size()
+	)
+	_update_active_jelly_merge_visual(_active_jelly_merges[-1], 0.0)
+
+
+func _advance_active_jelly_merges(delta: float) -> int:
+	if _active_jelly_merges.is_empty():
+		return 0
+	var completed: int = 0
+	var remaining_entries: Array[Dictionary] = []
+	for entry: Dictionary in _active_jelly_merges:
+		var duration: float = maxf(float(entry["duration"]), 0.000001)
+		entry["elapsed"] = minf(float(entry["elapsed"]) + maxf(delta, 0.0), duration)
+		var progress: float = float(entry["elapsed"]) / duration
+		_update_active_jelly_merge_visual(entry, progress)
+		if progress < 1.0:
+			remaining_entries.append(entry)
+			continue
+		_complete_active_jelly_merge(entry)
+		completed += 1
+	_active_jelly_merges = remaining_entries
+	return completed
+
+
+func _update_active_jelly_merge_visual(entry: Dictionary, progress: float) -> void:
+	var reaction: Dictionary = entry["reaction"] as Dictionary
+	var result_orb: Variant = reaction.get("result_orb")
+	var target: Vector2 = entry["fixed_target"] as Vector2
+	if is_instance_valid(result_orb):
+		target = result_orb.position
+	var eased: float = progress * progress
+	for source_value: Variant in entry["visual_sources"] as Array:
+		var source_entry: Dictionary = source_value as Dictionary
+		var source: Variant = source_entry.get("orb")
+		if not is_instance_valid(source):
+			continue
+		var start: Vector2 = source_entry["start"] as Vector2
+		var direction: Vector2 = target - start
+		source.update_merge_visual(start.lerp(target, eased), direction, progress)
+
+
+func _complete_active_jelly_merge(entry: Dictionary) -> void:
+	var reaction: Dictionary = entry["reaction"] as Dictionary
+	var result_orb: Variant = reaction.get("result_orb")
+	if is_instance_valid(result_orb):
+		result_orb.finish_radius_growth()
+		_merge_reserved.erase(result_orb.get_instance_id())
+		reaction["position"] = result_orb.position
+	for source_value: Variant in entry["visual_sources"] as Array:
+		var source_entry: Dictionary = source_value as Dictionary
+		var source: Variant = source_entry.get("orb")
+		if is_instance_valid(source):
+			source.queue_free()
+	var shock_targets: Array[Dictionary] = _board.apply_shockwave(
+		reaction["position"] as Vector2,
+		int(reaction["shock_level"]),
+		result_orb,
+		reaction["type"] == ReactionRules.Type.MAX_CLEAR,
+		int(reaction["result_color"]),
+		Callable(_spawner, "next_shake_direction") if _spawner != null else Callable()
+	)
+	reaction["shock_targets"] = shock_targets
+	reaction["reaction_applied_usec"] = Time.get_ticks_usec()
+	reaction["reaction_physics_frame"] = Engine.get_physics_frames()
+	reaction["reaction_process_frame"] = Engine.get_process_frames()
+	reaction_applied.emit(reaction)
+
+
 func configure_latency_measurement(enabled: bool) -> void:
 	latency_measurement_enabled = enabled
 	_measurement_tick = 0
@@ -255,6 +513,8 @@ func measure_proximity_scan_usec() -> int:
 
 
 func has_pending_reactions() -> bool:
+	if not _active_jelly_merges.is_empty():
+		return true
 	if _reaction_locks.is_empty():
 		return false
 	var active_orbs: Array = _board.get_orbs()
@@ -366,6 +626,8 @@ func _is_reaction_locked(orb: Variant) -> bool:
 	if not is_instance_valid(orb):
 		return false
 	var lock_id: int = orb.get_instance_id()
+	if _merge_reserved.has(lock_id):
+		return true
 	if not _reaction_locks.has(lock_id):
 		return false
 	var entry: Dictionary = _reaction_locks[lock_id] as Dictionary
@@ -387,7 +649,7 @@ func _advance_reaction_locks(delta: float) -> void:
 		var lock_id: int = int(lock_id_value)
 		var entry: Dictionary = _reaction_locks[lock_id] as Dictionary
 		var orb: Variant = entry.get("orb")
-		if not _is_valid_reaction_orb(orb):
+		if not _is_existing_reaction_orb(orb):
 			_reaction_locks.erase(lock_id)
 			continue
 		var remaining: float = float(entry["remaining"]) - delta
@@ -404,8 +666,10 @@ func _queue_released_reaction_contacts() -> void:
 		var lock_id: int = int(lock_id_value)
 		var entry: Dictionary = _reaction_locks[lock_id] as Dictionary
 		var orb: Variant = entry.get("orb")
-		if not _is_valid_reaction_orb(orb):
+		if not _is_existing_reaction_orb(orb):
 			released_ids.append(lock_id)
+			continue
+		if _merge_reserved.has(lock_id):
 			continue
 		if float(entry.get("remaining", 0.0)) > 0.0:
 			continue
@@ -460,6 +724,14 @@ func _orb_contact_radius(orb: Variant) -> float:
 
 
 func _is_valid_reaction_orb(orb: Variant) -> bool:
+	return (
+		is_instance_valid(orb)
+		and not orb.consumed
+		and not _merge_reserved.has(orb.get_instance_id())
+	)
+
+
+func _is_existing_reaction_orb(orb: Variant) -> bool:
 	return is_instance_valid(orb) and not orb.consumed
 
 
