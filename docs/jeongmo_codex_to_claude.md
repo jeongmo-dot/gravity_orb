@@ -40,7 +40,7 @@
 
 ### [2026-10-31] 대상 #120 — 대폭발은 L7끼리만
 - 상태: 완료 — 최신 `origin/main` `960f4e9`에서 새 브랜치를 만들어 JELLY 대폭발 기본 임계값만 `5 → 7`로 바꿨다. 다른 색 L5·L6은 반응하지 않고, 다른 색 L7은 대폭발, 같은 색 L7은 기존 잭팟을 유지한다. 규칙·흡수·잭팟·범위·속도·점수·물리·생성·색 해금·CLASSIC 값은 바꾸지 않았다
-- 브랜치 / PR: `codex/jelly-blast-l7-main` / 생성 예정
+- 브랜치 / PR: `codex/jelly-blast-l7-main` / https://github.com/jeongmo-dot/gravity_orb/pull/124
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `tests/{test_config.gd,test_rules.gd,test_jelly_regression.gd,test_jelly_visuals.gd,test_jolt_3d.gd,capture_screens.ps1,run_jelly_physics_autoplay.ps1}`, `tests/spike/{capture_screens.gd,run_jolt_3d_measurement.gd}`, `tests/tools/run_jelly_blast_measurement.ps1`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] JELLY 기본 `jelly_blast_min_level=7`; 다른 색 L5+L5·L6+L6 `NONE`, 다른 색 L7+L7 `BLAST`, 같은 색 L7+L7 `MAX_CLEAR` — 자동 (`test_m9_blast_defaults`, `test_jelly_blast_default_l7_threshold_and_absorption_precedence`)
