@@ -40,7 +40,7 @@
 
 ### [2026-10-31] 대상 #122 — 미리보기를 판과 같은 크기로
 - 상태: 완료 — 최신 `origin/main` `24baadc`에서 NEXT·THEN 젤리의 배율을 판 투영 너비 ÷ `board_size`로 고정했다. 개수와 무관하게 판 위 같은 레벨과 같은 화면 크기이며, THEN은 크기만 NEXT와 같고 기존 알파 0.5는 유지한다
-- 브랜치 / PR: `codex/preview-board-size` / PR 생성 예정
+- 브랜치 / PR: `codex/preview-board-size` / https://github.com/jeongmo-dot/gravity_orb/pull/121
 - 변경 파일: `scenes/UI.tscn`, `scripts/ui/Hud.gd`, `tests/{test_screen_layout.gd,capture_screens.ps1}`, `tests/scenarios/test_score_flow.gd`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] NEXT·THEN의 L1·L2 몸통이 판 위 같은 레벨과 같은 화면 지름 — 자동 픽셀 측정 + 두 비율 직접 관측, 차이 `0.000%`
