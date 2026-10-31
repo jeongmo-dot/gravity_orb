@@ -78,6 +78,7 @@ const CAPTURE_FILES: Array[String] = [
 	"68_jelly_preview_next_2.png",
 	"69_jelly_preview_next_5.png",
 	"70_jelly_preview_then_l2_5.png",
+	"71_jelly_turn_hud_three_digit.png",
 ]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
@@ -142,6 +143,11 @@ func _capture_shell_scenes() -> void:
 	await _capture("01_jelly_start.png")
 	(main.get_node("UI") as DebugHud).show_ranking(GameConfig.GameMode.JELLY, 1)
 	await get_tree().create_timer(0.25).timeout
+	var ranking: RankingPanel = main.get_node("UI/RankingPanel") as RankingPanel
+	if (ranking.get_node("Panel/Content/RankingHeader/Columns/Turns") as Label).text != "턴":
+		_fail("JELLY ranking capture does not show the turn header")
+	if (ranking.get_node("Panel/Content/Rows/RankingRow1/Text/Columns/Turns") as Label).text != "84":
+		_fail("JELLY ranking capture does not show stored turns")
 	await _capture("02_jelly_ranking.png")
 	await _destroy_main(main)
 
@@ -248,7 +254,24 @@ func _capture_gameplay_scenes() -> void:
 	await _capture_overlay_detail_scenes(main, board)
 	await _capture_deform_scenes(main, board)
 	await _capture_recovered_jelly_scenes(main, manager, board, hud)
+	await _capture_turn_hud_scene(main, manager, hud)
 	await _destroy_main(main)
+
+
+func _capture_turn_hud_scene(main: Main, manager: TurnManager, hud: Hud) -> void:
+	var score: ScoreManager = main.get_node("ScoreManager") as ScoreManager
+	manager._set_state(TurnManager.State.SIMULATING)
+	manager.turn_index = 124
+	manager._set_state(TurnManager.State.WAITING_INPUT)
+	score.score = 1234567
+	score.best_score = 9876543
+	score.score_changed.emit(score.score, score.best_score)
+	await get_tree().create_timer(Hud.SCORE_ROLL_DURATION + 0.05).timeout
+	if hud._turn_label.text != "125":
+		_fail("three-digit TURN capture does not show 125")
+	if hud._score_label.text != "1234567":
+		_fail("seven-digit SCORE capture does not show 1234567")
+	await _capture("71_jelly_turn_hud_three_digit.png")
 
 
 func _capture_effect_scenes(main: Main, board: Board3D) -> void:
@@ -516,6 +539,8 @@ func _capture_recovered_hud_scenes(
 	manager._set_state(TurnManager.State.WAITING_INPUT)
 	InputRouter.set_locked(false)
 	await get_tree().create_timer(TurnInputIndicator.READY_FADE_DURATION + 0.02).timeout
+	if hud.get_node_or_null("BlockedPanel") != null or hud.get_node_or_null("BlockedLabel") != null:
+		_fail("blocked text panel still exists in the warning capture")
 	await _capture("30_board_blocked.png")
 	await _capture("31_turn_input_ready.png")
 	var indicator: TurnInputIndicator = main.get_node(

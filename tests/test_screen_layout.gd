@@ -27,6 +27,25 @@ func test_jelly_hud_layout_stays_in_safe_area_at_both_ratios() -> void:
 			assert_true(safe.encloses(layout[key] as Rect2), "%s fits safe area" % key)
 
 
+func test_turn_panel_fills_sound_to_score_gap_without_moving_existing_hud() -> void:
+	for viewport_size: Vector2 in [Vector2(1080.0, 1920.0), Vector2(1080.0, 2340.0)]:
+		var layout: Dictionary = Hud.hud_layout(
+			viewport_size,
+			Rect2(Vector2.ZERO, viewport_size)
+		)
+		var sound: Rect2 = layout["sound"] as Rect2
+		var score: Rect2 = layout["score_panel"] as Rect2
+		var turn_panel: Rect2 = layout["turn_panel"] as Rect2
+		assert_near(turn_panel.position.x, sound.end.x + 12.0, 0.001, "turn starts after sound")
+		assert_near(turn_panel.end.x, score.position.x - 12.0, 0.001, "turn ends before score")
+		assert_near(turn_panel.position.y, score.position.y, 0.001, "turn shares top row")
+		assert_near(turn_panel.size.y, score.size.y, 0.001, "turn shares top-row height")
+		assert_true(turn_panel.encloses(layout["turn_title"] as Rect2), "TURN title fits panel")
+		assert_true(turn_panel.encloses(layout["turn"] as Rect2), "turn number fits panel")
+		assert_eq((layout["score_panel"] as Rect2), Rect2(300.0, 24.0, 480.0, 150.0), "score unchanged")
+		assert_eq((layout["best_panel"] as Rect2), Rect2(820.0, 24.0, 236.0, 150.0), "best unchanged")
+
+
 func test_preview_orbs_match_board_scale_for_one_two_and_five_items() -> void:
 	var main: Main = MAIN_SCENE.instantiate() as Main
 	main.launch_immediately(GameConfig.GameMode.JELLY)
@@ -110,6 +129,12 @@ func test_scene_has_only_jelly_frontend_controls() -> void:
 	assert_true(start.get_node_or_null("Content/ClassicButton") == null, "CLASSIC action absent")
 	var ranking: RankingPanel = main.get_node("UI/RankingPanel") as RankingPanel
 	assert_true(ranking.get_node_or_null("Panel/Content/Tabs") == null, "ranking tabs absent")
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	assert_true(hud.get_node_or_null("TurnPanel") != null, "TURN panel exists")
+	assert_true(hud.get_node_or_null("TurnTitleLabel") != null, "TURN title exists")
+	assert_true(hud.get_node_or_null("TurnLabel") != null, "TURN value exists")
+	assert_true(hud.get_node_or_null("BlockedPanel") == null, "blocked text panel removed")
+	assert_true(hud.get_node_or_null("BlockedLabel") == null, "blocked text label removed")
 	main.queue_free()
 	await tree.process_frame
 	InputRouter.set_locked(false)
