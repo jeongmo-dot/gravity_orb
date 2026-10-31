@@ -59,6 +59,7 @@ func flush(delta: float = 0.0) -> int:
 	pending.sort_custom(_pair_less)
 	var applied: int = 0
 	var visited_pairs: Dictionary = {}
+	var occupied_area: float = _board_occupied_area()
 	for pair: Array in pending:
 		var a: Variant = pair[0]
 		var b: Variant = pair[1]
@@ -68,7 +69,9 @@ func flush(delta: float = 0.0) -> int:
 			continue
 		if _is_reaction_locked(a) or _is_reaction_locked(b):
 			continue
-		var pair_key: String = "%d:%d" % [a.stable_spawn_id, b.stable_spawn_id]
+		var pair_key: int = (
+			(int(a.stable_spawn_id) << 32) | int(b.stable_spawn_id)
+		)
 		if visited_pairs.has(pair_key):
 			continue
 		visited_pairs[pair_key] = true
@@ -101,7 +104,9 @@ func flush(delta: float = 0.0) -> int:
 		var result_color: int = int(classified["result_color"])
 		var survivor: int = int(classified["survivor"])
 		var result_orb: Variant = null
-		var occupancy: float = _board_occupancy()
+		var occupancy: float = occupied_area / (
+			Config.data.board_size * Config.data.board_size
+		)
 		var result_mass: float = float(classified.get("result_mass", 0.0))
 		var jelly_absorption: bool = bool(classified.get("jelly_absorption", false))
 		var absorber: int = int(classified.get("absorber", 0))
@@ -112,6 +117,10 @@ func flush(delta: float = 0.0) -> int:
 
 		_board.remove_orb(a)
 		_board.remove_orb(b)
+		occupied_area -= PI * (
+			source_radii[0] * source_radii[0]
+			+ source_radii[1] * source_radii[1]
+		)
 		if reaction_type == ReactionRules.Type.MERGE:
 			var result_radius: float = (
 				Config.data.jelly_radius_for_mass(result_mass)
@@ -161,6 +170,8 @@ func flush(delta: float = 0.0) -> int:
 				result_orb.enter_ghost_state(Config.data.ghost_alpha)
 
 		if result_orb != null:
+			var current_result_radius: float = _orb_contact_radius(result_orb)
+			occupied_area += PI * current_result_radius * current_result_radius
 			_lock_reaction_result(result_orb)
 
 		var shock_level: int = (
@@ -244,13 +255,109 @@ func measure_proximity_scan_usec() -> int:
 
 
 func has_pending_reactions() -> bool:
+	if _reaction_locks.is_empty():
+		return false
+	var active_orbs: Array = _board.get_orbs()
+	if Config.data.game_mode == GameConfig.GameMode.JELLY:
+		return _has_pending_jelly_reactions(active_orbs)
 	for lock_id_value: Variant in _reaction_locks.keys():
 		var lock_id: int = int(lock_id_value)
 		var entry: Dictionary = _reaction_locks[lock_id] as Dictionary
 		var orb: Variant = entry.get("orb")
 		if not _is_valid_reaction_orb(orb):
 			continue
-		if not _current_reaction_partners(orb).is_empty():
+		if _has_current_reaction_partner(orb, active_orbs):
+			return true
+	return false
+
+
+func _has_pending_jelly_reactions(active_orbs: Array) -> bool:
+	var level_stride: int = Config.data.orb_max_level + 1
+	var groups: Array = []
+	groups.resize(Config.data.color_display.size() * level_stride)
+	for candidate: Variant in active_orbs:
+		if not _is_valid_reaction_orb(candidate):
+			continue
+		if candidate.is_ghost or candidate.is_waiting_at_entrance:
+			continue
+		var group_index: int = int(candidate.color) * level_stride + int(candidate.level)
+		if groups[group_index] == null:
+			groups[group_index] = []
+		(groups[group_index] as Array).append(candidate)
+	for lock_id_value: Variant in _reaction_locks.keys():
+		var lock_id: int = int(lock_id_value)
+		var entry: Dictionary = _reaction_locks[lock_id] as Dictionary
+		var orb: Variant = entry.get("orb")
+		if not _is_valid_reaction_orb(orb) or orb.is_waiting_at_entrance:
+			continue
+		var orb_radius: float = _orb_contact_radius(orb)
+		for candidate_level: int in range(
+			maxi(int(orb.level) - 1, 1),
+			mini(int(orb.level) + 1, Config.data.orb_max_level) + 1
+		):
+			var same_color_index: int = int(orb.color) * level_stride + candidate_level
+			if _group_has_touching_partner(
+				orb,
+				orb_radius,
+				groups[same_color_index]
+			):
+				return true
+		if not Config.data.blast_enabled_for_level(int(orb.level)):
+			continue
+		for color: int in range(Config.data.color_display.size()):
+			if color == int(orb.color):
+				continue
+			var blast_index: int = color * level_stride + int(orb.level)
+			if _group_has_touching_partner(
+				orb,
+				orb_radius,
+				groups[blast_index]
+			):
+				return true
+	return false
+
+
+func _group_has_touching_partner(
+	orb: Variant,
+	orb_radius: float,
+	group_value: Variant
+) -> bool:
+	if group_value == null:
+		return false
+	for candidate: Variant in group_value as Array:
+		if candidate == orb:
+			continue
+		var contact_distance: float = (
+			orb_radius
+			+ _orb_contact_radius(candidate)
+			+ Config.data.ghost_exit_overlap
+		)
+		if orb.position.distance_squared_to(candidate.position) <= (
+			contact_distance * contact_distance
+		):
+			return true
+	return false
+
+
+func _has_current_reaction_partner(orb: Variant, active_orbs: Array) -> bool:
+	if not _is_valid_reaction_orb(orb) or orb.is_waiting_at_entrance:
+		return false
+	var orb_radius: float = _orb_contact_radius(orb)
+	for candidate: Variant in active_orbs:
+		if candidate == orb or not _is_valid_reaction_orb(candidate):
+			continue
+		if candidate.is_ghost or candidate.is_waiting_at_entrance:
+			continue
+		var contact_distance: float = (
+			orb_radius
+			+ _orb_contact_radius(candidate)
+			+ Config.data.ghost_exit_overlap
+		)
+		if orb.position.distance_squared_to(candidate.position) > (
+			contact_distance * contact_distance
+		):
+			continue
+		if _pair_can_react(orb, candidate):
 			return true
 	return false
 
@@ -289,7 +396,10 @@ func _advance_reaction_locks(delta: float) -> void:
 
 
 func _queue_released_reaction_contacts() -> void:
+	if _reaction_locks.is_empty():
+		return
 	var released_ids: Array[int] = []
+	var active_orbs: Array = _board.get_orbs()
 	for lock_id_value: Variant in _reaction_locks.keys():
 		var lock_id: int = int(lock_id_value)
 		var entry: Dictionary = _reaction_locks[lock_id] as Dictionary
@@ -299,21 +409,21 @@ func _queue_released_reaction_contacts() -> void:
 			continue
 		if float(entry.get("remaining", 0.0)) > 0.0:
 			continue
-		for partner: Variant in _current_reaction_partners(orb):
+		for partner: Variant in _current_reaction_partners(orb, active_orbs):
 			report_contact(orb, partner, "lock_release")
 		released_ids.append(lock_id)
 	for lock_id: int in released_ids:
 		_reaction_locks.erase(lock_id)
 
 
-func _current_reaction_partners(orb: Variant) -> Array:
+func _current_reaction_partners(orb: Variant, active_orbs: Array) -> Array:
 	var partners: Array = []
 	if not _is_valid_reaction_orb(orb):
 		return partners
 	if orb.is_waiting_at_entrance:
 		return partners
 	var orb_radius: float = _orb_contact_radius(orb)
-	for candidate: Variant in _board.get_orbs():
+	for candidate: Variant in active_orbs:
 		if candidate == orb or not _is_valid_reaction_orb(candidate):
 			continue
 		if candidate.is_ghost or candidate.is_waiting_at_entrance:
@@ -323,7 +433,9 @@ func _current_reaction_partners(orb: Variant) -> Array:
 			+ _orb_contact_radius(candidate)
 			+ Config.data.ghost_exit_overlap
 		)
-		if orb.position.distance_to(candidate.position) > contact_distance:
+		if orb.position.distance_squared_to(candidate.position) > (
+			contact_distance * contact_distance
+		):
 			continue
 		if not _pair_can_react(orb, candidate):
 			continue
@@ -332,16 +444,13 @@ func _current_reaction_partners(orb: Variant) -> Array:
 
 
 func _pair_can_react(a: Variant, b: Variant) -> bool:
-	var classified: Dictionary = ReactionRules.classify(
+	return ReactionRules.can_react(
 		a.color,
 		a.level,
 		b.color,
 		b.level,
-		Config.data,
-		float(a.get("jelly_mass")),
-		float(b.get("jelly_mass"))
+		Config.data
 	)
-	return int(classified["type"]) != ReactionRules.Type.NONE
 
 
 func _orb_contact_radius(orb: Variant) -> float:
@@ -354,7 +463,7 @@ func _is_valid_reaction_orb(orb: Variant) -> bool:
 	return is_instance_valid(orb) and not orb.consumed
 
 
-func _board_occupancy() -> float:
+func _board_occupied_area() -> float:
 	var occupied_area: float = 0.0
 	for orb: Variant in _board.get_orbs():
 		var radius: float = (
@@ -363,7 +472,7 @@ func _board_occupancy() -> float:
 			else Config.data.radius_for_level(orb.level)
 		)
 		occupied_area += PI * radius * radius
-	return occupied_area / (Config.data.board_size * Config.data.board_size)
+	return occupied_area
 
 
 func _pair_less(first: Array, second: Array) -> bool:
@@ -400,58 +509,80 @@ func _scan_geometric_contacts(queue_reactions: bool, measure_contacts: bool) -> 
 			continue
 		orbs.append(orb)
 	orbs.sort_custom(_orb_less)
-	var max_radius: float = Config.data.radius_for_level(Config.data.orb_max_level)
-	var cell_size: float = max_radius * 2.0 + GEOMETRIC_CONTACT_TOLERANCE
-	var buckets: Dictionary = {}
+	var positions: PackedVector2Array = PackedVector2Array()
+	var radii: PackedFloat32Array = PackedFloat32Array()
+	var colors: PackedInt32Array = PackedInt32Array()
+	var levels: PackedInt32Array = PackedInt32Array()
+	var stable_ids: PackedInt64Array = PackedInt64Array()
+	var max_radius: float = 0.0
 	for orb: Variant in orbs:
+		var radius: float = _orb_contact_radius(orb)
+		positions.append(orb.position)
+		radii.append(radius)
+		colors.append(int(orb.color))
+		levels.append(int(orb.level))
+		stable_ids.append(int(orb.stable_spawn_id))
+		max_radius = maxf(max_radius, radius)
+	var cell_size: float = maxf(
+		max_radius * 2.0 + GEOMETRIC_CONTACT_TOLERANCE,
+		GEOMETRIC_CONTACT_TOLERANCE
+	)
+	var buckets: Dictionary = {}
+	var cells: Array[Vector2i] = []
+	for orb_index: int in range(orbs.size()):
 		var cell: Vector2i = Vector2i(
-			floori(orb.position.x / cell_size),
-			floori(orb.position.y / cell_size)
+			floori(positions[orb_index].x / cell_size),
+			floori(positions[orb_index].y / cell_size)
 		)
-		var cell_key: String = "%d:%d" % [cell.x, cell.y]
+		cells.append(cell)
+		var cell_key: Vector2i = cell
 		if not buckets.has(cell_key):
 			buckets[cell_key] = []
 		var bucket: Array = buckets[cell_key] as Array
-		bucket.append(orb)
+		bucket.append(orb_index)
 	var contact_counts: Dictionary = {}
 	var current_contacts: Dictionary = {}
 	if measure_contacts:
-		for orb: Variant in orbs:
-			contact_counts[orb.stable_spawn_id] = 0
-	for orb: Variant in orbs:
-		var cell: Vector2i = Vector2i(
-			floori(orb.position.x / cell_size),
-			floori(orb.position.y / cell_size)
-		)
-		for offset_y: int in range(-1, 2):
-			for offset_x: int in range(-1, 2):
-				var neighbor_key: String = "%d:%d" % [
-					cell.x + offset_x,
-					cell.y + offset_y,
-				]
+		for stable_id: int in stable_ids:
+			contact_counts[stable_id] = 0
+	for orb_index: int in range(orbs.size()):
+		var cell: Vector2i = cells[orb_index]
+		for offset: Vector2i in FORWARD_CELL_OFFSETS:
+				var neighbor_key: Vector2i = cell + offset
 				if not buckets.has(neighbor_key):
 					continue
-				for candidate: Variant in buckets[neighbor_key] as Array:
-					if candidate.stable_spawn_id <= orb.stable_spawn_id:
+				for candidate_index_value: Variant in buckets[neighbor_key] as Array:
+					var candidate_index: int = int(candidate_index_value)
+					if offset == Vector2i.ZERO and (
+						stable_ids[candidate_index] <= stable_ids[orb_index]
+					):
 						continue
 					var contact_distance: float = (
-						_orb_contact_radius(orb)
-						+ _orb_contact_radius(candidate)
+						radii[orb_index]
+						+ radii[candidate_index]
 						+ GEOMETRIC_CONTACT_TOLERANCE
 					)
-					if orb.position.distance_squared_to(candidate.position) > (
+					if positions[orb_index].distance_squared_to(positions[candidate_index]) > (
 						contact_distance * contact_distance
 					):
 						continue
 					if measure_contacts:
-						contact_counts[orb.stable_spawn_id] = (
-							int(contact_counts[orb.stable_spawn_id]) + 1
+						contact_counts[stable_ids[orb_index]] = (
+							int(contact_counts[stable_ids[orb_index]]) + 1
 						)
-						contact_counts[candidate.stable_spawn_id] = (
-							int(contact_counts[candidate.stable_spawn_id]) + 1
+						contact_counts[stable_ids[candidate_index]] = (
+							int(contact_counts[stable_ids[candidate_index]]) + 1
 						)
-					if not _pair_can_react(orb, candidate):
+					if not ReactionRules.can_react(
+						colors[orb_index],
+						levels[orb_index],
+						colors[candidate_index],
+						levels[candidate_index],
+						Config.data
+					):
 						continue
+					var orb: Variant = orbs[orb_index]
+					var candidate: Variant = orbs[candidate_index]
 					if queue_reactions:
 						report_contact(orb, candidate, "proximity")
 					if measure_contacts:

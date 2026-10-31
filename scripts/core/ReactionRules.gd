@@ -43,6 +43,39 @@ static func classify(
 	return _result(Type.NONE, 0, color_a)
 
 
+static func can_react(
+	color_a: int,
+	level_a: int,
+	color_b: int,
+	level_b: int,
+	cfg: GameConfig
+) -> bool:
+	if cfg.game_mode == GameConfig.GameMode.JELLY:
+		return (
+			(color_a == color_b and absi(level_a - level_b) <= 1)
+			or (
+				color_a != color_b
+				and level_a == level_b
+				and cfg.blast_enabled_for_level(level_a)
+			)
+		)
+	if color_a == color_b and level_a == level_b:
+		return true
+	if cfg.is_opposite(color_a, color_b):
+		match cfg.annihilation_rule:
+			GameConfig.AnnihilationRule.A_BOTH:
+				return true
+			GameConfig.AnnihilationRule.B_SAME_LEVEL:
+				return level_a == level_b
+			GameConfig.AnnihilationRule.C_REMAINDER:
+				return true
+	return (
+		cfg.blast_enabled
+		and level_a == level_b
+		and level_a >= cfg.active_blast_min_level()
+	)
+
+
 static func _classify_jelly(
 	color_a: int,
 	level_a: int,

@@ -419,38 +419,66 @@ func find_free_spawn_slot(
 	placed: Array[Dictionary],
 	preferred_position: Vector2 = Vector2.ZERO
 ) -> Dictionary:
+	var occupancy: Dictionary = _normal_spawn_occupancy()
+	var occupied_positions: PackedVector2Array = occupancy["positions"] as PackedVector2Array
+	var occupied_radii: PackedFloat32Array = occupancy["radii"] as PackedFloat32Array
+	for item: Dictionary in placed:
+		occupied_positions.append(item["position"] as Vector2)
+		occupied_radii.append(float(item["radius"]))
+	return _find_free_spawn_slot_in_occupancy(
+		gravity,
+		radius,
+		occupied_positions,
+		occupied_radii,
+		preferred_position
+	)
+
+
+func _find_free_spawn_slot_in_occupancy(
+	gravity: Vector2i,
+	radius: float,
+	occupied_positions: PackedVector2Array,
+	occupied_radii: PackedFloat32Array,
+	preferred_position: Vector2 = Vector2.ZERO
+) -> Dictionary:
 	var line: Dictionary = spawn_line(gravity, radius)
 	var origin: Vector2 = line["origin"] as Vector2
 	var axis: Vector2 = line["axis"] as Vector2
 	var extent: float = float(line["extent"])
+	var blocked_intervals: Array[Vector2] = _spawn_blocked_intervals(
+		gravity,
+		radius,
+		origin,
+		axis,
+		occupied_positions,
+		occupied_radii
+	)
+	return _find_free_spawn_slot_with_intervals(
+		origin,
+		axis,
+		extent,
+		preferred_position,
+		blocked_intervals
+	)
+
+
+func _find_free_spawn_slot_with_intervals(
+	origin: Vector2,
+	axis: Vector2,
+	extent: float,
+	preferred_position: Vector2,
+	blocked_intervals: Array[Vector2]
+) -> Dictionary:
+	for interval: Vector2 in blocked_intervals:
+		if interval.x < -extent and interval.y > extent:
+			return {"found": false, "position": preferred_position}
 	var preferred_offset: float = clampf(
 		(preferred_position - origin).dot(axis),
 		-extent,
 		extent
 	)
-	var occupied_positions: PackedVector2Array = PackedVector2Array()
-	var occupied_radii: PackedFloat32Array = PackedFloat32Array()
-	for orb: Orb3D in _orbs:
-		if (
-			not is_instance_valid(orb)
-			or orb.consumed
-			or orb.is_waiting_at_entrance
-			or orb.is_ghost
-		):
-			continue
-		occupied_positions.append(orb.position)
-		occupied_radii.append(orb.get_radius())
-	for item: Dictionary in placed:
-		occupied_positions.append(item["position"] as Vector2)
-		occupied_radii.append(float(item["radius"]))
-
 	var preferred_candidate: Vector2 = origin + axis * preferred_offset
-	if _spawn_probe_is_clear(
-		preferred_candidate,
-		radius,
-		occupied_positions,
-		occupied_radii
-	):
+	if _spawn_offset_is_clear(preferred_offset, blocked_intervals):
 		return {"found": true, "position": preferred_candidate}
 
 	var step: float = maxf(Config.data.spawn_probe_step, 0.001)
@@ -484,14 +512,62 @@ func find_free_spawn_slot(
 		if is_equal_approx(offset, preferred_offset):
 			continue
 		var candidate_position: Vector2 = origin + axis * offset
-		if _spawn_probe_is_clear(
-			candidate_position,
-			radius,
-			occupied_positions,
-			occupied_radii
-		):
+		if _spawn_offset_is_clear(offset, blocked_intervals):
 			return {"found": true, "position": candidate_position}
 	return {"found": false, "position": preferred_position}
+
+
+func _spawn_blocked_intervals(
+	gravity: Vector2i,
+	radius: float,
+	origin: Vector2,
+	axis: Vector2,
+	occupied_positions: PackedVector2Array,
+	occupied_radii: PackedFloat32Array
+) -> Array[Vector2]:
+	var intervals: Array[Vector2] = []
+	var normal: Vector2 = Vector2(gravity)
+	for index: int in range(occupied_positions.size()):
+		var minimum_distance: float = (
+			radius
+			+ occupied_radii[index]
+			- Config.data.ghost_exit_overlap
+		)
+		if minimum_distance <= 0.0:
+			continue
+		var relative_position: Vector2 = occupied_positions[index] - origin
+		var normal_distance: float = relative_position.dot(normal)
+		var interval_half_width_squared: float = (
+			minimum_distance * minimum_distance
+			- normal_distance * normal_distance
+		)
+		if interval_half_width_squared <= 0.0:
+			continue
+		var interval_center: float = relative_position.dot(axis)
+		var interval_half_width: float = sqrt(interval_half_width_squared)
+		intervals.append(Vector2(
+			interval_center - interval_half_width,
+			interval_center + interval_half_width
+		))
+	intervals.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x < b.x)
+	var merged: Array[Vector2] = []
+	for interval: Vector2 in intervals:
+		if merged.is_empty() or interval.x >= merged[-1].y:
+			merged.append(interval)
+			continue
+		var previous: Vector2 = merged[-1]
+		previous.y = maxf(previous.y, interval.y)
+		merged[-1] = previous
+	return merged
+
+
+func _spawn_offset_is_clear(offset: float, blocked_intervals: Array[Vector2]) -> bool:
+	for interval: Vector2 in blocked_intervals:
+		if offset <= interval.x:
+			return true
+		if offset < interval.y:
+			return false
+	return true
 
 
 func entrance_waiting_orbs() -> Array[Orb3D]:
@@ -519,8 +595,16 @@ func normal_overlap_count(target: Orb3D) -> int:
 
 func blocked_spawn_directions(batch: Array[Dictionary]) -> Array[Vector2i]:
 	var blocked: Array[Vector2i] = []
+	var occupancy: Dictionary = _normal_spawn_occupancy()
+	var occupied_positions: PackedVector2Array = occupancy["positions"] as PackedVector2Array
+	var occupied_radii: PackedFloat32Array = occupancy["radii"] as PackedFloat32Array
 	for direction: Vector2i in OrbTypes.DIRECTIONS:
-		if not _batch_fits_spawn_line(direction, batch):
+		if not _batch_fits_spawn_line_with_occupancy(
+			direction,
+			batch,
+			occupied_positions,
+			occupied_radii
+		):
 			blocked.append(direction)
 	return blocked
 
@@ -549,52 +633,92 @@ func set_danger_state(occupancy: float, multiplier: float) -> void:
 
 
 func _batch_fits_spawn_line(gravity: Vector2i, batch: Array[Dictionary]) -> bool:
+	var occupancy: Dictionary = _normal_spawn_occupancy()
+	return _batch_fits_spawn_line_with_occupancy(
+		gravity,
+		batch,
+		occupancy["positions"] as PackedVector2Array,
+		occupancy["radii"] as PackedFloat32Array
+	)
+
+
+func _batch_fits_spawn_line_with_occupancy(
+	gravity: Vector2i,
+	batch: Array[Dictionary],
+	base_positions: PackedVector2Array,
+	base_radii: PackedFloat32Array
+) -> bool:
 	var radii: Array[float] = []
 	for candidate: Dictionary in batch:
 		radii.append(Config.data.radius_for_level(int(candidate["level"])))
 	radii.sort()
 	radii.reverse()
-	var placed: Array[Dictionary] = []
+	var occupied_positions: PackedVector2Array = base_positions.duplicate()
+	var occupied_radii: PackedFloat32Array = base_radii.duplicate()
 	for radius: float in radii:
-		var slot: Dictionary = find_free_spawn_slot(gravity, radius, placed)
+		var slot: Dictionary = _find_free_spawn_slot_in_occupancy(
+			gravity,
+			radius,
+			occupied_positions,
+			occupied_radii
+		)
 		if not bool(slot["found"]):
 			return false
-		placed.append({"position": slot["position"], "radius": radius})
+		occupied_positions.append(slot["position"] as Vector2)
+		occupied_radii.append(radius)
 	return true
 
 
-func _spawn_probe_is_clear(
-	candidate_position: Vector2,
-	radius: float,
-	occupied_positions: PackedVector2Array,
-	occupied_radii: PackedFloat32Array
-) -> bool:
-	for index: int in range(occupied_positions.size()):
-		var minimum_distance: float = (
-			radius
-			+ occupied_radii[index]
-			- Config.data.ghost_exit_overlap
-		)
+func _normal_spawn_occupancy() -> Dictionary:
+	var occupied_positions: PackedVector2Array = PackedVector2Array()
+	var occupied_radii: PackedFloat32Array = PackedFloat32Array()
+	for orb: Orb3D in _orbs:
 		if (
-			minimum_distance > 0.0
-			and candidate_position.distance_squared_to(occupied_positions[index])
-			< minimum_distance * minimum_distance
+			not is_instance_valid(orb)
+			or orb.consumed
+			or orb.is_waiting_at_entrance
+			or orb.is_ghost
 		):
-			return false
-	return true
+			continue
+		occupied_positions.append(orb.position)
+		occupied_radii.append(orb.get_radius())
+	return {"positions": occupied_positions, "radii": occupied_radii}
 
 
 func _update_entrance_waiters() -> void:
-	var placed: Array[Dictionary] = []
-	for orb: Orb3D in get_orbs():
-		if not orb.is_waiting_at_entrance and not orb.is_ghost:
-			placed.append({"position": orb.position, "radius": orb.get_radius()})
-	for orb: Orb3D in entrance_waiting_orbs():
-		var slot: Dictionary = find_free_spawn_slot(
-			orb.entrance_gravity,
-			orb.get_radius(),
-			placed,
-			orb.entrance_preferred_position
+	var active_orbs: Array[Orb3D] = get_orbs()
+	var occupancy: Dictionary = _normal_spawn_occupancy()
+	var occupied_positions: PackedVector2Array = occupancy["positions"] as PackedVector2Array
+	var occupied_radii: PackedFloat32Array = occupancy["radii"] as PackedFloat32Array
+	var interval_cache: Dictionary = {}
+	for orb: Orb3D in active_orbs:
+		if not orb.is_waiting_at_entrance:
+			continue
+		var radius: float = orb.get_radius()
+		var line: Dictionary = spawn_line(orb.entrance_gravity, radius)
+		var origin: Vector2 = line["origin"] as Vector2
+		var axis: Vector2 = line["axis"] as Vector2
+		var extent: float = float(line["extent"])
+		var cache_key: Vector3 = Vector3(
+			float(orb.entrance_gravity.x),
+			float(orb.entrance_gravity.y),
+			radius
+		)
+		if not interval_cache.has(cache_key):
+			interval_cache[cache_key] = _spawn_blocked_intervals(
+				orb.entrance_gravity,
+				radius,
+				origin,
+				axis,
+				occupied_positions,
+				occupied_radii
+			)
+		var slot: Dictionary = _find_free_spawn_slot_with_intervals(
+			origin,
+			axis,
+			extent,
+			orb.entrance_preferred_position,
+			interval_cache[cache_key] as Array[Vector2]
 		)
 		if not bool(slot["found"]):
 			continue
@@ -605,12 +729,18 @@ func _update_entrance_waiters() -> void:
 			Config.data.gravity_strength
 		)
 		orb.set_gravity_vector(_actual_gravity_direction, Config.data.gravity_strength)
-		placed.append({"position": spawn_position, "radius": orb.get_radius()})
+		occupied_positions.append(spawn_position)
+		occupied_radii.append(radius)
+		interval_cache.clear()
 
 
 func maximum_normal_overlap(ghost: Orb3D) -> float:
+	return _maximum_normal_overlap_in(ghost, get_orbs())
+
+
+func _maximum_normal_overlap_in(ghost: Orb3D, active_orbs: Array[Orb3D]) -> float:
 	var maximum_overlap: float = 0.0
-	for other: Orb3D in get_orbs():
+	for other: Orb3D in active_orbs:
 		if other == ghost or other.is_ghost:
 			continue
 		var overlap: float = (
@@ -629,11 +759,12 @@ func average_ghost_duration() -> float:
 
 
 func _update_ghost_orbs(delta: float) -> void:
-	for orb: Orb3D in get_orbs():
+	var active_orbs: Array[Orb3D] = get_orbs()
+	for orb: Orb3D in active_orbs:
 		if not orb.is_ghost or orb.is_waiting_at_entrance:
 			continue
 		orb.advance_ghost(delta)
-		var maximum_overlap: float = maximum_normal_overlap(orb)
+		var maximum_overlap: float = _maximum_normal_overlap_in(orb, active_orbs)
 		if maximum_overlap <= Config.data.ghost_exit_overlap:
 			_complete_ghost(orb, false)
 		elif orb.ghost_elapsed >= Config.data.ghost_max_time:
