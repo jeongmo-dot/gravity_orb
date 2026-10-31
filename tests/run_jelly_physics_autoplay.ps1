@@ -95,6 +95,13 @@ $totalTurns = 0
 $totalMerges = 0
 $departures = 0
 $maxTurnEndPairPenetration = 0.0
+$spawnedOrbCounts = @()
+$finalMoveCount = 0
+$finalMoveSuccessCount = 0
+$peakActiveOrbs = @()
+$peakActivePhysicsMeans = @()
+$peakActivePhysicsMaxima = @()
+$maximumActiveSample = $null
 $shockTotals = @{}
 foreach ($task in $tasks) {
     $report = Get-Content -LiteralPath $task.Output -Raw | ConvertFrom-Json
@@ -103,6 +110,21 @@ foreach ($task in $tasks) {
     $seedRows += $seedRow
     $totalTurns += [int]$seedRow.completed_turns
     $totalMerges += [int]$seedRow.merge_count
+    $spawnedOrbCounts += [double]$seedRow.spawned_orb_count
+    $finalMoveCount += [int]$seedRow.final_move_count
+    $finalMoveSuccessCount += [int]$seedRow.final_move_success_count
+    $peakActiveOrbs += [double]$seedRow.max_active_orbs
+    $peakActivePhysicsMeans += [double]$seedRow.max_active_physics_ms_mean
+    $peakActivePhysicsMaxima += [double]$seedRow.max_active_physics_ms_max
+    if ($null -eq $maximumActiveSample -or [int]$seedRow.max_active_orbs -gt [int]$maximumActiveSample.active_orbs) {
+        $maximumActiveSample = [ordered]@{
+            seed = [int]$seedRow.seed
+            turn = [int]$seedRow.max_active_orbs_turn
+            active_orbs = [int]$seedRow.max_active_orbs
+            physics_ms_mean = [double]$seedRow.max_active_physics_ms_mean
+            physics_ms_max = [double]$seedRow.max_active_physics_ms_max
+        }
+    }
     $maxTurnEndPairPenetration = [Math]::Max(
         $maxTurnEndPairPenetration,
         [double]$seedRow.max_turn_end_pair.penetration_px
@@ -133,6 +155,8 @@ $completedGames = @($seedRows | Where-Object { $_.game_over })
 $gameOverTurns = @($completedGames | ForEach-Object { [double]$_.completed_turns })
 $scores = @($seedRows | ForEach-Object { [double]$_.score })
 $gameOverScores = @($completedGames | ForEach-Object { [double]$_.score })
+$gameOverSpawnCounts = @($completedGames | ForEach-Object { [double]$_.game_over_spawn_count })
+$gameOverSpawnedTotals = @($completedGames | ForEach-Object { [double]$_.spawned_orb_count })
 $shockSummary = [ordered]@{}
 foreach ($level in @($shockTotals.Keys | Sort-Object)) {
     $samples = [int]$shockTotals[$level].samples
@@ -152,14 +176,31 @@ $summary = [ordered]@{
     gravity_turn_diagonal_time = if ($GravityTurnDiagonalTime -ge 0.0) { $GravityTurnDiagonalTime } else { $null }
     game_over_count = $completedGames.Count
     average_game_over_turns = if ($gameOverTurns.Count -gt 0) { ($gameOverTurns | Measure-Object -Average).Average } else { 0.0 }
+    minimum_game_over_turns = if ($gameOverTurns.Count -gt 0) { ($gameOverTurns | Measure-Object -Minimum).Minimum } else { 0.0 }
+    maximum_game_over_turns = if ($gameOverTurns.Count -gt 0) { ($gameOverTurns | Measure-Object -Maximum).Maximum } else { 0.0 }
     average_game_over_score = if ($gameOverScores.Count -gt 0) { ($gameOverScores | Measure-Object -Average).Average } else { 0.0 }
+    minimum_game_over_score = if ($gameOverScores.Count -gt 0) { ($gameOverScores | Measure-Object -Minimum).Minimum } else { 0.0 }
+    maximum_game_over_score = if ($gameOverScores.Count -gt 0) { ($gameOverScores | Measure-Object -Maximum).Maximum } else { 0.0 }
     average_score_all = ($scores | Measure-Object -Average).Average
+    total_spawned_orbs = ($spawnedOrbCounts | Measure-Object -Sum).Sum
+    average_spawned_orbs_all = ($spawnedOrbCounts | Measure-Object -Average).Average
+    average_game_over_spawned_orbs = if ($gameOverSpawnedTotals.Count -gt 0) { ($gameOverSpawnedTotals | Measure-Object -Average).Average } else { 0.0 }
+    average_game_over_spawn_count = if ($gameOverSpawnCounts.Count -gt 0) { ($gameOverSpawnCounts | Measure-Object -Average).Average } else { 0.0 }
+    minimum_game_over_spawn_count = if ($gameOverSpawnCounts.Count -gt 0) { ($gameOverSpawnCounts | Measure-Object -Minimum).Minimum } else { 0.0 }
+    maximum_game_over_spawn_count = if ($gameOverSpawnCounts.Count -gt 0) { ($gameOverSpawnCounts | Measure-Object -Maximum).Maximum } else { 0.0 }
+    final_move_count = $finalMoveCount
+    final_move_success_count = $finalMoveSuccessCount
+    final_move_success_rate = if ($finalMoveCount -gt 0) { [double]$finalMoveSuccessCount / $finalMoveCount } else { 0.0 }
     average_turn_seconds = if ($turnFrameCounts.Count -gt 0) { (($turnFrameCounts | Measure-Object -Average).Average / 120.0) } else { 0.0 }
     forced_settle_turns = $forcedTurnCount
     forced_settle_ratio = if ($turnFrameCounts.Count -gt 0) { [double]$forcedTurnCount / $turnFrameCounts.Count } else { 0.0 }
     merges_per_turn = if ($totalTurns -gt 0) { [double]$totalMerges / $totalTurns } else { 0.0 }
     max_turn_end_pair_penetration_px = $maxTurnEndPairPenetration
     departures = $departures
+    average_peak_active_orbs = ($peakActiveOrbs | Measure-Object -Average).Average
+    maximum_active_sample = $maximumActiveSample
+    average_peak_active_physics_ms_mean = ($peakActivePhysicsMeans | Measure-Object -Average).Average
+    maximum_peak_active_physics_ms = ($peakActivePhysicsMaxima | Measure-Object -Maximum).Maximum
     color_effect_target_displacement = $shockSummary
 }
 $summaryPath = Join-Path (Split-Path -Parent $outputDirectory) "jelly_physics_autoplay_$Label.json"

@@ -209,6 +209,31 @@ func test_ramp_draws_next_turn_batch_sizes_at_boundaries() -> void:
 	_restore_spawn_config(snapshot)
 
 
+func test_default_five_turn_ramp_has_no_maximum() -> void:
+	var snapshot: Dictionary = _snapshot_spawn_config()
+	Config.data.spawn_count_per_turn = 1
+	Config.data.spawn_count_ramp_turns = 5
+	Config.data.spawn_count_max = 0
+	var expected: Dictionary = {
+		1: 1,
+		5: 1,
+		6: 2,
+		10: 2,
+		11: 3,
+		50: 10,
+		51: 11,
+		100: 20,
+	}
+	for turn_value: Variant in expected:
+		var turn_index: int = int(turn_value)
+		assert_eq(
+			Config.data.spawn_count_for_turn(turn_index),
+			int(expected[turn_index]),
+			"default batch size at turn %d" % turn_index
+		)
+	_restore_spawn_config(snapshot)
+
+
 func test_preview_turns_one_keeps_single_next_batch() -> void:
 	var snapshot: Dictionary = _snapshot_spawn_config()
 	Config.data.preview_turns = 1
@@ -294,7 +319,7 @@ func test_default_classic_progression_hash() -> void:
 	print("STAGED_DIFFICULTY_HASH classic=%s" % hash_value)
 	assert_eq(
 		hash_value,
-		"cf6172428c7901c43eb74f417e6880dc3ad375a329e669a8904234f5d38d1031",
+		"fc09958093057262d6792e5742891539c1102dfff55a379a472bc97f9b548c22",
 		"CLASSIC staged progression hash"
 	)
 	spawner.free()

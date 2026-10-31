@@ -71,16 +71,23 @@ func test_spawn_line_matches_all_four_generation_walls() -> void:
 	_restore_config(snapshot)
 
 
-func test_initial_two_orbs_use_even_bottom_positions_without_overlap() -> void:
+func test_initial_four_colors_use_level_one_even_bottom_positions_and_seed_order() -> void:
 	var snapshot: Dictionary = _snapshot_config()
+	Config.data.initial_orb_count = 99
 	var fixture: Dictionary = await _create_fixture(4002, true)
 	var board: Board = fixture["board"] as Board
 	var orbs: Array[Orb] = board.get_orbs()
-	assert_eq(orbs.size(), 2, "initial orb count")
+	var expected_count: int = Config.data.color_count_for_turn(1)
+	assert_eq(orbs.size(), expected_count, "one initial orb per starting color")
 
 	var half: float = board.half_size()
+	var seen_colors: Dictionary = {}
+	var first_order: Array[int] = []
 	for index: int in range(orbs.size()):
 		var orb: Orb = orbs[index]
+		first_order.append(orb.color)
+		seen_colors[orb.color] = true
+		assert_eq(orb.level, 1, "initial orb %d is level one" % index)
 		assert_true(not orb.is_ghost, "initial orb %d is normal" % index)
 		var fraction: float = float(index + 1) / float(orbs.size() + 1)
 		var expected_position: Vector2 = Vector2(
@@ -99,12 +106,22 @@ func test_initial_two_orbs_use_even_bottom_positions_without_overlap() -> void:
 			absf(orb.position.y) + orb.get_radius() <= half,
 			"initial orb %d inside vertical walls" % index
 		)
-	if orbs.size() == 2:
-		var center_distance: float = orbs[0].position.distance_to(orbs[1].position)
-		var minimum_distance: float = orbs[0].get_radius() + orbs[1].get_radius()
+	assert_eq(seen_colors.size(), expected_count, "all starting colors appear exactly once")
+	for color_index: int in range(expected_count):
+		assert_true(seen_colors.has(color_index), "starting color %d appears" % color_index)
+	for index: int in range(1, orbs.size()):
+		var center_distance: float = orbs[index - 1].position.distance_to(orbs[index].position)
+		var minimum_distance: float = orbs[index - 1].get_radius() + orbs[index].get_radius()
 		assert_true(center_distance >= minimum_distance, "initial orbs do not overlap")
 
 	await _cleanup_fixture(fixture)
+	var replay_fixture: Dictionary = await _create_fixture(4002, true)
+	var replay_board: Board = replay_fixture["board"] as Board
+	var replay_order: Array[int] = []
+	for orb: Orb in replay_board.get_orbs():
+		replay_order.append(orb.color)
+	assert_eq(replay_order, first_order, "same seed reproduces initial color order")
+	await _cleanup_fixture(replay_fixture)
 	_restore_config(snapshot)
 
 
@@ -131,7 +148,7 @@ func test_preview_matches_spawned_orb_and_spawn_line() -> void:
 		1,
 		"spawn happens on the next physics frame"
 	)
-	assert_eq(board.get_orbs().size(), 3, "one orb exists after one physics frame")
+	assert_eq(board.get_orbs().size(), 5, "one orb exists after one physics frame")
 	assert_eq(_captured_spawn["color"], preview["color"], "preview color")
 	assert_eq(_captured_spawn["level"], preview["level"], "preview level")
 	assert_eq(_captured_spawn["is_ghost"], true, "turn spawn starts as ghost")
@@ -151,7 +168,7 @@ func test_preview_matches_spawned_orb_and_spawn_line() -> void:
 		"preview spawn"
 	)
 	await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
-	assert_eq(board.get_orbs().size(), 3, "one orb added after one turn")
+	assert_eq(board.get_orbs().size(), 5, "one orb added after one turn")
 
 	await _cleanup_fixture(fixture)
 	_restore_config(snapshot)
@@ -226,7 +243,7 @@ func test_count_two_spawns_whole_preview_batch_in_one_physics_frame() -> void:
 	manager.on_swipe(Vector2i.RIGHT)
 	await tree.physics_frame
 	var orbs: Array[Orb] = board.get_orbs()
-	assert_eq(orbs.size(), 4, "two orbs created in spawn frame")
+	assert_eq(orbs.size(), 6, "two orbs created in spawn frame")
 	for index: int in range(2):
 		var spawned: Orb = orbs[orbs.size() - 2 + index]
 		assert_eq(spawned.color, int(preview[index]["color"]), "batch color %d" % index)
@@ -276,7 +293,7 @@ func test_three_turns_spawn_before_one_settle_each() -> void:
 
 	assert_eq(
 		board.get_orbs().size(),
-		Config.data.initial_orb_count + directions.size() * spawn_count,
+		Config.data.color_count_for_turn(1) + directions.size() * spawn_count,
 		"initial orbs plus three turn batches"
 	)
 	var expected_states: Array[TurnManager.State] = []
@@ -304,10 +321,8 @@ func test_center_spawn_relocates_from_overlap_and_remains_inside_board() -> void
 	var spawner: Spawner = fixture["spawner"] as Spawner
 	var manager: TurnManager = fixture["manager"] as TurnManager
 
-	var configured_initial_count: int = Config.data.initial_orb_count
-	Config.data.initial_orb_count = 0
-	spawner.spawn_initial(board, Vector2i.DOWN)
-	Config.data.initial_orb_count = configured_initial_count
+	board.set_gravity(Vector2i.DOWN)
+	spawner.sync_next_batch_size(1)
 
 	var radius: float = Config.data.radius_for_level(1)
 	var bottom_y: float = board.half_size() - radius - Config.data.spawn_margin
@@ -460,11 +475,10 @@ func test_seed_4242_completes_twenty_turns_without_departures() -> void:
 		]
 	)
 	assert_true(completed_turns > 0 and completed_turns <= 20, "turns before game over")
-	assert_eq(
-		board.get_orbs().size(),
-		Config.data.initial_orb_count + completed_turns * Config.data.spawn_count_per_turn,
-		"initial orbs plus completed turn spawns"
-	)
+	var expected_orb_count: int = Config.data.color_count_for_turn(1)
+	for turn_index: int in range(1, completed_turns + 1):
+		expected_orb_count += Config.data.spawn_count_for_turn(turn_index)
+	assert_eq(board.get_orbs().size(), expected_orb_count, "initial orbs plus completed turn spawns")
 	assert_eq(total_departures, 0, "continuous-turn orb center departures")
 	assert_eq(total_divergences, 0, "continuous-turn divergent orb frames")
 	assert_eq(board.escape_guard_count, 0, "continuous-turn escape guard activations")

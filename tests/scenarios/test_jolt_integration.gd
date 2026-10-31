@@ -197,7 +197,7 @@ func test_shared_turn_path_completes_twenty_3d_turns() -> void:
 	await _cleanup_fixture(fixture)
 
 
-func test_seed_101_completes_120_3d_turns_with_shared_score_flow() -> void:
+func test_seed_101_runs_until_game_over_without_3d_divergence() -> void:
 	var fixture: Dictionary = await _create_fixture(true, false)
 	var board: Board3D = fixture["board"] as Board3D
 	var manager: TurnManager = fixture["manager"] as TurnManager
@@ -232,31 +232,31 @@ func test_seed_101_completes_120_3d_turns_with_shared_score_flow() -> void:
 		total_divergences += int(metrics["divergences"])
 		if manager.state == TurnManager.State.GAME_OVER:
 			break
-	assert_eq(manager.turn_index, 120, "seed 101 reaches 120 turns")
-	assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "120 turns remain playable")
-	assert_true(score.score > 0, "shared score path records reactions by turn 120")
-	assert_eq(total_departures, 0, "120-turn center departures")
-	assert_eq(total_divergences, 0, "120-turn divergent frames")
+	assert_eq(manager.state, TurnManager.State.GAME_OVER, "seed 101 reaches game over")
+	assert_true(manager.turn_index <= 120, "seed 101 finishes inside the 120-turn run")
+	assert_true(score.score > 0, "shared score path records reactions before game over")
+	assert_eq(total_departures, 0, "seed 101 center departures")
+	assert_eq(total_divergences, 0, "seed 101 divergent frames")
 	assert_true(
 		maximum_wall_penetration <= TURN_MAX_WALL_PENETRATION,
-		"120-turn wall penetration %.4f <= %.1f" % [
+		"seed 101 wall penetration %.4f <= %.1f" % [
 			maximum_wall_penetration,
 			TURN_MAX_WALL_PENETRATION,
 		]
 	)
 	assert_true(
 		maximum_pair_overlap <= TURN_MAX_PAIR_OVERLAP,
-		"120-turn pair overlap %.4f <= %.1f" % [
+		"seed 101 pair overlap %.4f <= %.1f" % [
 			maximum_pair_overlap,
 			TURN_MAX_PAIR_OVERLAP,
 		]
 	)
 	for orb: Orb3D in board.get_orbs():
-		assert_true(orb.position.is_finite(), "120-turn 3D position remains finite")
+		assert_true(orb.position.is_finite(), "seed 101 3D position remains finite")
 		assert_true(
 			maxf(absf(orb.position.x), absf(orb.position.y))
 			<= board.half_size() + DIVERGENCE_MARGIN,
-			"120-turn orb remains near board"
+			"seed 101 orb remains near board"
 		)
 	await _cleanup_fixture(fixture)
 
