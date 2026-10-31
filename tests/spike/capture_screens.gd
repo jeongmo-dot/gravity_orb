@@ -734,18 +734,18 @@ func _capture_spawn_ramp_scenes(main: Main, board: Board3D, hud: Hud) -> void:
 	await _capture("64_jelly_initial_four_colors.png")
 
 	spawner.init_rng(SPAWN_RAMP_CAPTURE_SEED)
-	spawner.sync_next_batch_size(51)
+	spawner.sync_next_batch_size(91)
 	var preview: Array = spawner.peek_preview()
 	hud._on_preview_changed(preview)
 	await get_tree().process_frame
-	if not hud._next_count_label.visible or hud._next_count_label.text != "×11":
-		_fail("spawn ramp NEXT double-digit count is not ×11")
-	if not hud._then_count_label.visible or hud._then_count_label.text != "×11":
-		_fail("spawn ramp THEN double-digit count is not ×11")
+	if not hud._next_count_label.visible or hud._next_count_label.text != "×10":
+		_fail("spawn ramp NEXT double-digit count is not ×10 at turn 91")
+	if not hud._then_count_label.visible or hud._then_count_label.text != "×10":
+		_fail("spawn ramp THEN double-digit count is not ×10 at turn 91")
 	await _capture("65_jelly_preview_double_digit.png")
 	print(
 		(
-			"SCREEN_CAPTURE_CHECK scene=spawn_ramp seed=%d initial_colors=%s positions=%s "
+			"SCREEN_CAPTURE_CHECK scene=spawn_ramp seed=%d preview_turn=91 initial_colors=%s positions=%s "
 			+ "next=%s then=%s"
 		) % [
 			SPAWN_RAMP_CAPTURE_SEED,
