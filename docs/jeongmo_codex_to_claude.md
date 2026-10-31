@@ -40,7 +40,7 @@
 
 ### [2026-10-31] 대상 #126 — 들어오는 수량을 L1 기준으로·최대 5
 - 상태: 완료 — 턴 수량을 L1 환산 예산으로 바꾸고, 남은 예산 안에 드는 레벨만 가중 추첨한다. `spawn_level_costs`의 없거나 1 미만인 값은 1로 처리하며, 기본값은 명세대로 M2 (`spawn_count_max=5`, 비용 `[1,2]`)다. NEXT·THEN은 실제로 뽑힌 젤리 묶음을 표시하고 `×n`은 비용이 아닌 실제 젤리 수다
-- 브랜치 / PR: `codex/spawn-level-budget-cap-five` / push 후 생성
+- 브랜치 / PR: `codex/spawn-level-budget-cap-five` / https://github.com/jeongmo-dot/gravity_orb/pull/126
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/Spawner.gd`, `tests/{test_config.gd,test_spawner.gd,test_screen_layout.gd,run_jelly_physics_autoplay.ps1,capture_screens.ps1}`, `tests/scenarios/test_jolt_integration.gd`, `tests/spike/{run_jolt_3d_measurement.gd,capture_screens.gd}`, `tests/tools/{run_spawn_budget_autoplay.ps1,run_spawn_budget_measurement.ps1}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 비용 필드 기본 `[1,2]`; 누락·0·음수 비용은 1. `[1,1]`은 같은 시드에서 기존 레벨·색·위치 RNG 순서를 그대로 재현 — 자동 (`test_spawn_level_cost_defaults_and_fallbacks`, `test_equal_level_costs_reproduce_previous_candidate_sequence`)
