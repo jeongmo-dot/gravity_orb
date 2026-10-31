@@ -32,7 +32,21 @@
 
 ## 대기 중
 
-- 없음
+### [2026-10-31 #125] 위에 턴 수·막힘 글자 삭제·랭킹은 턴
+- 상태: 대기 (**다음 차례**. `origin/main` `47a0f7c` 위에서)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.18**
+- 배경: 사용자 (2026-10-31) "상단에 턴 수도 넣어주고 랭킹에도 최고 턴 값 기록해줘", 미리보기 칸 위 "↑ ← → 막힘" 스크린샷과 함께 "이 막힘 표시는 없애줘", 랭킹 스크린샷과 함께 "랭킹에서 final move 는 빼고 턴 수 넣어줘"
+- 앵커: `scripts/ui/Hud.gd` `hud_layout()`·`_apply_layout()`·`_on_warning_changed()`, `scenes/UI.tscn` (`Hud/BestPanel`·`BestTitleLabel`·`BestLabel`을 본뜸, `Hud/BlockedPanel`·`BlockedLabel` 삭제), `scripts/ui/RankingPanel.gd` `_refresh()`, `scripts/core/TurnManager.gd` (`turn_index`·`state_changed`·`turn_started` — 읽기만), 테스트 `tests/test_screen_layout.gd`·`tests/scenarios/test_score_flow.gd`·`tests/test_jelly_shell.gd`·`tests/test_rankings.gd`
+- 수치: 턴 판 가로 = 소리 버튼 끝 + 12 ~ SCORE 판 시작 − 12 (1080 기준 156~288), 세로 = SCORE·BEST 판과 같은 줄 (높이 150), 숫자 글꼴 BEST와 같은 40~18
+- 요구:
+  1. 위 줄의 소리 버튼과 SCORE 판 사이에 BEST 모양의 `TURN` 판을 둔다. 다른 HUD 요소는 그대로
+  2. 숫자는 입력 대기 중 `turn_index + 1`, 공이 움직이는 동안과 게임 오버 뒤에는 `turn_index` (시작 정착 중 1). 게임 오버 때 숫자 = 랭킹 `turns`. 바뀔 때 연출 없음
+  3. 미리보기 칸 위 막힘 글자 판 (`BlockedPanel`·`BlockedLabel`)을 지운다. 판 둘레 빨간 화살표·✕와 막힘 계산은 그대로
+  4. 랭킹 JELLY의 `FINAL MOVE` 열을 `턴` (기록의 `turns`)으로 바꾼다. 저장 형식은 그대로 (`final_moves`도 계속 저장)
+  5. §12-ONE.18 확인 1~3
+- 건드리지 말 것: 다른 HUD 요소의 위치와 모양, NEXT·THEN 위치, 결과 화면·시작 화면, 저장 형식, 규칙·물리·생성, 새 연출 (턴 숫자 튀기·반짝임·소리 없음), 사용자 저장 파일, `docs/` (회신 파일 제외)
+- Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), JELLY 기준 해시 그대로 (`5e00b1f7…`), 캡처 보고 (실제 창, 두 비율, 마지막은 전체 캡처), 검증 빌드는 `-Debug`만
+- 커밋: 항목 단위 브랜치, **push·PR까지**
 
 ---
 
