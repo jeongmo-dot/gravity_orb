@@ -6,6 +6,7 @@ const DEFAULT_USER_SAVE: String = "user://save.cfg"
 const OUTPUT_PREFIX: String = "--capture-output-directory="
 const SAVE_PREFIX: String = "--capture-save-path="
 const PILE_JITTER_SEED: int = 11620261030
+const SPAWN_RAMP_CAPTURE_SEED: int = 11920261031
 const CAPTURE_FILES: Array[String] = [
 	"01_jelly_start.png",
 	"02_jelly_ranking.png",
@@ -70,6 +71,8 @@ const CAPTURE_FILES: Array[String] = [
 	"61_jelly_gravity_left_down_diagonal.png",
 	"62_jelly_gravity_left_down_rest.png",
 	"63_jelly_gravity_right_down_rest.png",
+	"64_jelly_initial_four_colors.png",
+	"65_jelly_preview_double_digit.png",
 ]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
@@ -692,10 +695,58 @@ func _capture_recovered_jelly_scenes(
 
 	await _capture_recovered_jelly_motion(main, manager, board)
 	await _capture_gravity_turn_scenes(main, manager, board)
+	await _capture_spawn_ramp_scenes(main, board, hud)
 	print(
 		"SCREEN_CAPTURE_CHECK scene=recovered_jelly levels=7 crowded=25 max=true "
 		+ "stretch=true absorption=true unlock=true land_frames=10 breathe=true "
-		+ "physical_pile=true right_motion=true gravity_turn_scenes=3"
+		+ "physical_pile=true right_motion=true gravity_turn_scenes=3 spawn_ramp_scenes=2"
+	)
+
+
+func _capture_spawn_ramp_scenes(main: Main, board: Board3D, hud: Hud) -> void:
+	var spawner: Spawner = main.get_node("Spawner") as Spawner
+	board.clear()
+	spawner.init_rng(SPAWN_RAMP_CAPTURE_SEED)
+	spawner.spawn_initial(board, Vector2i.DOWN)
+	var initial_orbs: Array[Orb3D] = board.get_orbs()
+	var initial_colors: Array[int] = []
+	var initial_positions: Array[Vector2] = []
+	var distinct_colors: Dictionary = {}
+	for orb: Orb3D in initial_orbs:
+		orb.disable_physics()
+		initial_colors.append(orb.color)
+		initial_positions.append(orb.position)
+		distinct_colors[orb.color] = true
+		if orb.level != 1:
+			_fail("spawn ramp initial capture contains a non-L1 orb")
+	if initial_orbs.size() != Config.data.color_count_for_turn(1):
+		_fail("spawn ramp initial capture count mismatch")
+	if distinct_colors.size() != initial_orbs.size():
+		_fail("spawn ramp initial capture colors are not distinct")
+	await get_tree().process_frame
+	await _capture("64_jelly_initial_four_colors.png")
+
+	spawner.init_rng(SPAWN_RAMP_CAPTURE_SEED)
+	spawner.sync_next_batch_size(51)
+	var preview: Array = spawner.peek_preview()
+	hud._on_preview_changed(preview)
+	await get_tree().process_frame
+	if not hud._next_count_label.visible or hud._next_count_label.text != "×11":
+		_fail("spawn ramp NEXT double-digit count is not ×11")
+	if not hud._then_count_label.visible or hud._then_count_label.text != "×11":
+		_fail("spawn ramp THEN double-digit count is not ×11")
+	await _capture("65_jelly_preview_double_digit.png")
+	print(
+		(
+			"SCREEN_CAPTURE_CHECK scene=spawn_ramp seed=%d initial_colors=%s positions=%s "
+			+ "next=%s then=%s"
+		) % [
+			SPAWN_RAMP_CAPTURE_SEED,
+			str(initial_colors),
+			str(initial_positions),
+			hud._next_count_label.text,
+			hud._then_count_label.text,
+		]
 	)
 
 

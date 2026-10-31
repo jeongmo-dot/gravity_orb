@@ -296,7 +296,10 @@ func _create_fixture(seed: int) -> Dictionary:
 	tree.root.add_child(fixture_root)
 	await tree.process_frame
 	spawner.init_rng(seed)
-	spawner.spawn_initial(board, Vector2i.DOWN)
+	if Config.data.initial_orb_count > 0:
+		spawner.spawn_initial(board, Vector2i.DOWN)
+	else:
+		board.set_gravity(Vector2i.DOWN)
 	return {
 		"root": fixture_root,
 		"board": board,

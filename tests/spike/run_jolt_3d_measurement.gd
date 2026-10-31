@@ -58,6 +58,7 @@ var _preview_fixture_serial: int = 0
 var _seed_seen_colors: Dictionary = {}
 var _seed_merge_count: int = 0
 var _seed_absorption_count: int = 0
+var _seed_spawn_count: int = 0
 var _seed_jelly_outline_visible_frames: int = 0
 var _seed_jelly_unarmed_outline_visible_frames: int = 0
 var _seed_jelly_outline_max_alpha: float = 0.0
@@ -256,6 +257,7 @@ func _run_seed(
 	_seed_seen_colors.clear()
 	_seed_merge_count = 0
 	_seed_absorption_count = 0
+	_seed_spawn_count = 0
 	_seed_jelly_outline_visible_frames = 0
 	_seed_jelly_unarmed_outline_visible_frames = 0
 	_seed_jelly_outline_max_alpha = 0.0
@@ -274,6 +276,10 @@ func _run_seed(
 	var engine_count_samples: Array[Dictionary] = []
 	var turn_performance_samples: Array[Dictionary] = []
 	var turn_rows: Array[Dictionary] = []
+	var max_active_orbs: int = board.get_orbs().size()
+	var max_active_orbs_turn: int = 0
+	var max_active_physics_ms_mean: float = 0.0
+	var max_active_physics_ms_max: float = 0.0
 	var seed_max_pair_end: Dictionary = {"penetration_px": 0.0, "category": "none"}
 	var seed_max_pair_end_turn: int = 0
 	var seed_max_wall: float = 0.0
@@ -334,19 +340,29 @@ func _run_seed(
 				rearrangement_values.append(rearrangement)
 		_record_shock_displacements(shock_displacements, _turn_shock_events)
 		completed_turns = turn_offset + 1
+		var active_orbs: int = board.get_orbs().size()
+		var turn_physics_ms_mean: float = _safe_ratio(
+			float(frame_metrics["physics_ms_sum"]),
+			int(frame_metrics["physics_ms_samples"])
+		)
+		var turn_physics_ms_max: float = float(frame_metrics["physics_ms_max"])
 		turn_performance_samples.append({
 			"turn": completed_turns,
-			"active_orbs": board.get_orbs().size(),
+			"active_orbs": active_orbs,
 			"physics_frames": int(frame_metrics["physics_ms_samples"]),
-			"physics_ms_mean": _safe_ratio(
-				float(frame_metrics["physics_ms_sum"]),
-				int(frame_metrics["physics_ms_samples"])
-			),
-			"physics_ms_max": float(frame_metrics["physics_ms_max"]),
+			"physics_ms_mean": turn_physics_ms_mean,
+			"physics_ms_max": turn_physics_ms_max,
 		})
+		if active_orbs > max_active_orbs:
+			max_active_orbs = active_orbs
+			max_active_orbs_turn = completed_turns
+			max_active_physics_ms_mean = turn_physics_ms_mean
+			max_active_physics_ms_max = turn_physics_ms_max
 		var occupancy: float = _board_occupancy(board)
 		turn_rows.append({
 			"turn": completed_turns,
+			"spawn_count": Config.data.spawn_count_for_turn(completed_turns),
+			"spawned_total": _seed_spawn_count,
 			"occupancy": occupancy,
 			"reactions": _turn_reaction_count,
 			"merges": _turn_merge_count,
@@ -421,6 +437,16 @@ func _run_seed(
 		"final_occupancy_percent": _board_occupancy(board) * 100.0,
 		"final_orb_count": board.get_orbs().size(),
 		"score": score_manager.score,
+		"spawned_orb_count": _seed_spawn_count,
+		"game_over_spawn_count": (
+			Config.data.spawn_count_for_turn(completed_turns)
+			if manager.state == TurnManager.State.GAME_OVER
+			else 0
+		),
+		"max_active_orbs": max_active_orbs,
+		"max_active_orbs_turn": max_active_orbs_turn,
+		"max_active_physics_ms_mean": max_active_physics_ms_mean,
+		"max_active_physics_ms_max": max_active_physics_ms_max,
 		"max_combo": manager.max_combo,
 		"reactions_by_color": _seed_reactions_by_color.duplicate(),
 		"max_level_reached": score_manager.max_level_reached,
@@ -522,6 +548,7 @@ func _create_fixture(seed: int) -> Dictionary:
 	manager.reaction_ready.connect(score_manager.on_reaction)
 	resolver.reaction_applied.connect(_record_shock_event)
 	spawner.orb_spawned.connect(score_manager.on_orb_spawned)
+	spawner.orb_spawned.connect(_record_spawned_orb)
 	spawner.init_rng(seed)
 	spawner.spawn_initial(board, Vector2i.DOWN)
 	manager.start_game()
@@ -850,6 +877,10 @@ func _projection_item_less(first: Dictionary, second: Dictionary) -> bool:
 	if not is_equal_approx(first_projection, second_projection):
 		return first_projection < second_projection
 	return int(first["id"]) < int(second["id"])
+
+
+func _record_spawned_orb(_level: int) -> void:
+	_seed_spawn_count += 1
 
 
 func _record_shock_event(reaction: Dictionary) -> void:

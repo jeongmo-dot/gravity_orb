@@ -33,7 +33,7 @@ const LONG_TEST_METHODS: Dictionary = {
 		"test_cycle_seeded_orbs_remain_inside_board_during_gravity_cycles",
 	],
 	"res://tests/scenarios/test_jolt_integration.gd": [
-		"test_seed_101_completes_120_3d_turns_with_shared_score_flow",
+		"test_seed_101_runs_until_game_over_without_3d_divergence",
 		"test_shared_turn_path_completes_twenty_3d_turns",
 		"test_twenty_two_seed_3d_gravity_cycles_have_no_departures_or_divergence",
 	],

@@ -585,10 +585,7 @@ func test_turn_manager_finishes_turn_after_merge() -> void:
 	var spawner: Spawner = fixture["spawner"] as Spawner
 	var manager: TurnManager = fixture["manager"] as TurnManager
 	spawner.init_rng(5009)
-	var initial_count: int = Config.data.initial_orb_count
-	Config.data.initial_orb_count = 0
-	spawner.spawn_initial(board, Vector2i.DOWN)
-	Config.data.initial_orb_count = initial_count
+	board.set_gravity(Vector2i.DOWN)
 	manager.turn_finished.connect(_record_turn_finished)
 	manager.start_game()
 	await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)
@@ -628,10 +625,7 @@ func test_waiting_input_flush_continues_previous_turn_combo() -> void:
 	var spawner: Spawner = fixture["spawner"] as Spawner
 	var manager: TurnManager = fixture["manager"] as TurnManager
 	spawner.init_rng(5010)
-	var initial_count: int = Config.data.initial_orb_count
-	Config.data.initial_orb_count = 0
-	spawner.spawn_initial(board, Vector2i.DOWN)
-	Config.data.initial_orb_count = initial_count
+	board.set_gravity(Vector2i.DOWN)
 	manager.turn_finished.connect(_record_turn_finished)
 	manager.start_game()
 	await _wait_for_state(manager, TurnManager.State.WAITING_INPUT)

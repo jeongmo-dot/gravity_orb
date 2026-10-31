@@ -44,18 +44,25 @@ func next_shake_direction() -> Vector2:
 
 func spawn_initial(board: Variant, gravity: Vector2i) -> void:
 	board.set_gravity(gravity)
-	var count: int = Config.data.initial_orb_count
+	var colors: Array[int] = []
+	for color_index: int in range(Config.data.color_count_for_turn(1)):
+		colors.append(color_index)
+	for index: int in range(colors.size() - 1, 0, -1):
+		var swap_index: int = _rng.randi_range(0, index)
+		var color: int = colors[index]
+		colors[index] = colors[swap_index]
+		colors[swap_index] = color
+	var count: int = colors.size()
 	var half: float = board.half_size()
 	for index: int in range(count):
-		var candidate: Dictionary = _draw_candidate_for_turn(1)
-		var level: int = int(candidate["level"])
+		var level: int = 1
 		var radius: float = Config.data.radius_for_level(level)
 		var fraction: float = float(index + 1) / float(count + 1)
 		var position: Vector2 = Vector2(
 			lerpf(-half, half, fraction),
 			half - radius - Config.data.spawn_margin
 		)
-		var orb: Variant = board.spawn_orb(int(candidate["color"]), level, position)
+		var orb: Variant = board.spawn_orb(colors[index], level, position)
 		orb.exit_ghost_state()
 		orb_spawned.emit(level)
 	_sync_preview_count(1)

@@ -75,7 +75,9 @@ $expectedFiles = @(
     "60_popup_crowded.png",
     "61_jelly_gravity_left_down_diagonal.png",
     "62_jelly_gravity_left_down_rest.png",
-    "63_jelly_gravity_right_down_rest.png"
+    "63_jelly_gravity_right_down_rest.png",
+    "64_jelly_initial_four_colors.png",
+    "65_jelly_preview_double_digit.png"
 )
 
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {

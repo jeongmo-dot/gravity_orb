@@ -38,6 +38,47 @@
 
 ## 미확인
 
+### [2026-10-31] 대상 #119 — 공이 빨리 늘어나게, 시작은 색마다 하나씩
+- 상태: 완료 — 최신 `origin/main` `f05299f`에서 항목 브랜치를 만들고 생성 증가 간격을 `50 → 5턴`으로 바꿨다. 시작 배치는 첫 턴의 4색을 시드 RNG로 섞은 뒤 색마다 L1 하나씩 바닥에 등간격 배치한다
+- 브랜치 / PR: `codex/spawn-ramp-five-turns` / push 후 생성 예정
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/Spawner.gd`, `tests/{capture_screens.ps1,run_jelly_physics_autoplay.ps1,run_tests.gd,test_config.gd,test_jelly_regression.gd,test_spawner.gd}`, `tests/scenarios/{test_game_over.gd,test_jolt_integration.gd,test_merge_scenario.gd,test_spawn_flow.gd}`, `tests/spike/{capture_screens.gd,run_jolt_3d_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `spawn_count_ramp_turns=5`, `spawn_count_per_turn=1`, `spawn_count_max=0` — 자동 (`test_m4_spawn_defaults`, `test_default_five_turn_ramp_has_no_maximum`)
+  - [x] 1·5·6·10·11·50·51·100턴 생성 수 `1/1/2/2/3/10/11/20` — 자동 (`test_spawn_count_ramp_turn_boundaries`)
+  - [x] 시작 색마다 L1 하나씩, 바닥 등간격, 4색 모두 다름, 같은 시드 순서 재현 — 자동 (`test_initial_four_colors_use_level_one_even_bottom_positions_and_seed_order`)
+  - [x] #118과 같은 101~120 시드 자동 플레이로 판 길이·점수·합체·생성·FINAL MOVE·안정·침투·이탈과 최대 활성 공 물리 시간을 비교 — 자동, 아래 표
+  - [x] 새 JELLY 기준 해시에서 시드 `1085050`의 사건 7종이 각각 1회이고 렌더링 켬/끔 동일 — 자동
+  - [x] 시작 4색과 NEXT/THEN 두 자리 `×11` 장면을 추가하고 두 화면비 전체 캡처를 마지막에 생성해 직접 확인 — 자동 캡처 + 직접 관측
+  - [x] 일반·장기·성능 테스트, 소스/내보낸 Debug 스모크, Debug 빌드 통과. Release 빌드는 미실행
+- 20시드 자동 플레이 비교 (`Godot 4.8-dev3 Standard`, Jolt, 120Hz, 시드 `101~120`, #118과 같은 방향 패턴·물리·400턴 상한):
+  - #118 기준 (50턴 램프): 게임오버 `17/20`, 게임오버 턴 평균/최소/최대 `337.059/290/394`, 점수 `456,639.82/197,728/1,047,432`, 턴당 합체 `3.5302`, 게임오버 턴 생성 수 `7.294/6/8`, 전체 20판 생성 합계·평균 `27,838/1,391.90` (게임오버 판 평균 `1,319.53`), FINAL MOVE `20회/성공 3회` (`15.0%`), 평균 턴 `1.51217초`, 강제 안정 `6,821/6,930턴` (`98.427%`), 최대 턴 끝 침투 `38.309px` (`merge_immediate`, 시드 109·91턴), 이탈 `0`
+  - #119 (5턴 램프): 게임오버 `20/20`, 게임오버 턴 `79.550/72/87`, 점수 `604,802.15/257,150/1,059,042`, 턴당 합체 `6.5902`, 게임오버 턴 생성 수 `16.350/15/18`, 생성 합계·평균 `13,219/660.95`, FINAL MOVE `21회/성공 1회` (`4.762%`), 평균 턴 `1.50633초`, 강제 안정 `1,531/1,591턴` (`96.229%`), 최대 침투 `25.416px` (`merge_immediate`, 시드 112·39턴), 이탈 `0`
+  - #118 원시 결과에는 생성 합계 필드가 없어 당시 시작 2개와 `1 + floor((turn-1)/50)`를 완료 턴까지 합산했다. #119는 `orb_spawned` 신호로 실제 생성 수를 기록했다. 5턴 램프는 한 판 총 생성 수는 줄었지만 한 턴 배치는 평균 게임오버 시 `7.29 → 16.35`, 게임오버는 `337.06 → 79.55턴`으로 바뀌었다. 명세대로 다른 난도·물리값은 조정하지 않았다
+- 최대 활성 공·물리 프레임 시간 (각 시드에서 공이 가장 많았던 턴의 표본):
+  - #118: 시드별 최대 활성 공 평균 `102.00`, 전체 최대 `126개` (시드 105·376턴), 그 턴 물리 프레임 평균/최대 `20.700/32.939ms`; 시드별 최고점 프레임 평균의 평균 `25.648ms`, 최고점 최대값 중 최대 `43.632ms`
+  - #119: 시드별 최대 활성 공 평균 `118.35`, 전체 최대 `133개` (시드 116·80턴), 그 턴 `31.789/36.355ms`; 시드별 최고점 프레임 평균의 평균 `32.277ms`, 최고점 최대값 중 최대 `52.766ms`
+- JELLY 새 기준 해시:
+  - 시드 `1085050`, SHA-256 `ce7054b628a6c1f6e528eb62bbd2a9bb67946fe3a28b4374bda12d5f1b251ce2`, 렌더링 켬/끔 동일
+  - 사건 수: 흡수 레벨 유지 1, 흡수 레벨 상승 1, L5 대폭발 1, L7이 L6 흡수 1, MAX CLEAR 1, FINAL MOVE 성공 1, 실패 1
+- 최종 캡처 관측:
+  - `tests/capture_screens.ps1` → `540×960`, `540×1170` 각 65장, 합계 `130장`, 종료 코드 0; 착지 `44~53` PNG SHA 고유 각 `10/10`
+  - 두 비율 `64_jelly_initial_four_colors`: 캡처 시드 `11920261031`, 색 순서 `[3,2,1,0]`, 모두 L1, 위치 `(-288,451),(-96,451),(96,451),(288,451)`로 바닥에 같은 간격. 보드·HUD 잘림 없음
+  - 두 비율 `65_jelly_preview_double_digit`: 51턴 기준 NEXT·THEN 배치가 각각 11개이고 두 곳 모두 `×11`이 잘림 없이 보임. 미리보기 개수·모양 코드는 변경하지 않음
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard (`C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`)
+  - 격리 사용자 경로의 `godot --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·`ERROR` 0건
+  - `tests/run_tests.ps1` → 일반 `290/290`, 장기 `5/5`, 성능 `5/5`, 합계 `300/300`, 종료 코드 0, 총 `81.445초`; 장기 22시드 이탈·발산 0
+  - 소스 기본·`--mode=jelly` `--quit-after 300` → 각각 종료 코드 0, 오류 표식 0건
+  - `tools/build_windows.ps1 -Debug` → 샌드박스 밖 재실행에서 종료 코드 0, 오류 표식 0건, `version=0.16.0`, Debug exe `104,949,536`바이트, 다른 버전 파일 18개 보존. 내보낸 Debug 기본·JELLY 스모크 각각 종료 코드 0. Release 미실행
+  - 변경 PowerShell 2개 구문 분석 오류 0건. 규칙 검색 → `Input`/`InputEvent`는 `InputRouter.gd`·`Haptics.gd`만, 기존 `Spawner`·`ColorEffectVisual` 지역 RNG 밖 신규 런타임 전역 난수 사용 0건, `git diff --check` 오류 0건
+  - 사용자 `save.cfg` SHA-256 `4D8C75B028AD8710E8B24779A35283848845F75D9A97D238B9D24419BD1FB14D`로 #118 전후와 동일
+- 수동 확인 절차:
+  1. 새 JELLY 게임을 시작한다 → 아래 바닥에 시작 4색이 L1 하나씩 같은 간격으로 놓이고, 새 게임마다 순서는 섞이되 같은 디버그 시드에서는 같은 순서여야 한다.
+  2. 51턴까지 진행하거나 캡처 스위트를 실행한다 → NEXT·THEN 모두 `×11`로 표시되고 숫자·카드·패널이 잘리지 않아야 한다.
+  3. `tests/capture_screens.ps1` 후 두 화면비의 `64`·`65`를 연다 → 4색 시작 배치와 두 자리 미리보기가 두 비율에서 동일한 내용과 안전 영역을 유지해야 한다.
+- 결정 사항: `initial_orb_count` 필드는 기존 리소스·테스트 호환을 위해 기본값 2인 채 유지했지만 런타임 `Spawner.spawn_initial()`은 읽지 않는다. 색 셔플은 전역 `shuffle()` 대신 Spawner의 시드 RNG로 Fisher–Yates를 수행한다. 캡처 고정 시드는 항목 번호와 날짜를 식별할 수 있는 `11920261031`로 정했다. 기존 120턴 생존 장기 테스트는 새 램프에서 시드 101이 66턴에 정상 게임오버하므로, 같은 120턴 상한 안에서 게임오버까지 이탈·발산·침투 한계를 검증하는 안정성 테스트로 바꿨다
+- 남은 것 · 질문: 5턴 램프에서 평균 게임오버가 `79.55턴`, FINAL MOVE 성공률이 `4.762%`로 관측됐고 최대 활성 공 표본의 시드별 평균 물리 시간이 `25.648 → 32.277ms`로 증가했다. 수치는 임의 조정하지 않았으며 최종 합격/불합격과 후속값 판정을 요청함
+
 ### [2026-10-30] 대상 #118 — 90° 중력 전환을 대각선으로 구분
 - 상태: 완료 — 최신 `origin/main` `9d84937`에서 항목 브랜치를 만들고 90° 전환에만 명세값 `0.15초`(120Hz 18프레임)의 정규화 대각선 중력을 적용함. 같은·반대 방향은 즉시 전환하며, 최종 4방향과 공에 거는 실제 방향을 분리해 전환 중 생성·성장·입장 해제 공까지 실제 방향을 받도록 구현함
 - 브랜치 / PR: `codex/gravity-diagonal-transition` / https://github.com/jeongmo-dot/gravity_orb/pull/118

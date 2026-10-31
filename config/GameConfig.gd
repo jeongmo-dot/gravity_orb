@@ -53,7 +53,7 @@ enum GameMode {
 )
 @export var spawn_count_per_turn: int = 1
 @export var preview_turns: int = 2
-@export var spawn_count_ramp_turns: int = 50
+@export var spawn_count_ramp_turns: int = 5
 @export var spawn_count_max: int = 0
 @export var turn_start_colors: int = 4
 @export var turn_color_unlock_turns: Array[int] = [30, 60]
