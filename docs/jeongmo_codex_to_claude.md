@@ -40,7 +40,7 @@
 
 ### [2026-10-31] 대상 #123 — 공 늘어나는 간격 5턴 → 10턴
 - 상태: 완료 — 최신 `origin/main` `27810ea`에서 `spawn_count_ramp_turns`만 `5 → 10`으로 바꾸고, 턴 경계·진행 해시·두 자리 미리보기 캡처를 새 간격에 맞췄다. 시작 배치·색 해금·레벨 비율·규칙·점수·물리는 바꾸지 않았다
-- 브랜치 / PR: `codex/spawn-ramp-ten-turns` / PR 생성 후 갱신
+- 브랜치 / PR: `codex/spawn-ramp-ten-turns` / https://github.com/jeongmo-dot/gravity_orb/pull/122
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `tests/{test_config.gd,test_spawner.gd}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 기본 생성 증가 간격 `10턴`, 턴당 기본 `1`, 상한 `0` 유지 — 자동 (`test_m4_spawn_defaults`, `test_default_ten_turn_ramp_has_no_maximum`)
