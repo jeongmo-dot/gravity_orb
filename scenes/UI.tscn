@@ -470,7 +470,6 @@ mouse_filter = 2
 unique_name_in_owner = true
 modulate = Color(1, 1, 1, 0.5)
 position = Vector2(830, 1745)
-scale = Vector2(0.6, 0.6)
 
 [node name="ThenCountLabel" type="Label" parent="Hud"]
 unique_name_in_owner = true
