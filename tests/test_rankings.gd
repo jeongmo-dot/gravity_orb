@@ -16,7 +16,7 @@ func test_jelly_rankings_sort_cap_and_keep_legacy_keys() -> void:
 			SAVE_PATH,
 			GameConfig.GameMode.JELLY,
 			1000 - index * 10,
-			{"max_combo": index + 1, "final_moves": index % 4},
+			{"max_combo": index + 1, "turns": 50 + index, "max_level": 5, "final_moves": index % 4},
 			"2026-10-%02d 12:00" % (index + 1)
 		)
 	var rankings: Array[Dictionary] = SaveStore.load_rankings(
@@ -38,7 +38,7 @@ func test_ranking_panel_is_jelly_only_without_tabs() -> void:
 		SAVE_PATH,
 		GameConfig.GameMode.JELLY,
 		7654,
-		{"max_combo": 8, "final_moves": 3},
+		{"max_combo": 8, "turns": 84, "max_level": 6, "final_moves": 3},
 		"2026-10-25 10:30"
 	)
 	var main: Main = MAIN_SCENE.instantiate() as Main
@@ -56,7 +56,11 @@ func test_ranking_panel_is_jelly_only_without_tabs() -> void:
 	var columns: HBoxContainer = row.get_node("Columns") as HBoxContainer
 	assert_eq((columns.get_node("Score") as Label).text, "7,654", "score renders")
 	assert_eq((columns.get_node("Stat") as Label).text, "콤보 8", "combo renders")
-	assert_eq((columns.get_node("Turns") as Label).text, "3", "FINAL MOVE renders")
+	var header: Label = panel.get_node("Panel/Content/RankingHeader") as Label
+	var header_columns: HBoxContainer = header.get_node("Columns") as HBoxContainer
+	assert_eq((header_columns.get_node("Turns") as Label).text, "턴", "turn header renders")
+	assert_eq((columns.get_node("Turns") as Label).text, "84", "stored turns render")
+	assert_true(not header.text.contains("FINAL MOVE"), "legacy FINAL MOVE header absent")
 	main.queue_free()
 	await tree.process_frame
 	InputRouter.set_locked(false)

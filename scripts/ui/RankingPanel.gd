@@ -99,7 +99,7 @@ func _refresh() -> void:
 	(_header_columns["Rank"] as Label).text = "순위"
 	(_header_columns["Score"] as Label).text = "점수"
 	(_header_columns["Stat"] as Label).text = "최대 콤보"
-	(_header_columns["Turns"] as Label).text = "FINAL MOVE"
+	(_header_columns["Turns"] as Label).text = "턴"
 	(_header_columns["Date"] as Label).text = "날짜"
 	var rankings: Array[Dictionary] = SaveStore.load_rankings(
 		_save_path, GameConfig.GameMode.JELLY
@@ -122,7 +122,7 @@ func _refresh() -> void:
 			var record: Dictionary = rankings[index]
 			(columns["Score"] as Label).text = _format_score(int(record["score"]))
 			(columns["Stat"] as Label).text = "콤보 %d" % int(record["max_combo"])
-			(columns["Turns"] as Label).text = str(int(record["final_moves"]))
+			(columns["Turns"] as Label).text = str(int(record["turns"]))
 			(columns["Date"] as Label).text = _short_date(str(record["date"]))
 		for column_name: String in COLUMN_NAMES:
 			(columns[column_name] as Label).add_theme_color_override(

@@ -185,6 +185,16 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("16_turn_input_indicator")
 
+[node name="TurnPanel" type="PanelContainer" parent="Hud"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 156.0
+offset_top = 24.0
+offset_right = 288.0
+offset_bottom = 174.0
+mouse_filter = 2
+theme_type_variation = &"HudPanel"
+
 [node name="ScorePanel" type="PanelContainer" parent="Hud"]
 unique_name_in_owner = true
 layout_mode = 0
@@ -226,16 +236,37 @@ offset_bottom = 1880.0
 mouse_filter = 2
 theme_type_variation = &"HudPanel"
 
-[node name="BlockedPanel" type="PanelContainer" parent="Hud"]
+[node name="TurnTitleLabel" type="Label" parent="Hud"]
 unique_name_in_owner = true
-visible = false
 layout_mode = 0
-offset_left = 330.0
-offset_top = 1548.0
-offset_right = 750.0
-offset_bottom = 1604.0
+offset_left = 168.0
+offset_top = 36.0
+offset_right = 276.0
+offset_bottom = 66.0
 mouse_filter = 2
-theme_type_variation = &"HudDangerPanel"
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.85)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 22
+theme_type_variation = &"HudDisplaySecondary"
+text = "TURN"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="TurnLabel" type="Label" parent="Hud"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 168.0
+offset_top = 66.0
+offset_right = 276.0
+offset_bottom = 160.0
+mouse_filter = 2
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.85)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 40
+theme_type_variation = &"HudDisplayBold"
+text = "1"
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="ScoreTitleLabel" type="Label" parent="Hud"]
 unique_name_in_owner = true
@@ -486,23 +517,6 @@ theme_override_font_sizes/font_size = 24
 theme_type_variation = &"HudDisplayMedium"
 text = "×8"
 horizontal_alignment = 1
-
-[node name="BlockedLabel" type="Label" parent="Hud"]
-unique_name_in_owner = true
-visible = false
-layout_mode = 0
-offset_left = 342.0
-offset_top = 1552.0
-offset_right = 738.0
-offset_bottom = 1600.0
-mouse_filter = 2
-theme_override_colors/font_outline_color = Color(0, 0, 0, 0.85)
-theme_override_constants/outline_size = 4
-theme_override_font_sizes/font_size = 28
-theme_type_variation = &"HudDangerLabel"
-text = "← 막힘"
-horizontal_alignment = 1
-vertical_alignment = 1
 
 [node name="HudSoundButton" type="Button" parent="Hud"]
 unique_name_in_owner = true

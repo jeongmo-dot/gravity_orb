@@ -38,6 +38,38 @@
 
 ## 미확인
 
+### [2026-10-31] 대상 #125 — 위에 턴 수·막힘 글자 삭제·랭킹은 턴
+- 상태: 완료 — 상단 소리 버튼과 SCORE 사이에 BEST와 같은 `TURN` 판을 추가하고, 상태에 따라 다음 입력 턴 또는 진행·종료 턴을 표시한다. 미리보기 위 막힘 글자 판은 삭제했으며 판 둘레 화살표·✕와 막힘 계산은 유지했다. JELLY 랭킹은 저장된 `turns`를 표시하고 `final_moves` 저장 형식은 그대로다
+- 브랜치 / PR: `codex/jelly-turn-hud-ranking` / https://github.com/jeongmo-dot/gravity_orb/pull/125
+- 변경 파일: `scenes/UI.tscn`, `scripts/ui/{Hud.gd,RankingPanel.gd}`, `tests/{test_screen_layout.gd,test_rankings.gd,test_jelly_shell.gd,capture_screens.ps1}`, `tests/scenarios/test_score_flow.gd`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `TurnPanel`은 1080 기준 `x=156~288`, `y=24~174`; SCORE·BEST·소리 버튼과 다른 HUD 배치는 그대로. BEST와 같은 판·제목·숫자 글꼴, 숫자 40~18 자동 맞춤 — 자동 (`test_turn_panel_fills_sound_to_score_gap_without_moving_existing_hud`) + 캡처 직접 관측
+  - [x] 시작 정착·첫 입력 대기는 1, 진행 중은 현재 `turn_index`, 입력 대기는 `turn_index+1`, FINAL MOVE 진행·성공·실패와 게임 오버·재시작도 같은 규칙 — 자동 (`test_turn_hud_tracks_waiting_moving_final_move_game_over_and_restart`)
+  - [x] `BlockedPanel`·`BlockedLabel`과 HUD의 글자 처리·레이아웃 키 삭제. `TurnInputIndicator`의 판 둘레 화살표·✕와 `warning_changed` 계산은 유지 — 자동 (`test_scene_has_only_jelly_frontend_controls`, 기존 막힘 테스트) + 캡처 직접 관측
+  - [x] JELLY 랭킹 열 제목 `턴`, 값은 기록의 `turns`; `final_moves`는 계속 저장되고 점수 정렬·10개 제한·강조는 그대로 — 자동 (`test_ranking_panel_is_jelly_only_without_tabs`, `test_jelly_save_rankings_and_last_mode_are_separate`)
+  - [x] JELLY 기준 해시 `5e00b1f74b76a4e33b443e9fa0a95b85d3717504f9bb55b8736a84e443cff8ea` 그대로, 사건 7종 각 1회·렌더링 켬/끔 동일 — 자동
+  - [x] 일반·장기·성능 테스트, import, 소스/내보낸 Debug 스모크, Debug 빌드 통과. Release 빌드는 명세대로 미실행
+- 최종 캡처 관측:
+  - `tests/capture_screens.ps1` → `540×960`, `540×1170` 각 71장, 합계 `142장`, 종료 코드 0, 누락 0건
+  - 두 비율 `04_jelly_gameplay`: `TURN 1`·`SCORE 0`; 소리·TURN·SCORE·BEST가 같은 줄에서 겹치거나 잘리지 않음
+  - 두 비율 `71_jelly_turn_hud_three_digit`: `TURN 125`·`SCORE 1234567`·`BEST 9876543`이 각 판 안에 맞음
+  - 두 비율 `30_board_blocked`: 막힘 글자 판 없음, 판 아래 빨간 ✕와 나머지 방향 화살표는 유지. NEXT·THEN 위치 변화 없음
+  - 두 비율 `02_jelly_ranking`: 열 제목 `턴`, 기록값 `84`·`61`; `FINAL MOVE` 열 글자 없음
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard (`C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`)
+  - `godot --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` → 일반 `300/300`, 장기 `5/5`, 성능 `5/5`, 합계 `310/310`, 종료 코드 0, `73.266초`; 22시드 이탈·발산 0
+  - 소스 기본·`--mode=blitz` 및 내보낸 Debug 기본·BLITZ `--quit-after 300` → 네 실행 모두 종료 코드 0, 오류 표식 0건
+  - `tools/build_windows.ps1 -Debug` → 종료 코드 0, `version=0.16.0`, Debug exe `104,964,288`바이트. Release 미실행
+  - 규칙 검색 → `Input`/`InputEvent`는 `InputRouter.gd`와 허용된 `Haptics.gd`만. 난수 검색의 기존 `ColorEffectVisual.gd` 전용 RNG와 `Spawner.gd`만 확인, 이번 변경 없음. `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. 새 게임을 시작한다 → 상단에 `TURN 1`, `SCORE 0`이 보이고 소리·SCORE·BEST와 겹치지 않아야 한다.
+  2. 방향을 입력한다 → 공이 움직이는 동안 숫자는 방금 입력한 턴, 다시 입력 대기가 되면 다음 턴으로 1 증가해야 한다. FINAL MOVE 성공·실패 뒤와 게임 오버 숫자도 실제 완료 턴·랭킹 `턴` 값과 같아야 한다.
+  3. 입구가 막힌 입력 대기 상태를 만든다 → 미리보기 위 `↑ ← → 막힘` 글자 판은 없고 판 둘레 빨간 화살표·✕는 보여야 한다.
+  4. 랭킹을 연다 → 네 번째 열 제목은 `턴`, 값은 해당 기록의 완료 턴이며 `FINAL MOVE` 열은 없어야 한다. 결과 화면의 기존 FINAL MOVE 줄은 그대로여야 한다.
+- 결정 사항: 명세 외 수치·규칙 변경 없음. 시각 완료 조건을 분리해서 보기 위해 세 자리 턴·7자리 점수 캡처 `71_jelly_turn_hud_three_digit`만 추가했다
+- 남은 것 · 질문: 없음
+
 ### [2026-10-31] 대상 #120 — 대폭발 임계값 재측정
 - 상태: 완료 (추가 요구 1 반영) — `origin/main` `261b2db`를 같은 브랜치에 병합하고 JELLY 대폭발 기본 임계값을 `7 → 6`으로 조정했다. 다른 색 L5는 반응하지 않고, 다른 색 L6·L7은 대폭발, 같은 색 L7은 기존 잭팟을 유지한다. 규칙 코드·흡수·잭팟·범위·속도·점수·물리·생성·색 해금·CLASSIC 값은 바꾸지 않았다
 - 브랜치 / PR: `codex/jelly-blast-l7-main` / https://github.com/jeongmo-dot/gravity_orb/pull/124

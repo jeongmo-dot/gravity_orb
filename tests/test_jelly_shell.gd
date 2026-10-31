@@ -26,6 +26,7 @@ func test_jelly_save_rankings_and_last_mode_are_separate() -> void:
 	)
 	assert_eq(rankings.size(), 1, "JELLY ranking has its own entry")
 	assert_eq(int(rankings[0]["max_combo"]), 7, "JELLY ranking stores combo")
+	assert_eq(int(rankings[0]["turns"]), 42, "JELLY ranking stores turns")
 	assert_eq(int(rankings[0]["final_moves"]), 2, "JELLY ranking stores survived FINAL MOVEs")
 	assert_eq(
 		SaveStore.load_best_score(SAVE_PATH, GameConfig.GameMode.TURN),
@@ -96,8 +97,13 @@ func test_jelly_start_action_and_single_ranking() -> void:
 	)
 	assert_eq(
 		(ranking.get_node("Panel/Content/Rows/RankingRow1/Text/Columns/Turns") as Label).text,
-		"3",
-		"JELLY ranking adds FINAL MOVE count"
+		"31",
+		"JELLY ranking displays turn count"
+	)
+	assert_eq(
+		(ranking.get_node("Panel/Content/RankingHeader/Columns/Turns") as Label).text,
+		"턴",
+		"JELLY ranking labels the turn column"
 	)
 	main.queue_free()
 	await tree.process_frame

@@ -64,6 +64,8 @@ const SPEAKER_OFF_ICON: Texture2D = preload("res://assets/ui/speaker_off.svg")
 @onready var _then_count_label: Label = %ThenCountLabel
 @onready var _score_title_label: Label = %ScoreTitleLabel
 @onready var _score_label: Label = %ScoreLabel
+@onready var _turn_title_label: Label = %TurnTitleLabel
+@onready var _turn_label: Label = %TurnLabel
 @onready var _best_title_label: Label = %BestTitleLabel
 @onready var _best_label: Label = %BestLabel
 @onready var _max_combo_label: Label = %MaxComboLabel
@@ -72,18 +74,18 @@ const SPEAKER_OFF_ICON: Texture2D = preload("res://assets/ui/speaker_off.svg")
 @onready var _danger_label: Label = %DangerLabel
 @onready var _score_popup_layer: Control = %ScorePopupLayer
 @onready var _callout_label: Label = %CalloutLabel
-@onready var _blocked_label: Label = %BlockedLabel
 @onready var _game_over_panel: GameOverPanel = %GameOverPanel
 @onready var _sound_button: Button = %HudSoundButton
 @onready var _score_panel: PanelContainer = %ScorePanel
+@onready var _turn_panel: PanelContainer = %TurnPanel
 @onready var _best_panel: PanelContainer = %BestPanel
 @onready var _danger_panel: PanelContainer = %DangerPanel
 @onready var _preview_shelf: PanelContainer = %PreviewShelf
-@onready var _blocked_panel: PanelContainer = %BlockedPanel
 @onready var _turn_input_indicator: TurnInputIndicator = %TurnInputIndicator
 
 var _spawner: Spawner
 var _score_manager: ScoreManager
+var _turn_manager: TurnManager
 var _callout_tween: Tween
 var _next_preview_flash_tween: Tween
 var _then_preview_flash_tween: Tween
@@ -204,6 +206,9 @@ func _apply_responsive_layout() -> void:
 	_set_control_rect(_score_panel, layout["score_panel"] as Rect2)
 	_set_control_rect(_score_title_label, layout["score_title"] as Rect2)
 	_set_control_rect(_score_label, layout["score"] as Rect2)
+	_set_control_rect(_turn_panel, layout["turn_panel"] as Rect2)
+	_set_control_rect(_turn_title_label, layout["turn_title"] as Rect2)
+	_set_control_rect(_turn_label, layout["turn"] as Rect2)
 	_set_control_rect(_best_panel, layout["best_panel"] as Rect2)
 	_set_control_rect(_best_title_label, layout["best_title"] as Rect2)
 	_set_control_rect(_best_label, layout["best"] as Rect2)
@@ -214,8 +219,6 @@ func _apply_responsive_layout() -> void:
 	_set_control_rect(_combo_label, layout["combo"] as Rect2)
 	_set_control_rect(_max_combo_label, layout["max_combo"] as Rect2)
 	_set_control_rect(_preview_shelf, layout["preview_shelf"] as Rect2)
-	_set_control_rect(_blocked_panel, layout["blocked_panel"] as Rect2)
-	_set_control_rect(_blocked_label, layout["blocked"] as Rect2)
 	_set_control_rect(_next_label, layout["next_label"] as Rect2)
 	_set_control_rect(_next_preview_region, layout["next"] as Rect2)
 	_set_control_rect(_next_count_label, layout["next_count"] as Rect2)
@@ -235,11 +238,13 @@ func _apply_responsive_layout() -> void:
 	_callout_label.pivot_offset = _callout_label.size * 0.5
 	_callout_base_position = _callout_label.position
 	_score_label.pivot_offset = _score_label.size * 0.5
+	_turn_label.pivot_offset = _turn_label.size * 0.5
 	_best_label.pivot_offset = _best_label.size * 0.5
 	_multiplier_label.pivot_offset = _multiplier_label.size * 0.5
 	_combo_label.pivot_offset = _combo_label.size * 0.5
 	_danger_label.pivot_offset = _danger_label.size * 0.5
 	_fit_numeric_label(_score_label, _displayed_score, SCORE_FONT_MAX, SCORE_FONT_MIN)
+	_refresh_turn_number()
 	_fit_numeric_label(_best_label, _best_target, BEST_FONT_MAX, BEST_FONT_MIN)
 
 
@@ -288,23 +293,29 @@ static func hud_layout(viewport_size: Vector2, safe_area: Rect2 = Rect2()) -> Di
 	var next_width: float = shelf.size.x * 0.55
 	var then_x: float = shelf.position.x + shelf.size.x * 0.60
 	var then_width: float = shelf.end.x - 30.0 - then_x
+	var score_panel: Rect2 = Rect2(center_x - 240.0, top, 480.0, 150.0)
+	var sound_rect: Rect2 = Rect2(safe.position.x + HUD_MARGIN, top + 8.0, 120.0, 120.0)
+	var turn_left: float = sound_rect.end.x + 12.0
+	var turn_right: float = score_panel.position.x - 12.0
+	var turn_panel: Rect2 = Rect2(turn_left, top, turn_right - turn_left, 150.0)
 	return {
 		"safe": safe,
-		"score_panel": Rect2(center_x - 240.0, top, 480.0, 150.0),
+		"score_panel": score_panel,
 		"score_title": Rect2(center_x - 224.0, top + 12.0, 448.0, 30.0),
 		"score": Rect2(center_x - 224.0, top + 42.0, 448.0, 96.0),
+		"turn_panel": turn_panel,
+		"turn_title": Rect2(turn_left + 12.0, top + 12.0, turn_panel.size.x - 24.0, 30.0),
+		"turn": Rect2(turn_left + 12.0, top + 42.0, turn_panel.size.x - 24.0, 94.0),
 		"best_panel": Rect2(safe.end.x - HUD_MARGIN - 236.0, top, 236.0, 150.0),
 		"best_title": Rect2(safe.end.x - HUD_MARGIN - 224.0, top + 12.0, 212.0, 30.0),
 		"best": Rect2(safe.end.x - HUD_MARGIN - 224.0, top + 42.0, 212.0, 94.0),
-		"sound": Rect2(safe.position.x + HUD_MARGIN, top + 8.0, 120.0, 120.0),
+		"sound": sound_rect,
 		"danger_panel": Rect2(safe.position.x + HUD_MARGIN, top + 166.0, 256.0, 62.0),
 		"danger": Rect2(safe.position.x + HUD_MARGIN + 12.0, top + 172.0, 232.0, 50.0),
 		"multiplier": Rect2(center_x - 220.0, top + 160.0, 440.0, 66.0),
 		"combo": Rect2(center_x - 220.0, top + 226.0, 440.0, 46.0),
 		"max_combo": Rect2(safe.end.x - HUD_MARGIN - 236.0, top + 162.0, 236.0, 46.0),
 		"preview_shelf": shelf,
-		"blocked_panel": Rect2(center_x - 210.0, shelf_top + 8.0, 420.0, 56.0),
-		"blocked": Rect2(center_x - 198.0, shelf_top + 12.0, 396.0, 48.0),
 		"next_label": Rect2(shelf.position.x + 30.0, shelf_top + 76.0, next_width, 40.0),
 		"next": Rect2(shelf.position.x + 30.0, shelf_top + 116.0, next_width, 194.0),
 		"next_count": Rect2(
@@ -433,10 +444,13 @@ func bind_game_state(
 	score_manager: ScoreManager
 ) -> void:
 	_board = board
+	_turn_manager = game_manager as TurnManager
 	_apply_responsive_layout()
 	_reset_callout_tracking()
 	_turn_input_indicator.bind(game_manager, board)
-	var turn_manager: TurnManager = game_manager as TurnManager
+	var turn_manager: TurnManager = _turn_manager
+	if not turn_manager.state_changed.is_connected(_on_turn_state_changed):
+		turn_manager.state_changed.connect(_on_turn_state_changed)
 	if not turn_manager.planet_unlocked.is_connected(_on_planet_unlocked):
 		turn_manager.planet_unlocked.connect(_on_planet_unlocked)
 	if not turn_manager.final_move_changed.is_connected(_on_final_move_changed):
@@ -445,10 +459,9 @@ func bind_game_state(
 		turn_manager.final_move_pending or turn_manager.final_move_active,
 		TurnManager.FINAL_MOVE_MESSAGE
 	)
-	game_manager.warning_changed.connect(_on_warning_changed)
 	game_manager.combo_changed.connect(_on_combo_changed)
 	_game_over_panel.bind(game_manager, score_manager)
-	_on_warning_changed(game_manager.blocked_directions)
+	_refresh_turn_number()
 	_on_combo_changed(
 		game_manager.turn_combo,
 		game_manager.current_combo_multiplier(),
@@ -456,6 +469,29 @@ func bind_game_state(
 	)
 	board.set_warning_directions(game_manager.blocked_directions)
 	_refresh_danger_badge()
+
+
+func _on_turn_state_changed(_state: int) -> void:
+	_refresh_turn_number()
+
+
+func _refresh_turn_number() -> void:
+	if _turn_manager == null or not is_instance_valid(_turn_label):
+		return
+	var value: int = turn_number_for_state(
+		_turn_manager.turn_index,
+		int(_turn_manager.state)
+	)
+	_turn_label.text = str(value)
+	_fit_numeric_label(_turn_label, value, BEST_FONT_MAX, BEST_FONT_MIN)
+
+
+static func turn_number_for_state(turn_index: int, state: int) -> int:
+	if turn_index <= 0:
+		return 1
+	if state == int(TurnManager.State.WAITING_INPUT):
+		return turn_index + 1
+	return turn_index
 
 
 func _on_final_move_changed(visible: bool, message: String) -> void:
@@ -1185,27 +1221,6 @@ func _format_multiplier(multiplier: float) -> String:
 	if is_equal_approx(multiplier, float(roundi(multiplier))):
 		return str(roundi(multiplier))
 	return "%.2f" % multiplier
-
-
-func _on_warning_changed(directions: Array[Vector2i]) -> void:
-	var symbols: Array[String] = []
-	for direction: Vector2i in directions:
-		symbols.append(_direction_symbol(direction))
-	_blocked_label.visible = not symbols.is_empty()
-	_blocked_panel.visible = _blocked_label.visible
-	_blocked_label.text = "" if symbols.is_empty() else "%s 막힘" % " ".join(symbols)
-
-
-func _direction_symbol(direction: Vector2i) -> String:
-	if direction == Vector2i.LEFT:
-		return "←"
-	if direction == Vector2i.RIGHT:
-		return "→"
-	if direction == Vector2i.UP:
-		return "↑"
-	if direction == Vector2i.DOWN:
-		return "↓"
-	return "?"
 
 
 func _update_callout(combo: int) -> void:

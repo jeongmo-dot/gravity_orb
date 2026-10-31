@@ -269,6 +269,53 @@ func test_main_scene_binds_score_hud_and_restart() -> void:
 	Config.data.preview_turns = original_preview_turns
 
 
+func test_turn_hud_tracks_waiting_moving_final_move_game_over_and_restart() -> void:
+	var main: Main = MAIN_SCENE.instantiate() as Main
+	main.launch_immediately(GameConfig.GameMode.JELLY)
+	tree.root.add_child(main)
+	await tree.process_frame
+	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
+	manager.set_physics_process(false)
+	var turn_label: Label = main.get_node("UI/Hud/TurnLabel") as Label
+	assert_eq(turn_label.text, "1", "initial settling displays turn one")
+
+	manager.turn_index = 0
+	manager._set_state(TurnManager.State.WAITING_INPUT)
+	assert_eq(turn_label.text, "1", "first input waits for turn one")
+	manager.turn_index = 1
+	manager._set_state(TurnManager.State.SPAWNING)
+	assert_eq(turn_label.text, "1", "moving first turn keeps current number")
+	manager._set_state(TurnManager.State.WAITING_INPUT)
+	assert_eq(turn_label.text, "2", "next input advances to turn two")
+
+	manager.final_move_pending = true
+	manager.turn_index = 2
+	manager._set_state(TurnManager.State.SIMULATING)
+	assert_eq(turn_label.text, "2", "FINAL MOVE in progress displays current turn")
+	manager._set_state(TurnManager.State.WAITING_INPUT)
+	assert_eq(turn_label.text, "3", "FINAL MOVE success returns to next turn")
+	manager.turn_index = 3
+	manager._set_state(TurnManager.State.GAME_OVER)
+	assert_eq(turn_label.text, "3", "game over displays ranking turn count")
+
+	main.queue_free()
+	await tree.process_frame
+	InputRouter.set_locked(false)
+
+	var restarted: Main = MAIN_SCENE.instantiate() as Main
+	restarted.launch_immediately(GameConfig.GameMode.JELLY)
+	tree.root.add_child(restarted)
+	await tree.process_frame
+	assert_eq(
+		(restarted.get_node("UI/Hud/TurnLabel") as Label).text,
+		"1",
+		"new game resets TURN to one"
+	)
+	restarted.queue_free()
+	await tree.process_frame
+	InputRouter.set_locked(false)
+
+
 func test_game_over_panel_shows_scores_direction_and_restart_button() -> void:
 	var main: Main = MAIN_SCENE.instantiate() as Main
 	main.launch_immediately(GameConfig.GameMode.TURN)
