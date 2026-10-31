@@ -2,7 +2,6 @@ class_name Hud
 extends Control
 
 const MAX_PREVIEW_COUNT: int = 5
-const PREVIEW_REGION_SIZE: Vector2 = Vector2(480.0, 180.0)
 const PREVIEW_GAP: float = 16.0
 const DANGER_REFRESH_INTERVAL: float = 0.25
 const SCORE_ROLL_DURATION: float = 0.30
@@ -116,6 +115,7 @@ var _planet_unlock_history: Array[int] = []
 var _pending_planet_unlocks: Array[int] = []
 var _preview_unlock_seen: Dictionary = {}
 var _preview_unlock_flash_history: Array[int] = []
+var _preview_batches: Array = []
 var _callout_base_position: Vector2 = Vector2.ZERO
 var _planet_callout_visual: OrbVisual
 var _planet_callout_base_position: Vector2 = Vector2.ZERO
@@ -224,6 +224,8 @@ func _apply_responsive_layout() -> void:
 	_set_control_rect(_then_count_label, layout["then_count"] as Rect2)
 	_next_preview.position = (layout["next"] as Rect2).get_center() + Vector2(0.0, 8.0)
 	_then_preview.position = (layout["then"] as Rect2).get_center() + Vector2(0.0, 8.0)
+	if not _preview_batches.is_empty():
+		_render_preview_batches(_preview_batches)
 	var callout_rect: Rect2 = _callout_layout_rect(viewport_size, layout)
 	_set_control_rect(_callout_label, callout_rect)
 	_callout_label.add_theme_font_size_override(
@@ -466,6 +468,12 @@ func _on_final_move_changed(visible: bool, message: String) -> void:
 
 
 func _on_preview_changed(batches: Array) -> void:
+	_preview_batches = batches.duplicate(true)
+	_render_preview_batches(_preview_batches)
+	_track_preview_unlocks(batches)
+
+
+func _render_preview_batches(batches: Array) -> void:
 	var next_batch: Array = batches[0] if not batches.is_empty() else []
 	_render_preview(_next_preview, next_batch)
 	_next_count_label.visible = next_batch.size() > MAX_PREVIEW_COUNT
@@ -477,7 +485,6 @@ func _on_preview_changed(batches: Array) -> void:
 	_render_preview(_then_preview, then_batch)
 	_then_count_label.visible = has_then and then_batch.size() > MAX_PREVIEW_COUNT
 	_then_count_label.text = "×%d" % then_batch.size()
-	_track_preview_unlocks(batches)
 
 
 func _track_preview_unlocks(batches: Array) -> void:
@@ -542,26 +549,24 @@ func _render_preview(preview_root: Node2D, batch: Array) -> void:
 		return
 
 	var radii: Array[float] = []
-	var natural_width: float = 0.0
-	var natural_height: float = 0.0
 	for index: int in range(preview_count):
 		var candidate: Dictionary = batch[index] as Dictionary
 		var level: int = int(candidate["level"])
 		var radius: float = Config.data.radius_for_level(level)
 		radii.append(radius)
-		natural_width += radius * 2.0
-		natural_height = maxf(natural_height, radius * 2.0)
-	if preview_count > 1:
-		natural_width += PREVIEW_GAP * float(preview_count - 1)
 
-	var preview_scale: float = minf(
-		2.0,
-		minf(
-			PREVIEW_REGION_SIZE.x / natural_width,
-			PREVIEW_REGION_SIZE.y / natural_height
-		)
+	var region: Control = (
+		_next_preview_region if preview_root == _next_preview else _then_preview_region
 	)
-	var cursor_x: float = -natural_width * preview_scale * 0.5
+	var preview_scale: float = preview_scale_for_width(
+		_projected_board_rect().size.x,
+		Config.data.board_size
+	)
+	var centers: PackedFloat32Array = preview_item_centers(
+		radii,
+		preview_scale,
+		region.size.x
+	)
 	for index: int in range(preview_count):
 		var candidate: Dictionary = batch[index] as Dictionary
 		var radius: float = radii[index]
@@ -595,11 +600,50 @@ func _render_preview(preview_root: Node2D, batch: Array) -> void:
 			Config.data.blast_blink_period
 		)
 		visual.scale = Vector2.ONE * preview_scale
-		visual.position = Vector2(
-			cursor_x + radius * preview_scale,
-			0.0
-		)
-		cursor_x += (radius * 2.0 + PREVIEW_GAP) * preview_scale
+		visual.position = Vector2(centers[index], 0.0)
+
+
+static func preview_scale_for_width(projected_board_width: float, board_size: float) -> float:
+	if projected_board_width <= 0.0 or board_size <= 0.0:
+		return 1.0
+	return projected_board_width / board_size
+
+
+static func preview_item_spacing(
+	radii: Array[float],
+	preview_scale: float,
+	region_width: float
+) -> float:
+	if radii.size() <= 1:
+		return 0.0
+	var diameter_total: float = 0.0
+	for radius: float in radii:
+		diameter_total += radius * 2.0 * preview_scale
+	var preferred_gap: float = PREVIEW_GAP * preview_scale
+	return minf(
+		preferred_gap,
+		(region_width - diameter_total) / float(radii.size() - 1)
+	)
+
+
+static func preview_item_centers(
+	radii: Array[float],
+	preview_scale: float,
+	region_width: float
+) -> PackedFloat32Array:
+	var centers: PackedFloat32Array = PackedFloat32Array()
+	if radii.is_empty():
+		return centers
+	var spacing: float = preview_item_spacing(radii, preview_scale, region_width)
+	var total_width: float = spacing * float(radii.size() - 1)
+	for radius: float in radii:
+		total_width += radius * 2.0 * preview_scale
+	var cursor_x: float = -total_width * 0.5
+	for radius: float in radii:
+		var scaled_radius: float = radius * preview_scale
+		centers.append(cursor_x + scaled_radius)
+		cursor_x += scaled_radius * 2.0 + spacing
+	return centers
 
 
 func set_symbols_enabled(enabled: bool) -> void:

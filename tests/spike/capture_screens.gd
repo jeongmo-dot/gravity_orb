@@ -73,6 +73,11 @@ const CAPTURE_FILES: Array[String] = [
 	"63_jelly_gravity_right_down_rest.png",
 	"64_jelly_initial_four_colors.png",
 	"65_jelly_preview_double_digit.png",
+	"66_jelly_preview_board_match.png",
+	"67_jelly_preview_next_1.png",
+	"68_jelly_preview_next_2.png",
+	"69_jelly_preview_next_5.png",
+	"70_jelly_preview_then_l2_5.png",
 ]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
@@ -696,10 +701,12 @@ func _capture_recovered_jelly_scenes(
 	await _capture_recovered_jelly_motion(main, manager, board)
 	await _capture_gravity_turn_scenes(main, manager, board)
 	await _capture_spawn_ramp_scenes(main, board, hud)
+	await _capture_preview_scale_scenes(board, hud)
 	print(
 		"SCREEN_CAPTURE_CHECK scene=recovered_jelly levels=7 crowded=25 max=true "
 		+ "stretch=true absorption=true unlock=true land_frames=10 breathe=true "
-		+ "physical_pile=true right_motion=true gravity_turn_scenes=3 spawn_ramp_scenes=2"
+		+ "physical_pile=true right_motion=true gravity_turn_scenes=3 spawn_ramp_scenes=2 "
+		+ "preview_scale_scenes=5"
 	)
 
 
@@ -747,6 +754,117 @@ func _capture_spawn_ramp_scenes(main: Main, board: Board3D, hud: Hud) -> void:
 			hud._next_count_label.text,
 			hud._then_count_label.text,
 		]
+	)
+
+
+func _capture_preview_scale_scenes(board: Board3D, hud: Hud) -> void:
+	board.clear()
+	board.set_gravity(Vector2i.DOWN)
+	var board_l1: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.YELLOW,
+		1,
+		Vector2(-150.0, 40.0)
+	)
+	var board_l2: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.BLUE,
+		2,
+		Vector2(150.0, 40.0)
+	)
+	board_l1.disable_physics()
+	board_l2.disable_physics()
+	var level_pair: Array = [
+		{"color": OrbTypes.OrbColor.YELLOW, "level": 1},
+		{"color": OrbTypes.OrbColor.BLUE, "level": 2},
+	]
+	hud._on_preview_changed([level_pair, level_pair])
+	await get_tree().process_frame
+	await _capture("66_jelly_preview_board_match.png")
+	_measure_preview_diameters(board_l1, board_l2, hud)
+
+	var next_one: Array = [{"color": OrbTypes.OrbColor.YELLOW, "level": 1}]
+	hud._on_preview_changed([next_one, level_pair])
+	await get_tree().process_frame
+	await _capture("67_jelly_preview_next_1.png")
+	var next_two: Array = [
+		{"color": OrbTypes.OrbColor.YELLOW, "level": 1},
+		{"color": OrbTypes.OrbColor.BLUE, "level": 2},
+	]
+	hud._on_preview_changed([next_two, level_pair])
+	await get_tree().process_frame
+	await _capture("68_jelly_preview_next_2.png")
+	var next_five: Array = []
+	for index: int in range(5):
+		next_five.append({"color": index % 4, "level": 1 + index % 2})
+	hud._on_preview_changed([next_five, level_pair])
+	await get_tree().process_frame
+	await _capture("69_jelly_preview_next_5.png")
+
+	var then_l2_five: Array = []
+	for index: int in range(5):
+		then_l2_five.append({"color": index % 4, "level": 2})
+	hud._on_preview_changed([next_one, then_l2_five])
+	await get_tree().process_frame
+	await _capture("70_jelly_preview_then_l2_5.png")
+
+
+func _measure_preview_diameters(board_l1: Orb3D, board_l2: Orb3D, hud: Hud) -> void:
+	var camera: Camera3D = get_viewport().get_camera_3d()
+	if camera == null:
+		_fail("preview diameter measurement has no camera")
+		return
+	var board_l1_px: float = _orb_screen_diameter(camera, board_l1)
+	var board_l2_px: float = _orb_screen_diameter(camera, board_l2)
+	var next_l1: OrbVisual = hud._next_preview.get_child(0) as OrbVisual
+	var next_l2: OrbVisual = hud._next_preview.get_child(1) as OrbVisual
+	var then_l1: OrbVisual = hud._then_preview.get_child(0) as OrbVisual
+	var then_l2: OrbVisual = hud._then_preview.get_child(1) as OrbVisual
+	var next_l1_px: float = _preview_screen_diameter(next_l1, 1)
+	var next_l2_px: float = _preview_screen_diameter(next_l2, 2)
+	var then_l1_px: float = _preview_screen_diameter(then_l1, 1)
+	var then_l2_px: float = _preview_screen_diameter(then_l2, 2)
+	print(
+		(
+			"JELLY_PREVIEW_SIZE_CHECK board_l1=%.3f next_l1=%.3f then_l1=%.3f "
+			+ "board_l2=%.3f next_l2=%.3f then_l2=%.3f"
+		) % [
+			board_l1_px,
+			next_l1_px,
+			then_l1_px,
+			board_l2_px,
+			next_l2_px,
+			then_l2_px,
+		]
+	)
+	for comparison: Vector2 in [
+		Vector2(board_l1_px, next_l1_px),
+		Vector2(board_l1_px, then_l1_px),
+		Vector2(board_l2_px, next_l2_px),
+		Vector2(board_l2_px, then_l2_px),
+	]:
+		var difference_ratio: float = absf(comparison.x - comparison.y) / maxf(
+			comparison.x,
+			0.001
+		)
+		if difference_ratio > 0.05:
+			_fail("preview body diameter differs from board by more than five percent")
+
+
+func _orb_screen_diameter(camera: Camera3D, orb: Orb3D) -> float:
+	var body: RigidBody3D = orb.get_physics_body()
+	var center: Vector2 = camera.unproject_position(body.global_position)
+	var edge_world: Vector3 = body.global_position + (
+		body.global_transform.basis.x.normalized()
+		* orb.get_current_radius()
+		/ Board3D.PIXELS_PER_METER
+	)
+	return center.distance_to(camera.unproject_position(edge_world)) * 2.0
+
+
+func _preview_screen_diameter(visual: OrbVisual, level: int) -> float:
+	return (
+		Config.data.radius_for_level(level)
+		* 2.0
+		* visual.global_transform.x.length()
 	)
 
 

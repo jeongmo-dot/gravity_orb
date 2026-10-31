@@ -38,6 +38,47 @@
 
 ## 미확인
 
+### [2026-10-31] 대상 #122 — 미리보기를 판과 같은 크기로
+- 상태: 완료 — 최신 `origin/main` `24baadc`에서 NEXT·THEN 젤리의 배율을 판 투영 너비 ÷ `board_size`로 고정했다. 개수와 무관하게 판 위 같은 레벨과 같은 화면 크기이며, THEN은 크기만 NEXT와 같고 기존 알파 0.5는 유지한다
+- 브랜치 / PR: `codex/preview-board-size` / PR 생성 예정
+- 변경 파일: `scenes/UI.tscn`, `scripts/ui/Hud.gd`, `tests/{test_screen_layout.gd,capture_screens.ps1}`, `tests/scenarios/test_score_flow.gd`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] NEXT·THEN의 L1·L2 몸통이 판 위 같은 레벨과 같은 화면 지름 — 자동 픽셀 측정 + 두 비율 직접 관측, 차이 `0.000%`
+  - [x] 1·2·5개에서 배율이 변하지 않고 판 투영 배율과 같음 — 자동 (`test_preview_orbs_match_board_scale_for_one_two_and_five_items`)
+  - [x] 창/카메라 투영 크기가 바뀌면 저장된 미리보기를 새 판 투영 배율로 다시 그림 — 자동 (같은 테스트의 투영 변경 대조)
+  - [x] 칸이 부족하면 간격을 0까지 줄이고, 더 부족하면 크기를 유지한 채 균등하게 겹쳐 첫·마지막 몸통을 칸 안에 둠 — 자동 (`test_preview_spacing_reduces_then_overlaps_without_changing_size`) + 직접 관측 (`70`)
+  - [x] THEN 배율 `0.6 → 1.0`, 흐림 알파 `0.5` 유지. `×n`·글자·젤리 그림·미리보기 개수·게임 규칙은 그대로 — 자동 회귀 + 직접 관측
+  - [x] JELLY 기준 해시 `ce7054b628a6c1f6e528eb62bbd2a9bb67946fe3a28b4374bda12d5f1b251ce2`, 렌더링 켬/끔 동일, 사건 7종 각 1회 — 자동
+  - [x] 두 화면비 전체 캡처를 마지막에 다시 만들고 새 장면 5종을 직접 확인 — 자동 캡처 + 직접 관측
+  - [x] 일반·장기·성능 테스트, import, 소스/내보낸 Debug 스모크, Debug 빌드 통과. Release 빌드는 미실행
+- 화면 지름 측정 (`66_jelly_preview_board_match`, 정지 상태, 화면 논리 픽셀):
+
+  | 화면비 | 판 L1 / NEXT L1 / THEN L1 | 판 L2 / NEXT L2 / THEN L2 | 최대 차이 |
+  |---|---|---|---:|
+  | `540×960` | `51.551 / 51.551 / 51.551px` | `82.482 / 82.482 / 82.482px` | `0.000%` |
+  | `540×1170` | `51.551 / 51.551 / 51.551px` | `82.482 / 82.482 / 82.482px` | `0.000%` |
+
+- 최종 캡처 관측:
+  - `tests/capture_screens.ps1` → `540×960`, `540×1170` 각 70장, 합계 `140장`, 종료 코드 0, `SCRIPT ERROR`·누락 0건; 착지 연속 장면 SHA 고유 각 `10/10`
+  - `66`: 판 위와 NEXT·THEN의 노랑 L1·파랑 L2 몸통 크기가 일치하고 THEN만 기존처럼 흐리다. 두 비율에서 보드·HUD 잘림 없음
+  - `67`·`68`·`69`: NEXT가 1·2·5개로 바뀌어도 L1·L2 크기가 그대로이고 중앙 정렬·글자 위치가 유지된다
+  - `70`: THEN L2 5개가 축소 없이 같은 양으로 겹치며 양 끝 몸통이 THEN 칸 안에 있다. 배열의 뒤 젤리가 앞 젤리 위에 그려져 겹침 순서가 일정하다
+  - 기존 `65_jelly_preview_double_digit`도 두 비율에서 다시 확인했다. NEXT·THEN `×11`과 최대 5개 표시가 유지되고 숫자·젤리가 잘리지 않는다
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard (`C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`)
+  - `godot --headless --path . --import` → 종료 코드 0, 오류 표식 0건
+  - `tests/run_tests.ps1` 최종 → 일반 `296/296`, 장기 `5/5`, 성능 `5/5`, 합계 `306/306`, 종료 코드 0, `73.979초`; 최초 실행의 기존 THEN 0.6 기대값 1건은 명세에 맞게 1.0으로 갱신 후 관련 `10/10`과 전체를 재실행함
+  - 소스 기본·`--mode=blitz` 및 내보낸 Debug 기본·BLITZ `--quit-after 300` → 네 실행 모두 종료 코드 0, 오류 표식 0건
+  - `tools/build_windows.ps1 -Debug` → 종료 코드 0, `version=0.16.0`, Debug exe `104,963,488`바이트. Release 미실행
+  - 규칙 검색 → 신규 `Input`/`InputEvent`·전역 난수 사용 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. JELLY에서 판 위 L1·L2와 NEXT·THEN L1·L2를 함께 본다 → 같은 레벨의 몸통 화면 크기가 같고 THEN만 반투명이어야 한다.
+  2. NEXT가 1개·2개·5개인 턴을 비교한다 → 개수가 바뀌어도 각 레벨 크기는 바뀌지 않아야 한다.
+  3. THEN에 L2가 5개인 장면을 본다 → 크기를 줄이지 않고 균등하게 겹치며 양 끝 젤리가 칸 안에 있어야 한다.
+  4. 창 높이/비율을 바꾼다 → 판의 새 화면 투영 크기에 맞춰 NEXT·THEN이 다시 배율되고 같은 레벨 크기 일치를 유지해야 한다.
+- 결정 사항: 선호 간격은 기존 `PREVIEW_GAP`을 판 투영 배율로 환산한다. 지름 합계와 선호 간격이 칸을 넘으면 `(칸 너비 - 지름 합계) / (개수 - 1)`을 실제 간격으로 사용해 양수 구간에서는 간격만 줄이고, 음수가 되면 같은 양으로 겹친다. 미리보기 데이터는 복제해 저장하고 반응형 레이아웃 갱신 때 다시 배치하되, 새 색 해금 반짝임 이력은 다시 발생시키지 않는다
+- 남은 것 · 질문: 없음. 캡처 PNG는 검증 산출물이라 기존대로 `artifacts/`에만 두고 커밋하지 않는다
+
 ### [2026-10-31] 대상 #121 — 공이 많을 때 느려짐 경량화
 - 상태: 완료 — `origin/main` `e247957`에서 시작해 규칙·수치·물리 주기·그림을 바꾸지 않고, 반복 전수 탐색과 반응 판정 할당을 줄였다. 실제 `540×960` 창·VSync 끔·단일 프로세스에서 같은 세 장면을 변경 전/후로 측정했다
 - 브랜치 / PR: `codex/full-board-performance` / https://github.com/jeongmo-dot/gravity_orb/pull/120
