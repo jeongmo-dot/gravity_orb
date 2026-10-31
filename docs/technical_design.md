@@ -3618,6 +3618,18 @@ M4 검수(2026-09-28)에서 발견. 합체가 없는 M4 상태에서 **이동·�
      - 막힌 방향이 있는 입력 대기: 글자 판은 없고 판 둘레 빨간 표시는 있음
      - 랭킹: 턴 열에 기록
 
+**#125 결과 — 병합** ([PR #125](https://github.com/jeongmo-dot/gravity_orb/pull/125) `aa355bd`, 2026-10-31):
+- 턴 판: `UI.tscn`에 `TurnPanel`·`TurnTitleLabel`·`TurnLabel` (BEST와 같은 `HudPanel`·`HudDisplaySecondary`·`HudDisplayBold`). `hud_layout()`가 소리 버튼 끝 + 12 ~ SCORE 판 시작 − 12로 `turn_panel`을 계산한다 (1080 기준 156~288, 위 24~174)
+- 숫자: `Hud.turn_number_for_state()`. `turn_index` ≤ 0이면 1, 입력 대기면 `turn_index + 1`, 그 밖에는 `turn_index`. `TurnManager.state_changed`마다 다시 그린다 (연출 없음). 다시 시작은 장면을 새로 불러오므로 (`Main.restart()`) 늘 1부터다 (Claude 확인)
+- 막힘 글자 판: `BlockedPanel`·`BlockedLabel`, 레이아웃 키, `_on_warning_changed()`·`_direction_symbol()`을 지웠다. `board.set_warning_directions()`·`TurnInputIndicator`는 그대로
+- 랭킹: 열 제목 `턴`, 값 `record["turns"]`. 저장 형식 그대로
+- JELLY 기준 해시 `5e00b1f7…` 그대로, 래퍼 310/310, Debug 빌드 (Codex). 새 캡처 `71_jelly_turn_hud_three_digit` (TURN 125·SCORE 1234567·BEST 9876543)
+- Claude 검수 (diff, 캡처 `71`·`30` (540×1170)·`02`·`65` 직접 확인, 재실행 없음):
+  - `71`: 소리·TURN·SCORE·BEST가 한 줄에서 겹치거나 잘리지 않는다
+  - `30`: 미리보기 칸 위 글자 판이 없고, 판 아래 빨간 ✕·화살표는 있다
+  - `02`: 열 제목 `턴`, 값 84·61
+  - 캡처 장면만의 불일치 (게임에는 영향 없음): `65` (NEXT·THEN `×10`)는 미리보기만 91턴으로 꾸며 TURN이 1이다. `71`은 TURN 125인데 NEXT가 1개다. 캡처를 다시 손볼 때 장면의 `turn_index`를 미리보기와 맞춘다
+
 ### 12-ONE.3 다음 (JELLY 개선)
 - CLASSIC 전용 분기 정리 (행성 그림·연출·규칙 — JELLY가 안 쓰는 것)
 - 결정 대기에서 이어지는 것: 효과음 (합성·녹음), 시작 화면 그림 (지금 행성 — JELLY에 맞게?)

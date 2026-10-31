@@ -32,8 +32,15 @@
 
 ## 대기 중
 
-### [2026-10-31 #125] 위에 턴 수·막힘 글자 삭제·랭킹은 턴
-- 상태: 대기 (**다음 차례**. `origin/main` `47a0f7c` 위에서)
+- 없음
+
+---
+
+## 처리 완료
+
+### [2026-10-31 #125] 위에 턴 수·막힘 글자 삭제·랭킹은 턴 — 완료
+- 상태: 완료 (2026-10-31 Claude 검수 · [PR #125](https://github.com/jeongmo-dot/gravity_orb/pull/125) 병합 `aa355bd`)
+- 검수: 소리 버튼과 SCORE 사이 `TURN` 판 (1080 기준 156~288), 숫자 = 입력 대기 중 `turn_index + 1`·그 밖 `turn_index` (0이면 1), `state_changed`마다 갱신·연출 없음. 막힘 글자 판·레이아웃 키·글자 처리 삭제, 판 둘레 표시 그대로. 랭킹 `턴` 열 = `turns`. 해시 `5e00b1f7…` 그대로, 래퍼 310/310 (Codex). Claude가 캡처 `71`·`30`·`02`를 직접 확인했다. 캡처 `65`·`71`은 장면의 턴과 미리보기가 맞지 않는다 (캡처만의 일, §12-ONE.18 결과). Claude 재실행 없음
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.18**
 - 배경: 사용자 (2026-10-31) "상단에 턴 수도 넣어주고 랭킹에도 최고 턴 값 기록해줘", 미리보기 칸 위 "↑ ← → 막힘" 스크린샷과 함께 "이 막힘 표시는 없애줘", 랭킹 스크린샷과 함께 "랭킹에서 final move 는 빼고 턴 수 넣어줘"
 - 앵커: `scripts/ui/Hud.gd` `hud_layout()`·`_apply_layout()`·`_on_warning_changed()`, `scenes/UI.tscn` (`Hud/BestPanel`·`BestTitleLabel`·`BestLabel`을 본뜸, `Hud/BlockedPanel`·`BlockedLabel` 삭제), `scripts/ui/RankingPanel.gd` `_refresh()`, `scripts/core/TurnManager.gd` (`turn_index`·`state_changed`·`turn_started` — 읽기만), 테스트 `tests/test_screen_layout.gd`·`tests/scenarios/test_score_flow.gd`·`tests/test_jelly_shell.gd`·`tests/test_rankings.gd`
@@ -47,10 +54,6 @@
 - 건드리지 말 것: 다른 HUD 요소의 위치와 모양, NEXT·THEN 위치, 결과 화면·시작 화면, 저장 형식, 규칙·물리·생성, 새 연출 (턴 숫자 튀기·반짝임·소리 없음), 사용자 저장 파일, `docs/` (회신 파일 제외)
 - Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), JELLY 기준 해시 그대로 (`5e00b1f7…`), 캡처 보고 (실제 창, 두 비율, 마지막은 전체 캡처), 검증 빌드는 `-Debug`만
 - 커밋: 항목 단위 브랜치, **push·PR까지**
-
----
-
-## 처리 완료
 
 ### [2026-10-31 #120] 대폭발은 L7끼리만 → L6부터 — 완료
 - 상태: 완료 (2026-10-31 Claude 검수 · [PR #124](https://github.com/jeongmo-dot/gravity_orb/pull/124) 병합 `32ee9d8`, 최종 값 6 — 사용자 결정)
