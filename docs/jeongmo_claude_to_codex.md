@@ -32,8 +32,15 @@
 
 ## 대기 중
 
-### [2026-10-31 #126] 들어오는 수량을 L1 기준으로 (L2는 2개 또는 3개분)·최대 5
-- 상태: 대기 (**다음 차례**. 최신 `origin/main` 위에서)
+- 없음
+
+---
+
+## 처리 완료
+
+### [2026-10-31 #126] 들어오는 수량을 L1 기준으로 (L2는 2개 또는 3개분)·최대 5 — 완료
+- 상태: 완료 (2026-10-31 Claude 검수 · [PR #126](https://github.com/jeongmo-dot/gravity_orb/pull/126) 병합 `919ce0e`, 사용자가 M2 선택)
+- 검수: `spawn_cost_for_level()` (없거나 1 미만이면 1), `_draw_level_for_budget()`이 남은 예산보다 비싼 레벨을 빼고 뽑는다 ([1, 1]은 예전 RNG 순서 그대로), `_draw_batch()`·`sync_next_batch_size()`가 예산을 정확히 채운다 (넘치면 끝에서 뺌). `×n` = 젤리 개수. 600턴 상한에서 B·M0·M2·M3 80판 모두 게임 오버 — M2 평균 130.05턴·점수 107,291, L÷R 길이 1.46 (§12-ONE.19 결과). 해시 `5e00b1f7…` 그대로, 래퍼 314/314 (Codex). Claude가 캡처 `65`·`71`을 직접 확인했다 (§12-ONE.18 캡처 불일치도 해소). M2 최대 관통 39.4px는 #118 38.3px보다 조금 커서 지켜본다. Claude 재실행 없음
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.19**
 - 배경: 지금은 턴 수량만큼 젤리를 뽑고 레벨을 따로 정해서, L2가 섞이면 같은 수량이라도 덩치가 커진다. 수량에 상한이 없다. 사용자 (2026-10-31) "공이 들어올 때 L1 공이면 1개로 취급, L2 공이면 2개나 3개로 취급해서 수량 계산해줘", "그리고 공 수량 최대값은 5개를 맥스로 해줘"
 - 앵커: `config/GameConfig.gd` (새 필드 `spawn_level_costs`)·`config/default_config.tres`, `scripts/core/Spawner.gd` `_draw_batch()`·`_draw_candidate_for_turn()`·`sync_next_batch_size()`·`_batch_size_for_index()`, `scripts/ui/Hud.gd` 미리보기 `×n` (`_next_count_label`·`_then_count_label` — 젤리 개수 그대로인지 확인), `tests/test_spawner.gd`·`tests/test_config.gd`, 봇 `tests/run_jelly_physics_autoplay.ps1`·`tests/tools/run_jelly_blast_measurement.ps1`, 캡처 `tests/spike/capture_screens.gd`
@@ -47,10 +54,6 @@
 - 건드리지 말 것: 수량 램프 (10턴마다 +1)·`spawn_level_weights`·시작 배치·색 해금, 생성 위치·입구 대기·FINAL MOVE·게임 오버, 규칙·점수·물리, 그림·연출 (새 연출 없음), 사용자 저장 파일, `docs/` (회신 파일 제외). 판 길이·점수가 어떻게 나와도 (판이 끝나지 않아도) 값은 M2로 두고 보고한다
 - Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), JELLY 기준 해시 보고, 측정 표·캡처 보고 (마지막은 전체 캡처), 검증 빌드는 `-Debug`만. **병합은 결과를 보고 사용자가 2·3을 고른 뒤**
 - 커밋: 항목 단위 브랜치, **push·PR까지**
-
----
-
-## 처리 완료
 
 ### [2026-10-31 #125] 위에 턴 수·막힘 글자 삭제·랭킹은 턴 — 완료
 - 상태: 완료 (2026-10-31 Claude 검수 · [PR #125](https://github.com/jeongmo-dot/gravity_orb/pull/125) 병합 `aa355bd`)
