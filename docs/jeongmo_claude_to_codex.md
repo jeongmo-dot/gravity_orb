@@ -32,8 +32,28 @@
 
 ## 대기 중
 
-### [2026-10-30 #119] 공이 빨리 늘어나게, 시작은 색마다 하나씩
-- 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합)
+### [2026-10-31 #120] 대폭발은 L7끼리만
+- 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합 — #119 `5b77ece` 포함)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.13**
+- 배경: 지금 JELLY는 다른 색·같은 레벨 젤리가 둘 다 L5 이상이면 닿을 때 대폭발한다 (`jelly_blast_min_level` 5). 사용자 (2026-10-31) "폭발이 L7 이었으면 L7과 L7이 만났을 때만 폭발"
+- 앵커: `config/default_config.tres`·`config/GameConfig.gd`의 `jelly_blast_min_level`, `scripts/core/ReactionRules.gd` `_classify_jelly()`, `GameConfig.blast_enabled_for_level()`, `tests/test_config.gd` (기본값 5 확인), `tests/test_rules.gd`, JELLY 회귀 (`test_jelly_regression`), `tests/tools/run_jelly_blast_measurement.ps1`
+- 수치: `jelly_blast_min_level` 5 → 7. 나머지 그대로
+- 요구:
+  1. `jelly_blast_min_level` 5 → 7 (규칙 코드는 그대로)
+  2. 테스트 (기본값에서): 다른 색 L5+L5·L6+L6 반응 없음, 다른 색 L7+L7 대폭발, 같은 색 L7+L7 잭팟, L5·L6 보통 얼굴 (`is_blast_armed()` 거짓), L7 MAX 얼굴 그대로
+  3. JELLY 회귀 7가지 사건의 "L5 대폭발"을 "L7 대폭발 (다른 색 L7+L7)"로 바꾼다. 새 기준 해시
+  4. §12-ONE.13 측정 1~5 (5는 #119 후속: 실제 창에서 공 약 120개 판의 프레임 시간)
+- 건드리지 말 것: 흡수·잭팟 규칙, 대폭발 범위·속도·점수, 물리 값, #119 값, 색 해금, 그림·연출 (새 연출 없음, 얼굴 코드 지우지 않음), CLASSIC `blast_min_level`, 사용자 저장 파일, `docs/` (회신 파일 제외). 판이 짧아지거나 실력 비가 떨어져도 값은 그대로 두고 보고한다
+- Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), 새 JELLY 기준 해시, 측정 표·캡처 보고 (마지막은 전체 캡처), 검증 빌드는 `-Debug`만
+- 커밋: 항목 단위 브랜치, **push·PR까지**
+
+---
+
+## 처리 완료
+
+### [2026-10-30 #119] 공이 빨리 늘어나게, 시작은 색마다 하나씩 — 완료
+- 상태: 완료 (2026-10-31 Claude 검수 · [PR #119](https://github.com/jeongmo-dot/gravity_orb/pull/119) 병합 `5b77ece`)
+- 검수: 램프 5턴, 시작은 4색 L1을 시드 RNG로 섞어 바닥에 같은 간격으로 놓는다 (`initial_orb_count`는 필드만 남음). 봇 20판 한 판 337 → 79.6턴 (72~87턴, 턴당 15~18개가 들어올 때 끝남), 점수 45.7만 → 60.5만, 턴당 합체 3.53 → 6.59, FINAL MOVE 성공 15% → 4.8% (§12-ONE.12 결과). 새 해시 `ce7054b6…`, 래퍼 300/300 (Codex). Claude가 캡처 `64`·`65` 두 비율을 직접 확인했다. 측정 도구의 물리 프레임 시간 (25.6 → 32.3ms)은 실제 게임 값이 아니어서 #120 측정 5로 실제 창에서 다시 잰다. Claude 재실행 없음
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.12**
 - 배경: 지금은 50턴마다 공이 1개씩 늘어나고, 무작위 구체 2개로 시작한다. 사용자 (2026-10-30) "첫번째 1개씩 5턴 그 다음부터 매 5턴 마다 공 한개씩 추가", "시작할 때 아래에 색깔별로 공 하나씩 배치된 상태로 시작"
 - 앵커: `config/default_config.tres`·`config/GameConfig.gd`의 `spawn_count_ramp_turns`, `scripts/core/Spawner.gd` `spawn_initial()`
@@ -46,25 +66,6 @@
 - 건드리지 말 것: 물리 값, 색 해금 턴, 크기 비율, 미리보기 개수·모양, 규칙·점수·FINAL MOVE, `stable_*`·`max_settle_time`, 그림·연출, 사용자 저장 파일, `docs/` (회신 파일 제외). 판이 너무 짧아져도 값은 그대로 두고 보고한다
 - Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), 새 JELLY 기준 해시, 측정 표·캡처 보고 (마지막은 전체 캡처), 검증 빌드는 `-Debug`만
 - 커밋: 항목 단위 브랜치, **push·PR까지**
-
-### [2026-10-31 #120] 대폭발은 L7끼리만
-- 상태: 대기 (**#119 다음**. #119 병합 뒤 `origin/main` 병합)
-- 근거: [technical_design.md](technical_design.md) **§12-ONE.13**
-- 배경: 지금 JELLY는 다른 색·같은 레벨 젤리가 둘 다 L5 이상이면 닿을 때 대폭발한다 (`jelly_blast_min_level` 5). 사용자 (2026-10-31) "폭발이 L7 이었으면 L7과 L7이 만났을 때만 폭발"
-- 앵커: `config/default_config.tres`·`config/GameConfig.gd`의 `jelly_blast_min_level`, `scripts/core/ReactionRules.gd` `_classify_jelly()`, `GameConfig.blast_enabled_for_level()`, `tests/test_config.gd` (기본값 5 확인), `tests/test_rules.gd`, JELLY 회귀 (`test_jelly_regression`), `tests/tools/run_jelly_blast_measurement.ps1`
-- 수치: `jelly_blast_min_level` 5 → 7. 나머지 그대로
-- 요구:
-  1. `jelly_blast_min_level` 5 → 7 (규칙 코드는 그대로)
-  2. 테스트 (기본값에서): 다른 색 L5+L5·L6+L6 반응 없음, 다른 색 L7+L7 대폭발, 같은 색 L7+L7 잭팟, L5·L6 보통 얼굴 (`is_blast_armed()` 거짓), L7 MAX 얼굴 그대로
-  3. JELLY 회귀 7가지 사건의 "L5 대폭발"을 "L7 대폭발 (다른 색 L7+L7)"로 바꾼다. 새 기준 해시
-  4. §12-ONE.13 측정 1~4
-- 건드리지 말 것: 흡수·잭팟 규칙, 대폭발 범위·속도·점수, 물리 값, #119 값, 색 해금, 그림·연출 (새 연출 없음, 얼굴 코드 지우지 않음), CLASSIC `blast_min_level`, 사용자 저장 파일, `docs/` (회신 파일 제외). 판이 짧아지거나 실력 비가 떨어져도 값은 그대로 두고 보고한다
-- Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), 새 JELLY 기준 해시, 측정 표·캡처 보고 (마지막은 전체 캡처), 검증 빌드는 `-Debug`만
-- 커밋: 항목 단위 브랜치, **push·PR까지**
-
----
-
-## 처리 완료
 
 ### [2026-10-30 #118] 90° 꺾을 때 대각선을 지나게 — 왼→아래와 오른→아래를 다르게 — 완료
 - 상태: 완료 (2026-10-30 Claude 검수 · [PR #118](https://github.com/jeongmo-dot/gravity_orb/pull/118) 병합 `e8450cc`)
