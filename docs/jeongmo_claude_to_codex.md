@@ -33,7 +33,12 @@
 ## 대기 중
 
 ### [2026-10-31 #127] 합쳐지는 과정이 보이게
-- 상태: 대기 (**다음 차례**. 최신 `origin/main` 위에서)
+- 상태: 진행중 — **중간 리뷰 4건 추가** (2026-10-31, [technical_design.md](technical_design.md) §12-ONE.20 「중간 리뷰」). 회신의 부분완료 상태와 커밋 전 변경을 Claude가 읽었다
+  1. [버그] 안정 분기: sweep이 과정을 시작만 하면 `flush()`가 0을 돌려줘 진행 중 합체를 남긴 채 `_on_settled()` → sweep 뒤 `active_jelly_merge_count() > 0`이면 `_stable_time = 0`·`return`. 테스트 포함
+  2. [측정 추가] 입력 대기 시작 때 닿아 있는 합체 가능 쌍 (턴 수·비율·쌍 수)과 상한 뒤 다음 턴으로 미뤄진 합체 수, T = 0·0.3 둘 다. 규칙은 그대로
+  3. [테스트 보강] `TurnManager` 수준 안정·상한 턴 끝, 상한 뒤 새 합체 없음, `MAX_CLEAR` 뒤 잭팟, 다시 시작 때 노드 정리, 흡수 먹히는 쪽 충돌 꺼짐, 매 프레임 그림 = 물리 반지름, T = 0.3 해시 상수
+  4. [캡처] 두 젤리를 닿은 상태 (중심 거리 = 반지름 합)에서 시작, 앞 장면 효과·팝업이 남지 않게 다시 찍기
+  - 그 뒤 남은 측정 2종 (20시드 0/0.3, 성능)을 마치고 커밋·push·PR
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.20**
 - 배경: 지금은 닿은 물리 프레임에 두 젤리를 지우고 결과를 만들어 "닿음 → 결과"가 한 프레임에 끝난다. 같은 레벨은 중점에 다 큰 결과가 바로 나타나고, 흡수는 작은 쪽 대신 빛 덩어리가 미끄러진다. 사용자 (2026-10-31) "공과 공이 합쳐질 때 너무 순식간에 합쳐지는 느낌이야. 합쳐지는 과정이 눈에 보였으면 좋겠어"
 - 앵커: `scripts/core/CollisionResolver.gd` `flush()`·`has_pending_reactions()`·`_lock_reaction_result()`, `scripts/core/TurnManager.gd` 안정·1.5초 상한 판정, `scripts/spike/Orb3D.gd` `set_jelly_mass()`·`_advance_growth()`·`JELLY_ABSORPTION_GROWTH_DURATION`·`disable_physics()`, `scripts/spike/Board3D.gd` `spawn_orb()`·`remove_orb()`, `scripts/fx/FeedbackDirector.gd` 합체 연출 (`play_visual_punch`·`_create_jelly_absorption_trails`), `config/GameConfig.gd` (새 필드)·`config/default_config.tres`, 테스트·봇 (`tests/run_jelly_physics_autoplay.ps1`)·캡처 (`tests/spike/capture_screens.gd`)
