@@ -209,20 +209,21 @@ func test_ramp_draws_next_turn_batch_sizes_at_boundaries() -> void:
 	_restore_spawn_config(snapshot)
 
 
-func test_default_five_turn_ramp_has_no_maximum() -> void:
+func test_default_ten_turn_ramp_has_no_maximum() -> void:
 	var snapshot: Dictionary = _snapshot_spawn_config()
 	Config.data.spawn_count_per_turn = 1
-	Config.data.spawn_count_ramp_turns = 5
+	Config.data.spawn_count_ramp_turns = 10
 	Config.data.spawn_count_max = 0
 	var expected: Dictionary = {
 		1: 1,
-		5: 1,
-		6: 2,
-		10: 2,
-		11: 3,
-		50: 10,
-		51: 11,
-		100: 20,
+		10: 1,
+		11: 2,
+		20: 2,
+		21: 3,
+		50: 5,
+		51: 6,
+		100: 10,
+		101: 11,
 	}
 	for turn_value: Variant in expected:
 		var turn_index: int = int(turn_value)
@@ -319,7 +320,7 @@ func test_default_classic_progression_hash() -> void:
 	print("STAGED_DIFFICULTY_HASH classic=%s" % hash_value)
 	assert_eq(
 		hash_value,
-		"fc09958093057262d6792e5742891539c1102dfff55a379a472bc97f9b548c22",
+		"d0e0a894835a0b41a286b72a9d5c77a5d13e14a1555be07cc3176479aec1aa5f",
 		"CLASSIC staged progression hash"
 	)
 	spawner.free()
