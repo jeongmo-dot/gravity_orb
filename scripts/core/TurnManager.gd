@@ -28,6 +28,9 @@ var turn_index: int = 0
 var turn_combo: int = 0
 var max_combo: int = 0
 var capped_turn_count: int = 0
+var merge_delayed_turn_count: int = 0
+var merge_delay_seconds_sum: float = 0.0
+var merge_delay_seconds_max: float = 0.0
 var blocked_directions: Array[Vector2i] = []
 var game_over_details: Dictionary = {}
 var final_move_pending: bool = false
@@ -43,6 +46,7 @@ var _settle_elapsed: float:
 
 var _stable_time: float = 0.0
 var _is_initial_settle: bool = false
+var _current_merge_delay_seconds: float = 0.0
 
 
 func _ready() -> void:
@@ -51,10 +55,14 @@ func _ready() -> void:
 
 
 func start_game() -> void:
+	_collision_resolver.cancel_active_jelly_merges()
 	turn_index = 0
 	turn_combo = 0
 	max_combo = 0
 	capped_turn_count = 0
+	merge_delayed_turn_count = 0
+	merge_delay_seconds_sum = 0.0
+	merge_delay_seconds_max = 0.0
 	blocked_directions.clear()
 	game_over_details.clear()
 	final_move_pending = false
@@ -133,12 +141,23 @@ func _physics_process(delta: float) -> void:
 		_stable_time = 0.0
 
 	if settle_elapsed >= Config.data.max_settle_time:
+		_collision_resolver.set_accepting_new_jelly_merges(false)
+		if _collision_resolver.active_jelly_merge_count() > 0:
+			if not _is_initial_settle:
+				if _current_merge_delay_seconds <= 0.0:
+					merge_delayed_turn_count += 1
+				_current_merge_delay_seconds += delta
+			return
 		_collision_resolver.sweep_resting_contacts()
 		if not _is_initial_settle:
 			capped_turn_count += 1
 		_on_settled()
 	elif _stable_time >= Config.data.stable_duration:
-		if _collision_resolver.sweep_resting_contacts() > 0:
+		var swept_reactions: int = _collision_resolver.sweep_resting_contacts()
+		if (
+			swept_reactions > 0
+			or _collision_resolver.active_jelly_merge_count() > 0
+		):
 			_stable_time = 0.0
 			return
 		_on_settled()
@@ -175,11 +194,18 @@ func _emit_combo_changed() -> void:
 
 
 func _begin_settle() -> void:
+	_collision_resolver.set_accepting_new_jelly_merges(true)
+	_current_merge_delay_seconds = 0.0
 	_stable_time = 0.0
 	settle_elapsed = 0.0
 
 
 func _on_settled() -> void:
+	merge_delay_seconds_sum += _current_merge_delay_seconds
+	merge_delay_seconds_max = maxf(
+		merge_delay_seconds_max,
+		_current_merge_delay_seconds
+	)
 	if _is_initial_settle:
 		_is_initial_settle = false
 		_update_warnings()

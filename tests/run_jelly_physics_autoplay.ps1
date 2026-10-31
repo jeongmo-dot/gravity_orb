@@ -14,6 +14,8 @@ param(
     [ValidateRange(-1, 100)]
     [int]$SpawnCountMax = -1,
     [string]$SpawnLevelCosts = "",
+	[ValidateRange(0.0, 10.0)]
+	[double]$JellyMergeDuration = 0.3,
     [switch]$AggregateOnly
 )
 
@@ -32,6 +34,7 @@ if ($GravityTurnDiagonalTime -lt -1.0) {
 }
 $culture = [Globalization.CultureInfo]::InvariantCulture
 $physicsArguments = @()
+$physicsArguments += "--jelly-merge-duration=$($JellyMergeDuration.ToString($culture))"
 if ($Friction -gt 0.0) {
     $physicsArguments += "--physics-friction=$($Friction.ToString($culture))"
 }
@@ -129,6 +132,16 @@ $peakActiveOrbs = @()
 $peakActivePhysicsMeans = @()
 $peakActivePhysicsMaxima = @()
 $maximumActiveSample = $null
+$mergeDelayedTurns = 0
+$mergeDelaySecondsSum = 0.0
+$mergeDelaySecondsMax = 0.0
+$maxConcurrentJellyMerges = 0
+$maxTurnChain = 0
+$inputWaitingTurns = 0
+$inputWaitingTouchingMergeTurns = 0
+$inputWaitingTouchingMergePairCountSum = 0
+$inputWaitingTouchingMergePairCountMax = 0
+$deferredJellyMergeCount = 0
 $shockTotals = @{}
 foreach ($task in $tasks) {
     $report = Get-Content -LiteralPath $task.Output -Raw | ConvertFrom-Json
@@ -136,6 +149,16 @@ foreach ($task in $tasks) {
     $seedRow = $tick.seeds[0]
     $seedRows += $seedRow
     $totalTurns += [int]$seedRow.completed_turns
+	$mergeDelayedTurns += [int]$seedRow.merge_delayed_turn_count
+	$mergeDelaySecondsSum += [double]$seedRow.merge_delay_seconds_sum
+	$mergeDelaySecondsMax = [Math]::Max($mergeDelaySecondsMax, [double]$seedRow.merge_delay_seconds_max)
+	$maxConcurrentJellyMerges = [Math]::Max($maxConcurrentJellyMerges, [int]$seedRow.max_concurrent_jelly_merges)
+	$maxTurnChain = [Math]::Max($maxTurnChain, [int]$seedRow.max_combo)
+	$inputWaitingTurns += [int]$seedRow.input_waiting_turn_count
+	$inputWaitingTouchingMergeTurns += [int]$seedRow.input_waiting_touching_merge_turn_count
+	$inputWaitingTouchingMergePairCountSum += [int]$seedRow.input_waiting_touching_merge_pair_count_sum
+	$inputWaitingTouchingMergePairCountMax = [Math]::Max($inputWaitingTouchingMergePairCountMax, [int]$seedRow.input_waiting_touching_merge_pair_count_max)
+	$deferredJellyMergeCount += [int]$seedRow.deferred_jelly_merge_count
     $totalMerges += [int]$seedRow.merge_count
     $totalBlasts += [int]$seedRow.blast_count
     $totalJackpots += [int]$seedRow.max_clear_count
@@ -214,6 +237,7 @@ $summary = [ordered]@{
     seeds = @(101..120)
     fixed_fps = 120
     max_turns = $MaxTurns
+	jelly_merge_duration = $JellyMergeDuration
     friction = if ($Friction -gt 0.0) { $Friction } else { $null }
     angular_damp = if ($AngularDamp -ge 0.0) { $AngularDamp } else { $null }
     gravity_turn_diagonal_time = if ($GravityTurnDiagonalTime -ge 0.0) { $GravityTurnDiagonalTime } else { $null }
@@ -246,6 +270,19 @@ $summary = [ordered]@{
     average_turn_seconds = if ($turnFrameCounts.Count -gt 0) { (($turnFrameCounts | Measure-Object -Average).Average / 120.0) } else { 0.0 }
     forced_settle_turns = $forcedTurnCount
     forced_settle_ratio = if ($turnFrameCounts.Count -gt 0) { [double]$forcedTurnCount / $turnFrameCounts.Count } else { 0.0 }
+	merge_delayed_turns = $mergeDelayedTurns
+	merge_delayed_turn_ratio = if ($totalTurns -gt 0) { [double]$mergeDelayedTurns / $totalTurns } else { 0.0 }
+	average_merge_delay_seconds = if ($mergeDelayedTurns -gt 0) { $mergeDelaySecondsSum / $mergeDelayedTurns } else { 0.0 }
+	maximum_merge_delay_seconds = $mergeDelaySecondsMax
+	maximum_turn_chain = $maxTurnChain
+	maximum_concurrent_jelly_merges = $maxConcurrentJellyMerges
+	input_waiting_turns = $inputWaitingTurns
+	input_waiting_touching_merge_turns = $inputWaitingTouchingMergeTurns
+	input_waiting_touching_merge_turn_ratio = if ($inputWaitingTurns -gt 0) { [double]$inputWaitingTouchingMergeTurns / $inputWaitingTurns } else { 0.0 }
+	input_waiting_touching_merge_pair_count = $inputWaitingTouchingMergePairCountSum
+	average_touching_merge_pairs_per_affected_turn = if ($inputWaitingTouchingMergeTurns -gt 0) { [double]$inputWaitingTouchingMergePairCountSum / $inputWaitingTouchingMergeTurns } else { 0.0 }
+	maximum_touching_merge_pairs_at_input_waiting = $inputWaitingTouchingMergePairCountMax
+	deferred_jelly_merge_count = $deferredJellyMergeCount
     merges_per_turn = if ($totalTurns -gt 0) { [double]$totalMerges / $totalTurns } else { 0.0 }
     blast_count = $totalBlasts
     blast_count_by_level = $blastCountByLevel

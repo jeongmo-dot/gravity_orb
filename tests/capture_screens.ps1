@@ -83,7 +83,22 @@ $expectedFiles = @(
     "68_jelly_preview_next_2.png",
     "69_jelly_preview_next_5.png",
     "70_jelly_preview_then_l2_5.png",
-    "71_jelly_turn_hud_three_digit.png"
+    "71_jelly_turn_hud_three_digit.png",
+    "72_jelly_merge_process_equal_00.png",
+    "73_jelly_merge_process_equal_25.png",
+    "74_jelly_merge_process_equal_50.png",
+    "75_jelly_merge_process_equal_75.png",
+    "76_jelly_merge_process_equal_100.png",
+    "77_jelly_merge_process_absorb_00.png",
+    "78_jelly_merge_process_absorb_25.png",
+    "79_jelly_merge_process_absorb_50.png",
+    "80_jelly_merge_process_absorb_75.png",
+    "81_jelly_merge_process_absorb_100.png",
+    "82_jelly_merge_process_level_up_00.png",
+    "83_jelly_merge_process_level_up_25.png",
+    "84_jelly_merge_process_level_up_50.png",
+    "85_jelly_merge_process_level_up_75.png",
+    "86_jelly_merge_process_level_up_100.png"
 )
 
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {

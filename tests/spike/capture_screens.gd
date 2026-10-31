@@ -79,6 +79,21 @@ const CAPTURE_FILES: Array[String] = [
 	"69_jelly_preview_next_5.png",
 	"70_jelly_preview_then_l2_5.png",
 	"71_jelly_turn_hud_three_digit.png",
+	"72_jelly_merge_process_equal_00.png",
+	"73_jelly_merge_process_equal_25.png",
+	"74_jelly_merge_process_equal_50.png",
+	"75_jelly_merge_process_equal_75.png",
+	"76_jelly_merge_process_equal_100.png",
+	"77_jelly_merge_process_absorb_00.png",
+	"78_jelly_merge_process_absorb_25.png",
+	"79_jelly_merge_process_absorb_50.png",
+	"80_jelly_merge_process_absorb_75.png",
+	"81_jelly_merge_process_absorb_100.png",
+	"82_jelly_merge_process_level_up_00.png",
+	"83_jelly_merge_process_level_up_25.png",
+	"84_jelly_merge_process_level_up_50.png",
+	"85_jelly_merge_process_level_up_75.png",
+	"86_jelly_merge_process_level_up_100.png",
 ]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
@@ -254,6 +269,7 @@ func _capture_gameplay_scenes() -> void:
 	await _capture_overlay_detail_scenes(main, board)
 	await _capture_deform_scenes(main, board)
 	await _capture_recovered_jelly_scenes(main, manager, board, hud)
+	await _capture_jelly_merge_process_scenes(board, resolver, manager)
 	await _capture_turn_hud_scene(main, manager, hud)
 	await _destroy_main(main)
 
@@ -890,6 +906,83 @@ func _capture_preview_scale_scenes(board: Board3D, hud: Hud) -> void:
 	hud._on_preview_changed([next_one, then_l2_five])
 	await get_tree().process_frame
 	await _capture("70_jelly_preview_then_l2_5.png")
+
+
+func _capture_jelly_merge_process_scenes(
+	board: Board3D,
+	resolver: CollisionResolver,
+	manager: TurnManager
+) -> void:
+	var original_duration: float = Config.data.jelly_merge_duration
+	var original_scan: bool = resolver.proximity_reaction_scan_enabled
+	Config.data.jelly_merge_duration = 0.3
+	resolver.proximity_reaction_scan_enabled = false
+	await _capture_jelly_merge_process_case(
+		board, resolver, manager, 2, 2.0, 2, 2.0, 72
+	)
+	await _capture_jelly_merge_process_case(
+		board, resolver, manager, 3, 4.0, 2, 2.0, 77
+	)
+	await _capture_jelly_merge_process_case(
+		board, resolver, manager, 3, 6.0, 2, 2.0, 82
+	)
+	resolver.proximity_reaction_scan_enabled = original_scan
+	Config.data.jelly_merge_duration = original_duration
+
+
+func _capture_jelly_merge_process_case(
+	board: Board3D,
+	resolver: CollisionResolver,
+	manager: TurnManager,
+	first_level: int,
+	first_mass: float,
+	second_level: int,
+	second_mass: float,
+	file_number: int
+) -> void:
+	resolver.cancel_active_jelly_merges()
+	board.clear()
+	manager.turn_combo = 0
+	manager.max_combo = 0
+	manager._emit_combo_changed()
+	await get_tree().process_frame
+	var first: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.PURPLE,
+		first_level,
+		Vector2.ZERO
+	)
+	var second: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.PURPLE,
+		second_level,
+		Vector2.ZERO
+	)
+	first.set_jelly_mass(first_mass, Config.data)
+	second.set_jelly_mass(second_mass, Config.data)
+	var touching_distance: float = first.get_current_radius() + second.get_current_radius()
+	first.position = Vector2(-touching_distance * 0.5, 0.0)
+	second.position = Vector2(touching_distance * 0.5, 0.0)
+	first.linear_velocity = Vector2.ZERO
+	second.linear_velocity = Vector2.ZERO
+	resolver.report_contact(first, second, "capture")
+	resolver.flush()
+	for stage: int in range(5):
+		if stage > 0:
+			var active_before: Array[Orb3D] = board.get_orbs()
+			resolver.flush(Config.data.jelly_merge_duration * 0.25)
+			for orb: Orb3D in active_before:
+				if is_instance_valid(orb):
+					orb._physics_process(Config.data.jelly_merge_duration * 0.25)
+		await get_tree().process_frame
+		await _capture("%02d_jelly_merge_process_%s_%02d.png" % [
+			file_number + stage,
+			(
+				"equal" if file_number == 72
+				else "absorb" if file_number == 77
+				else "level_up"
+			),
+			stage * 25,
+		])
+	await get_tree().create_timer(1.0).timeout
 
 
 func _measure_preview_diameters(board_l1: Orb3D, board_l2: Orb3D, hud: Hud) -> void:

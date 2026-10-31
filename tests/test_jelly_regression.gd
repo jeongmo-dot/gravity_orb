@@ -8,9 +8,11 @@ func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
 	var original_seed: int = Config.data.rng_seed
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_sfx_enabled: bool = Config.data.sfx_enabled
+	var original_merge_duration: float = Config.data.jelly_merge_duration
 	Config.data.rng_seed = 1085050
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.sfx_enabled = false
+	Config.data.jelly_merge_duration = 0.0
 	var visible_result: Dictionary = await _run_rule_path(true)
 	var hidden_result: Dictionary = await _run_rule_path(false)
 	assert_eq(
@@ -42,9 +44,24 @@ func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
 		EXPECTED_REGRESSION_HASH,
 		"JELLY full-rule regression baseline"
 	)
+	Config.data.jelly_merge_duration = 0.3
+	var delayed_visible_result: Dictionary = await _run_rule_path(true)
+	var delayed_hidden_result: Dictionary = await _run_rule_path(false)
+	assert_eq(
+		delayed_visible_result["hash"],
+		delayed_hidden_result["hash"],
+		"delayed JELLY rule hash is independent of rendering"
+	)
+	print(
+		"JELLY_DELAYED_REGRESSION_HASH duration=0.3 hash=%s events=%s" % [
+			str(delayed_visible_result["hash"]),
+			JSON.stringify(delayed_visible_result["events"]),
+		]
+	)
 	Config.data.rng_seed = original_seed
 	Config.data.game_mode = original_mode
 	Config.data.sfx_enabled = original_sfx_enabled
+	Config.data.jelly_merge_duration = original_merge_duration
 
 
 func _run_rule_path(visuals_enabled: bool) -> Dictionary:
@@ -218,6 +235,11 @@ func _apply_pair(
 		captured.append(reaction.duplicate(false))
 	resolver.reaction_applied.connect(capture, CONNECT_ONE_SHOT)
 	resolver.report_contact(first, second, "jelly_regression")
-	assert_eq(resolver.flush(), 1, "fixed JELLY pair resolves exactly once")
+	var applied_count: int = resolver.flush()
+	if applied_count == 0 and Config.data.jelly_merge_duration > 0.0:
+		var tick: float = 1.0 / 120.0
+		for _step: int in range(ceili(Config.data.jelly_merge_duration / tick) + 1):
+			applied_count += resolver.flush(tick)
+	assert_eq(applied_count, 1, "fixed JELLY pair resolves exactly once")
 	await tree.process_frame
 	return captured[0]

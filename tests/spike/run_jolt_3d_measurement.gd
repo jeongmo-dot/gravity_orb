@@ -105,6 +105,7 @@ func _run() -> void:
 		"blast_enabled": Config.data.blast_enabled,
 		"blast_min_level": Config.data.blast_min_level,
 		"jelly_blast_min_level": Config.data.jelly_blast_min_level,
+		"jelly_merge_duration": Config.data.jelly_merge_duration,
 		"blast_push_radius_by_level": Array(Config.data.blast_push_radius_by_level),
 		"blast_speed": Config.data.blast_speed,
 		"blast_far_factor": Config.data.blast_far_factor,
@@ -273,6 +274,7 @@ func _run_seed(
 	var board: Board3D = fixture["board"] as Board3D
 	var manager: TurnManager = fixture["manager"] as TurnManager
 	var score_manager: ScoreManager = fixture["score_manager"] as ScoreManager
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
 	_record_seen_colors(board)
 	var completed_turns: int = 0
 	var aborted: bool = false
@@ -297,6 +299,10 @@ func _run_seed(
 	var preview_unblocked_spread_sum: float = 0.0
 	var preview_score_gain_spreads: Array[float] = []
 	var preview_decision_usec_sum: int = 0
+	var input_waiting_turn_count: int = 0
+	var input_waiting_touching_merge_turn_count: int = 0
+	var input_waiting_touching_merge_pair_count_sum: int = 0
+	var input_waiting_touching_merge_pair_count_max: int = 0
 	_skill_rng.seed = 0x5A110000 + seed * 131 + _skill_strategy.hash()
 	var layer_distances: Dictionary = _empty_layer_distances()
 	for turn_offset: int in range(max_turns):
@@ -340,6 +346,17 @@ func _run_seed(
 		manager.on_swipe(direction)
 		var frame_metrics: Dictionary = await _wait_for_turn_end(manager, board, physics_ms)
 		var entrance_waiting_count: int = board.entrance_waiting_orbs().size()
+		var input_waiting_touching_merge_pairs: int = 0
+		if manager.state == TurnManager.State.WAITING_INPUT:
+			input_waiting_turn_count += 1
+			input_waiting_touching_merge_pairs = _count_touching_jelly_merge_pairs(board)
+			if input_waiting_touching_merge_pairs > 0:
+				input_waiting_touching_merge_turn_count += 1
+				input_waiting_touching_merge_pair_count_sum += input_waiting_touching_merge_pairs
+				input_waiting_touching_merge_pair_count_max = maxi(
+					input_waiting_touching_merge_pair_count_max,
+					input_waiting_touching_merge_pairs
+				)
 		_record_seen_colors(board)
 		if entrance_waiting_count > 0:
 			entrance_blocked_turns += 1
@@ -380,6 +397,7 @@ func _run_seed(
 			"score_gain": score_manager.score - score_before,
 			"blast_count": _turn_blast_count,
 			"entrance_waiting_count": entrance_waiting_count,
+			"input_waiting_touching_merge_pairs": input_waiting_touching_merge_pairs,
 		})
 		var bin_name: String = _occupancy_bin(occupancy)
 		var bin_values: Dictionary = bins[bin_name] as Dictionary
@@ -464,6 +482,15 @@ func _run_seed(
 		"max_active_physics_ms_mean": max_active_physics_ms_mean,
 		"max_active_physics_ms_max": max_active_physics_ms_max,
 		"max_combo": manager.max_combo,
+		"merge_delayed_turn_count": manager.merge_delayed_turn_count,
+		"merge_delay_seconds_sum": manager.merge_delay_seconds_sum,
+		"merge_delay_seconds_max": manager.merge_delay_seconds_max,
+		"max_concurrent_jelly_merges": resolver.max_concurrent_jelly_merges,
+		"deferred_jelly_merge_count": resolver.deferred_jelly_merge_count,
+		"input_waiting_turn_count": input_waiting_turn_count,
+		"input_waiting_touching_merge_turn_count": input_waiting_touching_merge_turn_count,
+		"input_waiting_touching_merge_pair_count_sum": input_waiting_touching_merge_pair_count_sum,
+		"input_waiting_touching_merge_pair_count_max": input_waiting_touching_merge_pair_count_max,
 		"reactions_by_color": _seed_reactions_by_color.duplicate(),
 		"max_level_reached": score_manager.max_level_reached,
 		"max_clear_count": _seed_max_clear_count,
@@ -578,6 +605,7 @@ func _create_fixture(seed: int) -> Dictionary:
 		"root": fixture_root,
 		"board": board,
 		"manager": manager,
+		"resolver": resolver,
 		"score_manager": score_manager,
 	}
 
@@ -1674,6 +1702,39 @@ func _count_skill_reaction_pairs(board: Board3D, direction: Vector2i) -> int:
 	return count
 
 
+func _count_touching_jelly_merge_pairs(board: Board3D) -> int:
+	var count: int = 0
+	var orbs: Array[Orb3D] = board.get_orbs()
+	for first_index: int in range(orbs.size()):
+		var first: Orb3D = orbs[first_index]
+		if first.consumed or first.is_ghost or first.is_waiting_at_entrance:
+			continue
+		for second_index: int in range(first_index + 1, orbs.size()):
+			var second: Orb3D = orbs[second_index]
+			if second.consumed or second.is_ghost or second.is_waiting_at_entrance:
+				continue
+			var contact_distance: float = (
+				first.get_current_radius()
+				+ second.get_current_radius()
+				+ CollisionResolver.GEOMETRIC_CONTACT_TOLERANCE
+			)
+			if first.position.distance_squared_to(second.position) > contact_distance * contact_distance:
+				continue
+			var reaction: Dictionary = ReactionRules.classify(
+				first.color,
+				first.level,
+				second.color,
+				second.level,
+				Config.data,
+				first.jelly_mass,
+				second.jelly_mass
+			)
+			var reaction_type: ReactionRules.Type = reaction["type"] as ReactionRules.Type
+			if reaction_type in [ReactionRules.Type.MERGE, ReactionRules.Type.MAX_CLEAR]:
+				count += 1
+	return count
+
+
 func _state_rows(board: Board3D) -> Array[Dictionary]:
 	var rows: Array[Dictionary] = []
 	for orb: Orb3D in board.get_orbs():
@@ -1844,6 +1905,11 @@ func _apply_arguments() -> void:
 				argument.trim_prefix("--jelly-blast-min-level=").to_int(),
 				0,
 				Config.data.orb_max_level
+			)
+		elif argument.begins_with("--jelly-merge-duration="):
+			Config.data.jelly_merge_duration = maxf(
+				argument.trim_prefix("--jelly-merge-duration=").to_float(),
+				0.0
 			)
 		elif argument.begins_with("--blast-push-radius-by-level="):
 			Config.data.blast_push_radius_by_level = _parse_float_list(

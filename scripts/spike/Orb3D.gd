@@ -47,6 +47,7 @@ var _current_radius: float = 0.0
 var _growth_start_radius: float = 0.0
 var _growth_duration: float = 0.0
 var _growth_elapsed: float = 0.0
+var _growth_uses_smoothstep: bool = false
 var _contact_reporting_enabled: bool = true
 var _continuous_cd_enabled: bool = true
 var _allow_sleep: bool = false
@@ -79,6 +80,10 @@ var _jelly_belly_elapsed: float = 0.0
 var _previous_physics_position: Vector3 = Vector3.ZERO
 var _current_physics_position: Vector3 = Vector3.ZERO
 var _physics_position_initialized: bool = false
+var _merge_visual_active: bool = false
+var _merge_visual_scale: Vector2 = Vector2.ONE
+var _merge_visual_rotation: float = 0.0
+var _merge_visual_depth: float = 0.0
 
 var position: Vector2:
 	get:
@@ -319,7 +324,9 @@ func get_jelly_mass() -> float:
 func set_jelly_mass(
 	next_mass: float,
 	cfg: GameConfig,
-	growth_start_radius_px: float = -1.0
+	growth_start_radius_px: float = -1.0,
+	growth_duration_override: float = -1.0,
+	use_smoothstep_growth: bool = false
 ) -> void:
 	var gravity_direction: Vector2 = world_vector_to_plane(_body.constant_force).normalized()
 	var previous_radius: float = _current_radius
@@ -334,10 +341,15 @@ func set_jelly_mass(
 		previous_radius = minf(growth_start_radius_px, _radius)
 	_growth_start_radius = previous_radius
 	_growth_duration = (
-		JELLY_ABSORPTION_GROWTH_DURATION
+		(
+			growth_duration_override
+			if growth_duration_override >= 0.0
+			else JELLY_ABSORPTION_GROWTH_DURATION
+		)
 		if _radius > previous_radius + 0.000001
 		else 0.0
 	)
+	_growth_uses_smoothstep = use_smoothstep_growth
 	_growth_elapsed = 0.0
 	_current_radius = previous_radius if _growth_duration > 0.0 else _radius
 	_body.mass = cfg.mass_for_radius(_radius)
@@ -565,6 +577,45 @@ func disable_physics() -> void:
 	_reset_visual_interpolation()
 
 
+func begin_merge_visual() -> void:
+	disable_physics()
+	_render_clamp_enabled = false
+	_merge_visual_active = true
+	_merge_visual_scale = Vector2.ONE
+	_merge_visual_rotation = 0.0
+	_merge_visual_depth = -0.025
+	_update_visual_transform()
+
+
+func update_merge_visual(
+	visual_position: Vector2,
+	direction: Vector2,
+	progress: float
+) -> void:
+	if not _merge_visual_active:
+		return
+	position = visual_position
+	var p: float = clampf(progress, 0.0, 1.0)
+	var shrink: float = lerpf(1.0, 0.2, p * p)
+	_merge_visual_scale = Vector2(
+		shrink * (1.0 + 0.25 * p),
+		shrink * (1.0 - 0.15 * p)
+	)
+	_merge_visual_rotation = -direction.angle() if not direction.is_zero_approx() else 0.0
+	_update_visual_transform()
+
+
+func merge_visual_scale() -> Vector2:
+	return _merge_visual_scale
+
+
+func finish_radius_growth() -> void:
+	if _growth_duration <= 0.0:
+		return
+	_growth_elapsed = _growth_duration
+	_set_current_radius(_radius)
+
+
 func get_physics_body() -> RigidBody3D:
 	return _body
 
@@ -701,6 +752,8 @@ func _advance_growth(delta: float) -> void:
 		return
 	_growth_elapsed = minf(_growth_elapsed + delta, _growth_duration)
 	var progress: float = _growth_elapsed / _growth_duration
+	if _growth_uses_smoothstep:
+		progress = smoothstep(0.0, 1.0, progress)
 	_set_current_radius(lerpf(_growth_start_radius, _radius, progress))
 
 
@@ -895,13 +948,21 @@ func _update_visual_transform() -> void:
 		)
 	var render_world_position: Vector3 = plane_position_to_world(
 		render_plane_position,
-		interpolated_position.z
+		interpolated_position.z + _merge_visual_depth
 	)
 	var stretch_ratio: float = _visual_stretch_ratio()
 	var stretch_scale: Vector3 = _stretch_scale_for_ratio(stretch_ratio)
 	var jelly_deform: Vector2 = _jelly_render_deform() if _is_jelly_visual else Vector2.ONE
 	var jelly_body_scale: Vector3 = _jelly_body_scale() if _is_jelly_visual else Vector3.ONE
-	_mesh.scale = jelly_body_scale if _is_jelly_visual else _visual_punch_scale * stretch_scale
+	var merge_scale: Vector3 = Vector3(
+		_merge_visual_scale.x,
+		_merge_visual_scale.y,
+		minf(_merge_visual_scale.x, _merge_visual_scale.y)
+	)
+	_mesh.scale = (
+		(jelly_body_scale if _is_jelly_visual else _visual_punch_scale * stretch_scale)
+		* merge_scale
+	)
 	_mesh.position = render_world_position
 	var body_front_offset: float = radius_m * _mesh.scale.z
 	_belly.position = _front_overlay_position(
@@ -913,7 +974,11 @@ func _update_visual_transform() -> void:
 		body_front_offset + 0.006
 	)
 	if _is_jelly_visual:
-		_mesh.rotation = Vector3(0.0, 0.0, _jelly_frame_rotation)
+		_mesh.rotation = Vector3(
+			0.0,
+			0.0,
+			_merge_visual_rotation if _merge_visual_active else _jelly_frame_rotation
+		)
 	elif stretch_ratio <= 0.0:
 		_mesh.rotation = _body.rotation
 	else:
@@ -929,19 +994,23 @@ func _update_visual_transform() -> void:
 		jelly_body_scale.y
 	) if _is_jelly_visual else jelly_deform * punch_scale
 	_belly.scale = Vector3(
-		radius_m * jelly_content_deform.x,
-		radius_m * jelly_content_deform.y,
+		radius_m * jelly_content_deform.x * _merge_visual_scale.x,
+		radius_m * jelly_content_deform.y * _merge_visual_scale.y,
 		1.0
 	)
+	if _merge_visual_active:
+		_belly.rotation.z = _merge_visual_rotation
 	var face_radius_ratio: float = (
 		1.0
 		if _is_jelly_visual and (level >= Config.data.orb_max_level or _blast_armed)
 		else 0.62
 	)
 	var face_scale_m: float = radius_m * face_radius_ratio
+	if _merge_visual_active:
+		jelly_content_deform *= _merge_visual_scale
 	_face.basis = (
 		jelly_upright_deform_basis(
-			_jelly_frame_rotation,
+			_merge_visual_rotation if _merge_visual_active else _jelly_frame_rotation,
 			jelly_content_deform,
 			face_scale_m
 		)
@@ -965,3 +1034,10 @@ func _update_visual_transform() -> void:
 		0.42 if _is_jelly_visual else 1.0
 	)
 	_symbol_mesh.scale = Vector3(symbol_size_m, symbol_size_m, 1.0)
+	if _merge_visual_active:
+		_symbol_mesh.rotation.z = _merge_visual_rotation
+		_symbol_mesh.scale *= Vector3(
+			_merge_visual_scale.x,
+			_merge_visual_scale.y,
+			1.0
+		)
