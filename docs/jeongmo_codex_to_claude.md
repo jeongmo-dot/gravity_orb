@@ -40,7 +40,7 @@
 
 ### [2026-10-31] 대상 #127 — 합쳐지는 과정이 보이게
 - 상태: 완료 — JELLY 합체를 닿음→0.3초 과정→완성으로 분리했고, 20시드 전후 비교·실제 창 성능·두 비율 연속 캡처까지 완료했다
-- 브랜치 / PR: `codex/visible-jelly-merge-process` / 미생성
+- 브랜치 / PR: `codex/visible-jelly-merge-process` / https://github.com/jeongmo-dot/gravity_orb/pull/127
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/{CollisionResolver.gd,TurnManager.gd}`, `scripts/spike/{Board3D.gd,Orb3D.gd}`, `scripts/fx/FeedbackDirector.gd`, `scripts/platform/FullBoardPerformanceMeasurement.gd`, `tests/{test_config.gd,test_jelly_regression.gd,test_jolt_3d.gd,capture_screens.ps1,run_jelly_physics_autoplay.ps1}`, `tests/spike/{capture_screens.gd,run_jolt_3d_measurement.gd}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] JELLY `MERGE/MAX_CLEAR`를 닿음→과정→완성으로 분리. 흡수자는 기존 물리 구슬로 움직이고, 먹히는 그림은 충돌을 끈 뒤 현재 결과 위치로 `p²` 이동·축소·방향 변형. 같은 레벨 결과는 즉시 생성되어 smoothstep으로 물리/그림 반지름을 함께 키움
