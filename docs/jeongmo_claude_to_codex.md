@@ -32,8 +32,54 @@
 
 ## 대기 중
 
+### [2026-10-31 #122] 미리보기를 판과 같은 크기로
+- 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.15**
+- 배경: 미리보기가 칸에 맞춰 최대 2배로 커지고 개수에 따라 배율이 달라, NEXT의 L2가 판 위 L4처럼 보였다. 사용자 (2026-10-31) "이렇게 나오는데 L1, L2 만 들어온다고?" → 시안 A 선택, "A로 해줘. NEXT도 같은 크기로"
+- 앵커: `scripts/ui/Hud.gd` `_render_preview()`·`PREVIEW_REGION_SIZE`·`PREVIEW_GAP`·`_projected_board_rect()`, `scenes/UI.tscn` `ThenPreview` (scale 0.6, modulate 알파 0.5)
+- 수치: 미리보기 배율 = 판 투영 너비 ÷ `board_size` (고정, 개수와 무관). THEN 0.6배 → 1.0, 알파 0.5 그대로
+- 요구:
+  1. NEXT·THEN 젤리를 판 위 같은 레벨과 같은 화면 크기로 그린다. 창 크기·비율이 바뀌면 다시 계산
+  2. THEN도 같은 크기, 흐림 그대로
+  3. 칸이 모자라면 간격을 줄이고, 그래도 넘치면 크기는 그대로 겹쳐 놓는다 (배율을 줄이지 않는다)
+  4. 테스트: 개수 1·2·5개에서 같은 레벨의 그린 크기가 같음, 배율이 판 투영과 같음, 넘칠 때 크기 그대로·칸 안
+  5. 캡처 (두 비율): ① 판 위 L1·L2와 NEXT·THEN의 L1·L2가 한 화면에 (판 위와 미리보기 몸통 화면 지름을 픽셀로 재서 회신에) ② NEXT 1개·2개·5개 ③ THEN에 L2 5개 (겹침). 기존 미리보기 캡처는 다시 찍는다. 두 비율 전체 캡처 (마지막에)
+- 건드리지 말 것: 미리보기 개수·`×n` 규칙, 미리보기 젤리 그림, 판·규칙·물리·생성, 사용자 저장 파일, `docs/` (회신 파일 제외)
+- Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), 판 위와 미리보기 크기 차이 5% 이내, JELLY 기준 해시 그대로, 캡처 보고, 검증 빌드는 `-Debug`만
+- 커밋: 항목 단위 브랜치, **push·PR까지**
+
+### [2026-10-31 #123] 공 늘어나는 간격 5턴 → 10턴
+- 상태: 대기 (**#122 다음**. #122 병합 뒤 `origin/main` 병합)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.16**
+- 배경: #119부터 5턴마다 공이 1개씩 늘어 봇 기준 한 판이 약 80턴이다. 사용자 (2026-10-31) "들어오는 공의 수가 늘어나는 턴 기준도 5턴이 아니라 10턴 단위로 바꿔줘"
+- 앵커: `config/default_config.tres`·`config/GameConfig.gd`의 `spawn_count_ramp_turns`, `tests/test_config.gd`·`tests/test_spawner.gd` (5턴 램프 확인), JELLY 회귀 (`test_jelly_regression`), 캡처 `65_jelly_preview_double_digit`
+- 수치: `spawn_count_ramp_turns` 5 → 10 (상한 없음 그대로)
+- 요구:
+  1. `spawn_count_ramp_turns` 5 → 10
+  2. 테스트: 1·10·11·20·21·50·51·100·101턴의 생성 수 1/1/2/2/3/5/6/10/11
+  3. §12-ONE.16 측정 1·2 (새 해시, `65` 캡처는 91턴 이후로)
+- 건드리지 말 것: 시작 배치, 색 해금, 크기 비율, 미리보기, 물리 값, 규칙·점수·대폭발, 사용자 저장 파일, `docs/` (회신 파일 제외). 판 길이가 어떻게 나와도 값은 그대로 두고 보고한다
+- Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), 새 JELLY 기준 해시, 측정 표·캡처 보고 (마지막은 전체 캡처), 검증 빌드는 `-Debug`만
+- 커밋: 항목 단위 브랜치, **push·PR까지**
+
+### [2026-10-31 #124] 같은 방향으로는 밀 수 없게
+- 상태: 대기 (**#123 다음**. #123 병합 뒤 `origin/main` 병합)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.17**
+- 배경: 지금은 지금 중력과 같은 방향으로 밀어도 턴이 넘어가 새 공만 들어온다. 사용자 (2026-10-31) "방향 입력 할 때 이전에 입력한 방향을 그대로 유지는 못하게 막아줘"
+- 앵커: `config/default_config.tres`·`config/GameConfig.gd`의 `allow_same_direction_swipe`, `scripts/core/TurnManager.gd` `on_swipe()`, `scripts/ui/TurnInputIndicator.gd` `_draw()`, `tests/test_config.gd` (기본값 true 확인), `tests/scenarios/test_turn_manager.gd`, `tests/spike/run_jolt_3d_measurement.gd` `DIRECTION_PATTERN`, 전략 봇 (`tests/tools/run_jelly_blast_measurement.ps1`이 쓰는 경로), JELLY 회귀 (`test_jelly_regression`)
+- 수치: `allow_same_direction_swipe` true → false
+- 요구:
+  1. `allow_same_direction_swipe` true → false (판정은 지금 코드 그대로 — 지금 중력과 같으면 잠그지 않고 무시)
+  2. 입력을 기다리는 동안 지금 중력 방향의 화살표·막힘 표시를 그리지 않는다. 같은 방향 입력에 새 소리·연출 없음
+  3. 봇: 자동 플레이는 차례 방향이 지금 중력과 같으면 순서의 다음 방향, 전략 봇은 지금 방향을 후보에서 뺀다
+  4. 테스트 (기본값에서): 같은 방향 입력은 턴·중력·생성이 그대로이고 입력 잠금도 안 걸림, 첫 턴 아래 막힘, FINAL MOVE에서도 막힘, 다른 세 방향은 지금처럼, 입력 대기 중 지금 방향 화살표 없음
+  5. §12-ONE.17 측정 1·2
+- 건드리지 말 것: 스와이프 판정 (4방향·거리·우세 비율), 중력 전환 (#118), 생성·규칙·점수·물리, 그림·연출 (화살표 하나 숨기기 말고는), 사용자 저장 파일, `docs/` (회신 파일 제외). 판 길이가 어떻게 나와도 값은 그대로 두고 보고한다
+- Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), 새 JELLY 기준 해시, 측정 표·캡처 보고 (마지막은 전체 캡처), 검증 빌드는 `-Debug`만
+- 커밋: 항목 단위 브랜치, **push·PR까지**
+
 ### [2026-10-31 #120] 대폭발은 L7끼리만
-- 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합 — #121 `12bf7a3` 포함)
+- 상태: 대기 (**#124 다음**. #122~#124 병합 뒤 `origin/main` 병합 — 생성 10턴마다·같은 방향 막힘 위에서 잰다)
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.13**
 - 배경: 지금 JELLY는 다른 색·같은 레벨 젤리가 둘 다 L5 이상이면 닿을 때 대폭발한다 (`jelly_blast_min_level` 5). 사용자 (2026-10-31) "폭발이 L7 이었으면 L7과 L7이 만났을 때만 폭발"
 - 앵커: `config/default_config.tres`·`config/GameConfig.gd`의 `jelly_blast_min_level`, `scripts/core/ReactionRules.gd` `_classify_jelly()`, `GameConfig.blast_enabled_for_level()`, `tests/test_config.gd` (기본값 5 확인), `tests/test_rules.gd`, JELLY 회귀 (`test_jelly_regression`), `tests/tools/run_jelly_blast_measurement.ps1`
