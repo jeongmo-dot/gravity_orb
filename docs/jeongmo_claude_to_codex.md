@@ -32,8 +32,24 @@
 
 ## 대기 중
 
+### [2026-10-31 #121] 공이 많을 때 느려짐 — 가볍게
+- 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.14**
+- 배경: #119부터 판 끝 무렵 공이 약 120개가 되고, 판이 차면 들어오지 못한 공이 입구에서 기다린다. 사용자 (2026-10-31) "공이 많아졌을 때 화면을 채울 때 쯤 많이 느려지네, 좀 더 빠르고 가볍게 할 수 없을까"
+- 앵커: `scripts/spike/Board3D.gd` `_update_entrance_waiters()`·`find_free_spawn_slot()`·`_update_ghost_orbs()`·`get_orbs()`·`blocked_spawn_directions()`, `scripts/core/CollisionResolver.gd` `flush()`·`_scan_geometric_contacts()`·`has_pending_reactions()`·`_current_reaction_partners()`, `scripts/core/TurnManager.gd` `_all_below_threshold()`, `scripts/core/ReactionRules.gd`
+- 수치: 없음 (값을 바꾸지 않는다)
+- 요구:
+  1. 고치기 전에 실제 창에서 장면 ①~③을 잰다 (§12-ONE.14 방법 1). 위 앵커와 그리기 중 어디가 비싼지 항목별로
+  2. 비싼 순서대로, 결과가 같은 고침만 한다 (JELLY 기준 해시 그대로). 결과가 바뀌어야만 되는 고침·물리 주기·그림 줄이기는 하지 않고 효과 추정과 함께 보고한다
+  3. 목표: 장면 ①~③에서 물리 한 스텝 (스크립트 포함) p99 4ms 이하, 전체 프레임 p99 16.7ms 이하, 게임이 실제 시간보다 느려지지 않음. 못 미치면 남은 비용을 보고
+  4. 테스트: 고친 함수마다 고치기 전과 같은 결과를 내는지 (기다리는 공 자리 찾기·닿은 쌍 찾기·반응 대기 판정·유령 해제)
+  5. §12-ONE.14 측정 1~4
+- 건드리지 말 것: 규칙·점수, 물리 값·물리 주기 (120Hz), #119 값, 그림·연출, 사용자 저장 파일, `docs/` (회신 파일 제외)
+- Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), JELLY 기준 해시 그대로, 자동 플레이 20시드가 #119와 같음, 고치기 전·후 측정 표, 검증 빌드는 `-Debug`만
+- 커밋: 항목 단위 브랜치, **push·PR까지**
+
 ### [2026-10-31 #120] 대폭발은 L7끼리만
-- 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합 — #119 `5b77ece` 포함)
+- 상태: 대기 (**#121 다음**. #121 병합 뒤 `origin/main` 병합)
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.13**
 - 배경: 지금 JELLY는 다른 색·같은 레벨 젤리가 둘 다 L5 이상이면 닿을 때 대폭발한다 (`jelly_blast_min_level` 5). 사용자 (2026-10-31) "폭발이 L7 이었으면 L7과 L7이 만났을 때만 폭발"
 - 앵커: `config/default_config.tres`·`config/GameConfig.gd`의 `jelly_blast_min_level`, `scripts/core/ReactionRules.gd` `_classify_jelly()`, `GameConfig.blast_enabled_for_level()`, `tests/test_config.gd` (기본값 5 확인), `tests/test_rules.gd`, JELLY 회귀 (`test_jelly_regression`), `tests/tools/run_jelly_blast_measurement.ps1`
@@ -42,7 +58,7 @@
   1. `jelly_blast_min_level` 5 → 7 (규칙 코드는 그대로)
   2. 테스트 (기본값에서): 다른 색 L5+L5·L6+L6 반응 없음, 다른 색 L7+L7 대폭발, 같은 색 L7+L7 잭팟, L5·L6 보통 얼굴 (`is_blast_armed()` 거짓), L7 MAX 얼굴 그대로
   3. JELLY 회귀 7가지 사건의 "L5 대폭발"을 "L7 대폭발 (다른 색 L7+L7)"로 바꾼다. 새 기준 해시
-  4. §12-ONE.13 측정 1~5 (5는 #119 후속: 실제 창에서 공 약 120개 판의 프레임 시간)
+  4. §12-ONE.13 측정 1~5 (5는 J7에서 합체가 많은 턴의 실제 창 프레임 시간 한 번 — 성능 본 작업은 #121)
 - 건드리지 말 것: 흡수·잭팟 규칙, 대폭발 범위·속도·점수, 물리 값, #119 값, 색 해금, 그림·연출 (새 연출 없음, 얼굴 코드 지우지 않음), CLASSIC `blast_min_level`, 사용자 저장 파일, `docs/` (회신 파일 제외). 판이 짧아지거나 실력 비가 떨어져도 값은 그대로 두고 보고한다
 - Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), 새 JELLY 기준 해시, 측정 표·캡처 보고 (마지막은 전체 캡처), 검증 빌드는 `-Debug`만
 - 커밋: 항목 단위 브랜치, **push·PR까지**
@@ -53,7 +69,7 @@
 
 ### [2026-10-30 #119] 공이 빨리 늘어나게, 시작은 색마다 하나씩 — 완료
 - 상태: 완료 (2026-10-31 Claude 검수 · [PR #119](https://github.com/jeongmo-dot/gravity_orb/pull/119) 병합 `5b77ece`)
-- 검수: 램프 5턴, 시작은 4색 L1을 시드 RNG로 섞어 바닥에 같은 간격으로 놓는다 (`initial_orb_count`는 필드만 남음). 봇 20판 한 판 337 → 79.6턴 (72~87턴, 턴당 15~18개가 들어올 때 끝남), 점수 45.7만 → 60.5만, 턴당 합체 3.53 → 6.59, FINAL MOVE 성공 15% → 4.8% (§12-ONE.12 결과). 새 해시 `ce7054b6…`, 래퍼 300/300 (Codex). Claude가 캡처 `64`·`65` 두 비율을 직접 확인했다. 측정 도구의 물리 프레임 시간 (25.6 → 32.3ms)은 실제 게임 값이 아니어서 #120 측정 5로 실제 창에서 다시 잰다. Claude 재실행 없음
+- 검수: 램프 5턴, 시작은 4색 L1을 시드 RNG로 섞어 바닥에 같은 간격으로 놓는다 (`initial_orb_count`는 필드만 남음). 봇 20판 한 판 337 → 79.6턴 (72~87턴, 턴당 15~18개가 들어올 때 끝남), 점수 45.7만 → 60.5만, 턴당 합체 3.53 → 6.59, FINAL MOVE 성공 15% → 4.8% (§12-ONE.12 결과). 새 해시 `ce7054b6…`, 래퍼 300/300 (Codex). Claude가 캡처 `64`·`65` 두 비율을 직접 확인했다. 측정 도구의 물리 프레임 시간 (25.6 → 32.3ms)은 실제 게임 값이 아니어서 실제 창에서 다시 잰다 (→ 사용자가 느려짐을 알려 #121). Claude 재실행 없음
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.12**
 - 배경: 지금은 50턴마다 공이 1개씩 늘어나고, 무작위 구체 2개로 시작한다. 사용자 (2026-10-30) "첫번째 1개씩 5턴 그 다음부터 매 5턴 마다 공 한개씩 추가", "시작할 때 아래에 색깔별로 공 하나씩 배치된 상태로 시작"
 - 앵커: `config/default_config.tres`·`config/GameConfig.gd`의 `spawn_count_ramp_turns`, `scripts/core/Spawner.gd` `spawn_initial()`
