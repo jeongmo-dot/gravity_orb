@@ -33,7 +33,7 @@
 ## 대기 중
 
 ### [2026-10-31 #120] 대폭발은 L7끼리만
-- 상태: 대기 (**다음 차례**. 먼저 `origin/main` 병합 — #122~#124 포함, 생성 10턴마다·같은 방향 막힘 위에서 잰다. 지금 JELLY 해시 `935908ce…`)
+- 상태: **추가 요구 1** (다음 차례 — 같은 브랜치 `codex/jelly-blast-l7-main`·PR #124에서. 1차 J7 병합 보류)
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.13**
 - 배경: 지금 JELLY는 다른 색·같은 레벨 젤리가 둘 다 L5 이상이면 닿을 때 대폭발한다 (`jelly_blast_min_level` 5). 사용자 (2026-10-31) "폭발이 L7 이었으면 L7과 L7이 만났을 때만 폭발"
 - 앵커: `config/default_config.tres`·`config/GameConfig.gd`의 `jelly_blast_min_level`, `scripts/core/ReactionRules.gd` `_classify_jelly()`, `GameConfig.blast_enabled_for_level()`, `tests/test_config.gd` (기본값 5 확인), `tests/test_rules.gd`, JELLY 회귀 (`test_jelly_regression`), `tests/tools/run_jelly_blast_measurement.ps1`
@@ -46,6 +46,12 @@
 - 건드리지 말 것: 흡수·잭팟 규칙, 대폭발 범위·속도·점수, 물리 값, #119 값, 색 해금, 그림·연출 (새 연출 없음, 얼굴 코드 지우지 않음), CLASSIC `blast_min_level`, 사용자 저장 파일, `docs/` (회신 파일 제외). 판이 짧아지거나 실력 비가 떨어져도 값은 그대로 두고 보고한다
 - Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), 새 JELLY 기준 해시, 측정 표·캡처 보고 (마지막은 전체 캡처), 검증 빌드는 `-Debug`만
 - 커밋: 항목 단위 브랜치, **push·PR까지**
+- **추가 요구 1** (2026-10-31, [PR #124](https://github.com/jeongmo-dot/gravity_orb/pull/124) 1차 검수 — 병합 보류): 1차 (J7)는 명세대로지만 봇 120판 동안 대폭발이 0번이었다 (판 113 → 83턴, 점수 41만 → 4.7만, 실력 비 1.20 → 1.02). 사용자 결정 "L6부터로 다시 재기" → 같은 브랜치·PR에서 [technical_design.md](technical_design.md) §12-ONE.13 **추가 요구 1**:
+  1. `jelly_blast_min_level` 7 → **6** (다른 색 L5 반응 없음, 다른 색 L6·L7 대폭발, 같은 색 L7 잭팟)
+  2. 테스트·얼굴 (L6 `><`, L5 보통, L7 MAX)·회귀 대폭발 사건을 L6 쌍으로, 새 기준 해시
+  3. 봇 20판·전략 봇 R·G·L × 20을 J6으로, 1차의 J5·J7과 나란히 (대폭발은 레벨별)
+  4. 캡처 `06`·`07`·`15`를 L6 기준으로 (이름은 내용에 맞게), 두 비율 전체 캡처 (마지막에)
+  - 값은 6으로 두고 보고한다. 병합 여부와 최종 값은 결과를 보고 사용자와 정한다
 
 ---
 
