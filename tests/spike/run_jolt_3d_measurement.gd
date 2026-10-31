@@ -58,6 +58,7 @@ var _preview_fixture_serial: int = 0
 var _seed_seen_colors: Dictionary = {}
 var _seed_merge_count: int = 0
 var _seed_absorption_count: int = 0
+var _seed_level_seven_creation_count: int = 0
 var _seed_spawn_count: int = 0
 var _seed_jelly_outline_visible_frames: int = 0
 var _seed_jelly_unarmed_outline_visible_frames: int = 0
@@ -257,6 +258,7 @@ func _run_seed(
 	_seed_seen_colors.clear()
 	_seed_merge_count = 0
 	_seed_absorption_count = 0
+	_seed_level_seven_creation_count = 0
 	_seed_spawn_count = 0
 	_seed_jelly_outline_visible_frames = 0
 	_seed_jelly_unarmed_outline_visible_frames = 0
@@ -456,6 +458,7 @@ func _run_seed(
 		"max_clear_count": _seed_max_clear_count,
 		"merge_count": _seed_merge_count,
 		"one_level_absorption_count": _seed_absorption_count,
+		"level_seven_creation_count": _seed_level_seven_creation_count,
 		"one_level_absorption_fraction": (
 			float(_seed_absorption_count) / float(_seed_merge_count)
 			if _seed_merge_count > 0
@@ -893,6 +896,8 @@ func _record_shock_event(reaction: Dictionary) -> void:
 	if reaction_type == ReactionRules.Type.MERGE:
 		_turn_merge_count += 1
 		_seed_merge_count += 1
+		if int(reaction.get("result_level", 0)) == Config.data.orb_max_level:
+			_seed_level_seven_creation_count += 1
 		if bool(reaction.get("jelly_absorption", false)):
 			_seed_absorption_count += 1
 	if reaction_type == ReactionRules.Type.BLAST:

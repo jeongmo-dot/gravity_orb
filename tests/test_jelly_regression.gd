@@ -1,7 +1,7 @@
 extends TestCase
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
-const EXPECTED_REGRESSION_HASH: String = "935908ce0fed6a141611ad2621d13bbc4a7d75252a43568301c0261be9c9a3cc"
+const EXPECTED_REGRESSION_HASH: String = "5656ac3c91d2ff9c828e0c6e7505e24d2ab8f8a189437f4b7927fa372e0c9781"
 
 
 func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
@@ -97,9 +97,9 @@ func _run_rule_path(visuals_enabled: bool) -> Dictionary:
 	events["absorption_level_up"] = int(events["absorption_level_up"]) + 1
 
 	result = await _apply_pair(
-		board, resolver, OrbTypes.OrbColor.RED, 5, 16.0, OrbTypes.OrbColor.BLUE, 5, 16.0
+		board, resolver, OrbTypes.OrbColor.RED, 7, 64.0, OrbTypes.OrbColor.BLUE, 7, 64.0
 	)
-	assert_eq(int(result["type"]), int(ReactionRules.Type.BLAST), "different L5 colors blast")
+	assert_eq(int(result["type"]), int(ReactionRules.Type.BLAST), "different L7 colors blast")
 	events["blast"] = int(events["blast"]) + 1
 
 	result = await _apply_pair(

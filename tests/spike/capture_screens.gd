@@ -13,8 +13,8 @@ const CAPTURE_FILES: Array[String] = [
 	"03_jelly_result.png",
 	"04_jelly_gameplay.png",
 	"05_jelly_final_move.png",
-	"06_jelly_blast_down.png",
-	"07_jelly_blast_right.png",
+	"06_jelly_l5_l6_no_blast.png",
+	"07_jelly_l7_blast.png",
 	"08_jelly_full_down.png",
 	"09_jelly_full_right.png",
 	"10_jelly_eat_00.png",
@@ -173,6 +173,7 @@ func _capture_gameplay_scenes() -> void:
 	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
 	manager.set_physics_process(false)
 	var board: Board3D = main.get_node("Board") as Board3D
+	var resolver: CollisionResolver = main.get_node("CollisionResolver") as CollisionResolver
 	var hud: Hud = main.get_node("UI/Hud") as Hud
 	board.clear()
 	board.set_gravity(Vector2i.DOWN)
@@ -196,12 +197,26 @@ func _capture_gameplay_scenes() -> void:
 	await _capture_recovered_hud_scenes(main, manager, board, hud)
 
 	board.clear()
-	_spawn_featured(board)
-	await _capture("06_jelly_blast_down.png")
+	_spawn_no_blast_pairs(board)
+	await _capture("06_jelly_l5_l6_no_blast.png")
 	board.clear()
-	board.set_gravity(Vector2i.RIGHT)
-	_spawn_featured(board)
-	await _capture("07_jelly_blast_right.png")
+	var first_maximum: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		7,
+		Vector2(-140.0, 0.0)
+	)
+	var second_maximum: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.BLUE,
+		7,
+		Vector2(140.0, 0.0)
+	)
+	first_maximum.disable_physics()
+	second_maximum.disable_physics()
+	resolver.report_contact(first_maximum, second_maximum, "capture_l7_blast")
+	if resolver.flush() != 1:
+		_fail("different-color L7 pair did not produce one capture reaction")
+	await get_tree().create_timer(0.06).timeout
+	await _capture("07_jelly_l7_blast.png")
 
 	board.clear()
 	board.set_gravity(Vector2i.DOWN)
@@ -276,12 +291,12 @@ func _capture_effect_scenes(main: Main, board: Board3D) -> void:
 	board.clear()
 	director.clear_effects()
 	_spawn_specs(board, [
-		{"color": OrbTypes.OrbColor.RED, "level": 6, "mass": 32.0, "position": Vector2(-85.0, 0.0)},
-		{"color": OrbTypes.OrbColor.BLUE, "level": 6, "mass": 32.0, "position": Vector2(85.0, 0.0)},
+		{"color": OrbTypes.OrbColor.RED, "level": 7, "mass": 64.0, "position": Vector2(-140.0, 0.0)},
+		{"color": OrbTypes.OrbColor.BLUE, "level": 7, "mass": 64.0, "position": Vector2(140.0, 0.0)},
 	])
 	director.play_reaction_visuals({
 		"type": ReactionRules.Type.BLAST,
-		"levels": [6, 6],
+		"levels": [7, 7],
 		"colors": [OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE],
 		"position": Vector2.ZERO,
 	})
@@ -323,6 +338,11 @@ func _capture_overlay_detail_scenes(main: Main, board: Board3D) -> void:
 	director.clear_effects()
 	board.clear()
 	board.set_gravity(Vector2i.DOWN)
+	# The blast-face art is intentionally unreachable with the J7 default because
+	# L7 keeps the MAX face. Preserve its isolated visual regression fixture by
+	# lowering only this fixture's threshold, then restore the product default.
+	var default_blast_min_level: int = Config.data.jelly_blast_min_level
+	Config.data.jelly_blast_min_level = 5
 	var cheek_specs: Array[Dictionary] = [
 		{
 			"color": OrbTypes.OrbColor.YELLOW,
@@ -381,6 +401,7 @@ func _capture_overlay_detail_scenes(main: Main, board: Board3D) -> void:
 			camera.unproject_position(orb._mesh.global_position),
 			76
 		)
+	Config.data.jelly_blast_min_level = default_blast_min_level
 
 	board.clear()
 	var belly_half: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 3, Vector2(-100.0, 0.0))
@@ -1442,6 +1463,15 @@ func _spawn_featured(board: Board3D) -> void:
 	for spec: Dictionary in specs:
 		var orb: Orb3D = board.spawn_orb(int(spec["color"]), int(spec["level"]), spec["position"] as Vector2)
 		orb.disable_physics()
+
+
+func _spawn_no_blast_pairs(board: Board3D) -> void:
+	_spawn_specs(board, [
+		{"color": OrbTypes.OrbColor.RED, "level": 5, "mass": 16.0, "position": Vector2(-260.0, -150.0)},
+		{"color": OrbTypes.OrbColor.BLUE, "level": 5, "mass": 16.0, "position": Vector2(-60.0, -150.0)},
+		{"color": OrbTypes.OrbColor.GREEN, "level": 6, "mass": 32.0, "position": Vector2(-120.0, 150.0)},
+		{"color": OrbTypes.OrbColor.YELLOW, "level": 6, "mass": 32.0, "position": Vector2(120.0, 150.0)},
+	])
 
 
 func _spawn_full(board: Board3D) -> void:

@@ -236,22 +236,31 @@ func test_classic_3d_blast_readiness_starts_at_level_four() -> void:
 	Config.data.game_mode = original_mode
 
 
-func test_jelly_blast_face_follows_threshold_without_outline_geometry() -> void:
+func test_jelly_default_l7_blast_readiness_follows_mass_without_outline_geometry() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_jelly_minimum: int = Config.data.jelly_blast_min_level
 	Config.data.game_mode = GameConfig.GameMode.JELLY
-	Config.data.jelly_blast_min_level = 5
+	Config.data.jelly_blast_min_level = 7
 	var board: Board3D = await _create_board()
-	var level_four: Orb3D = board.spawn_orb(0, 4, Vector2(-180.0, 0.0))
-	var level_five: Orb3D = board.spawn_orb(1, 5, Vector2(180.0, 0.0))
-	assert_true(not level_four.is_blast_armed(), "J5 leaves L4 unarmed")
-	assert_true(level_five.is_blast_armed(), "J5 arms L5")
-	level_four.set_jelly_mass(16.0, Config.data)
-	assert_eq(level_four.level, 5, "mass update reaches displayed L5")
-	assert_true(level_four.is_blast_armed(), "mass-updated displayed L5 arms BLAST")
+	var level_five: Orb3D = board.spawn_orb(0, 5, Vector2(-180.0, 0.0))
+	var level_six: Orb3D = board.spawn_orb(1, 6, Vector2(0.0, 0.0))
+	var level_seven: Orb3D = board.spawn_orb(2, 7, Vector2(180.0, 0.0))
+	assert_true(not level_five.is_blast_armed(), "J7 leaves L5 unarmed")
+	assert_true(not level_six.is_blast_armed(), "J7 leaves L6 unarmed")
+	assert_true(level_seven.is_blast_armed(), "J7 arms L7")
+	level_five.set_jelly_mass(32.0, Config.data)
+	assert_eq(level_five.level, 6, "mass update reaches displayed L6")
+	assert_true(not level_five.is_blast_armed(), "mass-updated displayed L6 stays unarmed")
+	level_five.set_jelly_mass(64.0, Config.data)
+	assert_eq(level_five.level, 7, "mass update reaches displayed L7")
+	assert_true(level_five.is_blast_armed(), "mass-updated displayed L7 arms BLAST")
 	assert_true(
-		bool((level_four._face.material_override as ShaderMaterial).get_shader_parameter("is_blast_ready")),
-		"mass-updated L5 switches to the blast-ready face"
+		bool((level_five._face.material_override as ShaderMaterial).get_shader_parameter("is_max")),
+		"mass-updated L7 keeps the MAX face"
+	)
+	assert_true(
+		not bool((level_five._face.material_override as ShaderMaterial).get_shader_parameter("is_blast_ready")),
+		"mass-updated L7 does not replace MAX with blast-ready face"
 	)
 	_cleanup(board)
 	Config.data.jelly_blast_min_level = original_jelly_minimum
