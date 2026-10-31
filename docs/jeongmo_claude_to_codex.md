@@ -32,8 +32,15 @@
 
 ## 대기 중
 
-### [2026-10-31 #120] 대폭발은 L7끼리만
-- 상태: **추가 요구 1** (다음 차례 — 같은 브랜치 `codex/jelly-blast-l7-main`·PR #124에서. 1차 J7 병합 보류)
+- 없음
+
+---
+
+## 처리 완료
+
+### [2026-10-31 #120] 대폭발은 L7끼리만 → L6부터 — 완료
+- 상태: 완료 (2026-10-31 Claude 검수 · [PR #124](https://github.com/jeongmo-dot/gravity_orb/pull/124) 병합 `32ee9d8`, 최종 값 6 — 사용자 결정)
+- 검수: 1차 J7은 봇 120판 동안 대폭발 0번 (실력 비 1.02)이라 보류 → 추가 요구 1로 J6. 봇 20판 J5 / J6 / J7 = 112.8 / 87.9 / 83.0턴, 점수 41.4만 / 9.1만 / 4.7만, 대폭발 204 / 18 / 0. 전략 봇 실력 비 (길이 / 점수) 1.20 / 2.42 → 1.14 / 2.60 → 1.02 / 1.13. 사용자가 세 값을 보고 "L6부터로 병합". 회귀 대폭발 사건 L6 쌍, 새 해시 `5e00b1f7…`, 래퍼 308/308 (Codex). Claude가 캡처 `06`을 직접 확인했다 (§12-ONE.13 결과). Claude 재실행 없음
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.13**
 - 배경: 지금 JELLY는 다른 색·같은 레벨 젤리가 둘 다 L5 이상이면 닿을 때 대폭발한다 (`jelly_blast_min_level` 5). 사용자 (2026-10-31) "폭발이 L7 이었으면 L7과 L7이 만났을 때만 폭발"
 - 앵커: `config/default_config.tres`·`config/GameConfig.gd`의 `jelly_blast_min_level`, `scripts/core/ReactionRules.gd` `_classify_jelly()`, `GameConfig.blast_enabled_for_level()`, `tests/test_config.gd` (기본값 5 확인), `tests/test_rules.gd`, JELLY 회귀 (`test_jelly_regression`), `tests/tools/run_jelly_blast_measurement.ps1`
@@ -52,10 +59,6 @@
   3. 봇 20판·전략 봇 R·G·L × 20을 J6으로, 1차의 J5·J7과 나란히 (대폭발은 레벨별)
   4. 캡처 `06`·`07`·`15`를 L6 기준으로 (이름은 내용에 맞게), 두 비율 전체 캡처 (마지막에)
   - 값은 6으로 두고 보고한다. 병합 여부와 최종 값은 결과를 보고 사용자와 정한다
-
----
-
-## 처리 완료
 
 ### [2026-10-31 #124] 같은 방향으로는 밀 수 없게 — 완료
 - 상태: 완료 (2026-10-31 Claude 검수 · [PR #123](https://github.com/jeongmo-dot/gravity_orb/pull/123) 병합 `99240c2`)
