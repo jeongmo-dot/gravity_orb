@@ -38,6 +38,70 @@
 
 ## 미확인
 
+### [2026-10-31] 대상 #126 — 들어오는 수량을 L1 기준으로·최대 5
+- 상태: 완료 — 턴 수량을 L1 환산 예산으로 바꾸고, 남은 예산 안에 드는 레벨만 가중 추첨한다. `spawn_level_costs`의 없거나 1 미만인 값은 1로 처리하며, 기본값은 명세대로 M2 (`spawn_count_max=5`, 비용 `[1,2]`)다. NEXT·THEN은 실제로 뽑힌 젤리 묶음을 표시하고 `×n`은 비용이 아닌 실제 젤리 수다
+- 브랜치 / PR: `codex/spawn-level-budget-cap-five` / push 후 생성
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/Spawner.gd`, `tests/{test_config.gd,test_spawner.gd,test_screen_layout.gd,run_jelly_physics_autoplay.ps1,capture_screens.ps1}`, `tests/scenarios/test_jolt_integration.gd`, `tests/spike/{run_jolt_3d_measurement.gd,capture_screens.gd}`, `tests/tools/{run_spawn_budget_autoplay.ps1,run_spawn_budget_measurement.ps1}`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 비용 필드 기본 `[1,2]`; 누락·0·음수 비용은 1. `[1,1]`은 같은 시드에서 기존 레벨·색·위치 RNG 순서를 그대로 재현 — 자동 (`test_spawn_level_cost_defaults_and_fallbacks`, `test_equal_level_costs_reproduce_previous_candidate_sequence`)
+  - [x] `[1,2]`·`[1,3]` 묶음 비용 합이 턴 예산과 같고 예산 1은 L1만 생성. 첫 해금 젤리의 새 색 강제는 유지 — 자동 (`test_weighted_level_cost_batches_fill_exact_budget`, `test_turn_color_preview_uses_target_turn_and_forces_new_color_first`)
+  - [x] `sync_next_batch_size()`가 끝에서 줄이고 비용 규칙으로 늘려 모든 NEXT·THEN 묶음을 정확한 예산에 맞춤 — 자동 (`test_sync_next_batch_size_shrinks_and_grows_to_exact_budget`)
+  - [x] 10턴 램프 유지, 상한 5: 40·41·100·500턴 예산 `4·5·5·5` — 자동 (`test_spawn_count_ramp_turn_boundaries`, `test_default_ten_turn_ramp_caps_at_five`)
+  - [x] 미리보기 `×n`은 레벨 비용과 무관한 실제 젤리 수 — 자동 (`test_preview_orbs_match_board_scale_and_count_uses_actual_jelly_items`)
+  - [x] B/M0/M2/M3 자동 봇 80판과 R/G/L-합체 전략 봇 240판, 모두 600턴 상한으로 측정 — 자동, 아래 표
+  - [x] JELLY 기준 해시 `5e00b1f74b76a4e33b443e9fa0a95b85d3717504f9bb55b8736a84e443cff8ea` 그대로, 사건 7종 각 1회·렌더링 켬/끔 동일 — 자동
+  - [x] 두 비율 전체 캡처 각 71장. TURN 21·예산 3의 L1+L2 NEXT와 TURN 125·예산 5의 실제 미리보기를 마지막 전체 캡처에서 직접 확인 — 자동 캡처 + 직접 관측
+  - [x] 일반·장기·성능 테스트, import, 소스 기본·BLITZ 스모크, Debug 빌드 통과. Release 빌드는 명세대로 미실행
+- 자동 순서 봇 20시드 비교 (`Godot 4.8-dev3 Standard`, Jolt, 120Hz, 시드 `101~120`, 600턴 상한):
+
+  | 항목 | B `0/[1,1]` | M0 `5/[1,1]` | M2 `5/[1,2]` | M3 `5/[1,3]` |
+  |---|---:|---:|---:|---:|
+  | 게임오버 / 600턴 미완료 | `20 / 0` | `20 / 0` | `20 / 0` | `20 / 0` |
+  | 게임오버 턴 평균 / 최소 / 최대 | `87.85 / 80 / 98` | `120.80 / 90 / 148` | `130.05 / 96 / 166` | `135.45 / 104 / 165` |
+  | 점수 평균 / 최소 / 최대 | `90,587.60 / 29,974 / 204,849` | `117,777.20 / 23,369 / 424,238` | `107,290.60 / 18,653 / 388,398` | `65,575.15 / 18,268 / 135,277` |
+  | 턴당 합체 | `3.6272` | `3.3204` | `3.1146` | `3.0853` |
+  | 대폭발 (레벨별) | `18 (L6 18)` | `40 (L6 40)` | `38 (L6 38)` | `37 (L6 37)` |
+  | 생성 합계 / 판당 평균 | `8,510 / 425.50` | `10,040 / 502.00` | `10,177 / 508.85` | `10,343 / 517.15` |
+  | L2 비율 | `10.000%` | `9.990%` | `7.694%` | `5.617%` |
+  | 게임오버 턴 실제 젤리 / L1 예산 평균 | `0 / 9.20` | `0 / 5.00` | `0 / 5.00` | `0 / 5.00` |
+  | FINAL MOVE 성공 / 발생 | `3 / 23` | `4 / 24` | `5 / 25` | `4 / 24` |
+  | 1.5초 강제 안정 | `1,684 (95.845%)` | `2,273 (94.081%)` | `2,438 (93.733%)` | `2,577 (95.127%)` |
+  | 최대 턴 끝 쌍 관통 | `23.606px` | `23.606px` | `39.445px` | `27.656px` |
+  | 판 밖 이탈 | `0` | `0` | `0` | `0` |
+  | 최대 활성 공 평균 / 전체 최대 | `105.25 / 115` | `97.45 / 108` | `100.10 / 114` | `95.90 / 110` |
+
+  - 게임오버는 FINAL MOVE 실패로 확정되므로 그 턴에 실제 생성된 젤리는 네 후보 모두 0개였다. 함께 기록한 L1 예산은 그 턴 번호의 생성 예산이다
+- 전략 봇 비교 (`B/M0/M2/M3 × R/G/L-합체 × 시드 1~20`, Jolt 120Hz, 600턴 상한; 전부 `20/20` 게임오버):
+
+  | 후보·전략 | 턴 중앙값 / 평균 | 점수 중앙값 / 평균 | 대폭발 |
+  |---|---:|---:|---:|
+  | B R / G / L | `83.5/84.10 · 86/85.80 · 95/94.40` | `57,981/97,002.95 · 51,445/71,435.85 · 150,685.5/187,825.05` | `9 / 13 / 37` (모두 L6) |
+  | M0 R / G / L | `96/103.00 · 118/116.85 · 137.5/145.40` | `47,647/50,918.70 · 67,101.5/102,134.75 · 128,812.5/176,389.90` | `14 / 34 / 76` (모두 L6) |
+  | M2 R / G / L | `115/118.55 · 118.5/121.50 · 168/178.85` | `67,062/101,950.75 · 48,159.5/73,145.15 · 135,284/185,912.50` | `23 / 28 / 101` (모두 L6) |
+  | M3 R / G / L | `127.5/125.90 · 133/131.20 · 165.5/184.00` | `68,338/96,974.85 · 45,717.5/66,753.40 · 113,634/164,787.25` | `26 / 33 / 95` (모두 L6) |
+
+  - L/R 길이·점수 비: B `1.1377 / 2.5989`, M0 `1.4323 / 2.7035`, M2 `1.4609 / 2.0174`, M3 `1.2980 / 1.6629`
+  - 같은 시드 L 우세율(길이/점수): B `92.5% / 75%`, M0 `95% / 85%`, M2 `85% / 70%`, M3 `80% / 65%`
+- 최종 캡처 관측:
+  - `tests/capture_screens.ps1` → `540×960`, `540×1170` 각 71장, 합계 `142장`, 종료 코드 0, 누락 0건, 착지 연속 장면 각 `10/10` 고유
+  - 두 비율 `65_jelly_preview_budget_mix`: TURN 21, NEXT 레벨 `[1,2]`, 비용 `1+2=3`, 실제 젤리 2개. 보드·HUD·NEXT·THEN이 겹치거나 잘리지 않음
+  - 두 비율 `71_jelly_turn_hud_three_digit`: TURN 125와 NEXT·THEN 비용이 각각 5로 일치. 기존 캡처의 턴/미리보기 불일치를 함께 수정
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard (`C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`)
+  - `godot --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` 최종 → 일반 `305/305`, 장기 `4/4`, 성능 `5/5`, 합계 `314/314`, 종료 코드 0, `90.589초`; 장기 22시드 이탈·발산 0
+  - 소스 기본·`--mode=blitz` `--quit-after 300` → 두 실행 모두 종료 코드 0, 오류 표식 0건
+  - `tools/build_windows.ps1 -Debug` → 종료 코드 0, `version=0.16.0`, Debug exe `104,965,408`바이트. Release 미실행
+  - 측정 원본: `artifacts/measurements/spawn_budget_autoplay_measurement.json`, `artifacts/measurements/spawn_budget_strategy_measurement.json`; 재현 도구 `tests/tools/run_spawn_budget_{autoplay,measurement}.ps1`
+  - 규칙 검색 → `Input`/`InputEvent`는 `InputRouter.gd`와 허용된 `Haptics.gd`만. 난수 검색은 기존 `ColorEffectVisual.gd` 전용 RNG와 `Spawner.gd`만. `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. 새 게임에서 1~10턴을 진행한다 → 매 턴 L1 한 개만 NEXT에 보이고 실제로도 한 개 들어와야 한다.
+  2. 21턴의 NEXT에 L2가 섞일 때까지 재시작하거나 시드를 바꾼다 → 예산 3이면 `L1+L2` 또는 `L1 3개`이며, L2가 있어도 총 비용은 3이어야 한다.
+  3. 41턴 이후 여러 턴 진행한다 → 한 턴 L1 환산량은 항상 5이고 실제 젤리는 5개 이하, NEXT·THEN의 `×n`이 보일 경우 화면의 실제 젤리 개수와 같아야 한다.
+  4. 30·60턴 해금 턴을 본다 → NEXT 첫 젤리는 각각 새로 해금된 색이며, 나머지는 그 턴까지 해금된 색만 사용해야 한다.
+- 결정 사항: 명세 외 수치 변경 없음. 측정값과 무관하게 지시대로 기본값은 M2 (`5/[1,2]`)에 두었다. 상한 5 때문에 기존 장기 물리 테스트의 “시드 101이 120턴 내 반드시 게임오버” 가정은 더 이상 성립하지 않아, 같은 물리 관측을 240턴 완료 또는 게임오버까지 수행하도록 갱신했다
+- 남은 것 · 질문: 병합 전 사용자에게 L2 비용 2(M2)와 3(M3) 중 최종 선택을 요청한다. 자동 봇 평균 판 길이는 M2 `130.05턴`, M3 `135.45턴`; 전략 L/R 길이 비는 M2 `1.4609`, M3 `1.2980`; 점수 비는 M2 `2.0174`, M3 `1.6629`로 관측됐다
+
 ### [2026-10-31] 대상 #125 — 위에 턴 수·막힘 글자 삭제·랭킹은 턴
 - 상태: 완료 — 상단 소리 버튼과 SCORE 사이에 BEST와 같은 `TURN` 판을 추가하고, 상태에 따라 다음 입력 턴 또는 진행·종료 턴을 표시한다. 미리보기 위 막힘 글자 판은 삭제했으며 판 둘레 화살표·✕와 막힘 계산은 유지했다. JELLY 랭킹은 저장된 `turns`를 표시하고 `final_moves` 저장 형식은 그대로다
 - 브랜치 / PR: `codex/jelly-turn-hud-ranking` / https://github.com/jeongmo-dot/gravity_orb/pull/125

@@ -48,13 +48,14 @@ enum GameMode {
 @export var max_settle_time: float = 3.0
 @export var allow_same_direction_swipe: bool = false
 @export var spawn_level_weights: PackedFloat32Array = PackedFloat32Array([0.9, 0.1])
+@export var spawn_level_costs: PackedInt32Array = PackedInt32Array([1, 2])
 @export var spawn_color_weights: PackedFloat32Array = PackedFloat32Array(
 	[1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 )
 @export var spawn_count_per_turn: int = 1
 @export var preview_turns: int = 2
 @export var spawn_count_ramp_turns: int = 10
-@export var spawn_count_max: int = 0
+@export var spawn_count_max: int = 5
 @export var turn_start_colors: int = 4
 @export var turn_color_unlock_turns: Array[int] = [30, 60]
 @export var spawn_position_mode: SpawnPositionMode = SpawnPositionMode.RANDOM
@@ -213,6 +214,13 @@ func spawn_count_for_turn(turn_index: int) -> int:
 	if spawn_count_max <= 0:
 		return ramped_count
 	return mini(ramped_count, spawn_count_max)
+
+
+func spawn_cost_for_level(level: int) -> int:
+	var index: int = level - 1
+	if index < 0 or index >= spawn_level_costs.size():
+		return 1
+	return maxi(spawn_level_costs[index], 1)
 
 
 func color_count_for_turn(turn_index: int) -> int:

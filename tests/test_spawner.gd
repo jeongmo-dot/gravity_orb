@@ -178,6 +178,7 @@ func test_zero_seed_randomizes_and_reports_actual_seed() -> void:
 
 func test_count_two_batch_sequence_matches_continuous_count_one_sequence() -> void:
 	var snapshot: Dictionary = _snapshot_spawn_config()
+	Config.data.spawn_level_costs = PackedInt32Array([1, 1])
 	var count_one: Array[Dictionary] = _draw_batched_sequence(2468, 1, 6)
 	var count_two: Array[Dictionary] = _draw_batched_sequence(2468, 2, 3)
 	assert_eq(count_two, count_one, "count 2 preserves level, color, t RNG order")
@@ -189,6 +190,7 @@ func test_ramp_draws_next_turn_batch_sizes_at_boundaries() -> void:
 	Config.data.spawn_count_per_turn = 1
 	Config.data.spawn_count_ramp_turns = 20
 	Config.data.spawn_count_max = 0
+	Config.data.spawn_level_costs = PackedInt32Array([1, 1])
 	var spawner: Spawner = Spawner.new()
 	spawner.init_rng(8642)
 	var expected: Dictionary = {
@@ -209,21 +211,16 @@ func test_ramp_draws_next_turn_batch_sizes_at_boundaries() -> void:
 	_restore_spawn_config(snapshot)
 
 
-func test_default_ten_turn_ramp_has_no_maximum() -> void:
+func test_default_ten_turn_ramp_caps_at_five() -> void:
 	var snapshot: Dictionary = _snapshot_spawn_config()
 	Config.data.spawn_count_per_turn = 1
 	Config.data.spawn_count_ramp_turns = 10
-	Config.data.spawn_count_max = 0
+	Config.data.spawn_count_max = 5
 	var expected: Dictionary = {
-		1: 1,
-		10: 1,
-		11: 2,
-		20: 2,
-		21: 3,
-		50: 5,
-		51: 6,
-		100: 10,
-		101: 11,
+		40: 4,
+		41: 5,
+		100: 5,
+		500: 5,
 	}
 	for turn_value: Variant in expected:
 		var turn_index: int = int(turn_value)
@@ -255,6 +252,7 @@ func test_ramp_preview_batches_use_each_future_turn_number() -> void:
 	Config.data.spawn_count_per_turn = 1
 	Config.data.spawn_count_ramp_turns = 20
 	Config.data.spawn_count_max = 0
+	Config.data.spawn_level_costs = PackedInt32Array([1, 1])
 	var spawner: Spawner = Spawner.new()
 	spawner.init_rng(8642)
 	spawner.sync_next_batch_size(20)
@@ -320,7 +318,7 @@ func test_default_classic_progression_hash() -> void:
 	print("STAGED_DIFFICULTY_HASH classic=%s" % hash_value)
 	assert_eq(
 		hash_value,
-		"d0e0a894835a0b41a286b72a9d5c77a5d13e14a1555be07cc3176479aec1aa5f",
+		"1ded23b4fcdad092740dc7854b0a0640ae3900c1d1effe620686ac5c7ca1a3eb",
 		"CLASSIC staged progression hash"
 	)
 	spawner.free()
@@ -354,6 +352,7 @@ func test_sync_next_batch_size_updates_all_preview_batches() -> void:
 	Config.data.preview_turns = 2
 	Config.data.spawn_count_per_turn = 1
 	Config.data.spawn_count_ramp_turns = 0
+	Config.data.spawn_level_costs = PackedInt32Array([1, 1])
 	var spawner: Spawner = Spawner.new()
 	spawner.init_rng(6420)
 	spawner.sync_next_batch_size(1)
@@ -372,6 +371,85 @@ func test_sync_next_batch_size_updates_all_preview_batches() -> void:
 	_restore_spawn_config(snapshot)
 
 
+func test_equal_level_costs_reproduce_previous_candidate_sequence() -> void:
+	var snapshot: Dictionary = _snapshot_spawn_config()
+	Config.data.spawn_level_costs = PackedInt32Array([1, 1])
+	Config.data.spawn_count_per_turn = 5
+	Config.data.spawn_count_ramp_turns = 0
+	var batched_spawner := Spawner.new()
+	batched_spawner.init_rng(12601)
+	var actual: Array[Dictionary] = batched_spawner._draw_batch(1)
+	var reference_spawner := Spawner.new()
+	reference_spawner.init_rng(12601)
+	var expected: Array[Dictionary] = []
+	for index: int in range(5):
+		expected.append(reference_spawner._draw_candidate_for_turn(1, index == 0))
+	assert_eq(actual, expected, "[1, 1] preserves level, color, and position RNG sequence")
+	batched_spawner.free()
+	reference_spawner.free()
+	_restore_spawn_config(snapshot)
+
+
+func test_weighted_level_cost_batches_fill_exact_budget() -> void:
+	var snapshot: Dictionary = _snapshot_spawn_config()
+	Config.data.spawn_count_per_turn = 1
+	Config.data.spawn_count_ramp_turns = 10
+	Config.data.spawn_count_max = 5
+	for costs: PackedInt32Array in [PackedInt32Array([1, 2]), PackedInt32Array([1, 3])]:
+		Config.data.spawn_level_costs = costs
+		var spawner := Spawner.new()
+		spawner.init_rng(12602)
+		for turn_index: int in [1, 11, 21, 41, 100]:
+			var budget: int = Config.data.spawn_count_for_turn(turn_index)
+			var batch: Array[Dictionary] = spawner._draw_batch(turn_index)
+			assert_eq(_candidate_batch_cost(batch), budget, "batch cost at turn %d" % turn_index)
+			for candidate: Dictionary in batch:
+				assert_true(
+					Config.data.spawn_cost_for_level(int(candidate["level"])) <= budget,
+					"candidate fits turn %d budget" % turn_index
+				)
+			if budget == 1:
+				assert_eq(int(batch[0]["level"]), 1, "budget one permits only L1")
+		spawner.free()
+	_restore_spawn_config(snapshot)
+
+
+func test_sync_next_batch_size_shrinks_and_grows_to_exact_budget() -> void:
+	var snapshot: Dictionary = _snapshot_spawn_config()
+	Config.data.preview_turns = 2
+	Config.data.spawn_level_costs = PackedInt32Array([1, 2])
+	Config.data.spawn_count_per_turn = 5
+	Config.data.spawn_count_ramp_turns = 0
+	Config.data.spawn_count_max = 5
+	var spawner := Spawner.new()
+	spawner.init_rng(12603)
+	spawner.sync_next_batch_size(1)
+	var initial_preview: Array = spawner.peek_preview()
+	for batch: Array in initial_preview:
+		assert_eq(_candidate_batch_cost(batch), 5, "initial preview budget")
+	Config.data.spawn_count_per_turn = 2
+	spawner.sync_next_batch_size(1)
+	var shrunk_preview: Array = spawner.peek_preview()
+	for batch_index: int in range(shrunk_preview.size()):
+		var batch: Array = shrunk_preview[batch_index] as Array
+		assert_eq(_candidate_batch_cost(batch), 2, "shrunk preview budget")
+		var retained_prefix: Array = (initial_preview[batch_index] as Array).duplicate(true)
+		while not retained_prefix.is_empty() and _candidate_batch_cost(retained_prefix) > 2:
+			retained_prefix.pop_back()
+		for candidate_index: int in range(retained_prefix.size()):
+			assert_eq(
+				batch[candidate_index],
+				retained_prefix[candidate_index],
+				"shrink removes only from batch %d end" % batch_index
+			)
+	Config.data.spawn_count_per_turn = 4
+	spawner.sync_next_batch_size(1)
+	for batch: Array in spawner.peek_preview():
+		assert_eq(_candidate_batch_cost(batch), 4, "grown preview budget")
+	spawner.free()
+	_restore_spawn_config(snapshot)
+
+
 func _draw_batched_sequence(seed: int, batch_size: int, batch_count: int) -> Array[Dictionary]:
 	Config.data.spawn_count_per_turn = batch_size
 	Config.data.spawn_count_ramp_turns = 0
@@ -382,6 +460,13 @@ func _draw_batched_sequence(seed: int, batch_size: int, batch_count: int) -> Arr
 		sequence.append_array(spawner._draw_batch())
 	spawner.free()
 	return sequence
+
+
+func _candidate_batch_cost(batch: Array) -> int:
+	var total: int = 0
+	for candidate: Dictionary in batch:
+		total += Config.data.spawn_cost_for_level(int(candidate["level"]))
+	return total
 
 
 func _draw_sequence(seed: int, count: int, mode: GameConfig.SpawnPositionMode) -> Array[Dictionary]:
@@ -398,6 +483,7 @@ func _draw_sequence(seed: int, count: int, mode: GameConfig.SpawnPositionMode) -
 func _snapshot_spawn_config() -> Dictionary:
 	return {
 		"spawn_level_weights": Config.data.spawn_level_weights.duplicate(),
+		"spawn_level_costs": Config.data.spawn_level_costs.duplicate(),
 		"spawn_color_weights": Config.data.spawn_color_weights.duplicate(),
 		"spawn_position_mode": Config.data.spawn_position_mode,
 		"spawn_count_per_turn": Config.data.spawn_count_per_turn,
@@ -411,6 +497,7 @@ func _snapshot_spawn_config() -> Dictionary:
 
 func _restore_spawn_config(snapshot: Dictionary) -> void:
 	Config.data.spawn_level_weights = snapshot["spawn_level_weights"] as PackedFloat32Array
+	Config.data.spawn_level_costs = snapshot["spawn_level_costs"] as PackedInt32Array
 	Config.data.spawn_color_weights = snapshot["spawn_color_weights"] as PackedFloat32Array
 	Config.data.spawn_position_mode = int(snapshot["spawn_position_mode"]) as GameConfig.SpawnPositionMode
 	Config.data.spawn_count_per_turn = int(snapshot["spawn_count_per_turn"])

@@ -138,16 +138,19 @@ func sync_next_batch_size(next_turn_index: int = 1) -> void:
 	_sync_preview_count(next_turn_index)
 	for turn_offset: int in range(_preview_batches.size()):
 		var batch: Array = _preview_batches[turn_offset]
-		var target_size: int = _batch_size_for_index(next_turn_index + turn_offset)
-		while batch.size() < target_size:
-			batch.append(
-				_draw_candidate_for_turn(
-					next_turn_index + turn_offset,
-					batch.is_empty()
-				)
+		var turn_index: int = next_turn_index + turn_offset
+		var target_budget: int = _batch_size_for_index(turn_index)
+		while not batch.is_empty() and _batch_cost(batch) > target_budget:
+			batch.pop_back()
+		var remaining_budget: int = target_budget - _batch_cost(batch)
+		while remaining_budget > 0:
+			var candidate: Dictionary = _draw_candidate_for_turn(
+				turn_index,
+				batch.is_empty(),
+				remaining_budget
 			)
-		if batch.size() > target_size:
-			batch.resize(target_size)
+			batch.append(candidate)
+			remaining_budget -= Config.data.spawn_cost_for_level(int(candidate["level"]))
 	_publish_preview()
 
 
@@ -158,8 +161,12 @@ func _draw_candidate() -> Dictionary:
 	return {"level": level, "color": color, "t": position_t}
 
 
-func _draw_candidate_for_turn(turn_index: int, first_in_batch: bool = false) -> Dictionary:
-	var level: int = _rng.rand_weighted(Config.data.spawn_level_weights) + 1
+func _draw_candidate_for_turn(
+	turn_index: int,
+	first_in_batch: bool = false,
+	remaining_budget: int = -1
+) -> Dictionary:
+	var level: int = _draw_level_for_budget(remaining_budget)
 	var active_color_count: int = Config.data.color_count_for_turn(turn_index)
 	var color_weights: PackedFloat32Array = Config.data.spawn_color_weights
 	if active_color_count < color_weights.size():
@@ -176,10 +183,43 @@ func _draw_candidate_for_turn(turn_index: int, first_in_batch: bool = false) -> 
 
 func _draw_batch(turn_index: int = 1) -> Array[Dictionary]:
 	var batch: Array[Dictionary] = []
-	var count: int = _batch_size_for_index(turn_index)
-	for index: int in range(count):
-		batch.append(_draw_candidate_for_turn(turn_index, index == 0))
+	var remaining_budget: int = _batch_size_for_index(turn_index)
+	while remaining_budget > 0:
+		var candidate: Dictionary = _draw_candidate_for_turn(
+			turn_index,
+			batch.is_empty(),
+			remaining_budget
+		)
+		batch.append(candidate)
+		remaining_budget -= Config.data.spawn_cost_for_level(int(candidate["level"]))
 	return batch
+
+
+func _draw_level_for_budget(remaining_budget: int) -> int:
+	var level_weights: PackedFloat32Array = Config.data.spawn_level_weights
+	if remaining_budget < 0:
+		return _rng.rand_weighted(level_weights) + 1
+	var filtered_weights: PackedFloat32Array = level_weights.duplicate()
+	var all_levels_fit: bool = true
+	var has_eligible_weight: bool = false
+	for index: int in range(filtered_weights.size()):
+		if Config.data.spawn_cost_for_level(index + 1) > remaining_budget:
+			filtered_weights[index] = 0.0
+			all_levels_fit = false
+		elif filtered_weights[index] > 0.0:
+			has_eligible_weight = true
+	if all_levels_fit:
+		return _rng.rand_weighted(level_weights) + 1
+	if has_eligible_weight:
+		return _rng.rand_weighted(filtered_weights) + 1
+	return 1
+
+
+func _batch_cost(batch: Array) -> int:
+	var total_cost: int = 0
+	for candidate: Dictionary in batch:
+		total_cost += Config.data.spawn_cost_for_level(int(candidate["level"]))
+	return total_cost
 
 
 func _sync_preview_count(next_turn_index: int) -> void:

@@ -72,7 +72,7 @@ const CAPTURE_FILES: Array[String] = [
 	"62_jelly_gravity_left_down_rest.png",
 	"63_jelly_gravity_right_down_rest.png",
 	"64_jelly_initial_four_colors.png",
-	"65_jelly_preview_double_digit.png",
+	"65_jelly_preview_budget_mix.png",
 	"66_jelly_preview_board_match.png",
 	"67_jelly_preview_next_1.png",
 	"68_jelly_preview_next_2.png",
@@ -260,9 +260,11 @@ func _capture_gameplay_scenes() -> void:
 
 func _capture_turn_hud_scene(main: Main, manager: TurnManager, hud: Hud) -> void:
 	var score: ScoreManager = main.get_node("ScoreManager") as ScoreManager
+	var spawner: Spawner = main.get_node("Spawner") as Spawner
 	manager._set_state(TurnManager.State.SIMULATING)
 	manager.turn_index = 124
 	manager._set_state(TurnManager.State.WAITING_INPUT)
+	spawner.sync_next_batch_size(125)
 	score.score = 1234567
 	score.best_score = 9876543
 	score.score_changed.emit(score.score, score.best_score)
@@ -271,6 +273,9 @@ func _capture_turn_hud_scene(main: Main, manager: TurnManager, hud: Hud) -> void
 		_fail("three-digit TURN capture does not show 125")
 	if hud._score_label.text != "1234567":
 		_fail("seven-digit SCORE capture does not show 1234567")
+	for batch: Array in spawner.peek_preview():
+		if _preview_batch_cost(batch) != 5:
+			_fail("three-digit TURN capture preview does not use turn 125 budget")
 	await _capture("71_jelly_turn_hud_three_digit.png")
 
 
@@ -765,6 +770,7 @@ func _capture_recovered_jelly_scenes(
 
 func _capture_spawn_ramp_scenes(main: Main, board: Board3D, hud: Hud) -> void:
 	var spawner: Spawner = main.get_node("Spawner") as Spawner
+	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
 	board.clear()
 	spawner.init_rng(SPAWN_RAMP_CAPTURE_SEED)
 	spawner.spawn_initial(board, Vector2i.DOWN)
@@ -786,28 +792,54 @@ func _capture_spawn_ramp_scenes(main: Main, board: Board3D, hud: Hud) -> void:
 	await get_tree().process_frame
 	await _capture("64_jelly_initial_four_colors.png")
 
-	spawner.init_rng(SPAWN_RAMP_CAPTURE_SEED)
-	spawner.sync_next_batch_size(91)
-	var preview: Array = spawner.peek_preview()
+	var mixed_seed: int = -1
+	var preview: Array = []
+	for candidate_seed: int in range(1, 1001):
+		spawner._preview_batches.clear()
+		spawner.init_rng(candidate_seed)
+		spawner.sync_next_batch_size(21)
+		preview = spawner.peek_preview()
+		var next_batch: Array = preview[0] as Array
+		var levels: Array[int] = []
+		for candidate: Dictionary in next_batch:
+			levels.append(int(candidate["level"]))
+		if next_batch.size() == 2 and levels.has(1) and levels.has(2):
+			mixed_seed = candidate_seed
+			break
+	if mixed_seed < 0:
+		_fail("could not find deterministic L1 + L2 budget-three preview")
+		return
+	manager._set_state(TurnManager.State.SIMULATING)
+	manager.turn_index = 20
+	manager._set_state(TurnManager.State.WAITING_INPUT)
 	hud._on_preview_changed(preview)
 	await get_tree().process_frame
-	if not hud._next_count_label.visible or hud._next_count_label.text != "×10":
-		_fail("spawn ramp NEXT double-digit count is not ×10 at turn 91")
-	if not hud._then_count_label.visible or hud._then_count_label.text != "×10":
-		_fail("spawn ramp THEN double-digit count is not ×10 at turn 91")
-	await _capture("65_jelly_preview_double_digit.png")
+	var next_batch: Array = preview[0] as Array
+	if _preview_batch_cost(next_batch) != 3:
+		_fail("mixed NEXT does not spend budget three")
+	if hud._turn_label.text != "21":
+		_fail("mixed NEXT capture TURN does not match preview turn 21")
+	await _capture("65_jelly_preview_budget_mix.png")
 	print(
 		(
-			"SCREEN_CAPTURE_CHECK scene=spawn_ramp seed=%d preview_turn=91 initial_colors=%s positions=%s "
-			+ "next=%s then=%s"
+			"SCREEN_CAPTURE_CHECK scene=spawn_ramp seed=%d preview_turn=21 initial_colors=%s positions=%s "
+			+ "next_levels=%s next_cost=%d next_count=%d"
 		) % [
-			SPAWN_RAMP_CAPTURE_SEED,
+			mixed_seed,
 			str(initial_colors),
 			str(initial_positions),
-			hud._next_count_label.text,
-			hud._then_count_label.text,
+			str(next_batch.map(func(candidate: Dictionary) -> int: return int(candidate["level"]))),
+			_preview_batch_cost(next_batch),
+			next_batch.size(),
 		]
 	)
+
+
+func _preview_batch_cost(batch: Array) -> int:
+	var total: int = 0
+	for candidate: Dictionary in batch:
+		total += Config.data.spawn_cost_for_level(int(candidate["level"]))
+	return total
 
 
 func _capture_preview_scale_scenes(board: Board3D, hud: Hud) -> void:
