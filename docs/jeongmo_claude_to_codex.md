@@ -32,7 +32,25 @@
 
 ## 대기 중
 
-- 없음
+### [2026-11-01 #128] 레벨 L10까지 잘게 (L10 = 지금 L7 크기)·다른 색 대폭발은 L10끼리만·L10 터치 소폭발
+- 상태: 대기 (**다음 차례**. 최신 `origin/main` 위에서)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.21**
+- 배경: 사용자 (2026-11-01) "같은 색 L7 은 대폭발 유지, 다른 색의 경우 L7의 경우만 유지", "L2 부터 L7의 단계를 더욱 세분화 L10 까지 늘리는 대신 L10 의 크기를 현재 L7 사이즈로", "L10 이 되면 해당 젤리를 터치해서 소폭발을 할 수 있게 해줘". 1번의 L7은 새 L10이다 (사용자 확인). L10까지 드는 양은 A (단계마다 2배, L10 = 512)·B (L10 = 64) 둘 다 재서 사용자가 고른다
+- 앵커: `config/GameConfig.gd` `jelly_mass_for_level()`·`jelly_level_for_mass()`·`blast_enabled_for_level()`·새 필드, `config/default_config.tres`, `scripts/spike/Orb3D.gd` `_jelly_fill_fraction_for_mass()`, `scripts/core/JellyOrbArt.gd` (레벨 7 하드코딩·밝기), `scripts/fx/FeedbackDirector.gd` (레벨 기준·대폭발 연출), `scripts/autoload/InputRouter.gd` `_end_pointer_gesture()` (터치), `scripts/core/TurnManager.gd` (소폭발 뒤 안정), `scripts/core/CollisionResolver.gd`·`scripts/spike/Board3D.gd` `apply_blast()`, `scripts/core/ScoreManager.gd`, 봇·측정 도구, 캡처 (`tests/spike/capture_screens.gd`)
+- 수치 (기본 = B):
+  - `orb_max_level` 10, 새 `jelly_level_masses` [1, 2, 3, 5, 7, 11, 17, 27, 42, 64], `level_radii` [25, 40, 52, 68, 80, 92, 102, 115, 128, 140], `level_scores` [2, 4, 6, 10, 14, 22, 34, 54, 84, 128]
+  - A (측정용 값 묶음): 질량 [1, 2, 4, 8, 16, 32, 64, 128, 256, 512], 반지름 [25, 40, 47, 55, 64, 75, 88, 102, 120, 140], 점수 [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
+  - `jelly_blast_min_level` 6 → 10, `blast_push_radius_by_level` [0, 0, 0, 0.3, 0.55, 1, 1, 1, 1, 1], `gravity_level_scale` 0.05 → 0.0333, `shock_level_scale` 0.3 → 0.2
+  - 새 `jelly_tap_blast_radius_factor` 0.3, `jelly_tap_blast_score_factor` 1.0, `jelly_tap_blast_touch_margin` 16
+- 요구:
+  1. 레벨 10단계, 질량 표 (`jelly_level_masses` — 길이가 다르면 2^(L−1)), 배 속 비율도 표 기준
+  2. 꼭대기 규칙: 같은 색 L10+L10 잭팟, 다른 색은 L10+L10만 대폭발
+  3. 레벨에 묶인 그림·연출 값은 L10 = 지금 L7. 꼭대기를 뜻하는 7은 `orb_max_level`로, 그 밖의 레벨 숫자 기준은 같은 반지름 이상인 첫 레벨로 바꾸고, 바꾼 곳 전부를 회신에 표로 적는다
+  4. L10 터치 소폭발: 입력 대기 중 80px 미만 터치로 L10 하나를 터뜨려 반경 0.3 × 판 안을 밀어낸다. 턴·생성·중력 그대로, 판이 안정되면 입력 대기로 돌아온다. 연출은 기존 대폭발 연출을 한 젤리분·세기 절반으로 (새 연출 없음)
+  5. §12-ONE.21 측정 1~5 (M / A0 / A1 / B0 / B1)
+- 건드리지 말 것: 생성 (L1·L2·비용·램프·상한), 흡수 판정 (레벨 차 ≤ 1), 합체 과정 0.3초, 색 효과, 물리 (위 두 값 빼고), FINAL MOVE·게임 오버, 랭킹, 사용자 저장 파일, 새 연출 (고리 모양 금지), `docs/` (회신 파일 제외). 측정이 어떻게 나와도 기본값은 B로 두고 보고한다
+- Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), M 값에서 해시 `ee67b19c…` 그대로, 새 기본값 해시 상수 고정, 측정 표·캡처 (실제 창 포함, 마지막은 전체 캡처) 보고, 검증 빌드는 `-Debug`만
+- 커밋: 항목 단위 브랜치, **push·PR까지**. 병합은 사용자가 A·B를 고른 뒤
 
 ---
 
