@@ -32,8 +32,27 @@
 
 ## 대기 중
 
-### [2026-11-01 #130] 대폭발 점수를 소폭발보다 확실히 크게·소폭발에 턴 쓰기 — 생존이냐 점수냐
+### [2026-11-01 #131] 잭팟을 대폭발보다 크게 — 같은 색 L10 둘 640 → 5,120
 - 상태: 대기 (**다음 차례**. 최신 `origin/main` 위에서)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.24**
+- 배경: #130에서 대폭발 배율을 5 → 15로 올려 (L8+L8 1,620 ~ L10+L10 3,840) 잭팟 640이 모든 대폭발보다 작아졌다. 사용자 "다음 차례에 올리기"
+- 앵커: `config/GameConfig.gd`·`default_config.tres` (`max_merge_bonus_factor`), `scripts/core/ScoreManager.gd` `points_for()` (`MAX_CLEAR` — 식은 그대로), 회귀 해시 (`tests/test_jelly_regression.gd`), `tests/test_score.gd`·`tests/test_config.gd`, 캡처 (`tests/spike/capture_screens.gd`)
+- 수치 (Claude): `max_merge_bonus_factor` 5 → **40** (잭팟 128 × 40 = 5,120)
+- 요구:
+  1. 기본값 변경 (`GameConfig.gd`·`default_config.tres` 함께)
+  2. 예전 값 묶음 (M·B·C8·D·ST)은 5로 두어 해시 그대로, 새 기본 해시 상수 고정
+  3. §12-ONE.24 테스트·캡처. 측정은 하지 않는다
+- 건드리지 말 것: 잭팟 판정·충격파·연출, 대폭발·소폭발·합체 점수, 콤보·위험 배수, 소폭발 턴 쓰기, 레벨표·마찰·생성, 랭킹 (저장 형식·기록), 사용자 저장 파일, 새 연출·표시 (고리 모양 금지), `docs/` (회신 파일 제외)
+- Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), 예전 해시 그대로, 새 기본 해시 상수 고정, 캡처 (실제 창, 마지막은 전체 캡처) 보고, 검증 빌드는 `-Debug`만
+- 커밋: 항목 단위 브랜치, **push·PR까지**. 병합은 Claude 검수 뒤
+
+---
+
+## 처리 완료
+
+### [2026-11-01 #130] 대폭발 점수를 소폭발보다 확실히 크게·소폭발에 턴 쓰기 — 생존이냐 점수냐 — 완료
+- 상태: 완료 (2026-11-01 Claude 검수 · [PR #130](https://github.com/jeongmo-dot/gravity_orb/pull/130) 병합 `3bf113e`)
+- 검수: 코드·테스트·캡처는 명세대로 — 스와이프와 소폭발이 같은 `_start_turn()`을 지나고 소폭발은 중력만 안 바꾼다. 래퍼 331/331, M·B·C8·D 해시 그대로, 새 기본 ST `f3ff9347…` 고정 (Codex). 측정: 턴 쓰기로 L-합체 바로 쓰기 600턴 미완료 8 → 1판·중앙값 546.5 → 309턴, 자동 1 → 0판. 아끼기 ÷ 바로 쓰기 총점 비 (×15) 자동 1.53·R 2.15·G 1.41·L 1.14 (중앙값으로는 자동·L 0.92~0.94). 위기에만 쓰기가 모든 봇에서 평균 1등. 전략 봇 숫자는 Claude가 측정 파일로 대조. Claude 재실행 없음 (§12-ONE.23 결과)
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.23**
 - 배경: 사용자 (2026-11-01, #129 병합 뒤) "L8,9,10 대폭발 점수를 소폭발 보다 확실히 커질 수 있게 해줘", "생존을 선택하냐 점수를 선택하느냐 전략이 될 수 있게", "잠깐 그럼 소폭발의 대가는 뭐가 있을까" → Claude 후보 중 "턴 쓰기". #129 측정에서 바로 쓰기 (D-all)는 판이 거의 끝나지 않아 (L-합체 20판 중 8판 600턴) 총점도 이겼다
 - 앵커: `config/GameConfig.gd`·`default_config.tres` (`blast_score_factor`·`jelly_tap_blast_score_factor` 기본값, 새 필드), `scripts/core/ScoreManager.gd` `points_for()`, `scripts/core/TurnManager.gd` `try_tap_blast_orb()`·`on_swipe()`·`_on_settled()` (`_is_tap_blast_settle`), 봇·측정 도구 (`tests/spike/run_jolt_3d_measurement.gd`, `tests/run_jelly_physics_autoplay.ps1`, `tests/tools/run_jelly_measurement.ps1`), 회귀 해시 (`tests/test_jelly_regression.gd`), 캡처 (`tests/spike/capture_screens.gd`)
@@ -48,11 +67,7 @@
   4. §12-ONE.23 측정 (S × D-0·D-save·D-all, ST × D-save·D-all — 자동 20시드·전략 R·G·L × 20, 반응 종류별 점수, 배율 10·20 환산, 아끼기 ÷ 바로 쓰기 총점 비)·테스트·캡처
 - 건드리지 말 것: 소폭발 판정·반경·여백, 대폭발 규칙, 잭팟 점수, 합체 점수, 콤보·위험 배수, 레벨표, 마찰, 생성 값, 랭킹 (저장 형식·기록), 사용자 저장 파일, 새 연출·표시 (고리 모양 금지), `docs/` (회신 파일 제외)
 - Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), M·B·C8·D 해시 그대로, 새 기본 해시 상수 고정, 측정 표·캡처 (실제 창, 마지막은 전체 캡처) 보고, 검증 빌드는 `-Debug`만
-- 커밋: 항목 단위 브랜치, **push·PR까지**. 기본값은 ST로 두고, 병합은 측정을 사용자와 본 뒤 (배율 10·15·20, 턴 쓰기 여부)
-
----
-
-## 처리 완료
+- 커밋: 항목 단위 브랜치, **push·PR까지**. 기본값은 ST로 두고, 병합은 측정을 사용자와 본 뒤 (배율 10·15·20, 턴 쓰기 여부) → 사용자 "ST ×15 그대로", 잭팟은 "다음 차례에 올리기" (#131)
 
 ### [2026-11-01 #129] L8~L10 터치 소폭발·L8 이상 다른 색은 레벨 상관없이 대폭발·레벨별 공끼리 마찰 — 완료
 - 상태: 완료 (2026-11-01 Claude 검수 · [PR #129](https://github.com/jeongmo-dot/gravity_orb/pull/129) 병합 `0fab3b2`)
