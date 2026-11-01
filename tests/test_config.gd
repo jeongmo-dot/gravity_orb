@@ -272,7 +272,7 @@ func test_m7_score_defaults() -> void:
 	)
 	assert_near(
 		config.max_merge_bonus_factor,
-		5.0,
+		40.0,
 		TOLERANCE,
 		"maximum merge bonus factor"
 	)
