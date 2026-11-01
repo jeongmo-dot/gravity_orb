@@ -224,11 +224,11 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M1 | `board_size` | float | 960.0 | 보드 한 변 (px) |
 | M1 | `wall_thickness` | float | 256.0 | 터널링 방지용으로 두껍게 |
 | ~~M1~~ | ~~`orb_base_radius`, `orb_radius_growth`~~ | | | **#14에서 제거** → `level_radii` |
-| #14 | `level_radii` | PackedFloat32Array | [25, 40, 60, 85, 115, 150, 190] → **[25, 40, 60, 85, 100, 120, 140]** (기획서 0.6.2. #18은 보류, **#22 추가 요구 1 측정으로 2026-10-05 확정, #27 적용**) | 레벨별 반지름 |
+| #14 | `level_radii` | PackedFloat32Array | [25, 40, 60, 85, 115, 150, 190] → [25, 40, 60, 85, 100, 120, 140] (기획서 0.6.2. #18은 보류, #22 추가 요구 1 측정으로 2026-10-05 확정, #27 적용) → **[25, 40, 52, 68, 80, 92, 102, 115, 128, 140]** (#128, 2026-11-01 사용자 "L10 까지 늘리는 대신 L10 의 크기를 현재 L7 사이즈로" — 같은 질량이면 예전과 같은 크기, §12-ONE.21) | 레벨별 반지름 (인덱스 0 = L1) |
 | #45~#48 | `fx_score_popups_enabled` 등 연출 필드 | | §12-P | M8 연출 2차 (§12-P) |
 | #38 | `orb_symbols_enabled` | bool | true → **false** (#66, 2026-10-11 사용자: 구슬 안 문양 삭제) | 색각 문양 표시 (§12-U.2). 기능은 남겨 두고 나중에 설정(접근성)에서 켤 수 있게 |
 | #62 | `blast_min_level` / `blitz_blast_min_level` / `blitz_time_bonus_blast` | int / int / float | 6 → **4** / **삭제** (두 모드 `blast_min_level` 하나) / **삭제** (`blitz_time_bonus_blast_by_level`로) | **두 모드 모두 대폭발 L4, 기준은 항상 같다** (기획서 0.10.15, 2026-10-11 사용자 결정, §12-B.10) |
-| #62 | `blast_push_radius_by_level` / `blitz_time_bonus_blast_by_level` | PackedFloat32Array | **[0, 0, 0, 0.3, 0.55, 1.0, 1.0]** / **[0, 0, 0, 0.5, 1.0, 2.0, 3.0]** | 클수록 큰 대폭발: 밀어내는 반경(`board_size` 비율, 1.0 이상 = 판 전체) / BLITZ 대폭발 시간 (§7.7, §12-B.10) |
+| #62 | `blast_push_radius_by_level` / `blitz_time_bonus_blast_by_level` | PackedFloat32Array | [0, 0, 0, 0.3, 0.55, 1.0, 1.0] → **[0, 0, 0, 0.3, 0.55, 1, 1, 1, 1, 1]** (#128, 10칸) / **[0, 0, 0, 0.5, 1.0, 2.0, 3.0]** | 클수록 큰 대폭발: 밀어내는 반경(`board_size` 비율, 1.0 이상 = 판 전체) / BLITZ 대폭발 시간 (§7.7, §12-B.10) |
 | #36 | `blitz_min_spawn_per_swipe` / `blitz_max_spawn_per_swipe` | int | **1 / 8** | BLITZ 스와이프당 생성 = 없어진 만큼 (§12-B.5) |
 | #35 | `fx_*`, `sfx_*` | | §12-F 표 | 대폭발 VFX·뽁뽁이 사운드 (§12-F) |
 | #34 | `blitz_spawn_color_weights` | PackedFloat32Array | **[1, 1, 1, 1, 1, 1]** | BLITZ 생성 색 확률 (§12-B.4). 턴제 `spawn_color_weights`도 #74부터 같은 6색 (§12-W) |
@@ -238,14 +238,17 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | #25 | `color_effects_enabled` 외 5개 | | §7.6 표 | 색별 합체 효과 (§7.6) |
 | #23 | `chain_reaction_delay` | float | 0.2 (가안, 플레이 체감으로 조정) | 합체 결과의 반응 잠금 시간 (초, §7.5) |
 | #127 | `jelly_merge_duration` | float | (새 필드) **0.3** (#127, 2026-10-31 사용자 "합쳐지는 과정이 눈에 보였으면" — 사용자가 해 보고 조정, §12-ONE.20) | JELLY 합체 과정 길이 (초). 닿는 순간 규칙을 정하고, T 동안 먹히는 쪽 그림이 결과로 끌려가며 작아지고 결과가 커진 뒤 완성 (점수·연출·충격파). 0이면 닿는 순간 결과 (#126까지) |
+| #128 | `jelly_level_masses` | PackedFloat32Array | (새 필드) **[1, 2, 3, 5, 7, 11, 17, 27, 42, 64]** (#128 B — L10 = 예전 L7 양, §12-ONE.21) | JELLY 레벨별 질량 (인덱스 0 = L1). 질량 → 레벨은 표 값 ≤ m인 가장 큰 레벨, 배 속 = (m − 질량[L]) ÷ (질량[L+1] − 질량[L]). 길이가 `orb_max_level`과 다르면 2^(L−1) |
+| #128 | `jelly_merge_level_gap` | int | (새 필드) **2** (#128 추가 요구 2, 사용자 "C8" — §12-ONE.21) | JELLY 같은 색 흡수·합체 레벨 차 상한. 1 = 예전 (한 단계 차이까지) |
+| #128 | `jelly_tap_blast_radius_factor` / `jelly_tap_blast_score_factor` / `jelly_tap_blast_touch_margin` | float | (새 필드) **0.3 / 1.0 / 16** (#128, 2026-11-01 사용자 "L10 이 되면 해당 젤리를 터치해서 소폭발" — 값은 Claude, §12-ONE.21) | L10 터치 소폭발: 밀어내는 반경 (`board_size` 비율) / 점수 = `score_for_level(10)` × 값 / 터치 판정 여백 (판 좌표 px, 반지름 + 값) |
 | #21 | `combo_multiplier_base` | float | 2.0 | 콤보 배수 밑 (§8.2) |
 | #62 | `combo_multiplier_max` | float | **128.0** | 턴제 콤보 배수 상한 — `min(base^(combo − 1), max)`, 콤보 8부터 ×128 고정 (§8.2, 2026-10-11 사용자). BLITZ 체인 배수(최대 ×5)와 무관 |
 | #21 | `danger_start` / `danger_doubling` | float | 0.30 / 0.20 | 위험 배수 시작 점유율 / 2배가 되는 점유율 간격 (§8.2) |
-| #21 | `gravity_level_scale` | float | 0.1 (#21: L7 낙하 0.65초 vs L1 1.04초) → 0.25 (#60, 기획서 0.10.13: 레벨 하나마다 +25%, L7 = L1 × 2.5) → **0.05** (#115, 2026-10-29 사용자 "차이 줄이기": L7 = L1 × 1.3 — §12-ONE.8) | 레벨별 중력 배율 = 1 + 값 × (레벨 − 1). 큰 구체가 더 빨리 떨어진다 (기획서 0.8) |
+| #21 | `gravity_level_scale` | float | 0.1 (#21: L7 낙하 0.65초 vs L1 1.04초) → 0.25 (#60, 기획서 0.10.13: 레벨 하나마다 +25%, L7 = L1 × 2.5) → 0.05 (#115, 2026-10-29 사용자 "차이 줄이기": L7 = L1 × 1.3 — §12-ONE.8) → **0.0333** (#128: 레벨 10단계에서 L10 = L1 × 1.3 그대로 — §12-ONE.21) | 레벨별 중력 배율 = 1 + 값 × (레벨 − 1). 큰 구체가 더 빨리 떨어진다 (기획서 0.8) |
 | #118 | `gravity_turn_diagonal_time` | float | **0.15** (#118, 2026-10-30 사용자 "8방향으로 늘려서 좌에서 하로 갈 때와 우에서 하로 갈 때가 다른 중력 변화 과정을" — §12-ONE.11) | 90° 꺾을 때 처음 이 시간 (초, 물리 프레임으로 셈) 동안 두 방향 사이 대각선으로 당긴다. 같은·반대 방향은 곧장. 0이면 끈다. JELLY (`Board3D`)만 |
-| #120 | `jelly_blast_min_level` | int | 0 (#98) → 5 (#96, J5 — §12-JE.5) → 7 (#120 1차, 2026-10-31 사용자 "폭발이 L7 이었으면 L7과 L7이 만났을 때만 폭발" — 대폭발 0번이라 병합 안 함) → **6** (#120 추가 요구 1, 사용자 "L6부터로 다시 재기" → 5·6·7을 본 뒤 "L6부터로 병합" — §12-ONE.13) | JELLY 대폭발 기준 레벨: 다른 색·같은 레벨 둘 다 이 레벨 이상이면 닿을 때 대폭발. 7이면 다른 색 L7+L7만. 터질 듯한 얼굴도 이 레벨부터 (L7은 MAX 얼굴). 0이면 끈다 |
+| #120 | `jelly_blast_min_level` | int | 0 (#98) → 5 (#96, J5 — §12-JE.5) → 7 (#120 1차, 2026-10-31 사용자 "폭발이 L7 이었으면 L7과 L7이 만났을 때만 폭발" — 대폭발 0번이라 병합 안 함) → 6 (#120 추가 요구 1, 사용자 "L6부터로 다시 재기" → 5·6·7을 본 뒤 "L6부터로 병합" — §12-ONE.13) → 10 (#128 1차, 레벨 10단계, 사용자 "다른 색의 경우 L7(= 새 L10)의 경우만" — 대폭발 0번이라 병합 안 함) → **8** (#128 추가 요구 2, 사용자가 C10·C9·C8을 본 뒤 "C8" — §12-ONE.21) | JELLY 대폭발 기준 레벨: 다른 색·같은 레벨 둘 다 이 레벨 이상이면 닿을 때 대폭발. 10이면 다른 색 L10+L10만. 터질 듯한 얼굴도 이 레벨부터 (꼭대기 L10은 MAX 얼굴). 0이면 끈다 |
 | #14 | `mass_exponent` | float | **1.0** (#14 측정: 지수 2는 L1 관통 14.8px, 1은 8.2px) | 질량 = base × (r / r_L1)^지수. **#21에서 2로 확정** (L7이 L1에 밀리는 거리 47 → 12px) |
-| M1 | `orb_max_level` | int | 7 | |
+| M1 | `orb_max_level` | int | 7 → **10** (#128, 2026-11-01 — §12-ONE.21) | 꼭대기 레벨. 그림·연출의 꼭대기 (MAX 얼굴·맥동·미리보기 텍스처)·결과 화면 `L10 MAX`가 이 값을 따른다 |
 | M1 | `orb_base_mass` | float | 1.0 | L1 질량 |
 | M1 | `gravity_strength` | float | 2400.0 → 1800.0 (#17: 고밀도 40%+ 사전 복구 910 → 13, 발산 0, 2D 시절) → 3600.0 (#58, 두 모드 모두 2배) → 1800.0 (#60, 2026-10-10 사용자: 되돌리고 대신 레벨 차이를 크게 — §12-B.8) → **3600.0** (#115, 2026-10-29 사용자 "너무 느려요" — §12-ONE.8) | **L1** 중력 가속도 (px/s²). 레벨 L은 × (1 + `gravity_level_scale` × (L − 1)) |
 | M1 | `orb_friction` | float | 0.3 → 0.6 (#115, "구르지 않고 착 붙기" — §12-ONE.8) → **0.3** (#116, 2026-10-30 사용자 "마찰 낮추기" — §12-ONE.9) | #115~#116은 젤리 몸 회전 잠금 (`axis_lock_angular_z`). #117에서 잠금을 풀고, 대신 `orb_angular_damp`로 구르는 것을 금방 멈춘다 |
@@ -286,7 +289,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M5+ | `escape_guard_depth` | float | 25.0 | 벽 관통이 이 깊이를 넘으면 경계로 되돌리는 안전장치 (회귀 테스트는 발동 0 요구) |
 | M6 | `opposite_pairs` | Array[Vector2i] | [(RED, BLUE)] → **[] (#25, 기획서 0.9.3: 상극 소멸 폐지)**. 0.5의 (GREEN, YELLOW)는 0.6에서 철회 | 상극 쌍 (순서 무관). 비어 있으면 소멸 없음. ANNIHILATE 코드·규칙 A/B/C·점수는 지우지 않고 남긴다 (되살릴 때 값만 넣는다) |
 | M6 | `annihilation_rule` | AnnihilationRule | A_BOTH → **B_SAME_LEVEL** (2026-09-30 플레이테스트, 기획서 0.4.1) | |
-| M7 | `level_scores` | PackedInt32Array | [2,4,8,16,32,64,128] | 인덱스 0 = 레벨1 |
+| M7 | `level_scores` | PackedInt32Array | [2,4,8,16,32,64,128] → **[2, 4, 6, 10, 14, 22, 34, 54, 84, 128]** (#128 — JELLY 질량 × 2, §12-ONE.21) | 인덱스 0 = 레벨1 |
 | M7 | `annihilation_score_factor` | float | 0.5 | |
 | M7 | `max_merge_bonus_factor` | float | 5.0 | |
 | ~~M7~~ | ~~`spawn_candidate_count`, `spawn_fallback_to_free_slot`~~ | | | **폐기** (기획서 0.2: 빈자리와 무관하게 생성) |
@@ -638,7 +641,7 @@ MERGE·MAX_CLEAR 반응 직후 반응 지점 `p`에서 충격파를 낸다.
 - 충격량(속도 아님): `J = shock_impulse × (1 + shock_level_scale × (L_result − 1)) × (1 − d / R)`, 방향 `(q − p).normalized()` (평면). 속도 변화 = `J / mass` → **가벼운 구체가 더 크게 움직인다** (무게감)
 - MAX_CLEAR(L7 잭팟)는 `J × shock_jackpot_scale`
 - 결과 구체 자신은 제외. 물리 콜백 밖(`flush`)에서 적용
-- 새 필드와 확정값 (#21): `shock_impulse` **600** (L1 기준 Δv 600px/s), `shock_radius_factor` 2.5, `shock_level_scale` 0.3, `shock_jackpot_scale` 3.0
+- 새 필드와 확정값 (#21): `shock_impulse` **600** (L1 기준 Δv 600px/s), `shock_radius_factor` 2.5, `shock_level_scale` 0.3 (→ **0.2** #128: 레벨 10단계에서 L10 = × 2.8 그대로 — §12-ONE.21), `shock_jackpot_scale` 3.0
 - #21 측정: 충격파는 고밀도 재배열(켄달 불일치 약 6%)·L7 잼(81~87%)을 거의 바꾸지 못했다. 잼 해소가 아니라 **합체 손맛·무게 차이 표현**용으로 채택
 
 
@@ -3949,6 +3952,14 @@ M4 검수(2026-09-28)에서 발견. 합체가 없는 M4 상태에서 **이동·�
 4. 측정은 다시 하지 않는다 (C8 = 위 2차 숫자)
 5. 그대로: 새 연출 없음 (고리 모양 금지), 사용자 저장 파일, 검증 빌드는 `-Debug`만
 - Done-when: 테스트 통과, 새 기본 해시 고정 (C8 인자 실행과 같음), M·B 해시 그대로, 캡처 보고 → Claude 검수 뒤 병합
+
+**#128 결과 — 병합 (C8)** ([PR #128](https://github.com/jeongmo-dot/gravity_orb/pull/128) `79e12b9`, 2026-11-01): 추가 요구 2 반영 — 기본값 `jelly_merge_level_gap` **2**, `jelly_blast_min_level` **8** (`GameConfig.gd`·`default_config.tres`). 새 기본 해시 `8c1a02e9…` 상수 고정, M `ee67b19c…`·B `5a525e46…`는 명시적 값 묶음 검사로 남김. 래퍼 326/326 (Codex). 기본값 테스트: 다른 색 L7 반응 없음, 다른 색 L8·L9 대폭발, 같은 색 `L + (L−2)` 흡수·`L + (L−3)` 반응 없음, L7 보통·L8·L9 `><`·L10 MAX 얼굴. 캡처 이름 `100~102_jelly_default_l7_l5_*`·`103_jelly_default_l8_blast` (Claude가 diff와 캡처를 직접 확인, 재실행 없음)
+- 최종 규칙 (JELLY): L1~L10 (질량 1·2·3·5·7·11·17·27·42·64, 반지름 25·40·52·68·80·92·102·115·128·140, 점수 = 질량 × 2). 같은 색 레벨 차 ≤ 2 → 흡수·합체 (질량 합, 상한 L10). 다른 색 같은 레벨 L8 이상 → 대폭발 (판 전체, 점수 `(sA + sB) × 5`). 같은 색 L10 + L10 → 잭팟 (128 × 5). 입력 대기 중 L10 터치 (80px 미만) → 소폭발 (반경 0.3 × 판, 점수 L10 × 1, 턴·생성·중력 그대로)
+- 숫자 (2차 C8, 봇): 판 131.5턴 (M 139.1), 점수 91,390 (M 92,665), 턴당 레벨업 2.82 (M 2.15), 대폭발 56 (M 48), 실력 비 1.25 / 1.30 (M 1.23 / 1.93), L-합체 봇 20판 중 5판에서 L10·소폭발 6회
+- Claude 검수 메모:
+  - "C8 인자 실행과 같은 해시" 확인은 회신에 따로 없다. 새 기본값이 2차 C8 측정 인자 (B 레벨표 + 레벨 차 2 + L8, 그 밖은 기본)와 같은 값인 것을 Claude가 `default_config.tres` diff와 측정 JSON (`level_profile` B, `jelly_merge_level_gap` 2, `jelly_blast_min_level` 8)으로 확인했다
+  - 캡처 `06_jelly_l5_no_blast_l6_face`·`07_jelly_l6_blast`는 이름이 #120 그대로다. 내용은 새 값을 따른다 (`06`: 질량 16 = L6 보통 얼굴, 질량 32 = L8 `><` / `07`: 다른 색 L10 대폭발). 캡처를 고치는 다음 항목에서 이름을 맞춘다
+- 남은 것 (사용자가 해 보고): 점수 실력 비 1.30 (M 1.93)이 낮다. 판 길이 편차가 크다 (94~232턴). 소폭발 값 (반경 0.3·점수 × 1)·터치 표시 없음. 이웃 레벨 크기 차가 작다 (L7 102·L8 115·L9 128·L10 140)
 
 ### 12-ONE.3 다음 (JELLY 개선)
 - CLASSIC 전용 분기 정리 (행성 그림·연출·규칙 — JELLY가 안 쓰는 것)
