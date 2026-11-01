@@ -32,7 +32,23 @@
 
 ## 대기 중
 
-- 없음
+### [2026-11-01 #130] 대폭발 점수를 소폭발보다 확실히 크게·소폭발에 턴 쓰기 — 생존이냐 점수냐
+- 상태: 대기 (**다음 차례**. 최신 `origin/main` 위에서)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.23**
+- 배경: 사용자 (2026-11-01, #129 병합 뒤) "L8,9,10 대폭발 점수를 소폭발 보다 확실히 커질 수 있게 해줘", "생존을 선택하냐 점수를 선택하느냐 전략이 될 수 있게", "잠깐 그럼 소폭발의 대가는 뭐가 있을까" → Claude 후보 중 "턴 쓰기". #129 측정에서 바로 쓰기 (D-all)는 판이 거의 끝나지 않아 (L-합체 20판 중 8판 600턴) 총점도 이겼다
+- 앵커: `config/GameConfig.gd`·`default_config.tres` (`blast_score_factor`·`jelly_tap_blast_score_factor` 기본값, 새 필드), `scripts/core/ScoreManager.gd` `points_for()`, `scripts/core/TurnManager.gd` `try_tap_blast_orb()`·`on_swipe()`·`_on_settled()` (`_is_tap_blast_settle`), 봇·측정 도구 (`tests/spike/run_jolt_3d_measurement.gd`, `tests/run_jelly_physics_autoplay.ps1`, `tests/tools/run_jelly_measurement.ps1`), 회귀 해시 (`tests/test_jelly_regression.gd`), 캡처 (`tests/spike/capture_screens.gd`)
+- 수치 (Claude):
+  - `blast_score_factor` 5 → **15** (L8+L8 1,620 · L8+L10 2,730 · L10+L10 3,840)
+  - `jelly_tap_blast_score_factor` 1.0 → **0.5** (L8 27 · L9 42 · L10 64)
+  - 새 `jelly_tap_blast_uses_turn` **true**
+- 요구:
+  1. 두 점수 기본값 변경 (`GameConfig.gd`·`default_config.tres` 함께)
+  2. 턴 쓰기: 입력 대기 중 소폭발이 그 턴의 입력이 된다 — 소폭발 + `on_swipe()`와 같은 턴 시작 (`turn_index` +1, 콤보 0, 지금 중력 방향 입구로 NEXT 묶음 생성, 중력 그대로), 정착 뒤 게임 오버·FINAL MOVE 판정. FINAL MOVE 대기 중 소폭발은 그 FINAL MOVE를 쓴 것 (새 젤리 없이 판정). false면 #129 그대로
+  3. 예전 값 묶음 (M·B·C8·D)은 5 / 1.0 / 턴 안 씀으로 두어 해시 그대로
+  4. §12-ONE.23 측정 (S × D-0·D-save·D-all, ST × D-save·D-all — 자동 20시드·전략 R·G·L × 20, 반응 종류별 점수, 배율 10·20 환산, 아끼기 ÷ 바로 쓰기 총점 비)·테스트·캡처
+- 건드리지 말 것: 소폭발 판정·반경·여백, 대폭발 규칙, 잭팟 점수, 합체 점수, 콤보·위험 배수, 레벨표, 마찰, 생성 값, 랭킹 (저장 형식·기록), 사용자 저장 파일, 새 연출·표시 (고리 모양 금지), `docs/` (회신 파일 제외)
+- Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), M·B·C8·D 해시 그대로, 새 기본 해시 상수 고정, 측정 표·캡처 (실제 창, 마지막은 전체 캡처) 보고, 검증 빌드는 `-Debug`만
+- 커밋: 항목 단위 브랜치, **push·PR까지**. 기본값은 ST로 두고, 병합은 측정을 사용자와 본 뒤 (배율 10·15·20, 턴 쓰기 여부)
 
 ---
 
