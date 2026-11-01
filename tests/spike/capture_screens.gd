@@ -107,6 +107,10 @@ const CAPTURE_FILES: Array[String] = [
 	"97_jelly_l10_jackpot_a.png",
 	"98_jelly_l10_jackpot_b.png",
 	"99_jelly_result_l10_max.png",
+	"100_jelly_gap_two_l7_l5_00.png",
+	"101_jelly_gap_two_l7_l5_50.png",
+	"102_jelly_gap_two_l7_l5_100.png",
+	"103_jelly_l8_blast_c8.png",
 ]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
@@ -309,6 +313,7 @@ func _capture_level_ten_scenes(main: Main, board: Board3D) -> void:
 		await _capture_tap_blast_progress(board, director, profile)
 		await _capture_level_ten_pair_effect(board, director, profile, false)
 		await _capture_level_ten_pair_effect(board, director, profile, true)
+	await _capture_gap_two_scenes(main, board, director)
 
 	_set_jelly_level_profile("B")
 	board.clear()
@@ -329,6 +334,90 @@ func _capture_level_ten_scenes(main: Main, board: Board3D) -> void:
 	manager.game_over.emit()
 	await get_tree().create_timer(0.85).timeout
 	await _capture("99_jelly_result_l10_max.png")
+
+
+func _capture_gap_two_scenes(
+	main: Main,
+	board: Board3D,
+	director: FeedbackDirector
+) -> void:
+	var resolver: CollisionResolver = main.get_node("CollisionResolver") as CollisionResolver
+	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
+	var original_gap: int = Config.data.jelly_merge_level_gap
+	var original_blast_level: int = Config.data.jelly_blast_min_level
+	var original_duration: float = Config.data.jelly_merge_duration
+	var original_scan: bool = resolver.proximity_reaction_scan_enabled
+	_set_jelly_level_profile("B")
+	Config.data.jelly_merge_level_gap = 2
+	Config.data.jelly_blast_min_level = 8
+	Config.data.jelly_merge_duration = 0.3
+	resolver.proximity_reaction_scan_enabled = false
+	resolver.cancel_active_jelly_merges()
+	board.clear()
+	manager.turn_combo = 0
+	manager.max_combo = 0
+	manager._emit_combo_changed()
+	await get_tree().process_frame
+	var larger: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.PURPLE,
+		7,
+		Vector2.ZERO
+	)
+	var smaller: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.PURPLE,
+		5,
+		Vector2.ZERO
+	)
+	var touching_distance: float = larger.get_current_radius() + smaller.get_current_radius()
+	larger.position = Vector2(-touching_distance * 0.5, 0.0)
+	smaller.position = Vector2(touching_distance * 0.5, 0.0)
+	larger.linear_velocity = Vector2.ZERO
+	smaller.linear_velocity = Vector2.ZERO
+	resolver.report_contact(larger, smaller, "gap_two_capture")
+	resolver.flush()
+	await _capture("100_jelly_gap_two_l7_l5_00.png")
+	var active_before: Array[Orb3D] = board.get_orbs()
+	resolver.flush(Config.data.jelly_merge_duration * 0.5)
+	for orb: Orb3D in active_before:
+		if is_instance_valid(orb):
+			orb._physics_process(Config.data.jelly_merge_duration * 0.5)
+	await _capture("101_jelly_gap_two_l7_l5_50.png")
+	active_before = board.get_orbs()
+	resolver.flush(Config.data.jelly_merge_duration * 0.5)
+	for orb: Orb3D in active_before:
+		if is_instance_valid(orb):
+			orb._physics_process(Config.data.jelly_merge_duration * 0.5)
+	await _capture("102_jelly_gap_two_l7_l5_100.png")
+
+	board.clear()
+	director.clear_effects()
+	var first: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		8,
+		Vector2(-150.0, 0.0)
+	)
+	var second: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.BLUE,
+		8,
+		Vector2(150.0, 0.0)
+	)
+	first.disable_physics()
+	second.disable_physics()
+	director.play_reaction_visuals({
+		"type": ReactionRules.Type.BLAST,
+		"levels": [8, 8],
+		"colors": [first.color, second.color],
+		"position": Vector2.ZERO,
+		"shock_level": 8,
+	})
+	await get_tree().create_timer(0.06).timeout
+	await _capture("103_jelly_l8_blast_c8.png")
+
+	resolver.cancel_active_jelly_merges()
+	resolver.proximity_reaction_scan_enabled = original_scan
+	Config.data.jelly_merge_duration = original_duration
+	Config.data.jelly_merge_level_gap = original_gap
+	Config.data.jelly_blast_min_level = original_blast_level
 
 
 func _capture_tap_blast_progress(
@@ -426,6 +515,7 @@ func _capture_level_ten_pair_effect(
 
 func _set_jelly_level_profile(profile: String) -> void:
 	Config.data.orb_max_level = 10
+	Config.data.jelly_merge_level_gap = 1
 	if profile == "A":
 		Config.data.jelly_level_masses = PackedFloat32Array([
 			1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0, 512.0,

@@ -19,6 +19,8 @@ param(
     [string]$SpawnLevelCosts = "",
 	[ValidateRange(0.0, 10.0)]
 	[double]$JellyMergeDuration = 0.3,
+	[ValidateRange(0, 10)]
+	[int]$JellyMergeLevelGap = 1,
     [switch]$AggregateOnly
 )
 
@@ -40,6 +42,7 @@ $physicsArguments = @()
 $physicsArguments += if ($LevelProfile -eq "Default") { "--jelly-level-profile=B" } else { "--jelly-level-profile=$LevelProfile" }
 $physicsArguments += if ($TapBlastBot) { "--jelly-tap-blast-bot" } else { @() }
 $physicsArguments += "--jelly-merge-duration=$($JellyMergeDuration.ToString($culture))"
+$physicsArguments += "--jelly-merge-level-gap=$JellyMergeLevelGap"
 if ($Friction -gt 0.0) {
     $physicsArguments += "--physics-friction=$($Friction.ToString($culture))"
 }
@@ -130,6 +133,7 @@ $totalLevelUpCount = 0
 $totalTapBlastCount = 0
 $levelCreationCounts = @{}
 $maximumLevelDistribution = @{}
+$levelTenGameCount = 0
 $departures = 0
 $maxTurnEndPairPenetration = 0.0
 $spawnedOrbCounts = @()
@@ -179,6 +183,7 @@ foreach ($task in $tasks) {
 		$maximumLevelDistribution[$maximumLevelKey] = 0
 	}
 	$maximumLevelDistribution[$maximumLevelKey] += 1
+	if ([int]$seedRow.max_level_reached -ge 10) { $levelTenGameCount += 1 }
 	foreach ($levelProperty in $seedRow.level_creation_count_by_level.PSObject.Properties) {
 		$level = $levelProperty.Name
 		if (-not $levelCreationCounts.ContainsKey($level)) { $levelCreationCounts[$level] = 0 }
@@ -261,6 +266,7 @@ $summary = [ordered]@{
 	level_profile = if ($LevelProfile -eq "Default") { "B" } else { $LevelProfile }
 	tap_blast_bot = [bool]$TapBlastBot
 	jelly_merge_duration = $JellyMergeDuration
+	jelly_merge_level_gap = $JellyMergeLevelGap
     friction = if ($Friction -gt 0.0) { $Friction } else { $null }
     angular_damp = if ($AngularDamp -ge 0.0) { $AngularDamp } else { $null }
     gravity_turn_diagonal_time = if ($GravityTurnDiagonalTime -ge 0.0) { $GravityTurnDiagonalTime } else { $null }
@@ -310,6 +316,7 @@ $summary = [ordered]@{
 	level_ups_per_turn = if ($totalTurns -gt 0) { [double]$totalLevelUpCount / $totalTurns } else { 0.0 }
 	level_creation_count_by_level = $levelCreationCounts
 	maximum_level_distribution = $maximumLevelDistribution
+	level_ten_game_count = $levelTenGameCount
     blast_count = $totalBlasts
 	tap_blast_count = $totalTapBlastCount
     blast_count_by_level = $blastCountByLevel

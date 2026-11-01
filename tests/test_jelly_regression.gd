@@ -63,6 +63,11 @@ func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
 	var a_result: Dictionary = await _run_rule_path(false)
 	print("JELLY_A_DELAYED_REGRESSION_HASH duration=0.3 hash=%s" % str(a_result["hash"]))
 	_restore_level_profile(config_snapshot)
+	Config.data.jelly_merge_level_gap = 2
+	Config.data.jelly_blast_min_level = 10
+	var c10_result: Dictionary = await _run_rule_path(false)
+	print("JELLY_C10_DELAYED_REGRESSION_HASH duration=0.3 hash=%s" % str(c10_result["hash"]))
+	_restore_level_profile(config_snapshot)
 	Config.data.rng_seed = original_seed
 	Config.data.game_mode = original_mode
 	Config.data.sfx_enabled = original_sfx_enabled
@@ -146,6 +151,21 @@ func _run_rule_path(visuals_enabled: bool) -> Dictionary:
 	assert_eq(int(result["type"]), int(ReactionRules.Type.MERGE), "L7 consumes adjacent L6")
 	assert_eq(int(result["result_level"]), top_level, "top eating adjacent remains MAX")
 	events["l7_eats_l6"] = int(events["l7_eats_l6"]) + 1
+
+	if Config.data.jelly_merge_level_gap >= 2 and top_level >= 7:
+		result = await _apply_pair(
+			board,
+			resolver,
+			OrbTypes.OrbColor.RED,
+			7,
+			Config.data.jelly_mass_for_level(7),
+			OrbTypes.OrbColor.RED,
+			5,
+			Config.data.jelly_mass_for_level(5)
+		)
+		assert_eq(int(result["type"]), int(ReactionRules.Type.MERGE), "gap two merges L7+L5")
+		assert_eq(int(result["result_level"]), 7, "C L7+L5 remains L7")
+		events["gap_two_absorption"] = 1
 
 	result = await _apply_pair(
 		board, resolver, OrbTypes.OrbColor.YELLOW, top_level, top_mass, OrbTypes.OrbColor.YELLOW, top_level, top_mass
@@ -240,6 +260,7 @@ func _snapshot_level_profile() -> Dictionary:
 		"level_radii": Config.data.level_radii.duplicate(),
 		"level_scores": Config.data.level_scores.duplicate(),
 		"jelly_blast_min_level": Config.data.jelly_blast_min_level,
+		"jelly_merge_level_gap": Config.data.jelly_merge_level_gap,
 		"blast_push_radius_by_level": Config.data.blast_push_radius_by_level.duplicate(),
 		"gravity_level_scale": Config.data.gravity_level_scale,
 		"shock_level_scale": Config.data.shock_level_scale,
@@ -252,6 +273,7 @@ func _restore_level_profile(snapshot: Dictionary) -> void:
 	Config.data.level_radii = snapshot["level_radii"] as PackedFloat32Array
 	Config.data.level_scores = snapshot["level_scores"] as PackedInt32Array
 	Config.data.jelly_blast_min_level = int(snapshot["jelly_blast_min_level"])
+	Config.data.jelly_merge_level_gap = int(snapshot["jelly_merge_level_gap"])
 	Config.data.blast_push_radius_by_level = snapshot["blast_push_radius_by_level"] as PackedFloat32Array
 	Config.data.gravity_level_scale = float(snapshot["gravity_level_scale"])
 	Config.data.shock_level_scale = float(snapshot["shock_level_scale"])
@@ -266,6 +288,7 @@ func _apply_m_profile() -> void:
 	Config.data.blast_push_radius_by_level = PackedFloat32Array([0, 0, 0, 0.3, 0.55, 1, 1])
 	Config.data.gravity_level_scale = 0.05
 	Config.data.shock_level_scale = 0.3
+	Config.data.jelly_merge_level_gap = 1
 
 
 func _apply_a_profile() -> void:
@@ -277,6 +300,7 @@ func _apply_a_profile() -> void:
 	Config.data.blast_push_radius_by_level = PackedFloat32Array([0, 0, 0, 0.3, 0.55, 1, 1, 1, 1, 1])
 	Config.data.gravity_level_scale = 0.0333
 	Config.data.shock_level_scale = 0.2
+	Config.data.jelly_merge_level_gap = 1
 
 
 func _apply_pair(

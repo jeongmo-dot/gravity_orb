@@ -9,6 +9,11 @@ param(
 	[ValidateSet("M", "A", "B")]
 	[string]$LevelProfile = "B",
 	[switch]$TapBlastBot,
+	[ValidateRange(0, 10)]
+	[int]$JellyMergeLevelGap = 1,
+	[ValidateRange(0, 10)]
+	[int]$JellyBlastMinLevel = 10,
+	[string]$MeasurementLabel = "",
     [switch]$ReuseCompleted,
     [switch]$AggregateOnly
 )
@@ -16,7 +21,11 @@ param(
 $ErrorActionPreference = "Stop"
 $repoPath = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $outputDirectory = Join-Path $repoPath "artifacts\measurements"
-$measurementLabel = "$($LevelProfile.ToLower())$(if ($TapBlastBot) { '1' } else { '0' })"
+$measurementLabel = if ([string]::IsNullOrWhiteSpace($MeasurementLabel)) {
+	"$($LevelProfile.ToLower())$(if ($TapBlastBot) { '1' } else { '0' })"
+} else {
+	$MeasurementLabel.ToLower()
+}
 $summaryPath = Join-Path $outputDirectory "jelly_rules_measurement_$measurementLabel.json"
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {
     if (-not [string]::IsNullOrWhiteSpace($env:GODOT)) {
@@ -57,6 +66,8 @@ if (-not $AggregateOnly) {
                     "--game-mode=jelly", "--jolt-ticks=120", "--jolt-seeds=$($shard.Csv)",
                     "--jolt-max-turns=$TurnCap", "--jolt-no-determinism", "--skill-strategy=$strategy",
 					"--jelly-level-profile=$LevelProfile",
+					"--jelly-merge-level-gap=$JellyMergeLevelGap",
+					"--jelly-blast-min-level=$JellyBlastMinLevel",
 					$(if ($TapBlastBot) { "--jelly-tap-blast-bot" } else { "--jolt-no-determinism" }),
                     "--jolt-output=res://artifacts/measurements/$name.json"
                 )
@@ -128,6 +139,16 @@ function Get-Summary($Rows) {
     $outlineFrames = [double](($Rows | Measure-Object -Property jelly_outline_visible_frames -Sum).Sum)
     $unarmedOutlineFrames = [double](($Rows | Measure-Object -Property jelly_unarmed_outline_visible_frames -Sum).Sum)
     $outlineMaxAlpha = [double](($Rows | Measure-Object -Property jelly_outline_max_alpha -Maximum).Maximum)
+    $blastCountByLevel = [ordered]@{}
+    foreach ($row in @($Rows)) {
+        foreach ($levelProperty in $row.blast_count_by_level.PSObject.Properties) {
+            $levelKey = [string]$levelProperty.Name
+            if (-not $blastCountByLevel.Contains($levelKey)) {
+                $blastCountByLevel[$levelKey] = 0
+            }
+            $blastCountByLevel[$levelKey] += [int]$levelProperty.Value
+        }
+    }
     return [ordered]@{
         games = @($Rows).Count
         turns_median = Get-Median @($Rows | ForEach-Object { $_.completed_turns })
@@ -140,10 +161,12 @@ function Get-Summary($Rows) {
         blast_outline_visible_frames = [int]$outlineFrames
         unarmed_blast_outline_visible_frames = [int]$unarmedOutlineFrames
         blast_outline_max_alpha = $outlineMaxAlpha
-        level_seven_game_rate = Get-Ratio @($Rows | Where-Object { $_.reached_level_seven }).Count @($Rows).Count
+		level_seven_game_rate = Get-Ratio @($Rows | Where-Object { $_.reached_level_seven }).Count @($Rows).Count
+		level_ten_game_count = @($Rows | Where-Object { [int]$_.max_level_reached -ge 10 }).Count
         jackpots = [int](($Rows | Measure-Object -Property max_clear_count -Sum).Sum)
 		blasts = [int](($Rows | Measure-Object -Property blast_count -Sum).Sum)
 		tap_blasts = [int](($Rows | Measure-Object -Property tap_blast_count -Sum).Sum)
+		blast_count_by_level = $blastCountByLevel
         preview_fatal_avoidance_turns = [int]$fatalAvoidance
         preview_fatal_avoidance_ratio = Get-Ratio $fatalAvoidance $decisions
     }
@@ -181,6 +204,8 @@ $report = [ordered]@{
     conditions = "JELLY R/G/L-merge, seeds 1-$SeedCount, $TurnCap turns, fixed 120 fps"
 	level_profile = $LevelProfile
 	tap_blast_bot = [bool]$TapBlastBot
+	jelly_merge_level_gap = $JellyMergeLevelGap
+	jelly_blast_min_level = $JellyBlastMinLevel
     strategies = $strategies
     skill_length_ratio_l_merge_over_r = $lengthRatio
     skill_score_ratio_l_merge_over_r = $scoreRatio

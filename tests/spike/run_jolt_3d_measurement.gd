@@ -110,6 +110,7 @@ func _run() -> void:
 		"blast_min_level": Config.data.blast_min_level,
 		"jelly_blast_min_level": Config.data.jelly_blast_min_level,
 		"jelly_merge_duration": Config.data.jelly_merge_duration,
+		"jelly_merge_level_gap": Config.data.jelly_merge_level_gap,
 		"blast_push_radius_by_level": Array(Config.data.blast_push_radius_by_level),
 		"blast_speed": Config.data.blast_speed,
 		"blast_far_factor": Config.data.blast_far_factor,
@@ -1858,6 +1859,7 @@ func _apply_jelly_level_profile(profile: String) -> void:
 			Config.data.blast_push_radius_by_level = PackedFloat32Array([0, 0, 0, 0.3, 0.55, 1, 1])
 			Config.data.gravity_level_scale = 0.05
 			Config.data.shock_level_scale = 0.3
+			Config.data.jelly_merge_level_gap = 1
 		"A":
 			Config.data.orb_max_level = 10
 			Config.data.jelly_level_masses = PackedFloat32Array([1, 2, 4, 8, 16, 32, 64, 128, 256, 512])
@@ -1867,6 +1869,7 @@ func _apply_jelly_level_profile(profile: String) -> void:
 			Config.data.blast_push_radius_by_level = PackedFloat32Array([0, 0, 0, 0.3, 0.55, 1, 1, 1, 1, 1])
 			Config.data.gravity_level_scale = 0.0333
 			Config.data.shock_level_scale = 0.2
+			Config.data.jelly_merge_level_gap = 1
 		"B":
 			Config.data.orb_max_level = 10
 			Config.data.jelly_level_masses = PackedFloat32Array([1, 2, 3, 5, 7, 11, 17, 27, 42, 64])
@@ -1876,6 +1879,7 @@ func _apply_jelly_level_profile(profile: String) -> void:
 			Config.data.blast_push_radius_by_level = PackedFloat32Array([0, 0, 0, 0.3, 0.55, 1, 1, 1, 1, 1])
 			Config.data.gravity_level_scale = 0.0333
 			Config.data.shock_level_scale = 0.2
+			Config.data.jelly_merge_level_gap = 1
 		_:
 			_had_runner_error = true
 			push_error("Unknown JELLY level profile: %s" % profile)
@@ -1995,6 +1999,11 @@ func _apply_arguments() -> void:
 			Config.data.jelly_merge_duration = maxf(
 				argument.trim_prefix("--jelly-merge-duration=").to_float(),
 				0.0
+			)
+		elif argument.begins_with("--jelly-merge-level-gap="):
+			Config.data.jelly_merge_level_gap = maxi(
+				argument.trim_prefix("--jelly-merge-level-gap=").to_int(),
+				0
 			)
 		elif argument.begins_with("--blast-push-radius-by-level="):
 			Config.data.blast_push_radius_by_level = _parse_float_list(

@@ -436,6 +436,46 @@ func test_jelly_level_up_absorption_grows_from_old_to_new_level_radius() -> void
 	Config.data.jelly_merge_duration = original_merge_duration
 
 
+func test_jelly_gap_two_absorption_preserves_larger_body_and_partial_mass() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_merge_duration: float = Config.data.jelly_merge_duration
+	var original_level_gap: int = Config.data.jelly_merge_level_gap
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_merge_duration = 0.3
+	Config.data.jelly_merge_level_gap = 2
+	var fixture_root: Node = Node.new()
+	fixture_root.name = "JellyGapTwoFixture"
+	var board: Board3D = BOARD_SCENE.instantiate() as Board3D
+	board.name = "Board"
+	board.unique_name_in_owner = true
+	fixture_root.add_child(board)
+	board.owner = fixture_root
+	var resolver: CollisionResolver = RESOLVER_SCRIPT.new() as CollisionResolver
+	resolver.name = "CollisionResolver"
+	resolver.unique_name_in_owner = true
+	fixture_root.add_child(resolver)
+	resolver.owner = fixture_root
+	tree.root.add_child(fixture_root)
+	await tree.process_frame
+	var larger: Orb3D = board.spawn_orb(2, 7, Vector2(-60.0, 0.0))
+	var smaller: Orb3D = board.spawn_orb(2, 5, Vector2(60.0, 0.0))
+	var larger_id: int = larger.stable_spawn_id
+	resolver.report_contact(larger, smaller)
+	assert_eq(resolver.flush(), 0, "gap-two L7+L5 starts its visible merge")
+	assert_eq(resolver.flush(0.3), 1, "gap-two L7+L5 resolves once after the merge duration")
+	var active: Array[Orb3D] = board.get_orbs()
+	assert_eq(active.size(), 1, "gap-two absorption leaves one orb")
+	if active.size() == 1:
+		assert_eq(active[0].stable_spawn_id, larger_id, "larger physical body survives")
+		assert_eq(active[0].level, 7, "mass 24 remains L7")
+		assert_near(active[0].jelly_mass, 24.0, 0.001, "L7+L5 mass is preserved")
+		assert_near(active[0]._jelly_belly_target, 0.7, 0.001, "mass 24 is seventy percent full")
+	await _cleanup(fixture_root)
+	Config.data.game_mode = original_mode
+	Config.data.jelly_merge_duration = original_merge_duration
+	Config.data.jelly_merge_level_gap = original_level_gap
+
+
 func test_delayed_jelly_merge_reserves_sources_grows_and_emits_on_completion() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_duration: float = Config.data.jelly_merge_duration

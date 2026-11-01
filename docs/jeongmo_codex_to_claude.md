@@ -39,9 +39,53 @@
 ## 미확인
 
 ### [2026-11-01] 대상 #128 — L10 세분화·꼭대기 규칙·L10 터치 소폭발
-- 상태: 완료 — 기본값 B로 L1~L10, L10끼리 잭팟/대폭발, 입력 대기 L10 터치 소폭발을 구현했다. A/B 측정은 끝났으며 최종 후보 선택은 아래 관측값으로 사용자 확인이 필요하다
+- 상태: 완료 — 추가 요구 1의 같은 색 레벨 차이 흡수 간격을 설정화하고 gap 2의 C10-0/C10/C9/C8 후보 재측정·실제 창 캡처까지 완료했다. 기본값은 지시대로 B/gap 1/폭발 L10을 유지했으며 최종 후보 선택은 아래 관측값으로 사용자 확인이 필요하다
 - 브랜치 / PR: `codex/jelly-level-ten-tap-blast` / https://github.com/jeongmo-dot/gravity_orb/pull/128
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/autoload/InputRouter.gd`, `scripts/core/{CelestialOrbArt.gd,CollisionResolver.gd,JellyOrbArt.gd,Main.gd,OrbVisual.gd,ReactionRules.gd,ScoreManager.gd,TurnManager.gd}`, `scripts/fx/{FeedbackDirector.gd,SfxBank.gd}`, `scripts/platform/{FullBoardPerformanceMeasurement.gd,Haptics.gd}`, `scripts/spike/{Board3D.gd,Orb3D.gd}`, `scripts/ui/Hud.gd`, 관련 `tests/`, `docs/jeongmo_codex_to_claude.md`
+
+#### 추가 요구 1 — 흡수 간격 2·폭발 L8/L9/L10 재측정
+
+- Done-when 대조:
+  - [x] `jelly_merge_level_gap: int = 1` 추가. JELLY 같은 색은 `abs(level_a-level_b) <= max(gap, 0)`일 때만 합체/흡수하며 다른 색 규칙은 그대로 — 자동 (`test_rules`, `test_jolt_3d`, `test_config`)
+  - [x] gap 1/2 경계, L7+L5 실제 지연 흡수, L10 상한, M/B 해시 불변, C10 해시 출력 — 자동 (`test_rules`, `test_jolt_3d`, `test_jelly_regression`)
+  - [x] 자동 순서 C10-0/C10/C9/C8 각 시드 101~120 및 전략 R/G/L-합체 C10/C9/C8 각 시드 1~20 측정. 레벨별 폭발·L10 도달 게임 수·탭 폭발을 JSON 집계 — 자동, 아래 표
+  - [x] 두 비율에서 L7이 L5를 먹는 0/50/100%와 다른 색 L8+L8 폭발 순간을 실제 창 캡처하고 직접 확인 — 각 103장, 합계 206장
+  - [x] 기본값 B/gap 1/폭발 L10 유지. 후보 수치는 측정 실행 인자로만 덮어씀
+- 자동 순서 봇 (`Godot 4.8-dev3 Standard`, Jolt 120Hz, gap 2, 시드 `101~120`, 600턴 상한, 모두 20/20 게임오버·이탈 0):
+
+  | 후보 | 탭 봇 | 평균 턴 | 평균 점수 | L10 도달 게임 | 폭발(레벨별) | 탭 폭발 | 최대 활성 공 |
+  |---|---:|---:|---:|---:|---:|---:|---:|
+  | C10-0 | 끔 | `101.00` | `40,823.50` | `0` | `0` | `0` | `102` |
+  | C10 | 켬 | `101.00` | `40,823.50` | `0` | `0` | `0` | `102` |
+  | C9 | 켬 | `106.75` | `58,885.45` | `1` | `8 (L9 8)` | `1` | `97` |
+  | C8 | 켬 | `131.45` | `91,390.45` | `1` | `56 (L8 54, L9 2)` | `1` | `101` |
+
+  - 원본: `artifacts/jelly_physics_autoplay_level10_{c10_0,c10,c9,c8}.json` (gitignore 대상)
+- 전략 봇 (`R/G/L-합체 × 시드 1~20`, gap 2, 탭 봇 켬, 모두 20게임):
+
+  | 후보·전략 | 턴 중앙값 | 점수 중앙값 | L10 도달 게임 | 폭발(레벨별) | 탭 폭발 |
+  |---|---:|---:|---:|---:|---:|
+  | C10 R / G / L | `97 / 99 / 101` | `34,278.5 / 27,891.5 / 37,787.5` | `0 / 0 / 0` | `0 / 0 / 0` | `0 / 0 / 0` |
+  | C9 R / G / L | `97 / 99 / 103` | `34,278.5 / 27,891.5 / 41,546` | `0 / 0 / 1` | `1 / 2 / 7` (모두 L9) | `0 / 0 / 1` |
+  | C8 R / G / L | `120.5 / 120 / 151` | `102,095.5 / 60,770.5 / 132,701.5` | `0 / 1 / 5` | `49 (L8 48,L9 1) / 38 (L8 34,L9 4) / 76 (L8 76)` | `0 / 1 / 6` |
+
+  - 원본: `artifacts/measurements/jelly_rules_measurement_{c10,c9,c8}.json` (gitignore 대상)
+- 해시: M `ee67b19ca82ddb2e35ea7a5ed605e83eedbae4d0c044106ec5b86622a21ac45d`(기존과 동일), B `5a525e46718f3befc3c4101e5a4fe1c3b392fc1c172f7166ed0b0517f6d74dc7`(기존과 동일), C10 `e6d80b509ee42419dcda295a2dc30282477b37350b67d9c9ed6cec9d6ef0d1ed`(출력)
+- gap 적용 위치 점검: 런타임 판정은 `ReactionRules.can_react()`와 `_classify_jelly()` 두 곳이 설정값을 읽는다. 자동 순서·전략 G·접촉 쌍 탐색은 모두 `ReactionRules.classify()`를 사용해 별도 임계값 복사가 없다. 측정 도구는 CLI 덮어쓰기와 보고서 필드만 추가했다
+- 성능 조건: 네 자동 후보의 최대 활성 공은 `102`로 1차 A의 `137`보다 낮아 명세의 추가 최대치 성능 재측정 조건에 해당하지 않았다
+- 추가 요구 1 QA 관측값:
+  - `tests/run_tests.ps1` → 일반 `317/317`, 장기 `4/4`, 성능 `5/5`, 합계 `326/326`; 세 묶음 각각 새 프로세스, 종료 코드 0
+  - `godot --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 기본/`--mode=blitz` 300프레임 스모크 → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tools/build_windows.ps1 -Debug` → 종료 코드 0, `GravityOrb_v0.16.0.exe` `104,980,672`바이트
+  - `tests/capture_screens.ps1` → 540×960·540×1170 각 103장, 합계 206장, 종료 코드 0. `100~102`에서 L7+L5 흡수 0/50/100%, `103`에서 다른 색 L8+L8 폭발 순간을 직접 확인
+  - 규칙 검색 → `InputEvent*`는 `InputRouter.gd`, `Input.vibrate_handheld`는 허용 예외 `Haptics.gd`; 난수는 기존 `Spawner.gd`와 시각 전용 `ColorEffectVisual.gd`의 로컬 RNG만 검출
+- 추가 요구 1 수동 확인 절차:
+  1. 측정 실행 인자에서 gap 2를 켜고 같은 색 L7과 L5를 접촉 → 0.3초 동안 L5가 L7로 흡수되고 L7의 질량·배 진행도가 증가하는지 확인
+  2. 같은 설정에서 같은 색 L7과 L4를 접촉 → 레벨 차이 3이므로 반응하지 않는지 확인
+  3. 폭발 최소 레벨을 8로 덮어쓰고 다른 색 L8 둘을 접촉 → 두 공이 제거되고 판 전체 폭발이 한 번 발생하는지 확인
+- 추가 요구 1 결정 사항: 없음. 수치와 기본값은 인박스 지시를 그대로 적용했다
+- 추가 요구 1 남은 것 · 질문: C8은 C10보다 자동 평균 턴이 `30.45`, 전략 L 중앙값이 `50` 길고 실제 탭 폭발도 관측됐다. C8/C9/C10 중 최종 기본 후보 선택이 필요하다
 - Done-when 대조:
   - [x] `jelly_level_masses` 표와 길이 불일치 시 2^(L−1) 대체, 질량→레벨·다음 레벨까지 배 속 비율, A/B 값 묶음 — 자동 (`test_config`, `test_jelly_shell`)
   - [x] 같은 색 L10+L10 잭팟, 다른 색 L10+L10만 대폭발, 다른 색 L9+L9 무반응, 같은 색 L10+L9는 L10 흡수 — 자동 (`test_rules`, `test_jelly_regression`, `test_jolt_3d`)
@@ -105,7 +149,7 @@
   3. FINAL MOVE 대기에서 L10을 터치한 뒤 입구가 비어도 FINAL MOVE 표시가 유지되고, 다음 스와이프가 FINAL MOVE가 되어야 한다
   4. 같은 색 L10 둘을 접촉 → 잭팟. 다른 색 L10 둘 → 판 전체 대폭발. 다른 색 L9 둘 → 반응 없음. 결과 화면 최고 레벨 표시는 `L10 MAX`여야 한다
 - 결정 사항: 새 반응 enum 이름은 명세 예시대로 `TAP_BLAST`. 기존 랭킹의 역사적 `max_level=L7` 값과 표시는 저장 호환 지시대로 변경하지 않았다
-- 남은 것 · 질문: 기본값은 명세대로 B다. 측정에서는 A가 M보다 길고 최대 공 수가 `137`, B는 평균 `93.1턴`으로 M보다 크게 짧았으며 두 후보 모두 봇이 L10/소폭발에 도달하지 못했다. 병합 전에 사용자에게 A/B 최종 선택이 필요하다
+- 남은 것 · 질문: 1차 A/B 비교는 위 추가 요구 1의 B+gap 2 C10/C9/C8 재측정으로 이어졌다. 최종 기본 후보 질문은 추가 요구 1 항목을 기준으로 한다
 
 ### [2026-10-31] 대상 #127 — 합쳐지는 과정이 보이게
 - 상태: 완료 — JELLY 합체를 닿음→0.3초 과정→완성으로 분리했고, 20시드 전후 비교·실제 창 성능·두 비율 연속 캡처까지 완료했다
