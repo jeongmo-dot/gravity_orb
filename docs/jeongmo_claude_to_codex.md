@@ -32,7 +32,24 @@
 
 ## 대기 중
 
-- 없음
+### [2026-11-01 #129] L8~L10 터치 소폭발·L8 이상 다른 색은 레벨 상관없이 대폭발·레벨별 공끼리 마찰
+- 상태: 대기 (**다음 차례**. 최신 `origin/main` 위에서)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.22**
+- 배경: 사용자 (2026-11-01, #128 병합 뒤 플레이) "L8 공 터치했는데 안터지는데" → "L8~L10 싱글 폭발 가능. 소폭발.", "L8~L10 서로 다른 색깔과 충돌시 대폭발" (Claude 질문에 "레벨 상관없이"), "공끼리의 마찰은 L1~L3 는 마찰 0.3 L4~L7은 0.4, L8~L10 은 0.5 로 마찰 계수 바꿔줘"
+- 앵커: `scripts/core/CollisionResolver.gd` `is_jelly_tap_blast_candidate()`·`apply_jelly_tap_blast()`, `scripts/core/TurnManager.gd` `on_tap()`, `scripts/core/ScoreManager.gd` `points_for()` (`TAP_BLAST`), `scripts/core/ReactionRules.gd` `_classify_jelly()`·`can_react()`, `scripts/spike/Orb3D.gd` `_shared_physics_material()`·레벨이 바뀌는 곳, `config/GameConfig.gd`·`default_config.tres` 새 필드, 봇·측정 도구, 회귀 해시 (`tests/test_jelly_regression.gd`), 캡처 (`tests/spike/capture_screens.gd`)
+- 수치 (Claude):
+  - 새 `jelly_tap_blast_min_level` **8** (소폭발 점수 = 터진 레벨 점수 × 1.0 → L8 54·L9 84·L10 128, 반경 0.3 그대로)
+  - 새 `jelly_blast_requires_same_level` **false** (다른 색 둘 다 L8 이상이면 레벨이 달라도 대폭발, 점수 `(sA + sB) × 5`, 범위·연출은 큰 레벨)
+  - 새 `orb_friction_by_level` **[0.3, 0.3, 0.3, 0.4, 0.4, 0.4, 0.4, 0.5, 0.5, 0.5]** (길이가 다르면 `orb_friction` 하나). 두 젤리 사이는 엔진 규칙 (작은 값 — Jolt에서 확인해 회신에), 벽은 0.3 그대로
+- 요구:
+  1. L8 이상 터치 소폭발 (그 밖의 조건·턴 안 씀·FINAL MOVE 유지 등은 #128 그대로). 반응의 레벨·점수·연출 레벨은 터진 젤리 레벨, 연출 세기 절반
+  2. 다른 색 대폭발에서 같은 레벨 조건을 값으로 끔. 같은 색 흡수가 먼저, `can_react()`도 같은 규칙
+  3. 젤리 물리 재질을 레벨별로. 흡수·합체로 레벨이 바뀌면 재질도 바꾼다
+  4. 예전 값 묶음 (M·B·C8)은 예전 동작 (같은 레벨만, 소폭발은 꼭대기만, 마찰 하나)으로 두어 해시 그대로
+  5. §12-ONE.22 측정 1~5 (F·D-0·D-save·D-all, 전략 봇 D-0·D-save·D-all, 캡처 — L8 소폭발은 주변 젤리가 밀리는 모습이 보이게, `06`·`07` 이름 정리)
+- 건드리지 말 것: 레벨표·흡수 레벨 차 2·대폭발 기준 L8·잭팟, 소폭발 반경·점수 배율·터치 여백, 벽 마찰, 튕김, 생성, FINAL MOVE·게임 오버, 랭킹, 사용자 저장 파일, 새 연출·터치 표시 (고리 모양 금지), `docs/` (회신 파일 제외)
+- Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), M·B·C8 해시 그대로, 새 기본값 해시 상수 고정, 엔진 마찰 섞기 규칙 확인, 측정 표·캡처 (실제 창, 마지막은 전체 캡처) 보고, 검증 빌드는 `-Debug`만
+- 커밋: 항목 단위 브랜치, **push·PR까지**. 기본값은 새 값으로 두고, 병합은 측정을 사용자와 본 뒤
 
 ---
 
