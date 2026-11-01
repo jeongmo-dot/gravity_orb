@@ -12,6 +12,13 @@ param(
 	[ValidateSet("Default", "M", "A", "B")]
 	[string]$LevelProfile = "Default",
 	[switch]$TapBlastBot,
+	[ValidateSet("None", "Save", "All")]
+	[string]$TapBlastBotMode = "None",
+	[ValidateRange(0, 10)]
+	[int]$JellyTapBlastMinLevel = 8,
+	[ValidateSet("On", "Off")]
+	[string]$JellyBlastRequiresSameLevel = "Off",
+	[string]$OrbFrictionByLevel = "0.3,0.3,0.3,0.4,0.4,0.4,0.4,0.5,0.5,0.5",
     [ValidateRange(1, 600)]
     [int]$MaxTurns = 400,
     [ValidateRange(-1, 100)]
@@ -40,9 +47,16 @@ if ($GravityTurnDiagonalTime -lt -1.0) {
 $culture = [Globalization.CultureInfo]::InvariantCulture
 $physicsArguments = @()
 $physicsArguments += if ($LevelProfile -eq "Default") { "--jelly-level-profile=B" } else { "--jelly-level-profile=$LevelProfile" }
-$physicsArguments += if ($TapBlastBot) { "--jelly-tap-blast-bot" } else { @() }
+$resolvedTapBlastBotMode = if ($TapBlastBot -and $TapBlastBotMode -eq "None") { "All" } else { $TapBlastBotMode }
+$physicsArguments += "--jelly-tap-blast-bot=$($resolvedTapBlastBotMode.ToLower())"
 $physicsArguments += "--jelly-merge-duration=$($JellyMergeDuration.ToString($culture))"
 $physicsArguments += "--jelly-merge-level-gap=$JellyMergeLevelGap"
+$physicsArguments += "--jelly-tap-blast-min-level=$JellyTapBlastMinLevel"
+$physicsArguments += "--jelly-blast-requires-same-level=$($JellyBlastRequiresSameLevel.ToLower())"
+if ($OrbFrictionByLevel -ne "none" -and $OrbFrictionByLevel -notmatch '^\d+(\.\d+)?(,\d+(\.\d+)?)*$') {
+	throw "OrbFrictionByLevel must be 'none' or comma-separated non-negative numbers"
+}
+$physicsArguments += "--orb-friction-by-level=$OrbFrictionByLevel"
 if ($Friction -gt 0.0) {
     $physicsArguments += "--physics-friction=$($Friction.ToString($culture))"
 }
@@ -127,10 +141,13 @@ $totalTurns = 0
 $totalMerges = 0
 $totalBlasts = 0
 $blastCountByLevel = @{}
+$sameLevelBlastCountByLevel = @{}
+$mixedLevelBlastCountByLevel = @{}
 $totalJackpots = 0
 $totalLevelSevenCreations = 0
 $totalLevelUpCount = 0
 $totalTapBlastCount = 0
+$tapBlastCountByLevel = @{}
 $levelCreationCounts = @{}
 $maximumLevelDistribution = @{}
 $levelTenGameCount = 0
@@ -178,6 +195,21 @@ foreach ($task in $tasks) {
     $totalLevelSevenCreations += [int]$seedRow.level_seven_creation_count
 	$totalLevelUpCount += [int]$seedRow.level_up_count
 	$totalTapBlastCount += [int]$seedRow.tap_blast_count
+	foreach ($levelProperty in $seedRow.tap_blast_count_by_level.PSObject.Properties) {
+		$level = $levelProperty.Name
+		if (-not $tapBlastCountByLevel.ContainsKey($level)) { $tapBlastCountByLevel[$level] = 0 }
+		$tapBlastCountByLevel[$level] += [int]$levelProperty.Value
+	}
+	foreach ($levelProperty in $seedRow.same_level_blast_count_by_level.PSObject.Properties) {
+		$level = $levelProperty.Name
+		if (-not $sameLevelBlastCountByLevel.ContainsKey($level)) { $sameLevelBlastCountByLevel[$level] = 0 }
+		$sameLevelBlastCountByLevel[$level] += [int]$levelProperty.Value
+	}
+	foreach ($levelProperty in $seedRow.mixed_level_blast_count_by_level.PSObject.Properties) {
+		$level = $levelProperty.Name
+		if (-not $mixedLevelBlastCountByLevel.ContainsKey($level)) { $mixedLevelBlastCountByLevel[$level] = 0 }
+		$mixedLevelBlastCountByLevel[$level] += [int]$levelProperty.Value
+	}
 	$maximumLevelKey = "L$([int]$seedRow.max_level_reached)"
 	if (-not $maximumLevelDistribution.ContainsKey($maximumLevelKey)) {
 		$maximumLevelDistribution[$maximumLevelKey] = 0
@@ -264,9 +296,12 @@ $summary = [ordered]@{
     fixed_fps = 120
     max_turns = $MaxTurns
 	level_profile = if ($LevelProfile -eq "Default") { "B" } else { $LevelProfile }
-	tap_blast_bot = [bool]$TapBlastBot
+	tap_blast_bot_mode = $resolvedTapBlastBotMode.ToLower()
 	jelly_merge_duration = $JellyMergeDuration
 	jelly_merge_level_gap = $JellyMergeLevelGap
+	jelly_tap_blast_min_level = $JellyTapBlastMinLevel
+	jelly_blast_requires_same_level = $JellyBlastRequiresSameLevel -eq "On"
+	orb_friction_by_level = $OrbFrictionByLevel
     friction = if ($Friction -gt 0.0) { $Friction } else { $null }
     angular_damp = if ($AngularDamp -ge 0.0) { $AngularDamp } else { $null }
     gravity_turn_diagonal_time = if ($GravityTurnDiagonalTime -ge 0.0) { $GravityTurnDiagonalTime } else { $null }
@@ -319,7 +354,10 @@ $summary = [ordered]@{
 	level_ten_game_count = $levelTenGameCount
     blast_count = $totalBlasts
 	tap_blast_count = $totalTapBlastCount
+	tap_blast_count_by_level = $tapBlastCountByLevel
     blast_count_by_level = $blastCountByLevel
+	same_level_blast_count_by_level = $sameLevelBlastCountByLevel
+	mixed_level_blast_count_by_level = $mixedLevelBlastCountByLevel
     jackpot_count = $totalJackpots
     level_seven_creation_count = $totalLevelSevenCreations
     average_game_over_level_five_plus_count = if ($gameOverHighLevelCounts.Count -gt 0) { ($gameOverHighLevelCounts | Measure-Object -Average).Average } else { 0.0 }

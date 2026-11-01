@@ -1,19 +1,20 @@
 extends TestCase
 
 
-func test_level_ten_tap_blast_uses_single_orb_score_and_multipliers() -> void:
+func test_level_eight_to_ten_tap_blast_uses_source_level_score_and_multipliers() -> void:
 	var cfg: GameConfig = GameConfig.new()
-	var reaction: Dictionary = {
-		"type": ReactionRules.Type.TAP_BLAST,
-		"levels": [cfg.orb_max_level],
-		"combo": 2,
-		"occupancy": 0.0,
-	}
-	assert_eq(
-		ScoreManager.points_for(reaction, cfg),
-		cfg.score_for_level(cfg.orb_max_level) * 2,
-		"tap blast scores one L10 with combo"
-	)
+	for level: int in [8, 9, 10]:
+		var reaction: Dictionary = {
+			"type": ReactionRules.Type.TAP_BLAST,
+			"levels": [level],
+			"combo": 1,
+			"occupancy": 0.0,
+		}
+		assert_eq(
+			ScoreManager.points_for(reaction, cfg),
+			cfg.score_for_level(level),
+			"tap blast scores one L%d at combo one" % level
+		)
 
 const CONFIG_RESOURCE: GameConfig = preload("res://config/default_config.tres")
 const TOLERANCE: float = 1.0e-6

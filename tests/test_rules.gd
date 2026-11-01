@@ -308,14 +308,33 @@ func test_jelly_blast_default_l8_threshold_and_gap_two_absorption_precedence() -
 	cfg.opposite_pairs = [Vector2i(0, 1)]
 	var level_seven_default: Dictionary = ReactionRules.classify(0, 7, 1, 7, cfg, 17.0, 17.0)
 	var level_eight_default: Dictionary = ReactionRules.classify(0, 8, 1, 8, cfg, 27.0, 27.0)
+	var level_eight_nine_default: Dictionary = ReactionRules.classify(0, 8, 1, 9, cfg, 27.0, 42.0)
+	var level_eight_ten_default: Dictionary = ReactionRules.classify(0, 8, 1, 10, cfg, 27.0, 64.0)
+	var level_nine_ten_default: Dictionary = ReactionRules.classify(0, 9, 1, 10, cfg, 42.0, 64.0)
+	var level_seven_eight_default: Dictionary = ReactionRules.classify(0, 7, 1, 8, cfg, 17.0, 27.0)
 	var level_ten_default: Dictionary = ReactionRules.classify(0, 10, 1, 10, cfg, 64.0, 64.0)
 	var level_ten_jackpot: Dictionary = ReactionRules.classify(0, 10, 0, 10, cfg, 64.0, 64.0)
+	var same_color_eight_ten: Dictionary = ReactionRules.classify(0, 8, 0, 10, cfg, 27.0, 64.0)
 	var gap_two_default: Dictionary = ReactionRules.classify(0, 7, 0, 5, cfg, 17.0, 7.0)
 	var gap_three_default: Dictionary = ReactionRules.classify(0, 7, 0, 4, cfg, 17.0, 5.0)
 	assert_eq(level_seven_default["type"], ReactionRules.Type.NONE, "default leaves different-color L7")
 	assert_eq(level_eight_default["type"], ReactionRules.Type.BLAST, "default blasts different-color L8")
+	assert_eq(level_eight_nine_default["type"], ReactionRules.Type.BLAST, "default blasts L8+L9")
+	assert_eq(level_eight_ten_default["type"], ReactionRules.Type.BLAST, "default blasts L8+L10")
+	assert_eq(level_nine_ten_default["type"], ReactionRules.Type.BLAST, "default blasts L9+L10")
+	assert_eq(level_seven_eight_default["type"], ReactionRules.Type.NONE, "default leaves L7+L8")
 	assert_eq(level_ten_default["type"], ReactionRules.Type.BLAST, "default blasts different-color L10")
 	assert_eq(level_ten_jackpot["type"], ReactionRules.Type.MAX_CLEAR, "same-color L10 keeps jackpot precedence")
+	assert_eq(same_color_eight_ten["type"], ReactionRules.Type.MERGE, "same-color L8+L10 absorbs")
+	assert_true(ReactionRules.can_react(0, 8, 1, 9, cfg), "can_react matches mixed-level BLAST")
+	cfg.jelly_blast_requires_same_level = true
+	assert_eq(
+		ReactionRules.classify(0, 8, 1, 9, cfg, 27.0, 42.0)["type"],
+		ReactionRules.Type.NONE,
+		"same-level compatibility toggle rejects L8+L9"
+	)
+	assert_true(not ReactionRules.can_react(0, 8, 1, 9, cfg), "can_react follows toggle")
+	cfg.jelly_blast_requires_same_level = false
 	assert_eq(gap_two_default["type"], ReactionRules.Type.MERGE, "default absorbs same-color L+(L-2)")
 	assert_eq(gap_three_default["type"], ReactionRules.Type.NONE, "default rejects same-color L+(L-3)")
 	cfg.jelly_blast_min_level = 0
