@@ -40,7 +40,7 @@
 
 ### [2026-11-01] 대상 #131 — L10 잭팟 점수 상향
 - 상태: 완료 — `max_merge_bonus_factor` 기본값을 `5→40`으로 올려 콤보 1·위험 배수 1의 L10+L10 잭팟을 `5,120`점으로 변경하고, 과거 값 묶음과 화면 캡처·전체 검증을 마쳤다
-- 브랜치 / PR: `codex/jelly-jackpot-score` / 푸시 후 생성 예정
+- 브랜치 / PR: `codex/jelly-jackpot-score` / https://github.com/jeongmo-dot/gravity_orb/pull/131
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `tests/{test_config.gd,test_score.gd,test_jelly_regression.gd}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 새 기본 `max_merge_bonus_factor=40.0`; L10 기본 점수 `128×40=5,120` — 자동 (`test_config`, `test_score`)
