@@ -102,6 +102,11 @@ static func points_for(reaction: Dictionary, cfg: GameConfig) -> int:
 					float(cfg.score_for_level(levels[0]) + cfg.score_for_level(levels[1]))
 					* cfg.blast_score_factor
 				)
+		ReactionRules.Type.TAP_BLAST:
+			base_points = int(
+				float(cfg.score_for_level(cfg.orb_max_level))
+				* cfg.jelly_tap_blast_score_factor
+			)
 		_:
 			return 0
 	var combo: int = maxi(int(reaction.get("combo", 1)), 1)

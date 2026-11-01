@@ -94,6 +94,19 @@ const CAPTURE_FILES: Array[String] = [
 	"84_jelly_merge_process_level_up_50.png",
 	"85_jelly_merge_process_level_up_75.png",
 	"86_jelly_merge_process_level_up_100.png",
+	"87_jelly_l1_l10_profile_a.png",
+	"88_jelly_l1_l10_profile_b.png",
+	"89_jelly_tap_blast_a_00.png",
+	"90_jelly_tap_blast_a_50.png",
+	"91_jelly_tap_blast_a_100.png",
+	"92_jelly_tap_blast_b_00.png",
+	"93_jelly_tap_blast_b_50.png",
+	"94_jelly_tap_blast_b_100.png",
+	"95_jelly_l10_blast_a.png",
+	"96_jelly_l10_blast_b.png",
+	"97_jelly_l10_jackpot_a.png",
+	"98_jelly_l10_jackpot_b.png",
+	"99_jelly_result_l10_max.png",
 ]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
@@ -223,19 +236,19 @@ func _capture_gameplay_scenes() -> void:
 	board.clear()
 	var first_blast: Orb3D = board.spawn_orb(
 		OrbTypes.OrbColor.RED,
-		6,
+		Config.data.orb_max_level,
 		Vector2(-120.0, 0.0)
 	)
 	var second_blast: Orb3D = board.spawn_orb(
 		OrbTypes.OrbColor.BLUE,
-		6,
+		Config.data.orb_max_level,
 		Vector2(120.0, 0.0)
 	)
 	first_blast.disable_physics()
 	second_blast.disable_physics()
 	resolver.report_contact(first_blast, second_blast, "capture_l6_blast")
 	if resolver.flush() != 1:
-		_fail("different-color L6 pair did not produce one capture reaction")
+		_fail("different-color maximum-level pair did not produce one capture reaction")
 	await get_tree().create_timer(0.06).timeout
 	await _capture("07_jelly_l6_blast.png")
 
@@ -271,7 +284,168 @@ func _capture_gameplay_scenes() -> void:
 	await _capture_recovered_jelly_scenes(main, manager, board, hud)
 	await _capture_jelly_merge_process_scenes(board, resolver, manager)
 	await _capture_turn_hud_scene(main, manager, hud)
+	await _capture_level_ten_scenes(main, board)
 	await _destroy_main(main)
+
+
+func _capture_level_ten_scenes(main: Main, board: Board3D) -> void:
+	var director: FeedbackDirector = main.get_node("FeedbackDirector") as FeedbackDirector
+	for profile: String in ["A", "B"]:
+		_set_jelly_level_profile(profile)
+		board.clear()
+		director.clear_effects()
+		for level: int in range(1, Config.data.orb_max_level + 1):
+			var orb: Orb3D = board.spawn_orb(
+				OrbTypes.OrbColor.PURPLE,
+				level,
+				Vector2(-405.0 + float(level - 1) * 90.0, 20.0)
+			)
+			orb.disable_physics()
+		await _capture(
+			"87_jelly_l1_l10_profile_a.png"
+			if profile == "A"
+			else "88_jelly_l1_l10_profile_b.png"
+		)
+		await _capture_tap_blast_progress(board, director, profile)
+		await _capture_level_ten_pair_effect(board, director, profile, false)
+		await _capture_level_ten_pair_effect(board, director, profile, true)
+
+	_set_jelly_level_profile("B")
+	board.clear()
+	director.clear_effects()
+	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
+	var score: ScoreManager = main.get_node("ScoreManager") as ScoreManager
+	manager.turn_index = 128
+	manager.max_combo = 10
+	score.score = 128000
+	score.best_score = 128000
+	score.max_level_reached = Config.data.orb_max_level
+	manager.game_over_details = {
+		"direction": Vector2i.DOWN,
+		"final_moves": 2,
+		"final_move_successes": 1,
+	}
+	manager.game_over_details["ranking"] = manager._commit_completed_ranking()
+	manager.game_over.emit()
+	await get_tree().create_timer(0.85).timeout
+	await _capture("99_jelly_result_l10_max.png")
+
+
+func _capture_tap_blast_progress(
+	board: Board3D,
+	director: FeedbackDirector,
+	profile: String
+) -> void:
+	var first_file_number: int = 89 if profile == "A" else 92
+	board.clear()
+	director.clear_effects()
+	var source: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.YELLOW,
+		Config.data.orb_max_level,
+		Vector2.ZERO
+	)
+	source.disable_physics()
+	await _capture("%02d_jelly_tap_blast_%s_00.png" % [
+		first_file_number,
+		profile.to_lower(),
+	])
+	board.clear()
+	director.clear_effects()
+	var original_hitstop_enabled: bool = Config.data.fx_hitstop_enabled
+	Config.data.fx_hitstop_enabled = false
+	director.play_reaction_visuals(_tap_blast_capture_reaction())
+	await get_tree().create_timer(FeedbackDirector.SUPERNOVA_DURATION * 0.5).timeout
+	await _capture("%02d_jelly_tap_blast_%s_50.png" % [
+		first_file_number + 1,
+		profile.to_lower(),
+	])
+	await get_tree().create_timer(FeedbackDirector.SUPERNOVA_DURATION * 0.5).timeout
+	await _capture("%02d_jelly_tap_blast_%s_100.png" % [
+		first_file_number + 2,
+		profile.to_lower(),
+	])
+	Config.data.fx_hitstop_enabled = original_hitstop_enabled
+
+
+func _tap_blast_capture_reaction() -> Dictionary:
+	return {
+		"type": ReactionRules.Type.TAP_BLAST,
+		"levels": [Config.data.orb_max_level],
+		"colors": [OrbTypes.OrbColor.YELLOW],
+		"position": Vector2.ZERO,
+		"shock_level": Config.data.orb_max_level,
+		"blast_radius_factor": Config.data.jelly_tap_blast_radius_factor,
+	}
+
+
+func _capture_level_ten_pair_effect(
+	board: Board3D,
+	director: FeedbackDirector,
+	profile: String,
+	jackpot: bool
+) -> void:
+	board.clear()
+	director.clear_effects()
+	var first_color: int = OrbTypes.OrbColor.RED
+	var second_color: int = first_color if jackpot else OrbTypes.OrbColor.BLUE
+	_spawn_specs(board, [
+		{
+			"color": first_color,
+			"level": Config.data.orb_max_level,
+			"mass": Config.data.jelly_mass_for_level(Config.data.orb_max_level),
+			"position": Vector2(-150.0, 0.0),
+		},
+		{
+			"color": second_color,
+			"level": Config.data.orb_max_level,
+			"mass": Config.data.jelly_mass_for_level(Config.data.orb_max_level),
+			"position": Vector2(150.0, 0.0),
+		},
+	])
+	director.play_reaction_visuals({
+		"type": ReactionRules.Type.MAX_CLEAR if jackpot else ReactionRules.Type.BLAST,
+		"levels": [Config.data.orb_max_level, Config.data.orb_max_level],
+		"colors": [first_color, second_color],
+		"result_color": first_color,
+		"position": Vector2.ZERO,
+		"shock_level": Config.data.orb_max_level,
+	})
+	await get_tree().create_timer(0.06).timeout
+	var file_number: int = (
+		97 if jackpot and profile == "A"
+		else 98 if jackpot
+		else 95 if profile == "A"
+		else 96
+	)
+	await _capture("%02d_jelly_l10_%s_%s.png" % [
+		file_number,
+		"jackpot" if jackpot else "blast",
+		profile.to_lower(),
+	])
+
+
+func _set_jelly_level_profile(profile: String) -> void:
+	Config.data.orb_max_level = 10
+	if profile == "A":
+		Config.data.jelly_level_masses = PackedFloat32Array([
+			1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0, 512.0,
+		])
+		Config.data.level_radii = PackedFloat32Array([
+			25.0, 40.0, 47.0, 55.0, 64.0, 75.0, 88.0, 102.0, 120.0, 140.0,
+		])
+		Config.data.level_scores = PackedInt32Array([
+			2, 4, 8, 16, 32, 64, 128, 256, 512, 1024,
+		])
+		return
+	Config.data.jelly_level_masses = PackedFloat32Array([
+		1.0, 2.0, 3.0, 5.0, 7.0, 11.0, 17.0, 27.0, 42.0, 64.0,
+	])
+	Config.data.level_radii = PackedFloat32Array([
+		25.0, 40.0, 52.0, 68.0, 80.0, 92.0, 102.0, 115.0, 128.0, 140.0,
+	])
+	Config.data.level_scores = PackedInt32Array([
+		2, 4, 6, 10, 14, 22, 34, 54, 84, 128,
+	])
 
 
 func _capture_turn_hud_scene(main: Main, manager: TurnManager, hud: Hud) -> void:
@@ -451,7 +625,7 @@ func _capture_overlay_detail_scenes(main: Main, board: Board3D) -> void:
 	var belly_half: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 3, Vector2(-100.0, 0.0))
 	var belly_three_quarter: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 3, Vector2(100.0, 0.0))
 	belly_half.set_jelly_mass(6.0, Config.data)
-	belly_three_quarter.set_jelly_mass(7.0, Config.data)
+	belly_three_quarter.set_jelly_mass(6.5, Config.data)
 	belly_half.disable_physics()
 	belly_three_quarter.disable_physics()
 	await get_tree().create_timer(Orb3D.JELLY_BELLY_TRANSITION_DURATION).timeout

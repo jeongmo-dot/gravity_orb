@@ -155,6 +155,7 @@ func _start_gameplay() -> void:
 	_game_manager = _turn_manager
 	_turn_manager.set_physics_process(true)
 	InputRouter.swipe.connect(_game_manager.on_swipe)
+	InputRouter.tap_released.connect(_game_manager.on_tap)
 	_game_manager.reaction_ready.connect(_score_manager.on_reaction)
 	_feedback_director.bind(_game_manager, _board)
 	_spawner.orb_spawned.connect(_score_manager.on_orb_spawned)

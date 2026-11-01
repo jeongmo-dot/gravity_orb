@@ -39,8 +39,8 @@ func test_same_turn_merges_score_twenty_and_track_combo_two() -> void:
 			else:
 				assert_eq(applied, 1, "second merge count")
 
-	assert_eq(score_manager.score, 20, "merge chain score")
-	assert_eq(score_manager.best_score, 20, "merge chain best score")
+	assert_eq(score_manager.score, 16, "merge chain score")
+	assert_eq(score_manager.best_score, 16, "merge chain best score")
 	assert_eq(manager.max_combo, 2, "merge combo maximum")
 	assert_eq(score_manager.max_level_reached, 3, "merge chain maximum level")
 	await _cleanup_fixture(fixture)
@@ -96,8 +96,8 @@ func test_best_score_is_saved_on_completed_ranking_and_loaded_by_new_manager() -
 	_remove_test_file(BEST_SAVE_PATH)
 	var first: ScoreManager = await _create_score_manager(BEST_SAVE_PATH)
 	first.on_reaction(_reaction(ReactionRules.Type.MERGE, 1, [2, 2], 3))
-	assert_eq(first.score, 8, "first manager score")
-	assert_eq(first.best_score, 8, "first manager best")
+	assert_eq(first.score, 6, "first manager score")
+	assert_eq(first.best_score, 6, "first manager best")
 	first.commit_ranking(
 		GameConfig.GameMode.TURN,
 		{"max_combo": 1, "turns": 1, "max_level": 3},
@@ -108,7 +108,7 @@ func test_best_score_is_saved_on_completed_ranking_and_loaded_by_new_manager() -
 
 	var second: ScoreManager = await _create_score_manager(BEST_SAVE_PATH)
 	assert_eq(second.score, 0, "new manager score starts at zero")
-	assert_eq(second.best_score, 8, "new manager loads best")
+	assert_eq(second.best_score, 6, "new manager loads best")
 	second.queue_free()
 	await tree.process_frame
 	_remove_test_file(BEST_SAVE_PATH)
@@ -167,7 +167,7 @@ func test_restart_request_resets_score_and_preserves_best_and_rule() -> void:
 	router._handle_event(_restart_key_event())
 
 	assert_eq(score_manager.score, 0, "restart score reset")
-	assert_eq(score_manager.best_score, 8, "restart best preserved")
+	assert_eq(score_manager.best_score, 6, "restart best preserved")
 	assert_eq(
 		Config.data.annihilation_rule,
 		GameConfig.AnnihilationRule.C_REMAINDER,
@@ -350,8 +350,8 @@ func test_game_over_panel_shows_scores_direction_and_restart_button() -> void:
 	assert_true(panel_style != null, "game-over panel has a flat opaque style")
 	if panel_style != null:
 		assert_true(panel_style.bg_color.a >= 0.92, "game-over panel opacity")
-	assert_eq(score_label.text, "48", "game-over score")
-	assert_eq(best_label.text, "BEST 48", "game-over best")
+	assert_eq(score_label.text, "30", "game-over score")
+	assert_eq(best_label.text, "BEST 30", "game-over best")
 	assert_eq(combo_label.text, "최대 콤보", "game-over max combo label")
 	assert_eq(combo_value.text, "2", "game-over max combo value")
 	assert_eq(blocked_label.text, "최고 젤리", "JELLY game-over highest level label")

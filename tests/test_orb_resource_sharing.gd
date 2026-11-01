@@ -33,7 +33,7 @@ func test_one_hundred_orbs_share_level_color_and_physics_resources() -> void:
 	)
 	assert_eq(
 		Orb3D.shared_resource_counts()["visual_materials"],
-		Config.data.color_display.size() * Config.data.orb_max_level,
+		Config.data.color_display.size() * 7,
 		"prewarm creates exactly one celestial material per color and level"
 	)
 	assert_eq(physics_materials.size(), 1, "all orbs share one physics material")

@@ -101,8 +101,8 @@ func test_transition_applies_to_spawn_growth_and_entrance_release() -> void:
 		"JELLY deform frame follows the active diagonal gravity"
 	)
 	spawned.set_jelly_mass(8.0, Config.data)
-	assert_eq(spawned.level, 4, "mass growth reaches level four during transition")
-	_assert_orb_acceleration(spawned, diagonal, Config.data.gravity_for_level(4))
+	assert_eq(spawned.level, 5, "mass growth reaches level five during transition")
+	_assert_orb_acceleration(spawned, diagonal, Config.data.gravity_for_level(5))
 
 	var waiter: Orb3D = board.spawn_orb(
 		OrbTypes.OrbColor.BLUE,

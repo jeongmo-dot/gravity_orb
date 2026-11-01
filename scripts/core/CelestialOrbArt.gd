@@ -32,7 +32,7 @@ static var _last_animation_frame: int = -1
 
 static func prewarm(cfg: GameConfig) -> void:
 	for color_index: int in range(cfg.color_display.size()):
-		for level_index: int in range(1, cfg.orb_max_level + 1):
+		for level_index: int in range(1, mini(cfg.orb_max_level, LEVEL_NAMES.size() - 1) + 1):
 			material_for(cfg, color_index, level_index)
 
 

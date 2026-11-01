@@ -41,6 +41,7 @@ var _record_seed_hashes: bool = false
 var _scan_pairs_each_frame: bool = false
 var _skip_determinism: bool = false
 var _skill_strategy: String = ""
+var _tap_blast_bot_enabled: bool = false
 var _measurement_mode: GameConfig.GameMode = GameConfig.GameMode.TURN
 var _skill_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _turn_shock_events: Array[Dictionary] = []
@@ -59,6 +60,9 @@ var _seed_seen_colors: Dictionary = {}
 var _seed_merge_count: int = 0
 var _seed_absorption_count: int = 0
 var _seed_level_seven_creation_count: int = 0
+var _seed_level_creation_count_by_level: Dictionary = {}
+var _seed_level_up_count: int = 0
+var _seed_tap_blast_count: int = 0
 var _seed_spawn_count: int = 0
 var _seed_spawn_count_by_level: Dictionary = {}
 var _seed_jelly_outline_visible_frames: int = 0
@@ -118,6 +122,9 @@ func _run() -> void:
 		"turn_color_unlock_turns": Config.data.turn_color_unlock_turns,
 		"preview_turns": Config.data.preview_turns,
 		"level_radii_px": Array(Config.data.level_radii),
+		"jelly_level_masses": Array(Config.data.jelly_level_masses),
+		"orb_max_level": Config.data.orb_max_level,
+		"tap_blast_bot_enabled": _tap_blast_bot_enabled,
 		"corrections": {
 			"reaction_ghost": _reaction_ghost_enabled,
 			"growth": _progressive_growth_enabled,
@@ -262,6 +269,9 @@ func _run_seed(
 	_seed_merge_count = 0
 	_seed_absorption_count = 0
 	_seed_level_seven_creation_count = 0
+	_seed_level_creation_count_by_level.clear()
+	_seed_level_up_count = 0
+	_seed_tap_blast_count = 0
 	_seed_spawn_count = 0
 	_seed_spawn_count_by_level.clear()
 	_seed_jelly_outline_visible_frames = 0
@@ -313,6 +323,8 @@ func _run_seed(
 		_turn_blast_count = 0
 		var score_before: int = score_manager.score
 		var spawned_before: int = _seed_spawn_count
+		if _tap_blast_bot_enabled:
+			await _use_oldest_level_ten_orbs(manager, board)
 		var direction: Vector2i = _next_pattern_direction(turn_offset, manager.gravity)
 		if _skill_strategy in ["l_space", "l_merge"]:
 			var preview_decision: Dictionary = await _choose_preview_direction(
@@ -497,6 +509,9 @@ func _run_seed(
 		"merge_count": _seed_merge_count,
 		"one_level_absorption_count": _seed_absorption_count,
 		"level_seven_creation_count": _seed_level_seven_creation_count,
+		"level_creation_count_by_level": _seed_level_creation_count_by_level.duplicate(true),
+		"level_up_count": _seed_level_up_count,
+		"tap_blast_count": _seed_tap_blast_count,
 		"one_level_absorption_fraction": (
 			float(_seed_absorption_count) / float(_seed_merge_count)
 			if _seed_merge_count > 0
@@ -939,8 +954,23 @@ func _record_shock_event(reaction: Dictionary) -> void:
 		_seed_merge_count += 1
 		if int(reaction.get("result_level", 0)) == Config.data.orb_max_level:
 			_seed_level_seven_creation_count += 1
+		var result_level: int = int(reaction.get("result_level", 0))
+		if result_level >= 3:
+			var level_key: String = "L%d" % result_level
+			_seed_level_creation_count_by_level[level_key] = int(
+				_seed_level_creation_count_by_level.get(level_key, 0)
+			) + 1
+		var source_levels: Array = reaction.get("levels", []) as Array
+		var previous_level: int = 0
+		for level_value: Variant in source_levels:
+			previous_level = maxi(previous_level, int(level_value))
+		if result_level > previous_level:
+			_seed_level_up_count += 1
 		if bool(reaction.get("jelly_absorption", false)):
 			_seed_absorption_count += 1
+	if reaction_type == ReactionRules.Type.TAP_BLAST:
+		_seed_tap_blast_count += 1
+		return
 	if reaction_type == ReactionRules.Type.BLAST:
 		_turn_blast_count += 1
 		_seed_blast_count += 1
@@ -1800,6 +1830,57 @@ func _write_report(report: Dictionary) -> void:
 	file.store_string(JSON.stringify(report, "\t"))
 
 
+func _use_oldest_level_ten_orbs(manager: TurnManager, board: Board3D) -> void:
+	while manager.state == TurnManager.State.WAITING_INPUT:
+		var oldest: Orb3D = null
+		for orb: Orb3D in board.get_orbs():
+			if orb.level != Config.data.orb_max_level:
+				continue
+			if orb.is_waiting_at_entrance or orb.is_ghost or orb.consumed:
+				continue
+			if oldest == null or orb.stable_spawn_id < oldest.stable_spawn_id:
+				oldest = orb
+		if oldest == null or not manager.try_tap_blast_orb(oldest):
+			return
+		if not await _wait_for_state(manager, TurnManager.State.WAITING_INPUT):
+			_had_runner_error = true
+			return
+
+
+func _apply_jelly_level_profile(profile: String) -> void:
+	match profile:
+		"M":
+			Config.data.orb_max_level = 7
+			Config.data.jelly_level_masses = PackedFloat32Array()
+			Config.data.level_radii = PackedFloat32Array([25, 40, 60, 85, 100, 120, 140])
+			Config.data.level_scores = PackedInt32Array([2, 4, 8, 16, 32, 64, 128])
+			Config.data.jelly_blast_min_level = 6
+			Config.data.blast_push_radius_by_level = PackedFloat32Array([0, 0, 0, 0.3, 0.55, 1, 1])
+			Config.data.gravity_level_scale = 0.05
+			Config.data.shock_level_scale = 0.3
+		"A":
+			Config.data.orb_max_level = 10
+			Config.data.jelly_level_masses = PackedFloat32Array([1, 2, 4, 8, 16, 32, 64, 128, 256, 512])
+			Config.data.level_radii = PackedFloat32Array([25, 40, 47, 55, 64, 75, 88, 102, 120, 140])
+			Config.data.level_scores = PackedInt32Array([2, 4, 8, 16, 32, 64, 128, 256, 512, 1024])
+			Config.data.jelly_blast_min_level = 10
+			Config.data.blast_push_radius_by_level = PackedFloat32Array([0, 0, 0, 0.3, 0.55, 1, 1, 1, 1, 1])
+			Config.data.gravity_level_scale = 0.0333
+			Config.data.shock_level_scale = 0.2
+		"B":
+			Config.data.orb_max_level = 10
+			Config.data.jelly_level_masses = PackedFloat32Array([1, 2, 3, 5, 7, 11, 17, 27, 42, 64])
+			Config.data.level_radii = PackedFloat32Array([25, 40, 52, 68, 80, 92, 102, 115, 128, 140])
+			Config.data.level_scores = PackedInt32Array([2, 4, 6, 10, 14, 22, 34, 54, 84, 128])
+			Config.data.jelly_blast_min_level = 10
+			Config.data.blast_push_radius_by_level = PackedFloat32Array([0, 0, 0, 0.3, 0.55, 1, 1, 1, 1, 1])
+			Config.data.gravity_level_scale = 0.0333
+			Config.data.shock_level_scale = 0.2
+		_:
+			_had_runner_error = true
+			push_error("Unknown JELLY level profile: %s" % profile)
+
+
 func _apply_arguments() -> void:
 	for argument: String in OS.get_cmdline_user_args():
 		if argument == "--jolt-smoke":
@@ -1821,6 +1902,10 @@ func _apply_arguments() -> void:
 			)
 		elif argument.begins_with("--jolt-output="):
 			_report_path = argument.trim_prefix("--jolt-output=")
+		elif argument.begins_with("--jelly-level-profile="):
+			_apply_jelly_level_profile(argument.trim_prefix("--jelly-level-profile=").to_upper())
+		elif argument == "--jelly-tap-blast-bot":
+			_tap_blast_bot_enabled = true
 		elif argument.begins_with("--spawn-count="):
 			Config.data.spawn_count_per_turn = maxi(
 				argument.trim_prefix("--spawn-count=").to_int(),

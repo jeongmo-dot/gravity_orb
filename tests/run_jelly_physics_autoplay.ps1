@@ -7,8 +7,11 @@ param(
     [double]$Friction = -1.0,
     [double]$AngularDamp = -1.0,
     [double]$GravityTurnDiagonalTime = -1.0,
-    [ValidateRange(-1, 7)]
+    [ValidateRange(-1, 10)]
     [int]$JellyBlastMinLevel = -1,
+	[ValidateSet("Default", "M", "A", "B")]
+	[string]$LevelProfile = "Default",
+	[switch]$TapBlastBot,
     [ValidateRange(1, 600)]
     [int]$MaxTurns = 400,
     [ValidateRange(-1, 100)]
@@ -34,6 +37,8 @@ if ($GravityTurnDiagonalTime -lt -1.0) {
 }
 $culture = [Globalization.CultureInfo]::InvariantCulture
 $physicsArguments = @()
+$physicsArguments += if ($LevelProfile -eq "Default") { "--jelly-level-profile=B" } else { "--jelly-level-profile=$LevelProfile" }
+$physicsArguments += if ($TapBlastBot) { "--jelly-tap-blast-bot" } else { @() }
 $physicsArguments += "--jelly-merge-duration=$($JellyMergeDuration.ToString($culture))"
 if ($Friction -gt 0.0) {
     $physicsArguments += "--physics-friction=$($Friction.ToString($culture))"
@@ -121,6 +126,10 @@ $totalBlasts = 0
 $blastCountByLevel = @{}
 $totalJackpots = 0
 $totalLevelSevenCreations = 0
+$totalLevelUpCount = 0
+$totalTapBlastCount = 0
+$levelCreationCounts = @{}
+$maximumLevelDistribution = @{}
 $departures = 0
 $maxTurnEndPairPenetration = 0.0
 $spawnedOrbCounts = @()
@@ -163,6 +172,18 @@ foreach ($task in $tasks) {
     $totalBlasts += [int]$seedRow.blast_count
     $totalJackpots += [int]$seedRow.max_clear_count
     $totalLevelSevenCreations += [int]$seedRow.level_seven_creation_count
+	$totalLevelUpCount += [int]$seedRow.level_up_count
+	$totalTapBlastCount += [int]$seedRow.tap_blast_count
+	$maximumLevelKey = "L$([int]$seedRow.max_level_reached)"
+	if (-not $maximumLevelDistribution.ContainsKey($maximumLevelKey)) {
+		$maximumLevelDistribution[$maximumLevelKey] = 0
+	}
+	$maximumLevelDistribution[$maximumLevelKey] += 1
+	foreach ($levelProperty in $seedRow.level_creation_count_by_level.PSObject.Properties) {
+		$level = $levelProperty.Name
+		if (-not $levelCreationCounts.ContainsKey($level)) { $levelCreationCounts[$level] = 0 }
+		$levelCreationCounts[$level] += [int]$levelProperty.Value
+	}
     foreach ($levelProperty in $seedRow.blast_count_by_level.PSObject.Properties) {
         $level = $levelProperty.Name
         if (-not $blastCountByLevel.ContainsKey($level)) { $blastCountByLevel[$level] = 0 }
@@ -237,6 +258,8 @@ $summary = [ordered]@{
     seeds = @(101..120)
     fixed_fps = 120
     max_turns = $MaxTurns
+	level_profile = if ($LevelProfile -eq "Default") { "B" } else { $LevelProfile }
+	tap_blast_bot = [bool]$TapBlastBot
 	jelly_merge_duration = $JellyMergeDuration
     friction = if ($Friction -gt 0.0) { $Friction } else { $null }
     angular_damp = if ($AngularDamp -ge 0.0) { $AngularDamp } else { $null }
@@ -284,7 +307,11 @@ $summary = [ordered]@{
 	maximum_touching_merge_pairs_at_input_waiting = $inputWaitingTouchingMergePairCountMax
 	deferred_jelly_merge_count = $deferredJellyMergeCount
     merges_per_turn = if ($totalTurns -gt 0) { [double]$totalMerges / $totalTurns } else { 0.0 }
+	level_ups_per_turn = if ($totalTurns -gt 0) { [double]$totalLevelUpCount / $totalTurns } else { 0.0 }
+	level_creation_count_by_level = $levelCreationCounts
+	maximum_level_distribution = $maximumLevelDistribution
     blast_count = $totalBlasts
+	tap_blast_count = $totalTapBlastCount
     blast_count_by_level = $blastCountByLevel
     jackpot_count = $totalJackpots
     level_seven_creation_count = $totalLevelSevenCreations

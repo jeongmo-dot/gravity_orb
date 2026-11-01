@@ -142,7 +142,8 @@ func play_blast(
 	finale_index: int = 1,
 	reaction_usec: int = 0,
 	reaction_physics_frame: int = -1,
-	reaction_process_frame: int = -1
+	reaction_process_frame: int = -1,
+	intensity: float = 1.0
 ) -> void:
 	if not Config.data.sfx_enabled:
 		return
@@ -151,6 +152,7 @@ func play_blast(
 	if finale:
 		pitch = pow(2.0, float(maxi(finale_index - 1, 0)) / 12.0)
 		volume_db = Config.data.sfx_volume_db - 2.0
+	volume_db += linear_to_db(clampf(intensity, 0.001, 1.0))
 	_play(
 		_blast_stream,
 		pitch,
@@ -190,8 +192,11 @@ func play_turn_ready() -> void:
 
 
 func merge_pitch(result_level: int, chain: int, stable_spawn_id: int) -> float:
-	var clamped_level: int = clampi(result_level, 2, 7)
-	var level_ratio: float = float(clamped_level - 2) / 5.0
+	var maximum_level: int = maxi(Config.data.orb_max_level, 2)
+	var clamped_level: int = clampi(result_level, 2, maximum_level)
+	var level_ratio: float = (
+		float(clamped_level - 2) / float(maxi(maximum_level - 2, 1))
+	)
 	var level_pitch: float = lerpf(1.35, 0.75, level_ratio)
 	var semitones: int = mini(
 		maxi(chain - 1, 0),

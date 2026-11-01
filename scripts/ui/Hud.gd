@@ -899,7 +899,11 @@ func _popup_appearance(reaction: Dictionary) -> Dictionary:
 	) as ReactionRules.Type
 	var cosmic: bool = (
 		bool(reaction.get("finale", false))
-		or reaction_type in [ReactionRules.Type.BLAST, ReactionRules.Type.MAX_CLEAR]
+		or reaction_type in [
+			ReactionRules.Type.BLAST,
+			ReactionRules.Type.TAP_BLAST,
+			ReactionRules.Type.MAX_CLEAR,
+		]
 		or float(reaction.get("combo_multiplier", 1.0)) >= 8.0
 	)
 	if cosmic:

@@ -63,8 +63,13 @@ static var _last_animation_frame: int = -1
 
 static func color_for(color_index: int, level: int = 1) -> Color:
 	var safe_color: int = clampi(color_index, 0, PALETTE.size() - 1)
-	var safe_level: int = maxi(level, 1)
-	return PALETTE[safe_color].lightened(float(safe_level) * LEVEL_LIGHTEN_AMOUNT)
+	var safe_level: int = clampi(level, 1, Config.data.orb_max_level)
+	var visual_level: float = 1.0
+	if Config.data.orb_max_level > 1:
+		visual_level += (
+			float(safe_level - 1) * 6.0 / float(Config.data.orb_max_level - 1)
+		)
+	return PALETTE[safe_color].lightened(visual_level * LEVEL_LIGHTEN_AMOUNT)
 
 
 static func prewarm(cfg: GameConfig) -> void:
@@ -122,11 +127,15 @@ static func animation_time() -> float:
 
 static func preview_texture_for(color_index: int, level: int) -> Texture2D:
 	var safe_color: int = clampi(color_index, 0, PALETTE.size() - 1)
-	var safe_level: int = clampi(level, 1, 7)
+	var safe_level: int = clampi(level, 1, Config.data.orb_max_level)
 	var key: String = "%d:%d" % [safe_color, safe_level]
 	if _preview_textures.has(key):
 		return _preview_textures[key] as Texture2D
-	var texture_size: int = PREVIEW_MAX_TEXTURE_SIZE if safe_level == 7 else PREVIEW_TEXTURE_SIZE
+	var texture_size: int = (
+		PREVIEW_MAX_TEXTURE_SIZE
+		if safe_level == Config.data.orb_max_level
+		else PREVIEW_TEXTURE_SIZE
+	)
 	var base_color: Color = color_for(safe_color, safe_level)
 	var image: Image = Image.create(texture_size, texture_size, false, Image.FORMAT_RGBA8)
 	var light: Vector3 = Vector3(-0.20, -0.86, 0.48).normalized()
@@ -168,6 +177,7 @@ static func body_material_for(color_index: int, level: int) -> ShaderMaterial:
 		material.shader = _get_body_shader()
 		material.set_shader_parameter("base_color", color_for(color_index, level))
 		material.set_shader_parameter("level_id", level)
+		material.set_shader_parameter("max_level_id", Config.data.orb_max_level)
 		material.set_shader_parameter("animation_time", _animation_time)
 		_body_materials[key] = material
 	return _body_materials[key] as ShaderMaterial
@@ -178,7 +188,7 @@ static func face_material_for(
 	level: int,
 	blast_ready: bool = false
 ) -> ShaderMaterial:
-	var uses_blast_face: bool = blast_ready and level < 7
+	var uses_blast_face: bool = blast_ready and level < Config.data.orb_max_level
 	var key: String = "%d:%d:%s" % [color_index, level, uses_blast_face]
 	if not _face_materials.has(key):
 		var material: ShaderMaterial = ShaderMaterial.new()
@@ -191,7 +201,7 @@ static func face_material_for(
 		material.shader = _get_face_shader()
 		material.set_shader_parameter("jelly_color", color_for(color_index, level))
 		material.set_shader_parameter("color_id", color_index)
-		material.set_shader_parameter("is_max", level >= 7)
+		material.set_shader_parameter("is_max", level >= Config.data.orb_max_level)
 		material.set_shader_parameter("is_blast_ready", uses_blast_face)
 		material.set_shader_parameter("max_face_color", MAX_FACE_COLOR)
 		material.set_shader_parameter("max_blush_color", MAX_BLUSH_COLOR)
@@ -292,6 +302,7 @@ render_mode unshaded, depth_prepass_alpha, cull_back;
 
 uniform vec4 base_color : source_color = vec4(1.0);
 uniform int level_id = 1;
+uniform int max_level_id = 10;
 uniform float animation_time = 0.0;
 
 void fragment() {
@@ -310,7 +321,7 @@ void fragment() {
 	interior += mix(base, vec3(1.0), 0.72) * broad;
 	interior += vec3(1.0) * sharp * 0.48;
 	interior += mix(base, vec3(1.0), 0.44) * rim * 0.23;
-	float max_pulse = level_id >= 7 ? (0.5 + 0.5 * sin(animation_time * 2.15)) : 0.0;
+	float max_pulse = level_id >= max_level_id ? (0.5 + 0.5 * sin(animation_time * 2.15)) : 0.0;
 	interior += vec3(1.0) * rim * max_pulse * 0.30;
 	ALBEDO = interior;
 	EMISSION = interior * (0.08 + rim * (0.08 + max_pulse * 0.32));

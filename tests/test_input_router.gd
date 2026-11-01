@@ -4,6 +4,7 @@ const INPUT_ROUTER_SCRIPT: Script = preload("res://scripts/autoload/InputRouter.
 
 var _received: Array[Vector2i] = []
 var _rejected: Array[Vector2i] = []
+var _taps: Array[Vector2] = []
 var _debug_hud_toggles: int = 0
 var _debug_cycles: int = 0
 var _spawn_count_cycles: int = 0
@@ -61,6 +62,16 @@ func test_short_drag_is_ignored() -> void:
 	router._handle_event(_mouse_button(Vector2(100.0, 100.0), MOUSE_BUTTON_LEFT, true))
 	router._handle_event(_mouse_button(Vector2(130.0, 100.0), MOUSE_BUTTON_LEFT, false))
 	_assert_swipes([])
+	assert_eq(_taps, [Vector2(130.0, 100.0)], "short drag emits tap release")
+	router.free()
+
+
+func test_exact_swipe_minimum_is_not_a_tap() -> void:
+	var router: Variant = _new_router()
+	router._handle_event(_mouse_button(Vector2(100.0, 100.0), MOUSE_BUTTON_LEFT, true))
+	router._handle_event(_mouse_button(Vector2(180.0, 100.0), MOUSE_BUTTON_LEFT, false))
+	_assert_swipes([Vector2i.RIGHT])
+	assert_true(_taps.is_empty(), "80px gesture stays swipe")
 	router.free()
 
 
@@ -71,6 +82,17 @@ func test_locked_drag_is_ignored() -> void:
 	router._handle_event(_mouse_button(Vector2(300.0, 100.0), MOUSE_BUTTON_LEFT, false))
 	_assert_swipes([])
 	_assert_rejected([Vector2i.RIGHT])
+	router.free()
+
+
+func test_short_drag_requires_unlocked_press_and_release() -> void:
+	var router: Variant = _new_router()
+	router.set_locked(true)
+	router._handle_event(_mouse_button(Vector2(100.0, 100.0), MOUSE_BUTTON_LEFT, true))
+	router.set_locked(false)
+	router._handle_event(_mouse_button(Vector2(130.0, 100.0), MOUSE_BUTTON_LEFT, false))
+	_assert_swipes([])
+	assert_true(_taps.is_empty(), "tap pressed while locked stays ignored")
 	router.free()
 
 
@@ -194,6 +216,7 @@ func test_m_sfx_mute_action_emits_even_while_locked() -> void:
 func _new_router() -> Variant:
 	_received.clear()
 	_rejected.clear()
+	_taps.clear()
 	_debug_hud_toggles = 0
 	_debug_cycles = 0
 	_spawn_count_cycles = 0
@@ -203,6 +226,7 @@ func _new_router() -> Variant:
 	var router: Variant = INPUT_ROUTER_SCRIPT.new()
 	router.swipe.connect(_record_swipe)
 	router.swipe_rejected.connect(_record_rejected)
+	router.tap_released.connect(_record_tap)
 	router.restart_requested.connect(_record_restart_request)
 	router.debug_toggle_hud.connect(_record_debug_hud_toggle)
 	router.debug_cycle_annihilation_rule.connect(_record_debug_cycle)
@@ -218,6 +242,10 @@ func _record_swipe(direction: Vector2i) -> void:
 
 func _record_rejected(direction: Vector2i) -> void:
 	_rejected.append(direction)
+
+
+func _record_tap(position: Vector2) -> void:
+	_taps.append(position)
 
 
 func _record_debug_cycle() -> void:

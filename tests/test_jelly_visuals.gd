@@ -62,7 +62,7 @@ func test_jelly_palette_matches_classic_color_indices_and_level_lightening() -> 
 		assert_eq(JellyOrbArt.PALETTE[color_index], expected[color_index], "JELLY color %d" % color_index)
 		assert_eq(
 			JellyOrbArt.color_for(color_index, 4),
-			expected[color_index].lightened(4.0 * 0.018),
+			expected[color_index].lightened(3.0 * 0.018),
 			"JELLY color %d L4 lightening" % color_index
 		)
 
@@ -105,46 +105,46 @@ func test_jelly_max_face_uses_body_radius_while_regular_faces_keep_original_scal
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	var board: Board3D = await _create_board()
 	var regular: Orb3D = board.spawn_orb(0, 3, Vector2(-100.0, 0.0))
-	var maximum: Orb3D = board.spawn_orb(0, 7, Vector2(100.0, 0.0))
+	var maximum: Orb3D = board.spawn_orb(0, 10, Vector2(100.0, 0.0))
 	var regular_radius_m: float = Config.data.radius_for_level(3) / Orb3D.PIXELS_PER_METER
-	var maximum_radius_m: float = Config.data.radius_for_level(7) / Orb3D.PIXELS_PER_METER
+	var maximum_radius_m: float = Config.data.radius_for_level(10) / Orb3D.PIXELS_PER_METER
 	assert_near(regular._face.scale.x / regular_radius_m, 0.62, 0.001, "regular face scale unchanged")
 	assert_near(maximum._face.scale.x / maximum_radius_m, 1.0, 0.001, "MAX face matches body radius")
 	await _cleanup(board)
 	Config.data.game_mode = original_mode
 
 
-func test_jelly_default_l6_faces_match_mockup_c_without_outline() -> void:
+func test_jelly_default_l10_keeps_max_face_without_blast_face() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_jelly_minimum: int = Config.data.jelly_blast_min_level
 	Config.data.game_mode = GameConfig.GameMode.JELLY
-	Config.data.jelly_blast_min_level = 6
+	Config.data.jelly_blast_min_level = 10
 	var board: Board3D = await _create_board()
 	var level_four: Orb3D = board.spawn_orb(0, 4, Vector2(-270.0, 0.0))
 	var level_five: Orb3D = board.spawn_orb(3, 5, Vector2(-90.0, 0.0))
-	var level_six: Orb3D = board.spawn_orb(4, 6, Vector2(110.0, 0.0))
-	var level_seven: Orb3D = board.spawn_orb(1, 7, Vector2(310.0, 0.0))
+	var level_six: Orb3D = board.spawn_orb(4, 9, Vector2(110.0, 0.0))
+	var level_seven: Orb3D = board.spawn_orb(1, 10, Vector2(310.0, 0.0))
 	var regular_material: ShaderMaterial = level_four._face.material_override as ShaderMaterial
 	var level_five_material: ShaderMaterial = level_five._face.material_override as ShaderMaterial
 	var level_six_material: ShaderMaterial = level_six._face.material_override as ShaderMaterial
 	var max_material: ShaderMaterial = level_seven._face.material_override as ShaderMaterial
 
 	assert_true(not bool(regular_material.get_shader_parameter("is_blast_ready")), "L4 keeps normal face")
-	assert_true(not bool(level_five_material.get_shader_parameter("is_blast_ready")), "J6 leaves L5 face normal")
-	assert_true(bool(level_six_material.get_shader_parameter("is_blast_ready")), "J6 gives L6 the blast-ready face")
-	assert_true(not bool(max_material.get_shader_parameter("is_blast_ready")), "L7 keeps MAX face")
-	assert_true(bool(max_material.get_shader_parameter("is_max")), "L7 remains MAX")
-	assert_true(not level_five.is_blast_armed(), "J6 leaves L5 unarmed")
-	assert_true(level_six.is_blast_armed(), "J6 arms L6")
-	assert_true(level_seven.is_blast_armed(), "J6 arms L7")
-	for orb: Orb3D in [level_four, level_five]:
+	assert_true(not bool(level_five_material.get_shader_parameter("is_blast_ready")), "L5 face normal")
+	assert_true(not bool(level_six_material.get_shader_parameter("is_blast_ready")), "L9 face normal")
+	assert_true(not bool(max_material.get_shader_parameter("is_blast_ready")), "L10 keeps MAX face")
+	assert_true(bool(max_material.get_shader_parameter("is_max")), "L10 remains MAX")
+	assert_true(not level_five.is_blast_armed(), "L5 unarmed")
+	assert_true(not level_six.is_blast_armed(), "L9 unarmed")
+	assert_true(level_seven.is_blast_armed(), "L10 armed by rule")
+	for orb: Orb3D in [level_four, level_five, level_six]:
 		assert_near(
 			orb._face.scale.x / (orb.get_current_radius() / Orb3D.PIXELS_PER_METER),
 			0.62,
 			0.001,
 			"L%d keeps regular face scale" % orb.level
 		)
-	for orb: Orb3D in [level_six, level_seven]:
+	for orb: Orb3D in [level_seven]:
 		assert_near(
 			orb._face.scale.x / (orb.get_current_radius() / Orb3D.PIXELS_PER_METER),
 			1.0,
@@ -153,7 +153,7 @@ func test_jelly_default_l6_faces_match_mockup_c_without_outline() -> void:
 		)
 	for orb: Orb3D in [level_four, level_five, level_six, level_seven]:
 		assert_eq(_forbidden_geometry_count(orb), 0, "JELLY L%d has no outline geometry" % orb.level)
-	var blast_material: ShaderMaterial = level_six_material
+	var blast_material: ShaderMaterial = JellyOrbArt.face_material_for(4, 9, true)
 	assert_eq(blast_material.get_shader_parameter("blast_eye_outer_top"), Vector2(0.32, -0.16), "blast eye outer top")
 	assert_eq(blast_material.get_shader_parameter("blast_eye_inner"), Vector2(0.16, -0.04), "blast eye inner corner")
 	assert_eq(blast_material.get_shader_parameter("blast_eye_outer_bottom"), Vector2(0.32, 0.08), "blast eye outer bottom")
@@ -199,8 +199,8 @@ func test_jelly_belly_uses_mass_fraction_and_transitions_over_point_fifteen_seco
 	)
 	assert_true(belly_material.shader.code.contains("sqrt(fraction)"), "belly radius uses square-root fill")
 
-	orb.set_jelly_mass(6.0, Config.data)
-	assert_near(orb._jelly_belly_target, 0.5, 0.0001, "mass six targets half-full belly")
+	orb.set_jelly_mass(4.0, Config.data)
+	assert_near(orb._jelly_belly_target, 0.5, 0.0001, "mass four targets half-full belly")
 	assert_near(orb.get_radius(), Config.data.radius_for_level(3), 0.001, "partial L3 keeps L3 radius")
 	orb._process(0.075)
 	assert_near(orb._jelly_belly_fraction, 0.25, 0.0001, "belly reaches midpoint after 0.075 seconds")
@@ -211,18 +211,18 @@ func test_jelly_belly_uses_mass_fraction_and_transitions_over_point_fifteen_seco
 	assert_true(orb._belly.position.z < orb._face.position.z, "belly stays behind face")
 	assert_true(orb._belly.position.z > orb._mesh.position.z, "belly stays in front of body center")
 
-	orb.set_jelly_mass(8.0, Config.data)
+	orb.set_jelly_mass(5.0, Config.data)
 	assert_near(orb.get_current_radius(), Config.data.radius_for_level(3), 0.001, "level-up starts at old level radius")
 	orb._physics_process(0.05)
-	assert_near(orb.get_current_radius(), 72.5, 0.001, "level-up radius is halfway after 0.05 seconds")
+	assert_near(orb.get_current_radius(), 60.0, 0.001, "level-up radius is halfway after 0.05 seconds")
 	orb._physics_process(0.05)
 	assert_near(orb.get_current_radius(), Config.data.radius_for_level(4), 0.001, "level-up radius finishes at 0.10 seconds")
 	orb._process(0.15)
 	assert_near(orb._jelly_belly_fraction, 0.0, 0.0001, "new exact level clears belly over 0.15 seconds")
 	assert_true(not orb._belly.visible, "zero fill hides belly mesh")
 	orb.set_jelly_mass(64.0, Config.data)
-	assert_eq(orb.level, Config.data.orb_max_level, "mass cap displays L7")
-	assert_near(orb._jelly_belly_target, 0.0, 0.0001, "L7 mass cap always has zero belly fill")
+	assert_eq(orb.level, Config.data.orb_max_level, "mass cap displays L10")
+	assert_near(orb._jelly_belly_target, 0.0, 0.0001, "L10 mass cap always has zero belly fill")
 	await _cleanup(board)
 	Config.data.game_mode = original_mode
 
@@ -231,7 +231,7 @@ func test_max_face_projects_smile_below_eyes_and_stays_upright() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	var board: Board3D = await _create_board()
-	var orb: Orb3D = board.spawn_orb(0, 7, Vector2.ZERO)
+	var orb: Orb3D = board.spawn_orb(0, 10, Vector2.ZERO)
 	var material: ShaderMaterial = orb._face.material_override as ShaderMaterial
 	var eye_center: Vector2 = Vector2(
 		0.0,
@@ -384,7 +384,7 @@ func test_jelly_face_and_symbol_stay_in_front_of_deformed_body() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	var board: Board3D = await _create_board()
-	var orb: Orb3D = board.spawn_orb(0, 7, Vector2.ZERO)
+	var orb: Orb3D = board.spawn_orb(0, 10, Vector2.ZERO)
 	var body_mesh: SphereMesh = orb._mesh.mesh as SphereMesh
 
 	orb._jelly_deform = Vector2(1.18, 0.80)
@@ -402,8 +402,8 @@ func test_jelly_face_and_symbol_stay_in_front_of_deformed_body() -> void:
 	assert_true(orb._mesh.scale.y >= 1.0, "breathing never shortens the body")
 	assert_true(orb._mesh.scale != Vector3.ONE, "breathing expansion remains visible")
 	var breath_front_z: float = orb._mesh.position.z + body_mesh.radius * orb._mesh.scale.z
-	assert_true(orb._face.position.z > breath_front_z, "face stays ahead at L7 breath peak")
-	assert_true(orb._symbol_mesh.position.z > breath_front_z, "symbol stays ahead at L7 breath peak")
+	assert_true(orb._face.position.z > breath_front_z, "face stays ahead at L10 breath peak")
+	assert_true(orb._symbol_mesh.position.z > breath_front_z, "symbol stays ahead at L10 breath peak")
 
 	orb._jelly_breath_weight = 0.0
 	orb._visual_punch_scale = Vector3.ONE * 1.06

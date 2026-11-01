@@ -1,7 +1,7 @@
 class_name ReactionRules
 extends RefCounted
 
-enum Type { NONE, MERGE, MAX_CLEAR, ANNIHILATE, BLAST }
+enum Type { NONE, MERGE, MAX_CLEAR, ANNIHILATE, BLAST, TAP_BLAST }
 
 
 static func classify(

@@ -58,7 +58,7 @@ func setup_jelly_preview(
 	symbols_enabled: bool = true
 ) -> void:
 	_celestial_level = 0
-	_jelly_level = clampi(level, 1, 7)
+	_jelly_level = clampi(level, 1, Config.data.orb_max_level)
 	_jelly_color_index = clampi(color_index, 0, JellyOrbArt.PALETTE.size() - 1)
 	_planet_animation_elapsed = 0.0
 	_display_color = JellyOrbArt.color_for(_jelly_color_index, _jelly_level)
@@ -185,16 +185,18 @@ func _draw_jelly() -> void:
 
 
 func _draw_jelly_face() -> void:
-	var level_index: int = _jelly_level - 1
-	var eye_size: float = clampf(3.8 + float(level_index) * 0.75, 3.8, 7.6)
+	var level_progress: float = (
+		float(_jelly_level - 1) / float(maxi(Config.data.orb_max_level - 1, 1))
+	)
+	var eye_size: float = lerpf(3.8, 7.6, level_progress)
 	var eye_y: float = -0.12 * _radius
 	var spacing: float = 0.30 * _radius
 	var blink: bool = sin(_planet_animation_elapsed * 2.35 + float(_jelly_color_index) * 0.91) > 0.985
-	if _jelly_level >= 7:
+	if _jelly_level >= Config.data.orb_max_level:
 		_draw_jelly_max_face(blink)
 		return
 	var half_width: float = eye_size * 0.72
-	var half_height: float = eye_size * lerpf(1.08, 1.42, float(level_index) / 6.0)
+	var half_height: float = eye_size * lerpf(1.08, 1.42, level_progress)
 	for sign_value: float in [-1.0, 1.0]:
 		var center: Vector2 = Vector2(sign_value * spacing, eye_y)
 		if blink:

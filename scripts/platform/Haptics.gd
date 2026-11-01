@@ -14,8 +14,8 @@ func play_swipe() -> void:
 	_vibrate(SWIPE_DURATION_MS)
 
 
-func play_blast() -> void:
-	_vibrate(BLAST_DURATION_MS)
+func play_blast(intensity: float = 1.0) -> void:
+	_vibrate(maxi(roundi(float(BLAST_DURATION_MS) * clampf(intensity, 0.0, 1.0)), 1))
 
 
 func play_turn_ready() -> void:

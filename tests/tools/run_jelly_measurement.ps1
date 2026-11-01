@@ -6,6 +6,9 @@ param(
     [int]$Parallelism = 3,
     [ValidateRange(1, 600)]
     [int]$TurnCap = 600,
+	[ValidateSet("M", "A", "B")]
+	[string]$LevelProfile = "B",
+	[switch]$TapBlastBot,
     [switch]$ReuseCompleted,
     [switch]$AggregateOnly
 )
@@ -13,7 +16,8 @@ param(
 $ErrorActionPreference = "Stop"
 $repoPath = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $outputDirectory = Join-Path $repoPath "artifacts\measurements"
-$summaryPath = Join-Path $outputDirectory "jelly_rules_measurement.json"
+$measurementLabel = "$($LevelProfile.ToLower())$(if ($TapBlastBot) { '1' } else { '0' })"
+$summaryPath = Join-Path $outputDirectory "jelly_rules_measurement_$measurementLabel.json"
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {
     if (-not [string]::IsNullOrWhiteSpace($env:GODOT)) {
         $GodotPath = $env:GODOT
@@ -39,7 +43,7 @@ if (-not $AggregateOnly) {
         # A single 600-turn seed can already take more than one minute.
         $shardSize = 1
         foreach ($shard in @(Get-SeedShards $SeedCount $shardSize)) {
-            $name = "jelly_${strategy}_part$($shard.Start)-$($shard.End)"
+            $name = "jelly_${measurementLabel}_${strategy}_part$($shard.Start)-$($shard.End)"
             $output = Join-Path $outputDirectory "$name.json"
             $tasks += [pscustomobject]@{
                 Name = $name
@@ -52,6 +56,8 @@ if (-not $AggregateOnly) {
                     "res://tests/spike/JoltMeasurement.tscn", "--",
                     "--game-mode=jelly", "--jolt-ticks=120", "--jolt-seeds=$($shard.Csv)",
                     "--jolt-max-turns=$TurnCap", "--jolt-no-determinism", "--skill-strategy=$strategy",
+					"--jelly-level-profile=$LevelProfile",
+					$(if ($TapBlastBot) { "--jelly-tap-blast-bot" } else { "--jolt-no-determinism" }),
                     "--jolt-output=res://artifacts/measurements/$name.json"
                 )
             }
@@ -136,6 +142,8 @@ function Get-Summary($Rows) {
         blast_outline_max_alpha = $outlineMaxAlpha
         level_seven_game_rate = Get-Ratio @($Rows | Where-Object { $_.reached_level_seven }).Count @($Rows).Count
         jackpots = [int](($Rows | Measure-Object -Property max_clear_count -Sum).Sum)
+		blasts = [int](($Rows | Measure-Object -Property blast_count -Sum).Sum)
+		tap_blasts = [int](($Rows | Measure-Object -Property tap_blast_count -Sum).Sum)
         preview_fatal_avoidance_turns = [int]$fatalAvoidance
         preview_fatal_avoidance_ratio = Get-Ratio $fatalAvoidance $decisions
     }
@@ -145,7 +153,7 @@ $rows = [ordered]@{ r = @(); g = @(); l_merge = @() }
 foreach ($strategy in @($rows.Keys)) {
     $shardSize = 1
     foreach ($shard in @(Get-SeedShards $SeedCount $shardSize)) {
-        $filePath = Join-Path $outputDirectory "jelly_${strategy}_part$($shard.Start)-$($shard.End).json"
+        $filePath = Join-Path $outputDirectory "jelly_${measurementLabel}_${strategy}_part$($shard.Start)-$($shard.End).json"
         if (-not (Test-Path -LiteralPath $filePath)) { throw "Missing $filePath" }
         $rows[$strategy] += @((Get-Content -LiteralPath $filePath -Raw | ConvertFrom-Json).ticks[0].seeds)
     }
@@ -171,6 +179,8 @@ if ($strategies.r.early_merges_per_turn_1_30 -le 0.595) {
 $report = [ordered]@{
     generated_at = (Get-Date).ToUniversalTime().ToString("o")
     conditions = "JELLY R/G/L-merge, seeds 1-$SeedCount, $TurnCap turns, fixed 120 fps"
+	level_profile = $LevelProfile
+	tap_blast_bot = [bool]$TapBlastBot
     strategies = $strategies
     skill_length_ratio_l_merge_over_r = $lengthRatio
     skill_score_ratio_l_merge_over_r = $scoreRatio
