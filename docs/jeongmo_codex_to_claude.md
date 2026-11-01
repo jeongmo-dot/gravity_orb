@@ -40,7 +40,7 @@
 
 ### [2026-11-01] 대상 #129 — L8~L10 터치 소폭발·레벨 무관 대폭발·레벨별 마찰
 - 상태: 완료 — 기본값 D(L8~L10 소폭발, 다른 색 둘 다 L8 이상이면 레벨이 달라도 대폭발, 레벨별 마찰)를 구현하고 회귀·측정·두 비율 캡처·전체 검증을 마쳤다
-- 브랜치 / PR: `codex/jelly-level-blast-friction` / 생성 후 링크 갱신
+- 브랜치 / PR: `codex/jelly-level-blast-friction` / https://github.com/jeongmo-dot/gravity_orb/pull/129
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/{CollisionResolver.gd,ReactionRules.gd,ScoreManager.gd}`, `scripts/spike/Orb3D.gd`, `tests/{capture_screens.ps1,run_jelly_physics_autoplay.ps1,test_config.gd,test_jelly_regression.gd,test_jolt_3d.gd,test_rules.gd,test_score.gd}`, `tests/spike/{capture_screens.gd,run_jolt_3d_measurement.gd}`, `tests/tools/run_jelly_measurement.ps1`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `jelly_tap_blast_min_level=8`: L8·L9·L10 터치 소폭발, L7 거절. 반응 `levels`·`shock_level`과 점수는 실제 소스 레벨(L8 `54`, L9 `84`, L10 `128`)을 사용 — 자동 (`test_jolt_3d`, `test_score`, `test_config`)
