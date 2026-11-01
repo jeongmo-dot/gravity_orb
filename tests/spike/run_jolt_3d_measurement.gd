@@ -66,6 +66,7 @@ var _seed_level_creation_count_by_level: Dictionary = {}
 var _seed_level_up_count: int = 0
 var _seed_tap_blast_count: int = 0
 var _seed_tap_blast_count_by_level: Dictionary = {}
+var _seed_score_by_reaction_type: Dictionary = {}
 var _seed_spawn_count: int = 0
 var _seed_spawn_count_by_level: Dictionary = {}
 var _seed_jelly_outline_visible_frames: int = 0
@@ -115,6 +116,8 @@ func _run() -> void:
 		"jelly_blast_min_level": Config.data.jelly_blast_min_level,
 		"jelly_blast_requires_same_level": Config.data.jelly_blast_requires_same_level,
 		"jelly_tap_blast_min_level": Config.data.jelly_tap_blast_min_level,
+		"jelly_tap_blast_score_factor": Config.data.jelly_tap_blast_score_factor,
+		"jelly_tap_blast_uses_turn": Config.data.jelly_tap_blast_uses_turn,
 		"jelly_merge_duration": Config.data.jelly_merge_duration,
 		"jelly_merge_level_gap": Config.data.jelly_merge_level_gap,
 		"blast_push_radius_by_level": Array(Config.data.blast_push_radius_by_level),
@@ -282,6 +285,12 @@ func _run_seed(
 	_seed_level_up_count = 0
 	_seed_tap_blast_count = 0
 	_seed_tap_blast_count_by_level.clear()
+	_seed_score_by_reaction_type = {
+		"merge": 0,
+		"blast": 0,
+		"tap": 0,
+		"jackpot": 0,
+	}
 	_seed_spawn_count = 0
 	_seed_spawn_count_by_level.clear()
 	_seed_jelly_outline_visible_frames = 0
@@ -333,10 +342,14 @@ func _run_seed(
 		_turn_blast_count = 0
 		var score_before: int = score_manager.score
 		var spawned_before: int = _seed_spawn_count
+		var tap_turn_orb: Orb3D = null
 		if _should_use_tap_blast_bot(manager, board):
-			await _use_high_level_orbs(manager, board)
+			if Config.data.jelly_tap_blast_uses_turn:
+				tap_turn_orb = _select_high_level_orb(board)
+			else:
+				await _use_high_level_orbs_without_turn(manager, board)
 		var direction: Vector2i = _next_pattern_direction(turn_offset, manager.gravity)
-		if _skill_strategy in ["l_space", "l_merge"]:
+		if tap_turn_orb == null and _skill_strategy in ["l_space", "l_merge"]:
 			var preview_decision: Dictionary = await _choose_preview_direction(
 				board,
 				manager,
@@ -355,17 +368,26 @@ func _run_seed(
 				float(preview_decision["score_gain_spread"])
 			)
 			preview_decision_usec_sum += int(preview_decision["decision_usec"])
-		elif not _skill_strategy.is_empty():
+		elif tap_turn_orb == null and not _skill_strategy.is_empty():
 			direction = _choose_skill_direction(board, manager)
-		var chose_blocked_direction: bool = manager.blocked_directions.has(direction)
+		var chose_blocked_direction: bool = (
+			tap_turn_orb == null and manager.blocked_directions.has(direction)
+		)
 		if chose_blocked_direction:
 			blocked_choice_count += 1
-		var same_direction: bool = direction == manager.gravity
+		var same_direction: bool = tap_turn_orb == null and direction == manager.gravity
 		if same_direction:
 			same_direction_input_count += 1
 		var before: Dictionary = _snapshot_orbs(board)
 		var start_occupancy: float = _snapshot_occupancy(before)
-		manager.on_swipe(direction)
+		if tap_turn_orb != null:
+			if not manager.try_tap_blast_orb(tap_turn_orb):
+				_had_runner_error = true
+				aborted = true
+				abort_reason = "tap_blast_turn_rejected"
+				break
+		else:
+			manager.on_swipe(direction)
 		var frame_metrics: Dictionary = await _wait_for_turn_end(manager, board, physics_ms)
 		var entrance_waiting_count: int = board.entrance_waiting_orbs().size()
 		var input_waiting_touching_merge_pairs: int = 0
@@ -523,6 +545,7 @@ func _run_seed(
 		"level_up_count": _seed_level_up_count,
 		"tap_blast_count": _seed_tap_blast_count,
 		"tap_blast_count_by_level": _seed_tap_blast_count_by_level.duplicate(true),
+		"score_by_reaction_type": _seed_score_by_reaction_type.duplicate(true),
 		"same_level_blast_count_by_level": _seed_same_level_blast_count_by_level.duplicate(true),
 		"mixed_level_blast_count_by_level": _seed_mixed_level_blast_count_by_level.duplicate(true),
 		"one_level_absorption_fraction": (
@@ -961,6 +984,25 @@ func _record_spawned_orb(level: int) -> void:
 
 func _record_shock_event(reaction: Dictionary) -> void:
 	var reaction_type: ReactionRules.Type = reaction["type"] as ReactionRules.Type
+	var score_key: String = ""
+	match reaction_type:
+		ReactionRules.Type.MERGE:
+			score_key = "merge"
+		ReactionRules.Type.BLAST:
+			score_key = "blast"
+		ReactionRules.Type.TAP_BLAST:
+			score_key = "tap"
+		ReactionRules.Type.MAX_CLEAR:
+			score_key = "jackpot"
+	if not score_key.is_empty():
+		var points: int = (
+			int(reaction["points"])
+			if reaction.has("points")
+			else ScoreManager.points_for(reaction, Config.data)
+		)
+		_seed_score_by_reaction_type[score_key] = int(
+			_seed_score_by_reaction_type.get(score_key, 0)
+		) + points
 	_turn_reaction_count += 1
 	if reaction_type == ReactionRules.Type.MERGE:
 		_turn_merge_count += 1
@@ -1868,25 +1910,30 @@ func _should_use_tap_blast_bot(manager: TurnManager, board: Board3D) -> bool:
 	return false
 
 
-func _use_high_level_orbs(manager: TurnManager, board: Board3D) -> void:
+func _select_high_level_orb(board: Board3D) -> Orb3D:
+	var selected: Orb3D = null
+	for orb: Orb3D in board.get_orbs():
+		if not Config.data.jelly_tap_blast_enabled_for_level(orb.level):
+			continue
+		if orb.is_waiting_at_entrance or orb.is_ghost or orb.consumed:
+			continue
+		if (
+			selected == null
+			or orb.level > selected.level
+			or (
+				orb.level == selected.level
+				and orb.stable_spawn_id < selected.stable_spawn_id
+			)
+		):
+			selected = orb
+	return selected
+
+
+func _use_high_level_orbs_without_turn(manager: TurnManager, board: Board3D) -> void:
 	while manager.state == TurnManager.State.WAITING_INPUT:
 		if not _should_use_tap_blast_bot(manager, board):
 			return
-		var selected: Orb3D = null
-		for orb: Orb3D in board.get_orbs():
-			if not Config.data.jelly_tap_blast_enabled_for_level(orb.level):
-				continue
-			if orb.is_waiting_at_entrance or orb.is_ghost or orb.consumed:
-				continue
-			if (
-				selected == null
-				or orb.level > selected.level
-				or (
-					orb.level == selected.level
-					and orb.stable_spawn_id < selected.stable_spawn_id
-				)
-			):
-				selected = orb
+		var selected: Orb3D = _select_high_level_orb(board)
 		if selected == null or not manager.try_tap_blast_orb(selected):
 			return
 		if not await _wait_for_state(manager, TurnManager.State.WAITING_INPUT):
@@ -1896,6 +1943,8 @@ func _use_high_level_orbs(manager: TurnManager, board: Board3D) -> void:
 
 func _apply_jelly_level_profile(profile: String) -> void:
 	match profile:
+		"D":
+			_apply_legacy_score_profile()
 		"M":
 			Config.data.orb_max_level = 7
 			Config.data.jelly_level_masses = PackedFloat32Array()
@@ -1909,6 +1958,7 @@ func _apply_jelly_level_profile(profile: String) -> void:
 			Config.data.gravity_level_scale = 0.05
 			Config.data.shock_level_scale = 0.3
 			Config.data.jelly_merge_level_gap = 1
+			_apply_legacy_score_profile()
 		"A":
 			Config.data.orb_max_level = 10
 			Config.data.jelly_level_masses = PackedFloat32Array([1, 2, 4, 8, 16, 32, 64, 128, 256, 512])
@@ -1922,6 +1972,7 @@ func _apply_jelly_level_profile(profile: String) -> void:
 			Config.data.gravity_level_scale = 0.0333
 			Config.data.shock_level_scale = 0.2
 			Config.data.jelly_merge_level_gap = 1
+			_apply_legacy_score_profile()
 		"B":
 			Config.data.orb_max_level = 10
 			Config.data.jelly_level_masses = PackedFloat32Array([1, 2, 3, 5, 7, 11, 17, 27, 42, 64])
@@ -1935,9 +1986,16 @@ func _apply_jelly_level_profile(profile: String) -> void:
 			Config.data.gravity_level_scale = 0.0333
 			Config.data.shock_level_scale = 0.2
 			Config.data.jelly_merge_level_gap = 1
+			_apply_legacy_score_profile()
 		_:
 			_had_runner_error = true
 			push_error("Unknown JELLY level profile: %s" % profile)
+
+
+func _apply_legacy_score_profile() -> void:
+	Config.data.blast_score_factor = 5.0
+	Config.data.jelly_tap_blast_score_factor = 1.0
+	Config.data.jelly_tap_blast_uses_turn = false
 
 
 func _apply_arguments() -> void:
@@ -2069,6 +2127,20 @@ func _apply_arguments() -> void:
 				argument.trim_prefix("--jelly-tap-blast-min-level=").to_int(),
 				0,
 				Config.data.orb_max_level
+			)
+		elif argument.begins_with("--blast-score-factor="):
+			Config.data.blast_score_factor = maxf(
+				argument.trim_prefix("--blast-score-factor=").to_float(),
+				0.0
+			)
+		elif argument.begins_with("--jelly-tap-blast-score-factor="):
+			Config.data.jelly_tap_blast_score_factor = maxf(
+				argument.trim_prefix("--jelly-tap-blast-score-factor=").to_float(),
+				0.0
+			)
+		elif argument.begins_with("--jelly-tap-blast-uses-turn="):
+			Config.data.jelly_tap_blast_uses_turn = (
+				argument.trim_prefix("--jelly-tap-blast-uses-turn=") == "on"
 			)
 		elif argument.begins_with("--jelly-blast-requires-same-level="):
 			Config.data.jelly_blast_requires_same_level = (

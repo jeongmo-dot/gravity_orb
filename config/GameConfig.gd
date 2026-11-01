@@ -127,11 +127,12 @@ enum GameMode {
 )
 @export var jelly_tap_blast_min_level: int = 8
 @export var jelly_tap_blast_radius_factor: float = 0.3
-@export var jelly_tap_blast_score_factor: float = 1.0
+@export var jelly_tap_blast_score_factor: float = 0.5
+@export var jelly_tap_blast_uses_turn: bool = true
 @export var jelly_tap_blast_touch_margin: float = 16.0
 @export var blast_speed: float = 900.0
 @export var blast_far_factor: float = 0.4
-@export var blast_score_factor: float = 5.0
+@export var blast_score_factor: float = 15.0
 @export var blast_blink_period: float = 0.8
 @export var fx_enabled: bool = true
 @export var fx_hitstop_enabled: bool = true
