@@ -1,10 +1,13 @@
 extends TestCase
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
-const EXPECTED_REGRESSION_HASH: String = "5e00b1f74b76a4e33b443e9fa0a95b85d3717504f9bb55b8736a84e443cff8ea"
+const EXPECTED_M_DELAYED_HASH: String = "ee67b19ca82ddb2e35ea7a5ed605e83eedbae4d0c044106ec5b86622a21ac45d"
+const EXPECTED_B_DELAYED_HASH: String = "5a525e46718f3befc3c4101e5a4fe1c3b392fc1c172f7166ed0b0517f6d74dc7"
+const EXPECTED_C8_DEFAULT_HASH: String = "8c1a02e9dfa345a31828276e917dad0f8dda35282a34cb5a0ced15a670752184"
 
 
 func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
+	var config_snapshot: Dictionary = _snapshot_level_profile()
 	var original_seed: int = Config.data.rng_seed
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_sfx_enabled: bool = Config.data.sfx_enabled
@@ -12,7 +15,8 @@ func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
 	Config.data.rng_seed = 1085050
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.sfx_enabled = false
-	Config.data.jelly_merge_duration = 0.0
+	Config.data.jelly_merge_duration = 0.3
+	_apply_m_profile()
 	var visible_result: Dictionary = await _run_rule_path(true)
 	var hidden_result: Dictionary = await _run_rule_path(false)
 	assert_eq(
@@ -39,25 +43,30 @@ func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
 			JSON.stringify(visible_result["events"]),
 		]
 	)
-	assert_eq(
-		visible_result["hash"],
-		EXPECTED_REGRESSION_HASH,
-		"JELLY full-rule regression baseline"
-	)
+	assert_eq(visible_result["hash"], EXPECTED_M_DELAYED_HASH, "M delayed hash")
+	_restore_level_profile(config_snapshot)
 	Config.data.jelly_merge_duration = 0.3
-	var delayed_visible_result: Dictionary = await _run_rule_path(true)
-	var delayed_hidden_result: Dictionary = await _run_rule_path(false)
+	var c8_visible_result: Dictionary = await _run_rule_path(true)
+	var c8_hidden_result: Dictionary = await _run_rule_path(false)
 	assert_eq(
-		delayed_visible_result["hash"],
-		delayed_hidden_result["hash"],
-		"delayed JELLY rule hash is independent of rendering"
+		c8_visible_result["hash"],
+		c8_hidden_result["hash"],
+		"default C8 rule hash is independent of rendering"
 	)
 	print(
-		"JELLY_DELAYED_REGRESSION_HASH duration=0.3 hash=%s events=%s" % [
-			str(delayed_visible_result["hash"]),
-			JSON.stringify(delayed_visible_result["events"]),
+		"JELLY_C8_DEFAULT_REGRESSION_HASH duration=0.3 hash=%s events=%s" % [
+			str(c8_visible_result["hash"]),
+			JSON.stringify(c8_visible_result["events"]),
 		]
 	)
+	assert_eq(c8_visible_result["hash"], EXPECTED_C8_DEFAULT_HASH, "C8 default hash")
+	_apply_b_profile()
+	var b_result: Dictionary = await _run_rule_path(false)
+	assert_eq(b_result["hash"], EXPECTED_B_DELAYED_HASH, "B delayed hash")
+	_apply_a_profile()
+	var a_result: Dictionary = await _run_rule_path(false)
+	print("JELLY_A_DELAYED_REGRESSION_HASH duration=0.3 hash=%s" % str(a_result["hash"]))
+	_restore_level_profile(config_snapshot)
 	Config.data.rng_seed = original_seed
 	Config.data.game_mode = original_mode
 	Config.data.sfx_enabled = original_sfx_enabled
@@ -97,37 +106,68 @@ func _run_rule_path(visuals_enabled: bool) -> Dictionary:
 		"l7_eats_l6": 0,
 		"max_clear": 0,
 	}
+	var legacy_profile: bool = Config.data.orb_max_level == 7
+	var profile_a: bool = not legacy_profile and Config.data.jelly_mass_for_level(10) > 100.0
+	var first_large_mass: float = 4.0 if legacy_profile or profile_a else 3.0
+	var first_small_mass: float = 2.0
+	var first_result_level: int = 3 if legacy_profile or profile_a else 4
+	var second_large_level: int = 3 if legacy_profile or profile_a else 4
+	var second_large_mass: float = 6.0 if legacy_profile or profile_a else 5.0
+	var second_small_level: int = 2 if legacy_profile or profile_a else 3
+	var second_small_mass: float = 2.0 if legacy_profile or profile_a else 3.0
+	var second_result_level: int = 4 if legacy_profile or profile_a else 5
+	var top_level: int = Config.data.orb_max_level
+	var below_top_level: int = top_level - 1
+	var top_mass: float = Config.data.jelly_mass_for_level(top_level)
+	var below_top_mass: float = Config.data.jelly_mass_for_level(below_top_level)
+	var blast_level: int = Config.data.jelly_blast_min_level
+	var blast_mass: float = Config.data.jelly_mass_for_level(blast_level)
 
 	var result: Dictionary = await _apply_pair(
-		board, resolver, OrbTypes.OrbColor.GREEN, 3, 4.0, OrbTypes.OrbColor.GREEN, 2, 2.0
+		board, resolver, OrbTypes.OrbColor.GREEN, 3, first_large_mass, OrbTypes.OrbColor.GREEN, 2, first_small_mass
 	)
 	assert_eq(int(result["type"]), int(ReactionRules.Type.MERGE), "same-level absorption merges")
-	assert_eq(int(result["result_level"]), 3, "first absorption keeps L3")
-	assert_near(float(result["result_mass"]), 6.0, 0.0001, "first absorption reaches mass six")
+	assert_eq(int(result["result_level"]), first_result_level, "first absorption level")
+	assert_near(float(result["result_mass"]), first_large_mass + first_small_mass, 0.0001, "first absorption mass")
 	events["absorption_same_level"] = int(events["absorption_same_level"]) + 1
 
 	result = await _apply_pair(
-		board, resolver, OrbTypes.OrbColor.GREEN, 3, 6.0, OrbTypes.OrbColor.GREEN, 2, 2.0
+		board, resolver, OrbTypes.OrbColor.GREEN, second_large_level, second_large_mass, OrbTypes.OrbColor.GREEN, second_small_level, second_small_mass
 	)
-	assert_eq(int(result["result_level"]), 4, "second absorption raises L3 to L4")
-	assert_near(float(result["result_mass"]), 8.0, 0.0001, "level-up absorption reaches mass eight")
+	assert_eq(int(result["result_level"]), second_result_level, "second absorption levels up")
+	assert_near(float(result["result_mass"]), second_large_mass + second_small_mass, 0.0001, "level-up absorption mass")
 	events["absorption_level_up"] = int(events["absorption_level_up"]) + 1
 
 	result = await _apply_pair(
-		board, resolver, OrbTypes.OrbColor.RED, 6, 32.0, OrbTypes.OrbColor.BLUE, 6, 32.0
+		board, resolver, OrbTypes.OrbColor.RED, blast_level, blast_mass, OrbTypes.OrbColor.BLUE, blast_level, blast_mass
 	)
 	assert_eq(int(result["type"]), int(ReactionRules.Type.BLAST), "different L6 colors blast")
 	events["blast"] = int(events["blast"]) + 1
 
 	result = await _apply_pair(
-		board, resolver, OrbTypes.OrbColor.PURPLE, 7, 64.0, OrbTypes.OrbColor.PURPLE, 6, 32.0
+		board, resolver, OrbTypes.OrbColor.PURPLE, top_level, top_mass, OrbTypes.OrbColor.PURPLE, below_top_level, below_top_mass
 	)
 	assert_eq(int(result["type"]), int(ReactionRules.Type.MERGE), "L7 consumes adjacent L6")
-	assert_eq(int(result["result_level"]), 7, "L7 eating L6 remains MAX")
+	assert_eq(int(result["result_level"]), top_level, "top eating adjacent remains MAX")
 	events["l7_eats_l6"] = int(events["l7_eats_l6"]) + 1
 
+	if Config.data.jelly_merge_level_gap >= 2 and top_level >= 7:
+		result = await _apply_pair(
+			board,
+			resolver,
+			OrbTypes.OrbColor.RED,
+			7,
+			Config.data.jelly_mass_for_level(7),
+			OrbTypes.OrbColor.RED,
+			5,
+			Config.data.jelly_mass_for_level(5)
+		)
+		assert_eq(int(result["type"]), int(ReactionRules.Type.MERGE), "gap two merges L7+L5")
+		assert_eq(int(result["result_level"]), 7, "C L7+L5 remains L7")
+		events["gap_two_absorption"] = 1
+
 	result = await _apply_pair(
-		board, resolver, OrbTypes.OrbColor.YELLOW, 7, 64.0, OrbTypes.OrbColor.YELLOW, 7, 64.0
+		board, resolver, OrbTypes.OrbColor.YELLOW, top_level, top_mass, OrbTypes.OrbColor.YELLOW, top_level, top_mass
 	)
 	assert_eq(int(result["type"]), int(ReactionRules.Type.MAX_CLEAR), "two L7 jelly trigger MAX clear")
 	events["max_clear"] = int(events["max_clear"]) + 1
@@ -210,6 +250,68 @@ func _run_rule_path(visuals_enabled: bool) -> Dictionary:
 	await tree.process_frame
 	InputRouter.set_locked(false)
 	return {"hash": hash, "events": events}
+
+
+func _snapshot_level_profile() -> Dictionary:
+	return {
+		"orb_max_level": Config.data.orb_max_level,
+		"jelly_level_masses": Config.data.jelly_level_masses.duplicate(),
+		"level_radii": Config.data.level_radii.duplicate(),
+		"level_scores": Config.data.level_scores.duplicate(),
+		"jelly_blast_min_level": Config.data.jelly_blast_min_level,
+		"jelly_merge_level_gap": Config.data.jelly_merge_level_gap,
+		"blast_push_radius_by_level": Config.data.blast_push_radius_by_level.duplicate(),
+		"gravity_level_scale": Config.data.gravity_level_scale,
+		"shock_level_scale": Config.data.shock_level_scale,
+	}
+
+
+func _restore_level_profile(snapshot: Dictionary) -> void:
+	Config.data.orb_max_level = int(snapshot["orb_max_level"])
+	Config.data.jelly_level_masses = snapshot["jelly_level_masses"] as PackedFloat32Array
+	Config.data.level_radii = snapshot["level_radii"] as PackedFloat32Array
+	Config.data.level_scores = snapshot["level_scores"] as PackedInt32Array
+	Config.data.jelly_blast_min_level = int(snapshot["jelly_blast_min_level"])
+	Config.data.jelly_merge_level_gap = int(snapshot["jelly_merge_level_gap"])
+	Config.data.blast_push_radius_by_level = snapshot["blast_push_radius_by_level"] as PackedFloat32Array
+	Config.data.gravity_level_scale = float(snapshot["gravity_level_scale"])
+	Config.data.shock_level_scale = float(snapshot["shock_level_scale"])
+
+
+func _apply_m_profile() -> void:
+	Config.data.orb_max_level = 7
+	Config.data.jelly_level_masses = PackedFloat32Array()
+	Config.data.level_radii = PackedFloat32Array([25, 40, 60, 85, 100, 120, 140])
+	Config.data.level_scores = PackedInt32Array([2, 4, 8, 16, 32, 64, 128])
+	Config.data.jelly_blast_min_level = 6
+	Config.data.blast_push_radius_by_level = PackedFloat32Array([0, 0, 0, 0.3, 0.55, 1, 1])
+	Config.data.gravity_level_scale = 0.05
+	Config.data.shock_level_scale = 0.3
+	Config.data.jelly_merge_level_gap = 1
+
+
+func _apply_a_profile() -> void:
+	Config.data.orb_max_level = 10
+	Config.data.jelly_level_masses = PackedFloat32Array([1, 2, 4, 8, 16, 32, 64, 128, 256, 512])
+	Config.data.level_radii = PackedFloat32Array([25, 40, 47, 55, 64, 75, 88, 102, 120, 140])
+	Config.data.level_scores = PackedInt32Array([2, 4, 8, 16, 32, 64, 128, 256, 512, 1024])
+	Config.data.jelly_blast_min_level = 10
+	Config.data.blast_push_radius_by_level = PackedFloat32Array([0, 0, 0, 0.3, 0.55, 1, 1, 1, 1, 1])
+	Config.data.gravity_level_scale = 0.0333
+	Config.data.shock_level_scale = 0.2
+	Config.data.jelly_merge_level_gap = 1
+
+
+func _apply_b_profile() -> void:
+	Config.data.orb_max_level = 10
+	Config.data.jelly_level_masses = PackedFloat32Array([1, 2, 3, 5, 7, 11, 17, 27, 42, 64])
+	Config.data.level_radii = PackedFloat32Array([25, 40, 52, 68, 80, 92, 102, 115, 128, 140])
+	Config.data.level_scores = PackedInt32Array([2, 4, 6, 10, 14, 22, 34, 54, 84, 128])
+	Config.data.jelly_blast_min_level = 10
+	Config.data.blast_push_radius_by_level = PackedFloat32Array([0, 0, 0, 0.3, 0.55, 1, 1, 1, 1, 1])
+	Config.data.gravity_level_scale = 0.0333
+	Config.data.shock_level_scale = 0.2
+	Config.data.jelly_merge_level_gap = 1
 
 
 func _apply_pair(

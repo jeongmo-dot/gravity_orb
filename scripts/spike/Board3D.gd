@@ -346,8 +346,15 @@ func apply_shockwave(
 
 
 func apply_blast(origin: Vector2, blast_level: int) -> Array[Dictionary]:
-	var targets: Array[Dictionary] = []
 	var radius_factor: float = Config.data.blast_push_radius_factor_for_level(blast_level)
+	return apply_blast_with_radius_factor(origin, radius_factor)
+
+
+func apply_blast_with_radius_factor(
+	origin: Vector2,
+	radius_factor: float
+) -> Array[Dictionary]:
+	var targets: Array[Dictionary] = []
 	var limited_radius: float = radius_factor * Config.data.board_size
 	for orb: Orb3D in get_orbs():
 		if orb.is_ghost or orb.is_waiting_at_entrance:
@@ -381,6 +388,20 @@ func apply_blast(origin: Vector2, blast_level: int) -> Array[Dictionary]:
 			"velocity_change": velocity_change,
 		})
 	return targets
+
+
+func screen_position_to_plane(screen_position: Vector2) -> Vector2:
+	var camera: Camera3D = get_viewport().get_camera_3d()
+	if camera == null:
+		return Vector2(INF, INF)
+	var ray_origin: Vector3 = camera.project_ray_origin(screen_position)
+	var ray_direction: Vector3 = camera.project_ray_normal(screen_position)
+	if is_zero_approx(ray_direction.z):
+		return Vector2(INF, INF)
+	var distance: float = -ray_origin.z / ray_direction.z
+	if distance < 0.0:
+		return Vector2(INF, INF)
+	return Orb3D.world_position_to_plane(ray_origin + ray_direction * distance)
 
 
 func _shock_mode_for_color(color: int) -> GameConfig.ShockMode:

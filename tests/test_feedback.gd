@@ -18,14 +18,14 @@ func test_blast_feedback_creates_and_cleans_non_ring_effects() -> void:
 	var camera: Camera3D = fixture["camera"] as Camera3D
 	director.play_reaction({
 		"type": ReactionRules.Type.BLAST,
-		"levels": [4, 4],
+		"levels": [6, 6],
 		"colors": [OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE],
 		"position": Vector2.ZERO,
 	})
 	assert_eq(director.active_particle_count(), 3, "two debris colors plus white sparks")
 	assert_eq(director.active_light_count(), 1, "blast light count")
-	assert_eq(director.active_glow_count(), 1, "L4 local nebula count")
-	assert_eq(director.active_flash_count(), 0, "L4 has no full-screen flash")
+	assert_eq(director.active_glow_count(), 1, "mapped L6 local nebula count")
+	assert_eq(director.active_flash_count(), 0, "mapped L6 has no full-screen flash")
 	assert_eq(_forbidden_geometry_count(fixture["root"] as Node), 0, "blast creates no ring geometry")
 	await tree.process_frame
 	assert_true(
@@ -64,7 +64,7 @@ func test_merge_birth_blast_jackpot_and_max_create_no_ring_geometry() -> void:
 			"result_color": OrbTypes.OrbColor.YELLOW,
 			"position": Vector2.ZERO,
 		},
-		_blast_reaction_for_level(6),
+		_blast_reaction_for_level(9),
 		{
 			"type": ReactionRules.Type.MAX_CLEAR,
 			"levels": [7, 7],
@@ -90,7 +90,7 @@ func test_supernova_soft_cloud_is_mottled_and_rendered_behind_orbs() -> void:
 	Config.data.fx_hitstop_enabled = false
 	var fixture: Dictionary = await _create_director_fixture()
 	var director: FeedbackDirector = fixture["director"] as FeedbackDirector
-	director.play_reaction_visuals(_blast_reaction_for_level(6))
+	director.play_reaction_visuals(_blast_reaction_for_level(9))
 	var glow_count: int = 0
 	for effect: Dictionary in director._effects:
 		if str(effect.get("kind", "")) != "glow":
@@ -104,7 +104,7 @@ func test_supernova_soft_cloud_is_mottled_and_rendered_behind_orbs() -> void:
 	assert_true(shader_code.contains("soft_cloud"), "supernova keeps a soft cloud")
 	assert_true(not shader_code.contains("float shell"), "supernova has no shell band")
 	assert_true(not shader_code.contains("atan("), "supernova has no angle-based pinwheel")
-	assert_eq(glow_count, 2, "L6 keeps the supernova and core as soft clouds behind orbs")
+	assert_eq(glow_count, 2, "mapped L9 keeps the supernova and core as soft clouds behind orbs")
 	await _cleanup(fixture["root"] as Node)
 	Config.data.fx_enabled = original_fx
 	Config.data.fx_hitstop_enabled = original_hitstop
@@ -262,13 +262,13 @@ func test_blast_flash_levels_and_rolling_rate_limit() -> void:
 	Config.data.fx_hitstop_enabled = false
 	var fixture: Dictionary = await _create_director_fixture()
 	var director: FeedbackDirector = fixture["director"] as FeedbackDirector
-	for level: int in [4, 5]:
+	for level: int in [6, 7]:
 		director.play_reaction_visuals(_blast_reaction_for_level(level))
-	assert_eq(director.active_flash_count(), 0, "L4/L5 do not use full-screen flash")
+	assert_eq(director.active_flash_count(), 0, "mapped L6/L7 do not use full-screen flash")
 	director.clear_effects()
 	for _index: int in range(5):
-		director.play_reaction_visuals(_blast_reaction_for_level(6))
-	assert_eq(director.active_flash_count(), 3, "only three L6 flashes are accepted")
+		director.play_reaction_visuals(_blast_reaction_for_level(9))
+	assert_eq(director.active_flash_count(), 3, "only three mapped L9 flashes are accepted")
 	assert_eq(director.full_screen_flash_count_last_second(), 3, "rolling window caps at three")
 	assert_eq(director.full_screen_flash_accepted_total(), 3, "accepted flash diagnostics")
 	assert_eq(director.full_screen_flash_skipped_total(), 2, "excess flash diagnostics")
@@ -346,7 +346,12 @@ func test_synthesized_sfx_pitch_volume_jitter_and_voice_pool() -> void:
 	])
 	Config.data.sfx_pitch_jitter = 0.0
 	assert_near(bank.merge_pitch(2, 1, 1), 1.35, TOLERANCE, "L2 base pitch")
-	assert_near(bank.merge_pitch(7, 1, 1), 0.75, TOLERANCE, "L7 base pitch")
+	assert_near(
+		bank.merge_pitch(Config.data.orb_max_level, 1, 1),
+		0.75,
+		TOLERANCE,
+		"maximum-level base pitch"
+	)
 	assert_near(
 		bank.merge_pitch(2, 2, 1),
 		1.35 * pow(2.0, 1.0 / 12.0),
@@ -363,6 +368,13 @@ func test_synthesized_sfx_pitch_volume_jitter_and_voice_pool() -> void:
 	assert_near(bank.last_voice().volume_db, 0.0, TOLERANCE, "merge volume")
 	bank.play_blast(false)
 	assert_near(bank.last_voice().volume_db, 4.0, TOLERANCE, "blast volume")
+	bank.play_blast(false, 1, 0, -1, -1, 0.5)
+	assert_near(
+		bank.last_voice().volume_db,
+		4.0 + linear_to_db(0.5),
+		TOLERANCE,
+		"half-strength blast volume"
+	)
 	bank.play_blast(true, 3)
 	assert_near(bank.last_voice().volume_db, -2.0, TOLERANCE, "finale volume")
 	assert_near(
@@ -415,7 +427,7 @@ func test_reaction_signal_calls_sfx_play_synchronously_once() -> void:
 
 
 func _blast_reaction() -> Dictionary:
-	var levels: Array[int] = [4, 4]
+	var levels: Array[int] = [6, 6]
 	var colors: Array[int] = [OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE]
 	return {
 		"type": ReactionRules.Type.BLAST,

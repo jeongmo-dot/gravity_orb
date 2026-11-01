@@ -15,21 +15,21 @@ func test_each_scored_reaction_shows_matching_popup_and_conditional_formula() ->
 	score.on_reaction(combo_reaction)
 	assert_eq(hud.active_score_popup_count(), 1, "one popup for one scored reaction")
 	var combo_popup: ScorePopup = hud.active_score_popups()[0]
-	assert_eq(combo_popup.score_text(), "+512", "popup uses awarded points")
-	assert_eq(combo_popup.formula_text(), "128 ×4", "combo ×4 shows calculation")
+	assert_eq(combo_popup.score_text(), "+136", "popup uses awarded points")
+	assert_eq(combo_popup.formula_text(), "34 ×4", "combo ×4 shows calculation")
 	var danger_reaction: Dictionary = _reaction(Vector2(100.0, 0.0), 1.0, 0.50)
 	score.on_reaction(danger_reaction)
 	assert_eq(hud.active_score_popup_count(), 2, "separate reaction position gets popup")
 	var danger_popup: ScorePopup = hud.active_score_popups()[1]
-	assert_eq(danger_popup.score_text(), "+256", "danger popup uses awarded points")
-	assert_eq(danger_popup.formula_text(), "128 ×2", "danger ×2 shows calculation")
+	assert_eq(danger_popup.score_text(), "+68", "danger popup uses awarded points")
+	assert_eq(danger_popup.formula_text(), "34 ×2", "danger ×2 shows calculation")
 	var capped_reaction: Dictionary = _reaction(Vector2(0.0, 200.0), 1.0, 0.20)
 	capped_reaction.erase("combo_multiplier")
 	capped_reaction["combo"] = 20
 	score.on_reaction(capped_reaction)
 	var capped_popup: ScorePopup = hud.active_score_popups()[2]
-	assert_eq(capped_popup.score_text(), "+16,384", "large popup uses comma separators")
-	assert_eq(capped_popup.formula_text(), "128 ×128", "popup shows actual capped multiplier")
+	assert_eq(capped_popup.score_text(), "+4,352", "large popup uses comma separators")
+	assert_eq(capped_popup.formula_text(), "34 ×128", "popup shows actual capped multiplier")
 	assert_eq(ScorePopup.popup_font_size(10), 24, "popup text is seventy percent size")
 	assert_eq(ScorePopup.POPUP_SIZE, Vector2(308.0, 126.0), "popup bounds scale to seventy percent")
 	assert_true(
@@ -161,9 +161,9 @@ func test_score_rolls_to_target_in_three_tenths_of_a_second() -> void:
 	var score: ScoreManager = main.get_node("ScoreManager") as ScoreManager
 	var score_label: Label = main.get_node("UI/Hud/ScoreLabel") as Label
 	score.on_reaction(_reaction(Vector2.ZERO, 4.0, 0.20))
-	assert_true(score_label.text != "512", "score does not jump immediately")
+	assert_true(score_label.text != "136", "score does not jump immediately")
 	await tree.create_timer(0.31, true, false, true).timeout
-	assert_eq(score_label.text, "512", "score reaches target after 0.3 seconds")
+	assert_eq(score_label.text, "136", "score reaches target after 0.3 seconds")
 	await _destroy_main(main)
 	Config.data.fx_score_popups_enabled = original_enabled
 

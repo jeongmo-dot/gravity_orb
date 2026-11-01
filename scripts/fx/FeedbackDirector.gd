@@ -143,13 +143,18 @@ func play_reaction_visuals(reaction: Dictionary) -> void:
 		return
 	if (
 		reaction_type != ReactionRules.Type.BLAST
+		and reaction_type != ReactionRules.Type.TAP_BLAST
 		and reaction_type != ReactionRules.Type.MAX_CLEAR
 	):
 		return
 	if not Config.data.fx_enabled or _camera == null:
 		return
 	var level: int = _effect_level(reaction)
-	var intensity: float = FINALE_INTENSITY if finale else 1.0
+	var intensity: float = (
+		FINALE_INTENSITY
+		if finale
+		else 0.5 if reaction_type == ReactionRules.Type.TAP_BLAST else 1.0
+	)
 	if (
 		Config.data.game_mode == GameConfig.GameMode.JELLY
 		and reaction_type == ReactionRules.Type.MAX_CLEAR
@@ -171,6 +176,8 @@ func play_reaction_visuals(reaction: Dictionary) -> void:
 			if reaction_type == ReactionRules.Type.MAX_CLEAR
 			else Config.data.fx_hitstop_time
 		)
+		if reaction_type == ReactionRules.Type.TAP_BLAST:
+			hitstop_time *= 0.5
 		begin_hitstop(hitstop_time)
 
 
@@ -192,6 +199,7 @@ func _play_reaction_sfx(reaction: Dictionary) -> void:
 		return
 	if (
 		reaction_type != ReactionRules.Type.BLAST
+		and reaction_type != ReactionRules.Type.TAP_BLAST
 		and reaction_type != ReactionRules.Type.MAX_CLEAR
 	):
 		return
@@ -205,14 +213,19 @@ func _play_reaction_sfx(reaction: Dictionary) -> void:
 		maxi(_finale_sfx_index, 1),
 		int(reaction.get("reaction_applied_usec", 0)),
 		int(reaction.get("reaction_physics_frame", -1)),
-		int(reaction.get("reaction_process_frame", -1))
+		int(reaction.get("reaction_process_frame", -1)),
+		0.5 if reaction_type == ReactionRules.Type.TAP_BLAST else 1.0
 	)
 
 
 func _play_reaction_haptics(reaction: Dictionary) -> void:
 	var reaction_type: ReactionRules.Type = reaction["type"] as ReactionRules.Type
-	if reaction_type in [ReactionRules.Type.BLAST, ReactionRules.Type.MAX_CLEAR]:
-		_haptics.play_blast()
+	if reaction_type in [
+		ReactionRules.Type.BLAST,
+		ReactionRules.Type.TAP_BLAST,
+		ReactionRules.Type.MAX_CLEAR,
+	]:
+		_haptics.play_blast(0.5 if reaction_type == ReactionRules.Type.TAP_BLAST else 1.0)
 
 
 func begin_hitstop(duration: float) -> void:
@@ -663,11 +676,14 @@ func _play_blast_feedback(
 	intensity: float
 ) -> void:
 	var origin: Vector2 = reaction.get("position", Vector2.ZERO) as Vector2
-	var level_scale: float = maxf(1.0, 1.0 + 0.25 * float(level - 4))
+	var visual_level: float = _legacy_visual_level(level)
+	var level_scale: float = maxf(1.0, 1.0 + 0.25 * (visual_level - 4.0))
+	var radius_factor: float = float(reaction.get(
+		"blast_radius_factor",
+		Config.data.blast_push_radius_factor_for_level(level)
+	))
 	var radius_m: float = (
-		Config.data.board_size
-		* Config.data.blast_push_radius_factor_for_level(level)
-		/ Orb3D.PIXELS_PER_METER
+		Config.data.board_size * radius_factor / Orb3D.PIXELS_PER_METER
 	)
 	var colors: Array = reaction.get("colors", []) as Array
 	var mixed_color: Color = _mixed_color(colors)
@@ -695,7 +711,7 @@ func _play_blast_feedback(
 		"BlastSparks",
 		"debris"
 	)
-	if level == 4:
+	if level == 6:
 		_create_glow(
 			origin,
 			nebula_inner,
@@ -704,7 +720,8 @@ func _play_blast_feedback(
 			0.0,
 			L4_NEBULA_DURATION,
 			radius_m * 0.24,
-			"BlastNebulaL4"
+			"BlastNebulaL4",
+			intensity
 		)
 	else:
 		_create_glow(
@@ -715,7 +732,8 @@ func _play_blast_feedback(
 			0.0,
 			SUPERNOVA_DURATION,
 			radius_m * 0.18,
-			"BlastSupernova"
+			"BlastSupernova",
+			intensity
 		)
 		_create_glow(
 			origin,
@@ -725,28 +743,40 @@ func _play_blast_feedback(
 			0.0,
 			LOCAL_FLASH_DURATION,
 			radius_m * 0.08,
-			"BlastLocalFlash"
+			"BlastLocalFlash",
+			intensity
 		)
 		_create_particles(
 			origin,
 			Color.WHITE,
-			SUPERNOVA_STAR_COUNT,
+			maxi(roundi(float(SUPERNOVA_STAR_COUNT) * intensity), 1),
 			level_scale,
 			"BlastTwinklingStars",
 			"stars"
 		)
 	_create_light(origin, level_scale * intensity)
-	if level >= 6:
+	if level >= 9:
 		_create_flash(intensity)
-	_start_reaction_shake(level, intensity * (0.5 if level == 4 else 1.0))
+	_start_reaction_shake(level, intensity * (0.5 if level == 6 else 1.0))
 
 
 func _start_reaction_shake(level: int, intensity: float) -> void:
-	var level_scale: float = maxf(1.0, 1.0 + 0.25 * float(level - 4))
+	var visual_level: float = _legacy_visual_level(level)
+	var level_scale: float = maxf(1.0, 1.0 + 0.25 * (visual_level - 4.0))
 	_shake_elapsed = 0.0
 	_shake_duration = maxf(Config.data.fx_shake_time * intensity, 0.001)
 	_shake_strength_m = (
 		Config.data.fx_shake_px / Orb3D.PIXELS_PER_METER * level_scale * intensity
+	)
+
+
+func _legacy_visual_level(level: int) -> float:
+	if Config.data.orb_max_level <= 1:
+		return 1.0
+	return 1.0 + (
+		float(clampi(level, 1, Config.data.orb_max_level) - 1)
+		* 6.0
+		/ float(Config.data.orb_max_level - 1)
 	)
 
 
@@ -848,7 +878,8 @@ func _create_glow(
 	delay: float,
 	duration: float,
 	start_radius: float,
-	node_name: String
+	node_name: String,
+	intensity: float = 1.0
 ) -> void:
 	var glow: MeshInstance3D = _acquire_blast_effect("glow") as MeshInstance3D
 	glow.name = node_name
@@ -859,7 +890,8 @@ func _create_glow(
 	var material: ShaderMaterial = glow.material_override as ShaderMaterial
 	material.set_shader_parameter("inner_color", inner_color)
 	material.set_shader_parameter("outer_color", outer_color)
-	material.set_shader_parameter("effect_alpha", 0.0 if delay > 0.0 else 1.0)
+	var maximum_alpha: float = clampf(intensity, 0.0, 1.0)
+	material.set_shader_parameter("effect_alpha", 0.0 if delay > 0.0 else maximum_alpha)
 	material.set_shader_parameter("noise_seed", float(_effects.size() % 11) * 0.37)
 	_effects.append({
 		"node": glow,
@@ -870,6 +902,7 @@ func _create_glow(
 		"start_scale": start_radius,
 		"end_scale": final_radius,
 		"material": material,
+		"maximum_alpha": maximum_alpha,
 	})
 
 
@@ -1240,7 +1273,10 @@ func _update_effect(effect: Dictionary, progress: float) -> void:
 			smoothstep(0.0, 0.12, progress)
 			* (1.0 - smoothstep(0.42, 1.0, progress))
 		)
-		glow_material.set_shader_parameter("effect_alpha", alpha)
+		glow_material.set_shader_parameter(
+			"effect_alpha",
+			alpha * float(effect.get("maximum_alpha", 1.0))
+		)
 
 
 func _update_shake(delta: float) -> void:

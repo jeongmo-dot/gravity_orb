@@ -46,6 +46,7 @@ var _settle_elapsed: float:
 
 var _stable_time: float = 0.0
 var _is_initial_settle: bool = false
+var _is_tap_blast_settle: bool = false
 var _current_merge_delay_seconds: float = 0.0
 
 
@@ -72,6 +73,7 @@ func start_game() -> void:
 	final_move_changed.emit(false, "")
 	gravity = Vector2i.DOWN
 	_is_initial_settle = true
+	_is_tap_blast_settle = false
 	InputRouter.set_locked(true)
 	_board.set_gravity(gravity)
 	_board.set_warning_directions(blocked_directions)
@@ -106,6 +108,50 @@ func on_swipe(dir: Vector2i) -> void:
 		_set_state(State.SIMULATING)
 	else:
 		_set_state(State.SPAWNING)
+
+
+func on_tap(screen_position: Vector2) -> void:
+	if state != State.WAITING_INPUT or Config.data.game_mode != GameConfig.GameMode.JELLY:
+		return
+	if not _board.has_method("screen_position_to_plane"):
+		return
+	var plane_position: Vector2 = _board.screen_position_to_plane(screen_position)
+	if not is_finite(plane_position.x) or not is_finite(plane_position.y):
+		return
+	var selected_orb: Variant = null
+	var selected_distance: float = INF
+	for orb: Variant in _board.get_orbs():
+		if not _collision_resolver.is_jelly_tap_blast_candidate(orb):
+			continue
+		var distance: float = orb.position.distance_to(plane_position)
+		var touch_radius: float = (
+			orb.get_current_radius() + Config.data.jelly_tap_blast_touch_margin
+		)
+		if distance <= touch_radius and distance < selected_distance:
+			selected_orb = orb
+			selected_distance = distance
+	if selected_orb == null:
+		return
+	try_tap_blast_orb(selected_orb)
+
+
+func try_tap_blast_orb(orb: Variant) -> bool:
+	if state != State.WAITING_INPUT or Config.data.game_mode != GameConfig.GameMode.JELLY:
+		return false
+	if not _collision_resolver.is_jelly_tap_blast_candidate(orb):
+		return false
+	turn_combo = 0
+	_emit_combo_changed()
+	InputRouter.set_locked(true)
+	_is_tap_blast_settle = true
+	_begin_settle()
+	_set_state(State.SIMULATING)
+	if not _collision_resolver.apply_jelly_tap_blast(orb):
+		_is_tap_blast_settle = false
+		InputRouter.set_locked(false)
+		_set_state(State.WAITING_INPUT)
+		return false
+	return true
 
 
 func _physics_process(delta: float) -> void:
@@ -143,13 +189,13 @@ func _physics_process(delta: float) -> void:
 	if settle_elapsed >= Config.data.max_settle_time:
 		_collision_resolver.set_accepting_new_jelly_merges(false)
 		if _collision_resolver.active_jelly_merge_count() > 0:
-			if not _is_initial_settle:
+			if not _is_initial_settle and not _is_tap_blast_settle:
 				if _current_merge_delay_seconds <= 0.0:
 					merge_delayed_turn_count += 1
 				_current_merge_delay_seconds += delta
 			return
 		_collision_resolver.sweep_resting_contacts()
-		if not _is_initial_settle:
+		if not _is_initial_settle and not _is_tap_blast_settle:
 			capped_turn_count += 1
 		_on_settled()
 	elif _stable_time >= Config.data.stable_duration:
@@ -208,6 +254,12 @@ func _on_settled() -> void:
 	)
 	if _is_initial_settle:
 		_is_initial_settle = false
+		_update_warnings()
+		InputRouter.set_locked(false)
+		_set_state(State.WAITING_INPUT)
+		return
+	if _is_tap_blast_settle:
+		_is_tap_blast_settle = false
 		_update_warnings()
 		InputRouter.set_locked(false)
 		_set_state(State.WAITING_INPUT)

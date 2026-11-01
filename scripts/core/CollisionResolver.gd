@@ -284,6 +284,63 @@ func active_jelly_merge_count() -> int:
 	return _active_jelly_merges.size()
 
 
+func apply_jelly_tap_blast(orb: Variant) -> bool:
+	if not is_jelly_tap_blast_candidate(orb):
+		return false
+	var position: Vector2 = orb.position
+	var source_radius: float = _orb_contact_radius(orb)
+	var occupancy: float = _board_occupied_area() / (
+		Config.data.board_size * Config.data.board_size
+	)
+	var stable_spawn_id: int = int(orb.stable_spawn_id)
+	var color: int = int(orb.color)
+	_board.remove_orb(orb)
+	var blast_targets: Array[Dictionary] = _board.apply_blast_with_radius_factor(
+		position,
+		Config.data.jelly_tap_blast_radius_factor
+	)
+	var reaction: Dictionary = {
+		"type": ReactionRules.Type.TAP_BLAST,
+		"chain": 1,
+		"occupancy": occupancy,
+		"levels": [Config.data.orb_max_level],
+		"colors": [color],
+		"stable_spawn_ids": [stable_spawn_id],
+		"position": position,
+		"source_positions": [position],
+		"source_radii": [source_radius],
+		"result_level": 0,
+		"result_color": color,
+		"result_orb": null,
+		"result_mass": 0.0,
+		"jelly_absorption": false,
+		"absorbed_level": 0,
+		"absorber": 0,
+		"shock_level": Config.data.orb_max_level,
+		"shock_targets": [],
+		"blast_targets": blast_targets,
+		"contact_path": "tap_blast",
+		"tap_blast": true,
+		"blast_radius_factor": Config.data.jelly_tap_blast_radius_factor,
+		"reaction_applied_usec": Time.get_ticks_usec(),
+		"reaction_physics_frame": Engine.get_physics_frames(),
+		"reaction_process_frame": Engine.get_process_frames(),
+	}
+	reaction_applied.emit(reaction)
+	return true
+
+
+func is_jelly_tap_blast_candidate(orb: Variant) -> bool:
+	return (
+		Config.data.game_mode == GameConfig.GameMode.JELLY
+		and _is_valid_reaction_orb(orb)
+		and not orb.is_ghost
+		and not orb.is_waiting_at_entrance
+		and int(orb.level) == Config.data.orb_max_level
+		and not _is_reaction_locked(orb)
+	)
+
+
 func cancel_active_jelly_merges() -> void:
 	for entry: Dictionary in _active_jelly_merges:
 		var reaction: Dictionary = entry.get("reaction", {}) as Dictionary

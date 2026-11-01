@@ -1,5 +1,20 @@
 extends TestCase
 
+
+func test_level_ten_tap_blast_uses_single_orb_score_and_multipliers() -> void:
+	var cfg: GameConfig = GameConfig.new()
+	var reaction: Dictionary = {
+		"type": ReactionRules.Type.TAP_BLAST,
+		"levels": [cfg.orb_max_level],
+		"combo": 2,
+		"occupancy": 0.0,
+	}
+	assert_eq(
+		ScoreManager.points_for(reaction, cfg),
+		cfg.score_for_level(cfg.orb_max_level) * 2,
+		"tap blast scores one L10 with combo"
+	)
+
 const CONFIG_RESOURCE: GameConfig = preload("res://config/default_config.tres")
 const TOLERANCE: float = 1.0e-6
 
@@ -21,8 +36,8 @@ func test_same_turn_merge_example_scores_twenty() -> void:
 		0.20
 	)
 	assert_eq(ScoreManager.points_for(first, cfg), 4, "first L2 merge")
-	assert_eq(ScoreManager.points_for(second, cfg), 16, "second L3 merge")
-	assert_eq(int(first["points"]) + int(second["points"]), 20, "same-turn total")
+	assert_eq(ScoreManager.points_for(second, cfg), 12, "second L3 merge")
+	assert_eq(int(first["points"]) + int(second["points"]), 16, "same-turn total")
 
 
 func test_third_max_clear_at_seventy_percent_scores_10240() -> void:
@@ -90,8 +105,8 @@ func test_blast_uses_both_levels_combo_and_danger_multipliers() -> void:
 		0,
 		0.50
 	)
-	assert_eq(ScoreManager.points_for(multiplied, cfg), 1280, "blast combo and danger")
-	assert_eq(multiplied["base_points"], 320, "blast base points")
+	assert_eq(ScoreManager.points_for(multiplied, cfg), 560, "blast combo and danger")
+	assert_eq(multiplied["base_points"], 140, "blast base points")
 
 
 func test_scoring_populates_reaction_dictionary() -> void:
@@ -102,7 +117,7 @@ func test_scoring_populates_reaction_dictionary() -> void:
 		3,
 		0.50
 	)
-	assert_eq(ScoreManager.points_for(reaction, _config()), 32, "scored points")
+	assert_eq(ScoreManager.points_for(reaction, _config()), 24, "scored points")
 	for key: String in [
 		"base_points",
 		"combo_multiplier",
@@ -149,7 +164,7 @@ func test_jelly_merge_scores_new_level_and_absorption_scores_eaten_level() -> vo
 		0.20
 	)
 	leveled["jelly_absorption"] = false
-	assert_eq(ScoreManager.points_for(leveled, cfg), 8, "JELLY level-up scores L3")
+	assert_eq(ScoreManager.points_for(leveled, cfg), 6, "JELLY level-up scores L3")
 	var absorbed: Dictionary = _reaction(
 		ReactionRules.Type.MERGE,
 		1,
@@ -171,7 +186,7 @@ func test_jelly_merge_scores_new_level_and_absorption_scores_eaten_level() -> vo
 	absorption_level_up["absorbed_level"] = 2
 	assert_eq(
 		ScoreManager.points_for(absorption_level_up, cfg),
-		16,
+		10,
 		"JELLY absorption that raises level scores new L4"
 	)
 

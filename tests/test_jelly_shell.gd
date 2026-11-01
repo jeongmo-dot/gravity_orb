@@ -149,7 +149,7 @@ func test_jelly_result_ranking_restart_and_mode_selection_round_trip() -> void:
 	assert_eq((panel.get_node("Margin/Content/ResultExtraValue") as Label).text, "3번 버팀", "result survived count")
 	score.max_level_reached = Config.data.orb_max_level
 	panel._set_stat_text()
-	assert_eq((panel.get_node("Margin/Content/GameOverBlockedValue") as Label).text, "L7 MAX", "JELLY result MAX level")
+	assert_eq((panel.get_node("Margin/Content/GameOverBlockedValue") as Label).text, "L10 MAX", "JELLY result MAX level")
 	assert_eq(
 		SaveStore.load_rankings(SAVE_PATH, GameConfig.GameMode.JELLY).size(),
 		1,

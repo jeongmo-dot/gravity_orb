@@ -742,9 +742,7 @@ func _apply_jelly_belly_fraction() -> void:
 
 
 func _jelly_fill_fraction_for_mass(value: float, cfg: GameConfig) -> float:
-	var display_level: int = cfg.jelly_level_for_mass(value)
-	var base_mass: float = cfg.jelly_mass_for_level(display_level)
-	return clampf((value - base_mass) / base_mass, 0.0, 0.999999)
+	return cfg.jelly_fill_fraction_for_mass(value)
 
 
 func _advance_growth(delta: float) -> void:

@@ -193,6 +193,14 @@ func test_swipe_sfx_and_pc_haptics_use_specified_durations() -> void:
 	})
 	assert_eq(haptics.last_duration_ms(), 25, "blast haptic duration")
 	assert_eq(haptics.request_count(), 2, "one swipe and one blast haptic request")
+	director.play_reaction({
+		"type": ReactionRules.Type.TAP_BLAST,
+		"levels": [Config.data.orb_max_level],
+		"colors": [OrbTypes.OrbColor.YELLOW],
+		"position": Vector2.ZERO,
+	})
+	assert_eq(haptics.last_duration_ms(), 13, "half-strength tap blast haptic duration")
+	assert_eq(haptics.request_count(), 3, "tap blast adds one haptic request")
 	if not haptics.is_mobile_platform():
 		assert_eq(haptics.platform_vibration_count(), 0, "PC performs no vibration call")
 	await _cleanup(fixture["root"] as Node)

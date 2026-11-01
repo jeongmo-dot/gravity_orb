@@ -237,35 +237,38 @@ func test_classic_3d_blast_readiness_starts_at_level_four() -> void:
 	Config.data.game_mode = original_mode
 
 
-func test_jelly_default_l6_blast_readiness_follows_mass_without_outline_geometry() -> void:
+func test_jelly_default_l8_blast_readiness_follows_mass_without_outline_geometry() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_jelly_minimum: int = Config.data.jelly_blast_min_level
 	Config.data.game_mode = GameConfig.GameMode.JELLY
-	Config.data.jelly_blast_min_level = 6
+	Config.data.jelly_blast_min_level = 8
 	var board: Board3D = await _create_board()
-	var level_five: Orb3D = board.spawn_orb(0, 5, Vector2(-180.0, 0.0))
-	var level_six: Orb3D = board.spawn_orb(1, 6, Vector2(0.0, 0.0))
-	var level_seven: Orb3D = board.spawn_orb(2, 7, Vector2(180.0, 0.0))
-	assert_true(not level_five.is_blast_armed(), "J6 leaves L5 unarmed")
-	assert_true(level_six.is_blast_armed(), "J6 arms L6")
-	assert_true(level_seven.is_blast_armed(), "J6 arms L7")
-	level_five.set_jelly_mass(32.0, Config.data)
-	assert_eq(level_five.level, 6, "mass update reaches displayed L6")
-	assert_true(level_five.is_blast_armed(), "mass-updated displayed L6 arms BLAST")
+	var level_seven: Orb3D = board.spawn_orb(0, 7, Vector2(-300.0, 0.0))
+	var level_eight: Orb3D = board.spawn_orb(1, 8, Vector2(-100.0, 0.0))
+	var level_nine: Orb3D = board.spawn_orb(2, 9, Vector2(100.0, 0.0))
+	var level_ten: Orb3D = board.spawn_orb(3, 10, Vector2(300.0, 0.0))
+	assert_true(not level_seven.is_blast_armed(), "L7 remains unarmed")
+	assert_true(level_eight.is_blast_armed(), "L8 arms BLAST")
+	assert_true(level_nine.is_blast_armed(), "L9 arms BLAST")
+	assert_true(level_ten.is_blast_armed(), "L10 arms BLAST")
 	assert_true(
-		bool((level_five._face.material_override as ShaderMaterial).get_shader_parameter("is_blast_ready")),
-		"mass-updated L6 switches to the blast-ready face"
-	)
-	level_five.set_jelly_mass(64.0, Config.data)
-	assert_eq(level_five.level, 7, "mass update reaches displayed L7")
-	assert_true(level_five.is_blast_armed(), "mass-updated displayed L7 arms BLAST")
-	assert_true(
-		bool((level_five._face.material_override as ShaderMaterial).get_shader_parameter("is_max")),
-		"mass-updated L7 keeps the MAX face"
+		bool((level_eight._face.material_override as ShaderMaterial).get_shader_parameter("is_blast_ready")),
+		"L8 uses the blast-ready face"
 	)
 	assert_true(
-		not bool((level_five._face.material_override as ShaderMaterial).get_shader_parameter("is_blast_ready")),
-		"mass-updated L7 does not replace MAX with blast-ready face"
+		bool((level_nine._face.material_override as ShaderMaterial).get_shader_parameter("is_blast_ready")),
+		"L9 uses the blast-ready face"
+	)
+	level_nine.set_jelly_mass(64.0, Config.data)
+	assert_eq(level_nine.level, 10, "mass update reaches displayed L10")
+	assert_true(level_nine.is_blast_armed(), "mass-updated displayed L10 arms BLAST")
+	assert_true(
+		bool((level_nine._face.material_override as ShaderMaterial).get_shader_parameter("is_max")),
+		"mass-updated L10 keeps the MAX face"
+	)
+	assert_true(
+		not bool((level_nine._face.material_override as ShaderMaterial).get_shader_parameter("is_blast_ready")),
+		"mass-updated L10 does not replace MAX with blast-ready face"
 	)
 	_cleanup(board)
 	Config.data.jelly_blast_min_level = original_jelly_minimum
@@ -318,7 +321,7 @@ func test_jolt_reaction_uses_shared_rules_and_spawns_3d_result() -> void:
 	_cleanup(fixture_root)
 
 
-func test_jelly_same_level_absorption_keeps_radius_and_fills_belly() -> void:
+func test_jelly_equal_merge_fills_new_level_belly() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_merge_duration: float = Config.data.jelly_merge_duration
 	Config.data.game_mode = GameConfig.GameMode.JELLY
@@ -338,18 +341,19 @@ func test_jelly_same_level_absorption_keeps_radius_and_fills_belly() -> void:
 	tree.root.add_child(fixture_root)
 	await tree.process_frame
 	var larger: Orb3D = board.spawn_orb(2, 3, Vector2(-30.0, 0.0))
-	var smaller: Orb3D = board.spawn_orb(2, 2, Vector2(30.0, 0.0))
+	var smaller: Orb3D = board.spawn_orb(2, 3, Vector2(30.0, 0.0))
 	resolver.report_contact(larger, smaller)
-	assert_eq(resolver.flush(), 1, "L3 absorbs L2 once")
+	assert_eq(resolver.flush(), 1, "L3 pair merges once")
 	var active: Array[Orb3D] = board.get_orbs()
 	assert_eq(active.size(), 1, "same-level absorption leaves one orb")
 	if active.size() == 1:
 		var result: Orb3D = active[0]
-		assert_eq(result.level, 3, "mass six remains L3")
+		assert_eq(result.level, 4, "mass six reaches L4")
 		assert_near(result.jelly_mass, 6.0, 0.001, "absorbed mass is preserved")
-		assert_near(result.get_radius(), 60.0, 0.001, "partial L3 target radius stays fixed")
-		assert_near(result.get_current_radius(), 60.0, 0.001, "partial L3 has no radius tween")
-		assert_near(result.shape_resource().radius * Orb3D.PIXELS_PER_METER, 60.0, 0.001, "collision radius stays L3")
+		assert_near(result.get_radius(), 68.0, 0.001, "partial L4 target radius")
+		assert_near(result.get_current_radius(), 68.0, 0.001, "zero-duration merge reaches L4 radius")
+		result._physics_process(0.1)
+		assert_near(result.shape_resource().radius * Orb3D.PIXELS_PER_METER, 68.0, 0.001, "collision reaches L4")
 		assert_near(result._jelly_belly_target, 0.5, 0.001, "mass six targets half-full belly")
 		result._process(0.15)
 		assert_near(result._jelly_belly_fraction, 0.5, 0.001, "belly fills over 0.15 seconds")
@@ -380,8 +384,7 @@ func test_jelly_level_up_absorption_grows_from_old_to_new_level_radius() -> void
 	board.set_gravity(Vector2i.LEFT)
 	var larger_position: Vector2 = Vector2(-120.0, 25.0)
 	var larger: Orb3D = board.spawn_orb(2, 3, larger_position, Vector2(30.0, 0.0))
-	larger.set_jelly_mass(6.0, Config.data)
-	assert_near(larger.get_radius(), 60.0, 0.001, "mass-six absorber stays at L3 radius")
+	assert_near(larger.get_radius(), 52.0, 0.001, "L3 absorber radius")
 	var smaller: Orb3D = board.spawn_orb(2, 2, Vector2(-60.0, 25.0), Vector2.ZERO)
 	resolver.report_contact(larger, smaller)
 	assert_eq(resolver.flush(), 1, "JELLY adjacent levels absorb once")
@@ -389,25 +392,25 @@ func test_jelly_level_up_absorption_grows_from_old_to_new_level_radius() -> void
 	assert_eq(active.size(), 1, "absorption leaves one orb")
 	if active.size() == 1:
 		assert_eq(active[0].level, 4, "mass eight reaches level four")
-		assert_near(active[0].jelly_mass, 8.0, 0.001, "absorbed mass is preserved")
-		assert_near(active[0].get_radius(), 85.0, 0.001, "mass eight uses the L4 radius")
+		assert_near(active[0].jelly_mass, 5.0, 0.001, "absorbed mass is preserved")
+		assert_near(active[0].get_radius(), 68.0, 0.001, "mass five uses the L4 radius")
 		assert_near(
 			active[0].get_current_radius(),
-			60.0,
+			52.0,
 			0.001,
 			"level-up absorption starts from the fixed L3 absorber radius"
 		)
 		active[0]._physics_process(0.05)
 		assert_near(
 			active[0].get_current_radius(),
-			(60.0 + 85.0) * 0.5,
+			(52.0 + 68.0) * 0.5,
 			0.001,
 			"absorption radius is halfway after 0.05 seconds"
 		)
 		active[0]._physics_process(0.05)
 		assert_near(
 			active[0].get_current_radius(),
-			85.0,
+			68.0,
 			0.001,
 			"absorption reaches the target radius after 0.10 seconds"
 		)
@@ -443,6 +446,46 @@ func test_jelly_level_up_absorption_grows_from_old_to_new_level_radius() -> void
 	_cleanup(fixture_root)
 	Config.data.game_mode = original_mode
 	Config.data.jelly_merge_duration = original_merge_duration
+
+
+func test_jelly_gap_two_absorption_preserves_larger_body_and_partial_mass() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_merge_duration: float = Config.data.jelly_merge_duration
+	var original_level_gap: int = Config.data.jelly_merge_level_gap
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_merge_duration = 0.3
+	Config.data.jelly_merge_level_gap = 2
+	var fixture_root: Node = Node.new()
+	fixture_root.name = "JellyGapTwoFixture"
+	var board: Board3D = BOARD_SCENE.instantiate() as Board3D
+	board.name = "Board"
+	board.unique_name_in_owner = true
+	fixture_root.add_child(board)
+	board.owner = fixture_root
+	var resolver: CollisionResolver = RESOLVER_SCRIPT.new() as CollisionResolver
+	resolver.name = "CollisionResolver"
+	resolver.unique_name_in_owner = true
+	fixture_root.add_child(resolver)
+	resolver.owner = fixture_root
+	tree.root.add_child(fixture_root)
+	await tree.process_frame
+	var larger: Orb3D = board.spawn_orb(2, 7, Vector2(-60.0, 0.0))
+	var smaller: Orb3D = board.spawn_orb(2, 5, Vector2(60.0, 0.0))
+	var larger_id: int = larger.stable_spawn_id
+	resolver.report_contact(larger, smaller)
+	assert_eq(resolver.flush(), 0, "gap-two L7+L5 starts its visible merge")
+	assert_eq(resolver.flush(0.3), 1, "gap-two L7+L5 resolves once after the merge duration")
+	var active: Array[Orb3D] = board.get_orbs()
+	assert_eq(active.size(), 1, "gap-two absorption leaves one orb")
+	if active.size() == 1:
+		assert_eq(active[0].stable_spawn_id, larger_id, "larger physical body survives")
+		assert_eq(active[0].level, 7, "mass 24 remains L7")
+		assert_near(active[0].jelly_mass, 24.0, 0.001, "L7+L5 mass is preserved")
+		assert_near(active[0]._jelly_belly_target, 0.7, 0.001, "mass 24 is seventy percent full")
+	await _cleanup(fixture_root)
+	Config.data.game_mode = original_mode
+	Config.data.jelly_merge_duration = original_merge_duration
+	Config.data.jelly_merge_level_gap = original_level_gap
 
 
 func test_delayed_jelly_merge_reserves_sources_grows_and_emits_on_completion() -> void:
@@ -486,7 +529,7 @@ func test_delayed_jelly_merge_reserves_sources_grows_and_emits_on_completion() -
 		assert_eq(resolver.flush(merge_tick), 0, "first-half frame %d emits nothing" % frame_index)
 		result._physics_process(merge_tick)
 		_assert_orb_visual_and_collision_radius(result, "equal merge frame %d" % frame_index)
-	assert_near(result.get_current_radius(), 50.0, 0.001, "smoothstep midpoint is half grown")
+	assert_near(result.get_current_radius(), 46.0, 0.001, "smoothstep midpoint is half grown")
 	assert_near(first.merge_visual_scale().x, 0.9, 0.001, "source shrinks and stretches along pull")
 	assert_near(first.merge_visual_scale().y, 0.74, 0.001, "source narrows across pull")
 	var third: Orb3D = board.spawn_orb(2, 3, Vector2(300.0, 0.0))
@@ -506,7 +549,7 @@ func test_delayed_jelly_merge_reserves_sources_grows_and_emits_on_completion() -
 	assert_eq(completion_count, 1, "completion applies exactly one reaction")
 	assert_eq(reactions.size(), 1, "reaction signal emits once at completion")
 	assert_eq(resolver.active_jelly_merge_count(), 0, "process is removed after completion")
-	assert_near(result.get_current_radius(), 60.0, 0.001, "physical and visual radius finish together")
+	assert_near(result.get_current_radius(), 52.0, 0.001, "physical and visual radius finish together")
 	await tree.process_frame
 	assert_true(not is_instance_valid(first), "first pulled visual is removed")
 	assert_true(not is_instance_valid(second), "second pulled visual is removed")
@@ -515,7 +558,6 @@ func test_delayed_jelly_merge_reserves_sources_grows_and_emits_on_completion() -
 	board.clear()
 	await tree.process_frame
 	var absorber: Orb3D = board.spawn_orb(3, 3, Vector2(-30.0, 0.0))
-	absorber.set_jelly_mass(6.0, Config.data)
 	var absorbed: Orb3D = board.spawn_orb(3, 2, Vector2(30.0, 0.0))
 	resolver.report_contact(absorber, absorbed, "absorption_growth_test")
 	assert_eq(resolver.flush(), 0, "level-up absorption starts a delayed process")
@@ -532,8 +574,8 @@ func test_delayed_jelly_merge_reserves_sources_grows_and_emits_on_completion() -
 	assert_eq(reactions.size(), 2, "absorption emits once after its process")
 	board.clear()
 	await tree.process_frame
-	var max_first: Orb3D = board.spawn_orb(4, 7, Vector2(-60.0, 0.0))
-	var max_second: Orb3D = board.spawn_orb(4, 7, Vector2(60.0, 0.0))
+	var max_first: Orb3D = board.spawn_orb(4, 10, Vector2(-60.0, 0.0))
+	var max_second: Orb3D = board.spawn_orb(4, 10, Vector2(60.0, 0.0))
 	resolver.report_contact(max_first, max_second, "max_clear_completion_test")
 	assert_eq(resolver.flush(), 0, "MAX clear also starts as a process")
 	assert_eq(resolver.active_jelly_merge_count(), 1, "MAX process is active")
@@ -541,8 +583,8 @@ func test_delayed_jelly_merge_reserves_sources_grows_and_emits_on_completion() -
 	assert_eq(reactions.size(), 3, "MAX clear emits its jackpot reaction once")
 	assert_eq(reactions[-1]["type"], ReactionRules.Type.MAX_CLEAR, "completed MAX process is jackpot")
 	await tree.process_frame
-	var restart_first: Orb3D = board.spawn_orb(5, 7, Vector2(-60.0, 0.0))
-	var restart_second: Orb3D = board.spawn_orb(5, 7, Vector2(60.0, 0.0))
+	var restart_first: Orb3D = board.spawn_orb(5, 10, Vector2(-60.0, 0.0))
+	var restart_second: Orb3D = board.spawn_orb(5, 10, Vector2(60.0, 0.0))
 	resolver.report_contact(restart_first, restart_second, "restart_cleanup_test")
 	assert_eq(resolver.flush(), 0, "restart fixture starts another MAX process")
 	assert_eq(resolver.active_jelly_merge_count(), 1, "restart MAX process is active")
@@ -668,6 +710,127 @@ func test_turn_manager_cap_finishes_active_merge_without_starting_a_new_one() ->
 	Config.data.jelly_merge_duration = original_duration
 	Config.data.stable_duration = original_stable_duration
 	Config.data.max_settle_time = original_max_settle_time
+	await _cleanup(fixture["root"] as Node)
+
+
+func test_level_ten_tap_blast_is_turn_free_and_settles_back_to_input() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_stable_duration: float = Config.data.stable_duration
+	var original_linear_speed: float = Config.data.stable_linear_speed
+	var original_angular_speed: float = Config.data.stable_angular_speed
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.stable_duration = 0.001
+	Config.data.stable_linear_speed = 1.0e9
+	Config.data.stable_angular_speed = 1.0e9
+	var fixture: Dictionary = await _create_turn_fixture()
+	var root: Node3D = fixture["root"] as Node3D
+	var board: Board3D = fixture["board"] as Board3D
+	var spawner: Spawner = fixture["spawner"] as Spawner
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	var camera: Camera3D = Camera3D.new()
+	camera.position = Vector3(0.0, 0.0, 42.0)
+	camera.current = true
+	root.add_child(camera)
+	spawner.init_rng(128)
+	manager.state = TurnManager.State.WAITING_INPUT
+	manager.final_move_pending = true
+	InputRouter.set_locked(false)
+	var tapped: Orb3D = board.spawn_orb(2, Config.data.orb_max_level, Vector2.ZERO)
+	var nearby: Orb3D = board.spawn_orb(1, 1, Vector2(200.0, 0.0))
+	var reactions: Array[Dictionary] = []
+	var turn_starts: int = 0
+	var turn_finishes: int = 0
+	manager.reaction_ready.connect(func(reaction: Dictionary) -> void: reactions.append(reaction))
+	manager.turn_started.connect(func(_turn: int, _dir: Vector2i) -> void: turn_starts += 1)
+	manager.turn_finished.connect(func(_turn: int, _combo: int) -> void: turn_finishes += 1)
+	await tree.process_frame
+	manager.on_tap(camera.unproject_position(Orb3D.plane_position_to_world(Vector2.ZERO)))
+	assert_true(tapped.consumed, "tap removes selected L10")
+	assert_eq(manager.state, TurnManager.State.SIMULATING, "tap enters settling")
+	assert_eq(manager.turn_index, 0, "tap consumes no turn")
+	assert_eq(manager.gravity, Vector2i.DOWN, "tap preserves gravity")
+	assert_eq(turn_starts, 0, "tap emits no turn_started")
+	assert_eq(turn_finishes, 0, "tap emits no turn_finished")
+	assert_eq(reactions.size(), 1, "tap uses reaction pipeline")
+	if reactions.size() == 1:
+		assert_eq(reactions[0]["type"], ReactionRules.Type.TAP_BLAST, "tap reaction type")
+		assert_eq(reactions[0]["combo"], 1, "tap combo starts at one")
+	if reactions.size() == 1:
+		var blast_targets: Array = reactions[0]["blast_targets"] as Array
+		var nearby_was_pushed: bool = false
+		for target_value: Variant in blast_targets:
+			var target: Dictionary = target_value as Dictionary
+			if (
+				int(target["stable_spawn_id"]) == nearby.stable_spawn_id
+				and (target["velocity_change"] as Vector2).x > 0.0
+			):
+				nearby_was_pushed = true
+		assert_true(nearby_was_pushed, "nearby orb is pushed outward")
+	for _frame: int in range(30):
+		if manager.state == TurnManager.State.WAITING_INPUT:
+			break
+		await tree.physics_frame
+	assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "tap returns to input")
+	assert_true(manager.final_move_pending, "tap preserves FINAL MOVE pending")
+	Config.data.game_mode = original_mode
+	Config.data.stable_duration = original_stable_duration
+	Config.data.stable_linear_speed = original_linear_speed
+	Config.data.stable_angular_speed = original_angular_speed
+	await _cleanup(fixture["root"] as Node)
+
+
+func test_tap_blast_candidate_rejects_nonmax_waiting_ghost_and_locked_orbs() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var fixture: Dictionary = await _create_turn_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var level_nine: Orb3D = board.spawn_orb(0, Config.data.orb_max_level - 1, Vector2(-300.0, 0.0))
+	var waiting: Orb3D = board.spawn_orb(0, Config.data.orb_max_level, Vector2(-100.0, 0.0))
+	var ghost: Orb3D = board.spawn_orb(0, Config.data.orb_max_level, Vector2(100.0, 0.0))
+	var locked: Orb3D = board.spawn_orb(0, Config.data.orb_max_level, Vector2(300.0, 0.0))
+	waiting.is_waiting_at_entrance = true
+	ghost.is_ghost = true
+	resolver._lock_reaction_result(locked)
+	assert_true(not resolver.is_jelly_tap_blast_candidate(level_nine), "L9 rejected")
+	assert_true(not resolver.is_jelly_tap_blast_candidate(waiting), "entrance waiter rejected")
+	assert_true(not resolver.is_jelly_tap_blast_candidate(ghost), "ghost rejected")
+	assert_true(not resolver.is_jelly_tap_blast_candidate(locked), "reaction lock rejected")
+	Config.data.game_mode = original_mode
+	await _cleanup(fixture["root"] as Node)
+
+
+func test_level_ten_tap_uses_sixteen_pixel_margin_and_rejects_simulating() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var fixture: Dictionary = await _create_turn_fixture()
+	var root: Node3D = fixture["root"] as Node3D
+	var board: Board3D = fixture["board"] as Board3D
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	var camera: Camera3D = Camera3D.new()
+	camera.position = Vector3(0.0, 0.0, 42.0)
+	camera.current = true
+	root.add_child(camera)
+	manager.state = TurnManager.State.WAITING_INPUT
+	InputRouter.set_locked(false)
+	var tapped: Orb3D = board.spawn_orb(2, Config.data.orb_max_level, Vector2.ZERO)
+	await tree.process_frame
+	var outer_point: Vector2 = Vector2(
+		tapped.get_current_radius() + Config.data.jelly_tap_blast_touch_margin + 0.1,
+		0.0
+	)
+	manager.on_tap(camera.unproject_position(Orb3D.plane_position_to_world(outer_point)))
+	assert_true(not tapped.consumed, "point just outside touch margin is ignored")
+	manager.state = TurnManager.State.SIMULATING
+	assert_true(not manager.try_tap_blast_orb(tapped), "SIMULATING rejects direct tap blast")
+	manager.state = TurnManager.State.WAITING_INPUT
+	var inner_point: Vector2 = Vector2(
+		tapped.get_current_radius() + Config.data.jelly_tap_blast_touch_margin - 0.1,
+		0.0
+	)
+	manager.on_tap(camera.unproject_position(Orb3D.plane_position_to_world(inner_point)))
+	assert_true(tapped.consumed, "point just inside touch margin selects L10")
+	Config.data.game_mode = original_mode
 	await _cleanup(fixture["root"] as Node)
 
 

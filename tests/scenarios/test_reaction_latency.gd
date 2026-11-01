@@ -65,7 +65,7 @@ func _assert_dense_contact_reacts_within_one_tick() -> void:
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
 	_observed_reactions.clear()
 	resolver.reaction_applied.connect(_record_reaction)
-	var center: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, 6, Vector2.ZERO)
+	var center: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, 9, Vector2.ZERO)
 	center.get_physics_body().freeze = true
 	for neighbor_index: int in range(8):
 		var angle: float = deg_to_rad(70.0 + float(neighbor_index) * (220.0 / 7.0))
@@ -77,7 +77,7 @@ func _assert_dense_contact_reacts_within_one_tick() -> void:
 		neighbor.get_physics_body().freeze = true
 	var incoming: Orb3D = board.spawn_orb(
 		OrbTypes.OrbColor.RED,
-		6,
+		9,
 		Vector2(240.0, 0.0)
 	)
 	incoming.get_physics_body().freeze = true

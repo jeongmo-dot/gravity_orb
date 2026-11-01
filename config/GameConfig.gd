@@ -15,13 +15,16 @@ enum GameMode {
 @export var board_size: float = 960.0
 @export var wall_thickness: float = 256.0
 @export var level_radii: PackedFloat32Array = PackedFloat32Array(
-	[25.0, 40.0, 60.0, 85.0, 100.0, 120.0, 140.0]
+	[25.0, 40.0, 52.0, 68.0, 80.0, 92.0, 102.0, 115.0, 128.0, 140.0]
 )
-@export var orb_max_level: int = 7
+@export var orb_max_level: int = 10
+@export var jelly_level_masses: PackedFloat32Array = PackedFloat32Array(
+	[1.0, 2.0, 3.0, 5.0, 7.0, 11.0, 17.0, 27.0, 42.0, 64.0]
+)
 @export var orb_base_mass: float = 1.0
 @export var mass_exponent: float = 2.0
 @export var gravity_strength: float = 3600.0
-@export var gravity_level_scale: float = 0.05
+@export var gravity_level_scale: float = 0.0333
 @export var gravity_turn_diagonal_time: float = 0.15
 @export var orb_friction: float = 0.3
 @export var orb_bounce: float = 0.06
@@ -77,7 +80,9 @@ enum GameMode {
 @export var wall_penetration_limit: float = 16.0
 @export var opposite_pairs: Array[Vector2i] = []
 @export var annihilation_rule: AnnihilationRule = AnnihilationRule.B_SAME_LEVEL
-@export var level_scores: PackedInt32Array = PackedInt32Array([2, 4, 8, 16, 32, 64, 128])
+@export var level_scores: PackedInt32Array = PackedInt32Array(
+	[2, 4, 6, 10, 14, 22, 34, 54, 84, 128]
+)
 @export var annihilation_score_factor: float = 0.5
 @export var max_merge_bonus_factor: float = 5.0
 @export var combo_multiplier_base: float = 2.0
@@ -86,7 +91,7 @@ enum GameMode {
 @export var danger_doubling: float = 0.20
 @export var shock_impulse: float = 600.0
 @export var shock_radius_factor: float = 2.5
-@export var shock_level_scale: float = 0.3
+@export var shock_level_scale: float = 0.2
 @export var shock_jackpot_scale: float = 3.0
 @export var color_effects_enabled: bool = true
 @export var shock_color_modes: PackedInt32Array = PackedInt32Array(
@@ -109,12 +114,16 @@ enum GameMode {
 @export var green_shake_max_speed: float = 600.0
 @export var chain_reaction_delay: float = 0.2
 @export var jelly_merge_duration: float = 0.3
+@export var jelly_merge_level_gap: int = 2
 @export var blast_enabled: bool = true
 @export var blast_min_level: int = 4
-@export var jelly_blast_min_level: int = 6
+@export var jelly_blast_min_level: int = 8
 @export var blast_push_radius_by_level: PackedFloat32Array = PackedFloat32Array(
-	[0.0, 0.0, 0.0, 0.3, 0.55, 1.0, 1.0]
+	[0.0, 0.0, 0.0, 0.3, 0.55, 1.0, 1.0, 1.0, 1.0, 1.0]
 )
+@export var jelly_tap_blast_radius_factor: float = 0.3
+@export var jelly_tap_blast_score_factor: float = 1.0
+@export var jelly_tap_blast_touch_margin: float = 16.0
 @export var blast_speed: float = 900.0
 @export var blast_far_factor: float = 0.4
 @export var blast_score_factor: float = 5.0
@@ -153,7 +162,10 @@ func mass_for_level(level: int) -> float:
 
 
 func jelly_mass_for_level(level: int) -> float:
-	return pow(2.0, float(clampi(level, 1, orb_max_level) - 1))
+	var safe_level: int = clampi(level, 1, orb_max_level)
+	if jelly_level_masses.size() == orb_max_level:
+		return jelly_level_masses[safe_level - 1]
+	return pow(2.0, float(safe_level - 1))
 
 
 func jelly_level_for_mass(mass: float) -> int:
@@ -162,7 +174,24 @@ func jelly_level_for_mass(mass: float) -> int:
 		jelly_mass_for_level(1),
 		jelly_mass_for_level(orb_max_level)
 	)
-	return clampi(floori(log(clamped_mass) / log(2.0)) + 1, 1, orb_max_level)
+	if jelly_level_masses.size() != orb_max_level:
+		return clampi(floori(log(clamped_mass) / log(2.0)) + 1, 1, orb_max_level)
+	var resolved_level: int = 1
+	for level: int in range(2, orb_max_level + 1):
+		if jelly_mass_for_level(level) <= clamped_mass + 0.0001:
+			resolved_level = level
+		else:
+			break
+	return resolved_level
+
+
+func jelly_fill_fraction_for_mass(mass: float) -> float:
+	var level: int = jelly_level_for_mass(mass)
+	if level >= orb_max_level:
+		return 0.0
+	var base_mass: float = jelly_mass_for_level(level)
+	var next_mass: float = jelly_mass_for_level(level + 1)
+	return clampf((mass - base_mass) / maxf(next_mass - base_mass, 0.0001), 0.0, 0.999999)
 
 
 func jelly_radius_for_mass(mass: float) -> float:

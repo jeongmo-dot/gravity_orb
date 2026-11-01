@@ -4,16 +4,20 @@ const CONFIG_RESOURCE: GameConfig = preload("res://config/default_config.tres")
 const EXPECTED_RADII: Array[float] = [
 	25.0,
 	40.0,
-	60.0,
-	85.0,
-	100.0,
-	120.0,
+	52.0,
+	68.0,
+	80.0,
+	92.0,
+	102.0,
+	115.0,
+	128.0,
 	140.0,
 ]
+const EXPECTED_B_MASSES: Array[float] = [1.0, 2.0, 3.0, 5.0, 7.0, 11.0, 17.0, 27.0, 42.0, 64.0]
 const TOLERANCE: float = 1.0e-3
 
 
-func test_radius_for_levels_one_through_seven() -> void:
+func test_radius_for_levels_one_through_ten() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	assert_eq(config.orb_max_level, EXPECTED_RADII.size(), "expected radius count")
 	assert_eq(config.level_radii.size(), EXPECTED_RADII.size(), "configured radius count")
@@ -50,7 +54,7 @@ func test_jelly_mass_level_and_level_fixed_radius() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	assert_eq(int(GameConfig.GameMode.JELLY), 3, "JELLY enum keeps prior values stable")
 	for level: int in range(1, config.orb_max_level + 1):
-		var mass: float = pow(2.0, float(level - 1))
+		var mass: float = EXPECTED_B_MASSES[level - 1]
 		assert_near(config.jelly_mass_for_level(level), mass, TOLERANCE, "mass L%d" % level)
 		assert_eq(config.jelly_level_for_mass(mass), level, "level from exact mass L%d" % level)
 		assert_near(
@@ -59,19 +63,32 @@ func test_jelly_mass_level_and_level_fixed_radius() -> void:
 			TOLERANCE,
 			"exact mass radius L%d" % level
 		)
-	assert_eq(config.jelly_level_for_mass(6.0), 3, "mass 6 remains L3")
+	assert_eq(config.jelly_level_for_mass(6.0), 4, "mass 6 remains L4")
 	assert_near(
 		config.jelly_radius_for_mass(6.0),
-		config.radius_for_level(3),
+		config.radius_for_level(4),
 		TOLERANCE,
-		"mass 6 keeps the L3 radius"
+		"mass 6 keeps the L4 radius"
 	)
 	assert_near(
 		config.jelly_radius_for_mass(7.0),
-		config.radius_for_level(3),
+		config.radius_for_level(5),
 		TOLERANCE,
-		"mass 7 still keeps the L3 radius"
+		"mass 7 reaches the L5 radius"
 	)
+	assert_near(config.jelly_fill_fraction_for_mass(4.0), 0.5, TOLERANCE, "B L3 belly fraction")
+	assert_near(config.jelly_fill_fraction_for_mass(64.0), 0.0, TOLERANCE, "L10 belly is empty")
+
+
+func test_jelly_mass_profiles_a_b_and_invalid_table_fallback() -> void:
+	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
+	config.jelly_level_masses = PackedFloat32Array([1, 2, 4, 8, 16, 32, 64, 128, 256, 512])
+	for level: int in range(1, config.orb_max_level + 1):
+		assert_near(config.jelly_mass_for_level(level), pow(2.0, level - 1), TOLERANCE, "A mass L%d" % level)
+	assert_near(config.jelly_fill_fraction_for_mass(12.0), 0.5, TOLERANCE, "A belly fraction")
+	config.jelly_level_masses = PackedFloat32Array([1, 2])
+	for level: int in range(1, config.orb_max_level + 1):
+		assert_near(config.jelly_mass_for_level(level), pow(2.0, level - 1), TOLERANCE, "fallback mass L%d" % level)
 
 
 func test_m2_swipe_defaults() -> void:
@@ -83,7 +100,7 @@ func test_m2_swipe_defaults() -> void:
 func test_m3_turn_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	assert_near(config.gravity_strength, 3600.0, TOLERANCE, "gravity strength")
-	assert_near(config.gravity_level_scale, 0.05, TOLERANCE, "gravity level scale")
+	assert_near(config.gravity_level_scale, 0.0333, TOLERANCE, "gravity level scale")
 	assert_near(config.gravity_turn_diagonal_time, 0.15, TOLERANCE, "gravity diagonal time")
 	assert_near(config.orb_bounce, 0.06, TOLERANCE, "orb bounce")
 	assert_near(config.wall_bounce, 0.06, TOLERANCE, "wall bounce")
@@ -97,10 +114,10 @@ func test_m3_turn_defaults() -> void:
 		"level one gravity"
 	)
 	assert_near(
-		config.gravity_for_level(7),
-		config.gravity_strength * (1.0 + config.gravity_level_scale * 6.0),
+		config.gravity_for_level(10),
+		config.gravity_strength * (1.0 + config.gravity_level_scale * 9.0),
 		TOLERANCE,
-		"level seven gravity"
+		"level ten gravity"
 	)
 	assert_near(config.stable_linear_speed, 30.0, TOLERANCE, "stable linear speed")
 	assert_near(config.stable_angular_speed, 3.0, TOLERANCE, "stable angular speed")
@@ -239,7 +256,7 @@ func test_m7_score_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	assert_eq(
 		config.level_scores,
-		PackedInt32Array([2, 4, 8, 16, 32, 64, 128]),
+		PackedInt32Array([2, 4, 6, 10, 14, 22, 34, 54, 84, 128]),
 		"level scores"
 	)
 	assert_near(
@@ -260,7 +277,7 @@ func test_m7_score_defaults() -> void:
 	assert_near(config.danger_doubling, 0.20, TOLERANCE, "danger doubling")
 	assert_near(config.shock_impulse, 600.0, TOLERANCE, "shock impulse")
 	assert_near(config.shock_radius_factor, 2.5, TOLERANCE, "shock radius factor")
-	assert_near(config.shock_level_scale, 0.3, TOLERANCE, "shock level scale")
+	assert_near(config.shock_level_scale, 0.2, TOLERANCE, "shock level scale")
 	assert_near(config.shock_jackpot_scale, 3.0, TOLERANCE, "shock jackpot scale")
 	assert_true(config.color_effects_enabled, "color effects enabled")
 	assert_eq(
@@ -300,16 +317,20 @@ func test_m9_blast_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	assert_true(config.blast_enabled, "blast enabled")
 	assert_eq(config.blast_min_level, 4, "shared blast minimum level")
-	assert_eq(config.jelly_blast_min_level, 6, "JELLY blast starts at L6 by default")
+	assert_eq(config.jelly_blast_min_level, 8, "JELLY blast starts at L8 by default")
+	assert_eq(config.jelly_merge_level_gap, 2, "JELLY merge level gap defaults to two")
 	assert_eq(
 		config.blast_push_radius_by_level,
-		PackedFloat32Array([0.0, 0.0, 0.0, 0.3, 0.55, 1.0, 1.0]),
+		PackedFloat32Array([0.0, 0.0, 0.0, 0.3, 0.55, 1.0, 1.0, 1.0, 1.0, 1.0]),
 		"blast push radius by level"
 	)
 	assert_near(config.blast_speed, 900.0, TOLERANCE, "blast speed")
 	assert_near(config.blast_far_factor, 0.4, TOLERANCE, "blast far factor")
 	assert_near(config.blast_score_factor, 5.0, TOLERANCE, "blast score factor")
 	assert_near(config.blast_blink_period, 0.8, TOLERANCE, "blast blink period")
+	assert_near(config.jelly_tap_blast_radius_factor, 0.3, TOLERANCE, "tap radius")
+	assert_near(config.jelly_tap_blast_score_factor, 1.0, TOLERANCE, "tap score")
+	assert_near(config.jelly_tap_blast_touch_margin, 16.0, TOLERANCE, "tap margin")
 
 
 func test_m8_feedback_defaults() -> void:

@@ -197,7 +197,7 @@ func test_blast_requires_same_level_different_color_and_minimum_level() -> void:
 		{"colors": [0, 1], "levels": [4, 4], "type": ReactionRules.Type.NONE},
 		{"colors": [0, 1], "levels": [5, 7], "type": ReactionRules.Type.NONE},
 		{"colors": [0, 3], "levels": [7, 7], "type": ReactionRules.Type.BLAST},
-		{"colors": [3, 3], "levels": [7, 7], "type": ReactionRules.Type.MAX_CLEAR},
+		{"colors": [3, 3], "levels": [7, 7], "type": ReactionRules.Type.MERGE},
 	]
 	for item: Dictionary in cases:
 		var colors: Array = item["colors"] as Array
@@ -236,49 +236,88 @@ func test_default_blast_minimum_starts_at_level_four() -> void:
 func test_jelly_same_and_adjacent_levels_absorb_by_abstract_mass() -> void:
 	var cfg: GameConfig = GameConfig.new()
 	cfg.game_mode = GameConfig.GameMode.JELLY
-	var equal: Dictionary = ReactionRules.classify(2, 3, 2, 3, cfg, 4.0, 4.0)
+	var equal: Dictionary = ReactionRules.classify(2, 3, 2, 3, cfg, 3.0, 3.0)
 	assert_eq(equal["type"], ReactionRules.Type.MERGE, "JELLY L+L merges")
 	assert_eq(equal["result_level"], 4, "JELLY L3+L3 reaches L4")
-	assert_near(float(equal["result_mass"]), 8.0, 0.001, "JELLY equal mass sum")
+	assert_near(float(equal["result_mass"]), 6.0, 0.001, "JELLY equal mass sum")
 	assert_eq(equal["absorber"], 0, "equal levels use midpoint")
 
-	var adjacent: Dictionary = ReactionRules.classify(2, 3, 2, 2, cfg, 4.0, 2.0)
+	var adjacent: Dictionary = ReactionRules.classify(2, 3, 2, 2, cfg, 3.0, 2.0)
 	assert_eq(adjacent["type"], ReactionRules.Type.MERGE, "JELLY L+(L-1) absorbs")
-	assert_eq(adjacent["result_level"], 3, "adjacent absorption keeps level")
-	assert_near(float(adjacent["result_mass"]), 6.0, 0.001, "adjacent mass sum")
+	assert_eq(adjacent["result_level"], 4, "B adjacent absorption levels up")
+	assert_near(float(adjacent["result_mass"]), 5.0, 0.001, "adjacent mass sum")
 	assert_eq(adjacent["absorber"], 1, "larger first orb keeps position")
 	assert_true(bool(adjacent["jelly_absorption"]), "adjacent merge is absorption")
 
-	var reversed: Dictionary = ReactionRules.classify(2, 2, 2, 3, cfg, 2.0, 4.0)
+	var reversed: Dictionary = ReactionRules.classify(2, 2, 2, 3, cfg, 2.0, 3.0)
 	assert_eq(reversed["absorber"], 2, "larger second orb keeps position")
-	var gap: Dictionary = ReactionRules.classify(2, 4, 2, 2, cfg, 8.0, 2.0)
-	assert_eq(gap["type"], ReactionRules.Type.NONE, "JELLY L+(L-2) does not react")
+	var gap_two: Dictionary = ReactionRules.classify(2, 4, 2, 2, cfg, 8.0, 2.0)
+	var gap_three: Dictionary = ReactionRules.classify(2, 5, 2, 2, cfg, 16.0, 2.0)
+	assert_eq(gap_two["type"], ReactionRules.Type.MERGE, "default JELLY L+(L-2) absorbs")
+	assert_eq(gap_three["type"], ReactionRules.Type.NONE, "default JELLY L+(L-3) does not react")
 
 
-func test_jelly_level_seven_jackpot_and_capped_absorption() -> void:
+func test_jelly_level_ten_jackpot_and_capped_absorption() -> void:
 	var cfg: GameConfig = GameConfig.new()
 	cfg.game_mode = GameConfig.GameMode.JELLY
-	var jackpot: Dictionary = ReactionRules.classify(1, 7, 1, 7, cfg, 64.0, 64.0)
-	assert_eq(jackpot["type"], ReactionRules.Type.MAX_CLEAR, "JELLY L7+L7 jackpots")
-	var capped: Dictionary = ReactionRules.classify(1, 7, 1, 6, cfg, 64.0, 32.0)
-	assert_eq(capped["type"], ReactionRules.Type.MERGE, "JELLY L7 absorbs L6")
-	assert_eq(capped["result_level"], 7, "capped absorption stays L7")
+	var jackpot: Dictionary = ReactionRules.classify(1, 10, 1, 10, cfg, 64.0, 64.0)
+	assert_eq(jackpot["type"], ReactionRules.Type.MAX_CLEAR, "JELLY L10+L10 jackpots")
+	var capped: Dictionary = ReactionRules.classify(1, 10, 1, 9, cfg, 64.0, 42.0)
+	assert_eq(capped["type"], ReactionRules.Type.MERGE, "JELLY L10 absorbs L9")
+	assert_eq(capped["result_level"], 10, "capped absorption stays L10")
 	assert_near(float(capped["result_mass"]), 64.0, 0.001, "JELLY mass caps at 64")
 
 
-func test_jelly_blast_default_l6_threshold_and_absorption_precedence() -> void:
+func test_jelly_merge_level_gap_controls_same_color_absorption_only() -> void:
+	var cfg: GameConfig = GameConfig.new()
+	cfg.game_mode = GameConfig.GameMode.JELLY
+	cfg.jelly_merge_level_gap = 1
+	var adjacent: Dictionary = ReactionRules.classify(2, 7, 2, 6, cfg, 17.0, 11.0)
+	var gap_two_disabled: Dictionary = ReactionRules.classify(2, 7, 2, 5, cfg, 17.0, 7.0)
+	assert_eq(adjacent["type"], ReactionRules.Type.MERGE, "gap one allows adjacent levels")
+	assert_eq(gap_two_disabled["type"], ReactionRules.Type.NONE, "gap one rejects L+(L-2)")
+	assert_true(ReactionRules.can_react(2, 7, 2, 6, cfg), "can_react allows gap one")
+	assert_true(not ReactionRules.can_react(2, 7, 2, 5, cfg), "can_react rejects gap two")
+
+	cfg.jelly_merge_level_gap = 2
+	var gap_two: Dictionary = ReactionRules.classify(2, 7, 2, 5, cfg, 17.0, 7.0)
+	var gap_three: Dictionary = ReactionRules.classify(2, 7, 2, 4, cfg, 17.0, 5.0)
+	var capped: Dictionary = ReactionRules.classify(2, 10, 2, 8, cfg, 64.0, 27.0)
+	var jackpot: Dictionary = ReactionRules.classify(2, 10, 2, 10, cfg, 64.0, 64.0)
+	assert_eq(gap_two["type"], ReactionRules.Type.MERGE, "gap two allows L+(L-2)")
+	assert_eq(gap_two["result_level"], 7, "L7+L5 remains L7 at mass 24")
+	assert_near(float(gap_two["result_mass"]), 24.0, 0.001, "gap two preserves mass")
+	assert_eq(gap_three["type"], ReactionRules.Type.NONE, "gap two rejects L+(L-3)")
+	assert_eq(capped["type"], ReactionRules.Type.MERGE, "L10 absorbs L8 at gap two")
+	assert_eq(capped["result_level"], 10, "L10+L8 remains capped at L10")
+	assert_near(float(capped["result_mass"]), 64.0, 0.001, "L10+L8 caps mass")
+	assert_eq(jackpot["type"], ReactionRules.Type.MAX_CLEAR, "L10+L10 remains jackpot")
+	assert_true(ReactionRules.can_react(2, 7, 2, 5, cfg), "can_react follows gap two")
+
+	cfg.jelly_blast_min_level = 8
+	var different_l8: Dictionary = ReactionRules.classify(0, 8, 1, 8, cfg, 27.0, 27.0)
+	var different_gap: Dictionary = ReactionRules.classify(0, 8, 1, 6, cfg, 27.0, 11.0)
+	assert_eq(different_l8["type"], ReactionRules.Type.BLAST, "different-color same L8 blasts")
+	assert_eq(different_gap["type"], ReactionRules.Type.NONE, "merge gap does not affect colors")
+
+
+func test_jelly_blast_default_l8_threshold_and_gap_two_absorption_precedence() -> void:
 	var cfg: GameConfig = GameConfig.new()
 	cfg.game_mode = GameConfig.GameMode.JELLY
 	cfg.blast_enabled = true
 	cfg.opposite_pairs = [Vector2i(0, 1)]
-	var level_five_default: Dictionary = ReactionRules.classify(0, 5, 1, 5, cfg, 16.0, 16.0)
-	var level_six_default: Dictionary = ReactionRules.classify(0, 6, 1, 6, cfg, 32.0, 32.0)
-	var level_seven_default: Dictionary = ReactionRules.classify(0, 7, 1, 7, cfg, 64.0, 64.0)
-	var level_seven_jackpot: Dictionary = ReactionRules.classify(0, 7, 0, 7, cfg, 64.0, 64.0)
-	assert_eq(level_five_default["type"], ReactionRules.Type.NONE, "default J6 leaves different-color L5")
-	assert_eq(level_six_default["type"], ReactionRules.Type.BLAST, "default J6 blasts different-color L6")
-	assert_eq(level_seven_default["type"], ReactionRules.Type.BLAST, "default J6 blasts different-color L7")
-	assert_eq(level_seven_jackpot["type"], ReactionRules.Type.MAX_CLEAR, "same-color L7 keeps jackpot precedence")
+	var level_seven_default: Dictionary = ReactionRules.classify(0, 7, 1, 7, cfg, 17.0, 17.0)
+	var level_eight_default: Dictionary = ReactionRules.classify(0, 8, 1, 8, cfg, 27.0, 27.0)
+	var level_ten_default: Dictionary = ReactionRules.classify(0, 10, 1, 10, cfg, 64.0, 64.0)
+	var level_ten_jackpot: Dictionary = ReactionRules.classify(0, 10, 0, 10, cfg, 64.0, 64.0)
+	var gap_two_default: Dictionary = ReactionRules.classify(0, 7, 0, 5, cfg, 17.0, 7.0)
+	var gap_three_default: Dictionary = ReactionRules.classify(0, 7, 0, 4, cfg, 17.0, 5.0)
+	assert_eq(level_seven_default["type"], ReactionRules.Type.NONE, "default leaves different-color L7")
+	assert_eq(level_eight_default["type"], ReactionRules.Type.BLAST, "default blasts different-color L8")
+	assert_eq(level_ten_default["type"], ReactionRules.Type.BLAST, "default blasts different-color L10")
+	assert_eq(level_ten_jackpot["type"], ReactionRules.Type.MAX_CLEAR, "same-color L10 keeps jackpot precedence")
+	assert_eq(gap_two_default["type"], ReactionRules.Type.MERGE, "default absorbs same-color L+(L-2)")
+	assert_eq(gap_three_default["type"], ReactionRules.Type.NONE, "default rejects same-color L+(L-3)")
 	cfg.jelly_blast_min_level = 0
 	var disabled_result: Dictionary = ReactionRules.classify(0, 6, 1, 6, cfg, 32.0, 32.0)
 	assert_eq(disabled_result["type"], ReactionRules.Type.NONE, "explicit J0 disables BLAST")
@@ -299,7 +338,9 @@ func test_jelly_blast_default_l6_threshold_and_absorption_precedence() -> void:
 	var same_color: Dictionary = ReactionRules.classify(0, 4, 0, 4, cfg, 12.0, 8.0)
 	assert_eq(same_color["type"], ReactionRules.Type.MERGE, "same-color absorption precedes BLAST")
 	var same_color_gap: Dictionary = ReactionRules.classify(0, 6, 0, 4, cfg, 32.0, 8.0)
-	assert_eq(same_color_gap["type"], ReactionRules.Type.NONE, "same-color level gap does not BLAST")
+	assert_eq(same_color_gap["type"], ReactionRules.Type.MERGE, "default gap-two absorption precedes BLAST")
+	var same_color_gap_three: Dictionary = ReactionRules.classify(0, 7, 0, 4, cfg, 64.0, 8.0)
+	assert_eq(same_color_gap_three["type"], ReactionRules.Type.NONE, "same-color gap three does not BLAST")
 
 
 func _enable_red_blue(cfg: GameConfig) -> void:

@@ -1,6 +1,7 @@
 extends TestCase
 
 const BOARD_SCENE: PackedScene = preload("res://scenes/Board3D.tscn")
+const CELESTIAL_MAX_LEVEL: int = 7
 
 
 func test_all_levels_keep_celestial_art_inside_collision_radius() -> void:
@@ -14,7 +15,7 @@ func test_all_levels_keep_celestial_art_inside_collision_radius() -> void:
 		"planet_l6",
 		"planet_l7",
 	]
-	for level: int in range(1, Config.data.orb_max_level + 1):
+	for level: int in range(1, CELESTIAL_MAX_LEVEL + 1):
 		var orb: Orb3D = board.spawn_orb(
 			level % Config.data.color_display.size(),
 			level,
@@ -157,7 +158,7 @@ func test_celestial_materials_remain_shared() -> void:
 	var board: Board3D = await _create_board()
 	var materials: Dictionary = {}
 	for color: int in range(Config.data.color_display.size()):
-		for level: int in range(1, Config.data.orb_max_level + 1):
+		for level: int in range(1, CELESTIAL_MAX_LEVEL + 1):
 			var first: Orb3D = board.spawn_orb(color, level, Vector2.ZERO)
 			var second: Orb3D = board.spawn_orb(color, level, Vector2.ZERO)
 			assert_eq(
@@ -167,7 +168,7 @@ func test_celestial_materials_remain_shared() -> void:
 			)
 			materials[first.visual_material_resource().get_instance_id()] = true
 	assert_true(
-		materials.size() <= Config.data.color_display.size() * Config.data.orb_max_level,
+		materials.size() <= Config.data.color_display.size() * CELESTIAL_MAX_LEVEL,
 		"celestial materials are bounded by color times level"
 	)
 	assert_eq(_forbidden_geometry_count(board), 0, "shared resources contain no ring geometry")
@@ -179,7 +180,7 @@ func test_preview_uses_same_level_and_color_art_profile() -> void:
 	var preview: OrbVisual = OrbVisual.new()
 	tree.root.add_child(preview)
 	for color: int in range(Config.data.color_display.size()):
-		for level: int in range(1, Config.data.orb_max_level + 1):
+		for level: int in range(1, CELESTIAL_MAX_LEVEL + 1):
 			var orb: Orb3D = board.spawn_orb(color, level, Vector2.ZERO)
 			preview.setup_celestial_preview(
 				Config.data.color_display[color],

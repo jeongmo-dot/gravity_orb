@@ -2,6 +2,7 @@ extends Node
 
 signal swipe(direction: Vector2i)
 signal swipe_rejected(direction: Vector2i)
+signal tap_released(position: Vector2)
 signal restart_requested
 signal debug_toggle_hud
 signal debug_cycle_annihilation_rule
@@ -134,6 +135,8 @@ func _end_pointer_gesture(source: PointerSource, position: Vector2) -> void:
 		Config.data.swipe_dominance_ratio
 	)
 	if direction == Vector2i.ZERO:
+		if not _locked and not started_locked:
+			tap_released.emit(position)
 		return
 	if _locked or (started_locked and not _accept_release_after_unlock):
 		swipe_rejected.emit(direction)

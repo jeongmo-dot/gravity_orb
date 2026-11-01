@@ -3,6 +3,8 @@ extends Node
 const OUTPUT_PREFIX: String = "--full-board-performance-output="
 const LABEL_PREFIX: String = "--full-board-performance-label="
 const MERGE_DURATION_PREFIX: String = "--jelly-merge-duration="
+const ORB_COUNT_PREFIX: String = "--full-board-orb-count="
+const LEVEL_PROFILE_PREFIX: String = "--full-board-level-profile="
 const WINDOW_SIZE: Vector2i = Vector2i(540, 960)
 const WARMUP_SECONDS: float = 0.75
 const SAMPLE_SECONDS: float = 4.0
@@ -22,6 +24,7 @@ var _scenario_real_started_usec: int = 0
 var _samples: Dictionary = {}
 var _merge_activation_pairs: Array[Array] = []
 var _scenario_physics_step: int = 0
+var _full_board_orb_count: int = 120
 
 
 func configure(main: Main) -> void:
@@ -85,6 +88,8 @@ func _process(_delta: float) -> void:
 
 
 func _run() -> void:
+	var level_profile: String = _argument_value(LEVEL_PROFILE_PREFIX, "B").to_upper()
+	_apply_level_profile(level_profile)
 	Config.data.jelly_merge_duration = maxf(
 		_argument_value(
 			MERGE_DURATION_PREFIX,
@@ -92,6 +97,7 @@ func _run() -> void:
 		).to_float(),
 		0.0
 	)
+	_full_board_orb_count = maxi(_argument_value(ORB_COUNT_PREFIX, "120").to_int(), 120)
 	DisplayServer.window_set_size(WINDOW_SIZE)
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 	_turn_manager.set_physics_process(false)
@@ -104,15 +110,16 @@ func _run() -> void:
 		"vsync": "disabled",
 		"physics_ticks_per_second": Engine.physics_ticks_per_second,
 		"jelly_merge_duration": Config.data.jelly_merge_duration,
+		"level_profile": level_profile,
 		"scenarios": [],
 	}
 	await _prepare_full_board(false)
 	(results["scenarios"] as Array).append(
-		await _measure_scenario("01_stopped_120", SAMPLE_SECONDS, true)
+		await _measure_scenario("01_stopped_%d" % _full_board_orb_count, SAMPLE_SECONDS, true)
 	)
 	await _prepare_full_board(true)
 	(results["scenarios"] as Array).append(
-		await _measure_scenario("02_stopped_120_waiters_16", SAMPLE_SECONDS, true)
+		await _measure_scenario("02_stopped_%d_waiters_16" % _full_board_orb_count, SAMPLE_SECONDS, true)
 	)
 	await _prepare_merge_heavy_board()
 	(results["scenarios"] as Array).append(
@@ -134,6 +141,37 @@ func _run() -> void:
 	output.close()
 	print("FULL_BOARD_PERFORMANCE_OUTPUT=%s" % output_path)
 	get_tree().quit(0)
+
+
+func _apply_level_profile(profile: String) -> void:
+	if profile == "A":
+		Config.data.orb_max_level = 10
+		Config.data.jelly_level_masses = PackedFloat32Array([
+			1, 2, 4, 8, 16, 32, 64, 128, 256, 512,
+		])
+		Config.data.level_radii = PackedFloat32Array([
+			25, 40, 47, 55, 64, 75, 88, 102, 120, 140,
+		])
+		Config.data.level_scores = PackedInt32Array([
+			2, 4, 8, 16, 32, 64, 128, 256, 512, 1024,
+		])
+		Config.data.gravity_level_scale = 0.0333
+		Config.data.shock_level_scale = 0.2
+		return
+	if profile != "B":
+		push_warning("Unknown full-board level profile %s; using B" % profile)
+	Config.data.orb_max_level = 10
+	Config.data.jelly_level_masses = PackedFloat32Array([
+		1, 2, 3, 5, 7, 11, 17, 27, 42, 64,
+	])
+	Config.data.level_radii = PackedFloat32Array([
+		25, 40, 52, 68, 80, 92, 102, 115, 128, 140,
+	])
+	Config.data.level_scores = PackedInt32Array([
+		2, 4, 6, 10, 14, 22, 34, 54, 84, 128,
+	])
+	Config.data.gravity_level_scale = 0.0333
+	Config.data.shock_level_scale = 0.2
 
 
 func _prepare_full_board(add_waiters: bool) -> void:
@@ -158,8 +196,18 @@ func _prepare_full_board(add_waiters: bool) -> void:
 				2,
 				Vector2(-400.0 + float(column) * 80.0, -320.0 + float(row) * 80.0)
 			)
-	for column: int in range(3):
-		_spawn_stopped_orb(column % 4, 1, Vector2(-150.0 + float(column) * 150.0, 420.0))
+	var bottom_count: int = _full_board_orb_count - 117
+	for column: int in range(bottom_count):
+		var ratio: float = (
+			float(column) / float(bottom_count - 1)
+			if bottom_count > 1
+			else 0.5
+		)
+		_spawn_stopped_orb(
+			column % 4,
+			1,
+			Vector2(lerpf(-425.0, 425.0, ratio), 420.0)
+		)
 	if add_waiters:
 		for index: int in range(16):
 			var waiter: Orb3D = _board.spawn_orb(
