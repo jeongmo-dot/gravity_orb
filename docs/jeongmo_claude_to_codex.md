@@ -32,8 +32,15 @@
 
 ## 대기 중
 
-### [2026-11-01 #131] 잭팟을 대폭발보다 크게 — 같은 색 L10 둘 640 → 5,120
-- 상태: 대기 (**다음 차례**. 최신 `origin/main` 위에서)
+- 없음
+
+---
+
+## 처리 완료
+
+### [2026-11-01 #131] 잭팟을 대폭발보다 크게 — 같은 색 L10 둘 640 → 5,120 — 완료
+- 상태: 완료 (2026-11-01 Claude 검수 · [PR #131](https://github.com/jeongmo-dot/gravity_orb/pull/131) 병합 `2b0ced1`)
+- 검수: 명세대로 — 기본값 40 (잭팟 5,120, 콤보 3·점유율 70%에서 81,920 테스트), 래퍼 331/331, M·B·C8·D·ST 해시 그대로, 새 기본 해시 `3254c77f…` 고정 (Codex). `98` 캡처에서 실제 점수 경로로 금색 +5,120 팝업이 두 비율 모두 보드 안. 측정 없음 (명세대로). Claude 재실행 없음 (§12-ONE.24 결과)
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.24**
 - 배경: #130에서 대폭발 배율을 5 → 15로 올려 (L8+L8 1,620 ~ L10+L10 3,840) 잭팟 640이 모든 대폭발보다 작아졌다. 사용자 "다음 차례에 올리기"
 - 앵커: `config/GameConfig.gd`·`default_config.tres` (`max_merge_bonus_factor`), `scripts/core/ScoreManager.gd` `points_for()` (`MAX_CLEAR` — 식은 그대로), 회귀 해시 (`tests/test_jelly_regression.gd`), `tests/test_score.gd`·`tests/test_config.gd`, 캡처 (`tests/spike/capture_screens.gd`)
@@ -45,10 +52,6 @@
 - 건드리지 말 것: 잭팟 판정·충격파·연출, 대폭발·소폭발·합체 점수, 콤보·위험 배수, 소폭발 턴 쓰기, 레벨표·마찰·생성, 랭킹 (저장 형식·기록), 사용자 저장 파일, 새 연출·표시 (고리 모양 금지), `docs/` (회신 파일 제외)
 - Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), 예전 해시 그대로, 새 기본 해시 상수 고정, 캡처 (실제 창, 마지막은 전체 캡처) 보고, 검증 빌드는 `-Debug`만
 - 커밋: 항목 단위 브랜치, **push·PR까지**. 병합은 Claude 검수 뒤
-
----
-
-## 처리 완료
 
 ### [2026-11-01 #130] 대폭발 점수를 소폭발보다 확실히 크게·소폭발에 턴 쓰기 — 생존이냐 점수냐 — 완료
 - 상태: 완료 (2026-11-01 Claude 검수 · [PR #130](https://github.com/jeongmo-dot/gravity_orb/pull/130) 병합 `3bf113e`)

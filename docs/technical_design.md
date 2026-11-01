@@ -296,7 +296,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M6 | `annihilation_rule` | AnnihilationRule | A_BOTH → **B_SAME_LEVEL** (2026-09-30 플레이테스트, 기획서 0.4.1) | |
 | M7 | `level_scores` | PackedInt32Array | [2,4,8,16,32,64,128] → **[2, 4, 6, 10, 14, 22, 34, 54, 84, 128]** (#128 — JELLY 질량 × 2, §12-ONE.21) | 인덱스 0 = 레벨1 |
 | M7 | `annihilation_score_factor` | float | 0.5 | |
-| M7 | `max_merge_bonus_factor` | float | 5.0 | |
+| M7 | `max_merge_bonus_factor` | float | 5.0 → **40.0** (#131, 2026-11-01 — #130 대폭발 ×15 뒤 잭팟이 모든 대폭발보다 작아져 사용자 "다음 차례에 올리기", §12-ONE.24) | 잭팟 (`MAX_CLEAR`) 기본 점수 = `score_for_level(orb_max_level) × 값` — JELLY L10 128 × 40 = 5,120 (L10+L10 대폭발 3,840의 1.33배). 공유 값이라 레거시 CLASSIC·SLIME L7 잭팟도 같이 커진다 |
 | ~~M7~~ | ~~`spawn_candidate_count`, `spawn_fallback_to_free_slot`~~ | | | **폐기** (기획서 0.2: 빈자리와 무관하게 생성) |
 | 보류 | `warning_distance` | | | 게임오버 조건 재설계 후 결정 (11.4) |
 | M8 | `hitstop_duration` | float | 0.06 | 실시간 초 |
@@ -732,7 +732,7 @@ MERGE·MAX_CLEAR 반응 직후 반응 지점 `p`에서 충격파를 낸다.
 |---|---|
 | MERGE | `score_for_level(result_level)` |
 | ANNIHILATE | `floor((score_for_level(La) + score_for_level(Lb)) × annihilation_score_factor)` |
-| MAX_CLEAR (L7 잭팟) | `score_for_level(orb_max_level) × max_merge_bonus_factor` (128 × 5 = 640) |
+| MAX_CLEAR (L7 잭팟) | `score_for_level(orb_max_level) × max_merge_bonus_factor` (#131부터 128 × 40 = 5,120. 그 전 128 × 5 = 640) |
 
 - **콤보 배수** = `combo_multiplier_base ^ (combo − 1)` (기본 2.0). `combo`는 §8.1 턴 콤보. **#62: 상한 `combo_multiplier_max` ×128** — `min(base^(combo − 1), 128)`, 콤보 8부터 고정 (대폭발 L4로 한 판 최대 콤보가 14~24가 되어 점수가 수백만~수억으로 폭주, 2026-10-11 사용자 결정)
 - **위험 배수** = 점유율 p(반응 직전, 최종 반지름 기준 Σπr² ÷ 보드²)가 `danger_start`(0.30) 미만이면 1, 이상이면 `2 ^ ((p − danger_start) ÷ danger_doubling)` (`danger_doubling` 0.20)
@@ -4168,6 +4168,12 @@ M4 검수(2026-09-28)에서 발견. 합체가 없는 M4 상태에서 **이동·�
 - 측정: 없음 (잭팟 0번이라 판 진행·다른 점수에 영향 없음)
 - 테스트: 잭팟 기본 점수 5,120 (콤보 1·위험 배수 1), 콤보·위험 배수를 곱한 예 하나, `test_config` 기본값
 - 캡처 (두 비율, 실제 창): 잭팟 장면 (`16_jelly_jackpot_effect`·`98_jelly_l10_jackpot_b`)에 점수 팝업이 나오면 +5,120이 잘리지 않는지. 팝업이 없는 장면이면 그렇다고 회신. 마지막에 전체 캡처
+
+**#131 결과 — 병합** (2026-11-01, [PR #131](https://github.com/jeongmo-dot/gravity_orb/pull/131) `2b0ced1`. 검증·캡처는 Codex, 검수는 Claude — Claude 재실행 없음)
+- `max_merge_bonus_factor` 40 (`GameConfig.gd`·`default_config.tres`). 테스트: 잭팟 기본 5,120, 콤보 3 (×4)·점유율 70% (×4)에서 81,920
+- 테스트 331/331, 해시 M·B·C8·D·ST 그대로 (예전 값 묶음에 5를 명시), 새 기본 `3254c77f2bcf…` 고정 (해시 상태에 잭팟 배율을 넣어 구분)
+- 캡처: `98_jelly_l10_jackpot_b`는 실제 점수 경로 (`TurnManager` → `ScoreManager` → HUD)로 금색 +5,120 팝업 — 두 비율 모두 보드 안에서 잘리지 않음. `16_jelly_jackpot_effect`는 연출 전용이라 팝업 없음
+- 측정 없음 (명세대로)
 
 ### 12-ONE.3 다음 (JELLY 개선)
 - CLASSIC 전용 분기 정리 (행성 그림·연출·규칙 — JELLY가 안 쓰는 것)
