@@ -58,8 +58,7 @@ static func can_react(
 			)
 			or (
 				color_a != color_b
-				and level_a == level_b
-				and cfg.blast_enabled_for_level(level_a)
+				and cfg.jelly_blast_enabled_for_pair(level_a, level_b)
 			)
 		)
 	if color_a == color_b and level_a == level_b:
@@ -120,7 +119,7 @@ static func _classify_jelly(
 		result["jelly_absorption"] = level_a != level_b
 		result["absorbed_level"] = mini(level_a, level_b)
 		return result
-	if color_a != color_b and level_a == level_b and cfg.blast_enabled_for_level(level_a):
+	if color_a != color_b and cfg.jelly_blast_enabled_for_pair(level_a, level_b):
 		return _result(Type.BLAST, 0, color_a)
 	return _result(Type.NONE, 0, color_a)
 

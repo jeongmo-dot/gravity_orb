@@ -105,6 +105,11 @@ func test_m3_turn_defaults() -> void:
 	assert_near(config.orb_bounce, 0.06, TOLERANCE, "orb bounce")
 	assert_near(config.wall_bounce, 0.06, TOLERANCE, "wall bounce")
 	assert_near(config.orb_friction, 0.3, TOLERANCE, "orb friction")
+	assert_eq(
+		config.orb_friction_by_level,
+		PackedFloat32Array([0.3, 0.3, 0.3, 0.4, 0.4, 0.4, 0.4, 0.5, 0.5, 0.5]),
+		"JELLY friction by level"
+	)
 	assert_near(config.wall_friction, 0.3, TOLERANCE, "wall friction")
 	assert_near(config.orb_angular_damp, 15.0, TOLERANCE, "orb angular damp")
 	assert_near(
@@ -318,6 +323,7 @@ func test_m9_blast_defaults() -> void:
 	assert_true(config.blast_enabled, "blast enabled")
 	assert_eq(config.blast_min_level, 4, "shared blast minimum level")
 	assert_eq(config.jelly_blast_min_level, 8, "JELLY blast starts at L8 by default")
+	assert_true(not config.jelly_blast_requires_same_level, "JELLY blast allows mixed levels")
 	assert_eq(config.jelly_merge_level_gap, 2, "JELLY merge level gap defaults to two")
 	assert_eq(
 		config.blast_push_radius_by_level,
@@ -328,6 +334,7 @@ func test_m9_blast_defaults() -> void:
 	assert_near(config.blast_far_factor, 0.4, TOLERANCE, "blast far factor")
 	assert_near(config.blast_score_factor, 5.0, TOLERANCE, "blast score factor")
 	assert_near(config.blast_blink_period, 0.8, TOLERANCE, "blast blink period")
+	assert_eq(config.jelly_tap_blast_min_level, 8, "tap blast starts at L8")
 	assert_near(config.jelly_tap_blast_radius_factor, 0.3, TOLERANCE, "tap radius")
 	assert_near(config.jelly_tap_blast_score_factor, 1.0, TOLERANCE, "tap score")
 	assert_near(config.jelly_tap_blast_touch_margin, 16.0, TOLERANCE, "tap margin")

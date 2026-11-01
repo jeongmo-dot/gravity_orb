@@ -275,6 +275,43 @@ func test_jelly_default_l8_blast_readiness_follows_mass_without_outline_geometry
 	Config.data.game_mode = original_mode
 
 
+func test_jelly_level_friction_updates_with_mass_and_falls_back_to_single_value() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_by_level: PackedFloat32Array = Config.data.orb_friction_by_level.duplicate()
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var board: Board3D = await _create_board()
+	var level_three: Orb3D = board.spawn_orb(0, 3, Vector2(-250.0, 0.0))
+	var level_four: Orb3D = board.spawn_orb(1, 4, Vector2.ZERO)
+	var level_eight: Orb3D = board.spawn_orb(2, 8, Vector2(250.0, 0.0))
+	var level_three_material: PhysicsMaterial = level_three.get_physics_body().physics_material_override
+	var level_four_material: PhysicsMaterial = level_four.get_physics_body().physics_material_override
+	var level_eight_material: PhysicsMaterial = level_eight.get_physics_body().physics_material_override
+	assert_near(level_three_material.friction, 0.3, 0.0001, "L3 friction")
+	assert_near(level_four_material.friction, 0.4, 0.0001, "L4 friction")
+	assert_near(level_eight_material.friction, 0.5, 0.0001, "L8 friction")
+	assert_true(not level_three_material.rough, "default material uses lower-friction mixing")
+	assert_true(not level_four_material.rough, "mid material uses lower-friction mixing")
+	assert_true(not level_eight_material.rough, "high material uses lower-friction mixing")
+	level_three.set_jelly_mass(Config.data.jelly_mass_for_level(4), Config.data)
+	assert_near(
+		(level_three.get_physics_body().physics_material_override as PhysicsMaterial).friction,
+		0.4,
+		0.0001,
+		"level-up absorption updates friction material"
+	)
+	Config.data.orb_friction_by_level = PackedFloat32Array()
+	var fallback: Orb3D = board.spawn_orb(3, 10, Vector2(400.0, 0.0))
+	assert_near(
+		(fallback.get_physics_body().physics_material_override as PhysicsMaterial).friction,
+		Config.data.orb_friction,
+		0.0001,
+		"empty per-level table falls back to shared friction"
+	)
+	_cleanup(board)
+	Config.data.orb_friction_by_level = original_by_level
+	Config.data.game_mode = original_mode
+
+
 func test_jolt_reaction_uses_shared_rules_and_spawns_3d_result() -> void:
 	var fixture_root: Node = Node.new()
 	fixture_root.name = "JoltReactionFixture"
@@ -319,6 +356,33 @@ func test_jolt_reaction_uses_shared_rules_and_spawns_3d_result() -> void:
 	if active.size() == 1:
 		assert_eq(active[0].level, 3, "shared 3D delayed result level")
 	_cleanup(fixture_root)
+
+
+func test_jelly_mixed_level_blast_uses_larger_level_for_effect() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_requires_same: bool = Config.data.jelly_blast_requires_same_level
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_blast_requires_same_level = false
+	var fixture: Dictionary = await _create_turn_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	resolver.proximity_reaction_scan_enabled = false
+	var level_eight: Orb3D = board.spawn_orb(0, 8, Vector2(-100.0, 0.0))
+	var level_nine: Orb3D = board.spawn_orb(1, 9, Vector2(100.0, 0.0))
+	level_eight.disable_physics()
+	level_nine.disable_physics()
+	var reactions: Array[Dictionary] = []
+	resolver.reaction_applied.connect(func(reaction: Dictionary) -> void: reactions.append(reaction))
+	resolver.report_contact(level_eight, level_nine, "mixed_level_test")
+	assert_eq(resolver.flush(), 1, "mixed L8+L9 resolves once")
+	assert_eq(reactions.size(), 1, "mixed blast emits one reaction")
+	if reactions.size() == 1:
+		assert_eq(reactions[0]["type"], ReactionRules.Type.BLAST, "mixed pair is BLAST")
+		assert_eq(reactions[0]["levels"], [8, 9], "reaction keeps both source levels")
+		assert_eq(reactions[0]["shock_level"], 9, "larger source level drives effect")
+	await _cleanup(fixture["root"] as Node)
+	Config.data.jelly_blast_requires_same_level = original_requires_same
+	Config.data.game_mode = original_mode
 
 
 func test_jelly_equal_merge_fills_new_level_belly() -> void:
@@ -713,7 +777,7 @@ func test_turn_manager_cap_finishes_active_merge_without_starting_a_new_one() ->
 	await _cleanup(fixture["root"] as Node)
 
 
-func test_level_ten_tap_blast_is_turn_free_and_settles_back_to_input() -> void:
+func test_level_eight_tap_blast_is_turn_free_and_settles_back_to_input() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_stable_duration: float = Config.data.stable_duration
 	var original_linear_speed: float = Config.data.stable_linear_speed
@@ -735,7 +799,7 @@ func test_level_ten_tap_blast_is_turn_free_and_settles_back_to_input() -> void:
 	manager.state = TurnManager.State.WAITING_INPUT
 	manager.final_move_pending = true
 	InputRouter.set_locked(false)
-	var tapped: Orb3D = board.spawn_orb(2, Config.data.orb_max_level, Vector2.ZERO)
+	var tapped: Orb3D = board.spawn_orb(2, 8, Vector2.ZERO)
 	var nearby: Orb3D = board.spawn_orb(1, 1, Vector2(200.0, 0.0))
 	var reactions: Array[Dictionary] = []
 	var turn_starts: int = 0
@@ -745,7 +809,7 @@ func test_level_ten_tap_blast_is_turn_free_and_settles_back_to_input() -> void:
 	manager.turn_finished.connect(func(_turn: int, _combo: int) -> void: turn_finishes += 1)
 	await tree.process_frame
 	manager.on_tap(camera.unproject_position(Orb3D.plane_position_to_world(Vector2.ZERO)))
-	assert_true(tapped.consumed, "tap removes selected L10")
+	assert_true(tapped.consumed, "tap removes selected L8")
 	assert_eq(manager.state, TurnManager.State.SIMULATING, "tap enters settling")
 	assert_eq(manager.turn_index, 0, "tap consumes no turn")
 	assert_eq(manager.gravity, Vector2i.DOWN, "tap preserves gravity")
@@ -755,6 +819,8 @@ func test_level_ten_tap_blast_is_turn_free_and_settles_back_to_input() -> void:
 	if reactions.size() == 1:
 		assert_eq(reactions[0]["type"], ReactionRules.Type.TAP_BLAST, "tap reaction type")
 		assert_eq(reactions[0]["combo"], 1, "tap combo starts at one")
+		assert_eq(reactions[0]["levels"], [8], "tap reaction keeps source level")
+		assert_eq(reactions[0]["shock_level"], 8, "tap effect keeps source level")
 	if reactions.size() == 1:
 		var blast_targets: Array = reactions[0]["blast_targets"] as Array
 		var nearby_was_pushed: bool = false
@@ -779,20 +845,26 @@ func test_level_ten_tap_blast_is_turn_free_and_settles_back_to_input() -> void:
 	await _cleanup(fixture["root"] as Node)
 
 
-func test_tap_blast_candidate_rejects_nonmax_waiting_ghost_and_locked_orbs() -> void:
+func test_tap_blast_candidate_accepts_l8_to_l10_and_rejects_l7_waiting_ghost_and_locked() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	var fixture: Dictionary = await _create_turn_fixture()
 	var board: Board3D = fixture["board"] as Board3D
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
-	var level_nine: Orb3D = board.spawn_orb(0, Config.data.orb_max_level - 1, Vector2(-300.0, 0.0))
-	var waiting: Orb3D = board.spawn_orb(0, Config.data.orb_max_level, Vector2(-100.0, 0.0))
-	var ghost: Orb3D = board.spawn_orb(0, Config.data.orb_max_level, Vector2(100.0, 0.0))
-	var locked: Orb3D = board.spawn_orb(0, Config.data.orb_max_level, Vector2(300.0, 0.0))
+	var level_seven: Orb3D = board.spawn_orb(0, 7, Vector2(-400.0, 0.0))
+	var level_eight: Orb3D = board.spawn_orb(1, 8, Vector2(-240.0, 0.0))
+	var level_nine: Orb3D = board.spawn_orb(2, 9, Vector2(-80.0, 0.0))
+	var level_ten: Orb3D = board.spawn_orb(3, 10, Vector2(80.0, 0.0))
+	var waiting: Orb3D = board.spawn_orb(0, 8, Vector2(220.0, 0.0))
+	var ghost: Orb3D = board.spawn_orb(0, 9, Vector2(360.0, 0.0))
+	var locked: Orb3D = board.spawn_orb(0, 10, Vector2(480.0, 0.0))
 	waiting.is_waiting_at_entrance = true
 	ghost.is_ghost = true
 	resolver._lock_reaction_result(locked)
-	assert_true(not resolver.is_jelly_tap_blast_candidate(level_nine), "L9 rejected")
+	assert_true(not resolver.is_jelly_tap_blast_candidate(level_seven), "L7 rejected")
+	assert_true(resolver.is_jelly_tap_blast_candidate(level_eight), "L8 accepted")
+	assert_true(resolver.is_jelly_tap_blast_candidate(level_nine), "L9 accepted")
+	assert_true(resolver.is_jelly_tap_blast_candidate(level_ten), "L10 accepted")
 	assert_true(not resolver.is_jelly_tap_blast_candidate(waiting), "entrance waiter rejected")
 	assert_true(not resolver.is_jelly_tap_blast_candidate(ghost), "ghost rejected")
 	assert_true(not resolver.is_jelly_tap_blast_candidate(locked), "reaction lock rejected")

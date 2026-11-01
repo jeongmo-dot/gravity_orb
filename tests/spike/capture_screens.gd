@@ -13,8 +13,8 @@ const CAPTURE_FILES: Array[String] = [
 	"03_jelly_result.png",
 	"04_jelly_gameplay.png",
 	"05_jelly_final_move.png",
-	"06_jelly_l5_no_blast_l6_face.png",
-	"07_jelly_l6_blast.png",
+	"06_jelly_l6_normal_l8_blast_face.png",
+	"07_jelly_l10_blast.png",
 	"08_jelly_full_down.png",
 	"09_jelly_full_right.png",
 	"10_jelly_eat_00.png",
@@ -111,6 +111,10 @@ const CAPTURE_FILES: Array[String] = [
 	"101_jelly_default_l7_l5_50.png",
 	"102_jelly_default_l7_l5_100.png",
 	"103_jelly_default_l8_blast.png",
+	"104_jelly_l8_tap_blast_00.png",
+	"105_jelly_l8_tap_blast_50.png",
+	"106_jelly_l8_tap_blast_100.png",
+	"107_jelly_l8_l9_blast.png",
 ]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
@@ -235,8 +239,8 @@ func _capture_gameplay_scenes() -> void:
 	await _capture_recovered_hud_scenes(main, manager, board, hud)
 
 	board.clear()
-	_spawn_l5_no_blast_and_l6_faces(board)
-	await _capture("06_jelly_l5_no_blast_l6_face.png")
+	_spawn_l6_normal_and_l8_blast_faces(board)
+	await _capture("06_jelly_l6_normal_l8_blast_face.png")
 	board.clear()
 	var first_blast: Orb3D = board.spawn_orb(
 		OrbTypes.OrbColor.RED,
@@ -250,11 +254,11 @@ func _capture_gameplay_scenes() -> void:
 	)
 	first_blast.disable_physics()
 	second_blast.disable_physics()
-	resolver.report_contact(first_blast, second_blast, "capture_l6_blast")
+	resolver.report_contact(first_blast, second_blast, "capture_l10_blast")
 	if resolver.flush() != 1:
 		_fail("different-color maximum-level pair did not produce one capture reaction")
 	await get_tree().create_timer(0.06).timeout
-	await _capture("07_jelly_l6_blast.png")
+	await _capture("07_jelly_l10_blast.png")
 
 	board.clear()
 	board.set_gravity(Vector2i.DOWN)
@@ -314,6 +318,7 @@ func _capture_level_ten_scenes(main: Main, board: Board3D) -> void:
 		await _capture_level_ten_pair_effect(board, director, profile, false)
 		await _capture_level_ten_pair_effect(board, director, profile, true)
 	await _capture_default_c8_scenes(main, board, director)
+	await _capture_default_d_scenes(board, director)
 
 	_set_jelly_level_profile("B")
 	board.clear()
@@ -418,6 +423,71 @@ func _capture_default_c8_scenes(
 	Config.data.jelly_blast_min_level = original_blast_level
 
 
+func _capture_default_d_scenes(board: Board3D, director: FeedbackDirector) -> void:
+	_set_jelly_level_profile("B")
+	board.clear()
+	director.clear_effects()
+	board.set_gravity(Vector2i.DOWN)
+	var source: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.YELLOW,
+		8,
+		Vector2.ZERO
+	)
+	source.disable_physics()
+	var nearby_specs: Array[Dictionary] = [
+		{"color": OrbTypes.OrbColor.RED, "level": 1, "position": Vector2(-175.0, -110.0)},
+		{"color": OrbTypes.OrbColor.BLUE, "level": 2, "position": Vector2(185.0, -95.0)},
+		{"color": OrbTypes.OrbColor.GREEN, "level": 3, "position": Vector2(-150.0, 145.0)},
+		{"color": OrbTypes.OrbColor.PURPLE, "level": 2, "position": Vector2(165.0, 155.0)},
+	]
+	for spec: Dictionary in nearby_specs:
+		board.spawn_orb(
+			int(spec["color"]),
+			int(spec["level"]),
+			spec["position"] as Vector2
+		)
+	await get_tree().process_frame
+	await _capture("104_jelly_l8_tap_blast_00.png")
+	var blast_position: Vector2 = source.position
+	board.remove_orb(source)
+	board.apply_blast_with_radius_factor(
+		blast_position,
+		Config.data.jelly_tap_blast_radius_factor
+	)
+	var original_hitstop_enabled: bool = Config.data.fx_hitstop_enabled
+	Config.data.fx_hitstop_enabled = false
+	director.play_reaction_visuals(_tap_blast_capture_reaction(8))
+	await get_tree().create_timer(FeedbackDirector.SUPERNOVA_DURATION * 0.5).timeout
+	await _capture("105_jelly_l8_tap_blast_50.png")
+	await get_tree().create_timer(FeedbackDirector.SUPERNOVA_DURATION * 0.5).timeout
+	await _capture("106_jelly_l8_tap_blast_100.png")
+	Config.data.fx_hitstop_enabled = original_hitstop_enabled
+
+	board.clear()
+	director.clear_effects()
+	var level_eight: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		8,
+		Vector2(-150.0, 0.0)
+	)
+	var level_nine: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.BLUE,
+		9,
+		Vector2(150.0, 0.0)
+	)
+	level_eight.disable_physics()
+	level_nine.disable_physics()
+	director.play_reaction_visuals({
+		"type": ReactionRules.Type.BLAST,
+		"levels": [8, 9],
+		"colors": [level_eight.color, level_nine.color],
+		"position": Vector2.ZERO,
+		"shock_level": 9,
+	})
+	await get_tree().create_timer(0.06).timeout
+	await _capture("107_jelly_l8_l9_blast.png")
+
+
 func _capture_tap_blast_progress(
 	board: Board3D,
 	director: FeedbackDirector,
@@ -454,13 +524,14 @@ func _capture_tap_blast_progress(
 	Config.data.fx_hitstop_enabled = original_hitstop_enabled
 
 
-func _tap_blast_capture_reaction() -> Dictionary:
+func _tap_blast_capture_reaction(level: int = -1) -> Dictionary:
+	var resolved_level: int = Config.data.orb_max_level if level < 0 else level
 	return {
 		"type": ReactionRules.Type.TAP_BLAST,
-		"levels": [Config.data.orb_max_level],
+		"levels": [resolved_level],
 		"colors": [OrbTypes.OrbColor.YELLOW],
 		"position": Vector2.ZERO,
-		"shock_level": Config.data.orb_max_level,
+		"shock_level": resolved_level,
 		"blast_radius_factor": Config.data.jelly_tap_blast_radius_factor,
 	}
 
@@ -515,6 +586,11 @@ func _set_jelly_level_profile(profile: String) -> void:
 	Config.data.orb_max_level = 10
 	Config.data.jelly_merge_level_gap = 2
 	Config.data.jelly_blast_min_level = 8
+	Config.data.jelly_blast_requires_same_level = false
+	Config.data.jelly_tap_blast_min_level = 8
+	Config.data.orb_friction_by_level = PackedFloat32Array([
+		0.3, 0.3, 0.3, 0.4, 0.4, 0.4, 0.4, 0.5, 0.5, 0.5,
+	])
 	if profile == "A":
 		Config.data.jelly_level_masses = PackedFloat32Array([
 			1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0, 512.0,
@@ -1878,12 +1954,12 @@ func _spawn_featured(board: Board3D) -> void:
 		orb.disable_physics()
 
 
-func _spawn_l5_no_blast_and_l6_faces(board: Board3D) -> void:
+func _spawn_l6_normal_and_l8_blast_faces(board: Board3D) -> void:
 	_spawn_specs(board, [
-		{"color": OrbTypes.OrbColor.RED, "level": 5, "mass": 16.0, "position": Vector2(-260.0, -150.0)},
-		{"color": OrbTypes.OrbColor.BLUE, "level": 5, "mass": 16.0, "position": Vector2(-60.0, -150.0)},
-		{"color": OrbTypes.OrbColor.GREEN, "level": 6, "mass": 32.0, "position": Vector2(-180.0, 150.0)},
-		{"color": OrbTypes.OrbColor.YELLOW, "level": 6, "mass": 32.0, "position": Vector2(180.0, 150.0)},
+		{"color": OrbTypes.OrbColor.RED, "level": 6, "mass": 11.0, "position": Vector2(-260.0, -150.0)},
+		{"color": OrbTypes.OrbColor.BLUE, "level": 6, "mass": 11.0, "position": Vector2(-60.0, -150.0)},
+		{"color": OrbTypes.OrbColor.GREEN, "level": 8, "mass": 27.0, "position": Vector2(-180.0, 150.0)},
+		{"color": OrbTypes.OrbColor.YELLOW, "level": 8, "mass": 27.0, "position": Vector2(180.0, 150.0)},
 	])
 
 

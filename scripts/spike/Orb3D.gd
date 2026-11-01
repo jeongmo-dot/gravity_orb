@@ -165,8 +165,8 @@ static func world_angular_velocity_to_plane(value: float) -> float:
 
 
 static func prewarm_shared_resources(cfg: GameConfig) -> void:
-	_shared_physics_material(cfg)
 	for level_index: int in range(1, cfg.orb_max_level + 1):
+		_shared_physics_material(cfg, level_index)
 		_shared_shape_for_level(cfg, level_index)
 		_shared_mesh_for_level(cfg, level_index)
 	CelestialOrbArt.prewarm(cfg)
@@ -249,7 +249,7 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	_body.collision_layer = 2
 	_body.collision_mask = 3
 
-	_body.physics_material_override = _shared_physics_material(cfg)
+	_body.physics_material_override = _shared_physics_material(cfg, level)
 	_collision_shape.shape = _shared_shape_for_level(cfg, level)
 	_mesh.mesh = _shared_mesh_for_level(cfg, level)
 	_radius_resources_are_unique = false
@@ -353,6 +353,7 @@ func set_jelly_mass(
 	_growth_elapsed = 0.0
 	_current_radius = previous_radius if _growth_duration > 0.0 else _radius
 	_body.mass = cfg.mass_for_radius(_radius)
+	_body.physics_material_override = _shared_physics_material(cfg, level)
 	if not gravity_direction.is_zero_approx():
 		set_gravity_vector(gravity_direction, cfg.gravity_strength)
 	_blast_armed = cfg.blast_enabled_for_level(level)
@@ -877,11 +878,12 @@ func _ensure_unique_radius_resources() -> void:
 	_radius_resources_are_unique = true
 
 
-static func _shared_physics_material(cfg: GameConfig) -> PhysicsMaterial:
-	var key: String = "%.6f:%.6f" % [cfg.orb_friction, cfg.orb_bounce]
+static func _shared_physics_material(cfg: GameConfig, level_index: int) -> PhysicsMaterial:
+	var friction: float = cfg.orb_friction_for_level(level_index)
+	var key: String = "%.6f:%.6f" % [friction, cfg.orb_bounce]
 	if not _shared_physics_materials.has(key):
 		var material: PhysicsMaterial = PhysicsMaterial.new()
-		material.friction = cfg.orb_friction
+		material.friction = friction
 		material.bounce = cfg.orb_bounce
 		_shared_physics_materials[key] = material
 	return _shared_physics_materials[key] as PhysicsMaterial

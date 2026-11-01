@@ -103,8 +103,9 @@ static func points_for(reaction: Dictionary, cfg: GameConfig) -> int:
 					* cfg.blast_score_factor
 				)
 		ReactionRules.Type.TAP_BLAST:
+			var levels: Array = reaction["levels"] as Array
 			base_points = int(
-				float(cfg.score_for_level(cfg.orb_max_level))
+				float(cfg.score_for_level(int(levels[0])))
 				* cfg.jelly_tap_blast_score_factor
 			)
 		_:

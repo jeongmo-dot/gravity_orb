@@ -27,6 +27,9 @@ enum GameMode {
 @export var gravity_level_scale: float = 0.0333
 @export var gravity_turn_diagonal_time: float = 0.15
 @export var orb_friction: float = 0.3
+@export var orb_friction_by_level: PackedFloat32Array = PackedFloat32Array(
+	[0.3, 0.3, 0.3, 0.4, 0.4, 0.4, 0.4, 0.5, 0.5, 0.5]
+)
 @export var orb_bounce: float = 0.06
 @export var wall_friction: float = 0.3
 @export var wall_bounce: float = 0.06
@@ -118,9 +121,11 @@ enum GameMode {
 @export var blast_enabled: bool = true
 @export var blast_min_level: int = 4
 @export var jelly_blast_min_level: int = 8
+@export var jelly_blast_requires_same_level: bool = false
 @export var blast_push_radius_by_level: PackedFloat32Array = PackedFloat32Array(
 	[0.0, 0.0, 0.0, 0.3, 0.55, 1.0, 1.0, 1.0, 1.0, 1.0]
 )
+@export var jelly_tap_blast_min_level: int = 8
 @export var jelly_tap_blast_radius_factor: float = 0.3
 @export var jelly_tap_blast_score_factor: float = 1.0
 @export var jelly_tap_blast_touch_margin: float = 16.0
@@ -212,6 +217,12 @@ func gravity_for_level(level: int) -> float:
 	return gravity_strength * (1.0 + gravity_level_scale * float(level - 1))
 
 
+func orb_friction_for_level(level: int) -> float:
+	if game_mode != GameMode.JELLY or orb_friction_by_level.size() != orb_max_level:
+		return orb_friction
+	return orb_friction_by_level[clampi(level, 1, orb_max_level) - 1]
+
+
 func score_for_level(level: int) -> int:
 	return level_scores[level - 1]
 
@@ -225,6 +236,16 @@ func active_blast_min_level() -> int:
 func blast_enabled_for_level(level: int) -> bool:
 	var minimum_level: int = active_blast_min_level()
 	return blast_enabled and minimum_level > 0 and level >= minimum_level
+
+
+func jelly_blast_enabled_for_pair(level_a: int, level_b: int) -> bool:
+	if jelly_blast_requires_same_level and level_a != level_b:
+		return false
+	return blast_enabled_for_level(level_a) and blast_enabled_for_level(level_b)
+
+
+func jelly_tap_blast_enabled_for_level(level: int) -> bool:
+	return jelly_tap_blast_min_level > 0 and level >= jelly_tap_blast_min_level
 
 
 func blast_push_radius_factor_for_level(level: int) -> float:

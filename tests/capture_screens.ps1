@@ -18,8 +18,8 @@ $expectedFiles = @(
     "03_jelly_result.png",
     "04_jelly_gameplay.png",
     "05_jelly_final_move.png",
-    "06_jelly_l5_no_blast_l6_face.png",
-    "07_jelly_l6_blast.png",
+    "06_jelly_l6_normal_l8_blast_face.png",
+    "07_jelly_l10_blast.png",
     "08_jelly_full_down.png",
     "09_jelly_full_right.png",
     "10_jelly_eat_00.png",
@@ -115,7 +115,11 @@ $expectedFiles = @(
     "100_jelly_default_l7_l5_00.png",
     "101_jelly_default_l7_l5_50.png",
     "102_jelly_default_l7_l5_100.png",
-    "103_jelly_default_l8_blast.png"
+    "103_jelly_default_l8_blast.png",
+    "104_jelly_l8_tap_blast_00.png",
+    "105_jelly_l8_tap_blast_50.png",
+    "106_jelly_l8_tap_blast_100.png",
+    "107_jelly_l8_l9_blast.png"
 )
 
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {

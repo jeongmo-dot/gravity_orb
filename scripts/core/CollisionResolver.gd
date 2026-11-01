@@ -217,6 +217,7 @@ func flush(delta: float = 0.0) -> int:
 		var shock_level: int = (
 			Config.data.orb_max_level
 			if reaction_type == ReactionRules.Type.MAX_CLEAR
+			else maxi(levels[0], levels[1]) if reaction_type == ReactionRules.Type.BLAST
 			else result_level
 		)
 		var shock_targets: Array[Dictionary] = []
@@ -238,7 +239,7 @@ func flush(delta: float = 0.0) -> int:
 				)
 			)
 		elif reaction_type == ReactionRules.Type.BLAST:
-			blast_targets = _board.apply_blast(reaction_position, levels[0])
+			blast_targets = _board.apply_blast(reaction_position, shock_level)
 
 		var reaction: Dictionary = {
 			"type": reaction_type,
@@ -287,6 +288,7 @@ func active_jelly_merge_count() -> int:
 func apply_jelly_tap_blast(orb: Variant) -> bool:
 	if not is_jelly_tap_blast_candidate(orb):
 		return false
+	var level: int = int(orb.level)
 	var position: Vector2 = orb.position
 	var source_radius: float = _orb_contact_radius(orb)
 	var occupancy: float = _board_occupied_area() / (
@@ -303,7 +305,7 @@ func apply_jelly_tap_blast(orb: Variant) -> bool:
 		"type": ReactionRules.Type.TAP_BLAST,
 		"chain": 1,
 		"occupancy": occupancy,
-		"levels": [Config.data.orb_max_level],
+		"levels": [level],
 		"colors": [color],
 		"stable_spawn_ids": [stable_spawn_id],
 		"position": position,
@@ -316,7 +318,7 @@ func apply_jelly_tap_blast(orb: Variant) -> bool:
 		"jelly_absorption": false,
 		"absorbed_level": 0,
 		"absorber": 0,
-		"shock_level": Config.data.orb_max_level,
+		"shock_level": level,
 		"shock_targets": [],
 		"blast_targets": blast_targets,
 		"contact_path": "tap_blast",
@@ -336,7 +338,7 @@ func is_jelly_tap_blast_candidate(orb: Variant) -> bool:
 		and _is_valid_reaction_orb(orb)
 		and not orb.is_ghost
 		and not orb.is_waiting_at_entrance
-		and int(orb.level) == Config.data.orb_max_level
+		and Config.data.jelly_tap_blast_enabled_for_level(int(orb.level))
 		and not _is_reaction_locked(orb)
 	)
 
