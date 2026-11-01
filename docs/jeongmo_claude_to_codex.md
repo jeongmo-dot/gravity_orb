@@ -32,8 +32,15 @@
 
 ## 대기 중
 
-### [2026-11-01 #129] L8~L10 터치 소폭발·L8 이상 다른 색은 레벨 상관없이 대폭발·레벨별 공끼리 마찰
-- 상태: 대기 (**다음 차례**. 최신 `origin/main` 위에서)
+- 없음
+
+---
+
+## 처리 완료
+
+### [2026-11-01 #129] L8~L10 터치 소폭발·L8 이상 다른 색은 레벨 상관없이 대폭발·레벨별 공끼리 마찰 — 완료
+- 상태: 완료 (2026-11-01 Claude 검수 · [PR #129](https://github.com/jeongmo-dot/gravity_orb/pull/129) 병합 `0fab3b2`)
+- 검수: 코드·테스트·캡처는 명세대로. 래퍼 328/328, M·B·C8 해시 그대로, 새 기본 해시 `2cdf7947…` 고정 (Codex). 측정: 마찰만 (F) 판 길이 −3%, 레벨 다른 대폭발 20판에 13번 더, 소폭발 위기에만 (D-save) 141.7턴, 생기면 바로 (D-all) 218턴·1판 미완료, L-합체 봇 중앙값 546.5턴·20판 중 8판 600턴 미완료 (Claude가 측정 파일로 확인), 대폭발 63 → 7번. 마찰 작은 값 규칙은 재질 값·`rough` 끔까지 테스트, 실제 접촉은 재지 않음. 사용자가 표를 본 뒤 "그대로 병합". Claude 재실행 없음 (§12-ONE.22 결과)
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.22**
 - 배경: 사용자 (2026-11-01, #128 병합 뒤 플레이) "L8 공 터치했는데 안터지는데" → "L8~L10 싱글 폭발 가능. 소폭발.", "L8~L10 서로 다른 색깔과 충돌시 대폭발" (Claude 질문에 "레벨 상관없이"), "공끼리의 마찰은 L1~L3 는 마찰 0.3 L4~L7은 0.4, L8~L10 은 0.5 로 마찰 계수 바꿔줘"
 - 앵커: `scripts/core/CollisionResolver.gd` `is_jelly_tap_blast_candidate()`·`apply_jelly_tap_blast()`, `scripts/core/TurnManager.gd` `on_tap()`, `scripts/core/ScoreManager.gd` `points_for()` (`TAP_BLAST`), `scripts/core/ReactionRules.gd` `_classify_jelly()`·`can_react()`, `scripts/spike/Orb3D.gd` `_shared_physics_material()`·레벨이 바뀌는 곳, `config/GameConfig.gd`·`default_config.tres` 새 필드, 봇·측정 도구, 회귀 해시 (`tests/test_jelly_regression.gd`), 캡처 (`tests/spike/capture_screens.gd`)
@@ -49,11 +56,7 @@
   5. §12-ONE.22 측정 1~5 (F·D-0·D-save·D-all, 전략 봇 D-0·D-save·D-all, 캡처 — L8 소폭발은 주변 젤리가 밀리는 모습이 보이게, `06`·`07` 이름 정리)
 - 건드리지 말 것: 레벨표·흡수 레벨 차 2·대폭발 기준 L8·잭팟, 소폭발 반경·점수 배율·터치 여백, 벽 마찰, 튕김, 생성, FINAL MOVE·게임 오버, 랭킹, 사용자 저장 파일, 새 연출·터치 표시 (고리 모양 금지), `docs/` (회신 파일 제외)
 - Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), M·B·C8 해시 그대로, 새 기본값 해시 상수 고정, 엔진 마찰 섞기 규칙 확인, 측정 표·캡처 (실제 창, 마지막은 전체 캡처) 보고, 검증 빌드는 `-Debug`만
-- 커밋: 항목 단위 브랜치, **push·PR까지**. 기본값은 새 값으로 두고, 병합은 측정을 사용자와 본 뒤
-
----
-
-## 처리 완료
+- 커밋: 항목 단위 브랜치, **push·PR까지**. 기본값은 새 값으로 두고, 병합은 측정을 사용자와 본 뒤 → 사용자 "그대로 병합"
 
 ### [2026-11-01 #128] 레벨 L10까지 잘게 (L10 = 지금 L7 크기)·다른 색 대폭발은 L10끼리만·L10 터치 소폭발 — 완료
 - 상태: 완료 (2026-11-01 Claude 검수 · [PR #128](https://github.com/jeongmo-dot/gravity_orb/pull/128) 병합 `79e12b9`)
