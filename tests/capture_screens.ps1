@@ -112,10 +112,10 @@ $expectedFiles = @(
     "97_jelly_l10_jackpot_a.png",
     "98_jelly_l10_jackpot_b.png",
     "99_jelly_result_l10_max.png",
-    "100_jelly_gap_two_l7_l5_00.png",
-    "101_jelly_gap_two_l7_l5_50.png",
-    "102_jelly_gap_two_l7_l5_100.png",
-    "103_jelly_l8_blast_c8.png"
+    "100_jelly_default_l7_l5_00.png",
+    "101_jelly_default_l7_l5_50.png",
+    "102_jelly_default_l7_l5_100.png",
+    "103_jelly_default_l8_blast.png"
 )
 
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {

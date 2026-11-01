@@ -237,16 +237,28 @@ func test_classic_3d_blast_readiness_starts_at_level_four() -> void:
 	Config.data.game_mode = original_mode
 
 
-func test_jelly_default_l10_blast_readiness_follows_mass_without_outline_geometry() -> void:
+func test_jelly_default_l8_blast_readiness_follows_mass_without_outline_geometry() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_jelly_minimum: int = Config.data.jelly_blast_min_level
 	Config.data.game_mode = GameConfig.GameMode.JELLY
-	Config.data.jelly_blast_min_level = 10
+	Config.data.jelly_blast_min_level = 8
 	var board: Board3D = await _create_board()
-	var level_nine: Orb3D = board.spawn_orb(0, 9, Vector2(-180.0, 0.0))
-	var level_ten: Orb3D = board.spawn_orb(1, 10, Vector2(180.0, 0.0))
-	assert_true(not level_nine.is_blast_armed(), "L9 remains unarmed")
+	var level_seven: Orb3D = board.spawn_orb(0, 7, Vector2(-300.0, 0.0))
+	var level_eight: Orb3D = board.spawn_orb(1, 8, Vector2(-100.0, 0.0))
+	var level_nine: Orb3D = board.spawn_orb(2, 9, Vector2(100.0, 0.0))
+	var level_ten: Orb3D = board.spawn_orb(3, 10, Vector2(300.0, 0.0))
+	assert_true(not level_seven.is_blast_armed(), "L7 remains unarmed")
+	assert_true(level_eight.is_blast_armed(), "L8 arms BLAST")
+	assert_true(level_nine.is_blast_armed(), "L9 arms BLAST")
 	assert_true(level_ten.is_blast_armed(), "L10 arms BLAST")
+	assert_true(
+		bool((level_eight._face.material_override as ShaderMaterial).get_shader_parameter("is_blast_ready")),
+		"L8 uses the blast-ready face"
+	)
+	assert_true(
+		bool((level_nine._face.material_override as ShaderMaterial).get_shader_parameter("is_blast_ready")),
+		"L9 uses the blast-ready face"
+	)
 	level_nine.set_jelly_mass(64.0, Config.data)
 	assert_eq(level_nine.level, 10, "mass update reaches displayed L10")
 	assert_true(level_nine.is_blast_armed(), "mass-updated displayed L10 arms BLAST")

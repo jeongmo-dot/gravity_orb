@@ -114,44 +114,45 @@ func test_jelly_max_face_uses_body_radius_while_regular_faces_keep_original_scal
 	Config.data.game_mode = original_mode
 
 
-func test_jelly_default_l10_keeps_max_face_without_blast_face() -> void:
+func test_jelly_default_l8_l9_use_blast_face_and_l10_keeps_max_face() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_jelly_minimum: int = Config.data.jelly_blast_min_level
 	Config.data.game_mode = GameConfig.GameMode.JELLY
-	Config.data.jelly_blast_min_level = 10
+	Config.data.jelly_blast_min_level = 8
 	var board: Board3D = await _create_board()
-	var level_four: Orb3D = board.spawn_orb(0, 4, Vector2(-270.0, 0.0))
-	var level_five: Orb3D = board.spawn_orb(3, 5, Vector2(-90.0, 0.0))
-	var level_six: Orb3D = board.spawn_orb(4, 9, Vector2(110.0, 0.0))
-	var level_seven: Orb3D = board.spawn_orb(1, 10, Vector2(310.0, 0.0))
-	var regular_material: ShaderMaterial = level_four._face.material_override as ShaderMaterial
-	var level_five_material: ShaderMaterial = level_five._face.material_override as ShaderMaterial
-	var level_six_material: ShaderMaterial = level_six._face.material_override as ShaderMaterial
-	var max_material: ShaderMaterial = level_seven._face.material_override as ShaderMaterial
+	var level_seven: Orb3D = board.spawn_orb(0, 7, Vector2(-300.0, 0.0))
+	var level_eight: Orb3D = board.spawn_orb(3, 8, Vector2(-100.0, 0.0))
+	var level_nine: Orb3D = board.spawn_orb(4, 9, Vector2(100.0, 0.0))
+	var level_ten: Orb3D = board.spawn_orb(1, 10, Vector2(300.0, 0.0))
+	var level_seven_material: ShaderMaterial = level_seven._face.material_override as ShaderMaterial
+	var level_eight_material: ShaderMaterial = level_eight._face.material_override as ShaderMaterial
+	var level_nine_material: ShaderMaterial = level_nine._face.material_override as ShaderMaterial
+	var max_material: ShaderMaterial = level_ten._face.material_override as ShaderMaterial
 
-	assert_true(not bool(regular_material.get_shader_parameter("is_blast_ready")), "L4 keeps normal face")
-	assert_true(not bool(level_five_material.get_shader_parameter("is_blast_ready")), "L5 face normal")
-	assert_true(not bool(level_six_material.get_shader_parameter("is_blast_ready")), "L9 face normal")
+	assert_true(not bool(level_seven_material.get_shader_parameter("is_blast_ready")), "L7 keeps normal face")
+	assert_true(bool(level_eight_material.get_shader_parameter("is_blast_ready")), "L8 uses blast-ready face")
+	assert_true(bool(level_nine_material.get_shader_parameter("is_blast_ready")), "L9 uses blast-ready face")
 	assert_true(not bool(max_material.get_shader_parameter("is_blast_ready")), "L10 keeps MAX face")
 	assert_true(bool(max_material.get_shader_parameter("is_max")), "L10 remains MAX")
-	assert_true(not level_five.is_blast_armed(), "L5 unarmed")
-	assert_true(not level_six.is_blast_armed(), "L9 unarmed")
-	assert_true(level_seven.is_blast_armed(), "L10 armed by rule")
-	for orb: Orb3D in [level_four, level_five, level_six]:
+	assert_true(not level_seven.is_blast_armed(), "L7 unarmed")
+	assert_true(level_eight.is_blast_armed(), "L8 armed")
+	assert_true(level_nine.is_blast_armed(), "L9 armed")
+	assert_true(level_ten.is_blast_armed(), "L10 armed by rule")
+	for orb: Orb3D in [level_seven]:
 		assert_near(
 			orb._face.scale.x / (orb.get_current_radius() / Orb3D.PIXELS_PER_METER),
 			0.62,
 			0.001,
 			"L%d keeps regular face scale" % orb.level
 		)
-	for orb: Orb3D in [level_seven]:
+	for orb: Orb3D in [level_eight, level_nine, level_ten]:
 		assert_near(
 			orb._face.scale.x / (orb.get_current_radius() / Orb3D.PIXELS_PER_METER),
 			1.0,
 			0.001,
 			"L%d special face uses full body-radius plate" % orb.level
 		)
-	for orb: Orb3D in [level_four, level_five, level_six, level_seven]:
+	for orb: Orb3D in [level_seven, level_eight, level_nine, level_ten]:
 		assert_eq(_forbidden_geometry_count(orb), 0, "JELLY L%d has no outline geometry" % orb.level)
 	var blast_material: ShaderMaterial = JellyOrbArt.face_material_for(4, 9, true)
 	assert_eq(blast_material.get_shader_parameter("blast_eye_outer_top"), Vector2(0.32, -0.16), "blast eye outer top")

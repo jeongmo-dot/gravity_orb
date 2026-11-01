@@ -114,10 +114,10 @@ enum GameMode {
 @export var green_shake_max_speed: float = 600.0
 @export var chain_reaction_delay: float = 0.2
 @export var jelly_merge_duration: float = 0.3
-@export var jelly_merge_level_gap: int = 1
+@export var jelly_merge_level_gap: int = 2
 @export var blast_enabled: bool = true
 @export var blast_min_level: int = 4
-@export var jelly_blast_min_level: int = 10
+@export var jelly_blast_min_level: int = 8
 @export var blast_push_radius_by_level: PackedFloat32Array = PackedFloat32Array(
 	[0.0, 0.0, 0.0, 0.3, 0.55, 1.0, 1.0, 1.0, 1.0, 1.0]
 )

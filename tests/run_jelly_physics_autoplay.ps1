@@ -8,7 +8,7 @@ param(
     [double]$AngularDamp = -1.0,
     [double]$GravityTurnDiagonalTime = -1.0,
     [ValidateRange(-1, 10)]
-    [int]$JellyBlastMinLevel = -1,
+    [int]$JellyBlastMinLevel = 8,
 	[ValidateSet("Default", "M", "A", "B")]
 	[string]$LevelProfile = "Default",
 	[switch]$TapBlastBot,
@@ -20,7 +20,7 @@ param(
 	[ValidateRange(0.0, 10.0)]
 	[double]$JellyMergeDuration = 0.3,
 	[ValidateRange(0, 10)]
-	[int]$JellyMergeLevelGap = 1,
+	[int]$JellyMergeLevelGap = 2,
     [switch]$AggregateOnly
 )
 

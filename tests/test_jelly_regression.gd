@@ -3,6 +3,7 @@ extends TestCase
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
 const EXPECTED_M_DELAYED_HASH: String = "ee67b19ca82ddb2e35ea7a5ed605e83eedbae4d0c044106ec5b86622a21ac45d"
 const EXPECTED_B_DELAYED_HASH: String = "5a525e46718f3befc3c4101e5a4fe1c3b392fc1c172f7166ed0b0517f6d74dc7"
+const EXPECTED_C8_DEFAULT_HASH: String = "8c1a02e9dfa345a31828276e917dad0f8dda35282a34cb5a0ced15a670752184"
 
 
 func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
@@ -45,28 +46,26 @@ func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
 	assert_eq(visible_result["hash"], EXPECTED_M_DELAYED_HASH, "M delayed hash")
 	_restore_level_profile(config_snapshot)
 	Config.data.jelly_merge_duration = 0.3
-	var delayed_visible_result: Dictionary = await _run_rule_path(true)
-	var delayed_hidden_result: Dictionary = await _run_rule_path(false)
+	var c8_visible_result: Dictionary = await _run_rule_path(true)
+	var c8_hidden_result: Dictionary = await _run_rule_path(false)
 	assert_eq(
-		delayed_visible_result["hash"],
-		delayed_hidden_result["hash"],
-		"delayed JELLY rule hash is independent of rendering"
+		c8_visible_result["hash"],
+		c8_hidden_result["hash"],
+		"default C8 rule hash is independent of rendering"
 	)
 	print(
-		"JELLY_B_DELAYED_REGRESSION_HASH duration=0.3 hash=%s events=%s" % [
-			str(delayed_visible_result["hash"]),
-			JSON.stringify(delayed_visible_result["events"]),
+		"JELLY_C8_DEFAULT_REGRESSION_HASH duration=0.3 hash=%s events=%s" % [
+			str(c8_visible_result["hash"]),
+			JSON.stringify(c8_visible_result["events"]),
 		]
 	)
-	assert_eq(delayed_visible_result["hash"], EXPECTED_B_DELAYED_HASH, "B delayed hash")
+	assert_eq(c8_visible_result["hash"], EXPECTED_C8_DEFAULT_HASH, "C8 default hash")
+	_apply_b_profile()
+	var b_result: Dictionary = await _run_rule_path(false)
+	assert_eq(b_result["hash"], EXPECTED_B_DELAYED_HASH, "B delayed hash")
 	_apply_a_profile()
 	var a_result: Dictionary = await _run_rule_path(false)
 	print("JELLY_A_DELAYED_REGRESSION_HASH duration=0.3 hash=%s" % str(a_result["hash"]))
-	_restore_level_profile(config_snapshot)
-	Config.data.jelly_merge_level_gap = 2
-	Config.data.jelly_blast_min_level = 10
-	var c10_result: Dictionary = await _run_rule_path(false)
-	print("JELLY_C10_DELAYED_REGRESSION_HASH duration=0.3 hash=%s" % str(c10_result["hash"]))
 	_restore_level_profile(config_snapshot)
 	Config.data.rng_seed = original_seed
 	Config.data.game_mode = original_mode
@@ -296,6 +295,18 @@ func _apply_a_profile() -> void:
 	Config.data.jelly_level_masses = PackedFloat32Array([1, 2, 4, 8, 16, 32, 64, 128, 256, 512])
 	Config.data.level_radii = PackedFloat32Array([25, 40, 47, 55, 64, 75, 88, 102, 120, 140])
 	Config.data.level_scores = PackedInt32Array([2, 4, 8, 16, 32, 64, 128, 256, 512, 1024])
+	Config.data.jelly_blast_min_level = 10
+	Config.data.blast_push_radius_by_level = PackedFloat32Array([0, 0, 0, 0.3, 0.55, 1, 1, 1, 1, 1])
+	Config.data.gravity_level_scale = 0.0333
+	Config.data.shock_level_scale = 0.2
+	Config.data.jelly_merge_level_gap = 1
+
+
+func _apply_b_profile() -> void:
+	Config.data.orb_max_level = 10
+	Config.data.jelly_level_masses = PackedFloat32Array([1, 2, 3, 5, 7, 11, 17, 27, 42, 64])
+	Config.data.level_radii = PackedFloat32Array([25, 40, 52, 68, 80, 92, 102, 115, 128, 140])
+	Config.data.level_scores = PackedInt32Array([2, 4, 6, 10, 14, 22, 34, 54, 84, 128])
 	Config.data.jelly_blast_min_level = 10
 	Config.data.blast_push_radius_by_level = PackedFloat32Array([0, 0, 0, 0.3, 0.55, 1, 1, 1, 1, 1])
 	Config.data.gravity_level_scale = 0.0333

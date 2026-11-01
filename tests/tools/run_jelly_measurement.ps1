@@ -10,9 +10,9 @@ param(
 	[string]$LevelProfile = "B",
 	[switch]$TapBlastBot,
 	[ValidateRange(0, 10)]
-	[int]$JellyMergeLevelGap = 1,
+	[int]$JellyMergeLevelGap = 2,
 	[ValidateRange(0, 10)]
-	[int]$JellyBlastMinLevel = 10,
+	[int]$JellyBlastMinLevel = 8,
 	[string]$MeasurementLabel = "",
     [switch]$ReuseCompleted,
     [switch]$AggregateOnly
