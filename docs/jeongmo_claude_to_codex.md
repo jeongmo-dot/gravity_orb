@@ -32,7 +32,20 @@
 
 ## 대기 중
 
-- 없음
+### [2026-11-02 #132] Windows 빌드 0.16.1 — 0.16.0 뒤 JELLY 변경 (#111~#131)
+- 상태: 대기 (**다음 차례**. 최신 `origin/main` 위에서)
+- 근거: [technical_design.md](technical_design.md) **§10.5·§10.5.1** (버전 기록 0.16.0·0.16.1 줄)
+- 배경: 사용자 (2026-11-02) "빌드해줘" — 0.16.0 (10-26) 뒤 병합된 JELLY 변경을 직접 해 볼 빌드. 기획서 0.16.16
+- 요구:
+  1. `project.godot` `application/config/version` `0.16.0` → **`0.16.1`** (Claude 결정 값 — 기획서 0.16, PATCH +1)
+  2. 버전을 커밋한 뒤 **깨끗한 작업 트리에서** 릴리스 빌드 `.\tools\build_windows.ps1` → `build/windows/GravityOrb_v0.16.1.exe` + `.console.exe` + `_BUILD.txt`. 다른 버전 파일은 남긴다
+  3. 내보낸 콘솔 exe로 스모크 2종 (기본·`-- --mode=jelly`) 종료 코드 0·`SCRIPT ERROR` 0
+  4. 격리 창에서 시작 화면·JELLY 직접 실행 확인 (실제 클릭이 안 되면 그 사실과 대신 확인한 방법)
+  5. 지금 `build/windows/GravityOrb_v0.16.0.exe`는 원래 0.16.0이 아니다 (`_BUILD.txt` 커밋 `8aabebd`, 2026-11-01 17:56 — §10.5.1 0.16.0 줄). 그때 Codex가 Release 빌드를 돌렸는지 회신에 적는다 (기록이 없으면 "모름"). 파일은 그대로 둔다
+- 검수: 빌드 결과 줄·파일 크기, `_BUILD.txt` 커밋 = 이 브랜치 마지막 커밋, 사용자 `save.cfg` 해시 전후 동일, 묶음에 `tests/`·`artifacts/`·`docs/` 없음, 래퍼 통과, 다른 버전 파일 이름·크기 그대로
+- 건드리지 말 것: 버전 외 모든 파일, 사용자 저장 파일, 다른 버전 빌드 파일 (0.16.0 포함), `docs/` (회신 파일 제외)
+- Done-when: 위 검수 보고
+- 커밋: 항목 단위 브랜치 (`build-0.16.1`), **push·PR까지** (병합은 Claude 검수 뒤)
 
 ---
 
