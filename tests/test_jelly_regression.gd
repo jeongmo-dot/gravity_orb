@@ -6,6 +6,7 @@ const EXPECTED_B_DELAYED_HASH: String = "5a525e46718f3befc3c4101e5a4fe1c3b392fc1
 const EXPECTED_C8_LEGACY_HASH: String = "8c1a02e9dfa345a31828276e917dad0f8dda35282a34cb5a0ced15a670752184"
 const EXPECTED_D_DEFAULT_HASH: String = "2cdf79475d340e34252a3d295ccc23e092c719038e2362f5df6ac80dc8e5979f"
 const EXPECTED_ST_DEFAULT_HASH: String = "f3ff93474eb3765cdc611ae941c89ec96052a20f16fff75efe8ad6a6c8fb816c"
+const EXPECTED_JACKPOT_DEFAULT_HASH: String = "3254c77f2bcf478239f023f08af2bae5f48bc68aee56aa246894908d0b9ab5e7"
 
 
 func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
@@ -65,6 +66,7 @@ func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
 	assert_eq(legacy_d_visible_result["hash"], EXPECTED_D_DEFAULT_HASH, "D legacy hash")
 	_restore_level_profile(config_snapshot)
 	Config.data.jelly_merge_duration = 0.3
+	Config.data.max_merge_bonus_factor = 5.0
 	var st_visible_result: Dictionary = await _run_rule_path(true)
 	var st_hidden_result: Dictionary = await _run_rule_path(false)
 	assert_eq(
@@ -79,6 +81,26 @@ func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
 		]
 	)
 	assert_eq(st_visible_result["hash"], EXPECTED_ST_DEFAULT_HASH, "ST default hash")
+	_restore_level_profile(config_snapshot)
+	Config.data.jelly_merge_duration = 0.3
+	var jackpot_visible_result: Dictionary = await _run_rule_path(true)
+	var jackpot_hidden_result: Dictionary = await _run_rule_path(false)
+	assert_eq(
+		jackpot_visible_result["hash"],
+		jackpot_hidden_result["hash"],
+		"jackpot default rule hash is independent of rendering"
+	)
+	print(
+		"JELLY_JACKPOT_DEFAULT_REGRESSION_HASH duration=0.3 hash=%s events=%s" % [
+			str(jackpot_visible_result["hash"]),
+			JSON.stringify(jackpot_visible_result["events"]),
+		]
+	)
+	assert_eq(
+		jackpot_visible_result["hash"],
+		EXPECTED_JACKPOT_DEFAULT_HASH,
+		"jackpot default hash"
+	)
 	_apply_c8_profile()
 	var c8_result: Dictionary = await _run_rule_path(false)
 	assert_eq(c8_result["hash"], EXPECTED_C8_LEGACY_HASH, "C8 legacy hash")
@@ -284,6 +306,8 @@ func _run_rule_path(visuals_enabled: bool) -> Dictionary:
 			"jelly_tap_blast_score_factor": Config.data.jelly_tap_blast_score_factor,
 			"jelly_tap_blast_uses_turn": Config.data.jelly_tap_blast_uses_turn,
 		}
+	if not is_equal_approx(Config.data.max_merge_bonus_factor, 5.0):
+		state["jackpot_score_factor"] = Config.data.max_merge_bonus_factor
 	var state_json: String = JSON.stringify(state)
 	var hash_context: HashingContext = HashingContext.new()
 	hash_context.start(HashingContext.HASH_SHA256)
@@ -308,6 +332,7 @@ func _snapshot_level_profile() -> Dictionary:
 		"blast_score_factor": Config.data.blast_score_factor,
 		"jelly_tap_blast_score_factor": Config.data.jelly_tap_blast_score_factor,
 		"jelly_tap_blast_uses_turn": Config.data.jelly_tap_blast_uses_turn,
+		"max_merge_bonus_factor": Config.data.max_merge_bonus_factor,
 		"orb_friction_by_level": Config.data.orb_friction_by_level.duplicate(),
 		"jelly_merge_level_gap": Config.data.jelly_merge_level_gap,
 		"blast_push_radius_by_level": Config.data.blast_push_radius_by_level.duplicate(),
@@ -327,6 +352,7 @@ func _restore_level_profile(snapshot: Dictionary) -> void:
 	Config.data.blast_score_factor = float(snapshot["blast_score_factor"])
 	Config.data.jelly_tap_blast_score_factor = float(snapshot["jelly_tap_blast_score_factor"])
 	Config.data.jelly_tap_blast_uses_turn = bool(snapshot["jelly_tap_blast_uses_turn"])
+	Config.data.max_merge_bonus_factor = float(snapshot["max_merge_bonus_factor"])
 	Config.data.orb_friction_by_level = snapshot["orb_friction_by_level"] as PackedFloat32Array
 	Config.data.jelly_merge_level_gap = int(snapshot["jelly_merge_level_gap"])
 	Config.data.blast_push_radius_by_level = snapshot["blast_push_radius_by_level"] as PackedFloat32Array
@@ -406,6 +432,7 @@ func _apply_legacy_score_profile() -> void:
 	Config.data.blast_score_factor = 5.0
 	Config.data.jelly_tap_blast_score_factor = 1.0
 	Config.data.jelly_tap_blast_uses_turn = false
+	Config.data.max_merge_bonus_factor = 5.0
 
 
 func _apply_pair(

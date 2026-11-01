@@ -87,7 +87,7 @@ enum GameMode {
 	[2, 4, 6, 10, 14, 22, 34, 54, 84, 128]
 )
 @export var annihilation_score_factor: float = 0.5
-@export var max_merge_bonus_factor: float = 5.0
+@export var max_merge_bonus_factor: float = 40.0
 @export var combo_multiplier_base: float = 2.0
 @export var combo_multiplier_max: float = 128.0
 @export var danger_start: float = 0.30

@@ -318,8 +318,8 @@ func _capture_level_ten_scenes(main: Main, board: Board3D) -> void:
 			else "88_jelly_l1_l10_profile_b.png"
 		)
 		await _capture_tap_blast_progress(board, director, profile)
-		await _capture_level_ten_pair_effect(board, director, profile, false)
-		await _capture_level_ten_pair_effect(board, director, profile, true)
+		await _capture_level_ten_pair_effect(main, board, director, profile, false)
+		await _capture_level_ten_pair_effect(main, board, director, profile, true)
 	await _capture_default_c8_scenes(main, board, director)
 	await _capture_default_d_scenes(main, board, director)
 
@@ -571,6 +571,7 @@ func _tap_blast_capture_reaction(level: int = -1) -> Dictionary:
 
 
 func _capture_level_ten_pair_effect(
+	main: Main,
 	board: Board3D,
 	director: FeedbackDirector,
 	profile: String,
@@ -594,14 +595,34 @@ func _capture_level_ten_pair_effect(
 			"position": Vector2(150.0, 0.0),
 		},
 	])
-	director.play_reaction_visuals({
+	var reaction: Dictionary = {
 		"type": ReactionRules.Type.MAX_CLEAR if jackpot else ReactionRules.Type.BLAST,
 		"levels": [Config.data.orb_max_level, Config.data.orb_max_level],
 		"colors": [first_color, second_color],
 		"result_color": first_color,
 		"position": Vector2.ZERO,
 		"shock_level": Config.data.orb_max_level,
-	})
+	}
+	if jackpot:
+		var manager: TurnManager = main.get_node("TurnManager") as TurnManager
+		var score: ScoreManager = main.get_node("ScoreManager") as ScoreManager
+		manager.turn_combo = 0
+		manager._emit_combo_changed()
+		score.reset()
+		manager.on_reaction(reaction)
+		var expected_points: int = int(
+			float(Config.data.score_for_level(Config.data.orb_max_level))
+			* Config.data.max_merge_bonus_factor
+		)
+		if int(reaction.get("points", 0)) != expected_points:
+			_fail("jackpot capture expected %d points, got %d" % [
+				expected_points,
+				int(reaction.get("points", 0)),
+			])
+		if profile == "B" and expected_points != 5120:
+			_fail("default L10 jackpot capture expected 5120 points")
+	else:
+		director.play_reaction_visuals(reaction)
 	await get_tree().create_timer(0.06).timeout
 	var file_number: int = (
 		97 if jackpot and profile == "A"
@@ -625,6 +646,7 @@ func _set_jelly_level_profile(profile: String) -> void:
 	Config.data.blast_score_factor = 15.0
 	Config.data.jelly_tap_blast_score_factor = 0.5
 	Config.data.jelly_tap_blast_uses_turn = true
+	Config.data.max_merge_bonus_factor = 40.0
 	Config.data.orb_friction_by_level = PackedFloat32Array([
 		0.3, 0.3, 0.3, 0.4, 0.4, 0.4, 0.4, 0.5, 0.5, 0.5,
 	])

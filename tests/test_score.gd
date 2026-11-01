@@ -42,9 +42,18 @@ func test_same_turn_merge_example_scores_twenty() -> void:
 	assert_eq(int(first["points"]) + int(second["points"]), 16, "same-turn total")
 
 
-func test_third_max_clear_at_seventy_percent_scores_10240() -> void:
+func test_max_clear_uses_bonus_combo_and_danger_multipliers() -> void:
 	var cfg: GameConfig = _config()
 	var levels: Array[int] = [cfg.orb_max_level, cfg.orb_max_level]
+	var base_reaction: Dictionary = _reaction(
+		ReactionRules.Type.MAX_CLEAR,
+		1,
+		levels,
+		0,
+		0.20
+	)
+	assert_eq(ScoreManager.points_for(base_reaction, cfg), 5120, "L10 jackpot base score")
+	assert_eq(base_reaction["base_points"], 5120, "maximum clear base points")
 	var reaction: Dictionary = _reaction(
 		ReactionRules.Type.MAX_CLEAR,
 		3,
@@ -52,8 +61,8 @@ func test_third_max_clear_at_seventy_percent_scores_10240() -> void:
 		0,
 		0.70
 	)
-	assert_eq(ScoreManager.points_for(reaction, cfg), 10240, "third L7 clear")
-	assert_eq(reaction["base_points"], 640, "maximum clear base")
+	assert_eq(ScoreManager.points_for(reaction, cfg), 81920, "third L10 jackpot at danger")
+	assert_eq(reaction["base_points"], 5120, "maximum clear multiplied base")
 	assert_near(float(reaction["combo_multiplier"]), 4.0, TOLERANCE, "combo multiplier")
 	assert_near(float(reaction["danger_multiplier"]), 4.0, TOLERANCE, "danger multiplier")
 

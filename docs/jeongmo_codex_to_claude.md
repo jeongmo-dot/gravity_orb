@@ -38,6 +38,47 @@
 
 ## 미확인
 
+### [2026-11-01] 대상 #131 — L10 잭팟 점수 상향
+- 상태: 완료 — `max_merge_bonus_factor` 기본값을 `5→40`으로 올려 콤보 1·위험 배수 1의 L10+L10 잭팟을 `5,120`점으로 변경하고, 과거 값 묶음과 화면 캡처·전체 검증을 마쳤다
+- 브랜치 / PR: `codex/jelly-jackpot-score` / https://github.com/jeongmo-dot/gravity_orb/pull/131
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `tests/{test_config.gd,test_score.gd,test_jelly_regression.gd}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 새 기본 `max_merge_bonus_factor=40.0`; L10 기본 점수 `128×40=5,120` — 자동 (`test_config`, `test_score`)
+  - [x] 기존 콤보·위험 배수 계산은 그대로 유지. 콤보 3(`×4`)·점유율 70%(`×4`) 예시는 `81,920`점 — 자동 (`test_score`)
+  - [x] 과거 M·B·C8·D·ST 값 묶음에는 `max_merge_bonus_factor=5.0`을 명시해 기존 해시 유지, 새 기본 해시 상수 고정 — 자동 (`test_jelly_regression`)
+  - [x] 두 실제 창 비율의 `16_jelly_jackpot_effect`, `98_jelly_l10_jackpot_b`, 마지막 전체 화면을 캡처하고 직접 관측 — 각 107장, 합계 214장
+  - [x] 명세에 따라 밸런스 측정은 실행하지 않고 Debug 빌드만 생성
+
+- 회귀 해시:
+  - M `ee67b19ca82ddb2e35ea7a5ed605e83eedbae4d0c044106ec5b86622a21ac45d` (기존과 동일)
+  - B `5a525e46718f3befc3c4101e5a4fe1c3b392fc1c172f7166ed0b0517f6d74dc7` (기존과 동일)
+  - C8 `8c1a02e9dfa345a31828276e917dad0f8dda35282a34cb5a0ced15a670752184` (기존과 동일)
+  - D `2cdf79475d340e34252a3d295ccc23e092c719038e2362f5df6ac80dc8e5979f` (기존과 동일)
+  - ST `f3ff93474eb3765cdc611ae941c89ec96052a20f16fff75efe8ad6a6c8fb816c` (기존과 동일)
+  - 새 기본 `3254c77f2bcf478239f023f08af2bae5f48bc68aee56aa246894908d0b9ab5e7` (상수 고정)
+
+- 캡처 관측:
+  - `16_jelly_jackpot_effect.png`: 두 비율 모두 잭팟 효과가 보드 안에 표시되며 점수 팝업은 없는 연출 전용 캡처임을 확인
+  - `98_jelly_l10_jackpot_b.png`: 실제 `TurnManager→ScoreManager→HUD/Feedback` 경로로 발생시킨 금색 `+5,120` 팝업이 두 비율 모두 보드 안에서 잘리지 않음을 확인
+  - `99_jelly_result_l10_max.png`: 두 비율 모두 마지막 실제 캡처이며 결과 전체 화면의 잘림 0건 확인
+  - `tests/capture_screens.ps1` → 540×960·540×1170 각 107장, 합계 214장, 종료 코드 0
+
+- QA 관측값:
+  - `tests/run_tests.ps1` → 일반 `322/322`, 장기 `4/4`, 성능 `5/5`, 합계 `331/331`; 각각 새 프로세스, 종료 코드 0, `97.482초`
+  - `godot --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 기본/`--mode=blitz` 300프레임 smoke → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tools/build_windows.ps1 -Debug` → 종료 코드 0, `GravityOrb_v0.16.0.exe` `104,981,648`바이트. Release 미실행
+  - `tests/capture_screens.ps1` → 종료 코드 0, 비율 2개·파일 214개
+  - `git diff --check` 오류 0건
+  - 규칙 검색 → `InputEvent*`는 `InputRouter.gd`, `Input.vibrate_handheld`는 허용 예외 `Haptics.gd`; 난수는 기존 `Spawner.gd`와 시각 전용 `ColorEffectVisual.gd`의 로컬 RNG만 검출
+
+- 수동 확인 절차:
+  1. 같은 색 L10 두 개를 접촉시켜 잭팟 발생 → 콤보 1·위험 배수 1에서 금색 `+5,120` 팝업이 표시되고 두 젤리가 제거되어야 한다
+  2. 콤보를 3까지 올리고 점유율 70% 이상에서 같은 잭팟 발생 → 기존 콤보 `×4`와 위험 `×4`가 함께 적용되어 `+81,920`이 표시되어야 한다
+  3. 540×960과 540×1170 창에서 잭팟 발생 → 효과와 점수 팝업이 보드·화면 밖으로 잘리지 않아야 한다
+- 결정 사항: 없음. 점수 수치·기존 배율·회귀 분리는 §12-ONE.24 그대로 적용했다
+- 남은 것 · 질문: 구현·검증 잔여 없음. 합격·병합 판정은 Claude/사용자에게 맡긴다
+
 ### [2026-11-01] 대상 #130 — 대폭발 점수 상향·소폭발 점수 하향·소폭발 턴 비용
 - 상태: 완료 — 새 기본 ST(대폭발 `15`, 소폭발 `0.5`, 소폭발에 턴 사용)를 구현하고 회귀·5개 후보 측정·두 비율 캡처·전체 검증을 마쳤다
 - 브랜치 / PR: `codex/jelly-tap-turn-score-choice` / https://github.com/jeongmo-dot/gravity_orb/pull/130
