@@ -40,7 +40,7 @@
 
 ### [2026-11-01] 대상 #130 — 대폭발 점수 상향·소폭발 점수 하향·소폭발 턴 비용
 - 상태: 완료 — 새 기본 ST(대폭발 `15`, 소폭발 `0.5`, 소폭발에 턴 사용)를 구현하고 회귀·5개 후보 측정·두 비율 캡처·전체 검증을 마쳤다
-- 브랜치 / PR: `codex/jelly-tap-turn-score-choice` / PR 생성 후 갱신
+- 브랜치 / PR: `codex/jelly-tap-turn-score-choice` / https://github.com/jeongmo-dot/gravity_orb/pull/130
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/TurnManager.gd`, `tests/{capture_screens.ps1,run_jelly_physics_autoplay.ps1,test_config.gd,test_jelly_regression.gd,test_jolt_3d.gd,test_score.gd}`, `tests/spike/{capture_screens.gd,run_jolt_3d_measurement.gd}`, `tests/tools/run_jelly_measurement.ps1`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 기본값을 `blast_score_factor=15`, `jelly_tap_blast_score_factor=0.5`, 새 `jelly_tap_blast_uses_turn=true`로 변경. L8+L8 `1,620`, L8+L10 `2,730`, L10+L10 `3,840`, 소폭발 L8/L9/L10 `27/42/64` — 자동 (`test_config`, `test_score`)
