@@ -111,9 +111,9 @@ const CAPTURE_FILES: Array[String] = [
 	"101_jelly_default_l7_l5_50.png",
 	"102_jelly_default_l7_l5_100.png",
 	"103_jelly_default_l8_blast.png",
-	"104_jelly_l8_tap_blast_00.png",
-	"105_jelly_l8_tap_blast_50.png",
-	"106_jelly_l8_tap_blast_100.png",
+	"104_jelly_l8_tap_turn_before.png",
+	"105_jelly_l8_tap_turn_entering.png",
+	"106_jelly_l8_tap_turn_settled.png",
 	"107_jelly_l8_l9_blast.png",
 ]
 
@@ -257,6 +257,9 @@ func _capture_gameplay_scenes() -> void:
 	resolver.report_contact(first_blast, second_blast, "capture_l10_blast")
 	if resolver.flush() != 1:
 		_fail("different-color maximum-level pair did not produce one capture reaction")
+	var score_manager: ScoreManager = main.get_node("ScoreManager") as ScoreManager
+	if score_manager.score != 3840:
+		_fail("L10+L10 capture score expected 3840, got %d" % score_manager.score)
 	await get_tree().create_timer(0.06).timeout
 	await _capture("07_jelly_l10_blast.png")
 
@@ -318,7 +321,7 @@ func _capture_level_ten_scenes(main: Main, board: Board3D) -> void:
 		await _capture_level_ten_pair_effect(board, director, profile, false)
 		await _capture_level_ten_pair_effect(board, director, profile, true)
 	await _capture_default_c8_scenes(main, board, director)
-	await _capture_default_d_scenes(board, director)
+	await _capture_default_d_scenes(main, board, director)
 
 	_set_jelly_level_profile("B")
 	board.clear()
@@ -423,11 +426,32 @@ func _capture_default_c8_scenes(
 	Config.data.jelly_blast_min_level = original_blast_level
 
 
-func _capture_default_d_scenes(board: Board3D, director: FeedbackDirector) -> void:
+func _capture_default_d_scenes(
+	main: Main,
+	board: Board3D,
+	director: FeedbackDirector
+) -> void:
 	_set_jelly_level_profile("B")
+	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
+	var spawner: Spawner = main.get_node("Spawner") as Spawner
+	var hud: Hud = main.get_node("UI/Hud") as Hud
 	board.clear()
 	director.clear_effects()
 	board.set_gravity(Vector2i.DOWN)
+	manager.gravity = Vector2i.DOWN
+	manager.turn_index = 124
+	manager.turn_combo = 0
+	manager.max_combo = 0
+	manager.final_move_pending = false
+	manager.final_move_active = false
+	manager._is_initial_settle = false
+	manager._is_tap_blast_settle = false
+	manager.state = TurnManager.State.WAITING_INPUT
+	manager._emit_combo_changed()
+	spawner.init_rng(130)
+	spawner.sync_next_batch_size(125)
+	hud._refresh_turn_number()
+	InputRouter.set_locked(false)
 	var source: Orb3D = board.spawn_orb(
 		OrbTypes.OrbColor.YELLOW,
 		8,
@@ -441,26 +465,36 @@ func _capture_default_d_scenes(board: Board3D, director: FeedbackDirector) -> vo
 		{"color": OrbTypes.OrbColor.PURPLE, "level": 2, "position": Vector2(165.0, 155.0)},
 	]
 	for spec: Dictionary in nearby_specs:
-		board.spawn_orb(
+		var nearby: Orb3D = board.spawn_orb(
 			int(spec["color"]),
 			int(spec["level"]),
 			spec["position"] as Vector2
 		)
+		nearby.disable_physics()
 	await get_tree().process_frame
-	await _capture("104_jelly_l8_tap_blast_00.png")
-	var blast_position: Vector2 = source.position
-	board.remove_orb(source)
-	board.apply_blast_with_radius_factor(
-		blast_position,
-		Config.data.jelly_tap_blast_radius_factor
-	)
+	var preview_before: Array = spawner.peek_preview()
+	await _capture("104_jelly_l8_tap_turn_before.png")
 	var original_hitstop_enabled: bool = Config.data.fx_hitstop_enabled
 	Config.data.fx_hitstop_enabled = false
-	director.play_reaction_visuals(_tap_blast_capture_reaction(8))
-	await get_tree().create_timer(FeedbackDirector.SUPERNOVA_DURATION * 0.5).timeout
-	await _capture("105_jelly_l8_tap_blast_50.png")
-	await get_tree().create_timer(FeedbackDirector.SUPERNOVA_DURATION * 0.5).timeout
-	await _capture("106_jelly_l8_tap_blast_100.png")
+	manager.set_physics_process(true)
+	if not manager.try_tap_blast_orb(source):
+		_fail("L8 tap turn capture could not start")
+	await get_tree().physics_frame
+	await get_tree().process_frame
+	if manager.turn_index != 125:
+		_fail("L8 tap turn capture expected turn index 125")
+	if spawner.peek_preview() == preview_before:
+		_fail("L8 tap turn capture did not advance NEXT and THEN")
+	await _capture("105_jelly_l8_tap_turn_entering.png")
+	for _frame: int in range(360):
+		if manager.state == TurnManager.State.WAITING_INPUT:
+			break
+		await get_tree().physics_frame
+	if manager.state != TurnManager.State.WAITING_INPUT:
+		_fail("L8 tap turn capture did not settle")
+	await get_tree().process_frame
+	await _capture("106_jelly_l8_tap_turn_settled.png")
+	manager.set_physics_process(false)
 	Config.data.fx_hitstop_enabled = original_hitstop_enabled
 
 	board.clear()
@@ -588,6 +622,9 @@ func _set_jelly_level_profile(profile: String) -> void:
 	Config.data.jelly_blast_min_level = 8
 	Config.data.jelly_blast_requires_same_level = false
 	Config.data.jelly_tap_blast_min_level = 8
+	Config.data.blast_score_factor = 15.0
+	Config.data.jelly_tap_blast_score_factor = 0.5
+	Config.data.jelly_tap_blast_uses_turn = true
 	Config.data.orb_friction_by_level = PackedFloat32Array([
 		0.3, 0.3, 0.3, 0.4, 0.4, 0.4, 0.4, 0.5, 0.5, 0.5,
 	])

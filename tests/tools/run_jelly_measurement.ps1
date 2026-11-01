@@ -6,8 +6,8 @@ param(
     [int]$Parallelism = 3,
     [ValidateRange(1, 600)]
     [int]$TurnCap = 600,
-	[ValidateSet("M", "A", "B")]
-	[string]$LevelProfile = "B",
+	[ValidateSet("D", "M", "A", "B")]
+	[string]$LevelProfile = "D",
 	[switch]$TapBlastBot,
 	[ValidateSet("None", "Save", "All")]
 	[string]$TapBlastBotMode = "None",
@@ -17,6 +17,12 @@ param(
 	[int]$JellyBlastMinLevel = 8,
 	[ValidateRange(0, 10)]
 	[int]$JellyTapBlastMinLevel = 8,
+	[ValidateRange(0.0, 100.0)]
+	[double]$BlastScoreFactor = 15.0,
+	[ValidateRange(0.0, 100.0)]
+	[double]$JellyTapBlastScoreFactor = 0.5,
+	[ValidateSet("On", "Off")]
+	[string]$JellyTapBlastUsesTurn = "On",
 	[ValidateSet("On", "Off")]
 	[string]$JellyBlastRequiresSameLevel = "Off",
 	[string]$OrbFrictionByLevel = "0.3,0.3,0.3,0.4,0.4,0.4,0.4,0.5,0.5,0.5",
@@ -80,6 +86,9 @@ if (-not $AggregateOnly) {
 					"--jelly-merge-level-gap=$JellyMergeLevelGap",
 					"--jelly-blast-min-level=$JellyBlastMinLevel",
 					"--jelly-tap-blast-min-level=$JellyTapBlastMinLevel",
+					"--blast-score-factor=$($BlastScoreFactor.ToString([Globalization.CultureInfo]::InvariantCulture))",
+					"--jelly-tap-blast-score-factor=$($JellyTapBlastScoreFactor.ToString([Globalization.CultureInfo]::InvariantCulture))",
+					"--jelly-tap-blast-uses-turn=$($JellyTapBlastUsesTurn.ToLower())",
 					"--jelly-blast-requires-same-level=$($JellyBlastRequiresSameLevel.ToLower())",
 					"--orb-friction-by-level=$OrbFrictionByLevel",
 					"--jelly-tap-blast-bot=$($resolvedTapBlastBotMode.ToLower())",
@@ -157,6 +166,7 @@ function Get-Summary($Rows) {
 	$tapBlastCountByLevel = [ordered]@{}
 	$sameLevelBlastCountByLevel = [ordered]@{}
 	$mixedLevelBlastCountByLevel = [ordered]@{}
+	$reactionScoreTotals = [ordered]@{ merge = 0; blast = 0; tap = 0; jackpot = 0 }
     foreach ($row in @($Rows)) {
         foreach ($levelProperty in $row.blast_count_by_level.PSObject.Properties) {
             $levelKey = [string]$levelProperty.Name
@@ -180,11 +190,32 @@ function Get-Summary($Rows) {
 			if (-not $mixedLevelBlastCountByLevel.Contains($levelKey)) { $mixedLevelBlastCountByLevel[$levelKey] = 0 }
 			$mixedLevelBlastCountByLevel[$levelKey] += [int]$levelProperty.Value
 		}
+		foreach ($scoreProperty in $row.score_by_reaction_type.PSObject.Properties) {
+			$scoreKey = [string]$scoreProperty.Name
+			$reactionScoreTotals[$scoreKey] += [long]$scoreProperty.Value
+		}
     }
+	$turnTotal = [double](($Rows | Measure-Object -Property completed_turns -Sum).Sum)
+	$scoreTotal = [double](($Rows | Measure-Object -Property score -Sum).Sum)
+	$reactionScoreTotal = [double](($reactionScoreTotals.Values | Measure-Object -Sum).Sum)
+	$reactionScoreShares = [ordered]@{}
+	foreach ($scoreKey in $reactionScoreTotals.Keys) {
+		$reactionScoreShares[$scoreKey] = Get-Ratio ([double]$reactionScoreTotals[$scoreKey]) $reactionScoreTotal
+	}
     return [ordered]@{
         games = @($Rows).Count
+		game_over_count = @($Rows | Where-Object { $_.game_over }).Count
+		incomplete_count = @($Rows | Where-Object { -not $_.game_over }).Count
+		turns_average = ($Rows | Measure-Object -Property completed_turns -Average).Average
+		turns_minimum = ($Rows | Measure-Object -Property completed_turns -Minimum).Minimum
+		turns_maximum = ($Rows | Measure-Object -Property completed_turns -Maximum).Maximum
         turns_median = Get-Median @($Rows | ForEach-Object { $_.completed_turns })
+		score_average = ($Rows | Measure-Object -Property score -Average).Average
         score_median = Get-Median @($Rows | ForEach-Object { $_.score })
+		score_per_turn = Get-Ratio $scoreTotal $turnTotal
+		score_by_reaction_type = $reactionScoreTotals
+		score_share_by_reaction_type = $reactionScoreShares
+		peak_active_orbs = ($Rows | Measure-Object -Property max_active_orbs -Maximum).Maximum
         early_merges_per_turn_1_30 = Get-Ratio $earlyMerges $earlyTurns
         final_move_occurrences = [int]$finalMoves
         final_move_successes = [int]$finalSuccess
@@ -239,6 +270,9 @@ $report = [ordered]@{
     conditions = "JELLY R/G/L-merge, seeds 1-$SeedCount, $TurnCap turns, fixed 120 fps"
 	level_profile = $LevelProfile
 	tap_blast_bot_mode = $resolvedTapBlastBotMode.ToLower()
+	blast_score_factor = $BlastScoreFactor
+	jelly_tap_blast_score_factor = $JellyTapBlastScoreFactor
+	jelly_tap_blast_uses_turn = $JellyTapBlastUsesTurn -eq "On"
 	jelly_merge_level_gap = $JellyMergeLevelGap
 	jelly_blast_min_level = $JellyBlastMinLevel
 	jelly_tap_blast_min_level = $JellyTapBlastMinLevel

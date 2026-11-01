@@ -3,6 +3,7 @@ extends TestCase
 
 func test_level_eight_to_ten_tap_blast_uses_source_level_score_and_multipliers() -> void:
 	var cfg: GameConfig = GameConfig.new()
+	var expected: Dictionary = {8: 27, 9: 42, 10: 64}
 	for level: int in [8, 9, 10]:
 		var reaction: Dictionary = {
 			"type": ReactionRules.Type.TAP_BLAST,
@@ -12,8 +13,8 @@ func test_level_eight_to_ten_tap_blast_uses_source_level_score_and_multipliers()
 		}
 		assert_eq(
 			ScoreManager.points_for(reaction, cfg),
-			cfg.score_for_level(level),
-			"tap blast scores one L%d at combo one" % level
+			int(expected[level]),
+			"tap blast scores half of L%d at combo one" % level
 		)
 
 const CONFIG_RESOURCE: GameConfig = preload("res://config/default_config.tres")
@@ -89,16 +90,26 @@ func test_annihilation_uses_original_levels_and_combo() -> void:
 
 func test_blast_uses_both_levels_combo_and_danger_multipliers() -> void:
 	var cfg: GameConfig = _config()
-	for level: int in [5, 6, 7]:
+	var exact_cases: Array[Dictionary] = [
+		{"levels": [8, 8], "points": 1620},
+		{"levels": [8, 10], "points": 2730},
+		{"levels": [10, 10], "points": 3840},
+	]
+	for exact_case: Dictionary in exact_cases:
+		var levels: Array[int] = []
+		levels.assign(exact_case["levels"] as Array)
 		var reaction: Dictionary = _reaction(
 			ReactionRules.Type.BLAST,
 			1,
-			[level, level],
+			levels,
 			0,
 			0.20
 		)
-		var expected: int = (cfg.score_for_level(level) * 2) * 5
-		assert_eq(ScoreManager.points_for(reaction, cfg), expected, "L%d blast" % level)
+		assert_eq(
+			ScoreManager.points_for(reaction, cfg),
+			int(exact_case["points"]),
+			"L%d+L%d blast" % [levels[0], levels[1]]
+		)
 	var multiplied: Dictionary = _reaction(
 		ReactionRules.Type.BLAST,
 		2,
@@ -106,8 +117,8 @@ func test_blast_uses_both_levels_combo_and_danger_multipliers() -> void:
 		0,
 		0.50
 	)
-	assert_eq(ScoreManager.points_for(multiplied, cfg), 560, "blast combo and danger")
-	assert_eq(multiplied["base_points"], 140, "blast base points")
+	assert_eq(ScoreManager.points_for(multiplied, cfg), 1680, "blast combo and danger")
+	assert_eq(multiplied["base_points"], 420, "blast base points")
 
 
 func test_scoring_populates_reaction_dictionary() -> void:

@@ -116,9 +116,9 @@ $expectedFiles = @(
     "101_jelly_default_l7_l5_50.png",
     "102_jelly_default_l7_l5_100.png",
     "103_jelly_default_l8_blast.png",
-    "104_jelly_l8_tap_blast_00.png",
-    "105_jelly_l8_tap_blast_50.png",
-    "106_jelly_l8_tap_blast_100.png",
+    "104_jelly_l8_tap_turn_before.png",
+    "105_jelly_l8_tap_turn_entering.png",
+    "106_jelly_l8_tap_turn_settled.png",
     "107_jelly_l8_l9_blast.png"
 )
 

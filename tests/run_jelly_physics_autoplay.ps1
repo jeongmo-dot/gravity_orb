@@ -9,13 +9,19 @@ param(
     [double]$GravityTurnDiagonalTime = -1.0,
     [ValidateRange(-1, 10)]
     [int]$JellyBlastMinLevel = 8,
-	[ValidateSet("Default", "M", "A", "B")]
+	[ValidateSet("Default", "D", "M", "A", "B")]
 	[string]$LevelProfile = "Default",
 	[switch]$TapBlastBot,
 	[ValidateSet("None", "Save", "All")]
 	[string]$TapBlastBotMode = "None",
 	[ValidateRange(0, 10)]
 	[int]$JellyTapBlastMinLevel = 8,
+	[ValidateRange(0.0, 100.0)]
+	[double]$BlastScoreFactor = 15.0,
+	[ValidateRange(0.0, 100.0)]
+	[double]$JellyTapBlastScoreFactor = 0.5,
+	[ValidateSet("On", "Off")]
+	[string]$JellyTapBlastUsesTurn = "On",
 	[ValidateSet("On", "Off")]
 	[string]$JellyBlastRequiresSameLevel = "Off",
 	[string]$OrbFrictionByLevel = "0.3,0.3,0.3,0.4,0.4,0.4,0.4,0.5,0.5,0.5",
@@ -46,12 +52,15 @@ if ($GravityTurnDiagonalTime -lt -1.0) {
 }
 $culture = [Globalization.CultureInfo]::InvariantCulture
 $physicsArguments = @()
-$physicsArguments += if ($LevelProfile -eq "Default") { "--jelly-level-profile=B" } else { "--jelly-level-profile=$LevelProfile" }
+$physicsArguments += if ($LevelProfile -eq "Default") { "--jelly-level-profile=D" } else { "--jelly-level-profile=$LevelProfile" }
 $resolvedTapBlastBotMode = if ($TapBlastBot -and $TapBlastBotMode -eq "None") { "All" } else { $TapBlastBotMode }
 $physicsArguments += "--jelly-tap-blast-bot=$($resolvedTapBlastBotMode.ToLower())"
 $physicsArguments += "--jelly-merge-duration=$($JellyMergeDuration.ToString($culture))"
 $physicsArguments += "--jelly-merge-level-gap=$JellyMergeLevelGap"
 $physicsArguments += "--jelly-tap-blast-min-level=$JellyTapBlastMinLevel"
+$physicsArguments += "--blast-score-factor=$($BlastScoreFactor.ToString($culture))"
+$physicsArguments += "--jelly-tap-blast-score-factor=$($JellyTapBlastScoreFactor.ToString($culture))"
+$physicsArguments += "--jelly-tap-blast-uses-turn=$($JellyTapBlastUsesTurn.ToLower())"
 $physicsArguments += "--jelly-blast-requires-same-level=$($JellyBlastRequiresSameLevel.ToLower())"
 if ($OrbFrictionByLevel -ne "none" -and $OrbFrictionByLevel -notmatch '^\d+(\.\d+)?(,\d+(\.\d+)?)*$') {
 	throw "OrbFrictionByLevel must be 'none' or comma-separated non-negative numbers"
@@ -173,6 +182,7 @@ $inputWaitingTouchingMergePairCountSum = 0
 $inputWaitingTouchingMergePairCountMax = 0
 $deferredJellyMergeCount = 0
 $shockTotals = @{}
+$reactionScoreTotals = [ordered]@{ merge = 0; blast = 0; tap = 0; jackpot = 0 }
 foreach ($task in $tasks) {
     $report = Get-Content -LiteralPath $task.Output -Raw | ConvertFrom-Json
     $tick = $report.ticks[0]
@@ -195,6 +205,10 @@ foreach ($task in $tasks) {
     $totalLevelSevenCreations += [int]$seedRow.level_seven_creation_count
 	$totalLevelUpCount += [int]$seedRow.level_up_count
 	$totalTapBlastCount += [int]$seedRow.tap_blast_count
+	foreach ($scoreProperty in $seedRow.score_by_reaction_type.PSObject.Properties) {
+		$scoreKey = [string]$scoreProperty.Name
+		$reactionScoreTotals[$scoreKey] += [long]$scoreProperty.Value
+	}
 	foreach ($levelProperty in $seedRow.tap_blast_count_by_level.PSObject.Properties) {
 		$level = $levelProperty.Name
 		if (-not $tapBlastCountByLevel.ContainsKey($level)) { $tapBlastCountByLevel[$level] = 0 }
@@ -270,6 +284,8 @@ foreach ($task in $tasks) {
 }
 
 $completedGames = @($seedRows | Where-Object { $_.game_over })
+$incompleteGames = @($seedRows | Where-Object { -not $_.game_over })
+$allTurns = @($seedRows | ForEach-Object { [double]$_.completed_turns })
 $gameOverTurns = @($completedGames | ForEach-Object { [double]$_.completed_turns })
 $scores = @($seedRows | ForEach-Object { [double]$_.score })
 $gameOverScores = @($completedGames | ForEach-Object { [double]$_.score })
@@ -289,14 +305,31 @@ foreach ($level in @($shockTotals.Keys | Sort-Object)) {
         target_samples = $samples
     }
 }
+function Get-Median($Values) {
+    $items = @($Values | ForEach-Object { [double]$_ } | Sort-Object)
+    if ($items.Count -eq 0) { return 0.0 }
+    $middle = [Math]::Floor($items.Count / 2)
+    if ($items.Count % 2 -eq 1) { return [double]$items[$middle] }
+    return ([double]$items[$middle - 1] + [double]$items[$middle]) / 2.0
+}
+$reactionScoreTotal = [double](($reactionScoreTotals.Values | Measure-Object -Sum).Sum)
+$reactionScoreShares = [ordered]@{}
+foreach ($scoreKey in $reactionScoreTotals.Keys) {
+    $reactionScoreShares[$scoreKey] = if ($reactionScoreTotal -gt 0.0) {
+        [double]$reactionScoreTotals[$scoreKey] / $reactionScoreTotal
+    } else { 0.0 }
+}
 $summary = [ordered]@{
     label = $Label
     engine = "Godot 4.8-dev3 standard"
     seeds = @(101..120)
     fixed_fps = 120
     max_turns = $MaxTurns
-	level_profile = if ($LevelProfile -eq "Default") { "B" } else { $LevelProfile }
+	level_profile = if ($LevelProfile -eq "Default") { "D" } else { $LevelProfile }
 	tap_blast_bot_mode = $resolvedTapBlastBotMode.ToLower()
+	blast_score_factor = $BlastScoreFactor
+	jelly_tap_blast_score_factor = $JellyTapBlastScoreFactor
+	jelly_tap_blast_uses_turn = $JellyTapBlastUsesTurn -eq "On"
 	jelly_merge_duration = $JellyMergeDuration
 	jelly_merge_level_gap = $JellyMergeLevelGap
 	jelly_tap_blast_min_level = $JellyTapBlastMinLevel
@@ -309,6 +342,11 @@ $summary = [ordered]@{
     spawn_count_max = if ($SpawnCountMax -ge 0) { $SpawnCountMax } else { $null }
     spawn_level_costs = if ([string]::IsNullOrWhiteSpace($SpawnLevelCosts)) { $null } else { $SpawnLevelCosts }
     game_over_count = $completedGames.Count
+    incomplete_count = $incompleteGames.Count
+    average_turns_all = ($allTurns | Measure-Object -Average).Average
+    minimum_turns_all = ($allTurns | Measure-Object -Minimum).Minimum
+    maximum_turns_all = ($allTurns | Measure-Object -Maximum).Maximum
+    median_turns_all = Get-Median $allTurns
     average_game_over_turns = if ($gameOverTurns.Count -gt 0) { ($gameOverTurns | Measure-Object -Average).Average } else { 0.0 }
     minimum_game_over_turns = if ($gameOverTurns.Count -gt 0) { ($gameOverTurns | Measure-Object -Minimum).Minimum } else { 0.0 }
     maximum_game_over_turns = if ($gameOverTurns.Count -gt 0) { ($gameOverTurns | Measure-Object -Maximum).Maximum } else { 0.0 }
@@ -316,6 +354,10 @@ $summary = [ordered]@{
     minimum_game_over_score = if ($gameOverScores.Count -gt 0) { ($gameOverScores | Measure-Object -Minimum).Minimum } else { 0.0 }
     maximum_game_over_score = if ($gameOverScores.Count -gt 0) { ($gameOverScores | Measure-Object -Maximum).Maximum } else { 0.0 }
     average_score_all = ($scores | Measure-Object -Average).Average
+    median_score_all = Get-Median $scores
+    score_per_turn_all = if ($totalTurns -gt 0) { [double](($scores | Measure-Object -Sum).Sum) / $totalTurns } else { 0.0 }
+    score_by_reaction_type = $reactionScoreTotals
+    score_share_by_reaction_type = $reactionScoreShares
     total_spawned_orbs = ($spawnedOrbCounts | Measure-Object -Sum).Sum
     average_spawned_orbs_all = ($spawnedOrbCounts | Measure-Object -Average).Average
     spawned_level_one_count = $spawnedLevelOneCount

@@ -88,18 +88,22 @@ func on_swipe(dir: Vector2i) -> void:
 		return
 	if dir == gravity and not Config.data.allow_same_direction_swipe:
 		return
+	_start_turn(dir, true)
 
+
+func _start_turn(dir: Vector2i, change_gravity: bool) -> void:
 	turn_index += 1
 	turn_combo = 0
 	_emit_combo_changed()
 	for orb: Variant in _board.get_orbs():
 		orb.generation = 0
 	InputRouter.set_locked(true)
-	gravity = dir
-	_board.set_gravity(gravity)
-	if _board.has_method("play_visual_tilt"):
-		_board.play_visual_tilt(gravity)
-	gravity_changed.emit(gravity)
+	if change_gravity:
+		gravity = dir
+		_board.set_gravity(gravity)
+		if _board.has_method("play_visual_tilt"):
+			_board.play_visual_tilt(gravity)
+		gravity_changed.emit(gravity)
 	turn_started.emit(turn_index, gravity)
 	if final_move_pending:
 		final_move_pending = false
@@ -140,16 +144,21 @@ func try_tap_blast_orb(orb: Variant) -> bool:
 		return false
 	if not _collision_resolver.is_jelly_tap_blast_candidate(orb):
 		return false
-	turn_combo = 0
-	_emit_combo_changed()
-	InputRouter.set_locked(true)
-	_is_tap_blast_settle = true
-	_begin_settle()
-	_set_state(State.SIMULATING)
+	var uses_turn: bool = Config.data.jelly_tap_blast_uses_turn
+	if uses_turn:
+		_start_turn(gravity, false)
+	else:
+		turn_combo = 0
+		_emit_combo_changed()
+		InputRouter.set_locked(true)
+		_is_tap_blast_settle = true
+		_begin_settle()
+		_set_state(State.SIMULATING)
 	if not _collision_resolver.apply_jelly_tap_blast(orb):
-		_is_tap_blast_settle = false
-		InputRouter.set_locked(false)
-		_set_state(State.WAITING_INPUT)
+		if not uses_turn:
+			_is_tap_blast_settle = false
+			InputRouter.set_locked(false)
+			_set_state(State.WAITING_INPUT)
 		return false
 	return true
 
