@@ -38,6 +38,46 @@
 
 ## 미확인
 
+### [2026-11-03] 대상 #132 — Windows Release 빌드 0.16.1
+- 상태: 완료 — 프로젝트 버전을 `0.16.1`로 올리고, 버전 커밋 뒤 깨끗한 트리에서 Release 빌드·내보낸 exe 스모크·격리 실제 창·전체 테스트·보존/저장/묶음 검증을 마쳤다
+- 브랜치 / PR: `build-0.16.1` / https://github.com/jeongmo-dot/gravity_orb/pull/132
+- 변경 파일: `project.godot`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `application/config/version` `0.16.0→0.16.1`; 버전 변경 커밋 `9e68437` 뒤 깨끗한 트리에서 Release 빌드 — 자동 (`git status`, 빌드 결과 줄)
+  - [x] `GravityOrb_v0.16.1.exe` + `.console.exe` + `_BUILD.txt` 생성, PCK 내장. 최종 재빌드의 `_BUILD.txt` Commit과 `git rev-parse HEAD` 동일 — 자동
+  - [x] 내보낸 콘솔 exe 기본·`--mode=jelly` 300프레임 스모크 종료 코드 각각 0, `SCRIPT ERROR` 0건 — 자동
+  - [x] 격리 APPDATA 실제 창에서 시작 화면과 JELLY 직접 실행 화면 확인 — 수동 관측
+  - [x] 사용자 `save.cfg` 전후 SHA-256 동일, 기존 버전 파일 12개 이름·크기·SHA-256 동일 — 자동
+  - [x] exe 문자열 검사에서 `tests/`·`artifacts/`·`docs/` 및 대표 파일 이름 0건, 게임 코드 앵커 27건 — 자동
+
+- 빌드 관측:
+  - `WINDOWS_BUILD_RESULT version=0.16.1 mode=Release exit=0 bytes=111111824 preserved=12`
+  - 산출물: `build/windows/GravityOrb_v0.16.1.exe` `111,111,824`바이트, `.console.exe` `50,176`바이트, `_BUILD.txt` `159`바이트
+  - 엔진 `Godot 4.8-dev3 Standard` (`4.8.dev3.official.51105ccbe`), 모드 `Release`, sidecar `.pck` 없음
+  - 기존 파일 보존: 0.15.0 `111,213,584 / 50,176 / 159`, 0.15.1 `111,219,904 / 50,176 / 159`, 0.15.2 `111,221,024 / 50,176 / 159`, 0.16.0 `111,110,848 / 50,176 / 159`바이트 (`exe / console / BUILD`). 전후 SHA-256도 12/12 동일
+  - 사용자 `save.cfg`: 전후 `2,101`바이트, SHA-256 `2243b278dbf10afa50c73d54baeee316d4560658de75ac45658e620c6272db3a`, 변경 0건
+  - 묶음 검사: 금지 패턴 `res://tests/`, `res://artifacts/`, `res://docs/`, `run_tests.gd`, `capture_screens.gd`, `technical_design.md`, 인박스 문서 = 0건. 양성 앵커 `OrbitStage`·`JellyOrbArt`·`StartScreen`·`Main3D` 포함, 합계 27건
+
+- 실제 창 관측:
+  - 시작 화면: 제목 `Gravity Orb`, 배경·로고·단일 `JELLY` 카드·랭킹/소리/설정 버튼이 540×960 창 안에 정상 표시됨
+  - JELLY 직접 실행: 격리 APPDATA에서 `GravityOrb_v0.16.1.exe -- --mode=jelly` 실행. TURN 1, SCORE/BEST 0, 보드·방향 표시·시작 L1 네 색·NEXT/THEN이 잘림 없이 표시됨
+  - 시작 화면 JELLY 카드를 자동 클릭하려던 순간 사용자가 다른 창을 조작해 입력 충돌이 감지되어 클릭은 중단했다. 대신 명세의 직접 실행 인자로 별도 격리 창을 열어 JELLY 보드를 확인했다
+
+- QA 관측값:
+  - `tests/run_tests.ps1` → 일반 `322/322`, 장기 `4/4`, 성능 `5/5`, 합계 `331/331`; 각각 새 프로세스, 종료 코드 0, `99.006초`
+  - `godot --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 편집기 기본/`--mode=blitz` 300프레임 smoke → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 내보낸 `.console.exe` 기본/`--mode=jelly` 300프레임 smoke → 각각 종료 코드 0, `SCRIPT ERROR` 0건
+  - `git diff --check` 오류 0건
+
+- 수동 확인 절차:
+  1. `GravityOrb_v0.16.1.exe` 실행 → 시작 화면에 단일 JELLY 카드와 랭킹·소리·설정 버튼이 잘림 없이 보여야 한다
+  2. JELLY 카드를 클릭하거나 `GravityOrb_v0.16.1.exe -- --mode=jelly` 실행 → TURN 1, SCORE/BEST 0, 시작 젤리 네 색과 NEXT/THEN이 있는 보드로 진입해야 한다
+  3. 종료 뒤 `%APPDATA%/Godot/app_userdata/Gravity Orb/save.cfg` 해시 확인 → 실행 전과 같아야 한다
+- 결정 사항: 없음. 버전·파일 이름·Release 모드·검증 범위는 §10.5·§10.5.1과 인박스 그대로 적용했다
+- 알려진 기록: 현재 0.16.0 `_BUILD.txt`는 커밋 `8aabebd`, `2026-11-01T08:56:45Z`, Release다. #128~#131 회신에는 모두 `Release 미실행`이라고 적혀 있고 이 파일을 만든 별도 회신 기록은 없어, 당시 Codex가 Release 빌드를 실행했는지는 **모름**이다. 파일은 변경하지 않았다
+- 남은 것 · 질문: 구현·검증 잔여 없음. 합격·병합 판정은 Claude/사용자에게 맡긴다
+
 ### [2026-11-01] 대상 #131 — L10 잭팟 점수 상향
 - 상태: 완료 — `max_merge_bonus_factor` 기본값을 `5→40`으로 올려 콤보 1·위험 배수 1의 L10+L10 잭팟을 `5,120`점으로 변경하고, 과거 값 묶음과 화면 캡처·전체 검증을 마쳤다
 - 브랜치 / PR: `codex/jelly-jackpot-score` / https://github.com/jeongmo-dot/gravity_orb/pull/131
