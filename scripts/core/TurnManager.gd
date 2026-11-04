@@ -8,10 +8,12 @@ signal gravity_changed(dir: Vector2i)
 signal turn_started(turn_index: int, dir: Vector2i)
 signal turn_finished(turn_index: int, combo: int)
 signal planet_unlocked(color_index: int)
+signal jelly_tap_effect_unlocked(color_index: int)
 signal combo_changed(combo: int, multiplier: float, max_combo: int)
 signal reaction_ready(reaction: Dictionary)
 signal warning_changed(walls: Array[Vector2i])
 signal final_move_changed(visible: bool, message: String)
+signal game_started
 signal game_over
 
 const FINAL_MOVE_MESSAGE: String = "막혔어요 · 한 번의 이동으로 입구를 비우세요"
@@ -48,6 +50,7 @@ var _stable_time: float = 0.0
 var _is_initial_settle: bool = false
 var _is_tap_blast_settle: bool = false
 var _current_merge_delay_seconds: float = 0.0
+var _jelly_tap_effect_callout_seen: Dictionary = {}
 
 
 func _ready() -> void:
@@ -70,6 +73,7 @@ func start_game() -> void:
 	final_move_active = false
 	final_move_count = 0
 	final_move_success_count = 0
+	_jelly_tap_effect_callout_seen.clear()
 	final_move_changed.emit(false, "")
 	gravity = Vector2i.DOWN
 	_is_initial_settle = true
@@ -81,6 +85,7 @@ func start_game() -> void:
 	_emit_combo_changed()
 	_begin_settle()
 	_set_state(State.SIMULATING)
+	game_started.emit()
 
 
 func on_swipe(dir: Vector2i) -> void:
@@ -91,7 +96,11 @@ func on_swipe(dir: Vector2i) -> void:
 	_start_turn(dir, true)
 
 
-func _start_turn(dir: Vector2i, change_gravity: bool) -> void:
+func _start_turn(
+	dir: Vector2i,
+	change_gravity: bool,
+	spawn_next: bool = true
+) -> void:
 	turn_index += 1
 	turn_combo = 0
 	_emit_combo_changed()
@@ -105,9 +114,11 @@ func _start_turn(dir: Vector2i, change_gravity: bool) -> void:
 			_board.play_visual_tilt(gravity)
 		gravity_changed.emit(gravity)
 	turn_started.emit(turn_index, gravity)
-	if final_move_pending:
+	var spending_final_move: bool = final_move_pending
+	if spending_final_move or not spawn_next:
 		final_move_pending = false
-		final_move_active = true
+		if spending_final_move:
+			final_move_active = true
 		_begin_settle()
 		_set_state(State.SIMULATING)
 	else:
@@ -146,7 +157,14 @@ func try_tap_blast_orb(orb: Variant) -> bool:
 		return false
 	var uses_turn: bool = Config.data.jelly_tap_blast_uses_turn
 	if uses_turn:
-		_start_turn(gravity, false)
+		var tap_effect: GameConfig.JellyTapEffect = Config.data.jelly_tap_effect_for_color(
+			int(orb.color)
+		)
+		_start_turn(
+			gravity,
+			false,
+			tap_effect != GameConfig.JellyTapEffect.REST
+		)
 	else:
 		turn_combo = 0
 		_emit_combo_changed()
@@ -237,7 +255,26 @@ func on_reaction(reaction: Dictionary) -> void:
 	max_combo = maxi(max_combo, turn_combo)
 	reaction["combo"] = turn_combo
 	_emit_combo_changed()
+	_track_jelly_tap_effect_callout(reaction)
 	reaction_ready.emit(reaction)
+
+
+func _track_jelly_tap_effect_callout(reaction: Dictionary) -> void:
+	if Config.data.game_mode != GameConfig.GameMode.JELLY:
+		return
+	var reaction_type: ReactionRules.Type = reaction.get(
+		"type", ReactionRules.Type.NONE
+	) as ReactionRules.Type
+	var qualifies: bool = reaction_type == ReactionRules.Type.MERGE
+	if reaction_type == ReactionRules.Type.TAP_BLAST:
+		qualifies = int(reaction.get("tap_effect", -1)) == GameConfig.JellyTapEffect.GROW
+	if not qualifies or int(reaction.get("result_level", 0)) < 8:
+		return
+	var color_index: int = int(reaction.get("result_color", -1))
+	if color_index < 0 or _jelly_tap_effect_callout_seen.has(color_index):
+		return
+	_jelly_tap_effect_callout_seen[color_index] = true
+	jelly_tap_effect_unlocked.emit(color_index)
 
 
 func current_combo_multiplier() -> float:

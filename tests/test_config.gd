@@ -339,6 +339,30 @@ func test_m9_blast_defaults() -> void:
 	assert_near(config.jelly_tap_blast_score_factor, 0.5, TOLERANCE, "tap score")
 	assert_true(config.jelly_tap_blast_uses_turn, "tap blast consumes a turn")
 	assert_near(config.jelly_tap_blast_touch_margin, 16.0, TOLERANCE, "tap margin")
+	assert_eq(config.jelly_tap_clean_max_level, 3, "tap clean maximum level")
+	assert_near(config.jelly_tap_clean_score_factor, 1.0, TOLERANCE, "tap clean score")
+	assert_near(config.jelly_tap_clean_visual_time, 0.25, TOLERANCE, "tap clean visual")
+	assert_eq(
+		Array(config.jelly_tap_effect_modes),
+		[2, 3, 4, 5, 6, 7],
+		"six colors use bomb quake grow bonus magnet rest"
+	)
+	assert_near(config.jelly_tap_quake_speed, 900.0, TOLERANCE, "tap quake speed")
+	assert_eq(config.jelly_tap_bonus_points_per_orb, 100, "tap bonus per orb")
+	assert_near(config.jelly_tap_magnet_time, 0.5, TOLERANCE, "tap magnet time")
+	var fallback: GameConfig = GameConfig.new()
+	fallback.jelly_tap_effect_modes = PackedInt32Array()
+	assert_eq(
+		fallback.jelly_tap_effect_for_color(0),
+		GameConfig.JellyTapEffect.PUSH,
+		"empty tap mode table falls back to push"
+	)
+	fallback.jelly_tap_effect_modes = PackedInt32Array([99])
+	assert_eq(
+		fallback.jelly_tap_effect_for_color(0),
+		GameConfig.JellyTapEffect.PUSH,
+		"invalid tap mode falls back to push"
+	)
 
 
 func test_m8_feedback_defaults() -> void:

@@ -147,8 +147,23 @@ func play_reaction_visuals(reaction: Dictionary) -> void:
 		and reaction_type != ReactionRules.Type.MAX_CLEAR
 	):
 		return
+	if (
+		reaction_type == ReactionRules.Type.TAP_BLAST
+		and int(reaction.get("tap_effect", GameConfig.JellyTapEffect.PUSH))
+		== GameConfig.JellyTapEffect.GROW
+	):
+		var growth_orb: Variant = reaction.get("result_orb")
+		if is_instance_valid(growth_orb) and growth_orb.has_method("play_visual_punch"):
+			growth_orb.play_visual_punch(1.0, 0.18)
+		return
 	if not Config.data.fx_enabled or _camera == null:
 		return
+	if (
+		reaction_type == ReactionRules.Type.TAP_BLAST
+		and int(reaction.get("tap_effect", GameConfig.JellyTapEffect.PUSH))
+		== GameConfig.JellyTapEffect.QUAKE
+	):
+		_color_frame_shakes.append({"elapsed": 0.0, "duration": COLOR_SHAKE_DURATION})
 	var level: int = _effect_level(reaction)
 	var intensity: float = (
 		FINALE_INTENSITY
@@ -203,6 +218,12 @@ func _play_reaction_sfx(reaction: Dictionary) -> void:
 		and reaction_type != ReactionRules.Type.MAX_CLEAR
 	):
 		return
+	if (
+		reaction_type == ReactionRules.Type.TAP_BLAST
+		and int(reaction.get("tap_effect", GameConfig.JellyTapEffect.PUSH))
+		== GameConfig.JellyTapEffect.GROW
+	):
+		return
 	var finale: bool = bool(reaction.get("finale", false))
 	if finale:
 		_finale_sfx_index = int(reaction.get("finale_index", _finale_sfx_index + 1))
@@ -220,6 +241,12 @@ func _play_reaction_sfx(reaction: Dictionary) -> void:
 
 func _play_reaction_haptics(reaction: Dictionary) -> void:
 	var reaction_type: ReactionRules.Type = reaction["type"] as ReactionRules.Type
+	if (
+		reaction_type == ReactionRules.Type.TAP_BLAST
+		and int(reaction.get("tap_effect", GameConfig.JellyTapEffect.PUSH))
+		== GameConfig.JellyTapEffect.GROW
+	):
+		return
 	if reaction_type in [
 		ReactionRules.Type.BLAST,
 		ReactionRules.Type.TAP_BLAST,

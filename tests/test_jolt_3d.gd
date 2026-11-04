@@ -779,11 +779,15 @@ func test_turn_manager_cap_finishes_active_merge_without_starting_a_new_one() ->
 
 func test_level_eight_tap_blast_is_turn_free_and_settles_back_to_input() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_tap_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
+	var original_clean_max: int = Config.data.jelly_tap_clean_max_level
 	var original_uses_turn: bool = Config.data.jelly_tap_blast_uses_turn
 	var original_stable_duration: float = Config.data.stable_duration
 	var original_linear_speed: float = Config.data.stable_linear_speed
 	var original_angular_speed: float = Config.data.stable_angular_speed
 	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_tap_effect_modes = PackedInt32Array()
+	Config.data.jelly_tap_clean_max_level = 0
 	Config.data.jelly_tap_blast_uses_turn = false
 	Config.data.stable_duration = 0.001
 	Config.data.stable_linear_speed = 1.0e9
@@ -841,6 +845,8 @@ func test_level_eight_tap_blast_is_turn_free_and_settles_back_to_input() -> void
 	assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "tap returns to input")
 	assert_true(manager.final_move_pending, "tap preserves FINAL MOVE pending")
 	Config.data.game_mode = original_mode
+	Config.data.jelly_tap_effect_modes = original_tap_modes
+	Config.data.jelly_tap_clean_max_level = original_clean_max
 	Config.data.jelly_tap_blast_uses_turn = original_uses_turn
 	Config.data.stable_duration = original_stable_duration
 	Config.data.stable_linear_speed = original_linear_speed
@@ -850,11 +856,15 @@ func test_level_eight_tap_blast_is_turn_free_and_settles_back_to_input() -> void
 
 func test_level_eight_tap_blast_consumes_turn_spawns_next_and_keeps_gravity() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_tap_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
+	var original_clean_max: int = Config.data.jelly_tap_clean_max_level
 	var original_uses_turn: bool = Config.data.jelly_tap_blast_uses_turn
 	var original_stable_duration: float = Config.data.stable_duration
 	var original_linear_speed: float = Config.data.stable_linear_speed
 	var original_angular_speed: float = Config.data.stable_angular_speed
 	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_tap_effect_modes = PackedInt32Array()
+	Config.data.jelly_tap_clean_max_level = 0
 	Config.data.jelly_tap_blast_uses_turn = true
 	Config.data.stable_duration = 0.001
 	Config.data.stable_linear_speed = 1.0e9
@@ -891,6 +901,8 @@ func test_level_eight_tap_blast_consumes_turn_spawns_next_and_keeps_gravity() ->
 	assert_true(board.get_orbs().size() > orb_count_before, "tap turn spawns the current NEXT batch")
 	assert_true(spawner.peek_preview() != preview_before, "tap turn advances NEXT and THEN")
 	Config.data.game_mode = original_mode
+	Config.data.jelly_tap_effect_modes = original_tap_modes
+	Config.data.jelly_tap_clean_max_level = original_clean_max
 	Config.data.jelly_tap_blast_uses_turn = original_uses_turn
 	Config.data.stable_duration = original_stable_duration
 	Config.data.stable_linear_speed = original_linear_speed
@@ -900,11 +912,15 @@ func test_level_eight_tap_blast_consumes_turn_spawns_next_and_keeps_gravity() ->
 
 func test_tap_blast_spends_pending_final_move_without_spawning() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_tap_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
+	var original_clean_max: int = Config.data.jelly_tap_clean_max_level
 	var original_uses_turn: bool = Config.data.jelly_tap_blast_uses_turn
 	var original_stable_duration: float = Config.data.stable_duration
 	var original_linear_speed: float = Config.data.stable_linear_speed
 	var original_angular_speed: float = Config.data.stable_angular_speed
 	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_tap_effect_modes = PackedInt32Array()
+	Config.data.jelly_tap_clean_max_level = 0
 	Config.data.jelly_tap_blast_uses_turn = true
 	Config.data.stable_duration = 0.001
 	Config.data.stable_linear_speed = 1.0e9
@@ -934,6 +950,8 @@ func test_tap_blast_spends_pending_final_move_without_spawning() -> void:
 	assert_eq(manager.final_move_success_count, 1, "tap FINAL MOVE success is counted")
 	assert_true(board.get_orbs().size() < orb_count_before, "FINAL MOVE tap removes source and spawns nothing")
 	Config.data.game_mode = original_mode
+	Config.data.jelly_tap_effect_modes = original_tap_modes
+	Config.data.jelly_tap_clean_max_level = original_clean_max
 	Config.data.jelly_tap_blast_uses_turn = original_uses_turn
 	Config.data.stable_duration = original_stable_duration
 	Config.data.stable_linear_speed = original_linear_speed
@@ -943,11 +961,15 @@ func test_tap_blast_spends_pending_final_move_without_spawning() -> void:
 
 func test_tap_blast_pending_final_move_fails_if_entrance_stays_blocked() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_tap_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
+	var original_clean_max: int = Config.data.jelly_tap_clean_max_level
 	var original_uses_turn: bool = Config.data.jelly_tap_blast_uses_turn
 	var original_stable_duration: float = Config.data.stable_duration
 	var original_stable_linear_speed: float = Config.data.stable_linear_speed
 	var original_stable_angular_speed: float = Config.data.stable_angular_speed
 	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_tap_effect_modes = PackedInt32Array()
+	Config.data.jelly_tap_clean_max_level = 0
 	Config.data.jelly_tap_blast_uses_turn = true
 	Config.data.stable_duration = 0.001
 	Config.data.stable_linear_speed = 1.0e9
@@ -995,6 +1017,8 @@ func test_tap_blast_pending_final_move_fails_if_entrance_stays_blocked() -> void
 	assert_eq(manager.final_move_success_count, 0, "failed FINAL MOVE is not counted as success")
 	assert_true(board.get_orbs().size() < orb_count_before, "failed FINAL MOVE removes source and spawns nothing")
 	Config.data.game_mode = original_mode
+	Config.data.jelly_tap_effect_modes = original_tap_modes
+	Config.data.jelly_tap_clean_max_level = original_clean_max
 	Config.data.jelly_tap_blast_uses_turn = original_uses_turn
 	Config.data.stable_duration = original_stable_duration
 	Config.data.stable_linear_speed = original_stable_linear_speed
@@ -1004,8 +1028,12 @@ func test_tap_blast_pending_final_move_fails_if_entrance_stays_blocked() -> void
 
 func test_tap_blast_candidate_accepts_l8_to_l10_and_rejects_l7_waiting_ghost_and_locked() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_tap_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
+	var original_clean_max: int = Config.data.jelly_tap_clean_max_level
 	var original_uses_turn: bool = Config.data.jelly_tap_blast_uses_turn
 	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_tap_effect_modes = PackedInt32Array()
+	Config.data.jelly_tap_clean_max_level = 0
 	Config.data.jelly_tap_blast_uses_turn = true
 	var fixture: Dictionary = await _create_turn_fixture()
 	var board: Board3D = fixture["board"] as Board3D
@@ -1034,6 +1062,8 @@ func test_tap_blast_candidate_accepts_l8_to_l10_and_rejects_l7_waiting_ghost_and
 	assert_true(not manager.try_tap_blast_orb(level_seven), "L7 tap does not start a turn")
 	assert_eq(manager.turn_index, turn_before, "rejected L7 tap keeps turn index")
 	Config.data.game_mode = original_mode
+	Config.data.jelly_tap_effect_modes = original_tap_modes
+	Config.data.jelly_tap_clean_max_level = original_clean_max
 	Config.data.jelly_tap_blast_uses_turn = original_uses_turn
 	await _cleanup(fixture["root"] as Node)
 
@@ -1070,6 +1100,143 @@ func test_level_ten_tap_uses_sixteen_pixel_margin_and_rejects_simulating() -> vo
 	)
 	manager.on_tap(camera.unproject_position(Orb3D.plane_position_to_world(inner_point)))
 	assert_true(tapped.consumed, "point just inside touch margin selects L10")
+	Config.data.game_mode = original_mode
+	await _cleanup(fixture["root"] as Node)
+
+
+func test_tap_clean_removes_only_eligible_same_color_without_push() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_tap_effect_modes = PackedInt32Array([1, 1, 1, 1, 1, 1])
+	var fixture: Dictionary = await _create_turn_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var source: Orb3D = board.spawn_orb(0, 8, Vector2.ZERO)
+	var clean_one: Orb3D = board.spawn_orb(0, 1, Vector2(-400.0, 0.0))
+	var clean_three: Orb3D = board.spawn_orb(0, 3, Vector2(400.0, 0.0))
+	var same_high: Orb3D = board.spawn_orb(0, 4, Vector2(100.0, 0.0))
+	var other_low: Orb3D = board.spawn_orb(1, 1, Vector2(120.0, 0.0))
+	var ghost: Orb3D = board.spawn_orb(0, 1, Vector2(180.0, 120.0))
+	var waiting: Orb3D = board.spawn_orb(0, 1, Vector2(-180.0, 120.0))
+	var locked: Orb3D = board.spawn_orb(0, 1, Vector2(0.0, -180.0))
+	ghost.is_ghost = true
+	waiting.is_waiting_at_entrance = true
+	resolver._lock_reaction_result(locked)
+	var reactions: Array[Dictionary] = []
+	resolver.reaction_applied.connect(func(reaction: Dictionary) -> void: reactions.append(reaction))
+	assert_true(resolver.apply_jelly_tap_blast(source), "NONE tap applies")
+	assert_true(source.consumed, "source is removed")
+	assert_true(clean_one.consumed and clean_three.consumed, "same color L1-L3 clean")
+	assert_true(not same_high.consumed, "same color L4 remains")
+	assert_true(not other_low.consumed, "other color remains")
+	assert_true(not ghost.consumed, "ghost remains")
+	assert_true(not waiting.consumed, "entrance waiter remains")
+	assert_true(not locked.consumed, "merge-locked orb remains")
+	assert_eq(reactions[0]["clean_levels"], [1, 3], "clean levels are deterministic")
+	assert_true((reactions[0]["blast_targets"] as Array).is_empty(), "common clean does not push")
+	assert_true(same_high.linear_velocity.is_zero_approx(), "remaining orb is not pushed")
+	Config.data.game_mode = original_mode
+	Config.data.jelly_tap_effect_modes = original_modes
+	await _cleanup(fixture["root"] as Node)
+
+
+func test_bomb_quake_and_grow_tap_effects_follow_color_rules() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var fixture: Dictionary = await _create_turn_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+
+	var red: Orb3D = board.spawn_orb(0, 8, Vector2.ZERO)
+	var red_far: Orb3D = board.spawn_orb(0, 1, Vector2(430.0, 0.0))
+	var blue_near: Orb3D = board.spawn_orb(1, 2, Vector2(200.0, 0.0))
+	var blue_far: Orb3D = board.spawn_orb(1, 2, Vector2(400.0, 0.0))
+	var blue_high: Orb3D = board.spawn_orb(1, 4, Vector2(180.0, 0.0))
+	var reactions: Array[Dictionary] = []
+	resolver.reaction_applied.connect(func(reaction: Dictionary) -> void: reactions.append(reaction))
+	assert_true(resolver.apply_jelly_tap_blast(red), "BOMB tap applies")
+	assert_true(red_far.consumed, "same color clean is board-wide")
+	assert_true(blue_near.consumed, "near other-color low orb is bomb-cleaned")
+	assert_true(not blue_far.consumed, "far other-color orb remains")
+	assert_true(not blue_high.consumed, "other-color L4 remains")
+	var bomb_moved: bool = false
+	for target_value: Variant in reactions[-1]["blast_targets"] as Array:
+		var target_row: Dictionary = target_value as Dictionary
+		if int(target_row["stable_spawn_id"]) == blue_high.stable_spawn_id:
+			bomb_moved = (target_row["velocity_change"] as Vector2).x > 0.0
+	assert_true(bomb_moved, "remaining near orb is pushed")
+
+	board.clear()
+	await tree.process_frame
+	var quake: Orb3D = board.spawn_orb(1, 8, Vector2.ZERO)
+	var light: Orb3D = board.spawn_orb(0, 4, Vector2(100.0, 0.0))
+	var heavy: Orb3D = board.spawn_orb(3, 7, Vector2(-100.0, 0.0))
+	assert_true(resolver.apply_jelly_tap_blast(quake), "QUAKE tap applies")
+	var quake_speeds: Dictionary = {}
+	for target_value: Variant in reactions[-1]["shock_targets"] as Array:
+		var target_row: Dictionary = target_value as Dictionary
+		quake_speeds[int(target_row["stable_spawn_id"])] = (
+			target_row["velocity_change"] as Vector2
+		).length()
+	assert_near(float(quake_speeds[light.stable_spawn_id]), 900.0, 0.01, "light orb gets quake speed")
+	assert_near(float(quake_speeds[heavy.stable_spawn_id]), 900.0, 0.01, "heavy orb gets same quake speed")
+
+	board.clear()
+	await tree.process_frame
+	var empty_green: Orb3D = board.spawn_orb(2, 8, Vector2.ZERO)
+	assert_true(not resolver.is_jelly_tap_blast_candidate(empty_green), "empty L8 green rejects tap")
+	for index: int in range(5):
+		board.spawn_orb(2, 3, Vector2(-300.0 + float(index) * 120.0, 200.0))
+	assert_true(resolver.is_jelly_tap_blast_candidate(empty_green), "green accepts after clean target")
+	assert_true(resolver.apply_jelly_tap_blast(empty_green), "GROW tap applies")
+	assert_true(not empty_green.consumed, "L8 green source survives")
+	assert_eq(empty_green.level, 9, "cleaned mass grows source to L9")
+	assert_near(empty_green.jelly_mass, 42.0, 0.001, "growth uses cleaned jelly mass")
+	var max_green: Orb3D = board.spawn_orb(2, 10, Vector2(350.0, -200.0))
+	assert_true(resolver.is_jelly_tap_blast_candidate(max_green), "green L10 can tap empty")
+	assert_true(resolver.apply_jelly_tap_blast(max_green), "green L10 tap applies")
+	assert_true(max_green.consumed, "green L10 source is removed")
+
+	Config.data.game_mode = original_mode
+	await _cleanup(fixture["root"] as Node)
+
+
+func test_magnet_and_rest_tap_effects_hold_gravity_and_skip_next_spawn() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var fixture: Dictionary = await _create_turn_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var spawner: Spawner = fixture["spawner"] as Spawner
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	var purple: Orb3D = board.spawn_orb(4, 8, Vector2.ZERO)
+	var target: Orb3D = board.spawn_orb(0, 4, Vector2(200.0, 0.0))
+	assert_true(resolver.apply_jelly_tap_blast(purple), "MAGNET tap applies")
+	assert_true(board.tap_magnet_active(), "magnet window starts")
+	assert_true(board.is_gravity_transition_active(), "magnet blocks settling")
+	var magnet_direction: Vector2 = Orb3D.world_vector_to_plane(
+		target.get_physics_body().constant_force
+	).normalized()
+	assert_true(magnet_direction.x < -0.99, "magnet gravity points to tap origin")
+	board._advance_tap_magnet(0.5)
+	var restored_direction: Vector2 = Orb3D.world_vector_to_plane(
+		target.get_physics_body().constant_force
+	).normalized()
+	assert_true(restored_direction.y > 0.99, "magnet restores current gravity")
+
+	board.clear()
+	await tree.process_frame
+	spawner.init_rng(133)
+	spawner.sync_next_batch_size(1)
+	var preview_before: Array = spawner.peek_preview()
+	manager.state = TurnManager.State.WAITING_INPUT
+	InputRouter.set_locked(false)
+	var rest: Orb3D = board.spawn_orb(5, 8, Vector2.ZERO)
+	assert_true(manager.try_tap_blast_orb(rest), "REST tap starts turn")
+	assert_eq(manager.state, TurnManager.State.SIMULATING, "REST skips SPAWNING")
+	assert_eq(manager.turn_index, 1, "REST consumes turn")
+	assert_eq(spawner.peek_preview(), preview_before, "REST preserves NEXT and THEN")
 	Config.data.game_mode = original_mode
 	await _cleanup(fixture["root"] as Node)
 

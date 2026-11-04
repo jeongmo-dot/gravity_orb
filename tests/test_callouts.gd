@@ -157,6 +157,57 @@ func test_jelly_callout_sits_between_combo_and_board() -> void:
 	Config.data.sfx_enabled = original_sfx_enabled
 
 
+func test_six_jelly_tap_effect_callouts_show_once_without_art_or_sound() -> void:
+	var original_enabled: bool = Config.data.fx_callouts_enabled
+	var original_sfx_enabled: bool = Config.data.sfx_enabled
+	Config.data.fx_callouts_enabled = true
+	Config.data.sfx_enabled = false
+	var main: Main = await _create_main()
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
+	var callout: Label = main.get_node("UI/Hud/CalloutLabel") as Label
+	var unlock_visual: OrbVisual = main.get_node("UI/Hud/PlanetUnlockVisual") as OrbVisual
+	var expected: Array[String] = [
+		"분홍 L8: 터치하면 폭탄",
+		"파랑 L8: 터치하면 지진",
+		"초록 L8: 터치하면 성장",
+		"노랑 L8: 터치하면 보너스",
+		"보라 L8: 터치하면 자석",
+		"주황 L8: 터치하면 휴식",
+	]
+	for color_index: int in range(6):
+		manager.turn_combo = 0
+		manager.on_reaction({
+			"type": ReactionRules.Type.MERGE,
+			"levels": [7, 7],
+			"occupancy": 0.0,
+			"result_level": 8,
+			"result_color": color_index,
+		})
+		assert_eq(callout.text, expected[color_index], "effect callout text")
+		assert_eq(
+			callout.get_theme_color("font_color"),
+			JellyOrbArt.color_for(color_index, 8),
+			"effect callout uses jelly color"
+		)
+		assert_true(not unlock_visual.visible, "effect callout has no orb art")
+		if hud._callout_tween != null and hud._callout_tween.is_valid():
+			hud._callout_tween.kill()
+		hud._hide_callout_label()
+	assert_eq(hud.jelly_tap_effect_history(), [0, 1, 2, 3, 4, 5], "all colors seen once")
+	manager.on_reaction({
+		"type": ReactionRules.Type.MERGE,
+		"levels": [8, 8],
+		"occupancy": 0.0,
+		"result_level": 9,
+		"result_color": 0,
+	})
+	assert_eq(hud.jelly_tap_effect_history(), [0, 1, 2, 3, 4, 5], "repeat is ignored")
+	await _destroy_main(main)
+	Config.data.fx_callouts_enabled = original_enabled
+	Config.data.sfx_enabled = original_sfx_enabled
+
+
 func test_callout_frame_cost_report() -> void:
 	var original_enabled: bool = Config.data.fx_callouts_enabled
 	var original_sfx_enabled: bool = Config.data.sfx_enabled

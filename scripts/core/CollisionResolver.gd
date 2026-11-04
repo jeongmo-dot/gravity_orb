@@ -17,6 +17,7 @@ const FORWARD_CELL_OFFSETS: Array[Vector2i] = [
 var _pending: Array[Array] = []
 var _reaction_locks: Dictionary = {}
 var _active_jelly_merges: Array[Dictionary] = []
+var _active_tap_clean_visuals: Array[Dictionary] = []
 var _merge_reserved: Dictionary = {}
 var _accepting_new_jelly_merges: bool = true
 var max_concurrent_jelly_merges: int = 0
@@ -59,6 +60,7 @@ func flush(delta: float = 0.0) -> int:
 	if latency_measurement_enabled:
 		_scan_geometric_contacts(false, true)
 	_advance_reaction_locks(delta)
+	_advance_tap_clean_visuals(delta)
 	var applied: int = _advance_active_jelly_merges(delta)
 	_queue_released_reaction_contacts()
 	var pending: Array[Array] = _pending
@@ -296,11 +298,58 @@ func apply_jelly_tap_blast(orb: Variant) -> bool:
 	)
 	var stable_spawn_id: int = int(orb.stable_spawn_id)
 	var color: int = int(orb.color)
-	_board.remove_orb(orb)
-	var blast_targets: Array[Dictionary] = _board.apply_blast_with_radius_factor(
-		position,
-		Config.data.jelly_tap_blast_radius_factor
+	var tap_effect: GameConfig.JellyTapEffect = Config.data.jelly_tap_effect_for_color(color)
+	var clean_targets: Array[Variant] = _jelly_tap_clean_targets(orb, tap_effect)
+	var clean_levels: Array[int] = []
+	var clean_colors: Array[int] = []
+	var clean_stable_spawn_ids: Array[int] = []
+	var cleaned_mass: float = 0.0
+	for clean_orb: Variant in clean_targets:
+		clean_levels.append(int(clean_orb.level))
+		clean_colors.append(int(clean_orb.color))
+		clean_stable_spawn_ids.append(int(clean_orb.stable_spawn_id))
+		cleaned_mass += float(clean_orb.get("jelly_mass"))
+		_start_tap_clean_visual(clean_orb, position)
+
+	var source_survives: bool = (
+		tap_effect == GameConfig.JellyTapEffect.GROW
+		and level < Config.data.orb_max_level
 	)
+	var result_orb: Variant = null
+	var result_level: int = 0
+	var result_mass: float = 0.0
+	if source_survives:
+		result_orb = orb
+		var previous_radius: float = float(orb.get_current_radius())
+		result_mass = minf(
+			float(orb.get("jelly_mass")) + cleaned_mass,
+			Config.data.jelly_mass_for_level(Config.data.orb_max_level)
+		)
+		orb.set_jelly_mass(
+			result_mass,
+			Config.data,
+			previous_radius,
+			Config.data.jelly_merge_duration,
+			true
+		)
+		result_level = int(orb.level)
+	else:
+		_board.remove_orb(orb)
+
+	var blast_targets: Array[Dictionary] = []
+	var shock_targets: Array[Dictionary] = []
+	if tap_effect in [GameConfig.JellyTapEffect.PUSH, GameConfig.JellyTapEffect.BOMB]:
+		blast_targets = _board.apply_blast_with_radius_factor(
+			position,
+			Config.data.jelly_tap_blast_radius_factor
+		)
+	elif tap_effect == GameConfig.JellyTapEffect.QUAKE:
+		shock_targets = _board.apply_tap_quake(
+			Config.data.jelly_tap_quake_speed,
+			Callable(_spawner, "next_shake_direction") if _spawner != null else Callable()
+		)
+	elif tap_effect == GameConfig.JellyTapEffect.MAGNET:
+		_board.start_tap_magnet(position, Config.data.jelly_tap_magnet_time)
 	var reaction: Dictionary = {
 		"type": ReactionRules.Type.TAP_BLAST,
 		"chain": 1,
@@ -311,18 +360,23 @@ func apply_jelly_tap_blast(orb: Variant) -> bool:
 		"position": position,
 		"source_positions": [position],
 		"source_radii": [source_radius],
-		"result_level": 0,
+		"result_level": result_level,
 		"result_color": color,
-		"result_orb": null,
-		"result_mass": 0.0,
+		"result_orb": result_orb,
+		"result_mass": result_mass,
 		"jelly_absorption": false,
 		"absorbed_level": 0,
 		"absorber": 0,
 		"shock_level": level,
-		"shock_targets": [],
+		"shock_targets": shock_targets,
 		"blast_targets": blast_targets,
 		"contact_path": "tap_blast",
 		"tap_blast": true,
+		"tap_effect": tap_effect,
+		"clean_levels": clean_levels,
+		"clean_colors": clean_colors,
+		"clean_stable_spawn_ids": clean_stable_spawn_ids,
+		"clean_count": clean_levels.size(),
 		"blast_radius_factor": Config.data.jelly_tap_blast_radius_factor,
 		"reaction_applied_usec": Time.get_ticks_usec(),
 		"reaction_physics_frame": Engine.get_physics_frames(),
@@ -333,7 +387,7 @@ func apply_jelly_tap_blast(orb: Variant) -> bool:
 
 
 func is_jelly_tap_blast_candidate(orb: Variant) -> bool:
-	return (
+	var base_candidate: bool = (
 		Config.data.game_mode == GameConfig.GameMode.JELLY
 		and _is_valid_reaction_orb(orb)
 		and not orb.is_ghost
@@ -341,9 +395,112 @@ func is_jelly_tap_blast_candidate(orb: Variant) -> bool:
 		and Config.data.jelly_tap_blast_enabled_for_level(int(orb.level))
 		and not _is_reaction_locked(orb)
 	)
+	if not base_candidate:
+		return false
+	var tap_effect: GameConfig.JellyTapEffect = Config.data.jelly_tap_effect_for_color(
+		int(orb.color)
+	)
+	if (
+		tap_effect == GameConfig.JellyTapEffect.GROW
+		and int(orb.level) < Config.data.orb_max_level
+	):
+		return not _jelly_tap_clean_targets(orb, tap_effect).is_empty()
+	return true
+
+
+func jelly_tap_clean_count(orb: Variant) -> int:
+	if not is_jelly_tap_blast_candidate(orb):
+		return 0
+	return _jelly_tap_clean_targets(
+		orb,
+		Config.data.jelly_tap_effect_for_color(int(orb.color))
+	).size()
+
+
+func _jelly_tap_clean_targets(
+	source: Variant,
+	tap_effect: GameConfig.JellyTapEffect
+) -> Array[Variant]:
+	var targets: Array[Variant] = []
+	var max_level: int = maxi(Config.data.jelly_tap_clean_max_level, 0)
+	if max_level <= 0 or not is_instance_valid(source):
+		return targets
+	var bomb_radius: float = (
+		Config.data.jelly_tap_blast_radius_factor * Config.data.board_size
+	)
+	for candidate: Variant in _board.get_orbs():
+		if candidate == source or not _is_valid_reaction_orb(candidate):
+			continue
+		if candidate.is_ghost or candidate.is_waiting_at_entrance:
+			continue
+		if _is_reaction_locked(candidate) or int(candidate.level) > max_level:
+			continue
+		var same_color: bool = int(candidate.color) == int(source.color)
+		var bomb_extra: bool = (
+			tap_effect == GameConfig.JellyTapEffect.BOMB
+			and not same_color
+			and candidate.position.distance_to(source.position) <= bomb_radius
+		)
+		if same_color or bomb_extra:
+			targets.append(candidate)
+	targets.sort_custom(func(a: Variant, b: Variant) -> bool:
+		return int(a.stable_spawn_id) < int(b.stable_spawn_id)
+	)
+	return targets
+
+
+func _start_tap_clean_visual(orb: Variant, target: Vector2) -> void:
+	var duration: float = maxf(Config.data.jelly_tap_clean_visual_time, 0.0)
+	if duration <= 0.0 or not _board.has_method("detach_orb_for_merge_visual"):
+		_board.remove_orb(orb)
+		return
+	var start: Vector2 = orb.position
+	_board.detach_orb_for_merge_visual(orb)
+	_active_tap_clean_visuals.append({
+		"orb": orb,
+		"start": start,
+		"target": target,
+		"elapsed": 0.0,
+		"duration": duration,
+	})
+	orb.update_merge_visual(start, target - start, 0.0)
+
+
+func _advance_tap_clean_visuals(delta: float) -> void:
+	if _active_tap_clean_visuals.is_empty():
+		return
+	var remaining: Array[Dictionary] = []
+	for entry: Dictionary in _active_tap_clean_visuals:
+		var orb: Variant = entry.get("orb")
+		if not is_instance_valid(orb):
+			continue
+		var duration: float = maxf(float(entry["duration"]), 0.000001)
+		var elapsed: float = minf(
+			float(entry["elapsed"]) + maxf(delta, 0.0),
+			duration
+		)
+		var progress: float = elapsed / duration
+		var start: Vector2 = entry["start"] as Vector2
+		var target: Vector2 = entry["target"] as Vector2
+		orb.update_merge_visual(
+			start.lerp(target, progress * progress),
+			target - start,
+			progress
+		)
+		if progress >= 1.0:
+			orb.queue_free()
+			continue
+		entry["elapsed"] = elapsed
+		remaining.append(entry)
+	_active_tap_clean_visuals = remaining
 
 
 func cancel_active_jelly_merges() -> void:
+	for clean_entry: Dictionary in _active_tap_clean_visuals:
+		var clean_orb: Variant = clean_entry.get("orb")
+		if is_instance_valid(clean_orb):
+			clean_orb.queue_free()
+	_active_tap_clean_visuals.clear()
 	for entry: Dictionary in _active_jelly_merges:
 		var reaction: Dictionary = entry.get("reaction", {}) as Dictionary
 		var result_orb: Variant = reaction.get("result_orb")

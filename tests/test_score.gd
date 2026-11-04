@@ -17,6 +17,22 @@ func test_level_eight_to_ten_tap_blast_uses_source_level_score_and_multipliers()
 			"tap blast scores half of L%d at combo one" % level
 		)
 
+
+func test_yellow_tap_clean_bonus_example_scores_one_thousand_fifty_seven() -> void:
+	var cfg: GameConfig = GameConfig.new()
+	var reaction: Dictionary = {
+		"type": ReactionRules.Type.TAP_BLAST,
+		"levels": [8],
+		"clean_levels": [1, 1, 1, 1, 1, 1, 2, 2, 2, 3],
+		"tap_effect": GameConfig.JellyTapEffect.BONUS,
+		"combo": 1,
+		"occupancy": 0.0,
+	}
+	assert_eq(ScoreManager.points_for(reaction, cfg), 1057, "specified yellow base score")
+	assert_eq(reaction["base_points"], 1057, "yellow source clean and bonus sum")
+	reaction["occupancy"] = 0.5
+	assert_eq(ScoreManager.points_for(reaction, cfg), 2114, "danger doubles yellow score")
+
 const CONFIG_RESOURCE: GameConfig = preload("res://config/default_config.tres")
 const TOLERANCE: float = 1.0e-6
 

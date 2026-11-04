@@ -22,6 +22,10 @@ param(
 	[double]$JellyTapBlastScoreFactor = 0.5,
 	[ValidateSet("On", "Off")]
 	[string]$JellyTapBlastUsesTurn = "On",
+	[ValidateRange(0, 10)]
+	[int]$JellyTapCleanMaxLevel = 3,
+	[ValidateSet("Push", "None", "Color")]
+	[string]$JellyTapEffectModes = "Color",
 	[ValidateSet("On", "Off")]
 	[string]$JellyBlastRequiresSameLevel = "Off",
 	[string]$OrbFrictionByLevel = "0.3,0.3,0.3,0.4,0.4,0.4,0.4,0.5,0.5,0.5",
@@ -61,6 +65,8 @@ $physicsArguments += "--jelly-tap-blast-min-level=$JellyTapBlastMinLevel"
 $physicsArguments += "--blast-score-factor=$($BlastScoreFactor.ToString($culture))"
 $physicsArguments += "--jelly-tap-blast-score-factor=$($JellyTapBlastScoreFactor.ToString($culture))"
 $physicsArguments += "--jelly-tap-blast-uses-turn=$($JellyTapBlastUsesTurn.ToLower())"
+$physicsArguments += "--jelly-tap-clean-max-level=$JellyTapCleanMaxLevel"
+$physicsArguments += "--jelly-tap-effect-modes=$($JellyTapEffectModes.ToLower())"
 $physicsArguments += "--jelly-blast-requires-same-level=$($JellyBlastRequiresSameLevel.ToLower())"
 if ($OrbFrictionByLevel -ne "none" -and $OrbFrictionByLevel -notmatch '^\d+(\.\d+)?(,\d+(\.\d+)?)*$') {
 	throw "OrbFrictionByLevel must be 'none' or comma-separated non-negative numbers"
@@ -157,6 +163,11 @@ $totalLevelSevenCreations = 0
 $totalLevelUpCount = 0
 $totalTapBlastCount = 0
 $tapBlastCountByLevel = @{}
+$tapBlastCountByColor = @{}
+$tapCleanCountByColor = @{}
+$tapCleanCountTotal = 0
+$tapCleanCountMax = 0
+$purpleSameTurnBlastCount = 0
 $levelCreationCounts = @{}
 $maximumLevelDistribution = @{}
 $levelTenGameCount = 0
@@ -205,6 +216,19 @@ foreach ($task in $tasks) {
     $totalLevelSevenCreations += [int]$seedRow.level_seven_creation_count
 	$totalLevelUpCount += [int]$seedRow.level_up_count
 	$totalTapBlastCount += [int]$seedRow.tap_blast_count
+	$tapCleanCountTotal += [int]$seedRow.tap_clean_count_total
+	$tapCleanCountMax = [Math]::Max($tapCleanCountMax, [int]$seedRow.tap_clean_count_max)
+	$purpleSameTurnBlastCount += [int]$seedRow.purple_same_turn_blast_count
+	foreach ($colorProperty in $seedRow.tap_blast_count_by_color.PSObject.Properties) {
+		$color = $colorProperty.Name
+		if (-not $tapBlastCountByColor.ContainsKey($color)) { $tapBlastCountByColor[$color] = 0 }
+		$tapBlastCountByColor[$color] += [int]$colorProperty.Value
+	}
+	foreach ($colorProperty in $seedRow.tap_clean_count_by_color.PSObject.Properties) {
+		$color = $colorProperty.Name
+		if (-not $tapCleanCountByColor.ContainsKey($color)) { $tapCleanCountByColor[$color] = 0 }
+		$tapCleanCountByColor[$color] += [int]$colorProperty.Value
+	}
 	foreach ($scoreProperty in $seedRow.score_by_reaction_type.PSObject.Properties) {
 		$scoreKey = [string]$scoreProperty.Name
 		$reactionScoreTotals[$scoreKey] += [long]$scoreProperty.Value
@@ -330,6 +354,8 @@ $summary = [ordered]@{
 	blast_score_factor = $BlastScoreFactor
 	jelly_tap_blast_score_factor = $JellyTapBlastScoreFactor
 	jelly_tap_blast_uses_turn = $JellyTapBlastUsesTurn -eq "On"
+	jelly_tap_clean_max_level = $JellyTapCleanMaxLevel
+	jelly_tap_effect_modes = $JellyTapEffectModes.ToLower()
 	jelly_merge_duration = $JellyMergeDuration
 	jelly_merge_level_gap = $JellyMergeLevelGap
 	jelly_tap_blast_min_level = $JellyTapBlastMinLevel
@@ -397,6 +423,11 @@ $summary = [ordered]@{
     blast_count = $totalBlasts
 	tap_blast_count = $totalTapBlastCount
 	tap_blast_count_by_level = $tapBlastCountByLevel
+	tap_blast_count_by_color = $tapBlastCountByColor
+	tap_clean_count_by_color = $tapCleanCountByColor
+	average_clean_count_per_tap = if ($totalTapBlastCount -gt 0) { [double]$tapCleanCountTotal / $totalTapBlastCount } else { 0.0 }
+	maximum_clean_count_per_tap = $tapCleanCountMax
+	purple_same_turn_blast_count = $purpleSameTurnBlastCount
     blast_count_by_level = $blastCountByLevel
 	same_level_blast_count_by_level = $sameLevelBlastCountByLevel
 	mixed_level_blast_count_by_level = $mixedLevelBlastCountByLevel
