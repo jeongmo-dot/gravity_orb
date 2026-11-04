@@ -125,7 +125,6 @@ var _planet_unlock_history: Array[int] = []
 var _pending_planet_unlocks: Array[int] = []
 var _jelly_tap_effect_history: Array[int] = []
 var _pending_jelly_tap_effects: Array[int] = []
-var _pending_turn_callouts: Array[Vector2i] = []
 var _preview_unlock_seen: Dictionary = {}
 var _preview_unlock_flash_history: Array[int] = []
 var _preview_batches: Array = []
@@ -486,8 +485,10 @@ func bind_game_state(
 	_refresh_danger_badge()
 
 
-func _on_turn_state_changed(_state: int) -> void:
+func _on_turn_state_changed(state: int) -> void:
 	_refresh_turn_number()
+	if state == int(TurnManager.State.WAITING_INPUT):
+		_show_next_jelly_tap_effect()
 
 
 func _refresh_turn_number() -> void:
@@ -1253,9 +1254,6 @@ func _update_callout(combo: int) -> void:
 		return
 	_callout_seen[combo] = true
 	_callout_history.append(combo)
-	if _callout_label.visible:
-		_pending_turn_callouts.append(Vector2i(stage_index, combo))
-		return
 	_show_callout(CALLOUT_WORDS[stage_index], stage_index)
 	if _sfx_bank != null:
 		_sfx_bank.play_callout_chime(stage_index)
@@ -1414,12 +1412,15 @@ func _on_jelly_tap_effect_unlocked(color_index: int) -> void:
 	if not Config.data.fx_callouts_enabled:
 		return
 	_pending_jelly_tap_effects.append(color_index)
-	if not _callout_label.visible:
-		_show_next_jelly_tap_effect()
 
 
 func _show_next_jelly_tap_effect() -> void:
-	if _pending_jelly_tap_effects.is_empty() or _callout_label.visible:
+	if (
+		_pending_jelly_tap_effects.is_empty()
+		or _callout_label.visible
+		or _turn_manager == null
+		or _turn_manager.state != TurnManager.State.WAITING_INPUT
+	):
 		return
 	_show_jelly_tap_effect(_pending_jelly_tap_effects.pop_front())
 
@@ -1483,10 +1484,7 @@ func _layout_planet_callout_visual(text: String) -> void:
 func _complete_callout() -> void:
 	_hide_callout_label()
 	_callout_tween = null
-	if not _pending_turn_callouts.is_empty():
-		var pending_turn: Vector2i = _pending_turn_callouts.pop_front()
-		call_deferred("_show_pending_turn_callout", pending_turn)
-	elif not _pending_planet_unlocks.is_empty():
+	if not _pending_planet_unlocks.is_empty():
 		call_deferred("_show_next_planet_unlock")
 	elif not _pending_jelly_tap_effects.is_empty():
 		call_deferred("_show_next_jelly_tap_effect")
@@ -1533,7 +1531,6 @@ func _reset_callout_tracking() -> void:
 	_pending_planet_unlocks.clear()
 	_jelly_tap_effect_history.clear()
 	_pending_jelly_tap_effects.clear()
-	_pending_turn_callouts.clear()
 	_preview_unlock_seen.clear()
 	_preview_unlock_flash_history.clear()
 	_hide_callout_visuals()
@@ -1541,13 +1538,6 @@ func _reset_callout_tracking() -> void:
 
 func _hide_callout_visuals() -> void:
 	_hide_callout_label()
-
-
-func _show_pending_turn_callout(pending_turn: Vector2i) -> void:
-	var stage_index: int = pending_turn.x
-	_show_callout(CALLOUT_WORDS[stage_index], stage_index)
-	if _sfx_bank != null:
-		_sfx_bank.play_callout_chime(stage_index)
 
 
 func _hide_callout_label() -> void:

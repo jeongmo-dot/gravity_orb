@@ -339,9 +339,10 @@ func test_m9_blast_defaults() -> void:
 	assert_near(config.jelly_tap_blast_score_factor, 0.5, TOLERANCE, "tap score")
 	assert_true(config.jelly_tap_blast_uses_turn, "tap blast consumes a turn")
 	assert_near(config.jelly_tap_blast_touch_margin, 16.0, TOLERANCE, "tap margin")
-	assert_eq(config.jelly_tap_clean_max_level, 3, "tap clean maximum level")
+	assert_eq(config.jelly_tap_clean_max_level, 2, "tap clean maximum level")
 	assert_near(config.jelly_tap_clean_score_factor, 1.0, TOLERANCE, "tap clean score")
 	assert_near(config.jelly_tap_clean_visual_time, 0.25, TOLERANCE, "tap clean visual")
+	assert_eq(config.jelly_tap_grow_min_clean, 3, "green grow minimum clean targets")
 	assert_eq(
 		Array(config.jelly_tap_effect_modes),
 		[2, 3, 4, 5, 6, 7],

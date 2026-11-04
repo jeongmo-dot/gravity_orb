@@ -24,7 +24,9 @@ param(
 	[ValidateSet("On", "Off")]
 	[string]$JellyTapBlastUsesTurn = "On",
 	[ValidateRange(0, 10)]
-	[int]$JellyTapCleanMaxLevel = 3,
+	[int]$JellyTapCleanMaxLevel = 2,
+	[ValidateRange(0, 100)]
+	[int]$JellyTapGrowMinClean = 3,
 	[ValidateSet("Push", "None", "Color")]
 	[string]$JellyTapEffectModes = "Color",
 	[ValidateSet("On", "Off")]
@@ -94,6 +96,7 @@ if (-not $AggregateOnly) {
 					"--jelly-tap-blast-score-factor=$($JellyTapBlastScoreFactor.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--jelly-tap-blast-uses-turn=$($JellyTapBlastUsesTurn.ToLower())",
 					"--jelly-tap-clean-max-level=$JellyTapCleanMaxLevel",
+					"--jelly-tap-grow-min-clean=$JellyTapGrowMinClean",
 					"--jelly-tap-effect-modes=$($JellyTapEffectModes.ToLower())",
 					"--jelly-blast-requires-same-level=$($JellyBlastRequiresSameLevel.ToLower())",
 					"--orb-friction-by-level=$OrbFrictionByLevel",
@@ -302,6 +305,7 @@ $report = [ordered]@{
 	jelly_tap_blast_score_factor = $JellyTapBlastScoreFactor
 	jelly_tap_blast_uses_turn = $JellyTapBlastUsesTurn -eq "On"
 	jelly_tap_clean_max_level = $JellyTapCleanMaxLevel
+	jelly_tap_grow_min_clean = $JellyTapGrowMinClean
 	jelly_tap_effect_modes = $JellyTapEffectModes.ToLower()
 	jelly_merge_level_gap = $JellyMergeLevelGap
 	jelly_blast_min_level = $JellyBlastMinLevel

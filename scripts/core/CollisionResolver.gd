@@ -404,7 +404,10 @@ func is_jelly_tap_blast_candidate(orb: Variant) -> bool:
 		tap_effect == GameConfig.JellyTapEffect.GROW
 		and int(orb.level) < Config.data.orb_max_level
 	):
-		return not _jelly_tap_clean_targets(orb, tap_effect).is_empty()
+		return _jelly_tap_clean_targets(orb, tap_effect).size() >= maxi(
+			Config.data.jelly_tap_grow_min_clean,
+			0
+		)
 	return true
 
 

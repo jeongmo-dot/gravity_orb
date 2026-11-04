@@ -126,6 +126,7 @@ func _run() -> void:
 		"jelly_tap_blast_score_factor": Config.data.jelly_tap_blast_score_factor,
 		"jelly_tap_blast_uses_turn": Config.data.jelly_tap_blast_uses_turn,
 		"jelly_tap_clean_max_level": Config.data.jelly_tap_clean_max_level,
+		"jelly_tap_grow_min_clean": Config.data.jelly_tap_grow_min_clean,
 		"jelly_tap_effect_profile": _jelly_tap_effect_profile,
 		"jelly_tap_effect_modes": Array(Config.data.jelly_tap_effect_modes),
 		"jelly_merge_duration": Config.data.jelly_merge_duration,
@@ -2204,6 +2205,11 @@ func _apply_arguments() -> void:
 				argument.trim_prefix("--jelly-tap-clean-max-level=").to_int(),
 				0,
 				Config.data.orb_max_level
+			)
+		elif argument.begins_with("--jelly-tap-grow-min-clean="):
+			Config.data.jelly_tap_grow_min_clean = maxi(
+				argument.trim_prefix("--jelly-tap-grow-min-clean=").to_int(),
+				0
 			)
 		elif argument.begins_with("--jelly-tap-effect-modes="):
 			_jelly_tap_effect_profile = argument.trim_prefix(

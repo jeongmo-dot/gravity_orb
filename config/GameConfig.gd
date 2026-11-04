@@ -131,9 +131,10 @@ enum GameMode {
 @export var jelly_tap_blast_score_factor: float = 0.5
 @export var jelly_tap_blast_uses_turn: bool = true
 @export var jelly_tap_blast_touch_margin: float = 16.0
-@export var jelly_tap_clean_max_level: int = 3
+@export var jelly_tap_clean_max_level: int = 2
 @export var jelly_tap_clean_score_factor: float = 1.0
 @export var jelly_tap_clean_visual_time: float = 0.25
+@export var jelly_tap_grow_min_clean: int = 3
 @export var jelly_tap_effect_modes: PackedInt32Array = PackedInt32Array(
 	[
 		JellyTapEffect.BOMB,

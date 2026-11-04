@@ -550,7 +550,8 @@ func _capture_jelly_tap_effect_scenes(
 	director: FeedbackDirector
 ) -> void:
 	_set_jelly_level_profile("B")
-	Config.data.jelly_tap_clean_max_level = 3
+	Config.data.jelly_tap_clean_max_level = 2
+	Config.data.jelly_tap_grow_min_clean = 3
 	Config.data.jelly_tap_effect_modes = PackedInt32Array([2, 3, 4, 5, 6, 7])
 	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
 	var resolver: CollisionResolver = main.get_node("CollisionResolver") as CollisionResolver
@@ -581,7 +582,7 @@ func _capture_jelly_tap_effect_scenes(
 		for clean_index: int in range(3):
 			var clean_orb: Orb3D = board.spawn_orb(
 				color_index,
-				clean_index + 1,
+				mini(clean_index + 1, 2),
 				Vector2(-250.0 + float(clean_index) * 250.0, 180.0)
 			)
 			clean_orb.disable_physics()
@@ -613,11 +614,13 @@ func _capture_jelly_tap_effect_scenes(
 		hud._callout_tween.kill()
 	hud._hide_callout_label()
 	hud._on_jelly_tap_effect_unlocked(OrbTypes.OrbColor.BLUE)
+	hud._show_next_jelly_tap_effect()
 	await _capture("126_jelly_tap_blue_callout.png")
 	if hud._callout_tween != null and hud._callout_tween.is_valid():
 		hud._callout_tween.kill()
 	hud._hide_callout_label()
 	hud._on_jelly_tap_effect_unlocked(OrbTypes.OrbColor.CYAN)
+	hud._show_next_jelly_tap_effect()
 	await _capture("127_jelly_tap_orange_callout.png")
 	if hud._callout_tween != null and hud._callout_tween.is_valid():
 		hud._callout_tween.kill()

@@ -7,7 +7,7 @@ const EXPECTED_C8_LEGACY_HASH: String = "8c1a02e9dfa345a31828276e917dad0f8dda352
 const EXPECTED_D_DEFAULT_HASH: String = "2cdf79475d340e34252a3d295ccc23e092c719038e2362f5df6ac80dc8e5979f"
 const EXPECTED_ST_DEFAULT_HASH: String = "f3ff93474eb3765cdc611ae941c89ec96052a20f16fff75efe8ad6a6c8fb816c"
 const EXPECTED_JACKPOT_DEFAULT_HASH: String = "3254c77f2bcf478239f023f08af2bae5f48bc68aee56aa246894908d0b9ab5e7"
-const EXPECTED_COLOR_CLEAN_DEFAULT_HASH: String = "f14b51254a0d9f88c47437b6a8c8641d9918776aa918c7f1531d3307ed6efb3e"
+const EXPECTED_COLOR_CLEAN_DEFAULT_HASH: String = "4c4ab4aa9cf014d4d266a6fdfd75a03bbd4f40c5e9a540bd6f682da3c0835974"
 
 
 func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
@@ -324,6 +324,9 @@ func _run_rule_path(visuals_enabled: bool) -> Dictionary:
 			state["tap_turn_rules"]["jelly_tap_clean_max_level"] = (
 				Config.data.jelly_tap_clean_max_level
 			)
+			state["tap_turn_rules"]["jelly_tap_grow_min_clean"] = (
+				Config.data.jelly_tap_grow_min_clean
+			)
 			state["tap_turn_rules"]["jelly_tap_effect_modes"] = Array(
 				Config.data.jelly_tap_effect_modes
 			)
@@ -354,6 +357,7 @@ func _snapshot_level_profile() -> Dictionary:
 		"jelly_tap_blast_score_factor": Config.data.jelly_tap_blast_score_factor,
 		"jelly_tap_blast_uses_turn": Config.data.jelly_tap_blast_uses_turn,
 		"jelly_tap_clean_max_level": Config.data.jelly_tap_clean_max_level,
+		"jelly_tap_grow_min_clean": Config.data.jelly_tap_grow_min_clean,
 		"jelly_tap_effect_modes": Config.data.jelly_tap_effect_modes.duplicate(),
 		"max_merge_bonus_factor": Config.data.max_merge_bonus_factor,
 		"orb_friction_by_level": Config.data.orb_friction_by_level.duplicate(),
@@ -376,6 +380,7 @@ func _restore_level_profile(snapshot: Dictionary) -> void:
 	Config.data.jelly_tap_blast_score_factor = float(snapshot["jelly_tap_blast_score_factor"])
 	Config.data.jelly_tap_blast_uses_turn = bool(snapshot["jelly_tap_blast_uses_turn"])
 	Config.data.jelly_tap_clean_max_level = int(snapshot["jelly_tap_clean_max_level"])
+	Config.data.jelly_tap_grow_min_clean = int(snapshot["jelly_tap_grow_min_clean"])
 	Config.data.jelly_tap_effect_modes = snapshot["jelly_tap_effect_modes"] as PackedInt32Array
 	Config.data.max_merge_bonus_factor = float(snapshot["max_merge_bonus_factor"])
 	Config.data.orb_friction_by_level = snapshot["orb_friction_by_level"] as PackedFloat32Array
@@ -463,6 +468,7 @@ func _apply_legacy_score_profile() -> void:
 
 func _apply_legacy_tap_profile() -> void:
 	Config.data.jelly_tap_clean_max_level = 0
+	Config.data.jelly_tap_grow_min_clean = 1
 	Config.data.jelly_tap_effect_modes = PackedInt32Array()
 
 

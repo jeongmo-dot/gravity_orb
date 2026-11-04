@@ -268,7 +268,10 @@ func _track_jelly_tap_effect_callout(reaction: Dictionary) -> void:
 	var qualifies: bool = reaction_type == ReactionRules.Type.MERGE
 	if reaction_type == ReactionRules.Type.TAP_BLAST:
 		qualifies = int(reaction.get("tap_effect", -1)) == GameConfig.JellyTapEffect.GROW
-	if not qualifies or int(reaction.get("result_level", 0)) < 8:
+	if (
+		not qualifies
+		or int(reaction.get("result_level", 0)) < Config.data.jelly_tap_blast_min_level
+	):
 		return
 	var color_index: int = int(reaction.get("result_color", -1))
 	if color_index < 0 or _jelly_tap_effect_callout_seen.has(color_index):

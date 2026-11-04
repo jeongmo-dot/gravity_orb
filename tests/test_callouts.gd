@@ -26,6 +26,52 @@ func test_jelly_turn_callout_stages_fire_once_per_chain() -> void:
 	Config.data.sfx_enabled = original_sfx_enabled
 
 
+func test_combo_callout_replaces_previous_stage_without_carrying_to_next_turn() -> void:
+	var original_enabled: bool = Config.data.fx_callouts_enabled
+	var original_sfx_enabled: bool = Config.data.sfx_enabled
+	Config.data.fx_callouts_enabled = true
+	Config.data.sfx_enabled = false
+	var main: Main = await _create_main()
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	var callout: Label = main.get_node("UI/Hud/CalloutLabel") as Label
+	hud._on_combo_changed(3, 1.0, 3)
+	assert_eq(callout.text, "NICE!", "combo three starts NICE callout")
+	hud._on_combo_changed(5, 1.0, 5)
+	assert_eq(callout.text, "GREAT!", "combo five immediately replaces NICE")
+	if hud._callout_tween != null and hud._callout_tween.is_valid():
+		hud._callout_tween.kill()
+	hud._complete_callout()
+	assert_true(not callout.visible, "completed combo callout does not carry to next turn")
+	await _destroy_main(main)
+	Config.data.fx_callouts_enabled = original_enabled
+	Config.data.sfx_enabled = original_sfx_enabled
+
+
+func test_jelly_effect_hint_uses_configured_tap_minimum_level() -> void:
+	var original_min_level: int = Config.data.jelly_tap_blast_min_level
+	Config.data.jelly_tap_blast_min_level = 9
+	var main: Main = await _create_main()
+	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
+	var emitted: Array[int] = []
+	manager.jelly_tap_effect_unlocked.connect(
+		func(color_index: int) -> void: emitted.append(color_index)
+	)
+	manager.on_reaction({
+		"type": ReactionRules.Type.MERGE,
+		"result_level": 8,
+		"result_color": OrbTypes.OrbColor.RED,
+	})
+	assert_eq(emitted, [], "L8 does not unlock when tap minimum is L9")
+	manager.on_reaction({
+		"type": ReactionRules.Type.MERGE,
+		"result_level": 9,
+		"result_color": OrbTypes.OrbColor.RED,
+	})
+	assert_eq(emitted, [OrbTypes.OrbColor.RED], "configured L9 unlocks the hint")
+	await _destroy_main(main)
+	Config.data.jelly_tap_blast_min_level = original_min_level
+
+
 func test_jelly_preview_and_unlock_use_jelly_art_and_names() -> void:
 	var original_enabled: bool = Config.data.fx_callouts_enabled
 	var original_sfx_enabled: bool = Config.data.sfx_enabled
@@ -160,8 +206,10 @@ func test_jelly_callout_sits_between_combo_and_board() -> void:
 func test_six_jelly_tap_effect_callouts_show_once_without_art_or_sound() -> void:
 	var original_enabled: bool = Config.data.fx_callouts_enabled
 	var original_sfx_enabled: bool = Config.data.sfx_enabled
+	var original_min_level: int = Config.data.jelly_tap_blast_min_level
 	Config.data.fx_callouts_enabled = true
 	Config.data.sfx_enabled = false
+	Config.data.jelly_tap_blast_min_level = 8
 	var main: Main = await _create_main()
 	var hud: Hud = main.get_node("UI/Hud") as Hud
 	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
@@ -175,6 +223,7 @@ func test_six_jelly_tap_effect_callouts_show_once_without_art_or_sound() -> void
 		"보라 L8: 터치하면 자석",
 		"주황 L8: 터치하면 휴식",
 	]
+	manager.state = TurnManager.State.SIMULATING
 	for color_index: int in range(6):
 		manager.turn_combo = 0
 		manager.on_reaction({
@@ -184,7 +233,11 @@ func test_six_jelly_tap_effect_callouts_show_once_without_art_or_sound() -> void
 			"result_level": 8,
 			"result_color": color_index,
 		})
-		assert_eq(callout.text, expected[color_index], "effect callout text")
+	assert_true(not callout.visible, "effect hint stays hidden during the creation turn")
+	assert_eq(hud.jelly_tap_effect_history(), [0, 1, 2, 3, 4, 5], "all colors queued once")
+	manager._set_state(TurnManager.State.WAITING_INPUT)
+	for color_index: int in range(6):
+		assert_eq(callout.text, expected[color_index], "effect callout text at input wait")
 		assert_eq(
 			callout.get_theme_color("font_color"),
 			JellyOrbArt.color_for(color_index, 8),
@@ -193,8 +246,8 @@ func test_six_jelly_tap_effect_callouts_show_once_without_art_or_sound() -> void
 		assert_true(not unlock_visual.visible, "effect callout has no orb art")
 		if hud._callout_tween != null and hud._callout_tween.is_valid():
 			hud._callout_tween.kill()
-		hud._hide_callout_label()
-	assert_eq(hud.jelly_tap_effect_history(), [0, 1, 2, 3, 4, 5], "all colors seen once")
+		hud._complete_callout()
+		await tree.process_frame
 	manager.on_reaction({
 		"type": ReactionRules.Type.MERGE,
 		"levels": [8, 8],
@@ -206,6 +259,7 @@ func test_six_jelly_tap_effect_callouts_show_once_without_art_or_sound() -> void
 	await _destroy_main(main)
 	Config.data.fx_callouts_enabled = original_enabled
 	Config.data.sfx_enabled = original_sfx_enabled
+	Config.data.jelly_tap_blast_min_level = original_min_level
 
 
 func test_callout_frame_cost_report() -> void:

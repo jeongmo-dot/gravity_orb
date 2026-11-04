@@ -23,7 +23,9 @@ param(
 	[ValidateSet("On", "Off")]
 	[string]$JellyTapBlastUsesTurn = "On",
 	[ValidateRange(0, 10)]
-	[int]$JellyTapCleanMaxLevel = 3,
+	[int]$JellyTapCleanMaxLevel = 2,
+	[ValidateRange(0, 100)]
+	[int]$JellyTapGrowMinClean = 3,
 	[ValidateSet("Push", "None", "Color")]
 	[string]$JellyTapEffectModes = "Color",
 	[ValidateSet("On", "Off")]
@@ -66,6 +68,7 @@ $physicsArguments += "--blast-score-factor=$($BlastScoreFactor.ToString($culture
 $physicsArguments += "--jelly-tap-blast-score-factor=$($JellyTapBlastScoreFactor.ToString($culture))"
 $physicsArguments += "--jelly-tap-blast-uses-turn=$($JellyTapBlastUsesTurn.ToLower())"
 $physicsArguments += "--jelly-tap-clean-max-level=$JellyTapCleanMaxLevel"
+$physicsArguments += "--jelly-tap-grow-min-clean=$JellyTapGrowMinClean"
 $physicsArguments += "--jelly-tap-effect-modes=$($JellyTapEffectModes.ToLower())"
 $physicsArguments += "--jelly-blast-requires-same-level=$($JellyBlastRequiresSameLevel.ToLower())"
 if ($OrbFrictionByLevel -ne "none" -and $OrbFrictionByLevel -notmatch '^\d+(\.\d+)?(,\d+(\.\d+)?)*$') {
@@ -355,6 +358,7 @@ $summary = [ordered]@{
 	jelly_tap_blast_score_factor = $JellyTapBlastScoreFactor
 	jelly_tap_blast_uses_turn = $JellyTapBlastUsesTurn -eq "On"
 	jelly_tap_clean_max_level = $JellyTapCleanMaxLevel
+	jelly_tap_grow_min_clean = $JellyTapGrowMinClean
 	jelly_tap_effect_modes = $JellyTapEffectModes.ToLower()
 	jelly_merge_duration = $JellyMergeDuration
 	jelly_merge_level_gap = $JellyMergeLevelGap
