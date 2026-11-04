@@ -32,7 +32,21 @@
 
 ## 대기 중
 
-- 없음
+### [2026-11-04 #133] 색 청소 소폭발 — 색마다 다른 효과
+- 상태: 대기 (**다음 차례**. 최신 `origin/main` 위에서)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.25**
+- 배경: 사용자 (2026-11-04, 0.16.1 플레이 뒤) "중반 이후 공이 좀 찾을 때부터 전략적인 부분이 없어지고 루즈해지는 것 같아" → Claude 후보 5개 → "1번을 하되 색깔마다 효과가 다르게 할 수 있을까" → Claude 표 → "해보자"
+- 앵커: `scripts/core/CollisionResolver.gd` `apply_jelly_tap_blast()`·`is_jelly_tap_blast_candidate()`, `scripts/core/TurnManager.gd` `_start_turn()`·`try_tap_blast_orb()`, `scripts/core/ScoreManager.gd` `points_for()`, `scripts/spike/Board3D.gd` (`apply_blast_with_radius_factor()`·`is_gravity_transition_active()`), `scripts/spike/Orb3D.gd` (`set_jelly_mass()`·`update_merge_visual()`), `scripts/ui/Hud.gd` (`_show_planet_unlock()` 큐), `scripts/fx/FeedbackDirector.gd`, `config/GameConfig.gd`·`default_config.tres`, 측정 도구, 회귀 해시, 캡처
+- 수치 (Claude): 청소 레벨 ≤ **3**, 청소 점수 배율 **1.0**, 청소 그림 **0.25**초, 지진 **900** px/s, 보너스 젤리당 **100**, 자석 **0.5**초, 폭탄 반경은 지금 **0.3**
+- 요구 (§12-ONE.25 "바꿀 것" 1~5):
+  1. 공통: L8 이상 터치 → 같은 색 L3 이하 전부 사라짐 (공통에서는 밀지 않음)
+  2. 색별: 분홍 폭탄 (주변 다른 색 L3 이하도 + 밀기), 파랑 지진 (판 전체 흔들기), 초록 성장 (L8·L9는 터지지 않고 자람, 빈 터치 없음), 노랑 보너스 (청소 수 × 100), 보라 자석 (0.5초 터진 자리로 중력), 주황 휴식 (그 턴 새 젤리 없음)
+  3. 점수 식, 안내 한 줄 (판당 색마다 처음 한 번, 글자만), 청소 그림 (끌려가며 작아짐)
+  4. 예전 값 묶음은 청소 0·PUSH로 해시 그대로, 새 기본 해시 고정
+  5. 측정 J·C3·C2·E3·E2, 테스트, 캡처 (§12-ONE.25)
+- 건드리지 말 것: 소폭발 판정·턴 쓰기·반경·점수 배율 0.5, 대폭발·잭팟·합체 규칙과 점수, 콤보·위험 배수, 생성, 물리·마찰, 합체 색 효과 (`shock_color_*`), 랭킹 (저장 형식·기록), 사용자 저장 파일, 명세에 없는 연출·표시 (고리 모양 금지), `docs/` (회신 파일 제외)
+- Done-when: 테스트 통과 (`.\tests\run_tests.ps1`), 예전 해시 그대로, 새 기본 해시 상수 고정, 측정 표 보고, 캡처 (실제 창, 마지막은 전체 캡처) 보고, 검증 빌드는 `-Debug`만
+- 커밋: 항목 단위 브랜치, **push·PR까지**. 기본값은 E3. 청소 범위·값은 측정을 사용자와 본 뒤 정하고 병합한다
 
 ---
 

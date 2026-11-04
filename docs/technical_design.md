@@ -4176,6 +4176,99 @@ M4 검수(2026-09-28)에서 발견. 합체가 없는 M4 상태에서 **이동·�
 - 캡처: `98_jelly_l10_jackpot_b`는 실제 점수 경로 (`TurnManager` → `ScoreManager` → HUD)로 금색 +5,120 팝업 — 두 비율 모두 보드 안에서 잘리지 않음. `16_jelly_jackpot_effect`는 연출 전용이라 팝업 없음
 - 측정 없음 (명세대로)
 
+### 12-ONE.25 색 청소 소폭발 — 색마다 다른 효과 (#133)
+사용자 (2026-11-04, 0.16.1 플레이 뒤):
+1. **"중반 이후 공이 좀 찾을 때부터 전략적인 부분이 없어지고 루즈해지는 것 같아 해결책 아이디어 몇개 제안해줘"**
+2. Claude 후보 5개 (색 청소 소폭발·공 수 줄이기·후반 단계·주문·벽에 역할) → **"1번을 하되 색깔마다 효과가 다르게 할 수 있을까"**
+3. Claude 색별 표 + 안내 한 줄 제안 → **"해보자"**
+
+배경 (Claude 추정 — 판 전체 수치로 한 것이고 중반 구간만 잰 적은 없다):
+- 판이 차면 스와이프가 더미 전체를 미는 일이 되어 결과를 읽기 어렵다. 무작위 R 119턴, L-합체 153.5턴으로 1.29배뿐이다 (§12-ONE.23 D-0)
+- 소폭발을 "어느 색을 치울까"로 바꾸면 물리를 읽지 않아도 판을 보고 고를 수 있고, 공이 많을수록 선택이 선명하다. 색마다 효과가 다르면 어떤 색을 L8까지 키울지가 계획이 된다
+
+**지금** (#131, `CollisionResolver.apply_jelly_tap_blast()`): 터치한 L8 이상이 사라지고, 반경 `jelly_tap_blast_radius_factor` (0.3 × 960 = 288px) 안 젤리를 밀어낸다. 모든 색이 같다. 턴을 쓴다 (`TurnManager.try_tap_blast_orb()` → `_start_turn(gravity, false)`). 점수 `score_for_level(L) × 0.5`, 콤보 1
+
+**바꿀 것** (JELLY만):
+
+1. **공통 — 같은 색 청소**: 터치한 젤리와 **같은 색**이고 레벨 ≤ `jelly_tap_clean_max_level` (새 필드 **3**)인 젤리가 판 어디에 있든 전부 사라진다
+   - 제외: 터치한 젤리 자신, 유령, 입구 대기, 합체 연출 중인 젤리
+   - 물리에서는 터치한 그 프레임에 빠진다 (NEXT 묶음이 들어오기 전 — 지금 순서 그대로 `_start_turn()` 뒤 다음 물리 프레임에 생성). 그림은 5번
+   - 공통에서는 **밀어내지 않는다** (분홍만 민다)
+   - 터치한 젤리는 사라진다 (초록 L8·L9만 예외)
+   - 소폭발 한 번이 반응 한 번이다 (콤보 1). 청소된 젤리 수는 콤보로 세지 않는다. 이어지는 합체는 2, 3 … (지금과 같다)
+2. **색별 효과** — 새 필드 `jelly_tap_effect_modes` (`PackedInt32Array`, 색 번호 순서), 새 enum `JellyTapEffect { PUSH, NONE, BOMB, QUAKE, GROW, BONUS, MAGNET, REST }`. 비었거나 범위 밖이면 PUSH. PUSH = #131 그대로 (반경 안 밀기), NONE = 공통만
+
+| 색 번호 | 색 | 모드 | 효과 |
+|---|---|---|---|
+| 0 RED | 분홍 | **BOMB** 폭탄 | 터진 자리에서 `jelly_tap_blast_radius_factor` (288px) 안의 **다른 색** 레벨 ≤ `jelly_tap_clean_max_level`도 같이 사라진다 (중심 거리 기준, 제외 규칙은 1번과 같다). 남은 젤리는 `Board3D.apply_blast_with_radius_factor(position, 0.3)`으로 밀린다 (#131과 같은 힘) |
+| 1 BLUE | 파랑 | **QUAKE** 지진 | 판 위 일반 젤리 전부에 질량 무관 속도 변화 `jelly_tap_quake_speed` (새 필드 **900** px/s, 대폭발 `blast_speed`와 같음), 방향은 `Spawner.next_shake_direction()` (지금 SHAKE와 같은 결정론 난수) |
+| 2 GREEN | 초록 | **GROW** 성장 | L8·L9는 터지지 않는다. `jelly_mass` + 청소된 젤리 질량 합 (L1 1·L2 2·L3 3, 상한 L10 64), 레벨·크기는 `Orb3D.set_jelly_mass()` 규칙대로 (L9 42·L10 64에서 오른다). **청소할 젤리가 없으면 터치 후보가 아니다** (`is_jelly_tap_blast_candidate()` false — 아무 일 없고 턴도 안 쓴다). L10은 터치하면 청소만 하고 사라진다 (청소할 젤리가 없어도). 결과 화면 최고 젤리에 자란 레벨을 반영한다 |
+| 3 YELLOW | 노랑 | **BONUS** 보너스 | 3번 점수에 `청소 수 × jelly_tap_bonus_points_per_orb` (새 필드 **100**)을 더한다 |
+| 4 PURPLE | 보라 | **MAGNET** 자석 | `jelly_tap_magnet_time` (새 필드 **0.5**초) 동안 판의 일반 젤리 (그 사이 들어온 젤리 포함, 입구 대기 제외) 중력이 **터진 자리를 향한다**: 물리 프레임마다 `set_gravity_vector(터진 자리 − 젤리 위치, gravity_strength)`. 끝나면 지금 중력으로 되돌린다. 그동안 `is_gravity_transition_active()`는 true (정착을 세지 않는다). 중심과 거의 같은 자리 (`is_zero_approx`)면 그 프레임은 지금 중력 |
+| 5 CYAN | 주황 | **REST** 휴식 | 그 턴 NEXT 묶음이 **들어오지 않는다**. `turn_index` +1·콤보 0·`turn_started`는 그대로, 생성 없이 `_begin_settle()` → `SIMULATING` (`_start_turn()`에 인자 추가). NEXT·THEN은 그대로이고 다음 턴에 그 NEXT가 들어온다. 정착 뒤 판정은 보통 턴과 같다. FINAL MOVE 대기 중이면 지금처럼 FINAL MOVE를 쓴 것이다. 주황은 60턴부터 나오므로 수량 램프 (41턴부터 5)·색 해금 (60턴)과 겹치지 않는다 |
+
+3. **점수** (`ScoreManager.points_for()` `TAP_BLAST`): `기본 = ⌊score_for_level(L) × jelly_tap_blast_score_factor⌋ + Σ⌊score_for_level(청소된 젤리 레벨) × jelly_tap_clean_score_factor⌋ (새 필드 1.0) + (BONUS면 청소 수 × jelly_tap_bonus_points_per_orb)`. 여기에 콤보·위험 배수를 곱한다 (식 그대로). BOMB의 다른 색도 청소에 든다
+   - 예: 노랑 L8, 청소 L1 6·L2 3·L3 1 (10개) → 27 + 30 + 1,000 = 1,057. 점유율 50% (×2)면 2,114. 대폭발 L8+L8은 기본 1,620
+   - 반응에 `tap_effect`·`clean_levels`를 담는다. 위험 배수의 점유율은 지금처럼 청소 전에 잰다
+4. **안내 한 줄** (사용자 "해보자"로 승인된 표시 — 이것만 새로 생긴다): 그 판에서 그 색 L8 이상이 **처음** 생길 때 (합체 결과와 초록 성장 모두) 호령 자리에 글자 한 줄. 판당 색마다 한 번
+   - `분홍 L8: 터치하면 폭탄` · `파랑 L8: 터치하면 지진` · `초록 L8: 터치하면 성장` · `노랑 L8: 터치하면 보너스` · `보라 L8: 터치하면 자석` · `주황 L8: 터치하면 휴식`
+   - 글자색 = 그 젤리 색 (`JellyOrbArt.color_for`). 자리·시간·기다림 큐는 새 젤리 안내 (`Hud._show_planet_unlock()`·`_pending_planet_unlocks`)와 같고 그림·소리는 없다. `fx_callouts_enabled` false면 안 나온다. 새 게임에 초기화 (`_reset_callout_tracking()`)
+5. **그림**: 명세에 없는 연출은 넣지 않는다. 고리 모양 금지 (§12-ONE.4)
+   - 청소되는 젤리: 물리에서 빠진 뒤 (`Board3D.detach_orb_for_merge_visual()`) 그림만 `jelly_tap_clean_visual_time` (새 필드 **0.25**초) 동안 터진 자리로 끌려가며 작아져 사라진다 (`Orb3D.update_merge_visual()`). 별가루·빛·잔상을 더하지 않는다
+   - 터치한 젤리: 지금 소폭발 연출 그대로 (`_play_blast_feedback` 세기 0.5, 소리·진동). 초록 L8·L9는 터지는 연출 없이 지금 합체 부풀기 (1.0 → 1.06 → 1.0)와 배 속 젤리만
+   - 파랑: 지금 판 떨림 (`_color_frame_shakes`) 1회. 노랑·보라·주황은 더하지 않는다 (플레이 뒤 필요하면 정한다)
+
+새 필드 (GameConfig · `default_config.tres`, 값은 Claude):
+
+| 필드 | 타입 | 값 |
+|---|---|---|
+| `jelly_tap_clean_max_level` | int | **3** (0이면 청소 없음) |
+| `jelly_tap_clean_score_factor` | float | **1.0** |
+| `jelly_tap_clean_visual_time` | float | **0.25** |
+| `jelly_tap_effect_modes` | PackedInt32Array | **[BOMB, QUAKE, GROW, BONUS, MAGNET, REST]** |
+| `jelly_tap_quake_speed` | float | **900.0** |
+| `jelly_tap_bonus_points_per_orb` | int | **100** |
+| `jelly_tap_magnet_time` | float | **0.5** |
+
+- 예전 값 묶음 (`_apply_legacy_score_profile()`, 회귀·측정 모두)은 청소 0·모드 빈 배열 (= PUSH)로 두어 M·B·C8·D·ST·잭팟 해시 그대로. 새 기본 해시를 상수로 고정
+- 그대로: 소폭발 판정 (L8부터·80px 미만 터치·반지름 + 16·입구 대기·유령·합체 중 제외), 턴 쓰기, 반경 0.3, 소폭발 점수 배율 0.5, 대폭발·잭팟·합체 규칙과 점수, 콤보·위험 배수, 생성, 물리·마찰, **합체 색 효과** (`shock_color_*` — CLASSIC에서 따라온 것, 플레이 뒤 다시 묻는다)
+- 위험 (Claude):
+  - 지금 소폭발보다 훨씬 강하다. #129처럼 판이 끝나지 않을 수 있다 → L2·L3으로 잰다
+  - L8을 소폭발에 많이 쓰면 대폭발이 줄어 점수가 낮아질 수 있다 (§12-ONE.23 ST D-all 대폭발 3번)
+  - 값 100·900·0.5는 Claude 가늠이다. 노랑이 대폭발을 밀어내는지, 지진이 더미를 실제로 푸는지, 자석이 큰 젤리를 만나게 하는지 본다
+  - 자석은 판 중심으로 더미를 조이므로 관통이 커질 수 있다
+  - 봇은 색을 골라 두지 못한다. 측정은 판 길이·점수 균형만 말해 주고, 재미는 사용자 플레이로 판단한다
+  - 랭킹: 저장된 예전 기록은 그대로 둔다 (예전 점수와 섞인다)
+
+**측정** (`origin/main` 위, §12-ONE.23과 같은 조건 — 시드 101~120 / 1~20, 600턴 상한, 안 끝난 판은 따로 센다):
+
+| 이름 | 청소 | 색 효과 |
+|---|---|---|
+| **J** (#131, 지금 main) | 0 | PUSH (지금 그대로) |
+| **C3** | L3 이하 | 전부 NONE |
+| **C2** | L2 이하 | 전부 NONE |
+| **E3** (새 기본) | L3 이하 | 색별 |
+| **E2** | L2 이하 | 색별 |
+
+- 봇의 소폭발: D-0 (안 씀 — 모든 이름에서 같은 판이라 J로 한 번), D-save, D-all (§12-ONE.23). 고르는 규칙을 **청소 수가 가장 많은 것, 같으면 높은 레벨, 같으면 오래된 것**으로 바꾼다 (J는 청소가 0이라 지금과 같다). 후보는 `is_jelly_tap_blast_candidate()` (초록 빈 터치 제외)
+- 도구: 인자 `--jelly-tap-clean-max-level`, `--jelly-tap-effect-modes` (`push`·`none`·`color`), 프로필 J (`tests/spike/run_jolt_3d_measurement.gd`, `tests/run_jelly_physics_autoplay.ps1`, `tests/tools/run_jelly_measurement.ps1`)
+
+1. 자동 20시드: J × D-0·D-save·D-all, C3·C2·E3·E2 × D-save·D-all. J의 턴·대폭발·소폭발 수는 #130 ST와 같아야 한다 (다르면 회신에)
+2. 전략 봇 R·G·L-합체 × 20: 위 조합에서 C2만 뺀다
+3. 표: 조합별 게임 오버 / 미완료, 턴 (평균·최소·최대 / 중앙값), 총점 (평균 / 중앙값), 턴당 점수, 종류별 점수 비율, 대폭발·소폭발 수 (색별), **소폭발당 청소 수** (평균·최대, 색별), 보라 소폭발과 같은 턴의 대폭발 수, 판의 공 최대, 최대 관통, 판 밖 이탈, 1.5초 강제 안정, 아끼기 ÷ 바로 쓰기 총점 비, L÷R 길이 / 점수
+4. **E3의 L-합체 D-all 600턴 미완료가 3판 이상이면 회신 맨 앞에 적는다**
+5. 성능: 공 100개 이상 판에서 보라 소폭발 동안 실제 창 프레임 시간 1회. 판의 공 최대가 137을 넘는 조합이 있으면 그 수로도
+
+- 테스트:
+  - 청소: 같은 색 L1~L3만 사라짐 (다른 색·같은 색 L4·유령·입구 대기는 남음), L2 설정에서 L3은 남음, 청소 0이면 #131과 같다
+  - 효과별: 분홍 288px 안 다른 색 L3 이하 제거·밖은 남음·밀기, 파랑 속도 변화 900 (같은 시드면 같은 방향), 초록 질량 합·레벨 오름·상한 64·L8 빈 터치 후보 아님·L10 사라짐, 노랑 점수, 보라 0.5초 동안 중력 방향·끝난 뒤 복귀·그동안 정착 안 함, 주황 `turn_index` +1·생성 0·NEXT·THEN 그대로·다음 턴에 그 NEXT 생성
+  - 점수: 위 예 1,057, 콤보 1, 위험 배수는 청소 전 점유율
+  - FINAL MOVE 대기 중 색별 소폭발: FINAL MOVE를 쓰고 새 젤리 없음, 청소로 입구가 풀리면 성공
+  - 안내 한 줄: 색마다 처음 한 번, 두 번째 L8에서는 안 나옴, 새 게임에 다시, 호령과 겹치면 기다림, 두 비율에서 잘리지 않음
+  - 해시: M·B·C8·D·ST·잭팟 묶음 그대로, 새 기본 해시 고정
+- 캡처 (두 비율, 실제 창, 실제 경로 `try_tap_blast_orb()`): 6색 × (터치 직전 · 0.1초 뒤 · 정착 뒤), 안내 한 줄 (파랑·주황), 마지막에 전체 캡처
+- 기본값은 **E3**로 두고 결과를 보고한다. 청소 범위 (L2·L3)와 값은 숫자를 사용자와 본 뒤 정하고 병합한다
+
 ### 12-ONE.3 다음 (JELLY 개선)
 - CLASSIC 전용 분기 정리 (행성 그림·연출·규칙 — JELLY가 안 쓰는 것)
 - 결정 대기에서 이어지는 것: 효과음 (합성·녹음), 시작 화면 그림 (지금 행성 — JELLY에 맞게?)
