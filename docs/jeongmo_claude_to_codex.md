@@ -33,7 +33,15 @@
 ## 대기 중
 
 ### [2026-11-04 #133] 색 청소 소폭발 — 색마다 다른 효과
-- 상태: 대기 (**다음 차례**. 최신 `origin/main` 위에서)
+- 상태: 대기 (**추가 요구 1** — PR #133 같은 브랜치 `jelly-color-clean-tap-blast`, 최신 `origin/main`을 합치고)
+- 추가 요구 1: [technical_design.md](technical_design.md) **§12-ONE.25 "#133 1차 결과"** 1~7 — 표를 본 사용자 "L2 + 초록 3개 이상" (E3 L-합체 D-all 15/20 미완료, 소폭발의 약 70%가 초록)
+  1. 기본 청소 L3 → **L2**
+  2. 새 필드 `jelly_tap_grow_min_clean` **3**: 초록 L8·L9는 청소 대상 3개 이상일 때만 터치 후보
+  3. 호령 되돌리기: `_pending_turn_callouts`를 없애 콤보 호령은 main처럼 앞 호령을 바로 바꾼다 (명세에 없는 변경이었다)
+  4. 안내 한 줄은 입력을 기다릴 때 (`WAITING_INPUT`) 띄운다. 상수 8 → `jelly_tap_blast_min_level`
+  5. 성능: `--full-board-performance`에 공 100개 이상 + 보라 소폭발 장면 (#121과 같은 지표)
+  6. 다시 재기 **F2**: 자동·R·G·L-합체 × D-save·D-all, 색별 소폭발 수, 보라 같은 턴 대폭발 (D-save 따로). L-합체 D-all 미완료 3판 이상이면 회신 맨 앞
+  7. 테스트·해시·캡처 `108`~`128` 다시
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.25**
 - 배경: 사용자 (2026-11-04, 0.16.1 플레이 뒤) "중반 이후 공이 좀 찾을 때부터 전략적인 부분이 없어지고 루즈해지는 것 같아" → Claude 후보 5개 → "1번을 하되 색깔마다 효과가 다르게 할 수 있을까" → Claude 표 → "해보자"
 - 앵커: `scripts/core/CollisionResolver.gd` `apply_jelly_tap_blast()`·`is_jelly_tap_blast_candidate()`, `scripts/core/TurnManager.gd` `_start_turn()`·`try_tap_blast_orb()`, `scripts/core/ScoreManager.gd` `points_for()`, `scripts/spike/Board3D.gd` (`apply_blast_with_radius_factor()`·`is_gravity_transition_active()`), `scripts/spike/Orb3D.gd` (`set_jelly_mass()`·`update_merge_visual()`), `scripts/ui/Hud.gd` (`_show_planet_unlock()` 큐), `scripts/fx/FeedbackDirector.gd`, `config/GameConfig.gd`·`default_config.tres`, 측정 도구, 회귀 해시, 캡처
