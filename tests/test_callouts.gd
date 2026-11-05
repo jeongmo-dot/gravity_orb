@@ -72,6 +72,56 @@ func test_jelly_effect_hint_uses_configured_tap_minimum_level() -> void:
 	Config.data.jelly_tap_blast_min_level = original_min_level
 
 
+func test_green_effect_hint_uses_configured_minimum_clean_count() -> void:
+	var original_grow_min_clean: int = Config.data.jelly_tap_grow_min_clean
+	Config.data.jelly_tap_grow_min_clean = 4
+	var main: Main = await _create_main()
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	var callout: Label = main.get_node("UI/Hud/CalloutLabel") as Label
+	hud._show_jelly_tap_effect(OrbTypes.OrbColor.GREEN)
+	assert_eq(
+		callout.text,
+		"초록 L8: 작은 초록 4개면 성장",
+		"green hint reads the configured clean-target requirement"
+	)
+	await _destroy_main(main)
+	Config.data.jelly_tap_grow_min_clean = original_grow_min_clean
+
+
+func test_combo_replaces_effect_hint_and_defers_next_hint_to_next_input_wait() -> void:
+	var original_enabled: bool = Config.data.fx_callouts_enabled
+	var original_sfx_enabled: bool = Config.data.sfx_enabled
+	Config.data.fx_callouts_enabled = true
+	Config.data.sfx_enabled = false
+	var main: Main = await _create_main()
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
+	var callout: Label = main.get_node("UI/Hud/CalloutLabel") as Label
+	manager.state = TurnManager.State.SIMULATING
+	hud._on_jelly_tap_effect_unlocked(OrbTypes.OrbColor.BLUE)
+	hud._on_jelly_tap_effect_unlocked(OrbTypes.OrbColor.GREEN)
+	manager._set_state(TurnManager.State.WAITING_INPUT)
+	assert_eq(callout.text, "파랑 L8: 터치하면 지진", "first queued hint appears")
+	hud._on_combo_changed(3, 1.0, 3)
+	assert_eq(callout.text, "NICE!", "combo immediately replaces the visible hint")
+	if hud._callout_tween != null and hud._callout_tween.is_valid():
+		hud._callout_tween.kill()
+	hud._complete_callout()
+	await tree.process_frame
+	assert_true(not callout.visible, "replaced hint does not return after combo")
+	assert_eq(hud._pending_jelly_tap_effects.size(), 1, "next hint remains queued")
+	manager._set_state(TurnManager.State.SIMULATING)
+	manager._set_state(TurnManager.State.WAITING_INPUT)
+	assert_eq(
+		callout.text,
+		"초록 L8: 작은 초록 3개면 성장",
+		"next queued hint waits for the next input-ready state"
+	)
+	await _destroy_main(main)
+	Config.data.fx_callouts_enabled = original_enabled
+	Config.data.sfx_enabled = original_sfx_enabled
+
+
 func test_jelly_preview_and_unlock_use_jelly_art_and_names() -> void:
 	var original_enabled: bool = Config.data.fx_callouts_enabled
 	var original_sfx_enabled: bool = Config.data.sfx_enabled
@@ -218,7 +268,7 @@ func test_six_jelly_tap_effect_callouts_show_once_without_art_or_sound() -> void
 	var expected: Array[String] = [
 		"분홍 L8: 터치하면 폭탄",
 		"파랑 L8: 터치하면 지진",
-		"초록 L8: 터치하면 성장",
+		"초록 L8: 작은 초록 3개면 성장",
 		"노랑 L8: 터치하면 보너스",
 		"보라 L8: 터치하면 자석",
 		"주황 L8: 터치하면 휴식",

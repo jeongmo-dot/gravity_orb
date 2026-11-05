@@ -1,5 +1,6 @@
 param(
     [switch]$Debug,
+    [switch]$ReplaceSameVersion,
     [string]$GodotPath = ""
 )
 
@@ -89,7 +90,6 @@ $expectedPrefix = $buildRoot.TrimEnd('\') + '\'
 if (-not $outputDirectory.StartsWith($expectedPrefix, [StringComparison]::OrdinalIgnoreCase)) {
     throw "Refusing to clean unexpected output directory: $outputDirectory"
 }
-New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
 
 $artifactStem = "GravityOrb_v$projectVersion"
 $outputExecutable = Join-Path $outputDirectory "$artifactStem.exe"
@@ -107,6 +107,29 @@ $legacyPaths = @(
     (Join-Path $outputDirectory "GravityOrb.console.exe")
     (Join-Path $outputDirectory "BUILD.txt")
 )
+if (-not $Debug) {
+    $releaseWorktreeStatus = @(& git -C $repoPath status --porcelain)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not inspect the Git worktree before the Release build"
+    }
+    if ($releaseWorktreeStatus.Count -gt 0) {
+        throw (
+            "Release build requires a clean Git worktree. Commit changes first; " +
+            "use -Debug for verification builds."
+        )
+    }
+    if (
+        -not $ReplaceSameVersion -and
+        (Test-Path -LiteralPath $outputExecutable -PathType Leaf)
+    ) {
+        throw (
+            "Release artifact already exists: $outputExecutable. " +
+            "Use -Debug for verification builds or -ReplaceSameVersion to " +
+            "intentionally replace this version."
+        )
+    }
+}
+New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
 $preservedArtifacts = @(
     Get-ChildItem -LiteralPath $outputDirectory -File -ErrorAction SilentlyContinue |
         Where-Object {
