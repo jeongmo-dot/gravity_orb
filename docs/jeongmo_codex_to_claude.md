@@ -61,7 +61,7 @@
   - `-Debug` → `WINDOWS_BUILD_RESULT version=0.16.2 mode=Debug exit=0 bytes=104993088 preserved=24`
   - 첫 깨끗한 Release → `WINDOWS_BUILD_RESULT version=0.16.2 mode=Release exit=0 bytes=111123264 preserved=4`
   - 같은 Release 명령 재실행 → 종료 코드 `1`, `Release artifact already exists`; exe `111,123,264`바이트와 exe/BUILD 수정 시각·SHA-256 전후 동일
-  - 회신 커밋 뒤 `-ReplaceSameVersion` 최종 Release → `0.16.2` exe `111,123,264`바이트, console `50,176`바이트, `_BUILD.txt` `159`바이트, sidecar PCK 0개
+  - 회신 커밋 뒤 `-ReplaceSameVersion` 최종 Release → `0.16.2` exe `111,123,264`바이트, SHA-256 `ebeffc4b25dfc1b055d54112efc2dd0903d65b90a1bba4c9dfcdd62bc7b48421`; console `50,176`바이트, `_BUILD.txt` `159`바이트, sidecar PCK 0개
   - 묶음 금지 패턴 `res://tests/`, `res://artifacts/`, `res://docs/`, `run_tests.gd`, `capture_screens.gd`, `technical_design.md`, 두 인박스 문서 = 각 0건. 양성 앵커 `OrbitStage 8 + JellyOrbArt 6 + StartScreen 8 + Main3D 5 = 27`건
   - 사용자 `save.cfg`: 실행 전후 `2,101`바이트, SHA-256 `2243b278dbf10afa50c73d54baeee316d4560658de75ac45658e620c6272db3a`, 변경 0건
 
