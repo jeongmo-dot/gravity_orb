@@ -594,18 +594,35 @@ func _capture_jelly_tap_effect_scenes(
 			)
 			other.disable_physics()
 		await get_tree().process_frame
+		if color_index == OrbTypes.OrbColor.GREEN:
+			hud._show_jelly_tap_effect(OrbTypes.OrbColor.GREEN)
+			if hud._callout_tween != null and hud._callout_tween.is_valid():
+				hud._callout_tween.kill()
 		await _capture("%03d_jelly_tap_%s_before.png" % [file_number, names[color_index]])
 		manager.set_physics_process(true)
 		if not manager.try_tap_blast_orb(source):
 			_fail("tap effect capture could not start for color %d" % color_index)
 		await get_tree().create_timer(0.10).timeout
+		# Freeze the turn while the 0.10 s frame is rendered. Otherwise a physics-frame
+		# state transition can replace the forced hint between _show_jelly_tap_effect()
+		# and _capture(), leaving a mixed/partially redrawn label in the evidence image.
+		manager.set_physics_process(false)
+		if color_index == OrbTypes.OrbColor.GREEN:
+			hud._show_jelly_tap_effect(OrbTypes.OrbColor.GREEN)
+			if hud._callout_tween != null and hud._callout_tween.is_valid():
+				hud._callout_tween.kill()
 		await _capture("%03d_jelly_tap_%s_010.png" % [file_number + 1, names[color_index]])
+		manager.set_physics_process(true)
 		for _frame: int in range(480):
 			if manager.state == TurnManager.State.WAITING_INPUT:
 				break
 			await get_tree().physics_frame
 		if manager.state != TurnManager.State.WAITING_INPUT:
 			_fail("tap effect capture did not settle for color %d" % color_index)
+		if color_index == OrbTypes.OrbColor.GREEN:
+			hud._show_jelly_tap_effect(OrbTypes.OrbColor.GREEN)
+			if hud._callout_tween != null and hud._callout_tween.is_valid():
+				hud._callout_tween.kill()
 		await _capture("%03d_jelly_tap_%s_settled.png" % [file_number + 2, names[color_index]])
 		manager.set_physics_process(false)
 		file_number += 3

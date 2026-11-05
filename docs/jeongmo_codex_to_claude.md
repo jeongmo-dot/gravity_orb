@@ -38,6 +38,57 @@
 
 ## 미확인
 
+### [2026-11-06] 대상 #134 — Windows 0.16.2·0.16.1 복구·Release 보호·초록 안내
+- 상태: 완료 — 0.16.1 원본 복구, Release 보호, 안내/큐 보정, 0.16.2 Release 생성과 자동·실제 창 검증을 마쳤다. 합격·병합 판정은 Claude/사용자 대기
+- 브랜치 / PR: `build-0.16.2` / https://github.com/jeongmo-dot/gravity_orb/pull/134
+- 변경 파일: `project.godot`, `tools/build_windows.ps1`, `scripts/ui/Hud.gd`, `tests/test_build_script.gd`, `tests/test_callouts.gd`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 작업 시작 직후 `GravityOrb_v0.16.1.zip` 안의 exe로 0.16.1 exe를 `111,111,824`바이트로 복구하고 `_BUILD.txt`를 커밋 `0081c59b45c10cdc29cae7bd74666d8787522107`, `BuiltUtc 2026-11-02T17:42:34Z`, 복구 Note로 교정 — 자동
+  - [x] Release는 dirty worktree와 같은 버전 exe에서 삭제 전에 중단; `-ReplaceSameVersion`은 같은 버전 검사만 우회하고 dirty 검사는 유지; Debug는 그대로 실행 — 자동 (`test_build_script` + 실제 명령)
+  - [x] 초록 안내를 `초록 L8: 작은 초록 3개면 성장`으로 바꾸고 숫자는 `jelly_tap_grow_min_clean`에서 읽음 — 자동 (`test_callouts`) + 실제 캡처
+  - [x] 표시 중 안내를 콤보가 즉시 교체하면 이전 안내는 되살아나지 않고 큐의 다음 안내는 다음 `WAITING_INPUT`에 표시 — 자동 (`test_callouts`)
+  - [x] 버전 `0.16.2`; 회신 포함 최종 브랜치 끝 커밋의 깨끗한 트리에서 Release 재생성, `_BUILD.txt` Commit과 `git rev-parse HEAD` 동일 — 자동
+  - [x] 내보낸 콘솔 exe 기본·`--mode=jelly` 300프레임, 격리 APPDATA 시작/JELLY 실제 창, 저장·묶음·해시·캡처 검증 — 자동 + 실제 창 관측
+
+- 복구·보존 관측:
+  - 복구된 0.16.1 exe: `111,111,824`바이트, SHA-256 `878591bd1c95c77050660ad69542a4af1c70bf3b33b55aded7f65e2b19a20555`, UTC 시각 `2026-11-02T17:42:34Z`
+  - 0.16.1 console: `50,176`바이트, SHA-256 `926723b28d93b8981e336e7ed127987f8b734bdc068f146806b95678f412ea1c`; zip: `39,312,556`바이트, SHA-256 `3f2cf6f2fd9bef7a032e9e22cd231322fbff169b9ec5d408336f2e55f614efd9`; 복구·0.16.2 빌드 전후 동일
+  - 0.16.1 `_BUILD.txt`: `194`바이트, 복구 Note 포함, SHA-256 `892a195c43fec50f712338211ea30e38de28f935622d227112aadf39ac448d02`
+  - #132 회신에 있던 0.15.0·0.15.1·0.15.2·0.16.0의 12개 파일은 작업 시작 때 이미 없었다. Codex가 지웠다는 기록은 찾지 못해 **모름**이며, 이번 작업에서 되살리지 않았다
+
+- Release 보호·빌드 관측:
+  - dirty 상태 실제 Release 명령 → 종료 코드 `1`, `Release build requires a clean Git worktree`; 기존 0.16.1 파일 삭제 0건
+  - `-Debug` → `WINDOWS_BUILD_RESULT version=0.16.2 mode=Debug exit=0 bytes=104993088 preserved=24`
+  - 첫 깨끗한 Release → `WINDOWS_BUILD_RESULT version=0.16.2 mode=Release exit=0 bytes=111123264 preserved=4`
+  - 같은 Release 명령 재실행 → 종료 코드 `1`, `Release artifact already exists`; exe `111,123,264`바이트와 exe/BUILD 수정 시각·SHA-256 전후 동일
+  - 회신 커밋 뒤 `-ReplaceSameVersion` 최종 Release → `0.16.2` exe `111,123,264`바이트, SHA-256 `ebeffc4b25dfc1b055d54112efc2dd0903d65b90a1bba4c9dfcdd62bc7b48421`; console `50,176`바이트, `_BUILD.txt` `159`바이트, sidecar PCK 0개
+  - 묶음 금지 패턴 `res://tests/`, `res://artifacts/`, `res://docs/`, `run_tests.gd`, `capture_screens.gd`, `technical_design.md`, 두 인박스 문서 = 각 0건. 양성 앵커 `OrbitStage 8 + JellyOrbArt 6 + StartScreen 8 + Main3D 5 = 27`건
+  - 사용자 `save.cfg`: 실행 전후 `2,101`바이트, SHA-256 `2243b278dbf10afa50c73d54baeee316d4560658de75ac45658e620c6272db3a`, 변경 0건
+
+- 해시·캡처·실제 창 관측:
+  - 회귀 해시 M `ee67b19ca82ddb2e35ea7a5ed605e83eedbae4d0c044106ec5b86622a21ac45d`, B `5a525e46718f3befc3c4101e5a4fe1c3b392fc1c172f7166ed0b0517f6d74dc7`, C8 `8c1a02e9dfa345a31828276e917dad0f8dda35282a34cb5a0ced15a670752184`, D `2cdf79475d340e34252a3d295ccc23e092c719038e2362f5df6ac80dc8e5979f`, ST `f3ff93474eb3765cdc611ae941c89ec96052a20f16fff75efe8ad6a6c8fb816c`, 잭팟 `3254c77f2bcf478239f023f08af2bae5f48bc68aee56aa246894908d0b9ab5e7`, 색 청소 기본 `4c4ab4aa9cf014d4d266a6fdfd75a03bbd4f40c5e9a540bd6f682da3c0835974`; 기존 상수와 모두 일치
+  - `114`~`116`을 540×960·540×1170에서 재생성·직접 확인. 터치 직전/0.1초/정착 뒤 모두 `초록 L8: 작은 초록 3개면 성장` 전체가 보드 위 한 줄에 표시되고 잘림 0건
+  - 0.1초 캡처에서 물리 상태 전이가 강제 안내를 덮어 혼합 프레임을 만들 수 있어, 캡처 한 프레임 동안만 TurnManager 물리를 정지하도록 하네스를 보정했다. 게임 실행 경로·수치 변경은 없음
+  - 격리 시작 창: 542×992 창에 배경·GRAVITY ORB 로고·단일 JELLY 카드·랭킹/소리/설정 버튼이 잘림 없이 표시됨
+  - 격리 `--mode=jelly`: TURN 1, SCORE/BEST 0, 보드·방향 표시·시작 네 색·NEXT/THEN이 잘림 없이 표시됨. 두 `godot.log`의 `SCRIPT ERROR|Parse Error|ERROR:` 일치 0건
+
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard; `--headless --path . --import` 종료 코드 0
+  - `tests/run_tests.ps1` → 일반 `333/333`, 장기 `4/4`, 성능 `5/5`; 각각 새 프로세스, 종료 코드 0, 전체 `94.366초`
+  - 편집기 기본/`--mode=blitz` 300프레임 smoke → 각각 종료 코드 0
+  - 내보낸 `.console.exe` 기본/`--mode=jelly` 300프레임 smoke → 각각 종료 코드 0
+  - 최종 캡처 직접 실행 → 540×960 `128/128`, 540×1170 `128/128`, 종료 코드 0
+  - `git diff --check` 오류 0건; Input 사용은 `InputRouter.gd`·`Haptics.gd`만, 이번 변경에서 전역 난수 추가 0건
+
+- 수동 확인 절차:
+  1. `build/windows/GravityOrb_v0.16.2.exe` 실행 → 시작 화면의 단일 JELLY 카드와 세 하단 버튼이 잘림 없이 보여야 한다
+  2. JELLY 카드를 누르거나 `GravityOrb_v0.16.2.exe -- --mode=jelly` 실행 → TURN 1, 네 색 젤리, NEXT/THEN이 있는 보드로 진입해야 한다
+  3. 초록 L8과 작은 초록 3개 이상을 만든 뒤 안내 확인 → `초록 L8: 작은 초록 3개면 성장`이 한 줄로 보여야 한다
+  4. 안내 표시 중 콤보 3을 만들기 → `NICE!`가 즉시 교체하며 이전 안내가 되살아나지 않고, 큐의 다음 색 안내는 다음 입력 대기에서만 보여야 한다
+  5. 같은 버전 Release 명령 재실행 → 기존 exe를 지우지 않고 중단해야 하며, 의도적 교체 때만 `-ReplaceSameVersion`을 붙인다
+- 결정 사항: 없음. 버전·문구·복구 메타데이터·보호 조건은 #134 명세 그대로 적용했다
+- 남은 것 · 질문: 구현·검증 잔여 없음. 합격·병합 판정은 Claude/사용자에게 맡긴다
+
 > **경고 — #133 추가 요구 1 F2 L-all:** 20판 중 **12판이 600턴 미완료**였다. 완료 8판, 전체 턴 평균 510.70·중앙값 600이다. §12-ONE.25 추가 요구 1의 3판 이상 조건에 해당한다.
 
 ### [2026-11-05] 대상 #133 추가 요구 1 — L2 청소·초록 최소 3개·안내 대기 보정

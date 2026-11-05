@@ -43,7 +43,7 @@ const JELLY_NAMES: Dictionary = {
 const JELLY_TAP_EFFECT_CALLOUTS: Dictionary = {
 	OrbTypes.OrbColor.RED: "분홍 L8: 터치하면 폭탄",
 	OrbTypes.OrbColor.BLUE: "파랑 L8: 터치하면 지진",
-	OrbTypes.OrbColor.GREEN: "초록 L8: 터치하면 성장",
+	OrbTypes.OrbColor.GREEN: "초록 L8: 작은 초록 %d개면 성장",
 	OrbTypes.OrbColor.YELLOW: "노랑 L8: 터치하면 보너스",
 	OrbTypes.OrbColor.PURPLE: "보라 L8: 터치하면 자석",
 	OrbTypes.OrbColor.CYAN: "주황 L8: 터치하면 휴식",
@@ -125,6 +125,8 @@ var _planet_unlock_history: Array[int] = []
 var _pending_planet_unlocks: Array[int] = []
 var _jelly_tap_effect_history: Array[int] = []
 var _pending_jelly_tap_effects: Array[int] = []
+var _showing_jelly_tap_effect: bool = false
+var _defer_jelly_tap_effect_until_next_wait: bool = false
 var _preview_unlock_seen: Dictionary = {}
 var _preview_unlock_flash_history: Array[int] = []
 var _preview_batches: Array = []
@@ -488,6 +490,7 @@ func bind_game_state(
 func _on_turn_state_changed(state: int) -> void:
 	_refresh_turn_number()
 	if state == int(TurnManager.State.WAITING_INPUT):
+		_defer_jelly_tap_effect_until_next_wait = false
 		_show_next_jelly_tap_effect()
 
 
@@ -1254,6 +1257,8 @@ func _update_callout(combo: int) -> void:
 		return
 	_callout_seen[combo] = true
 	_callout_history.append(combo)
+	if _showing_jelly_tap_effect:
+		_defer_jelly_tap_effect_until_next_wait = true
 	_show_callout(CALLOUT_WORDS[stage_index], stage_index)
 	if _sfx_bank != null:
 		_sfx_bank.play_callout_chime(stage_index)
@@ -1261,6 +1266,7 @@ func _update_callout(combo: int) -> void:
 
 func _show_callout(text: String, stage_index: int = 0) -> void:
 	_apply_responsive_layout()
+	_showing_jelly_tap_effect = false
 	if _callout_tween != null and _callout_tween.is_valid():
 		_callout_tween.kill()
 	_stop_sparkles(_callout_sparkles)
@@ -1418,6 +1424,7 @@ func _show_next_jelly_tap_effect() -> void:
 	if (
 		_pending_jelly_tap_effects.is_empty()
 		or _callout_label.visible
+		or _defer_jelly_tap_effect_until_next_wait
 		or _turn_manager == null
 		or _turn_manager.state != TurnManager.State.WAITING_INPUT
 	):
@@ -1427,11 +1434,15 @@ func _show_next_jelly_tap_effect() -> void:
 
 func _show_jelly_tap_effect(color_index: int) -> void:
 	_apply_responsive_layout()
+	_showing_jelly_tap_effect = true
 	if _callout_tween != null and _callout_tween.is_valid():
 		_callout_tween.kill()
 	_stop_sparkles(_callout_sparkles)
 	_planet_callout_visual.visible = false
-	_callout_label.text = str(JELLY_TAP_EFFECT_CALLOUTS[color_index])
+	var callout_text: String = str(JELLY_TAP_EFFECT_CALLOUTS[color_index])
+	if color_index == OrbTypes.OrbColor.GREEN:
+		callout_text = callout_text % Config.data.jelly_tap_grow_min_clean
+	_callout_label.text = callout_text
 	_callout_label.add_theme_color_override(
 		"font_color",
 		JellyOrbArt.color_for(color_index, Config.data.jelly_tap_blast_min_level)
@@ -1531,6 +1542,8 @@ func _reset_callout_tracking() -> void:
 	_pending_planet_unlocks.clear()
 	_jelly_tap_effect_history.clear()
 	_pending_jelly_tap_effects.clear()
+	_showing_jelly_tap_effect = false
+	_defer_jelly_tap_effect_until_next_wait = false
 	_preview_unlock_seen.clear()
 	_preview_unlock_flash_history.clear()
 	_hide_callout_visuals()
@@ -1541,6 +1554,7 @@ func _hide_callout_visuals() -> void:
 
 
 func _hide_callout_label() -> void:
+	_showing_jelly_tap_effect = false
 	_callout_label.visible = false
 	_callout_label.scale = Vector2.ONE
 	_callout_label.position = _callout_base_position
