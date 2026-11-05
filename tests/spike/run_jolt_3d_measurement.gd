@@ -42,6 +42,7 @@ var _scan_pairs_each_frame: bool = false
 var _skip_determinism: bool = false
 var _skill_strategy: String = ""
 var _tap_blast_bot_mode: String = "none"
+var _jelly_tap_effect_profile: String = "color"
 var _measurement_mode: GameConfig.GameMode = GameConfig.GameMode.TURN
 var _skill_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _turn_shock_events: Array[Dictionary] = []
@@ -66,6 +67,12 @@ var _seed_level_creation_count_by_level: Dictionary = {}
 var _seed_level_up_count: int = 0
 var _seed_tap_blast_count: int = 0
 var _seed_tap_blast_count_by_level: Dictionary = {}
+var _seed_tap_blast_count_by_color: Dictionary = {}
+var _seed_tap_clean_count_by_color: Dictionary = {}
+var _seed_tap_clean_count_total: int = 0
+var _seed_tap_clean_count_max: int = 0
+var _seed_purple_tap_turns: Dictionary = {}
+var _seed_purple_same_turn_blast_count: int = 0
 var _seed_score_by_reaction_type: Dictionary = {}
 var _seed_spawn_count: int = 0
 var _seed_spawn_count_by_level: Dictionary = {}
@@ -118,6 +125,10 @@ func _run() -> void:
 		"jelly_tap_blast_min_level": Config.data.jelly_tap_blast_min_level,
 		"jelly_tap_blast_score_factor": Config.data.jelly_tap_blast_score_factor,
 		"jelly_tap_blast_uses_turn": Config.data.jelly_tap_blast_uses_turn,
+		"jelly_tap_clean_max_level": Config.data.jelly_tap_clean_max_level,
+		"jelly_tap_grow_min_clean": Config.data.jelly_tap_grow_min_clean,
+		"jelly_tap_effect_profile": _jelly_tap_effect_profile,
+		"jelly_tap_effect_modes": Array(Config.data.jelly_tap_effect_modes),
 		"jelly_merge_duration": Config.data.jelly_merge_duration,
 		"jelly_merge_level_gap": Config.data.jelly_merge_level_gap,
 		"blast_push_radius_by_level": Array(Config.data.blast_push_radius_by_level),
@@ -285,6 +296,12 @@ func _run_seed(
 	_seed_level_up_count = 0
 	_seed_tap_blast_count = 0
 	_seed_tap_blast_count_by_level.clear()
+	_seed_tap_blast_count_by_color.clear()
+	_seed_tap_clean_count_by_color.clear()
+	_seed_tap_clean_count_total = 0
+	_seed_tap_clean_count_max = 0
+	_seed_purple_tap_turns.clear()
+	_seed_purple_same_turn_blast_count = 0
 	_seed_score_by_reaction_type = {
 		"merge": 0,
 		"blast": 0,
@@ -319,6 +336,7 @@ func _run_seed(
 	var seed_max_pair_end: Dictionary = {"penetration_px": 0.0, "category": "none"}
 	var seed_max_pair_end_turn: int = 0
 	var seed_max_wall: float = 0.0
+	var seed_departures: int = 0
 	var entrance_blocked_turns: int = 0
 	var blocked_choice_count: int = 0
 	var same_direction_input_count: int = 0
@@ -345,7 +363,7 @@ func _run_seed(
 		var tap_turn_orb: Orb3D = null
 		if _should_use_tap_blast_bot(manager, board):
 			if Config.data.jelly_tap_blast_uses_turn:
-				tap_turn_orb = _select_high_level_orb(board)
+				tap_turn_orb = _select_high_level_orb(manager, board)
 			else:
 				await _use_high_level_orbs_without_turn(manager, board)
 		var direction: Vector2i = _next_pattern_direction(turn_offset, manager.gravity)
@@ -389,6 +407,7 @@ func _run_seed(
 		else:
 			manager.on_swipe(direction)
 		var frame_metrics: Dictionary = await _wait_for_turn_end(manager, board, physics_ms)
+		seed_departures += int(frame_metrics.get("departures", 0))
 		var entrance_waiting_count: int = board.entrance_waiting_orbs().size()
 		var input_waiting_touching_merge_pairs: int = 0
 		if manager.state == TurnManager.State.WAITING_INPUT:
@@ -545,6 +564,11 @@ func _run_seed(
 		"level_up_count": _seed_level_up_count,
 		"tap_blast_count": _seed_tap_blast_count,
 		"tap_blast_count_by_level": _seed_tap_blast_count_by_level.duplicate(true),
+		"tap_blast_count_by_color": _seed_tap_blast_count_by_color.duplicate(true),
+		"tap_clean_count_by_color": _seed_tap_clean_count_by_color.duplicate(true),
+		"tap_clean_count_total": _seed_tap_clean_count_total,
+		"tap_clean_count_max": _seed_tap_clean_count_max,
+		"purple_same_turn_blast_count": _seed_purple_same_turn_blast_count,
 		"score_by_reaction_type": _seed_score_by_reaction_type.duplicate(true),
 		"same_level_blast_count_by_level": _seed_same_level_blast_count_by_level.duplicate(true),
 		"mixed_level_blast_count_by_level": _seed_mixed_level_blast_count_by_level.duplicate(true),
@@ -594,6 +618,8 @@ func _run_seed(
 		"max_turn_end_pair": seed_max_pair_end,
 		"max_turn_end_pair_turn": seed_max_pair_end_turn,
 		"max_wall_penetration_px": seed_max_wall,
+		"departures": seed_departures,
+		"capped_turn_count": manager.capped_turn_count,
 		"layer_distance_by_level": _finalize_layer_distances(layer_distances),
 		"ghost_completed_count": board.ghost_completed_count,
 		"ghost_timeout_count": board.ghost_timeout_count,
@@ -1031,10 +1057,25 @@ func _record_shock_event(reaction: Dictionary) -> void:
 		_seed_tap_blast_count_by_level[tap_key] = int(
 			_seed_tap_blast_count_by_level.get(tap_key, 0)
 		) + 1
+		var tap_color: int = int(reaction.get("result_color", -1))
+		var color_key: String = _measurement_color_name(tap_color)
+		_seed_tap_blast_count_by_color[color_key] = int(
+			_seed_tap_blast_count_by_color.get(color_key, 0)
+		) + 1
+		var clean_count: int = int(reaction.get("clean_count", 0))
+		_seed_tap_clean_count_total += clean_count
+		_seed_tap_clean_count_max = maxi(_seed_tap_clean_count_max, clean_count)
+		_seed_tap_clean_count_by_color[color_key] = int(
+			_seed_tap_clean_count_by_color.get(color_key, 0)
+		) + clean_count
+		if tap_color == OrbTypes.OrbColor.PURPLE:
+			_seed_purple_tap_turns[_current_measurement_turn] = true
 		return
 	if reaction_type == ReactionRules.Type.BLAST:
 		_turn_blast_count += 1
 		_seed_blast_count += 1
+		if _seed_purple_tap_turns.has(_current_measurement_turn):
+			_seed_purple_same_turn_blast_count += 1
 		var levels: Array = reaction.get("levels", []) as Array
 		var blast_level: int = (
 			Config.data.active_blast_min_level()
@@ -1094,6 +1135,13 @@ func _record_shock_event(reaction: Dictionary) -> void:
 		)
 	var targets: Array[Dictionary] = reaction["shock_targets"] as Array[Dictionary]
 	_turn_shock_events.append({"targets": targets})
+
+
+func _measurement_color_name(color: int) -> String:
+	var color_names: Array[String] = [
+		"RED", "BLUE", "GREEN", "YELLOW", "PURPLE", "CYAN"
+	]
+	return color_names[color] if color >= 0 and color < color_names.size() else "UNKNOWN"
 
 
 func _blast_moved_ratio_by_level() -> Dictionary:
@@ -1910,22 +1958,29 @@ func _should_use_tap_blast_bot(manager: TurnManager, board: Board3D) -> bool:
 	return false
 
 
-func _select_high_level_orb(board: Board3D) -> Orb3D:
+func _select_high_level_orb(manager: TurnManager, board: Board3D) -> Orb3D:
 	var selected: Orb3D = null
+	var selected_clean_count: int = -1
 	for orb: Orb3D in board.get_orbs():
-		if not Config.data.jelly_tap_blast_enabled_for_level(orb.level):
+		if not manager._collision_resolver.is_jelly_tap_blast_candidate(orb):
 			continue
-		if orb.is_waiting_at_entrance or orb.is_ghost or orb.consumed:
-			continue
+		var clean_count: int = manager._collision_resolver.jelly_tap_clean_count(orb)
 		if (
 			selected == null
-			or orb.level > selected.level
+			or clean_count > selected_clean_count
 			or (
-				orb.level == selected.level
-				and orb.stable_spawn_id < selected.stable_spawn_id
+				clean_count == selected_clean_count
+				and (
+					orb.level > selected.level
+					or (
+						orb.level == selected.level
+						and orb.stable_spawn_id < selected.stable_spawn_id
+					)
+				)
 			)
 		):
 			selected = orb
+			selected_clean_count = clean_count
 	return selected
 
 
@@ -1933,7 +1988,7 @@ func _use_high_level_orbs_without_turn(manager: TurnManager, board: Board3D) -> 
 	while manager.state == TurnManager.State.WAITING_INPUT:
 		if not _should_use_tap_blast_bot(manager, board):
 			return
-		var selected: Orb3D = _select_high_level_orb(board)
+		var selected: Orb3D = _select_high_level_orb(manager, board)
 		if selected == null or not manager.try_tap_blast_orb(selected):
 			return
 		if not await _wait_for_state(manager, TurnManager.State.WAITING_INPUT):
@@ -1996,6 +2051,9 @@ func _apply_legacy_score_profile() -> void:
 	Config.data.blast_score_factor = 5.0
 	Config.data.jelly_tap_blast_score_factor = 1.0
 	Config.data.jelly_tap_blast_uses_turn = false
+	Config.data.jelly_tap_clean_max_level = 0
+	Config.data.jelly_tap_effect_modes = PackedInt32Array()
+	_jelly_tap_effect_profile = "push"
 
 
 func _apply_arguments() -> void:
@@ -2142,6 +2200,31 @@ func _apply_arguments() -> void:
 			Config.data.jelly_tap_blast_uses_turn = (
 				argument.trim_prefix("--jelly-tap-blast-uses-turn=") == "on"
 			)
+		elif argument.begins_with("--jelly-tap-clean-max-level="):
+			Config.data.jelly_tap_clean_max_level = clampi(
+				argument.trim_prefix("--jelly-tap-clean-max-level=").to_int(),
+				0,
+				Config.data.orb_max_level
+			)
+		elif argument.begins_with("--jelly-tap-grow-min-clean="):
+			Config.data.jelly_tap_grow_min_clean = maxi(
+				argument.trim_prefix("--jelly-tap-grow-min-clean=").to_int(),
+				0
+			)
+		elif argument.begins_with("--jelly-tap-effect-modes="):
+			_jelly_tap_effect_profile = argument.trim_prefix(
+				"--jelly-tap-effect-modes="
+			).to_lower()
+			match _jelly_tap_effect_profile:
+				"push":
+					Config.data.jelly_tap_effect_modes = PackedInt32Array()
+				"none":
+					Config.data.jelly_tap_effect_modes = PackedInt32Array([1, 1, 1, 1, 1, 1])
+				"color":
+					Config.data.jelly_tap_effect_modes = PackedInt32Array([2, 3, 4, 5, 6, 7])
+				_:
+					_had_runner_error = true
+					push_error("Unknown jelly tap effect profile: %s" % _jelly_tap_effect_profile)
 		elif argument.begins_with("--jelly-blast-requires-same-level="):
 			Config.data.jelly_blast_requires_same_level = (
 				argument.trim_prefix("--jelly-blast-requires-same-level=") == "on"

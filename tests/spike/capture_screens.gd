@@ -115,6 +115,27 @@ const CAPTURE_FILES: Array[String] = [
 	"105_jelly_l8_tap_turn_entering.png",
 	"106_jelly_l8_tap_turn_settled.png",
 	"107_jelly_l8_l9_blast.png",
+	"108_jelly_tap_pink_before.png",
+	"109_jelly_tap_pink_010.png",
+	"110_jelly_tap_pink_settled.png",
+	"111_jelly_tap_blue_before.png",
+	"112_jelly_tap_blue_010.png",
+	"113_jelly_tap_blue_settled.png",
+	"114_jelly_tap_green_before.png",
+	"115_jelly_tap_green_010.png",
+	"116_jelly_tap_green_settled.png",
+	"117_jelly_tap_yellow_before.png",
+	"118_jelly_tap_yellow_010.png",
+	"119_jelly_tap_yellow_settled.png",
+	"120_jelly_tap_purple_before.png",
+	"121_jelly_tap_purple_010.png",
+	"122_jelly_tap_purple_settled.png",
+	"123_jelly_tap_orange_before.png",
+	"124_jelly_tap_orange_010.png",
+	"125_jelly_tap_orange_settled.png",
+	"126_jelly_tap_blue_callout.png",
+	"127_jelly_tap_orange_callout.png",
+	"128_jelly_tap_effects_full.png",
 ]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
@@ -520,6 +541,103 @@ func _capture_default_d_scenes(
 	})
 	await get_tree().create_timer(0.06).timeout
 	await _capture("107_jelly_l8_l9_blast.png")
+	await _capture_jelly_tap_effect_scenes(main, board, director)
+
+
+func _capture_jelly_tap_effect_scenes(
+	main: Main,
+	board: Board3D,
+	director: FeedbackDirector
+) -> void:
+	_set_jelly_level_profile("B")
+	Config.data.jelly_tap_clean_max_level = 2
+	Config.data.jelly_tap_grow_min_clean = 3
+	Config.data.jelly_tap_effect_modes = PackedInt32Array([2, 3, 4, 5, 6, 7])
+	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
+	var resolver: CollisionResolver = main.get_node("CollisionResolver") as CollisionResolver
+	var spawner: Spawner = main.get_node("Spawner") as Spawner
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	var names: Array[String] = ["pink", "blue", "green", "yellow", "purple", "orange"]
+	var file_number: int = 108
+	var original_hitstop_enabled: bool = Config.data.fx_hitstop_enabled
+	Config.data.fx_hitstop_enabled = false
+	for color_index: int in range(6):
+		resolver.cancel_active_jelly_merges()
+		board.clear()
+		director.clear_effects()
+		board.set_gravity(Vector2i.DOWN)
+		manager.gravity = Vector2i.DOWN
+		manager.turn_index = 200 + color_index
+		manager.turn_combo = 0
+		manager.final_move_pending = false
+		manager.final_move_active = false
+		manager._is_initial_settle = false
+		manager._is_tap_blast_settle = false
+		manager.state = TurnManager.State.WAITING_INPUT
+		spawner.init_rng(1330 + color_index)
+		spawner.sync_next_batch_size(manager.turn_index + 1)
+		InputRouter.set_locked(false)
+		var source: Orb3D = board.spawn_orb(color_index, 8, Vector2.ZERO)
+		source.disable_physics()
+		for clean_index: int in range(3):
+			var clean_orb: Orb3D = board.spawn_orb(
+				color_index,
+				mini(clean_index + 1, 2),
+				Vector2(-250.0 + float(clean_index) * 250.0, 180.0)
+			)
+			clean_orb.disable_physics()
+		for other_index: int in range(3):
+			var other: Orb3D = board.spawn_orb(
+				(color_index + other_index + 1) % 6,
+				other_index + 2,
+				Vector2(-220.0 + float(other_index) * 220.0, -190.0)
+			)
+			other.disable_physics()
+		await get_tree().process_frame
+		await _capture("%03d_jelly_tap_%s_before.png" % [file_number, names[color_index]])
+		manager.set_physics_process(true)
+		if not manager.try_tap_blast_orb(source):
+			_fail("tap effect capture could not start for color %d" % color_index)
+		await get_tree().create_timer(0.10).timeout
+		await _capture("%03d_jelly_tap_%s_010.png" % [file_number + 1, names[color_index]])
+		for _frame: int in range(480):
+			if manager.state == TurnManager.State.WAITING_INPUT:
+				break
+			await get_tree().physics_frame
+		if manager.state != TurnManager.State.WAITING_INPUT:
+			_fail("tap effect capture did not settle for color %d" % color_index)
+		await _capture("%03d_jelly_tap_%s_settled.png" % [file_number + 2, names[color_index]])
+		manager.set_physics_process(false)
+		file_number += 3
+
+	if hud._callout_tween != null and hud._callout_tween.is_valid():
+		hud._callout_tween.kill()
+	hud._hide_callout_label()
+	hud._on_jelly_tap_effect_unlocked(OrbTypes.OrbColor.BLUE)
+	hud._show_next_jelly_tap_effect()
+	await _capture("126_jelly_tap_blue_callout.png")
+	if hud._callout_tween != null and hud._callout_tween.is_valid():
+		hud._callout_tween.kill()
+	hud._hide_callout_label()
+	hud._on_jelly_tap_effect_unlocked(OrbTypes.OrbColor.CYAN)
+	hud._show_next_jelly_tap_effect()
+	await _capture("127_jelly_tap_orange_callout.png")
+	if hud._callout_tween != null and hud._callout_tween.is_valid():
+		hud._callout_tween.kill()
+	hud._hide_callout_label()
+
+	board.clear()
+	for color_index: int in range(6):
+		var column: int = color_index % 3
+		var row: int = color_index / 3
+		var orb: Orb3D = board.spawn_orb(
+			color_index,
+			8,
+			Vector2(-280.0 + float(column) * 280.0, -170.0 + float(row) * 340.0)
+		)
+		orb.disable_physics()
+	await _capture("128_jelly_tap_effects_full.png")
+	Config.data.fx_hitstop_enabled = original_hitstop_enabled
 
 
 func _capture_tap_blast_progress(

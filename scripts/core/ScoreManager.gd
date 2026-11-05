@@ -27,7 +27,10 @@ func reset() -> void:
 func on_reaction(reaction: Dictionary) -> void:
 	var points: int = points_for(reaction, Config.data)
 	score += points
-	if int(reaction["type"]) == ReactionRules.Type.MERGE:
+	if int(reaction["type"]) in [
+		ReactionRules.Type.MERGE,
+		ReactionRules.Type.TAP_BLAST,
+	]:
 		max_level_reached = maxi(max_level_reached, int(reaction["result_level"]))
 	if score > best_score:
 		best_score = score
@@ -108,6 +111,19 @@ static func points_for(reaction: Dictionary, cfg: GameConfig) -> int:
 				float(cfg.score_for_level(int(levels[0])))
 				* cfg.jelly_tap_blast_score_factor
 			)
+			var clean_levels: Array = reaction.get("clean_levels", []) as Array
+			for clean_level_value: Variant in clean_levels:
+				base_points += floori(
+					float(cfg.score_for_level(int(clean_level_value)))
+					* cfg.jelly_tap_clean_score_factor
+				)
+			if (
+				int(reaction.get("tap_effect", GameConfig.JellyTapEffect.PUSH))
+				== GameConfig.JellyTapEffect.BONUS
+			):
+				base_points += (
+					clean_levels.size() * cfg.jelly_tap_bonus_points_per_orb
+				)
 		_:
 			return 0
 	var combo: int = maxi(int(reaction.get("combo", 1)), 1)

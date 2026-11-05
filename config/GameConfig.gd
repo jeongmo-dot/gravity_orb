@@ -4,6 +4,7 @@ extends Resource
 enum SpawnPositionMode { RANDOM, CENTER }
 enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }
 enum ShockMode { PUSH, PULL, SHAKE, LIFT }
+enum JellyTapEffect { PUSH, NONE, BOMB, QUAKE, GROW, BONUS, MAGNET, REST }
 enum GameMode {
 	TURN = 0, # Legacy: kept for save compatibility and shared JELLY foundations.
 	BLITZ = 1, # Legacy: kept for save compatibility only.
@@ -130,6 +131,23 @@ enum GameMode {
 @export var jelly_tap_blast_score_factor: float = 0.5
 @export var jelly_tap_blast_uses_turn: bool = true
 @export var jelly_tap_blast_touch_margin: float = 16.0
+@export var jelly_tap_clean_max_level: int = 2
+@export var jelly_tap_clean_score_factor: float = 1.0
+@export var jelly_tap_clean_visual_time: float = 0.25
+@export var jelly_tap_grow_min_clean: int = 3
+@export var jelly_tap_effect_modes: PackedInt32Array = PackedInt32Array(
+	[
+		JellyTapEffect.BOMB,
+		JellyTapEffect.QUAKE,
+		JellyTapEffect.GROW,
+		JellyTapEffect.BONUS,
+		JellyTapEffect.MAGNET,
+		JellyTapEffect.REST,
+	]
+)
+@export var jelly_tap_quake_speed: float = 900.0
+@export var jelly_tap_bonus_points_per_orb: int = 100
+@export var jelly_tap_magnet_time: float = 0.5
 @export var blast_speed: float = 900.0
 @export var blast_far_factor: float = 0.4
 @export var blast_score_factor: float = 15.0
@@ -247,6 +265,15 @@ func jelly_blast_enabled_for_pair(level_a: int, level_b: int) -> bool:
 
 func jelly_tap_blast_enabled_for_level(level: int) -> bool:
 	return jelly_tap_blast_min_level > 0 and level >= jelly_tap_blast_min_level
+
+
+func jelly_tap_effect_for_color(color: int) -> JellyTapEffect:
+	if color < 0 or color >= jelly_tap_effect_modes.size():
+		return JellyTapEffect.PUSH
+	var raw_mode: int = int(jelly_tap_effect_modes[color])
+	if raw_mode < JellyTapEffect.PUSH or raw_mode > JellyTapEffect.REST:
+		return JellyTapEffect.PUSH
+	return raw_mode as JellyTapEffect
 
 
 func blast_push_radius_factor_for_level(level: int) -> float:

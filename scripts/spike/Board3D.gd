@@ -35,6 +35,8 @@ var _actual_gravity_direction: Vector2 = Vector2.DOWN
 var _gravity_transition_frames_remaining: int = 0
 var _gravity_transition_finish_pending: bool = false
 var _gravity_transition_id: int = 0
+var _tap_magnet_origin: Vector2 = Vector2.ZERO
+var _tap_magnet_time_remaining: float = 0.0
 var _warning_directions: Array[Vector2i] = []
 var _visual_walls: Dictionary = {}
 var _wall_materials: Dictionary = {}
@@ -80,6 +82,7 @@ func _exit_tree() -> void:
 
 func _physics_process(delta: float) -> void:
 	_advance_gravity_transition()
+	_advance_tap_magnet(delta)
 	_update_entrance_waiters()
 	_update_ghost_orbs(delta)
 
@@ -141,7 +144,11 @@ func actual_gravity_direction() -> Vector2:
 
 
 func is_gravity_transition_active() -> bool:
-	return _gravity_transition_frames_remaining > 0 or _gravity_transition_finish_pending
+	return (
+		_gravity_transition_frames_remaining > 0
+		or _gravity_transition_finish_pending
+		or _tap_magnet_time_remaining > 0.0
+	)
 
 
 func _is_quarter_turn(from_direction: Vector2i, to_direction: Vector2i) -> bool:
@@ -175,6 +182,42 @@ func _finish_gravity_transition(transition_id: int) -> void:
 func _apply_actual_gravity_to_orbs() -> void:
 	for orb: Orb3D in _orbs:
 		orb.set_gravity_vector(_actual_gravity_direction, Config.data.gravity_strength)
+
+
+func start_tap_magnet(origin: Vector2, duration: float) -> void:
+	_tap_magnet_origin = origin
+	_tap_magnet_time_remaining = maxf(duration, 0.0)
+	if _tap_magnet_time_remaining > 0.0:
+		_apply_tap_magnet_gravity()
+
+
+func tap_magnet_active() -> bool:
+	return _tap_magnet_time_remaining > 0.0
+
+
+func _advance_tap_magnet(delta: float) -> void:
+	if _tap_magnet_time_remaining <= 0.0:
+		return
+	_apply_tap_magnet_gravity()
+	_tap_magnet_time_remaining = maxf(
+		_tap_magnet_time_remaining - maxf(delta, 0.0),
+		0.0
+	)
+	if _tap_magnet_time_remaining <= 0.0:
+		_apply_actual_gravity_to_orbs()
+
+
+func _apply_tap_magnet_gravity() -> void:
+	for orb: Orb3D in get_orbs():
+		if orb.is_ghost or orb.is_waiting_at_entrance:
+			continue
+		var offset: Vector2 = _tap_magnet_origin - orb.position
+		var direction: Vector2 = (
+			_actual_gravity_direction
+			if offset.is_zero_approx()
+			else offset.normalized()
+		)
+		orb.set_gravity_vector(direction, Config.data.gravity_strength)
 
 
 func play_visual_tilt(direction: Vector2i) -> void:
@@ -390,6 +433,28 @@ func apply_blast_with_radius_factor(
 	return targets
 
 
+func apply_tap_quake(
+	speed: float,
+	shake_direction_provider: Callable = Callable()
+) -> Array[Dictionary]:
+	var targets: Array[Dictionary] = []
+	for orb: Orb3D in get_orbs():
+		if orb.is_ghost or orb.is_waiting_at_entrance:
+			continue
+		var velocity_change: Vector2 = (
+			_next_shake_direction(shake_direction_provider) * maxf(speed, 0.0)
+		)
+		orb.apply_plane_velocity_change(velocity_change)
+		targets.append({
+			"orb": orb,
+			"stable_spawn_id": orb.stable_spawn_id,
+			"level": orb.level,
+			"position": orb.position,
+			"velocity_change": velocity_change,
+		})
+	return targets
+
+
 func screen_position_to_plane(screen_position: Vector2) -> Vector2:
 	var camera: Camera3D = get_viewport().get_camera_3d()
 	if camera == null:
@@ -424,6 +489,7 @@ func _next_shake_direction(provider: Callable) -> Vector2:
 
 
 func clear() -> void:
+	_tap_magnet_time_remaining = 0.0
 	var to_remove: Array[Orb3D] = _orbs.duplicate()
 	for orb: Orb3D in to_remove:
 		remove_orb(orb)

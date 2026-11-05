@@ -40,6 +40,14 @@ const JELLY_NAMES: Dictionary = {
 	OrbTypes.OrbColor.PURPLE: "보라",
 	OrbTypes.OrbColor.CYAN: "주황",
 }
+const JELLY_TAP_EFFECT_CALLOUTS: Dictionary = {
+	OrbTypes.OrbColor.RED: "분홍 L8: 터치하면 폭탄",
+	OrbTypes.OrbColor.BLUE: "파랑 L8: 터치하면 지진",
+	OrbTypes.OrbColor.GREEN: "초록 L8: 터치하면 성장",
+	OrbTypes.OrbColor.YELLOW: "노랑 L8: 터치하면 보너스",
+	OrbTypes.OrbColor.PURPLE: "보라 L8: 터치하면 자석",
+	OrbTypes.OrbColor.CYAN: "주황 L8: 터치하면 휴식",
+}
 const HUD_ACCENT_COLOR: Color = Color("#BFE9FF")
 const HUD_AMBER_COLOR: Color = Color("#FFB020")
 const HUD_PANEL_COLOR: Color = Color(0.0431373, 0.0941176, 0.2, 0.60)
@@ -115,6 +123,8 @@ var _callout_history: Array[int] = []
 var _planet_unlock_seen: Dictionary = {}
 var _planet_unlock_history: Array[int] = []
 var _pending_planet_unlocks: Array[int] = []
+var _jelly_tap_effect_history: Array[int] = []
+var _pending_jelly_tap_effects: Array[int] = []
 var _preview_unlock_seen: Dictionary = {}
 var _preview_unlock_flash_history: Array[int] = []
 var _preview_batches: Array = []
@@ -453,8 +463,12 @@ func bind_game_state(
 		turn_manager.state_changed.connect(_on_turn_state_changed)
 	if not turn_manager.planet_unlocked.is_connected(_on_planet_unlocked):
 		turn_manager.planet_unlocked.connect(_on_planet_unlocked)
+	if not turn_manager.jelly_tap_effect_unlocked.is_connected(_on_jelly_tap_effect_unlocked):
+		turn_manager.jelly_tap_effect_unlocked.connect(_on_jelly_tap_effect_unlocked)
 	if not turn_manager.final_move_changed.is_connected(_on_final_move_changed):
 		turn_manager.final_move_changed.connect(_on_final_move_changed)
+	if not turn_manager.game_started.is_connected(_reset_callout_tracking):
+		turn_manager.game_started.connect(_reset_callout_tracking)
 	_on_final_move_changed(
 		turn_manager.final_move_pending or turn_manager.final_move_active,
 		TurnManager.FINAL_MOVE_MESSAGE
@@ -471,8 +485,10 @@ func bind_game_state(
 	_refresh_danger_badge()
 
 
-func _on_turn_state_changed(_state: int) -> void:
+func _on_turn_state_changed(state: int) -> void:
 	_refresh_turn_number()
+	if state == int(TurnManager.State.WAITING_INPUT):
+		_show_next_jelly_tap_effect()
 
 
 func _refresh_turn_number() -> void:
@@ -1389,6 +1405,64 @@ func _show_planet_unlock(color_index: int) -> void:
 	_callout_tween.chain().tween_callback(_complete_callout)
 
 
+func _on_jelly_tap_effect_unlocked(color_index: int) -> void:
+	if not JELLY_TAP_EFFECT_CALLOUTS.has(color_index):
+		return
+	_jelly_tap_effect_history.append(color_index)
+	if not Config.data.fx_callouts_enabled:
+		return
+	_pending_jelly_tap_effects.append(color_index)
+
+
+func _show_next_jelly_tap_effect() -> void:
+	if (
+		_pending_jelly_tap_effects.is_empty()
+		or _callout_label.visible
+		or _turn_manager == null
+		or _turn_manager.state != TurnManager.State.WAITING_INPUT
+	):
+		return
+	_show_jelly_tap_effect(_pending_jelly_tap_effects.pop_front())
+
+
+func _show_jelly_tap_effect(color_index: int) -> void:
+	_apply_responsive_layout()
+	if _callout_tween != null and _callout_tween.is_valid():
+		_callout_tween.kill()
+	_stop_sparkles(_callout_sparkles)
+	_planet_callout_visual.visible = false
+	_callout_label.text = str(JELLY_TAP_EFFECT_CALLOUTS[color_index])
+	_callout_label.add_theme_color_override(
+		"font_color",
+		JellyOrbArt.color_for(color_index, Config.data.jelly_tap_blast_min_level)
+	)
+	_callout_label.add_theme_color_override(
+		"font_outline_color", Color(0.02, 0.035, 0.07, 0.92)
+	)
+	_callout_label.add_theme_constant_override("outline_size", 4)
+	_callout_label.add_theme_color_override("font_shadow_color", Color.TRANSPARENT)
+	_callout_label.add_theme_constant_override("shadow_outline_size", 0)
+	_callout_label.visible = true
+	_callout_label.modulate = Color.WHITE
+	_callout_label.position = _callout_base_position
+	_callout_label.scale = Vector2.ONE * 0.90
+	_callout_tween = create_tween()
+	_callout_tween.set_parallel(true)
+	_callout_tween.tween_property(
+		_callout_label, "scale", Vector2.ONE, PLANET_UNLOCK_CALLOUT_DURATION * 0.45
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_callout_tween.tween_property(
+		_callout_label,
+		"position",
+		_callout_base_position + Vector2.UP * CALLOUT_RISE_DISTANCE,
+		PLANET_UNLOCK_CALLOUT_DURATION * 0.72
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_callout_tween.tween_property(
+		_callout_label, "modulate:a", 0.0, 0.25
+	).set_delay(PLANET_UNLOCK_CALLOUT_DURATION - 0.25)
+	_callout_tween.chain().tween_callback(_complete_callout)
+
+
 func _layout_planet_callout_visual(text: String) -> void:
 	var font: Font = _callout_label.get_theme_font("font")
 	var font_size: int = _callout_label.get_theme_font_size("font_size")
@@ -1412,6 +1486,8 @@ func _complete_callout() -> void:
 	_callout_tween = null
 	if not _pending_planet_unlocks.is_empty():
 		call_deferred("_show_next_planet_unlock")
+	elif not _pending_jelly_tap_effects.is_empty():
+		call_deferred("_show_next_jelly_tap_effect")
 
 
 func _show_callout_sparkles(stage_index: int, duration: float) -> void:
@@ -1453,6 +1529,8 @@ func _reset_callout_tracking() -> void:
 	_planet_unlock_seen.clear()
 	_planet_unlock_history.clear()
 	_pending_planet_unlocks.clear()
+	_jelly_tap_effect_history.clear()
+	_pending_jelly_tap_effects.clear()
 	_preview_unlock_seen.clear()
 	_preview_unlock_flash_history.clear()
 	_hide_callout_visuals()
@@ -1478,6 +1556,10 @@ func callout_history() -> Array[int]:
 
 func planet_unlock_history() -> Array[int]:
 	return _planet_unlock_history.duplicate()
+
+
+func jelly_tap_effect_history() -> Array[int]:
+	return _jelly_tap_effect_history.duplicate()
 
 
 func preview_unlock_flash_history() -> Array[int]:

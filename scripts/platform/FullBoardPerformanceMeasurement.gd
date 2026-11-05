@@ -9,6 +9,7 @@ const WINDOW_SIZE: Vector2i = Vector2i(540, 960)
 const WARMUP_SECONDS: float = 0.75
 const SAMPLE_SECONDS: float = 4.0
 const MERGE_SAMPLE_SECONDS: float = 2.0
+const TAP_MAGNET_SAMPLE_SECONDS: float = 0.5
 
 var _main: Main
 var _board: Board3D
@@ -45,6 +46,7 @@ func _physics_process(delta: float) -> void:
 	_scenario_physics_step += 1
 	var total_started_usec: int = Time.get_ticks_usec()
 	_board._advance_gravity_transition()
+	_board._advance_tap_magnet(delta)
 	var waiter_started_usec: int = Time.get_ticks_usec()
 	_board._update_entrance_waiters()
 	_record_duration("waiter_update_ms", waiter_started_usec)
@@ -125,6 +127,14 @@ func _run() -> void:
 	(results["scenarios"] as Array).append(
 		await _measure_scenario("03_merge_heavy_turn_75", MERGE_SAMPLE_SECONDS, false)
 	)
+	var purple_tap_applied: bool = await _prepare_purple_tap_board()
+	var purple_tap_result: Dictionary = await _measure_scenario(
+		"04_purple_tap_%d" % (_full_board_orb_count - 1),
+		TAP_MAGNET_SAMPLE_SECONDS,
+		false
+	)
+	purple_tap_result["tap_blast_applied"] = purple_tap_applied
+	(results["scenarios"] as Array).append(purple_tap_result)
 	results["microbenchmarks"] = await _measure_microbenchmarks()
 	var output_path: String = _argument_value(
 		OUTPUT_PREFIX,
@@ -265,6 +275,20 @@ func _prepare_merge_heavy_board() -> void:
 	for orb: Orb3D in _board.get_orbs():
 		orb.get_physics_body().freeze = true
 	await _wait_real_seconds(0.5)
+
+
+func _prepare_purple_tap_board() -> bool:
+	await _prepare_full_board(false)
+	var orbs: Array[Orb3D] = _board.get_orbs()
+	if orbs.size() < 100:
+		push_error("Purple tap performance scene requires at least 100 orbs")
+		return false
+	var source: Orb3D = orbs[orbs.size() / 2]
+	source.setup(OrbTypes.OrbColor.PURPLE, Config.data.jelly_tap_blast_min_level, Config.data)
+	source.set_gravity_vector(Vector2.ZERO, 0.0)
+	source.linear_velocity = Vector2.ZERO
+	source.angular_velocity = 0.0
+	return _resolver.apply_jelly_tap_blast(source)
 
 
 func _spawn_stopped_orb(color: int, level: int, position: Vector2) -> Orb3D:

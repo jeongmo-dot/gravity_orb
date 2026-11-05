@@ -23,6 +23,12 @@ param(
 	[double]$JellyTapBlastScoreFactor = 0.5,
 	[ValidateSet("On", "Off")]
 	[string]$JellyTapBlastUsesTurn = "On",
+	[ValidateRange(0, 10)]
+	[int]$JellyTapCleanMaxLevel = 2,
+	[ValidateRange(0, 100)]
+	[int]$JellyTapGrowMinClean = 3,
+	[ValidateSet("Push", "None", "Color")]
+	[string]$JellyTapEffectModes = "Color",
 	[ValidateSet("On", "Off")]
 	[string]$JellyBlastRequiresSameLevel = "Off",
 	[string]$OrbFrictionByLevel = "0.3,0.3,0.3,0.4,0.4,0.4,0.4,0.5,0.5,0.5",
@@ -89,6 +95,9 @@ if (-not $AggregateOnly) {
 					"--blast-score-factor=$($BlastScoreFactor.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--jelly-tap-blast-score-factor=$($JellyTapBlastScoreFactor.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--jelly-tap-blast-uses-turn=$($JellyTapBlastUsesTurn.ToLower())",
+					"--jelly-tap-clean-max-level=$JellyTapCleanMaxLevel",
+					"--jelly-tap-grow-min-clean=$JellyTapGrowMinClean",
+					"--jelly-tap-effect-modes=$($JellyTapEffectModes.ToLower())",
 					"--jelly-blast-requires-same-level=$($JellyBlastRequiresSameLevel.ToLower())",
 					"--orb-friction-by-level=$OrbFrictionByLevel",
 					"--jelly-tap-blast-bot=$($resolvedTapBlastBotMode.ToLower())",
@@ -164,6 +173,8 @@ function Get-Summary($Rows) {
     $outlineMaxAlpha = [double](($Rows | Measure-Object -Property jelly_outline_max_alpha -Maximum).Maximum)
     $blastCountByLevel = [ordered]@{}
 	$tapBlastCountByLevel = [ordered]@{}
+	$tapBlastCountByColor = [ordered]@{}
+	$tapCleanCountByColor = [ordered]@{}
 	$sameLevelBlastCountByLevel = [ordered]@{}
 	$mixedLevelBlastCountByLevel = [ordered]@{}
 	$reactionScoreTotals = [ordered]@{ merge = 0; blast = 0; tap = 0; jackpot = 0 }
@@ -179,6 +190,16 @@ function Get-Summary($Rows) {
 			$levelKey = [string]$levelProperty.Name
 			if (-not $tapBlastCountByLevel.Contains($levelKey)) { $tapBlastCountByLevel[$levelKey] = 0 }
 			$tapBlastCountByLevel[$levelKey] += [int]$levelProperty.Value
+		}
+		foreach ($colorProperty in $row.tap_blast_count_by_color.PSObject.Properties) {
+			$colorKey = [string]$colorProperty.Name
+			if (-not $tapBlastCountByColor.Contains($colorKey)) { $tapBlastCountByColor[$colorKey] = 0 }
+			$tapBlastCountByColor[$colorKey] += [int]$colorProperty.Value
+		}
+		foreach ($colorProperty in $row.tap_clean_count_by_color.PSObject.Properties) {
+			$colorKey = [string]$colorProperty.Name
+			if (-not $tapCleanCountByColor.Contains($colorKey)) { $tapCleanCountByColor[$colorKey] = 0 }
+			$tapCleanCountByColor[$colorKey] += [int]$colorProperty.Value
 		}
 		foreach ($levelProperty in $row.same_level_blast_count_by_level.PSObject.Properties) {
 			$levelKey = [string]$levelProperty.Name
@@ -198,6 +219,8 @@ function Get-Summary($Rows) {
 	$turnTotal = [double](($Rows | Measure-Object -Property completed_turns -Sum).Sum)
 	$scoreTotal = [double](($Rows | Measure-Object -Property score -Sum).Sum)
 	$reactionScoreTotal = [double](($reactionScoreTotals.Values | Measure-Object -Sum).Sum)
+	$tapBlastTotal = [double](($Rows | Measure-Object -Property tap_blast_count -Sum).Sum)
+	$tapCleanTotal = [double](($Rows | Measure-Object -Property tap_clean_count_total -Sum).Sum)
 	$reactionScoreShares = [ordered]@{}
 	foreach ($scoreKey in $reactionScoreTotals.Keys) {
 		$reactionScoreShares[$scoreKey] = Get-Ratio ([double]$reactionScoreTotals[$scoreKey]) $reactionScoreTotal
@@ -231,6 +254,14 @@ function Get-Summary($Rows) {
 		tap_blasts = [int](($Rows | Measure-Object -Property tap_blast_count -Sum).Sum)
 		blast_count_by_level = $blastCountByLevel
 		tap_blast_count_by_level = $tapBlastCountByLevel
+		tap_blast_count_by_color = $tapBlastCountByColor
+		tap_clean_count_by_color = $tapCleanCountByColor
+		average_clean_count_per_tap = Get-Ratio $tapCleanTotal $tapBlastTotal
+		maximum_clean_count_per_tap = ($Rows | Measure-Object -Property tap_clean_count_max -Maximum).Maximum
+		purple_same_turn_blast_count = [int](($Rows | Measure-Object -Property purple_same_turn_blast_count -Sum).Sum)
+		maximum_pair_penetration_px = ($Rows | ForEach-Object { [double]$_.max_turn_end_pair.penetration_px } | Measure-Object -Maximum).Maximum
+		departures = [int](($Rows | Measure-Object -Property departures -Sum).Sum)
+		forced_settle_turns = [int](($Rows | Measure-Object -Property capped_turn_count -Sum).Sum)
 		same_level_blast_count_by_level = $sameLevelBlastCountByLevel
 		mixed_level_blast_count_by_level = $mixedLevelBlastCountByLevel
         preview_fatal_avoidance_turns = [int]$fatalAvoidance
@@ -273,6 +304,9 @@ $report = [ordered]@{
 	blast_score_factor = $BlastScoreFactor
 	jelly_tap_blast_score_factor = $JellyTapBlastScoreFactor
 	jelly_tap_blast_uses_turn = $JellyTapBlastUsesTurn -eq "On"
+	jelly_tap_clean_max_level = $JellyTapCleanMaxLevel
+	jelly_tap_grow_min_clean = $JellyTapGrowMinClean
+	jelly_tap_effect_modes = $JellyTapEffectModes.ToLower()
 	jelly_merge_level_gap = $JellyMergeLevelGap
 	jelly_blast_min_level = $JellyBlastMinLevel
 	jelly_tap_blast_min_level = $JellyTapBlastMinLevel
