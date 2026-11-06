@@ -40,7 +40,7 @@
 
 ### [2026-11-06 #134] Windows 빌드 0.16.2 (#133 포함)·0.16.1 복구·Release 덮어쓰기 막기·초록 안내 문구 — 완료
 - 상태: 완료 (2026-11-06 Claude 검수 · [PR #134](https://github.com/jeongmo-dot/gravity_orb/pull/134) 병합 `eecfcec`)
-- 검수: `build/windows/GravityOrb_v0.16.2.exe` (111,123,264바이트) 크기·해시·`_BUILD.txt` (커밋 `0e6a3f7` = 브랜치 끝), 0.16.1 복구 (111,111,824바이트, 해시 = zip 안 exe) 직접 확인. 코드 diff, 캡처 `115`·`116` 확인. Release 보호 실제 명령·테스트 333/4/5·스모크·격리 창·`save.cfg`는 Codex 관측 (Claude 재실행 없음). 시작 화면 JELLY 카드 실제 클릭은 못 함. 다른 버전 파일 12개 경위는 "모름" (§10.5.1). 결과: §12-ONE.25 "#134 결과"
+- 검수: `build/windows/GravityOrb_v0.16.2.exe` (111,123,264바이트) 크기·해시·`_BUILD.txt` (커밋 `0e6a3f7` = 브랜치 끝), 0.16.1 복구 (111,111,824바이트, 해시 = zip 안 exe) 직접 확인. 코드 diff, 캡처 `115`·`116` 확인. Release 보호 실제 명령·테스트 333/4/5·스모크·격리 창·`save.cfg`는 Codex 관측 (Claude 재실행 없음). 시작 화면 JELLY 카드 실제 클릭은 못 함. 다른 버전 파일 12개는 사용자가 지웠다 (2026-11-06 사용자 확인, §10.5.1). 결과: §12-ONE.25 "#134 결과"
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.25 "#134"**, §10.5.1 (버전 기록 0.16.1 줄)
 - 배경: 사용자 (2026-11-06) #133 표를 본 뒤 "병합하고 플레이". #133 추가 요구 1의 검증 빌드가 `-Debug` 없이 돌아 `build/windows/GravityOrb_v0.16.1.exe`가 덮였다 (§10.5.1 "항목 검증용 빌드는 `-Debug`로" 위반, 회신에 경고 없음)
 - 앵커: `tools/build_windows.ps1`, `tests/test_build_script.gd`, `scripts/ui/Hud.gd` `JELLY_TAP_EFFECT_CALLOUTS`·`_show_jelly_tap_effect()`, `tests/test_callouts.gd`, `project.godot`
