@@ -33,7 +33,7 @@
 ## 대기 중
 
 ### [2026-11-07 #137] 소폭발은 위로 터지게·들어오는 공 줄이기·합치는 레벨 3 × 3 측정
-- 상태: 대기
+- 상태: 대기 (추가 요구 1)
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.28**
 - 배경: 사용자 (2026-11-07, 0.16.4 뒤) "1. 소폭발도 위로 터지게 2. 한 턴에 들어오는 공 수 줄이기 3. 합치는 레벨 고민". 더미 위 소폭발은 50px 넘게 6%만 밀린다 (#136). G1은 L8 이상이 드물다 (#135)
 - 앵커: `scripts/spike/Board3D.gd` `apply_blast_with_radius_factor()` (소폭발 경로), `scripts/core/CollisionResolver.gd` `apply_jelly_tap_blast()`, `scripts/core/ReactionRules.gd` `can_react()`·`_classify_jelly()`, `config/GameConfig.gd`·`default_config.tres`, 측정 도구 (`run_jolt_3d_measurement.gd`·`run_blast_push_measurement.gd`·`run_jelly_measurement.ps1`), `tests/test_rules.gd`·`tests/test_jolt_3d.gd`·`tests/test_jelly_regression.gd`, 캡처
@@ -49,12 +49,20 @@
 - 수치 (Claude): `jelly_tap_lift_speed` **900**, `spawn_count_max` **4** (임시), `jelly_merge_wide_gap_min_level` **0** (측정 H6 = 6). 그 밖의 값은 그대로
 - 건드리지 말 것: 대폭발 밀기, #136 값 (무중력 0.2·속도 1350 / 0.5), 색별 효과·색 청소, 생성 램프 간격·시작 수·L2 비율, 대폭발 조건, 점수, 물리, 그림·연출 (명세에 없는 것 금지, 고리 모양 금지), 사용자 저장 파일, `docs/` (회신 파일 제외)
 - **이번에는 Release 빌드를 만들지 않는다** (값이 정해진 뒤 추가 요구에서 0.16.5). 검증 빌드는 `-Debug`
+- 1차 결과 ([PR #137](https://github.com/jeongmo-dot/gravity_orb/pull/137) `ce2ed5d`): 위로 터짐 900은 더미 위 50px 이상 6% → 100%. 3 × 3에서 다섯 봇 100판이 모두 끝나는 것은 S5-G1·S4-G1뿐 (S4-G1: 자동 D-save 103 → 125턴, 대폭발 4 → 11). Claude 검수에서 대기 판정 범위 빈틈 (H 규칙 짝을 못 봄 — 명세 탓, 기본값 영향 없음). [§12-ONE.28](technical_design.md) 「#137 1차 결과」
+- **추가 요구 1** (사용자 2026-11-07 표를 본 뒤 "S4-G1"): [§12-ONE.28](technical_design.md) 「추가 요구 1」
+  1. 값은 PR 기본값 그대로 확정 (`spawn_count_max` 4, 레벨 차 1, `jelly_tap_lift_speed` 900, `jelly_merge_wide_gap_min_level` 0)
+  2. `CollisionResolver._has_pending_jelly_reactions()`의 같은 색 후보 레벨 범위를 `can_react()`가 허용하는 레벨 차 전부로 (H 켜짐이면 ±(gap + 1)). 따로 적은 곳이 또 있으면 회신에 목록
+  3. 테스트: H6에서 잠긴 같은 색 L6 + L4 → 대기 true, L5 + L3 → false, H 0이면 L6 + L4 → false
+  4. 해시 모두 그대로. 측정·캡처 다시 하지 않음
+  5. 버전 **0.16.5**, 커밋 뒤 깨끗한 트리에서 Release. 보고는 #136과 같다
 - Done-when:
   - [ ] 테스트 통과, 예전 해시 9종 그대로, 새 기본 해시 고정
   - [ ] 3 × 3 측정표, 밀림 측정표 (lift 4값)
   - [ ] 캡처 (두 비율)
+  - [ ] 추가 요구 1: 대기 판정 테스트, 해시 그대로, `build/windows/GravityOrb_v0.16.5.exe` (`mode=Release`, `_BUILD.txt` 커밋 = 브랜치 끝), 0.16.1~0.16.4 파일 그대로
 - QA: §12-ONE.28 4·5번
-- 커밋: 항목 단위 브랜치 (`tap-lift-spawn-merge`), **push·PR까지** (병합은 사용자가 값을 고른 뒤)
+- 커밋: 항목 단위 브랜치 (`tap-lift-spawn-merge`), **push·PR까지**. 추가 요구 1도 같은 브랜치·PR (병합은 Claude 검수 뒤)
 
 ---
 
