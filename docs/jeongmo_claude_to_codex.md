@@ -32,8 +32,15 @@
 
 ## 대기 중
 
-### [2026-11-07 #137] 소폭발은 위로 터지게·들어오는 공 줄이기·합치는 레벨 3 × 3 측정
-- 상태: 대기 (추가 요구 1)
+- 없음
+
+---
+
+## 처리 완료
+
+### [2026-11-07 #137] 소폭발은 위로 터지게·들어오는 공 줄이기·합치는 레벨 3 × 3 측정 — 완료
+- 상태: 완료 (2026-11-07 사용자 "S4-G1" · [PR #137](https://github.com/jeongmo-dot/gravity_orb/pull/137) 병합 `2aab05c`)
+- 검수: 코드 diff (1차·추가 요구 1), 회신 측정표 (3 × 3·위로 터짐) — 측정 JSON 요약은 Claude가 직접 읽음, 캡처 `149`·`152`·`153`, `build/windows/GravityOrb_v0.16.5.exe` 크기·SHA-256·`_BUILD.txt` (커밋 `62db2c1` = 브랜치 끝, Release) 직접 확인. 테스트·해시·스모크·`save.cfg`는 Codex 관측 (Claude 재실행 없음 — 회신의 테스트 줄은 1차와 같은 글자라 추가 요구 1 뒤 전체 실행인지 불명). 위로 터짐 900: 더미 위 50px 이상 6% → 100%. S4-G1: 다섯 봇 100판 모두 끝남, 자동 D-save 103 → 125턴, 대폭발 4 → 11. 결과: §12-ONE.28 "#137 결과"
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.28**
 - 배경: 사용자 (2026-11-07, 0.16.4 뒤) "1. 소폭발도 위로 터지게 2. 한 턴에 들어오는 공 수 줄이기 3. 합치는 레벨 고민". 더미 위 소폭발은 50px 넘게 6%만 밀린다 (#136). G1은 L8 이상이 드물다 (#135)
 - 앵커: `scripts/spike/Board3D.gd` `apply_blast_with_radius_factor()` (소폭발 경로), `scripts/core/CollisionResolver.gd` `apply_jelly_tap_blast()`, `scripts/core/ReactionRules.gd` `can_react()`·`_classify_jelly()`, `config/GameConfig.gd`·`default_config.tres`, 측정 도구 (`run_jolt_3d_measurement.gd`·`run_blast_push_measurement.gd`·`run_jelly_measurement.ps1`), `tests/test_rules.gd`·`tests/test_jolt_3d.gd`·`tests/test_jelly_regression.gd`, 캡처
@@ -63,10 +70,6 @@
   - [ ] 추가 요구 1: 대기 판정 테스트, 해시 그대로, `build/windows/GravityOrb_v0.16.5.exe` (`mode=Release`, `_BUILD.txt` 커밋 = 브랜치 끝), 0.16.1~0.16.4 파일 그대로
 - QA: §12-ONE.28 4·5번
 - 커밋: 항목 단위 브랜치 (`tap-lift-spawn-merge`), **push·PR까지**. 추가 요구 1도 같은 브랜치·PR (병합은 Claude 검수 뒤)
-
----
-
-## 처리 완료
 
 ### [2026-11-07 #136] 소폭발·대폭발이 주변 젤리를 확실히 밀기·빌드 0.16.4 — 완료
 - 상태: 완료 (2026-11-07 Claude 검수 · [PR #136](https://github.com/jeongmo-dot/gravity_orb/pull/136) 병합 `22f1017`)

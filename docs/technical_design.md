@@ -252,6 +252,8 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | #130 | `jelly_tap_blast_uses_turn` | bool | (새 필드) **true** (#130, 사용자 "잠깐 그럼 소폭발의 대가는 뭐가 있을까" → "턴 쓰기", 측정을 본 뒤 "ST ×15 그대로", §12-ONE.23) | true: 입력 대기 중 소폭발이 그 턴의 입력 — `on_swipe()`와 같은 `TurnManager._start_turn()`에서 `turn_index` +1, 콤보 0, 지금 중력 방향 입구로 NEXT 묶음, **중력은 그대로**, 정착 뒤 게임 오버·FINAL MOVE 판정. FINAL MOVE 대기 중이면 그 FINAL MOVE를 쓴다 (새 젤리 없음). false: 턴 안 씀 (#129) |
 | #136 | `blast_speed` / `blast_far_factor` | float | 900 / 0.4 (#29) → **1350 / 0.5** (#136, 2026-11-07 사용자 "소폭발과 대폭발 모두 확실하게 주변 젤리들을 밀어냈으면" — 값은 Claude, §12-ONE.27) | 대폭발·소폭발 밀기: 터진 자리의 속도 변화 (px/s, 질량 무관) / 범위 끝에서의 비율 (§7.7). 공유 값이라 레거시 CLASSIC 대폭발도 같이 바뀐다 |
 | #136 | `jelly_tap_common_push` / `blast_gravity_pause_time` | bool / float | (새 필드) **true / 0.2** (#136, 같은 사용자 요청 — §12-ONE.27) | true: 모든 색 소폭발이 반경 `jelly_tap_blast_radius_factor` 안을 민다 (터치한 젤리 제외, PUSH·BOMB는 한 번). false = #133 (분홍만) / 대폭발·소폭발 밀기로 속도 변화를 받은 젤리의 무중력 시간 (초). 끝나면 그때 중력, 보라 자석은 이 시간 뒤 시작. 0이면 끈다 |
+| #137 | `jelly_tap_lift_speed` | float | (새 필드) **900** (#137, 2026-11-07 사용자 "소폭발도 위로 터지게" — 값은 Claude, §12-ONE.28) | 0보다 크면 소폭발 밀기에서 바깥 방향의 중력 쪽 성분을 빼고, 중력 반대쪽으로 이 속도 × `lerp(1, blast_far_factor, 거리 ÷ R)`을 더한다 (px/s, 그 순간 판 중력 기준). 대폭발은 그대로. 0 = #136 |
+| #137 | `jelly_merge_wide_gap_min_level` | int | (새 필드) **0** = 끔 (#137 — 측정 H6 = 6, 사용자는 S4-G1을 골랐다) | 0보다 크면 같은 색 레벨 차가 `jelly_merge_level_gap + 1`이고 큰 쪽이 이 레벨 이상일 때도 합쳐진다 (`ReactionRules.can_react()`·`_classify_jelly()`, 턴 대기 판정 범위도 따른다). 측정용 |
 | #21 | `combo_multiplier_base` | float | 2.0 | 콤보 배수 밑 (§8.2) |
 | #62 | `combo_multiplier_max` | float | **128.0** | 턴제 콤보 배수 상한 — `min(base^(combo − 1), max)`, 콤보 8부터 ×128 고정 (§8.2, 2026-10-11 사용자). BLITZ 체인 배수(최대 ×5)와 무관 |
 | #21 | `danger_start` / `danger_doubling` | float | 0.30 / 0.20 | 위험 배수 시작 점유율 / 2배가 되는 점유율 간격 (§8.2) |
@@ -283,7 +285,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | M4 | `spawn_color_weights` | PackedFloat32Array | [1, 1, 1] → [1, 1, 1, 1] (#15) → **[1, 1, 1, 1, 1, 1]** (#74, 두 모드 같은 6색 §12-W.1) | 인덱스 = 색. 가중치 0인 색은 생성되지 않는다 |
 | #15 | `spawn_count_per_turn` | int | 2 (기획서 0.6) → **1 (#26, 기획서 0.9.4: 상극 폐지 후 게임 길이 258 → 136턴)** | 턴당 생성 구체 수 |
 | #26 | `preview_turns` | int | **2** | 미리보기로 보여 줄 앞으로의 턴 수 (§11.10) |
-| #15 | `spawn_count_ramp_turns` / `spawn_count_max` | int | 0 → 100 (#55) → 50 (#56, 기획서 0.10.10) → 20 (#62, 판 길이 약 250턴 목표 — p50 240턴, §12-B.10) → 40 (#74, 6색에서 p50 266턴, §12-W.1) → 50 (#92, 단계별 난도 C2 §12-R.1 — 적용 `3ea4f0b`) → 5 (#119, 2026-10-30 사용자 "첫번째 1개씩 5턴 그 다음부터 매 5턴 마다 공 한개씩 추가" — §12-ONE.12) → **10** (#123, 2026-10-31 사용자 "5턴이 아니라 10턴 단위로" — §12-ONE.16) / 3 → 0 = 상한 없음 (#56) → **5** (#126, 2026-10-31 사용자 "공 수량 최대값은 5개를 맥스로" — §12-ONE.19) | 턴제 점진 증가: **10턴마다 +1, 최대 5** (1~10턴 1, 11~20턴 2 … 41턴부터 5, #126. 수량은 L1 환산 예산 — `spawn_level_costs`. #92~#118은 50턴마다, #119~#122는 5턴마다, #123~#125는 10턴마다·상한 없음). `spawn_count_max ≤ 0`이면 상한 없음. BLITZ는 쓰지 않음 |
+| #15 | `spawn_count_ramp_turns` / `spawn_count_max` | int | 0 → 100 (#55) → 50 (#56, 기획서 0.10.10) → 20 (#62, 판 길이 약 250턴 목표 — p50 240턴, §12-B.10) → 40 (#74, 6색에서 p50 266턴, §12-W.1) → 50 (#92, 단계별 난도 C2 §12-R.1 — 적용 `3ea4f0b`) → 5 (#119, 2026-10-30 사용자 "첫번째 1개씩 5턴 그 다음부터 매 5턴 마다 공 한개씩 추가" — §12-ONE.12) → **10** (#123, 2026-10-31 사용자 "5턴이 아니라 10턴 단위로" — §12-ONE.16) / 3 → 0 = 상한 없음 (#56) → 5 (#126, 2026-10-31 사용자 "공 수량 최대값은 5개를 맥스로" — §12-ONE.19) → **4** (#137, 2026-11-07 사용자 "한 턴에 들어오는 공 수 줄이기" → 3 × 3 표를 본 뒤 S4-G1 — §12-ONE.28) | 턴제 점진 증가: **10턴마다 +1, 최대 4** (1~10턴 1, 11~20턴 2, 21~30턴 3, 31턴부터 4, #137. 수량은 L1 환산 예산 — `spawn_level_costs`. #92~#118은 50턴마다, #119~#122는 5턴마다, #123~#125는 10턴마다·상한 없음, #126~#136은 41턴부터 5). `spawn_count_max ≤ 0`이면 상한 없음. BLITZ는 쓰지 않음 |
 | M4 | `spawn_position_mode` | SpawnPositionMode | RANDOM | |
 | M4 | `spawn_margin` | float | 4.0 | 생성 벽 안쪽 면과 구체 사이 여백 |
 | M4 | `rng_seed` | int | 0 | 0이면 시작 시 무작위 시드를 뽑아 기록 |
@@ -853,6 +855,7 @@ godot --headless --path . --quit-after 300 -- --mode=blitz
 | 0.16.2 | 2026-11-06 ([PR #134](https://github.com/jeongmo-dot/gravity_orb/pull/134) `eecfcec`, 빌드 커밋 `0e6a3f7` — 같은 코드, 커밋 뒤 깨끗한 트리에서 빌드) | `GravityOrb_v0.16.2.exe` 111,123,264바이트, SHA-256 `ebeffc4b…`. 기획서 0.16.17. 0.16.1 뒤 병합: 색 청소 소폭발 — L8 이상 터치로 같은 색 L2 이하 청소·색별 효과 6가지·초록은 작은 초록 3개 이상·입력 대기 때 안내 한 줄 (#133), 초록 안내 문구·빌드 스크립트 Release 보호 (#134) |
 | 0.16.3 | 2026-11-07 ([PR #135](https://github.com/jeongmo-dot/gravity_orb/pull/135) `1001f14`, 빌드 커밋 `dce78a4` — 같은 코드, 커밋 뒤 깨끗한 트리에서 빌드) | `GravityOrb_v0.16.3.exe` 111,123,424바이트, SHA-256 `d2d0b6dd…`. 기획서 0.16.18. 0.16.2 뒤 병합: 같은 색 합체 레벨 차 2 → 1·턴 대기 판정이 합체 규칙 함수를 따름 (#135) |
 | 0.16.4 | 2026-11-07 ([PR #136](https://github.com/jeongmo-dot/gravity_orb/pull/136) `22f1017`, 빌드 커밋 `9b20ab9` — 같은 코드, 커밋 뒤 깨끗한 트리에서 빌드) | `GravityOrb_v0.16.4.exe` 111,126,304바이트, SHA-256 `993ab162…`. 기획서 0.16.19. 0.16.3 뒤 병합: 모든 색 소폭발이 주변을 밂·밀린 젤리 0.2초 무중력·미는 속도 1350 / 0.5 (#136) |
+| 0.16.5 | 2026-11-07 ([PR #137](https://github.com/jeongmo-dot/gravity_orb/pull/137) `2aab05c`, 빌드 커밋 `62db2c1` — 같은 코드, 커밋 뒤 깨끗한 트리에서 빌드) | `GravityOrb_v0.16.5.exe` 111,127,296바이트, SHA-256 `08d41488…`. 기획서 0.16.20. 0.16.4 뒤 병합: 소폭발이 위로 터짐 (900)·한 턴 공 상한 5 → 4 (#137) |
 
 #### 10.5.2 출시 절차
 한국 모바일 출시에 필요한 법·행정·스토어·기술 절차와 M10 인박스 후보는 [release_checklist_kr.md](release_checklist_kr.md)에 둔다 (2026-10-11). 결정·확인 결과는 그 문서에 체크한다
@@ -4667,6 +4670,13 @@ G1 전략 봇 (시드 1~20, 600턴 상한, 턴 평균 / 총점 평균):
 5. 측정·캡처는 다시 하지 않는다 (H6 숫자는 기록으로 남긴다)
 6. 버전 **0.16.5**, 커밋 뒤 깨끗한 트리에서 Release (그 전 검증 빌드는 `-Debug`). 보고는 #136과 같다 — exe·console 크기·SHA-256, `_BUILD.txt` 커밋 = 브랜치 끝, 내보낸 console 스모크, 묶음 금지 패턴, `save.cfg` 불변, 0.16.1~0.16.4 파일 그대로
 - 그대로: 1차의 나머지 전부. 병합은 Claude 검수 뒤
+
+**#137 결과 — 병합** ([PR #137](https://github.com/jeongmo-dot/gravity_orb/pull/137) `2aab05c`, 2026-11-07 사용자 "S4-G1". 브랜치 끝·빌드 커밋 `62db2c1`. 측정·캡처·빌드는 Codex, 검수는 Claude — Claude 재실행 없음)
+- 추가 요구 1은 명세대로다 (diff 대조): `_has_pending_jelly_reactions()`의 같은 색 후보 범위가 `jelly_merge_wide_gap_min_level > 0`이면 ±(gap + 1), 짝은 지금처럼 `_pair_can_react()`. `test_pending_jelly_reactions_follow_merge_gap_and_blast_rule`에 H6 L6 + L4 대기 true·L5 + L3 false·H 0 L6 + L4 false를 더했다. 레벨 차를 따로 적은 곳은 이 함수와 `ReactionRules` 두 곳뿐 (Codex 검색). 기본값은 H 끔이라 새 분기를 타지 않는다 — 해시 모두 그대로 (Codex)
+- 회신의 `run_tests.ps1` 줄 (340/4/5, 92.993초)은 1차 회신과 글자까지 같다. 추가 요구 1 뒤의 전체 실행 기록인지 회신만으로는 알 수 없다 (새 단언은 기존 테스트 함수 안이라 개수는 그대로가 맞다). 바뀐 코드는 H가 켜졌을 때만 쓰는 범위 한 줄이라 받아들인다
+- 0.16.5: Claude 직접 확인 — `build/windows/GravityOrb_v0.16.5.exe` 111,127,296바이트, SHA-256 `08d41488…` = 회신 값, console `2a3b31dc…`, `_BUILD.txt` 커밋 `62db2c1` = 브랜치 끝·Mode Release. 병합 커밋 `2aab05c`의 트리 = `62db2c1`. 0.16.1~0.16.4 파일 그대로 (0.16.4 SHA-256 `993ab162…`). Release 보호·스모크·묶음 검사·`save.cfg`는 Codex 관측
+- 확정 값: `spawn_count_max` **4** (31턴부터 4), `jelly_merge_level_gap` 1, `jelly_tap_lift_speed` **900**, `jelly_merge_wide_gap_min_level` 0
+- 남은 것 (플레이 뒤): 위로 튄 젤리가 어지럽지 않은지, 판 길이 (봇 약 125턴)가 늘어지지 않는지, L8 이상이 충분히 보이는지. 캡처 하네스의 앞 장면 잔상 (#135부터)
 
 ### 12-ONE.3 다음 (JELLY 개선)
 - CLASSIC 전용 분기 정리 (행성 그림·연출·규칙 — JELLY가 안 쓰는 것)
