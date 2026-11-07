@@ -11,6 +11,7 @@ const EXPECTED_F2_DEFAULT_HASH: String = "4c4ab4aa9cf014d4d266a6fdfd75a03bbd4f40
 const EXPECTED_G1_DEFAULT_HASH: String = "d5175565a24fa4d0e00e1eb3ccbd5529a0c489852c00437fed58197bd20e4c7d"
 const EXPECTED_K4_DEFAULT_HASH: String = "3e929d90b33f6617322e96a2f53e0e790a32c9c5c11f045e9d7fa05c3a88c42f"
 const EXPECTED_S4_G1_LIFT_DEFAULT_HASH: String = "bc5951c060d635cb6e43d72f4854afbf38ef6a48bea693e224e118677ca736b2"
+const EXPECTED_T3_DEFAULT_HASH: String = "7a20210c45a5e68cb8be6d4e2bc310eca31b3b450d20d0a9bf37a38f892b9c63"
 
 
 func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
@@ -25,10 +26,18 @@ func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
 	Config.data.jelly_merge_duration = 0.3
 	var default_visible_result: Dictionary = await _run_rule_path(true)
 	var default_hidden_result: Dictionary = await _run_rule_path(false)
-	assert_eq(default_visible_result["hash"], default_hidden_result["hash"], "S4-G1 lift hash ignores rendering")
-	print("JELLY_S4_G1_LIFT_DEFAULT_HASH hash=%s" % str(default_hidden_result["hash"]))
+	assert_eq(default_visible_result["hash"], default_hidden_result["hash"], "T3 hash ignores rendering")
+	print("JELLY_T3_DEFAULT_HASH hash=%s" % str(default_hidden_result["hash"]))
+	assert_eq(default_hidden_result["hash"], EXPECTED_T3_DEFAULT_HASH, "T3 default hash")
+	Config.data.jelly_tap_lift_speed = 900.0
+	Config.data.jelly_tap_push_radius_factor = 0.0
+	Config.data.jelly_tap_push_speed = 0.0
+	var lift_visible_result: Dictionary = await _run_rule_path(true)
+	var lift_hidden_result: Dictionary = await _run_rule_path(false)
+	assert_eq(lift_visible_result["hash"], lift_hidden_result["hash"], "S4-G1 lift hash ignores rendering")
+	print("JELLY_S4_G1_LIFT_DEFAULT_HASH hash=%s" % str(lift_hidden_result["hash"]))
 	assert_eq(
-		default_hidden_result["hash"],
+		lift_hidden_result["hash"],
 		EXPECTED_S4_G1_LIFT_DEFAULT_HASH,
 		"S4-G1 lift default hash"
 	)
@@ -375,6 +384,14 @@ func _run_rule_path(visuals_enabled: bool) -> Dictionary:
 		}
 	if not is_zero_approx(Config.data.jelly_tap_lift_speed):
 		state["jelly_tap_lift_speed"] = Config.data.jelly_tap_lift_speed
+	if (
+		not is_zero_approx(Config.data.jelly_tap_push_radius_factor)
+		or not is_zero_approx(Config.data.jelly_tap_push_speed)
+	):
+		state["jelly_tap_push_profile"] = {
+			"radius": Config.data.jelly_tap_push_radius_factor,
+			"speed": Config.data.jelly_tap_push_speed,
+		}
 	if Config.data.jelly_merge_wide_gap_min_level != 0:
 		state["jelly_merge_wide_gap_min_level"] = Config.data.jelly_merge_wide_gap_min_level
 	if Config.data.spawn_count_max != 5:
@@ -416,6 +433,8 @@ func _snapshot_level_profile() -> Dictionary:
 		"shock_level_scale": Config.data.shock_level_scale,
 		"jelly_tap_common_push": Config.data.jelly_tap_common_push,
 		"jelly_tap_lift_speed": Config.data.jelly_tap_lift_speed,
+		"jelly_tap_push_radius_factor": Config.data.jelly_tap_push_radius_factor,
+		"jelly_tap_push_speed": Config.data.jelly_tap_push_speed,
 		"blast_gravity_pause_time": Config.data.blast_gravity_pause_time,
 		"blast_speed": Config.data.blast_speed,
 		"blast_far_factor": Config.data.blast_far_factor,
@@ -446,6 +465,8 @@ func _restore_level_profile(snapshot: Dictionary) -> void:
 	Config.data.shock_level_scale = float(snapshot["shock_level_scale"])
 	Config.data.jelly_tap_common_push = bool(snapshot["jelly_tap_common_push"])
 	Config.data.jelly_tap_lift_speed = float(snapshot["jelly_tap_lift_speed"])
+	Config.data.jelly_tap_push_radius_factor = float(snapshot["jelly_tap_push_radius_factor"])
+	Config.data.jelly_tap_push_speed = float(snapshot["jelly_tap_push_speed"])
 	Config.data.blast_gravity_pause_time = float(snapshot["blast_gravity_pause_time"])
 	Config.data.blast_speed = float(snapshot["blast_speed"])
 	Config.data.blast_far_factor = float(snapshot["blast_far_factor"])
@@ -538,6 +559,8 @@ func _apply_legacy_tap_profile() -> void:
 func _apply_legacy_blast_push_profile() -> void:
 	Config.data.jelly_tap_common_push = false
 	Config.data.jelly_tap_lift_speed = 0.0
+	Config.data.jelly_tap_push_radius_factor = 0.0
+	Config.data.jelly_tap_push_speed = 0.0
 	Config.data.jelly_merge_wide_gap_min_level = 0
 	Config.data.spawn_count_max = 5
 	Config.data.blast_gravity_pause_time = 0.0
@@ -548,6 +571,8 @@ func _apply_legacy_blast_push_profile() -> void:
 func _apply_k4_profile() -> void:
 	Config.data.jelly_tap_common_push = true
 	Config.data.jelly_tap_lift_speed = 0.0
+	Config.data.jelly_tap_push_radius_factor = 0.0
+	Config.data.jelly_tap_push_speed = 0.0
 	Config.data.jelly_merge_wide_gap_min_level = 0
 	Config.data.spawn_count_max = 5
 	Config.data.blast_gravity_pause_time = 0.2

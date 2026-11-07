@@ -36,7 +36,11 @@ param(
 	[ValidateSet("On", "Off")]
 	[string]$JellyTapCommonPush = "On",
 	[ValidateRange(0.0, 10000.0)]
-	[double]$JellyTapLiftSpeed = 900.0,
+	[double]$JellyTapLiftSpeed = 0.0,
+	[ValidateRange(0.0, 1.0)]
+	[double]$JellyTapPushRadiusFactor = 0.5,
+	[ValidateRange(0.0, 10000.0)]
+	[double]$JellyTapPushSpeed = 1800.0,
 	[ValidateRange(0.0, 10.0)]
 	[double]$BlastGravityPauseTime = 0.2,
 	[ValidateRange(0.0, 10000.0)]
@@ -121,6 +125,8 @@ if (-not $AggregateOnly) {
 					"--jelly-blast-requires-same-level=$($JellyBlastRequiresSameLevel.ToLower())",
 					"--jelly-tap-common-push=$($JellyTapCommonPush.ToLower())",
 					"--jelly-tap-lift-speed=$($JellyTapLiftSpeed.ToString([Globalization.CultureInfo]::InvariantCulture))",
+					"--jelly-tap-push-radius-factor=$($JellyTapPushRadiusFactor.ToString([Globalization.CultureInfo]::InvariantCulture))",
+					"--jelly-tap-push-speed=$($JellyTapPushSpeed.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--blast-gravity-pause-time=$($BlastGravityPauseTime.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--blast-speed=$($BlastSpeed.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--blast-far-factor=$($BlastFarFactor.ToString([Globalization.CultureInfo]::InvariantCulture))",

@@ -421,6 +421,9 @@ func apply_blast_with_radius_factor(
 ) -> Array[Dictionary]:
 	var targets: Array[Dictionary] = []
 	var limited_radius: float = radius_factor * Config.data.board_size
+	var push_speed: float = Config.data.blast_speed
+	if apply_tap_lift and Config.data.jelly_tap_push_speed > 0.0:
+		push_speed = Config.data.jelly_tap_push_speed
 	for orb: Orb3D in get_orbs():
 		if orb == excluded_orb or orb.is_ghost or orb.is_waiting_at_entrance:
 			continue
@@ -437,7 +440,7 @@ func apply_blast_with_radius_factor(
 			if falloff_radius > 0.0
 			else 1.0
 		)
-		var speed: float = Config.data.blast_speed * lerpf(
+		var speed: float = push_speed * lerpf(
 			1.0,
 			Config.data.blast_far_factor,
 			distance_ratio

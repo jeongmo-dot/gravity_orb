@@ -166,7 +166,32 @@ $expectedFiles = @(
     "151_jelly_tap_lift_900_yellow_010.png",
     "152_jelly_tap_lift_900_yellow_020.png",
     "153_jelly_tap_lift_900_yellow_040.png",
-    "154_jelly_tap_lift_full.png"
+    "154_jelly_tap_lift_full.png",
+    "155_jelly_tap_push_l9_center_000.png",
+    "156_jelly_tap_push_l9_center_010.png",
+    "157_jelly_tap_push_l9_center_020.png",
+    "158_jelly_tap_push_l9_center_040.png",
+    "159_jelly_tap_push_l9_yellow_000.png",
+    "160_jelly_tap_push_l9_yellow_010.png",
+    "161_jelly_tap_push_l9_yellow_020.png",
+    "162_jelly_tap_push_l9_yellow_040.png",
+    "163_jelly_tap_push_t0_center_000.png",
+    "164_jelly_tap_push_t0_center_010.png",
+    "165_jelly_tap_push_t0_center_020.png",
+    "166_jelly_tap_push_t0_center_040.png",
+    "167_jelly_tap_push_t0_yellow_000.png",
+    "168_jelly_tap_push_t0_yellow_010.png",
+    "169_jelly_tap_push_t0_yellow_020.png",
+    "170_jelly_tap_push_t0_yellow_040.png",
+    "171_jelly_tap_push_t3_center_000.png",
+    "172_jelly_tap_push_t3_center_010.png",
+    "173_jelly_tap_push_t3_center_020.png",
+    "174_jelly_tap_push_t3_center_040.png",
+    "175_jelly_tap_push_t3_yellow_000.png",
+    "176_jelly_tap_push_t3_yellow_010.png",
+    "177_jelly_tap_push_t3_yellow_020.png",
+    "178_jelly_tap_push_t3_yellow_040.png",
+    "179_jelly_tap_push_full.png"
 )
 
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {

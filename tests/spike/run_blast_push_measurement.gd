@@ -2,7 +2,7 @@ extends Node
 
 const BOARD_SCENE: PackedScene = preload("res://scenes/Board3D.tscn")
 const RESOLVER_SCRIPT: Script = preload("res://scripts/core/CollisionResolver.gd")
-const OUTPUT_PATH: String = "res://artifacts/measurements/blast_push_k0_k4_lift.json"
+const OUTPUT_PATH: String = "res://artifacts/measurements/blast_push_tap_wide.json"
 const TICKS_PER_SECOND: int = 120
 const SAMPLE_FRAMES: Dictionary = {12: "0.1", 24: "0.2", 48: "0.4", 96: "0.8"}
 const PROFILES: Array[Dictionary] = [
@@ -17,6 +17,14 @@ const LIFT_PROFILES: Array[Dictionary] = [
 	{"name": "lift_600", "common": true, "speed": 1350.0, "far": 0.5, "pause": 0.2, "lift": 600.0},
 	{"name": "lift_900", "common": true, "speed": 1350.0, "far": 0.5, "pause": 0.2, "lift": 900.0},
 	{"name": "lift_1200", "common": true, "speed": 1350.0, "far": 0.5, "pause": 0.2, "lift": 1200.0},
+]
+const TAP_PUSH_PROFILES: Array[Dictionary] = [
+	{"name": "L9", "common": true, "speed": 1350.0, "far": 0.5, "pause": 0.2, "lift": 900.0, "tap_radius": 0.0, "tap_speed": 0.0},
+	{"name": "T0", "common": true, "speed": 1350.0, "far": 0.5, "pause": 0.2, "lift": 0.0, "tap_radius": 0.0, "tap_speed": 0.0},
+	{"name": "T1", "common": true, "speed": 1350.0, "far": 0.5, "pause": 0.2, "lift": 0.0, "tap_radius": 0.5, "tap_speed": 0.0},
+	{"name": "T2", "common": true, "speed": 1350.0, "far": 0.5, "pause": 0.2, "lift": 0.0, "tap_radius": 0.0, "tap_speed": 1800.0},
+	{"name": "T3", "common": true, "speed": 1350.0, "far": 0.5, "pause": 0.2, "lift": 0.0, "tap_radius": 0.5, "tap_speed": 1800.0},
+	{"name": "T4", "common": true, "speed": 1350.0, "far": 0.5, "pause": 0.2, "lift": 0.0, "tap_radius": 0.7, "tap_speed": 1800.0},
 ]
 
 var _output_path: String = OUTPUT_PATH
@@ -39,6 +47,7 @@ func _run() -> void:
 		"physics_ticks_per_second": TICKS_PER_SECOND,
 		"profiles": {},
 		"lift_profiles": {},
+		"tap_push_profiles": {},
 	}
 	for profile: Dictionary in PROFILES:
 		_apply_profile(profile)
@@ -66,6 +75,18 @@ func _run() -> void:
 					"floor_tap", OrbTypes.OrbColor.YELLOW
 				),
 			},
+		}
+	for profile: Dictionary in TAP_PUSH_PROFILES:
+		_apply_profile(profile)
+		var scenes: Dictionary = {
+			"center_tap_yellow": await _measure_scene("tap", OrbTypes.OrbColor.YELLOW),
+			"yellow_floor_pile_tap": await _measure_scene("floor_tap", OrbTypes.OrbColor.YELLOW),
+		}
+		if str(profile["name"]) == "T3":
+			scenes["center_big_blast"] = await _measure_scene("big", -1)
+		(report["tap_push_profiles"] as Dictionary)[str(profile["name"])] = {
+			"values": profile.duplicate(true),
+			"scenes": scenes,
 		}
 	_restore_config(snapshot)
 	_write_report(report)
@@ -106,7 +127,7 @@ func _measure_scene(kind: String, tap_color: int) -> Dictionary:
 		if not reactions.is_empty():
 			trigger_rows = reactions[-1].get("blast_targets", []) as Array[Dictionary]
 	else:
-		var source: Orb3D = board.spawn_orb(tap_color, 10, origin)
+		var source: Orb3D = board.spawn_orb(tap_color, 8, origin)
 		resolver.apply_jelly_tap_blast(source)
 		if not reactions.is_empty():
 			trigger_rows = reactions[-1].get("blast_targets", []) as Array[Dictionary]
@@ -170,7 +191,7 @@ func _spawn_center_field(
 	level: int
 ) -> Array[Orb3D]:
 	var result: Array[Orb3D] = []
-	for row: int in range(8):
+	for row: int in range(10):
 		for column: int in range(10):
 			var position: Vector2 = Vector2(
 				(float(column) - 4.5) * 84.0,
@@ -185,7 +206,7 @@ func _spawn_center_field(
 func _spawn_floor_pile(board: Board3D, excluded_color: int) -> Array[Orb3D]:
 	var result: Array[Orb3D] = []
 	var floor_y: float = board.half_size() - 52.0
-	for row: int in range(8):
+	for row: int in range(10):
 		for column: int in range(10):
 			var position: Vector2 = Vector2(
 				(float(column) - 4.5) * 84.0 + (42.0 if row % 2 == 1 else 0.0),
@@ -215,6 +236,7 @@ func _displacement_sample(
 	var outward: Array[float] = []
 	var opposite_gravity: Array[float] = []
 	var outward_fifty: int = 0
+	var outward_hundred: int = 0
 	var opposite_gravity_fifty: int = 0
 	var opposite_direction: Vector2 = -gravity_direction.normalized()
 	for orb: Orb3D in board.get_orbs():
@@ -230,6 +252,8 @@ func _displacement_sample(
 		opposite_gravity.append(lift_displacement)
 		if outward_displacement >= 50.0:
 			outward_fifty += 1
+		if outward_displacement >= 100.0:
+			outward_hundred += 1
 		if lift_displacement >= 50.0:
 			opposite_gravity_fifty += 1
 	outward.sort()
@@ -240,6 +264,9 @@ func _displacement_sample(
 		"outward_p90_px": _percentile(outward, 0.9),
 		"at_least_50_px_ratio": (
 			float(outward_fifty) / float(outward.size()) if not outward.is_empty() else 0.0
+		),
+		"at_least_100_px_ratio": (
+			float(outward_hundred) / float(outward.size()) if not outward.is_empty() else 0.0
 		),
 		"opposite_gravity_median_px": _percentile(opposite_gravity, 0.5),
 		"opposite_gravity_p90_px": _percentile(opposite_gravity, 0.9),
@@ -298,6 +325,8 @@ func _snapshot_config() -> Dictionary:
 		"far": Config.data.blast_far_factor,
 		"pause": Config.data.blast_gravity_pause_time,
 		"lift": Config.data.jelly_tap_lift_speed,
+		"tap_radius": Config.data.jelly_tap_push_radius_factor,
+		"tap_speed": Config.data.jelly_tap_push_speed,
 	}
 
 
@@ -309,6 +338,8 @@ func _restore_config(snapshot: Dictionary) -> void:
 	Config.data.blast_far_factor = float(snapshot["far"])
 	Config.data.blast_gravity_pause_time = float(snapshot["pause"])
 	Config.data.jelly_tap_lift_speed = float(snapshot["lift"])
+	Config.data.jelly_tap_push_radius_factor = float(snapshot["tap_radius"])
+	Config.data.jelly_tap_push_speed = float(snapshot["tap_speed"])
 
 
 func _apply_profile(profile: Dictionary) -> void:
@@ -317,6 +348,8 @@ func _apply_profile(profile: Dictionary) -> void:
 	Config.data.blast_far_factor = float(profile["far"])
 	Config.data.blast_gravity_pause_time = float(profile["pause"])
 	Config.data.jelly_tap_lift_speed = float(profile["lift"])
+	Config.data.jelly_tap_push_radius_factor = float(profile.get("tap_radius", 0.0))
+	Config.data.jelly_tap_push_speed = float(profile.get("tap_speed", 0.0))
 
 
 func _write_report(report: Dictionary) -> void:

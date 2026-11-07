@@ -33,7 +33,11 @@ param(
 	[ValidateSet("On", "Off")]
 	[string]$JellyTapCommonPush = "On",
 	[ValidateRange(0.0, 10000.0)]
-	[double]$JellyTapLiftSpeed = 900.0,
+	[double]$JellyTapLiftSpeed = 0.0,
+	[ValidateRange(0.0, 1.0)]
+	[double]$JellyTapPushRadiusFactor = 0.5,
+	[ValidateRange(0.0, 10000.0)]
+	[double]$JellyTapPushSpeed = 1800.0,
 	[ValidateRange(0.0, 10.0)]
 	[double]$BlastGravityPauseTime = 0.2,
 	[ValidateRange(0.0, 10000.0)]
@@ -86,6 +90,8 @@ $physicsArguments += "--jelly-tap-effect-modes=$($JellyTapEffectModes.ToLower())
 $physicsArguments += "--jelly-blast-requires-same-level=$($JellyBlastRequiresSameLevel.ToLower())"
 $physicsArguments += "--jelly-tap-common-push=$($JellyTapCommonPush.ToLower())"
 $physicsArguments += "--jelly-tap-lift-speed=$($JellyTapLiftSpeed.ToString($culture))"
+$physicsArguments += "--jelly-tap-push-radius-factor=$($JellyTapPushRadiusFactor.ToString($culture))"
+$physicsArguments += "--jelly-tap-push-speed=$($JellyTapPushSpeed.ToString($culture))"
 $physicsArguments += "--blast-gravity-pause-time=$($BlastGravityPauseTime.ToString($culture))"
 $physicsArguments += "--blast-speed=$($BlastSpeed.ToString($culture))"
 $physicsArguments += "--blast-far-factor=$($BlastFarFactor.ToString($culture))"
@@ -404,6 +410,8 @@ $summary = [ordered]@{
 	jelly_blast_requires_same_level = $JellyBlastRequiresSameLevel -eq "On"
 	jelly_tap_common_push = $JellyTapCommonPush -eq "On"
 	jelly_tap_lift_speed = $JellyTapLiftSpeed
+	jelly_tap_push_radius_factor = $JellyTapPushRadiusFactor
+	jelly_tap_push_speed = $JellyTapPushSpeed
 	blast_gravity_pause_time = $BlastGravityPauseTime
 	blast_speed = $BlastSpeed
 	blast_far_factor = $BlastFarFactor
