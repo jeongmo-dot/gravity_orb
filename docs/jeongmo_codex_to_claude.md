@@ -42,8 +42,8 @@
 - **경고 1: C4E 자동 D-save 평균은 `367.50`턴으로 C6 `127.85`턴보다 `+187.45%` 길어, 명세 경고선 `30%`를 넘었다.** C4E는 16/20판 게임오버, 4/20판 600턴 미완료였다
 - **경고 2: C4E L-합체 D-all은 `20/20`판 모두 600턴 미완료로, 명세 경고선 `3판`을 넘었다.** 같은 조건 C6은 20/20판 게임오버·평균 `168.75`턴이었다
 - 휴식 램프 경계 불일치 경고는 없음: 29턴 초록 휴식 전후 NEXT `분홍/분홍/초록`, THEN `파랑/노랑/노랑/노랑`이 그대로였고, 다음 입력(31턴)이 휴식 전 NEXT 세 공을 정확히 생성했다
-- 상태: 구현·자동 검증·400게임 판 균형·두 비율 실제 창 캡처·Debug 빌드 완료. 0.16.7 Release와 PR은 아래 후속 검증 뒤 갱신 예정
-- 브랜치 / PR: `four-colors` / 생성 전
+- 상태: 완료 — 구현·자동 검증·400게임 판 균형·두 비율 실제 창 캡처·0.16.7 Release·PR까지 마쳤다. 합격·병합 판정은 Claude/사용자 대기
+- 브랜치 / PR: `four-colors` / https://github.com/jeongmo-dot/gravity_orb/pull/139
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/ui/Hud.gd`, `project.godot`, `tests/{capture_screens.ps1,run_jelly_physics_autoplay.ps1,test_callouts.gd,test_config.gd,test_jelly_regression.gd,test_jolt_3d.gd,test_spawner.gd}`, `tests/spike/{capture_screens.gd,run_jolt_3d_measurement.gd}`, `tests/tools/{run_four_color_balance.ps1,run_jelly_measurement.ps1}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `turn_color_unlock_turns=[]`: 기본 생성은 1~600턴 모두 시작 네 색만 사용하고, 과거 명시 설정 `[30,60]`은 예전 해시에서 유지 — 자동 (`test_config`, `test_spawner`, 회귀 해시)
@@ -54,7 +54,7 @@
   - [x] 예전 JELLY 해시 묶음(T3 포함) 유지, 새 CLASSIC 생성 진행·C4E 해시 고정 — 자동 (`test_jelly_regression`, `test_spawner`)
   - [x] 초록 휴식·노랑 자석 4프레임·네 색 안내·전체 장면을 두 비율로 생성하고 직접 확인. 과거 보라·주황·새 색 고정 장면 유지 — 실제 창 관측
   - [x] Godot 4.8 Standard import·전체 테스트·기본/blitz 스모크·Debug 빌드 — 자동
-  - [ ] 0.16.7 Release·내보낸 스모크·이전 빌드/저장 보존·PR — 구현 커밋 뒤 실행
+  - [x] 0.16.7 Release·내보낸 스모크·이전 빌드/저장 보존·PR — 자동 + 파일 해시 대조
 
 - 판 균형 (`종료/미완료`; 턴 평균/중앙값(범위); 터치 합계 `분홍/파랑/초록/노랑/보라/주황`; 각 행 20게임):
 
@@ -91,6 +91,12 @@
   - `tests/run_tests.ps1` → 일반 `343/343`, 장기 `4/4`, 성능 `5/5`; 각각 새 프로세스, 전체 `81.686초`, 종료 코드 0
   - 기본/`--mode=blitz` 300프레임 smoke → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·`ERROR:` 0건
   - `tools/build_windows.ps1 -Debug` → `WINDOWS_BUILD_RESULT version=0.16.7 mode=Debug exit=0 bytes=104998064 preserved=39`
+  - 깨끗한 트리 첫 Release → `WINDOWS_BUILD_RESULT version=0.16.7 mode=Release exit=0 bytes=111128240 preserved=19`; 같은 명령 재실행은 종료 코드 `1`, `Release artifact already exists`, exe 해시 불변
+  - 회신 최종 커밋 뒤 `-ReplaceSameVersion` 최종 Release: exe `111,128,240`바이트, SHA-256 `b5252ac027cc26a3778462cdfc4959b31c777d6acbd830f0bb27e5ab13481f2f`; console `50,176`바이트, SHA-256 `43a28d53e43e06bbf9c340f3ba28bc4cbfe6364a16206c56cbea63d3b0d7ca81`; sidecar PCK `0`개
+  - 최종 `_BUILD.txt`: `Version: 0.16.7`, `Mode: Release`, `Engine: 4.8.dev3.official.51105ccbe`, Commit과 브랜치 끝 일치
+  - 내보낸 console 기본/`--mode=jelly` 300프레임 스모크 각각 종료 코드 0, `SCRIPT ERROR|Parse Error|ERROR:` 0건
+  - 묶음 금지 패턴 `res://tests/`, `res://artifacts/`, `res://docs/`, `run_tests.gd`, `capture_screens.gd`, 설계·두 인박스 문서 각 0건; 양성 앵커 `OrbitStage 8 + JellyOrbArt 6 + StartScreen 8 + Main3D 5 = 27`건
+  - 사용자 `save.cfg` 2,101바이트, SHA-256 `2243b278dbf10afa50c73d54baeee316d4560658de75ac45658e620c6272db3a` 불변. 0.16.1~0.16.6 파일 19개의 이름·크기·SHA-256 매니페스트 `1f524b96d1d9900d921f87226b8f302447e6d7e1d3144c9bae216fc8fe2ce11f` 불변
   - PowerShell 변경 스크립트 4개 구문 분석 오류 0건. `git diff --check` 오류 0건
   - Input 검색은 `InputRouter.gd`와 허용 예외 `Haptics.gd`뿐. RNG 검색은 `Spawner.gd`와 기존 `ColorEffectVisual.gd` 전용 시드 RNG뿐이며 이번 diff 새 위반 0건
 - 수동 확인 절차:
@@ -99,7 +105,7 @@
   3. 29턴에 초록 L8을 터치 → TURN은 30으로 늘지만 NEXT/THEN은 그대로이고, 다음 스와이프에서 휴식 전 NEXT가 실제 생성되는지 본다
   4. 각 색 효과 최초 안내 → `분홍 L8: 터치하면 폭탄`·`파랑 … 지진`·`초록 … 휴식`·`노랑 … 자석`인지 본다
 - 결정 사항: 명세 수치 외 게임·물리·연출 값은 바꾸지 않았다. 과거 해시 테스트와 `120~128` 고정 캡처만 명시적으로 `[30,60]`·예전 효과 배열을 주입해 새 기본값과 분리했다. 측정 원본은 `artifacts/measurements/four_color_balance.json`이며 git에는 포함하지 않는다
-- 남은 것 · 질문: 구현·검증 잔여는 Release·내보낸 검증·PR. 밸런스 경고 두 건의 합격/값 변경 판정은 Claude/사용자 몫
+- 남은 것 · 질문: 구현·검증 잔여 없음. 밸런스 경고 두 건의 합격/값 변경과 병합 판정은 Claude/사용자 몫
 
 ### [2026-11-07] 대상 #138 — 소폭발은 사방으로 크게
 - **경고: T3 중앙 배치의 최대 벽 관통이 `34.0px`로 명세 경고선 `30px`를 넘었다.** 이 장면은 시작부터 벽에 걸친 100개 더미를 쓰며 판 밖 이탈은 `0`회였다. 그 밖의 앞 경고 조건은 없음: T3 중앙 노랑 0.4초 바깥 이동 중앙값 `40.4px` < 대폭발 `158.8px`; 자동 D-save 평균 `127.85`턴은 S4-G1 `124.85` 대비 `+2.4%`; L-합체 D-all 미완료 `0/20`판
