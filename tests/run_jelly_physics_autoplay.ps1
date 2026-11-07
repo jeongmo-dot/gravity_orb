@@ -26,8 +26,12 @@ param(
 	[int]$JellyTapCleanMaxLevel = 2,
 	[ValidateRange(0, 100)]
 	[int]$JellyTapGrowMinClean = 3,
-	[ValidateSet("Push", "None", "Color")]
+	[ValidateSet("Push", "None", "Color", "Four")]
 	[string]$JellyTapEffectModes = "Color",
+	[ValidateRange(1, 6)]
+	[int]$TurnStartColors = 4,
+	[ValidateSet("Default", "None", "30,60")]
+	[string]$TurnColorUnlockTurns = "Default",
 	[ValidateSet("On", "Off")]
 	[string]$JellyBlastRequiresSameLevel = "Off",
 	[ValidateSet("On", "Off")]
@@ -87,6 +91,10 @@ $physicsArguments += "--jelly-tap-blast-uses-turn=$($JellyTapBlastUsesTurn.ToLow
 $physicsArguments += "--jelly-tap-clean-max-level=$JellyTapCleanMaxLevel"
 $physicsArguments += "--jelly-tap-grow-min-clean=$JellyTapGrowMinClean"
 $physicsArguments += "--jelly-tap-effect-modes=$($JellyTapEffectModes.ToLower())"
+$physicsArguments += "--turn-start-colors=$TurnStartColors"
+if ($TurnColorUnlockTurns -ne "Default") {
+	$physicsArguments += if ($TurnColorUnlockTurns -eq "None") { "--turn-color-unlock-turns=" } else { "--turn-color-unlock-turns=$TurnColorUnlockTurns" }
+}
 $physicsArguments += "--jelly-blast-requires-same-level=$($JellyBlastRequiresSameLevel.ToLower())"
 $physicsArguments += "--jelly-tap-common-push=$($JellyTapCommonPush.ToLower())"
 $physicsArguments += "--jelly-tap-lift-speed=$($JellyTapLiftSpeed.ToString($culture))"
@@ -194,6 +202,7 @@ $tapBlastCountByColor = @{}
 $tapCleanCountByColor = @{}
 $tapCleanCountTotal = 0
 $tapCleanCountMax = 0
+$tapRestTurnCount = 0
 $purpleSameTurnBlastCount = 0
 $bigReactionWindows = 0
 $bigReactionMerges = 0
@@ -251,6 +260,7 @@ foreach ($task in $tasks) {
 	$totalTapBlastCount += [int]$seedRow.tap_blast_count
 	$tapCleanCountTotal += [int]$seedRow.tap_clean_count_total
 	$tapCleanCountMax = [Math]::Max($tapCleanCountMax, [int]$seedRow.tap_clean_count_max)
+	$tapRestTurnCount += [int]$seedRow.tap_rest_turn_count
 	$purpleSameTurnBlastCount += [int]$seedRow.purple_same_turn_blast_count
 	$bigReactionWindows += [int]$seedRow.reactions_within_one_second_after_blast.big.windows
 	$bigReactionMerges += [int]$seedRow.reactions_within_one_second_after_blast.big.merges
@@ -403,6 +413,8 @@ $summary = [ordered]@{
 	jelly_tap_clean_max_level = $JellyTapCleanMaxLevel
 	jelly_tap_grow_min_clean = $JellyTapGrowMinClean
 	jelly_tap_effect_modes = $JellyTapEffectModes.ToLower()
+	turn_start_colors = $TurnStartColors
+	turn_color_unlock_turns = $TurnColorUnlockTurns.ToLower()
 	jelly_merge_duration = $JellyMergeDuration
 	jelly_merge_level_gap = $JellyMergeLevelGap
 	jelly_merge_wide_gap_min_level = $JellyMergeWideGapMinLevel
@@ -485,6 +497,7 @@ $summary = [ordered]@{
 	tap_clean_count_by_color = $tapCleanCountByColor
 	average_clean_count_per_tap = if ($totalTapBlastCount -gt 0) { [double]$tapCleanCountTotal / $totalTapBlastCount } else { 0.0 }
 	maximum_clean_count_per_tap = $tapCleanCountMax
+	rest_skipped_turns = $tapRestTurnCount
 	purple_same_turn_blast_count = $purpleSameTurnBlastCount
 	reactions_within_one_second_after_blast = [ordered]@{
 		big = [ordered]@{ windows = $bigReactionWindows; merges = $bigReactionMerges; blasts = $bigReactionBlasts }

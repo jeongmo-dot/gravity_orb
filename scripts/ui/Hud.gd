@@ -37,16 +37,21 @@ const PLANET_NAMES: Dictionary = {
 	OrbTypes.OrbColor.CYAN: "수성",
 }
 const JELLY_NAMES: Dictionary = {
+	OrbTypes.OrbColor.RED: "분홍",
+	OrbTypes.OrbColor.BLUE: "파랑",
+	OrbTypes.OrbColor.GREEN: "초록",
+	OrbTypes.OrbColor.YELLOW: "노랑",
 	OrbTypes.OrbColor.PURPLE: "보라",
 	OrbTypes.OrbColor.CYAN: "주황",
 }
-const JELLY_TAP_EFFECT_CALLOUTS: Dictionary = {
-	OrbTypes.OrbColor.RED: "분홍 L8: 터치하면 폭탄",
-	OrbTypes.OrbColor.BLUE: "파랑 L8: 터치하면 지진",
-	OrbTypes.OrbColor.GREEN: "초록 L8: 작은 초록 %d개면 성장",
-	OrbTypes.OrbColor.YELLOW: "노랑 L8: 터치하면 보너스",
-	OrbTypes.OrbColor.PURPLE: "보라 L8: 터치하면 자석",
-	OrbTypes.OrbColor.CYAN: "주황 L8: 터치하면 휴식",
+const JELLY_TAP_EFFECT_NAMES: Dictionary = {
+	GameConfig.JellyTapEffect.PUSH: "청소",
+	GameConfig.JellyTapEffect.NONE: "청소",
+	GameConfig.JellyTapEffect.BOMB: "폭탄",
+	GameConfig.JellyTapEffect.QUAKE: "지진",
+	GameConfig.JellyTapEffect.BONUS: "보너스",
+	GameConfig.JellyTapEffect.MAGNET: "자석",
+	GameConfig.JellyTapEffect.REST: "휴식",
 }
 const HUD_ACCENT_COLOR: Color = Color("#BFE9FF")
 const HUD_AMBER_COLOR: Color = Color("#FFB020")
@@ -1412,7 +1417,7 @@ func _show_planet_unlock(color_index: int) -> void:
 
 
 func _on_jelly_tap_effect_unlocked(color_index: int) -> void:
-	if not JELLY_TAP_EFFECT_CALLOUTS.has(color_index):
+	if not JELLY_NAMES.has(color_index):
 		return
 	_jelly_tap_effect_history.append(color_index)
 	if not Config.data.fx_callouts_enabled:
@@ -1432,6 +1437,23 @@ func _show_next_jelly_tap_effect() -> void:
 	_show_jelly_tap_effect(_pending_jelly_tap_effects.pop_front())
 
 
+func _jelly_tap_effect_callout_text(color_index: int) -> String:
+	var color_name: String = str(JELLY_NAMES.get(color_index, "젤리"))
+	var minimum_level: int = Config.data.jelly_tap_blast_min_level
+	var tap_effect: GameConfig.JellyTapEffect = Config.data.jelly_tap_effect_for_color(
+		color_index
+	)
+	if tap_effect == GameConfig.JellyTapEffect.GROW:
+		return "%s L%d: 작은 %s %d개면 성장" % [
+			color_name,
+			minimum_level,
+			color_name,
+			Config.data.jelly_tap_grow_min_clean,
+		]
+	var effect_name: String = str(JELLY_TAP_EFFECT_NAMES.get(tap_effect, "청소"))
+	return "%s L%d: 터치하면 %s" % [color_name, minimum_level, effect_name]
+
+
 func _show_jelly_tap_effect(color_index: int) -> void:
 	_apply_responsive_layout()
 	_showing_jelly_tap_effect = true
@@ -1439,9 +1461,7 @@ func _show_jelly_tap_effect(color_index: int) -> void:
 		_callout_tween.kill()
 	_stop_sparkles(_callout_sparkles)
 	_planet_callout_visual.visible = false
-	var callout_text: String = str(JELLY_TAP_EFFECT_CALLOUTS[color_index])
-	if color_index == OrbTypes.OrbColor.GREEN:
-		callout_text = callout_text % Config.data.jelly_tap_grow_min_clean
+	var callout_text: String = _jelly_tap_effect_callout_text(color_index)
 	_callout_label.text = callout_text
 	_callout_label.add_theme_color_override(
 		"font_color",

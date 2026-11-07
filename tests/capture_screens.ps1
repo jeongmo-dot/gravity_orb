@@ -191,7 +191,18 @@ $expectedFiles = @(
     "176_jelly_tap_push_t3_yellow_010.png",
     "177_jelly_tap_push_t3_yellow_020.png",
     "178_jelly_tap_push_t3_yellow_040.png",
-    "179_jelly_tap_push_full.png"
+    "179_jelly_tap_push_full.png",
+    "180_jelly_four_green_rest_before.png",
+    "181_jelly_four_green_rest_after.png",
+    "182_jelly_four_yellow_magnet_000.png",
+    "183_jelly_four_yellow_magnet_020.png",
+    "184_jelly_four_yellow_magnet_040.png",
+    "185_jelly_four_yellow_magnet_070.png",
+    "186_jelly_four_pink_callout.png",
+    "187_jelly_four_blue_callout.png",
+    "188_jelly_four_green_callout.png",
+    "189_jelly_four_yellow_callout.png",
+    "190_jelly_four_effects_full.png"
 )
 
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {

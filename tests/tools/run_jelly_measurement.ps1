@@ -29,8 +29,12 @@ param(
 	[int]$JellyTapCleanMaxLevel = 2,
 	[ValidateRange(0, 100)]
 	[int]$JellyTapGrowMinClean = 3,
-	[ValidateSet("Push", "None", "Color")]
+	[ValidateSet("Push", "None", "Color", "Four")]
 	[string]$JellyTapEffectModes = "Color",
+	[ValidateRange(1, 6)]
+	[int]$TurnStartColors = 4,
+	[ValidateSet("Default", "None", "30,60")]
+	[string]$TurnColorUnlockTurns = "Default",
 	[ValidateSet("On", "Off")]
 	[string]$JellyBlastRequiresSameLevel = "Off",
 	[ValidateSet("On", "Off")]
@@ -122,6 +126,8 @@ if (-not $AggregateOnly) {
 					"--jelly-tap-clean-max-level=$JellyTapCleanMaxLevel",
 					"--jelly-tap-grow-min-clean=$JellyTapGrowMinClean",
 					"--jelly-tap-effect-modes=$($JellyTapEffectModes.ToLower())",
+					"--turn-start-colors=$TurnStartColors",
+					$(if ($TurnColorUnlockTurns -eq "Default") { "" } elseif ($TurnColorUnlockTurns -eq "None") { "--turn-color-unlock-turns=" } else { "--turn-color-unlock-turns=$TurnColorUnlockTurns" }),
 					"--jelly-blast-requires-same-level=$($JellyBlastRequiresSameLevel.ToLower())",
 					"--jelly-tap-common-push=$($JellyTapCommonPush.ToLower())",
 					"--jelly-tap-lift-speed=$($JellyTapLiftSpeed.ToString([Globalization.CultureInfo]::InvariantCulture))",
@@ -148,7 +154,8 @@ if (-not $AggregateOnly) {
             $task = $tasks[$nextTaskIndex]
             $nextTaskIndex += 1
             Remove-Item -LiteralPath $task.Output, $task.Stdout, $task.Stderr -Force -ErrorAction SilentlyContinue
-            $process = Start-Process -FilePath $GodotPath -ArgumentList $task.Arguments -WindowStyle Hidden `
+            $processArguments = @($task.Arguments | Where-Object { -not [string]::IsNullOrEmpty($_) })
+            $process = Start-Process -FilePath $GodotPath -ArgumentList $processArguments -WindowStyle Hidden `
                 -PassThru -RedirectStandardOutput $task.Stdout -RedirectStandardError $task.Stderr
             $running += [pscustomobject]@{ Task = $task; Process = $process }
             Write-Output "JELLY_MEASUREMENT_START name=$($task.Name) pid=$($process.Id)"
@@ -260,6 +267,7 @@ function Get-Summary($Rows) {
 	$reactionScoreTotal = [double](($reactionScoreTotals.Values | Measure-Object -Sum).Sum)
 	$tapBlastTotal = [double](($Rows | Measure-Object -Property tap_blast_count -Sum).Sum)
 	$tapCleanTotal = [double](($Rows | Measure-Object -Property tap_clean_count_total -Sum).Sum)
+	$tapRestTurnTotal = [double](($Rows | Measure-Object -Property tap_rest_turn_count -Sum).Sum)
 	$bigReactionWindows = [double](($Rows | ForEach-Object { $_.reactions_within_one_second_after_blast.big.windows } | Measure-Object -Sum).Sum)
 	$bigReactionMerges = [double](($Rows | ForEach-Object { $_.reactions_within_one_second_after_blast.big.merges } | Measure-Object -Sum).Sum)
 	$bigReactionBlasts = [double](($Rows | ForEach-Object { $_.reactions_within_one_second_after_blast.big.blasts } | Measure-Object -Sum).Sum)
@@ -308,6 +316,7 @@ function Get-Summary($Rows) {
 		tap_clean_count_by_color = $tapCleanCountByColor
 		average_clean_count_per_tap = Get-Ratio $tapCleanTotal $tapBlastTotal
 		maximum_clean_count_per_tap = ($Rows | Measure-Object -Property tap_clean_count_max -Maximum).Maximum
+		rest_skipped_turns = [int]$tapRestTurnTotal
 		purple_same_turn_blast_count = [int](($Rows | Measure-Object -Property purple_same_turn_blast_count -Sum).Sum)
 		reactions_within_one_second_after_blast = [ordered]@{
 			big = [ordered]@{ windows = [int]$bigReactionWindows; merges = [int]$bigReactionMerges; blasts = [int]$bigReactionBlasts }
@@ -374,6 +383,8 @@ $report = [ordered]@{
 	jelly_tap_clean_max_level = $JellyTapCleanMaxLevel
 	jelly_tap_grow_min_clean = $JellyTapGrowMinClean
 	jelly_tap_effect_modes = $JellyTapEffectModes.ToLower()
+	turn_start_colors = $TurnStartColors
+	turn_color_unlock_turns = $TurnColorUnlockTurns.ToLower()
 	jelly_merge_level_gap = $JellyMergeLevelGap
 	jelly_merge_wide_gap_min_level = $JellyMergeWideGapMinLevel
 	jelly_blast_min_level = $JellyBlastMinLevel

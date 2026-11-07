@@ -162,6 +162,17 @@ const CAPTURE_FILES: Array[String] = [
 	"152_jelly_tap_lift_900_yellow_020.png",
 	"153_jelly_tap_lift_900_yellow_040.png",
 	"154_jelly_tap_lift_full.png",
+	"180_jelly_four_green_rest_before.png",
+	"181_jelly_four_green_rest_after.png",
+	"182_jelly_four_yellow_magnet_000.png",
+	"183_jelly_four_yellow_magnet_020.png",
+	"184_jelly_four_yellow_magnet_040.png",
+	"185_jelly_four_yellow_magnet_070.png",
+	"186_jelly_four_pink_callout.png",
+	"187_jelly_four_blue_callout.png",
+	"188_jelly_four_green_callout.png",
+	"189_jelly_four_yellow_callout.png",
+	"190_jelly_four_effects_full.png",
 ]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
@@ -680,10 +691,107 @@ func _capture_jelly_tap_effect_scenes(
 		)
 		orb.disable_physics()
 	await _capture("128_jelly_tap_effects_full.png")
+	await _capture_four_color_effect_scenes(main, board, director, resolver, spawner, hud)
 	await _capture_blast_push_evidence(main, board, resolver)
 	await _capture_tap_lift_evidence(board, resolver)
 	await _capture_tap_push_evidence(main, board, resolver)
 	Config.data.fx_hitstop_enabled = original_hitstop_enabled
+
+
+func _capture_four_color_effect_scenes(
+	main: Main,
+	board: Board3D,
+	director: FeedbackDirector,
+	resolver: CollisionResolver,
+	spawner: Spawner,
+	hud: Hud
+) -> void:
+	Config.data.turn_color_unlock_turns.clear()
+	Config.data.jelly_tap_effect_modes = PackedInt32Array([2, 3, 7, 6, 1, 1])
+	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
+	resolver.cancel_active_jelly_merges()
+	board.clear()
+	director.clear_effects()
+	board.set_gravity(Vector2i.DOWN)
+	manager.gravity = Vector2i.DOWN
+	manager.turn_index = 29
+	manager.turn_combo = 0
+	manager.final_move_pending = false
+	manager.final_move_active = false
+	manager.state = TurnManager.State.WAITING_INPUT
+	manager.set_physics_process(false)
+	spawner.init_rng(1390)
+	spawner.sync_next_batch_size(30)
+	InputRouter.set_locked(false)
+	var rest_source: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.GREEN, 8, Vector2(0.0, 120.0)
+	)
+	rest_source.disable_physics()
+	for index: int in range(3):
+		var rest_clean: Orb3D = board.spawn_orb(
+			OrbTypes.OrbColor.GREEN,
+			1 + index % 2,
+			Vector2(-230.0 + float(index) * 230.0, -120.0)
+		)
+		rest_clean.disable_physics()
+	await get_tree().process_frame
+	await _capture("180_jelly_four_green_rest_before.png")
+	if not manager.try_tap_blast_orb(rest_source):
+		_fail("four-color green REST capture could not start")
+	manager.set_physics_process(false)
+	await get_tree().process_frame
+	await _capture("181_jelly_four_green_rest_after.png")
+
+	resolver.cancel_active_jelly_merges()
+	board.clear()
+	director.clear_effects()
+	board.set_gravity(Vector2i.DOWN)
+	var magnet_source: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.YELLOW, 8, Vector2.ZERO
+	)
+	for index: int in range(8):
+		var angle: float = TAU * float(index) / 8.0
+		board.spawn_orb(
+			index % 4,
+			4 + index % 3,
+			Vector2.from_angle(angle) * (230.0 + float(index % 2) * 70.0)
+		)
+	await get_tree().process_frame
+	await _capture("182_jelly_four_yellow_magnet_000.png")
+	if not resolver.apply_jelly_tap_blast(magnet_source):
+		_fail("four-color yellow MAGNET capture could not start")
+	await _wait_physics_seconds(0.2)
+	await _capture("183_jelly_four_yellow_magnet_020.png")
+	await _wait_physics_seconds(0.2)
+	await _capture("184_jelly_four_yellow_magnet_040.png")
+	await _wait_physics_seconds(0.3)
+	await _capture("185_jelly_four_yellow_magnet_070.png")
+
+	resolver.cancel_active_jelly_merges()
+	board.clear()
+	director.clear_effects()
+	for color_index: int in range(4):
+		var column: int = color_index % 2
+		var row: int = color_index / 2
+		var orb: Orb3D = board.spawn_orb(
+			color_index,
+			8,
+			Vector2(-180.0 + float(column) * 360.0, -180.0 + float(row) * 360.0)
+		)
+		orb.disable_physics()
+	var callout_files: Array[String] = [
+		"186_jelly_four_pink_callout.png",
+		"187_jelly_four_blue_callout.png",
+		"188_jelly_four_green_callout.png",
+		"189_jelly_four_yellow_callout.png",
+	]
+	for color_index: int in range(4):
+		hud._show_jelly_tap_effect(color_index)
+		if hud._callout_tween != null and hud._callout_tween.is_valid():
+			hud._callout_tween.kill()
+		await _capture(callout_files[color_index])
+		hud._hide_callout_label()
+	await _capture("190_jelly_four_effects_full.png")
 
 
 func _capture_blast_push_evidence(

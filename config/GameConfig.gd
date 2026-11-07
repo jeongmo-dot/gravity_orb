@@ -64,7 +64,7 @@ enum GameMode {
 @export var spawn_count_ramp_turns: int = 10
 @export var spawn_count_max: int = 4
 @export var turn_start_colors: int = 4
-@export var turn_color_unlock_turns: Array[int] = [30, 60]
+@export var turn_color_unlock_turns: Array[int] = []
 @export var spawn_position_mode: SpawnPositionMode = SpawnPositionMode.RANDOM
 @export var spawn_margin: float = 4.0
 @export var spawn_probe_step: float = 5.0
@@ -140,10 +140,10 @@ enum GameMode {
 	[
 		JellyTapEffect.BOMB,
 		JellyTapEffect.QUAKE,
-		JellyTapEffect.GROW,
-		JellyTapEffect.BONUS,
-		JellyTapEffect.MAGNET,
 		JellyTapEffect.REST,
+		JellyTapEffect.MAGNET,
+		JellyTapEffect.NONE,
+		JellyTapEffect.NONE,
 	]
 )
 @export var jelly_tap_quake_speed: float = 900.0

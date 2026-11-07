@@ -12,6 +12,7 @@ const EXPECTED_G1_DEFAULT_HASH: String = "d5175565a24fa4d0e00e1eb3ccbd5529a0c489
 const EXPECTED_K4_DEFAULT_HASH: String = "3e929d90b33f6617322e96a2f53e0e790a32c9c5c11f045e9d7fa05c3a88c42f"
 const EXPECTED_S4_G1_LIFT_DEFAULT_HASH: String = "bc5951c060d635cb6e43d72f4854afbf38ef6a48bea693e224e118677ca736b2"
 const EXPECTED_T3_DEFAULT_HASH: String = "7a20210c45a5e68cb8be6d4e2bc310eca31b3b450d20d0a9bf37a38f892b9c63"
+const EXPECTED_C4E_DEFAULT_HASH: String = "4a0c467d83177f3e0fb6acd302529fea572083896cac45e5885f8e90160438f6"
 
 
 func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
@@ -24,11 +25,19 @@ func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.sfx_enabled = false
 	Config.data.jelly_merge_duration = 0.3
+	_apply_legacy_color_profile()
 	var default_visible_result: Dictionary = await _run_rule_path(true)
 	var default_hidden_result: Dictionary = await _run_rule_path(false)
 	assert_eq(default_visible_result["hash"], default_hidden_result["hash"], "T3 hash ignores rendering")
 	print("JELLY_T3_DEFAULT_HASH hash=%s" % str(default_hidden_result["hash"]))
 	assert_eq(default_hidden_result["hash"], EXPECTED_T3_DEFAULT_HASH, "T3 default hash")
+	_apply_c4e_profile()
+	var c4e_visible_result: Dictionary = await _run_rule_path(true)
+	var c4e_hidden_result: Dictionary = await _run_rule_path(false)
+	assert_eq(c4e_visible_result["hash"], c4e_hidden_result["hash"], "C4E hash ignores rendering")
+	print("JELLY_C4E_DEFAULT_HASH hash=%s" % str(c4e_hidden_result["hash"]))
+	assert_eq(c4e_hidden_result["hash"], EXPECTED_C4E_DEFAULT_HASH, "C4E default hash")
+	_apply_legacy_color_profile()
 	Config.data.jelly_tap_lift_speed = 900.0
 	Config.data.jelly_tap_push_radius_factor = 0.0
 	Config.data.jelly_tap_push_speed = 0.0
@@ -48,6 +57,7 @@ func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
 	print("JELLY_K4_DEFAULT_HASH hash=%s" % str(k4_hidden_result["hash"]))
 	assert_eq(k4_hidden_result["hash"], EXPECTED_K4_DEFAULT_HASH, "K4 default hash")
 	_restore_level_profile(config_snapshot)
+	_apply_legacy_color_profile()
 	_apply_m_profile()
 	var visible_result: Dictionary = await _run_rule_path(true)
 	var hidden_result: Dictionary = await _run_rule_path(false)
@@ -77,6 +87,7 @@ func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
 	)
 	assert_eq(visible_result["hash"], EXPECTED_M_DELAYED_HASH, "M delayed hash")
 	_restore_level_profile(config_snapshot)
+	_apply_legacy_color_profile()
 	Config.data.jelly_merge_duration = 0.3
 	_apply_d_profile()
 	var legacy_d_visible_result: Dictionary = await _run_rule_path(true)
@@ -94,6 +105,7 @@ func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
 	)
 	assert_eq(legacy_d_visible_result["hash"], EXPECTED_D_DEFAULT_HASH, "D legacy hash")
 	_restore_level_profile(config_snapshot)
+	_apply_legacy_color_profile()
 	Config.data.jelly_merge_duration = 0.3
 	Config.data.max_merge_bonus_factor = 5.0
 	_apply_legacy_tap_profile()
@@ -112,6 +124,7 @@ func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
 	)
 	assert_eq(st_visible_result["hash"], EXPECTED_ST_DEFAULT_HASH, "ST default hash")
 	_restore_level_profile(config_snapshot)
+	_apply_legacy_color_profile()
 	Config.data.jelly_merge_duration = 0.3
 	Config.data.max_merge_bonus_factor = 40.0
 	_apply_legacy_tap_profile()
@@ -134,6 +147,7 @@ func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
 		"jackpot default hash"
 	)
 	_restore_level_profile(config_snapshot)
+	_apply_legacy_color_profile()
 	Config.data.jelly_merge_duration = 0.3
 	Config.data.max_merge_bonus_factor = 40.0
 	Config.data.jelly_merge_level_gap = 2
@@ -396,6 +410,8 @@ func _run_rule_path(visuals_enabled: bool) -> Dictionary:
 		state["jelly_merge_wide_gap_min_level"] = Config.data.jelly_merge_wide_gap_min_level
 	if Config.data.spawn_count_max != 5:
 		state["spawn_count_max"] = Config.data.spawn_count_max
+	if Config.data.turn_color_unlock_turns != [30, 60]:
+		state["turn_color_unlock_turns"] = Config.data.turn_color_unlock_turns.duplicate()
 	var state_json: String = JSON.stringify(state)
 	var hash_context: HashingContext = HashingContext.new()
 	hash_context.start(HashingContext.HASH_SHA256)
@@ -428,6 +444,7 @@ func _snapshot_level_profile() -> Dictionary:
 		"jelly_merge_level_gap": Config.data.jelly_merge_level_gap,
 		"jelly_merge_wide_gap_min_level": Config.data.jelly_merge_wide_gap_min_level,
 		"spawn_count_max": Config.data.spawn_count_max,
+		"turn_color_unlock_turns": Config.data.turn_color_unlock_turns.duplicate(),
 		"blast_push_radius_by_level": Config.data.blast_push_radius_by_level.duplicate(),
 		"gravity_level_scale": Config.data.gravity_level_scale,
 		"shock_level_scale": Config.data.shock_level_scale,
@@ -460,6 +477,7 @@ func _restore_level_profile(snapshot: Dictionary) -> void:
 	Config.data.jelly_merge_level_gap = int(snapshot["jelly_merge_level_gap"])
 	Config.data.jelly_merge_wide_gap_min_level = int(snapshot["jelly_merge_wide_gap_min_level"])
 	Config.data.spawn_count_max = int(snapshot["spawn_count_max"])
+	Config.data.turn_color_unlock_turns.assign(snapshot["turn_color_unlock_turns"])
 	Config.data.blast_push_radius_by_level = snapshot["blast_push_radius_by_level"] as PackedFloat32Array
 	Config.data.gravity_level_scale = float(snapshot["gravity_level_scale"])
 	Config.data.shock_level_scale = float(snapshot["shock_level_scale"])
@@ -566,6 +584,16 @@ func _apply_legacy_blast_push_profile() -> void:
 	Config.data.blast_gravity_pause_time = 0.0
 	Config.data.blast_speed = 900.0
 	Config.data.blast_far_factor = 0.4
+
+
+func _apply_legacy_color_profile() -> void:
+	Config.data.turn_color_unlock_turns.assign([30, 60])
+	Config.data.jelly_tap_effect_modes = PackedInt32Array([2, 3, 4, 5, 6, 7])
+
+
+func _apply_c4e_profile() -> void:
+	Config.data.turn_color_unlock_turns.clear()
+	Config.data.jelly_tap_effect_modes = PackedInt32Array([2, 3, 7, 6, 1, 1])
 
 
 func _apply_k4_profile() -> void:

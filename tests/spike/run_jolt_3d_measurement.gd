@@ -71,6 +71,7 @@ var _seed_tap_blast_count_by_color: Dictionary = {}
 var _seed_tap_clean_count_by_color: Dictionary = {}
 var _seed_tap_clean_count_total: int = 0
 var _seed_tap_clean_count_max: int = 0
+var _seed_tap_rest_turn_count: int = 0
 var _seed_purple_tap_turns: Dictionary = {}
 var _seed_purple_same_turn_blast_count: int = 0
 var _seed_blast_reaction_windows: Array[Dictionary] = []
@@ -307,6 +308,7 @@ func _run_seed(
 	_seed_tap_clean_count_by_color.clear()
 	_seed_tap_clean_count_total = 0
 	_seed_tap_clean_count_max = 0
+	_seed_tap_rest_turn_count = 0
 	_seed_purple_tap_turns.clear()
 	_seed_purple_same_turn_blast_count = 0
 	_seed_blast_reaction_windows.clear()
@@ -578,6 +580,7 @@ func _run_seed(
 		"tap_clean_count_by_color": _seed_tap_clean_count_by_color.duplicate(true),
 		"tap_clean_count_total": _seed_tap_clean_count_total,
 		"tap_clean_count_max": _seed_tap_clean_count_max,
+		"tap_rest_turn_count": _seed_tap_rest_turn_count,
 		"purple_same_turn_blast_count": _seed_purple_same_turn_blast_count,
 		"reactions_within_one_second_after_blast": _blast_reaction_window_summary(),
 		"score_by_reaction_type": _seed_score_by_reaction_type.duplicate(true),
@@ -1086,6 +1089,8 @@ func _record_shock_event(reaction: Dictionary) -> void:
 		_seed_tap_clean_count_by_color[color_key] = int(
 			_seed_tap_clean_count_by_color.get(color_key, 0)
 		) + clean_count
+		if int(reaction.get("tap_effect", -1)) == GameConfig.JellyTapEffect.REST:
+			_seed_tap_rest_turn_count += 1
 		if tap_color == OrbTypes.OrbColor.PURPLE:
 			_seed_purple_tap_turns[_current_measurement_turn] = true
 		return
@@ -2311,6 +2316,8 @@ func _apply_arguments() -> void:
 					Config.data.jelly_tap_effect_modes = PackedInt32Array([1, 1, 1, 1, 1, 1])
 				"color":
 					Config.data.jelly_tap_effect_modes = PackedInt32Array([2, 3, 4, 5, 6, 7])
+				"four":
+					Config.data.jelly_tap_effect_modes = PackedInt32Array([2, 3, 7, 6, 1, 1])
 				_:
 					_had_runner_error = true
 					push_error("Unknown jelly tap effect profile: %s" % _jelly_tap_effect_profile)

@@ -157,7 +157,7 @@ func test_m4_spawn_defaults() -> void:
 	assert_eq(config.spawn_count_ramp_turns, 10, "spawn count ramp interval")
 	assert_eq(config.spawn_count_max, 4, "spawn count maximum")
 	assert_eq(config.turn_start_colors, 4, "turn mode starts with four colors")
-	assert_eq(config.turn_color_unlock_turns, [30, 60], "turn color unlock schedule")
+	assert_eq(config.turn_color_unlock_turns, [], "turn colors stay at the starting four")
 	assert_eq(config.spawn_position_mode, GameConfig.SpawnPositionMode.RANDOM, "position mode")
 	assert_near(config.spawn_margin, 4.0, TOLERANCE, "spawn margin")
 	assert_near(config.spawn_probe_step, 5.0, TOLERANCE, "spawn probe step")
@@ -200,6 +200,10 @@ func test_spawn_level_cost_defaults_and_fallbacks() -> void:
 
 func test_turn_color_unlock_boundaries_follow_color_order() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
+	for turn_index: int in [1, 29, 30, 60, 600]:
+		assert_eq(config.color_count_for_turn(turn_index), 4, "default stays four colors")
+	assert_eq(config.newly_unlocked_color_for_turn(30), -1, "default has no turn 30 unlock")
+	assert_eq(config.newly_unlocked_color_for_turn(60), -1, "default has no turn 60 unlock")
 	config.turn_start_colors = 4
 	config.turn_color_unlock_turns = [30, 60]
 	assert_eq(config.color_count_for_turn(29), 4, "four colors before first unlock")
@@ -346,9 +350,13 @@ func test_m9_blast_defaults() -> void:
 	assert_eq(config.jelly_tap_grow_min_clean, 3, "green grow minimum clean targets")
 	assert_eq(
 		Array(config.jelly_tap_effect_modes),
-		[2, 3, 4, 5, 6, 7],
-		"six colors use bomb quake grow bonus magnet rest"
+		[2, 3, 7, 6, 1, 1],
+		"four colors use bomb quake rest magnet and later colors use none"
 	)
+	assert_eq(config.jelly_tap_effect_for_color(0), GameConfig.JellyTapEffect.BOMB, "pink bomb")
+	assert_eq(config.jelly_tap_effect_for_color(1), GameConfig.JellyTapEffect.QUAKE, "blue quake")
+	assert_eq(config.jelly_tap_effect_for_color(2), GameConfig.JellyTapEffect.REST, "green rest")
+	assert_eq(config.jelly_tap_effect_for_color(3), GameConfig.JellyTapEffect.MAGNET, "yellow magnet")
 	assert_near(config.jelly_tap_quake_speed, 900.0, TOLERANCE, "tap quake speed")
 	assert_eq(config.jelly_tap_bonus_points_per_orb, 100, "tap bonus per orb")
 	assert_near(config.jelly_tap_magnet_time, 0.5, TOLERANCE, "tap magnet time")
