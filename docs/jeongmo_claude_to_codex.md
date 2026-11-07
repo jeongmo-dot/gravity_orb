@@ -32,27 +32,29 @@
 
 ## 대기 중
 
-### [2026-11-07 #139] 색은 4가지로 — 30·60턴 새 색 없애기·빌드 0.16.7
-- 상태: 대기 (#138 병합됨 `80c3c9c` — main 위에서)
+### [2026-11-07 #139] 색은 4가지로·네 색 소폭발 효과 다시 정리 (폭탄·지진·휴식·자석)·빌드 0.16.7
+- 상태: 대기 (#138 병합됨 `80c3c9c` — main 위에서. 2026-11-07 처음 명세에 2·3번을 더해 다시 썼다)
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.30**
-- 배경: 사용자 (2026-11-07) "색상 종류 지금 6가지 인거 4가지로 줄이자". 지금은 4색으로 시작해 30턴 보라·60턴 주황이 더해진다
-- 앵커: `config/GameConfig.gd`·`default_config.tres` `turn_color_unlock_turns`, `GameConfig.color_count_for_turn()`·`newly_unlocked_color_for_turn()`, `scripts/core/Spawner.gd` `_draw_candidate_for_turn()`, `scripts/ui/Hud.gd` `_track_preview_unlocks()`, 판 균형 측정 도구, `tests/test_config.gd`·`tests/test_spawner.gd`·`tests/test_jelly_regression.gd`, 캡처, `project.godot`
-- 요구 (§12-ONE.30 1~6):
-  1. `turn_color_unlock_turns` [30, 60] → **[]**: 판 내내 분홍·파랑·초록·노랑 4색. 보라 자석·주황 휴식 코드·문구는 그대로 둔다
-  2. 판 균형 C6·C4·C4-S5 (자동 D-save·D-all, R D-save, L-합체 D-save·D-all × 20, 600턴 상한). 색별 소폭발 수·청소/회 평균 추가
-  3. 해시: 예전 JELLY 묶음 ([30, 60] 고정) 그대로, CLASSIC 생성 진행은 새 값으로 고정 (회신에), C4 고정
-  4. 테스트 (§12-ONE.30 4번)
-  5. 캡처: 전체를 새 기본값으로, 두 비율. 보라·주황·새 색 반짝임 고정 장면은 남기고 목록을 회신에
-  6. 버전 **0.16.7**, 커밋 뒤 깨끗한 트리에서 Release. 보고는 #136과 같다
-- 수치 (Claude): `turn_color_unlock_turns` **[]**, 버전 **0.16.7**. 그 밖의 값은 그대로
-- 건드리지 말 것: 색 그림·표시 색·시작 4색 순서, 색별 효과 코드, 생성 비율·상한·램프, 합치는 레벨, 소폭발·대폭발, 점수, 물리, 그림·연출 (명세에 없는 것 금지, 고리 모양 금지), 사용자 저장 파일, `docs/` (회신 파일 제외)
-- **회신 맨 앞에**: C4 L-합체 D-all 미완료 3판 이상, C4 자동 D-save 평균 턴이 C6과 30% 넘게 다름
+- 배경: 사용자 (2026-11-07) "색상 종류 지금 6가지 인거 4가지로 줄이자", (0.16.6 플레이) "녹색은 터치가 안되네?" → "녹색도 터질 수 있게 함" → "늘 사라짐", "4개의 색깔 터짐 효과 다시 정리" → "폭탄·지진·휴식·자석"
+- 앵커: `config/GameConfig.gd`·`default_config.tres` `turn_color_unlock_turns`·`jelly_tap_effect_modes`, `GameConfig.color_count_for_turn()`·`newly_unlocked_color_for_turn()`, `scripts/core/Spawner.gd` `_draw_candidate_for_turn()`, `scripts/core/TurnManager.gd` (REST·미리보기), `scripts/core/CollisionResolver.gd` `apply_jelly_tap_blast()`·`is_jelly_tap_blast_candidate()`, `scripts/ui/Hud.gd` `JELLY_TAP_EFFECT_CALLOUTS`·`_on_jelly_tap_effect_unlocked()`·`_track_preview_unlocks()`, 판 균형 측정 도구, `tests/test_config.gd`·`tests/test_spawner.gd`·`tests/test_jolt_3d.gd`·`tests/test_callouts.gd`·`tests/test_jelly_regression.gd`, 캡처, `project.godot`
+- 요구 (§12-ONE.30 1~8):
+  1. `turn_color_unlock_turns` [30, 60] → **[]**: 판 내내 분홍·파랑·초록·노랑
+  2. `jelly_tap_effect_modes` → **[2, 3, 7, 6, 1, 1]**: 분홍 폭탄·파랑 지진·**초록 휴식**·**노랑 자석** (보라·주황 NONE). 성장·보너스 코드는 남김. 모든 색에서 터치한 젤리는 사라지고 초록도 늘 터치 후보. 휴식이 램프 경계에 걸려도 미리보기 = 실제 (지금 동작을 회신에, 다르면 고침)
+  3. 안내 한 줄을 효과로 만든다: `<색> L8: 터치하면 <효과>` (기본 네 색: 폭탄·지진·휴식·자석)
+  4. 판 균형 C6·C4·C4E·C4E-S5 (자동 D-save·D-all, R D-save, L-합체 D-save·D-all × 20, 600턴 상한). 색별 소폭발 수·청소/회 평균·휴식 턴 수 추가
+  5. 해시: 예전 JELLY 묶음 (T3 포함) 그대로, CLASSIC 생성 진행은 새 값 고정 (회신에), C4E 고정
+  6. 테스트 (§12-ONE.30 6번)
+  7. 캡처: 전체를 새 기본값으로 + 초록 휴식·노랑 자석·네 색 안내 한 줄, 두 비율. 보라·주황·새 색 반짝임 고정 장면은 남기고 목록을 회신에
+  8. 버전 **0.16.7**, 커밋 뒤 깨끗한 트리에서 Release. 보고는 #136과 같다
+- 수치 (Claude): `turn_color_unlock_turns` **[]**, `jelly_tap_effect_modes` **[2, 3, 7, 6, 1, 1]**, 버전 **0.16.7**. 그 밖의 값은 그대로
+- 건드리지 말 것: 색 그림·표시 색·시작 4색 순서, 공통 청소·사방 밀기, 폭탄 반경·지진·자석 값, 휴식 동작 (경계 말고), 생성 비율·상한·램프, 합치는 레벨, 대폭발, 점수, 물리, 그림·연출 (명세에 없는 것 금지, 고리 모양 금지), 사용자 저장 파일, `docs/` (회신 파일 제외)
+- **회신 맨 앞에**: C4E L-합체 D-all 미완료 3판 이상, C4E 자동 D-save 평균 턴이 C6과 30% 넘게 다름, 휴식이 램프 경계에서 미리보기와 다르게 들어옴
 - Done-when:
-  - [ ] 테스트 통과, 예전 JELLY 해시 그대로, CLASSIC 생성 진행·C4 해시 고정
-  - [ ] 판 균형표 C6·C4·C4-S5
+  - [ ] 테스트 통과, 예전 JELLY 해시 그대로, CLASSIC 생성 진행·C4E 해시 고정
+  - [ ] 판 균형표 C6·C4·C4E·C4E-S5
   - [ ] 캡처 (두 비율)
   - [ ] `build/windows/GravityOrb_v0.16.7.exe` (`mode=Release`, `_BUILD.txt` 커밋 = 브랜치 끝), 0.16.1~0.16.6 파일 그대로
-- QA: §12-ONE.30 2·6번
+- QA: §12-ONE.30 4·8번
 - 커밋: 항목 단위 브랜치 (`four-colors`), **push·PR까지** (병합은 Claude 검수 뒤)
 
 ---
