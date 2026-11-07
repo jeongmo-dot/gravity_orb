@@ -39,9 +39,9 @@
 ## 미확인
 
 ### [2026-11-07] 대상 #137 — 소폭발 위쪽 리프트·생성 상한 4·합체 후보 3×3 측정
-- 상태: 완료 — 구현·자동 검증·총 `900`게임 3×3 측정·lift 4값 측정·두 비율 실제 창 캡처·Debug 빌드까지 마쳤다. 기본 `S4-G1 + lift 900`은 5개 봇 조합 모두 미완료 `0/20`이며, 후보값의 합격·최종 선택과 병합은 Claude/사용자 대기
+- 상태: 완료 — 1차 구현·측정 뒤 사용자가 고른 `S4-G1`을 확정하고 추가 요구 1의 H 규칙 대기 판정·버전 0.16.5·Release까지 마쳤다. 합격·병합 판정은 Claude/사용자 대기
 - 브랜치 / PR: `tap-lift-spawn-merge` / https://github.com/jeongmo-dot/gravity_orb/pull/137
-- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/{core/CollisionResolver.gd,core/ReactionRules.gd,spike/Board3D.gd}`, `tests/{capture_screens.ps1,run_jelly_physics_autoplay.ps1,test_config.gd,test_jelly_regression.gd,test_jolt_3d.gd,test_rules.gd,test_spawner.gd}`, `tests/spike/{capture_screens.gd,run_blast_push_measurement.gd,run_jolt_3d_measurement.gd}`, `tests/tools/{run_blast_push_measurement.ps1,run_jelly_measurement.ps1,run_spawn_merge_matrix.ps1}`, `docs/jeongmo_codex_to_claude.md`
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/{core/CollisionResolver.gd,core/ReactionRules.gd,spike/Board3D.gd}`, `project.godot`, `tests/{capture_screens.ps1,run_jelly_physics_autoplay.ps1,test_config.gd,test_full_board_performance_equivalence.gd,test_jelly_regression.gd,test_jolt_3d.gd,test_rules.gd,test_spawner.gd}`, `tests/spike/{capture_screens.gd,run_blast_push_measurement.gd,run_jolt_3d_measurement.gd}`, `tests/tools/{run_blast_push_measurement.ps1,run_jelly_measurement.ps1,run_spawn_merge_matrix.ps1}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 소폭발만 중력 방향 속도 성분을 버리고 같은 거리 감쇠의 중력 반대 리프트 `900`을 더함. 대폭발 불변, lift `0`은 #136 동작 — 자동 (`test_jolt_3d` + lift 측정)
   - [x] 기본 `spawn_count_max=4`, `jelly_merge_wide_gap_min_level=0`; H6은 같은 색 `기본 gap+1`이면서 큰 쪽 L6 이상일 때만 허용 — 자동 (`test_config`, `test_spawner`, `test_rules`)
@@ -49,7 +49,14 @@
   - [x] lift 0·600·900·1200, 중앙·바닥 더미 노랑의 중력 반대 이동·관통·이탈 측정 — 자동 측정
   - [x] 이전 해시 9종 유지, 새 기본 `S4-G1 + lift 900` 해시 고정 — 자동 (`test_jelly_regression`)
   - [x] lift 0·900 × 0·0.1·0.2·0.4초와 마지막 전체 장면을 두 비율에서 생성·직접 확인 — 실제 창 관측
-  - [x] Standard Godot 전체 검증·스모크·Debug 빌드. Release 미생성 — 자동
+  - [x] Standard Godot 전체 검증·스모크·Debug 빌드와 0.16.5 Release 생성 — 자동
+  - [x] 추가 요구 1: H6에서 잠긴 같은 색 L6+L4 대기는 `true`, L5+L3은 `false`, H0의 L6+L4는 `false` — 자동 (`test_full_board_performance_equivalence`)
+  - [x] 추가 요구 1: 예전 9종·새 기본·CLASSIC 생성 진행 해시 유지, 측정·캡처 재실행 없음 — 자동 + 명세
+
+- 추가 요구 1 구현·검색 관측:
+  - `_has_pending_jelly_reactions()`의 후보 범위를 H가 켜졌을 때만 `jelly_merge_level_gap + 1`까지 넓혔다. 최종 짝 판정은 기존 `_pair_can_react()`라 큰 쪽 레벨 문턱은 `ReactionRules.can_react()`와 같다
+  - `scripts/`에서 합체 레벨 차를 별도 범위로 적은 곳은 이 함수와 규칙 원본 `ReactionRules.can_react()`·`_classify_jelly()`뿐이었다. 추가 수정 대상은 없었다
+  - 확정 기본값은 `spawn_count_max=4`, `jelly_merge_level_gap=1`, `jelly_tap_lift_speed=900`, `jelly_merge_wide_gap_min_level=0`
 
 - 3×3 측정 (`게임오버/미완료; 턴 중앙값; L8 이상 판/판당 L8+ 생성`, 각 칸 20게임, **미완료 3판 이상** 강조):
 
@@ -88,7 +95,13 @@
   - Godot `4.8.dev3.official.51105ccbe` Standard; `--headless --path . --import` 종료 코드 0
   - `tests/run_tests.ps1` → 일반 `340/340`, 장기 `4/4`, 성능 `5/5`; 각각 새 프로세스, 전체 `92.993초`, 종료 코드 0
   - 기본/`--mode=blitz` 300프레임 smoke → 각각 종료 코드 0, 출력의 `SCRIPT ERROR`·`Parse Error` 0건
-  - `tools/build_windows.ps1 -Debug` → `WINDOWS_BUILD_RESULT version=0.16.4 mode=Debug exit=0 bytes=104996896 preserved=30`; Release 미실행
+  - `tools/build_windows.ps1 -Debug` → `WINDOWS_BUILD_RESULT version=0.16.5 mode=Debug exit=0 bytes=104997120 preserved=33`
+  - 첫 깨끗한 Release → `WINDOWS_BUILD_RESULT version=0.16.5 mode=Release exit=0 bytes=111127296 preserved=13`; 같은 명령 재실행은 종료 코드 `1`, `Release artifact already exists`, exe 해시 불변
+  - 회신 최종 커밋 뒤 `-ReplaceSameVersion` 최종 Release: exe `111,127,296`바이트, SHA-256 `08d41488c8a279d02cf7f29ed591799e08300077acb30d1b14ee3ea2dbbdde8e`; console `50,176`바이트, SHA-256 `2a3b31dcb6237d9a8abe4024a1e88c502ef1d61ffef22dd13f9948517444ba07`; sidecar PCK `0`개
+  - 최종 `_BUILD.txt`: `Version: 0.16.5`, `Mode: Release`, `Engine: 4.8.dev3.official.51105ccbe`, Commit과 브랜치 끝 일치
+  - 내보낸 console 기본/`--mode=jelly` 300프레임 스모크 각각 종료 코드 0, `SCRIPT ERROR|Parse Error|ERROR:` 0건
+  - 묶음 금지 패턴 `res://tests/`, `res://artifacts/`, `res://docs/`, `run_tests.gd`, `capture_screens.gd`, 설계·두 인박스 문서 각 0건; 양성 앵커 `OrbitStage 8 + JellyOrbArt 6 + StartScreen 8 + Main3D 5 = 27`건
+  - 사용자 `save.cfg` SHA-256 `2243b278dbf10afa50c73d54baeee316d4560658de75ac45658e620c6272db3a` 불변. 0.16.1~0.16.4 파일 13개의 이름·크기·SHA-256 매니페스트 `065742122039c892bc078c3f48527d8c57c058cbd7fcf22c1697b6f8871e568e` 불변
   - `git diff --check` 오류 0건. Input 검색은 `InputRouter.gd`와 허용 예외 `Haptics.gd`뿐. RNG 검색은 `Spawner.gd`와 기존 `ColorEffectVisual.gd`의 전용 `RandomNumberGenerator` 호출뿐이며 이번 diff 새 위반 0건
 
 - 수동 확인 절차:
@@ -96,7 +109,7 @@
   2. 같은 판에서 같은 레벨·다른 색 대폭발 유도 → #136 대폭발의 방사형 밀기 방향이 바뀌지 않았는지 본다
   3. 10턴 간격으로 진행 → 한 턴 생성 상한이 4에서 멈추고 NEXT·THEN의 비용도 4인지 본다
 - 결정 사항: 명세 수치 외 밸런스 값은 바꾸지 않았다. 캡처의 125턴 프리뷰 검증은 하드코딩 `5` 대신 `spawn_count_for_turn(125)`를 사용해 새 기본 상한을 검증한다. Windows 작업 실행기에서 마지막 20개 장기 worker 수집이 멈춘 구간은 동일 Godot 인자를 직접 8병렬 실행해 20개 결과를 모두 기록한 뒤 같은 집계기로 합쳤다
-- 남은 것 · 질문: 최종 생성·합체 후보값 선택과 합격·병합 판정은 Claude/사용자 몫. 측정 산출물은 `artifacts/measurements/spawn_merge_matrix_3x3.json`, `blast_push_k0_k4_lift.json`에 있으며 git에는 포함하지 않는다
+- 남은 것 · 질문: 구현·검증 잔여 없음. 합격·병합 판정은 Claude/사용자 몫. 측정 산출물은 `artifacts/measurements/spawn_merge_matrix_3x3.json`, `blast_push_k0_k4_lift.json`에 있으며 git에는 포함하지 않는다
 
 ### [2026-11-07] 대상 #136 — 소폭발·대폭발 주변 젤리 밀기·Windows 0.16.4
 - 상태: 완료 — **회신 맨 앞 경고 조건 없음**. K4 판 밖 이탈 `0`회, 전체 K4 최대 관통 `22.68px`, 자동 D-save 평균 `103.55`턴(G1 `101.70` 대비 `+1.8%`), L-합체 D-all 미완료 `0/20`판을 관측했다. 구현·자동 검증·측정·두 비율 실제 창 캡처·0.16.4 Release·PR까지 마쳤다. 합격·병합 판정은 Claude/사용자 대기
