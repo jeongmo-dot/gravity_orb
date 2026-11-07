@@ -324,7 +324,7 @@ func test_m9_blast_defaults() -> void:
 	assert_eq(config.blast_min_level, 4, "shared blast minimum level")
 	assert_eq(config.jelly_blast_min_level, 8, "JELLY blast starts at L8 by default")
 	assert_true(not config.jelly_blast_requires_same_level, "JELLY blast allows mixed levels")
-	assert_eq(config.jelly_merge_level_gap, 2, "JELLY merge level gap defaults to two")
+	assert_eq(config.jelly_merge_level_gap, 1, "JELLY merge level gap defaults to one")
 	assert_eq(
 		config.blast_push_radius_by_level,
 		PackedFloat32Array([0.0, 0.0, 0.0, 0.3, 0.55, 1.0, 1.0, 1.0, 1.0, 1.0]),

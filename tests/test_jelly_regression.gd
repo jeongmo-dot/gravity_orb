@@ -7,7 +7,8 @@ const EXPECTED_C8_LEGACY_HASH: String = "8c1a02e9dfa345a31828276e917dad0f8dda352
 const EXPECTED_D_DEFAULT_HASH: String = "2cdf79475d340e34252a3d295ccc23e092c719038e2362f5df6ac80dc8e5979f"
 const EXPECTED_ST_DEFAULT_HASH: String = "f3ff93474eb3765cdc611ae941c89ec96052a20f16fff75efe8ad6a6c8fb816c"
 const EXPECTED_JACKPOT_DEFAULT_HASH: String = "3254c77f2bcf478239f023f08af2bae5f48bc68aee56aa246894908d0b9ab5e7"
-const EXPECTED_COLOR_CLEAN_DEFAULT_HASH: String = "4c4ab4aa9cf014d4d266a6fdfd75a03bbd4f40c5e9a540bd6f682da3c0835974"
+const EXPECTED_F2_DEFAULT_HASH: String = "4c4ab4aa9cf014d4d266a6fdfd75a03bbd4f40c5e9a540bd6f682da3c0835974"
+const EXPECTED_G1_DEFAULT_HASH: String = "d5175565a24fa4d0e00e1eb3ccbd5529a0c489852c00437fed58197bd20e4c7d"
 
 
 func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
@@ -108,12 +109,21 @@ func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
 	_restore_level_profile(config_snapshot)
 	Config.data.jelly_merge_duration = 0.3
 	Config.data.max_merge_bonus_factor = 40.0
-	var color_clean_result: Dictionary = await _run_rule_path(false)
-	print("JELLY_COLOR_CLEAN_DEFAULT_HASH hash=%s" % str(color_clean_result["hash"]))
+	Config.data.jelly_merge_level_gap = 2
+	var f2_result: Dictionary = await _run_rule_path(false)
+	print("JELLY_F2_DEFAULT_HASH hash=%s" % str(f2_result["hash"]))
 	assert_eq(
-		color_clean_result["hash"],
-		EXPECTED_COLOR_CLEAN_DEFAULT_HASH,
-		"color clean default hash"
+		f2_result["hash"],
+		EXPECTED_F2_DEFAULT_HASH,
+		"F2 default hash"
+	)
+	Config.data.jelly_merge_level_gap = 1
+	var g1_result: Dictionary = await _run_rule_path(false)
+	print("JELLY_G1_DEFAULT_HASH hash=%s" % str(g1_result["hash"]))
+	assert_eq(
+		g1_result["hash"],
+		EXPECTED_G1_DEFAULT_HASH,
+		"G1 default hash"
 	)
 	_apply_c8_profile()
 	var c8_result: Dictionary = await _run_rule_path(false)
@@ -467,6 +477,7 @@ func _apply_legacy_score_profile() -> void:
 
 
 func _apply_legacy_tap_profile() -> void:
+	Config.data.jelly_merge_level_gap = 2
 	Config.data.jelly_tap_clean_max_level = 0
 	Config.data.jelly_tap_grow_min_clean = 1
 	Config.data.jelly_tap_effect_modes = PackedInt32Array()

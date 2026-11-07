@@ -12,7 +12,7 @@ param(
 	[ValidateSet("None", "Save", "All")]
 	[string]$TapBlastBotMode = "None",
 	[ValidateRange(0, 10)]
-	[int]$JellyMergeLevelGap = 2,
+	[int]$JellyMergeLevelGap = 1,
 	[ValidateRange(0, 10)]
 	[int]$JellyBlastMinLevel = 8,
 	[ValidateRange(0, 10)]

@@ -118,6 +118,44 @@ func test_pending_reaction_fast_path_matches_classification() -> void:
 	await _cleanup_fixture(fixture)
 
 
+func test_pending_jelly_reactions_follow_merge_gap_and_blast_rule() -> void:
+	var original_duration: float = Config.data.jelly_merge_duration
+	var original_gap: int = Config.data.jelly_merge_level_gap
+	var original_requires_same: bool = Config.data.jelly_blast_requires_same_level
+	Config.data.jelly_merge_duration = 0.0
+	Config.data.jelly_blast_requires_same_level = false
+	var fixture: Dictionary = await _create_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	Config.data.jelly_merge_level_gap = 2
+	assert_true(
+		_pending_for_pair(board, resolver, 2, 5, 2, 3),
+		"gap two keeps touching same-color L5/L3 pending"
+	)
+	Config.data.jelly_merge_level_gap = 1
+	assert_true(
+		not _pending_for_pair(board, resolver, 2, 5, 2, 3),
+		"gap one releases touching same-color L5/L3"
+	)
+	assert_true(
+		_pending_for_pair(board, resolver, 0, 8, 1, 10),
+		"mixed-color L8/L10 stays pending when mixed levels blast"
+	)
+	assert_true(
+		not _pending_for_pair(board, resolver, 0, 7, 1, 9),
+		"mixed-color L7/L9 does not stay pending below blast threshold"
+	)
+	Config.data.jelly_blast_requires_same_level = true
+	assert_true(
+		not _pending_for_pair(board, resolver, 0, 8, 1, 10),
+		"same-level blast toggle releases mixed-color L8/L10"
+	)
+	await _cleanup_fixture(fixture)
+	Config.data.jelly_merge_duration = original_duration
+	Config.data.jelly_merge_level_gap = original_gap
+	Config.data.jelly_blast_requires_same_level = original_requires_same
+
+
 func test_ghost_overlap_snapshot_preserves_release_result() -> void:
 	var fixture: Dictionary = await _create_fixture()
 	var board: Board3D = fixture["board"] as Board3D
@@ -272,6 +310,22 @@ func _spawn_normal(
 	orb.linear_velocity = Vector2.ZERO
 	orb.angular_velocity = 0.0
 	return orb
+
+
+func _pending_for_pair(
+	board: Board3D,
+	resolver: CollisionResolver,
+	color_a: int,
+	level_a: int,
+	color_b: int,
+	level_b: int
+) -> bool:
+	board.clear()
+	resolver.cancel_active_jelly_merges()
+	var first: Orb3D = _spawn_normal(board, color_a, level_a, Vector2.ZERO)
+	_spawn_normal(board, color_b, level_b, Vector2.ZERO)
+	resolver._lock_reaction_result(first)
+	return resolver.has_pending_reactions()
 
 
 func _create_fixture() -> Dictionary:

@@ -39,7 +39,7 @@ param(
 	[ValidateRange(0.0, 10.0)]
 	[double]$JellyMergeDuration = 0.3,
 	[ValidateRange(0, 10)]
-	[int]$JellyMergeLevelGap = 2,
+	[int]$JellyMergeLevelGap = 1,
     [switch]$AggregateOnly
 )
 
