@@ -40,7 +40,7 @@
 
 ### [2026-11-07] 대상 #137 — 소폭발 위쪽 리프트·생성 상한 4·합체 후보 3×3 측정
 - 상태: 완료 — 구현·자동 검증·총 `900`게임 3×3 측정·lift 4값 측정·두 비율 실제 창 캡처·Debug 빌드까지 마쳤다. 기본 `S4-G1 + lift 900`은 5개 봇 조합 모두 미완료 `0/20`이며, 후보값의 합격·최종 선택과 병합은 Claude/사용자 대기
-- 브랜치 / PR: `tap-lift-spawn-merge` / PR 생성 예정
+- 브랜치 / PR: `tap-lift-spawn-merge` / https://github.com/jeongmo-dot/gravity_orb/pull/137
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/{core/CollisionResolver.gd,core/ReactionRules.gd,spike/Board3D.gd}`, `tests/{capture_screens.ps1,run_jelly_physics_autoplay.ps1,test_config.gd,test_jelly_regression.gd,test_jolt_3d.gd,test_rules.gd,test_spawner.gd}`, `tests/spike/{capture_screens.gd,run_blast_push_measurement.gd,run_jolt_3d_measurement.gd}`, `tests/tools/{run_blast_push_measurement.ps1,run_jelly_measurement.ps1,run_spawn_merge_matrix.ps1}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 소폭발만 중력 방향 속도 성분을 버리고 같은 거리 감쇠의 중력 반대 리프트 `900`을 더함. 대폭발 불변, lift `0`은 #136 동작 — 자동 (`test_jolt_3d` + lift 측정)
