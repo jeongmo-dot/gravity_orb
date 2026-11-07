@@ -32,8 +32,15 @@
 
 ## 대기 중
 
-### [2026-11-07 #136] 소폭발·대폭발이 주변 젤리를 확실히 밀기·빌드 0.16.4
-- 상태: 대기
+- 없음
+
+---
+
+## 처리 완료
+
+### [2026-11-07 #136] 소폭발·대폭발이 주변 젤리를 확실히 밀기·빌드 0.16.4 — 완료
+- 상태: 완료 (2026-11-07 Claude 검수 · [PR #136](https://github.com/jeongmo-dot/gravity_orb/pull/136) 병합 `22f1017`)
+- 검수: 코드 diff, 회신 측정표 (밀림 K0~K4·판 균형·성능), 캡처 `132`·`136`·`140`·`144`, `build/windows/GravityOrb_v0.16.4.exe` 크기·SHA-256·`_BUILD.txt` (커밋 `9b20ab9` = 브랜치 끝, Release) 직접 확인. 테스트 338/4/5·해시·스모크·격리 창·`save.cfg`는 Codex 관측 (Claude 재실행 없음). 맨 앞 조건 없음. 대폭발 0.4초 바깥 이동 중앙값 132 → 204px, 탁 트인 곳 소폭발 31 → 47px, 더미 위 소폭발은 거의 안 밀림 (50px 넘게 6%). 판 길이·점수 거의 그대로. 결과: §12-ONE.27 "#136 결과"
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.27**
 - 배경: 사용자 (2026-11-07, 0.16.3 뒤) "소폭발과 대폭발 모두 확실하게 주변 젤리들을 밀어냈으면 좋겠어". 지금 소폭발은 분홍만 밀고, 밀린 젤리는 중력 3600에 바로 눌린다 (위로 900 px/s → 약 112px)
 - 앵커: `scripts/core/CollisionResolver.gd` `apply_jelly_tap_blast()`, `scripts/spike/Board3D.gd` `apply_blast_with_radius_factor()`·`start_tap_magnet()`·`_advance_tap_magnet()`·`set_gravity()`·`_apply_actual_gravity_to_orbs()`·`is_gravity_transition_active()`, `scripts/spike/Orb3D.gd` `set_gravity_vector()`, `config/GameConfig.gd`·`default_config.tres`, 측정 도구, `tests/test_jelly_regression.gd`, 캡처, `project.godot`
@@ -58,10 +65,6 @@
   - [ ] `build/windows/GravityOrb_v0.16.4.exe` (`mode=Release`, `_BUILD.txt` 커밋 = 브랜치 끝), 0.16.1~0.16.3 파일 그대로
 - QA: §12-ONE.27 4~6·10번
 - 커밋: 항목 단위 브랜치 (`blast-push`), **push·PR까지** (병합은 Claude 검수 뒤)
-
----
-
-## 처리 완료
 
 ### [2026-11-07 #135] 같은 색 합체는 레벨 차 1까지·턴 대기 판정 정리·빌드 0.16.3 — 완료
 - 상태: 완료 (2026-11-07 사용자 "그대로 병합" · [PR #135](https://github.com/jeongmo-dot/gravity_orb/pull/135) 병합 `1001f14`)
