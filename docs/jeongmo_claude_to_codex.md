@@ -32,7 +32,31 @@
 
 ## 대기 중
 
-- 없음
+### [2026-11-07 #138] 소폭발은 사방으로 크게 — 위로 터짐 끄기·소폭발 전용 반경·속도·빌드 0.16.6
+- 상태: 대기
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.29**
+- 배경: 사용자 (2026-11-07, 0.16.5 뒤) "위로 터지는게 아니라 사방으로 크게". #136 사방 밀기는 가운데에서도 0.4초 뒤 중앙값 47px — 반경 288px 밖의 젤리에 막힌다
+- 앵커: `scripts/spike/Board3D.gd` `apply_blast_with_radius_factor()` (소폭발 경로), `scripts/core/CollisionResolver.gd` `apply_jelly_tap_blast()` (청소 반경 `_jelly_tap_clean_targets()`·그림 `blast_radius_factor`는 그대로), `config/GameConfig.gd`·`default_config.tres`, 밀림·판 균형 측정 도구, `tests/test_jolt_3d.gd`·`tests/test_config.gd`·`tests/test_jelly_regression.gd`, `tests/spike/capture_screens.gd`, `project.godot`
+- 요구 (§12-ONE.29 1~9):
+  1. `jelly_tap_lift_speed` 900 → **0** (사방으로)
+  2. 새 필드 `jelly_tap_push_radius_factor` **0.5**: 소폭발 밀기 반경·감쇠 R. 0이면 `jelly_tap_blast_radius_factor`. 분홍 폭탄 청소 반경·소폭발 그림 크기는 0.3 그대로
+  3. 새 필드 `jelly_tap_push_speed` **1800**: 소폭발 밀기 속도. 0이면 `blast_speed`. 대폭발은 1350 그대로
+  4. 밀림 측정 L9·T0~T4 (가운데·바닥 더미 위 노랑, T3 대폭발 한 번). 바깥쪽 거리, 50px·100px 이상 비율, 최대 속도·관통·이탈
+  5. 판 균형 T3 (자동 D-save·D-all, R D-save, L-합체 D-save·D-all), S4-G1 옆
+  6. 해시: 예전 10종·CLASSIC 생성 진행 그대로, T3 고정
+  7. 테스트 (§12-ONE.29 7번)
+  8. 캡처: 가운데·더미 위 노랑 L9·T0·T3 × 0·0.1·0.2·0.4초, 두 비율, 앞 장면 팝업·호령·콤보 지운 뒤 (캡처 도구만), 마지막 전체
+  9. 버전 **0.16.6**, 커밋 뒤 깨끗한 트리에서 Release. 보고는 #136과 같다
+- 수치 (Claude): `jelly_tap_lift_speed` **0**, `jelly_tap_push_radius_factor` **0.5**, `jelly_tap_push_speed` **1800**, 버전 **0.16.6**. 그 밖의 값은 그대로
+- 건드리지 말 것: 대폭발, `blast_speed`·`blast_far_factor`·무중력, 색 청소·색별 효과·분홍 폭탄 청소 반경, 소폭발 그림 크기, 생성·합치는 레벨, 물리, 그림·연출 (명세에 없는 것 금지, 고리 모양 금지), 사용자 저장 파일, `docs/` (회신 파일 제외)
+- **회신 맨 앞에**: T3 판 밖 이탈 1회 이상 또는 최대 관통 30px 초과, T3 가운데 노랑 0.4초 중앙값이 대폭발보다 큼, T3 자동 D-save 평균 턴이 S4-G1 (124.85)과 20% 넘게 다름, T3 L-합체 D-all 미완료 3판 이상
+- Done-when:
+  - [ ] 테스트 통과, 예전 해시 10종·CLASSIC 생성 진행 그대로, T3 해시 고정
+  - [ ] 밀림 측정표 L9·T0~T4, 판 균형표 T3 (S4-G1 옆)
+  - [ ] 캡처 (두 비율)
+  - [ ] `build/windows/GravityOrb_v0.16.6.exe` (`mode=Release`, `_BUILD.txt` 커밋 = 브랜치 끝), 0.16.1~0.16.5 파일 그대로
+- QA: §12-ONE.29 4·5·9번
+- 커밋: 항목 단위 브랜치 (`tap-push-wide`), **push·PR까지** (병합은 Claude 검수 뒤)
 
 ---
 
