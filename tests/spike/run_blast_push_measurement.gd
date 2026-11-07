@@ -2,15 +2,21 @@ extends Node
 
 const BOARD_SCENE: PackedScene = preload("res://scenes/Board3D.tscn")
 const RESOLVER_SCRIPT: Script = preload("res://scripts/core/CollisionResolver.gd")
-const OUTPUT_PATH: String = "res://artifacts/measurements/blast_push_k0_k4.json"
+const OUTPUT_PATH: String = "res://artifacts/measurements/blast_push_k0_k4_lift.json"
 const TICKS_PER_SECOND: int = 120
 const SAMPLE_FRAMES: Dictionary = {12: "0.1", 24: "0.2", 48: "0.4", 96: "0.8"}
 const PROFILES: Array[Dictionary] = [
-	{"name": "K0", "common": false, "speed": 900.0, "far": 0.4, "pause": 0.0},
-	{"name": "K1", "common": true, "speed": 900.0, "far": 0.4, "pause": 0.0},
-	{"name": "K2", "common": true, "speed": 1350.0, "far": 0.5, "pause": 0.0},
-	{"name": "K3", "common": true, "speed": 900.0, "far": 0.4, "pause": 0.2},
-	{"name": "K4", "common": true, "speed": 1350.0, "far": 0.5, "pause": 0.2},
+	{"name": "K0", "common": false, "speed": 900.0, "far": 0.4, "pause": 0.0, "lift": 0.0},
+	{"name": "K1", "common": true, "speed": 900.0, "far": 0.4, "pause": 0.0, "lift": 0.0},
+	{"name": "K2", "common": true, "speed": 1350.0, "far": 0.5, "pause": 0.0, "lift": 0.0},
+	{"name": "K3", "common": true, "speed": 900.0, "far": 0.4, "pause": 0.2, "lift": 0.0},
+	{"name": "K4", "common": true, "speed": 1350.0, "far": 0.5, "pause": 0.2, "lift": 0.0},
+]
+const LIFT_PROFILES: Array[Dictionary] = [
+	{"name": "lift_0", "common": true, "speed": 1350.0, "far": 0.5, "pause": 0.2, "lift": 0.0},
+	{"name": "lift_600", "common": true, "speed": 1350.0, "far": 0.5, "pause": 0.2, "lift": 600.0},
+	{"name": "lift_900", "common": true, "speed": 1350.0, "far": 0.5, "pause": 0.2, "lift": 900.0},
+	{"name": "lift_1200", "common": true, "speed": 1350.0, "far": 0.5, "pause": 0.2, "lift": 1200.0},
 ]
 
 var _output_path: String = OUTPUT_PATH
@@ -32,6 +38,7 @@ func _run() -> void:
 		"engine": Engine.get_version_info(),
 		"physics_ticks_per_second": TICKS_PER_SECOND,
 		"profiles": {},
+		"lift_profiles": {},
 	}
 	for profile: Dictionary in PROFILES:
 		_apply_profile(profile)
@@ -46,6 +53,19 @@ func _run() -> void:
 		(report["profiles"] as Dictionary)[str(profile["name"])] = {
 			"values": profile.duplicate(true),
 			"scenes": scenes,
+		}
+	for profile: Dictionary in LIFT_PROFILES:
+		_apply_profile(profile)
+		(report["lift_profiles"] as Dictionary)[str(profile["name"])] = {
+			"values": profile.duplicate(true),
+			"scenes": {
+				"center_tap_yellow": await _measure_scene(
+					"tap", OrbTypes.OrbColor.YELLOW
+				),
+				"yellow_floor_pile_tap": await _measure_scene(
+					"floor_tap", OrbTypes.OrbColor.YELLOW
+				),
+			},
 		}
 	_restore_config(snapshot)
 	_write_report(report)
@@ -115,7 +135,8 @@ func _measure_scene(kind: String, tap_color: int) -> Dictionary:
 				board,
 				initial,
 				origin,
-				pushed_ids
+				pushed_ids,
+				board.actual_gravity_direction()
 			)
 	var followup_merges: int = 0
 	var followup_blasts: int = 0
@@ -188,27 +209,44 @@ func _displacement_sample(
 	board: Board3D,
 	initial: Dictionary,
 	origin: Vector2,
-	pushed_ids: Dictionary
+	pushed_ids: Dictionary,
+	gravity_direction: Vector2
 ) -> Dictionary:
 	var outward: Array[float] = []
-	var moved_fifty: int = 0
+	var opposite_gravity: Array[float] = []
+	var outward_fifty: int = 0
+	var opposite_gravity_fifty: int = 0
+	var opposite_direction: Vector2 = -gravity_direction.normalized()
 	for orb: Orb3D in board.get_orbs():
 		if not initial.has(orb.stable_spawn_id) or not pushed_ids.has(orb.stable_spawn_id):
 			continue
 		var start: Vector2 = initial[orb.stable_spawn_id]["position"] as Vector2
 		var radial: Vector2 = start - origin
 		var direction: Vector2 = Vector2.RIGHT if radial.is_zero_approx() else radial.normalized()
-		var displacement: float = (orb.position - start).dot(direction)
-		outward.append(displacement)
-		if displacement >= 50.0:
-			moved_fifty += 1
+		var delta: Vector2 = orb.position - start
+		var outward_displacement: float = delta.dot(direction)
+		var lift_displacement: float = delta.dot(opposite_direction)
+		outward.append(outward_displacement)
+		opposite_gravity.append(lift_displacement)
+		if outward_displacement >= 50.0:
+			outward_fifty += 1
+		if lift_displacement >= 50.0:
+			opposite_gravity_fifty += 1
 	outward.sort()
+	opposite_gravity.sort()
 	return {
 		"surviving_targets": outward.size(),
 		"outward_median_px": _percentile(outward, 0.5),
 		"outward_p90_px": _percentile(outward, 0.9),
 		"at_least_50_px_ratio": (
-			float(moved_fifty) / float(outward.size()) if not outward.is_empty() else 0.0
+			float(outward_fifty) / float(outward.size()) if not outward.is_empty() else 0.0
+		),
+		"opposite_gravity_median_px": _percentile(opposite_gravity, 0.5),
+		"opposite_gravity_p90_px": _percentile(opposite_gravity, 0.9),
+		"opposite_gravity_at_least_50_px_ratio": (
+			float(opposite_gravity_fifty) / float(opposite_gravity.size())
+			if not opposite_gravity.is_empty()
+			else 0.0
 		),
 	}
 
@@ -259,6 +297,7 @@ func _snapshot_config() -> Dictionary:
 		"speed": Config.data.blast_speed,
 		"far": Config.data.blast_far_factor,
 		"pause": Config.data.blast_gravity_pause_time,
+		"lift": Config.data.jelly_tap_lift_speed,
 	}
 
 
@@ -269,6 +308,7 @@ func _restore_config(snapshot: Dictionary) -> void:
 	Config.data.blast_speed = float(snapshot["speed"])
 	Config.data.blast_far_factor = float(snapshot["far"])
 	Config.data.blast_gravity_pause_time = float(snapshot["pause"])
+	Config.data.jelly_tap_lift_speed = float(snapshot["lift"])
 
 
 func _apply_profile(profile: Dictionary) -> void:
@@ -276,6 +316,7 @@ func _apply_profile(profile: Dictionary) -> void:
 	Config.data.blast_speed = float(profile["speed"])
 	Config.data.blast_far_factor = float(profile["far"])
 	Config.data.blast_gravity_pause_time = float(profile["pause"])
+	Config.data.jelly_tap_lift_speed = float(profile["lift"])
 
 
 func _write_report(report: Dictionary) -> void:

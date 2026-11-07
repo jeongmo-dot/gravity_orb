@@ -131,9 +131,11 @@ func _run() -> void:
 		"jelly_tap_effect_profile": _jelly_tap_effect_profile,
 		"jelly_tap_effect_modes": Array(Config.data.jelly_tap_effect_modes),
 		"jelly_tap_common_push": Config.data.jelly_tap_common_push,
+		"jelly_tap_lift_speed": Config.data.jelly_tap_lift_speed,
 		"blast_gravity_pause_time": Config.data.blast_gravity_pause_time,
 		"jelly_merge_duration": Config.data.jelly_merge_duration,
 		"jelly_merge_level_gap": Config.data.jelly_merge_level_gap,
+		"jelly_merge_wide_gap_min_level": Config.data.jelly_merge_wide_gap_min_level,
 		"blast_push_radius_by_level": Array(Config.data.blast_push_radius_by_level),
 		"blast_speed": Config.data.blast_speed,
 		"blast_far_factor": Config.data.blast_far_factor,
@@ -565,6 +567,8 @@ func _run_seed(
 		"one_level_absorption_count": _seed_absorption_count,
 		"level_seven_creation_count": _seed_level_seven_creation_count,
 		"level_creation_count_by_level": _seed_level_creation_count_by_level.duplicate(true),
+		"level_eight_plus_creation_count": _level_creation_count_at_least(8),
+		"reached_level_eight_plus": score_manager.max_level_reached >= 8,
 		"level_up_count": _seed_level_up_count,
 		"tap_blast_count": _seed_tap_blast_count,
 		"tap_blast_count_by_level": _seed_tap_blast_count_by_level.duplicate(true),
@@ -1167,6 +1171,15 @@ func _record_followup_for_blast_windows(reaction_type: ReactionRules.Type) -> vo
 			window["merges"] = int(window["merges"]) + 1
 		else:
 			window["blasts"] = int(window["blasts"]) + 1
+
+
+func _level_creation_count_at_least(minimum_level: int) -> int:
+	var total: int = 0
+	for property: String in _seed_level_creation_count_by_level:
+		var level: int = property.trim_prefix("L").to_int()
+		if level >= minimum_level:
+			total += int(_seed_level_creation_count_by_level[property])
+	return total
 
 
 func _blast_reaction_window_summary() -> Dictionary:
@@ -2228,6 +2241,11 @@ func _apply_arguments() -> void:
 			Config.data.jelly_tap_common_push = (
 				argument.trim_prefix("--jelly-tap-common-push=") == "on"
 			)
+		elif argument.begins_with("--jelly-tap-lift-speed="):
+			Config.data.jelly_tap_lift_speed = maxf(
+				argument.trim_prefix("--jelly-tap-lift-speed=").to_float(),
+				0.0
+			)
 		elif argument.begins_with("--blast-min-level="):
 			Config.data.blast_min_level = maxi(
 				argument.trim_prefix("--blast-min-level=").to_int(),
@@ -2296,6 +2314,11 @@ func _apply_arguments() -> void:
 		elif argument.begins_with("--jelly-merge-level-gap="):
 			Config.data.jelly_merge_level_gap = maxi(
 				argument.trim_prefix("--jelly-merge-level-gap=").to_int(),
+				0
+			)
+		elif argument.begins_with("--jelly-merge-wide-gap-min-level="):
+			Config.data.jelly_merge_wide_gap_min_level = maxi(
+				argument.trim_prefix("--jelly-merge-wide-gap-min-level=").to_int(),
 				0
 			)
 		elif argument.begins_with("--blast-push-radius-by-level="):

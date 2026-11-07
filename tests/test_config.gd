@@ -155,7 +155,7 @@ func test_m4_spawn_defaults() -> void:
 	assert_eq(config.spawn_count_per_turn, 1, "spawn count per turn")
 	assert_eq(config.preview_turns, 2, "preview turns")
 	assert_eq(config.spawn_count_ramp_turns, 10, "spawn count ramp interval")
-	assert_eq(config.spawn_count_max, 5, "spawn count maximum")
+	assert_eq(config.spawn_count_max, 4, "spawn count maximum")
 	assert_eq(config.turn_start_colors, 4, "turn mode starts with four colors")
 	assert_eq(config.turn_color_unlock_turns, [30, 60], "turn color unlock schedule")
 	assert_eq(config.spawn_position_mode, GameConfig.SpawnPositionMode.RANDOM, "position mode")
@@ -169,9 +169,9 @@ func test_spawn_count_ramp_turn_boundaries() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	var expected: Dictionary = {
 		40: 4,
-		41: 5,
-		100: 5,
-		500: 5,
+		41: 4,
+		100: 4,
+		500: 4,
 	}
 	for turn_value: Variant in expected:
 		var turn_index: int = int(turn_value)
@@ -325,6 +325,7 @@ func test_m9_blast_defaults() -> void:
 	assert_eq(config.jelly_blast_min_level, 8, "JELLY blast starts at L8 by default")
 	assert_true(not config.jelly_blast_requires_same_level, "JELLY blast allows mixed levels")
 	assert_eq(config.jelly_merge_level_gap, 1, "JELLY merge level gap defaults to one")
+	assert_eq(config.jelly_merge_wide_gap_min_level, 0, "JELLY wide merge gap defaults off")
 	assert_eq(
 		config.blast_push_radius_by_level,
 		PackedFloat32Array([0.0, 0.0, 0.0, 0.3, 0.55, 1.0, 1.0, 1.0, 1.0, 1.0]),
@@ -352,6 +353,7 @@ func test_m9_blast_defaults() -> void:
 	assert_eq(config.jelly_tap_bonus_points_per_orb, 100, "tap bonus per orb")
 	assert_near(config.jelly_tap_magnet_time, 0.5, TOLERANCE, "tap magnet time")
 	assert_true(config.jelly_tap_common_push, "all tap colors push nearby jelly")
+	assert_near(config.jelly_tap_lift_speed, 900.0, TOLERANCE, "tap blast lift speed")
 	assert_near(config.blast_gravity_pause_time, 0.2, TOLERANCE, "blast gravity pause")
 	var fallback: GameConfig = GameConfig.new()
 	fallback.jelly_tap_effect_modes = PackedInt32Array()

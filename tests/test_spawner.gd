@@ -211,24 +211,29 @@ func test_ramp_draws_next_turn_batch_sizes_at_boundaries() -> void:
 	_restore_spawn_config(snapshot)
 
 
-func test_default_ten_turn_ramp_caps_at_five() -> void:
+func test_ten_turn_ramp_caps_at_configured_four_and_three() -> void:
 	var snapshot: Dictionary = _snapshot_spawn_config()
 	Config.data.spawn_count_per_turn = 1
 	Config.data.spawn_count_ramp_turns = 10
-	Config.data.spawn_count_max = 5
+	Config.data.spawn_count_max = 4
 	var expected: Dictionary = {
+		30: 3,
+		31: 4,
 		40: 4,
-		41: 5,
-		100: 5,
-		500: 5,
+		41: 4,
+		100: 4,
 	}
 	for turn_value: Variant in expected:
 		var turn_index: int = int(turn_value)
 		assert_eq(
 			Config.data.spawn_count_for_turn(turn_index),
 			int(expected[turn_index]),
-			"default batch size at turn %d" % turn_index
+			"four-cap batch size at turn %d" % turn_index
 		)
+	Config.data.spawn_count_max = 3
+	assert_eq(Config.data.spawn_count_for_turn(20), 2, "three-cap stays at two through turn 20")
+	assert_eq(Config.data.spawn_count_for_turn(21), 3, "three-cap begins at turn 21")
+	assert_eq(Config.data.spawn_count_for_turn(100), 3, "three-cap remains capped")
 	_restore_spawn_config(snapshot)
 
 
@@ -318,7 +323,7 @@ func test_default_classic_progression_hash() -> void:
 	print("STAGED_DIFFICULTY_HASH classic=%s" % hash_value)
 	assert_eq(
 		hash_value,
-		"1ded23b4fcdad092740dc7854b0a0640ae3900c1d1effe620686ac5c7ca1a3eb",
+		"cd9b8fed034153324ddbfaf2f966ab848225b75f8ba6ad5e8cf6ae4d70a38a85",
 		"CLASSIC staged progression hash"
 	)
 	spawner.free()

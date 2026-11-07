@@ -1,6 +1,6 @@
 param(
     [string]$GodotPath = "",
-    [string]$OutputPath = "res://artifacts/measurements/blast_push_k0_k4.json"
+    [string]$OutputPath = "res://artifacts/measurements/blast_push_k0_k4_lift.json"
 )
 
 $ErrorActionPreference = "Stop"

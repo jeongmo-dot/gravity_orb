@@ -355,6 +355,55 @@ func test_jelly_merge_level_gap_controls_same_color_absorption_only() -> void:
 	assert_eq(different_gap["type"], ReactionRules.Type.NONE, "merge gap does not affect colors")
 
 
+func test_jelly_wide_gap_allows_only_large_same_color_absorbers() -> void:
+	var cfg: GameConfig = GameConfig.new()
+	cfg.game_mode = GameConfig.GameMode.JELLY
+	cfg.jelly_merge_level_gap = 1
+	cfg.jelly_merge_wide_gap_min_level = 6
+	var l6_l4: Dictionary = ReactionRules.classify(2, 6, 2, 4, cfg, 11.0, 5.0)
+	var l7_l5: Dictionary = ReactionRules.classify(2, 7, 2, 5, cfg, 17.0, 7.0)
+	assert_eq(l6_l4["type"], ReactionRules.Type.MERGE, "H6 allows L6+L4")
+	assert_eq(l6_l4["result_level"], 6, "L6+L4 remains L6")
+	assert_near(float(l6_l4["result_mass"]), 16.0, 0.001, "L6+L4 keeps summed mass")
+	assert_eq(l7_l5["type"], ReactionRules.Type.MERGE, "H6 allows L7+L5")
+	assert_eq(
+		ReactionRules.classify(2, 5, 2, 3, cfg)["type"],
+		ReactionRules.Type.NONE,
+		"H6 rejects L5+L3"
+	)
+	assert_eq(
+		ReactionRules.classify(2, 6, 2, 3, cfg)["type"],
+		ReactionRules.Type.NONE,
+		"H6 rejects gap three"
+	)
+	assert_eq(
+		ReactionRules.classify(0, 6, 1, 4, cfg)["type"],
+		ReactionRules.Type.NONE,
+		"H6 does not widen different colors"
+	)
+	for color_a: int in range(cfg.color_display.size()):
+		for color_b: int in range(cfg.color_display.size()):
+			for level_a: int in range(1, cfg.orb_max_level + 1):
+				for level_b: int in range(1, cfg.orb_max_level + 1):
+					var classified: Dictionary = ReactionRules.classify(
+						color_a, level_a, color_b, level_b, cfg
+					)
+					assert_eq(
+						ReactionRules.can_react(color_a, level_a, color_b, level_b, cfg),
+						int(classified["type"]) != ReactionRules.Type.NONE,
+						"H6 predicate matches %d/%d %d/%d" % [
+							color_a, level_a, color_b, level_b,
+						]
+					)
+	cfg.jelly_merge_wide_gap_min_level = 0
+	assert_true(not ReactionRules.can_react(2, 6, 2, 4, cfg), "zero restores G1")
+	assert_eq(
+		ReactionRules.classify(2, 6, 2, 4, cfg)["type"],
+		ReactionRules.Type.NONE,
+		"zero classification restores G1"
+	)
+
+
 func test_jelly_blast_default_l8_threshold_and_gap_one_absorption_precedence() -> void:
 	var cfg: GameConfig = GameConfig.new()
 	cfg.game_mode = GameConfig.GameMode.JELLY

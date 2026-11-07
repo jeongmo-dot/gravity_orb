@@ -51,10 +51,17 @@ static func can_react(
 	cfg: GameConfig
 ) -> bool:
 	if cfg.game_mode == GameConfig.GameMode.JELLY:
+		var level_gap: int = absi(level_a - level_b)
+		var base_gap: int = maxi(cfg.jelly_merge_level_gap, 0)
+		var wide_gap_allowed: bool = (
+			cfg.jelly_merge_wide_gap_min_level > 0
+			and level_gap == base_gap + 1
+			and maxi(level_a, level_b) >= cfg.jelly_merge_wide_gap_min_level
+		)
 		return (
 			(
 				color_a == color_b
-				and absi(level_a - level_b) <= maxi(cfg.jelly_merge_level_gap, 0)
+				and (level_gap <= base_gap or wide_gap_allowed)
 			)
 			or (
 				color_a != color_b
@@ -87,9 +94,16 @@ static func _classify_jelly(
 	mass_a: float,
 	mass_b: float
 ) -> Dictionary:
+	var level_gap: int = absi(level_a - level_b)
+	var base_gap: int = maxi(cfg.jelly_merge_level_gap, 0)
+	var wide_gap_allowed: bool = (
+		cfg.jelly_merge_wide_gap_min_level > 0
+		and level_gap == base_gap + 1
+		and maxi(level_a, level_b) >= cfg.jelly_merge_wide_gap_min_level
+	)
 	if (
 		color_a == color_b
-		and absi(level_a - level_b) <= maxi(cfg.jelly_merge_level_gap, 0)
+		and (level_gap <= base_gap or wide_gap_allowed)
 	):
 		if level_a == cfg.orb_max_level and level_b == cfg.orb_max_level:
 			return _result(Type.MAX_CLEAR, 0, color_a)

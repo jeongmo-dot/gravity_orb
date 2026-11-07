@@ -14,6 +14,8 @@ param(
 	[ValidateRange(0, 10)]
 	[int]$JellyMergeLevelGap = 1,
 	[ValidateRange(0, 10)]
+	[int]$JellyMergeWideGapMinLevel = 0,
+	[ValidateRange(0, 10)]
 	[int]$JellyBlastMinLevel = 8,
 	[ValidateRange(0, 10)]
 	[int]$JellyTapBlastMinLevel = 8,
@@ -33,6 +35,8 @@ param(
 	[string]$JellyBlastRequiresSameLevel = "Off",
 	[ValidateSet("On", "Off")]
 	[string]$JellyTapCommonPush = "On",
+	[ValidateRange(0.0, 10000.0)]
+	[double]$JellyTapLiftSpeed = 900.0,
 	[ValidateRange(0.0, 10.0)]
 	[double]$BlastGravityPauseTime = 0.2,
 	[ValidateRange(0.0, 10000.0)]
@@ -40,6 +44,9 @@ param(
 	[ValidateRange(0.0, 1.0)]
 	[double]$BlastFarFactor = 0.5,
 	[string]$OrbFrictionByLevel = "0.3,0.3,0.3,0.4,0.4,0.4,0.4,0.5,0.5,0.5",
+	[ValidateRange(1, 100)]
+	[int]$SpawnCountMax = 4,
+	[string]$Strategies = "r,g,l_merge",
 	[string]$MeasurementLabel = "",
     [switch]$ReuseCompleted,
     [switch]$AggregateOnly
@@ -49,6 +56,10 @@ $ErrorActionPreference = "Stop"
 $resolvedTapBlastBotMode = if ($TapBlastBot -and $TapBlastBotMode -eq "None") { "All" } else { $TapBlastBotMode }
 if ($OrbFrictionByLevel -ne "none" -and $OrbFrictionByLevel -notmatch '^\d+(\.\d+)?(,\d+(\.\d+)?)*$') {
 	throw "OrbFrictionByLevel must be 'none' or comma-separated non-negative numbers"
+}
+$resolvedStrategies = @($Strategies.Split(',') | ForEach-Object { $_.Trim().ToLower() } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+if ($resolvedStrategies.Count -eq 0 -or @($resolvedStrategies | Where-Object { $_ -notin @('r', 'g', 'l_merge') }).Count -gt 0) {
+	throw "Strategies must be a comma-separated subset of r,g,l_merge"
 }
 $repoPath = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $outputDirectory = Join-Path $repoPath "artifacts\measurements"
@@ -78,7 +89,7 @@ function Get-SeedShards([int]$Count, [int]$Size) {
 
 if (-not $AggregateOnly) {
     $tasks = @()
-    foreach ($strategy in @("r", "g", "l_merge")) {
+	foreach ($strategy in $resolvedStrategies) {
         # Keep each Godot worker below the desktop task runner's process window.
         # A single 600-turn seed can already take more than one minute.
         $shardSize = 1
@@ -98,6 +109,7 @@ if (-not $AggregateOnly) {
                     "--jolt-max-turns=$TurnCap", "--jolt-no-determinism", "--skill-strategy=$strategy",
 					"--jelly-level-profile=$LevelProfile",
 					"--jelly-merge-level-gap=$JellyMergeLevelGap",
+					"--jelly-merge-wide-gap-min-level=$JellyMergeWideGapMinLevel",
 					"--jelly-blast-min-level=$JellyBlastMinLevel",
 					"--jelly-tap-blast-min-level=$JellyTapBlastMinLevel",
 					"--blast-score-factor=$($BlastScoreFactor.ToString([Globalization.CultureInfo]::InvariantCulture))",
@@ -108,10 +120,12 @@ if (-not $AggregateOnly) {
 					"--jelly-tap-effect-modes=$($JellyTapEffectModes.ToLower())",
 					"--jelly-blast-requires-same-level=$($JellyBlastRequiresSameLevel.ToLower())",
 					"--jelly-tap-common-push=$($JellyTapCommonPush.ToLower())",
+					"--jelly-tap-lift-speed=$($JellyTapLiftSpeed.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--blast-gravity-pause-time=$($BlastGravityPauseTime.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--blast-speed=$($BlastSpeed.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--blast-far-factor=$($BlastFarFactor.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--orb-friction-by-level=$OrbFrictionByLevel",
+					"--spawn-count-max=$SpawnCountMax",
 					"--jelly-tap-blast-bot=$($resolvedTapBlastBotMode.ToLower())",
                     "--jolt-output=res://artifacts/measurements/$name.json"
                 )
@@ -121,21 +135,26 @@ if (-not $AggregateOnly) {
     if ($ReuseCompleted) {
         $tasks = @($tasks | Where-Object { -not ((Test-Path -LiteralPath $_.Output) -and (Get-Item -LiteralPath $_.Output).Length -gt 0) })
     }
-    for ($offset = 0; $offset -lt $tasks.Count; $offset += $Parallelism) {
-        $end = [Math]::Min($offset + $Parallelism - 1, $tasks.Count - 1)
-        $running = @()
-        foreach ($task in @($tasks[$offset..$end])) {
+    $nextTaskIndex = 0
+    $running = @()
+    while ($nextTaskIndex -lt $tasks.Count -or $running.Count -gt 0) {
+        while ($nextTaskIndex -lt $tasks.Count -and $running.Count -lt $Parallelism) {
+            $task = $tasks[$nextTaskIndex]
+            $nextTaskIndex += 1
             Remove-Item -LiteralPath $task.Output, $task.Stdout, $task.Stderr -Force -ErrorAction SilentlyContinue
             $process = Start-Process -FilePath $GodotPath -ArgumentList $task.Arguments -WindowStyle Hidden `
                 -PassThru -RedirectStandardOutput $task.Stdout -RedirectStandardError $task.Stderr
             $running += [pscustomobject]@{ Task = $task; Process = $process }
             Write-Output "JELLY_MEASUREMENT_START name=$($task.Name) pid=$($process.Id)"
         }
-        while (@($running | Where-Object { -not $_.Process.HasExited }).Count -gt 0) {
-            Start-Sleep -Milliseconds 500
-            foreach ($entry in $running) { $entry.Process.Refresh() }
-        }
+        Start-Sleep -Milliseconds 500
+        $stillRunning = @()
         foreach ($entry in $running) {
+			$entry.Process.Refresh()
+			if (-not $entry.Process.HasExited) {
+				$stillRunning += $entry
+				continue
+			}
 			$entry.Process.WaitForExit()
 			$entry.Process.Refresh()
             $stdout = Get-Content -LiteralPath $entry.Task.Stdout -Raw -ErrorAction SilentlyContinue
@@ -147,6 +166,7 @@ if (-not $AggregateOnly) {
             if (-not (Test-Path -LiteralPath $entry.Task.Output)) { throw "Missing $($entry.Task.Output)" }
             Write-Output "JELLY_MEASUREMENT_DONE name=$($entry.Task.Name) exit=0"
         }
+		$running = $stillRunning
     }
 }
 
@@ -269,6 +289,9 @@ function Get-Summary($Rows) {
         unarmed_blast_outline_visible_frames = [int]$unarmedOutlineFrames
         blast_outline_max_alpha = $outlineMaxAlpha
 		level_seven_game_rate = Get-Ratio @($Rows | Where-Object { $_.reached_level_seven }).Count @($Rows).Count
+		level_eight_plus_game_count = @($Rows | Where-Object { $_.reached_level_eight_plus }).Count
+		level_eight_plus_creation_count = [int](($Rows | Measure-Object -Property level_eight_plus_creation_count -Sum).Sum)
+		average_level_eight_plus_creations_per_game = Get-Ratio ([double](($Rows | Measure-Object -Property level_eight_plus_creation_count -Sum).Sum)) @($Rows).Count
 		level_ten_game_count = @($Rows | Where-Object { [int]$_.max_level_reached -ge 10 }).Count
         jackpots = [int](($Rows | Measure-Object -Property max_clear_count -Sum).Sum)
 		blasts = [int](($Rows | Measure-Object -Property blast_count -Sum).Sum)
@@ -294,7 +317,8 @@ function Get-Summary($Rows) {
     }
 }
 
-$rows = [ordered]@{ r = @(); g = @(); l_merge = @() }
+$rows = [ordered]@{}
+foreach ($strategy in $resolvedStrategies) { $rows[$strategy] = @() }
 foreach ($strategy in @($rows.Keys)) {
     $shardSize = 1
     foreach ($shard in @(Get-SeedShards $SeedCount $shardSize)) {
@@ -305,25 +329,37 @@ foreach ($strategy in @($rows.Keys)) {
     $rows[$strategy] = @($rows[$strategy] | Sort-Object { [int]$_.seed })
     if ($rows[$strategy].Count -ne $SeedCount) { throw "$strategy expected $SeedCount rows, got $($rows[$strategy].Count)" }
 }
-$strategies = [ordered]@{}
-foreach ($strategy in @($rows.Keys)) { $strategies[$strategy] = Get-Summary $rows[$strategy] }
-$lengthRatio = Get-Ratio $strategies.l_merge.turns_median $strategies.r.turns_median
-$scoreRatio = Get-Ratio $strategies.l_merge.score_median $strategies.r.score_median
+$strategySummaries = [ordered]@{}
+foreach ($strategy in @($rows.Keys)) {
+	$strategySummaries[$strategy] = Get-Summary ($rows[$strategy])
+}
+$hasSkillComparison = (
+	'r' -in $strategySummaries.Keys -and 'l_merge' -in $strategySummaries.Keys
+)
+$lengthRatio = if ($hasSkillComparison) {
+	Get-Ratio $strategySummaries.l_merge.turns_median $strategySummaries.r.turns_median
+} else { $null }
+$scoreRatio = if ($hasSkillComparison) {
+	Get-Ratio $strategySummaries.l_merge.score_median $strategySummaries.r.score_median
+} else { $null }
 $adjustmentCandidates = @()
-if ($strategies.r.turns_median -lt 150) {
+if ('r' -in $strategySummaries.Keys -and $strategySummaries.r.turns_median -lt 150) {
     $adjustmentCandidates += "Delay JELLY color unlocks or increase spawn_count_ramp_turns to lengthen random games"
-} elseif ($strategies.r.turns_median -gt 300) {
+} elseif ('r' -in $strategySummaries.Keys -and $strategySummaries.r.turns_median -gt 300) {
     $adjustmentCandidates += "Advance JELLY color unlocks or reduce spawn_count_ramp_turns to shorten random games"
 }
-if ($lengthRatio -lt 1.3) {
+if ($hasSkillComparison -and $lengthRatio -lt 1.3) {
     $adjustmentCandidates += "Measure JELLY-specific difficulty transition intervals because preview skill length ratio is below 1.3"
 }
-if ($strategies.r.early_merges_per_turn_1_30 -le 0.595) {
+if (
+	'r' -in $strategySummaries.Keys -and
+	$strategySummaries.r.early_merges_per_turn_1_30 -le 0.595
+) {
     $adjustmentCandidates += "Measure JELLY early color count/unlock candidates because early merge rate is not above CLASSIC C2"
 }
 $report = [ordered]@{
     generated_at = (Get-Date).ToUniversalTime().ToString("o")
-    conditions = "JELLY R/G/L-merge, seeds 1-$SeedCount, $TurnCap turns, fixed 120 fps"
+	conditions = "JELLY $($resolvedStrategies -join '/'), seeds 1-$SeedCount, $TurnCap turns, fixed 120 fps"
 	level_profile = $LevelProfile
 	tap_blast_bot_mode = $resolvedTapBlastBotMode.ToLower()
 	blast_score_factor = $BlastScoreFactor
@@ -333,19 +369,27 @@ $report = [ordered]@{
 	jelly_tap_grow_min_clean = $JellyTapGrowMinClean
 	jelly_tap_effect_modes = $JellyTapEffectModes.ToLower()
 	jelly_merge_level_gap = $JellyMergeLevelGap
+	jelly_merge_wide_gap_min_level = $JellyMergeWideGapMinLevel
 	jelly_blast_min_level = $JellyBlastMinLevel
 	jelly_tap_blast_min_level = $JellyTapBlastMinLevel
 	jelly_blast_requires_same_level = $JellyBlastRequiresSameLevel -eq "On"
 	jelly_tap_common_push = $JellyTapCommonPush -eq "On"
+	jelly_tap_lift_speed = $JellyTapLiftSpeed
 	blast_gravity_pause_time = $BlastGravityPauseTime
 	blast_speed = $BlastSpeed
 	blast_far_factor = $BlastFarFactor
 	orb_friction_by_level = $OrbFrictionByLevel
-    strategies = $strategies
+	spawn_count_max = $SpawnCountMax
+	strategies_requested = $resolvedStrategies
+	strategies = $strategySummaries
     skill_length_ratio_l_merge_over_r = $lengthRatio
     skill_score_ratio_l_merge_over_r = $scoreRatio
-    same_seed_length_win_rate = Get-SameSeedWinRate $rows.l_merge $rows.r "completed_turns"
-    same_seed_score_win_rate = Get-SameSeedWinRate $rows.l_merge $rows.r "score"
+    same_seed_length_win_rate = if ($hasSkillComparison) {
+		Get-SameSeedWinRate $rows.l_merge $rows.r "completed_turns"
+	} else { $null }
+    same_seed_score_win_rate = if ($hasSkillComparison) {
+		Get-SameSeedWinRate $rows.l_merge $rows.r "score"
+	} else { $null }
     comparison = [ordered]@{
         classic_c2 = [ordered]@{ r_turns = 221.0; r_score = 124262.5; l_turns = 327.0; l_score = 338539.5; skill_length_ratio = 1.479638009; early_merge_rate = 0.595 }
         slime_s2 = [ordered]@{ r_turns = 52.0; r_score = 103232.0; l_turns = 60.0; l_score = 151202.0; skill_length_ratio = 1.153846154; early_merge_rate = 2.966431688 }
@@ -353,9 +397,15 @@ $report = [ordered]@{
         jelly_motion_101 = [ordered]@{ r_turns = 230.5 }
     }
     desired_range = [ordered]@{
-        random_length_150_to_300 = $strategies.r.turns_median -ge 150 -and $strategies.r.turns_median -le 300
-        skill_length_ratio_at_least_1_3 = $lengthRatio -ge 1.3
-        early_merge_above_classic_c2 = $strategies.r.early_merges_per_turn_1_30 -gt 0.595
+        random_length_150_to_300 = if ('r' -in $strategySummaries.Keys) {
+			$strategySummaries.r.turns_median -ge 150 -and $strategySummaries.r.turns_median -le 300
+		} else { $null }
+        skill_length_ratio_at_least_1_3 = if ($hasSkillComparison) {
+			$lengthRatio -ge 1.3
+		} else { $null }
+        early_merge_above_classic_c2 = if ('r' -in $strategySummaries.Keys) {
+			$strategySummaries.r.early_merges_per_turn_1_30 -gt 0.595
+		} else { $null }
     }
     adjustment_candidates = $adjustmentCandidates
 }

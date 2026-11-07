@@ -343,7 +343,8 @@ func apply_jelly_tap_blast(orb: Variant) -> bool:
 		blast_targets = _board.apply_blast_with_radius_factor(
 			position,
 			Config.data.jelly_tap_blast_radius_factor,
-			orb
+			orb,
+			true
 		)
 	if tap_effect == GameConfig.JellyTapEffect.QUAKE:
 		shock_targets = _board.apply_tap_quake(

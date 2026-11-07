@@ -416,7 +416,8 @@ func apply_blast(origin: Vector2, blast_level: int) -> Array[Dictionary]:
 func apply_blast_with_radius_factor(
 	origin: Vector2,
 	radius_factor: float,
-	excluded_orb: Variant = null
+	excluded_orb: Variant = null,
+	apply_tap_lift: bool = false
 ) -> Array[Dictionary]:
 	var targets: Array[Dictionary] = []
 	var limited_radius: float = radius_factor * Config.data.board_size
@@ -442,6 +443,17 @@ func apply_blast_with_radius_factor(
 			distance_ratio
 		)
 		var velocity_change: Vector2 = direction * speed if in_range else Vector2.ZERO
+		if in_range and apply_tap_lift and Config.data.jelly_tap_lift_speed > 0.0:
+			var gravity_direction: Vector2 = _actual_gravity_direction.normalized()
+			var gravity_component: float = velocity_change.dot(gravity_direction)
+			if gravity_component > 0.0:
+				velocity_change -= gravity_direction * gravity_component
+			var lift_speed: float = Config.data.jelly_tap_lift_speed * lerpf(
+				1.0,
+				Config.data.blast_far_factor,
+				distance_ratio
+			)
+			velocity_change -= gravity_direction * lift_speed
 		if not velocity_change.is_zero_approx():
 			orb.apply_plane_velocity_change(velocity_change)
 			orb.start_blast_gravity_pause(Config.data.blast_gravity_pause_time)
