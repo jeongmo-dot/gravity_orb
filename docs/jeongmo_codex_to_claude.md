@@ -40,8 +40,8 @@
 
 ### [2026-11-07] 대상 #138 — 소폭발은 사방으로 크게
 - **경고: T3 중앙 배치의 최대 벽 관통이 `34.0px`로 명세 경고선 `30px`를 넘었다.** 이 장면은 시작부터 벽에 걸친 100개 더미를 쓰며 판 밖 이탈은 `0`회였다. 그 밖의 앞 경고 조건은 없음: T3 중앙 노랑 0.4초 바깥 이동 중앙값 `40.4px` < 대폭발 `158.8px`; 자동 D-save 평균 `127.85`턴은 S4-G1 `124.85` 대비 `+2.4%`; L-합체 D-all 미완료 `0/20`판
-- 상태: 완료 — 구현·자동 검증·100게임 판 균형·밀림 실측·두 비율 실제 창 캡처를 마쳤다. Release와 PR 정보는 최종 커밋 뒤 갱신
-- 브랜치 / PR: `tap-push-wide` / `TBD_PR`
+- 상태: 완료 — 구현·자동 검증·100게임 판 균형·밀림 실측·두 비율 실제 창 캡처·0.16.6 Release·PR까지 마쳤다. 합격·병합 판정은 Claude/사용자 대기
+- 브랜치 / PR: `tap-push-wide` / https://github.com/jeongmo-dot/gravity_orb/pull/138
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/{core/CollisionResolver.gd,spike/Board3D.gd}`, `project.godot`, `tests/{capture_screens.ps1,run_jelly_physics_autoplay.ps1,test_config.gd,test_jelly_regression.gd,test_jolt_3d.gd}`, `tests/spike/{capture_screens.gd,run_blast_push_measurement.gd,run_jolt_3d_measurement.gd}`, `tests/tools/{run_blast_push_measurement.ps1,run_jelly_measurement.ps1,run_spawn_merge_matrix.ps1,run_tap_push_balance.ps1}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 소폭발 리프트 기본값 `0`; 전용 밀기 반경 `0.5`와 속도 `1800`, 각 0이면 기존 0.3·1350으로 폴백 — 자동 (`test_config`, `test_jolt_3d`)
@@ -51,7 +51,7 @@
   - [x] 예전 JELLY 해시 10종과 CLASSIC 생성 진행 해시 유지, 새 T3 해시 고정 — 자동 (`test_jelly_regression`, `test_spawner`)
   - [x] L9·T0·T3 × 중앙/바닥 × 0·0.1·0.2·0.4초와 마지막 전체를 두 비율에서 생성. 팝업·콜아웃·콤보 잔여를 제거하고 직접 확인 — 실제 창 관측
   - [x] Godot Standard 전체 테스트·import·스모크·Debug 빌드 — 자동
-  - [ ] 0.16.6 Release·내보낸 스모크·PR — 최종 커밋 뒤 수행 예정
+  - [x] 0.16.6 Release·내보낸 스모크·PR — 자동 + 파일 해시 대조
 
 - 밀림 측정 (`바깥 이동 중앙값/p90 px`; 비율은 0.4초 `≥50px/≥100px`):
 
@@ -93,14 +93,19 @@
   - `tests/run_tests.ps1` → 일반 `341/341`, 장기 `4/4`, 성능 `5/5`; 각각 새 프로세스, 전체 `98.882초`, 종료 코드 0
   - 기본/`--mode=blitz` 300프레임 smoke → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·`ERROR:` 0건
   - `tools/build_windows.ps1 -Debug` → `WINDOWS_BUILD_RESULT version=0.16.6 mode=Debug exit=0 bytes=104997488 preserved=36`
-  - PowerShell 변경 스크립트 6개 구문 분석 오류 0건. `git diff --check`와 Release 정보는 최종 갱신 예정
+  - 깨끗한 트리 Release 뒤 회신 최종 커밋에서 `-ReplaceSameVersion` 재생성: exe `111,127,664`바이트, SHA-256 `2b1f52756854c1c2efc41a7ffdc4ff51eab08e1d7a53a7bb869f1981acf24371`; console `50,176`바이트, SHA-256 `a7cf03b0a3b137a701a4b51856f8b1a7d9e461a4b308c3cf04b9d7b1ec4f9086`; sidecar PCK `0`개
+  - 최종 `_BUILD.txt`: `Version: 0.16.6`, `Mode: Release`, `Engine: 4.8.dev3.official.51105ccbe`, Commit과 브랜치 끝 일치
+  - 내보낸 console 기본/`--mode=jelly` 300프레임 스모크 각각 종료 코드 0, `SCRIPT ERROR|Parse Error|ERROR:` 0건
+  - 묶음 금지 패턴 `res://tests/`, `res://artifacts/`, `res://docs/`, `run_tests.gd`, `capture_screens.gd`, 설계·두 인박스 문서 각 0건; 양성 앵커 `OrbitStage 8 + JellyOrbArt 6 + StartScreen 8 + Main3D 5 = 27`건
+  - 사용자 `save.cfg` SHA-256 `2243b278dbf10afa50c73d54baeee316d4560658de75ac45658e620c6272db3a` 불변. 0.16.1~0.16.5 파일 16개의 이름·크기·SHA-256 매니페스트 `3de57460f801825faa495e6d5f67b2b731d3abdf822b30fea554b1e6fce412f6` 불변
+  - PowerShell 변경 스크립트 6개 구문 분석 오류 0건. `git diff --check` 오류 0건
   - Input 검색은 `InputRouter.gd`와 허용 예외 `Haptics.gd`뿐. RNG 검색은 `Spawner.gd`와 기존 `ColorEffectVisual.gd`의 전용 시드 RNG뿐이며 이번 diff 새 위반 0건
 - 수동 확인 절차:
   1. JELLY에서 노랑 L8 이상을 가운데 터치 → 위쪽 리프트 없이 주변 젤리가 사방으로 멀리 밀리는지 본다
   2. 바닥 더미 위 노랑 L8 이상을 터치 → 밀린 젤리가 0.2초 무중력 뒤 현재 중력을 다시 받고, 분홍 청소·그림 반경은 이전과 같은지 본다
   3. 같은 레벨 다른 색 대폭발 유도 → 대폭발 세기·반경이 0.16.5와 같은지 본다
 - 결정 사항: 명세 수치 외 게임 수치는 바꾸지 않았다. 과거 #137 측정 재실행 도구는 새 기본값의 영향을 받지 않도록 새 소폭발 필드를 0으로 명시했다. 캡처 전용 경로는 반응 직후 점수 팝업·콜아웃·콤보·연출 잔여만 지우며 게임 실행 경로에는 영향이 없다
-- 남은 것 · 질문: Release/PR 정보만 최종 갱신 예정. 측정 원본은 `artifacts/measurements/blast_push_tap_wide.json`, `tap_push_t3_balance.json`이며 git에는 포함하지 않는다
+- 남은 것 · 질문: 구현·검증 잔여 없음. 합격·병합 판정은 Claude/사용자 몫. 측정 원본은 `artifacts/measurements/blast_push_tap_wide.json`, `tap_push_t3_balance.json`이며 git에는 포함하지 않는다
 
 ### [2026-11-07] 대상 #137 — 소폭발 위쪽 리프트·생성 상한 4·합체 후보 3×3 측정
 - 상태: 완료 — 1차 구현·측정 뒤 사용자가 고른 `S4-G1`을 확정하고 추가 요구 1의 H 규칙 대기 판정·버전 0.16.5·Release까지 마쳤다. 합격·병합 판정은 Claude/사용자 대기
