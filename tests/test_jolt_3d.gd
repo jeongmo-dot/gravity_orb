@@ -1107,8 +1107,10 @@ func test_level_ten_tap_uses_sixteen_pixel_margin_and_rejects_simulating() -> vo
 func test_tap_clean_removes_only_eligible_same_color_without_push() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
+	var original_common_push: bool = Config.data.jelly_tap_common_push
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.jelly_tap_effect_modes = PackedInt32Array([1, 1, 1, 1, 1, 1])
+	Config.data.jelly_tap_common_push = false
 	var fixture: Dictionary = await _create_turn_fixture()
 	var board: Board3D = fixture["board"] as Board3D
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
@@ -1140,7 +1142,87 @@ func test_tap_clean_removes_only_eligible_same_color_without_push() -> void:
 	assert_true(same_high.linear_velocity.is_zero_approx(), "remaining orb is not pushed")
 	Config.data.game_mode = original_mode
 	Config.data.jelly_tap_effect_modes = original_modes
+	Config.data.jelly_tap_common_push = original_common_push
 	await _cleanup(fixture["root"] as Node)
+
+
+func test_all_six_tap_colors_push_only_nearby_orbs_and_exclude_source() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_common_push: bool = Config.data.jelly_tap_common_push
+	var original_pause: float = Config.data.blast_gravity_pause_time
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_tap_common_push = true
+	Config.data.blast_gravity_pause_time = 0.2
+	var fixture: Dictionary = await _create_turn_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var reactions: Array[Dictionary] = []
+	resolver.reaction_applied.connect(func(reaction: Dictionary) -> void: reactions.append(reaction))
+	for color: int in range(6):
+		board.clear()
+		await tree.process_frame
+		var source: Orb3D = board.spawn_orb(color, 10, Vector2.ZERO)
+		var near: Orb3D = board.spawn_orb((color + 1) % 6, 4, Vector2(180.0, 0.0))
+		var far: Orb3D = board.spawn_orb((color + 2) % 6, 4, Vector2(380.0, 0.0))
+		assert_true(resolver.apply_jelly_tap_blast(source), "color %d tap applies" % color)
+		var source_seen: bool = false
+		var near_speed: float = -1.0
+		var far_speed: float = -1.0
+		for target_value: Variant in reactions[-1]["blast_targets"] as Array:
+			var target: Dictionary = target_value as Dictionary
+			var target_id: int = int(target["stable_spawn_id"])
+			source_seen = source_seen or target_id == source.stable_spawn_id
+			if target_id == near.stable_spawn_id:
+				near_speed = (target["velocity_change"] as Vector2).length()
+			elif target_id == far.stable_spawn_id:
+				far_speed = (target["velocity_change"] as Vector2).length()
+		assert_true(not source_seen, "color %d source is excluded" % color)
+		assert_true(near_speed > 0.0, "color %d pushes in-radius target" % color)
+		assert_near(far_speed, 0.0, 0.001, "color %d leaves out-of-radius target" % color)
+		assert_true(near.blast_gravity_pause_active(), "color %d pauses pushed target" % color)
+		assert_true(not far.blast_gravity_pause_active(), "color %d does not pause far target" % color)
+	Config.data.game_mode = original_mode
+	Config.data.jelly_tap_common_push = original_common_push
+	Config.data.blast_gravity_pause_time = original_pause
+	await _cleanup(fixture["root"] as Node)
+
+
+func test_blast_pause_defers_latest_gravity_repushes_and_skips_excluded_orbs() -> void:
+	var original_pause: float = Config.data.blast_gravity_pause_time
+	Config.data.blast_gravity_pause_time = 0.2
+	var board: Board3D = await _create_board()
+	var pushed: Orb3D = board.spawn_orb(0, 4, Vector2(120.0, 0.0))
+	var ghost: Orb3D = board.spawn_orb(1, 4, Vector2(-120.0, 0.0))
+	var waiting: Orb3D = board.spawn_orb(2, 4, Vector2(0.0, 120.0))
+	ghost.is_ghost = true
+	waiting.is_waiting_at_entrance = true
+	var rows: Array[Dictionary] = board.apply_blast_with_radius_factor(Vector2.ZERO, 0.3)
+	assert_eq(rows.size(), 1, "ghost and entrance waiter are excluded from blast rows")
+	assert_true(pushed.blast_gravity_pause_active(), "nonzero blast starts pause")
+	assert_true(board.is_gravity_transition_active(), "blast pause blocks settling")
+	assert_true(pushed.get_physics_body().constant_force.is_zero_approx(), "pause zeros force")
+	pushed.set_gravity(Vector2i.LEFT, Config.data.gravity_strength)
+	pushed.advance_blast_gravity_pause(0.15)
+	board.apply_blast_with_radius_factor(Vector2.ZERO, 0.3)
+	pushed.advance_blast_gravity_pause(0.15)
+	assert_true(pushed.blast_gravity_pause_active(), "re-push resets full pause")
+	pushed.advance_blast_gravity_pause(0.06)
+	var restored_direction: Vector2 = Orb3D.world_vector_to_plane(
+		pushed.get_physics_body().constant_force
+	).normalized()
+	assert_true(restored_direction.x < -0.99, "pause ends with latest requested gravity")
+	Config.data.blast_gravity_pause_time = 0.0
+	pushed.start_blast_gravity_pause(0.0)
+	assert_true(not pushed.blast_gravity_pause_active(), "zero duration preserves old behavior")
+	board.clear()
+	await tree.process_frame
+	var unaffected: Orb3D = board.spawn_orb(3, 4, Vector2(120.0, 0.0))
+	board.apply_tap_quake(900.0)
+	assert_true(not unaffected.blast_gravity_pause_active(), "quake does not pause gravity")
+	board.apply_shockwave(Vector2.ZERO, 8, null, false)
+	assert_true(not unaffected.blast_gravity_pause_active(), "merge shockwave does not pause gravity")
+	Config.data.blast_gravity_pause_time = original_pause
+	await _cleanup(board)
 
 
 func test_bomb_quake_and_grow_tap_effects_follow_color_rules() -> void:
@@ -1174,6 +1256,7 @@ func test_bomb_quake_and_grow_tap_effects_follow_color_rules() -> void:
 	var quake: Orb3D = board.spawn_orb(1, 8, Vector2.ZERO)
 	var light: Orb3D = board.spawn_orb(0, 4, Vector2(100.0, 0.0))
 	var heavy: Orb3D = board.spawn_orb(3, 7, Vector2(-100.0, 0.0))
+	var outside: Orb3D = board.spawn_orb(4, 4, Vector2(400.0, 0.0))
 	assert_true(resolver.apply_jelly_tap_blast(quake), "QUAKE tap applies")
 	var quake_speeds: Dictionary = {}
 	for target_value: Variant in reactions[-1]["shock_targets"] as Array:
@@ -1183,6 +1266,15 @@ func test_bomb_quake_and_grow_tap_effects_follow_color_rules() -> void:
 		).length()
 	assert_near(float(quake_speeds[light.stable_spawn_id]), 900.0, 0.01, "light orb gets quake speed")
 	assert_near(float(quake_speeds[heavy.stable_spawn_id]), 900.0, 0.01, "heavy orb gets same quake speed")
+	assert_near(float(quake_speeds[outside.stable_spawn_id]), 900.0, 0.01, "outside orb still gets quake")
+	var quake_push_speeds: Dictionary = {}
+	for target_value: Variant in reactions[-1]["blast_targets"] as Array:
+		var target_row: Dictionary = target_value as Dictionary
+		quake_push_speeds[int(target_row["stable_spawn_id"])] = (
+			target_row["velocity_change"] as Vector2
+		).length()
+	assert_true(float(quake_push_speeds[light.stable_spawn_id]) > 0.0, "blue near gets push plus quake")
+	assert_near(float(quake_push_speeds[outside.stable_spawn_id]), 0.0, 0.01, "blue outside gets quake only")
 
 	board.clear()
 	await tree.process_frame
@@ -1219,13 +1311,22 @@ func test_magnet_and_rest_tap_effects_hold_gravity_and_skip_next_spawn() -> void
 	var purple: Orb3D = board.spawn_orb(4, 8, Vector2.ZERO)
 	var target: Orb3D = board.spawn_orb(0, 4, Vector2(200.0, 0.0))
 	assert_true(resolver.apply_jelly_tap_blast(purple), "MAGNET tap applies")
-	assert_true(board.tap_magnet_active(), "magnet window starts")
-	assert_true(board.is_gravity_transition_active(), "magnet blocks settling")
+	assert_true(board.tap_magnet_active(), "magnet sequence starts")
+	assert_true(board.is_gravity_transition_active(), "pause and magnet block settling")
+	assert_true(
+		target.get_physics_body().constant_force.is_zero_approx(),
+		"purple starts with blast gravity pause"
+	)
+	board._advance_tap_magnet(0.19)
+	target.advance_blast_gravity_pause(0.19)
+	assert_true(target.get_physics_body().constant_force.is_zero_approx(), "gravity stays zero before 0.2 seconds")
+	board._advance_tap_magnet(0.02)
+	target.advance_blast_gravity_pause(0.02)
 	var magnet_direction: Vector2 = Orb3D.world_vector_to_plane(
 		target.get_physics_body().constant_force
 	).normalized()
-	assert_true(magnet_direction.x < -0.99, "magnet gravity points to tap origin")
-	board._advance_tap_magnet(0.5)
+	assert_true(magnet_direction.x < -0.99, "magnet starts after blast pause")
+	board._advance_tap_magnet(0.51)
 	var restored_direction: Vector2 = Orb3D.world_vector_to_plane(
 		target.get_physics_body().constant_force
 	).normalized()

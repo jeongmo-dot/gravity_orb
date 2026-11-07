@@ -31,6 +31,14 @@ param(
 	[string]$JellyTapEffectModes = "Color",
 	[ValidateSet("On", "Off")]
 	[string]$JellyBlastRequiresSameLevel = "Off",
+	[ValidateSet("On", "Off")]
+	[string]$JellyTapCommonPush = "On",
+	[ValidateRange(0.0, 10.0)]
+	[double]$BlastGravityPauseTime = 0.2,
+	[ValidateRange(0.0, 10000.0)]
+	[double]$BlastSpeed = 1350.0,
+	[ValidateRange(0.0, 1.0)]
+	[double]$BlastFarFactor = 0.5,
 	[string]$OrbFrictionByLevel = "0.3,0.3,0.3,0.4,0.4,0.4,0.4,0.5,0.5,0.5",
 	[string]$MeasurementLabel = "",
     [switch]$ReuseCompleted,
@@ -99,6 +107,10 @@ if (-not $AggregateOnly) {
 					"--jelly-tap-grow-min-clean=$JellyTapGrowMinClean",
 					"--jelly-tap-effect-modes=$($JellyTapEffectModes.ToLower())",
 					"--jelly-blast-requires-same-level=$($JellyBlastRequiresSameLevel.ToLower())",
+					"--jelly-tap-common-push=$($JellyTapCommonPush.ToLower())",
+					"--blast-gravity-pause-time=$($BlastGravityPauseTime.ToString([Globalization.CultureInfo]::InvariantCulture))",
+					"--blast-speed=$($BlastSpeed.ToString([Globalization.CultureInfo]::InvariantCulture))",
+					"--blast-far-factor=$($BlastFarFactor.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--orb-friction-by-level=$OrbFrictionByLevel",
 					"--jelly-tap-blast-bot=$($resolvedTapBlastBotMode.ToLower())",
                     "--jolt-output=res://artifacts/measurements/$name.json"
@@ -222,6 +234,12 @@ function Get-Summary($Rows) {
 	$reactionScoreTotal = [double](($reactionScoreTotals.Values | Measure-Object -Sum).Sum)
 	$tapBlastTotal = [double](($Rows | Measure-Object -Property tap_blast_count -Sum).Sum)
 	$tapCleanTotal = [double](($Rows | Measure-Object -Property tap_clean_count_total -Sum).Sum)
+	$bigReactionWindows = [double](($Rows | ForEach-Object { $_.reactions_within_one_second_after_blast.big.windows } | Measure-Object -Sum).Sum)
+	$bigReactionMerges = [double](($Rows | ForEach-Object { $_.reactions_within_one_second_after_blast.big.merges } | Measure-Object -Sum).Sum)
+	$bigReactionBlasts = [double](($Rows | ForEach-Object { $_.reactions_within_one_second_after_blast.big.blasts } | Measure-Object -Sum).Sum)
+	$tapReactionWindows = [double](($Rows | ForEach-Object { $_.reactions_within_one_second_after_blast.tap.windows } | Measure-Object -Sum).Sum)
+	$tapReactionMerges = [double](($Rows | ForEach-Object { $_.reactions_within_one_second_after_blast.tap.merges } | Measure-Object -Sum).Sum)
+	$tapReactionBlasts = [double](($Rows | ForEach-Object { $_.reactions_within_one_second_after_blast.tap.blasts } | Measure-Object -Sum).Sum)
 	$reactionScoreShares = [ordered]@{}
 	foreach ($scoreKey in $reactionScoreTotals.Keys) {
 		$reactionScoreShares[$scoreKey] = Get-Ratio ([double]$reactionScoreTotals[$scoreKey]) $reactionScoreTotal
@@ -262,6 +280,10 @@ function Get-Summary($Rows) {
 		average_clean_count_per_tap = Get-Ratio $tapCleanTotal $tapBlastTotal
 		maximum_clean_count_per_tap = ($Rows | Measure-Object -Property tap_clean_count_max -Maximum).Maximum
 		purple_same_turn_blast_count = [int](($Rows | Measure-Object -Property purple_same_turn_blast_count -Sum).Sum)
+		reactions_within_one_second_after_blast = [ordered]@{
+			big = [ordered]@{ windows = [int]$bigReactionWindows; merges = [int]$bigReactionMerges; blasts = [int]$bigReactionBlasts }
+			tap = [ordered]@{ windows = [int]$tapReactionWindows; merges = [int]$tapReactionMerges; blasts = [int]$tapReactionBlasts }
+		}
 		maximum_pair_penetration_px = ($Rows | ForEach-Object { [double]$_.max_turn_end_pair.penetration_px } | Measure-Object -Maximum).Maximum
 		departures = [int](($Rows | Measure-Object -Property departures -Sum).Sum)
 		forced_settle_turns = [int](($Rows | Measure-Object -Property capped_turn_count -Sum).Sum)
@@ -314,6 +336,10 @@ $report = [ordered]@{
 	jelly_blast_min_level = $JellyBlastMinLevel
 	jelly_tap_blast_min_level = $JellyTapBlastMinLevel
 	jelly_blast_requires_same_level = $JellyBlastRequiresSameLevel -eq "On"
+	jelly_tap_common_push = $JellyTapCommonPush -eq "On"
+	blast_gravity_pause_time = $BlastGravityPauseTime
+	blast_speed = $BlastSpeed
+	blast_far_factor = $BlastFarFactor
 	orb_friction_by_level = $OrbFrictionByLevel
     strategies = $strategies
     skill_length_ratio_l_merge_over_r = $lengthRatio

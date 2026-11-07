@@ -9,6 +9,7 @@ const EXPECTED_ST_DEFAULT_HASH: String = "f3ff93474eb3765cdc611ae941c89ec96052a2
 const EXPECTED_JACKPOT_DEFAULT_HASH: String = "3254c77f2bcf478239f023f08af2bae5f48bc68aee56aa246894908d0b9ab5e7"
 const EXPECTED_F2_DEFAULT_HASH: String = "4c4ab4aa9cf014d4d266a6fdfd75a03bbd4f40c5e9a540bd6f682da3c0835974"
 const EXPECTED_G1_DEFAULT_HASH: String = "d5175565a24fa4d0e00e1eb3ccbd5529a0c489852c00437fed58197bd20e4c7d"
+const EXPECTED_K4_DEFAULT_HASH: String = "3e929d90b33f6617322e96a2f53e0e790a32c9c5c11f045e9d7fa05c3a88c42f"
 
 
 func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
@@ -21,6 +22,11 @@ func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.sfx_enabled = false
 	Config.data.jelly_merge_duration = 0.3
+	var k4_visible_result: Dictionary = await _run_rule_path(true)
+	var k4_hidden_result: Dictionary = await _run_rule_path(false)
+	assert_eq(k4_visible_result["hash"], k4_hidden_result["hash"], "K4 hash ignores rendering")
+	print("JELLY_K4_DEFAULT_HASH hash=%s" % str(k4_hidden_result["hash"]))
+	assert_eq(k4_hidden_result["hash"], EXPECTED_K4_DEFAULT_HASH, "K4 default hash")
 	_apply_m_profile()
 	var visible_result: Dictionary = await _run_rule_path(true)
 	var hidden_result: Dictionary = await _run_rule_path(false)
@@ -110,6 +116,7 @@ func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
 	Config.data.jelly_merge_duration = 0.3
 	Config.data.max_merge_bonus_factor = 40.0
 	Config.data.jelly_merge_level_gap = 2
+	_apply_legacy_blast_push_profile()
 	var f2_result: Dictionary = await _run_rule_path(false)
 	print("JELLY_F2_DEFAULT_HASH hash=%s" % str(f2_result["hash"]))
 	assert_eq(
@@ -342,6 +349,18 @@ func _run_rule_path(visuals_enabled: bool) -> Dictionary:
 			)
 	if not is_equal_approx(Config.data.max_merge_bonus_factor, 5.0):
 		state["jackpot_score_factor"] = Config.data.max_merge_bonus_factor
+	if (
+		Config.data.jelly_tap_common_push
+		or not is_zero_approx(Config.data.blast_gravity_pause_time)
+		or not is_equal_approx(Config.data.blast_speed, 900.0)
+		or not is_equal_approx(Config.data.blast_far_factor, 0.4)
+	):
+		state["blast_push_profile"] = {
+			"common": Config.data.jelly_tap_common_push,
+			"pause": Config.data.blast_gravity_pause_time,
+			"speed": Config.data.blast_speed,
+			"far": Config.data.blast_far_factor,
+		}
 	var state_json: String = JSON.stringify(state)
 	var hash_context: HashingContext = HashingContext.new()
 	hash_context.start(HashingContext.HASH_SHA256)
@@ -375,6 +394,10 @@ func _snapshot_level_profile() -> Dictionary:
 		"blast_push_radius_by_level": Config.data.blast_push_radius_by_level.duplicate(),
 		"gravity_level_scale": Config.data.gravity_level_scale,
 		"shock_level_scale": Config.data.shock_level_scale,
+		"jelly_tap_common_push": Config.data.jelly_tap_common_push,
+		"blast_gravity_pause_time": Config.data.blast_gravity_pause_time,
+		"blast_speed": Config.data.blast_speed,
+		"blast_far_factor": Config.data.blast_far_factor,
 	}
 
 
@@ -398,6 +421,10 @@ func _restore_level_profile(snapshot: Dictionary) -> void:
 	Config.data.blast_push_radius_by_level = snapshot["blast_push_radius_by_level"] as PackedFloat32Array
 	Config.data.gravity_level_scale = float(snapshot["gravity_level_scale"])
 	Config.data.shock_level_scale = float(snapshot["shock_level_scale"])
+	Config.data.jelly_tap_common_push = bool(snapshot["jelly_tap_common_push"])
+	Config.data.blast_gravity_pause_time = float(snapshot["blast_gravity_pause_time"])
+	Config.data.blast_speed = float(snapshot["blast_speed"])
+	Config.data.blast_far_factor = float(snapshot["blast_far_factor"])
 
 
 func _apply_m_profile() -> void:
@@ -481,6 +508,14 @@ func _apply_legacy_tap_profile() -> void:
 	Config.data.jelly_tap_clean_max_level = 0
 	Config.data.jelly_tap_grow_min_clean = 1
 	Config.data.jelly_tap_effect_modes = PackedInt32Array()
+	_apply_legacy_blast_push_profile()
+
+
+func _apply_legacy_blast_push_profile() -> void:
+	Config.data.jelly_tap_common_push = false
+	Config.data.blast_gravity_pause_time = 0.0
+	Config.data.blast_speed = 900.0
+	Config.data.blast_far_factor = 0.4
 
 
 func _apply_pair(

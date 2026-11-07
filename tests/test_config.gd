@@ -330,8 +330,8 @@ func test_m9_blast_defaults() -> void:
 		PackedFloat32Array([0.0, 0.0, 0.0, 0.3, 0.55, 1.0, 1.0, 1.0, 1.0, 1.0]),
 		"blast push radius by level"
 	)
-	assert_near(config.blast_speed, 900.0, TOLERANCE, "blast speed")
-	assert_near(config.blast_far_factor, 0.4, TOLERANCE, "blast far factor")
+	assert_near(config.blast_speed, 1350.0, TOLERANCE, "blast speed")
+	assert_near(config.blast_far_factor, 0.5, TOLERANCE, "blast far factor")
 	assert_near(config.blast_score_factor, 15.0, TOLERANCE, "blast score factor")
 	assert_near(config.blast_blink_period, 0.8, TOLERANCE, "blast blink period")
 	assert_eq(config.jelly_tap_blast_min_level, 8, "tap blast starts at L8")
@@ -351,6 +351,8 @@ func test_m9_blast_defaults() -> void:
 	assert_near(config.jelly_tap_quake_speed, 900.0, TOLERANCE, "tap quake speed")
 	assert_eq(config.jelly_tap_bonus_points_per_orb, 100, "tap bonus per orb")
 	assert_near(config.jelly_tap_magnet_time, 0.5, TOLERANCE, "tap magnet time")
+	assert_true(config.jelly_tap_common_push, "all tap colors push nearby jelly")
+	assert_near(config.blast_gravity_pause_time, 0.2, TOLERANCE, "blast gravity pause")
 	var fallback: GameConfig = GameConfig.new()
 	fallback.jelly_tap_effect_modes = PackedInt32Array()
 	assert_eq(

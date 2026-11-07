@@ -338,18 +338,24 @@ func apply_jelly_tap_blast(orb: Variant) -> bool:
 
 	var blast_targets: Array[Dictionary] = []
 	var shock_targets: Array[Dictionary] = []
-	if tap_effect in [GameConfig.JellyTapEffect.PUSH, GameConfig.JellyTapEffect.BOMB]:
+	var common_push: bool = Config.data.jelly_tap_common_push
+	if common_push or tap_effect in [GameConfig.JellyTapEffect.PUSH, GameConfig.JellyTapEffect.BOMB]:
 		blast_targets = _board.apply_blast_with_radius_factor(
 			position,
-			Config.data.jelly_tap_blast_radius_factor
+			Config.data.jelly_tap_blast_radius_factor,
+			orb
 		)
-	elif tap_effect == GameConfig.JellyTapEffect.QUAKE:
+	if tap_effect == GameConfig.JellyTapEffect.QUAKE:
 		shock_targets = _board.apply_tap_quake(
 			Config.data.jelly_tap_quake_speed,
 			Callable(_spawner, "next_shake_direction") if _spawner != null else Callable()
 		)
 	elif tap_effect == GameConfig.JellyTapEffect.MAGNET:
-		_board.start_tap_magnet(position, Config.data.jelly_tap_magnet_time)
+		_board.start_tap_magnet(
+			position,
+			Config.data.jelly_tap_magnet_time,
+			Config.data.blast_gravity_pause_time if common_push else 0.0
+		)
 	var reaction: Dictionary = {
 		"type": ReactionRules.Type.TAP_BLAST,
 		"chain": 1,

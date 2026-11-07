@@ -136,6 +136,23 @@ const CAPTURE_FILES: Array[String] = [
 	"126_jelly_tap_blue_callout.png",
 	"127_jelly_tap_orange_callout.png",
 	"128_jelly_tap_effects_full.png",
+	"129_jelly_blast_push_k0_big_000.png",
+	"130_jelly_blast_push_k0_big_010.png",
+	"131_jelly_blast_push_k0_big_020.png",
+	"132_jelly_blast_push_k0_big_040.png",
+	"133_jelly_blast_push_k0_yellow_000.png",
+	"134_jelly_blast_push_k0_yellow_010.png",
+	"135_jelly_blast_push_k0_yellow_020.png",
+	"136_jelly_blast_push_k0_yellow_040.png",
+	"137_jelly_blast_push_k4_big_000.png",
+	"138_jelly_blast_push_k4_big_010.png",
+	"139_jelly_blast_push_k4_big_020.png",
+	"140_jelly_blast_push_k4_big_040.png",
+	"141_jelly_blast_push_k4_yellow_000.png",
+	"142_jelly_blast_push_k4_yellow_010.png",
+	"143_jelly_blast_push_k4_yellow_020.png",
+	"144_jelly_blast_push_k4_yellow_040.png",
+	"145_jelly_blast_push_full.png",
 ]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
@@ -654,7 +671,83 @@ func _capture_jelly_tap_effect_scenes(
 		)
 		orb.disable_physics()
 	await _capture("128_jelly_tap_effects_full.png")
+	await _capture_blast_push_evidence(main, board, resolver)
 	Config.data.fx_hitstop_enabled = original_hitstop_enabled
+
+
+func _capture_blast_push_evidence(
+	main: Main,
+	board: Board3D,
+	resolver: CollisionResolver
+) -> void:
+	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
+	manager.set_physics_process(false)
+	var profiles: Array[Dictionary] = [
+		{"tag": "k0", "common": false, "speed": 900.0, "far": 0.4, "pause": 0.0, "base": 129},
+		{"tag": "k4", "common": true, "speed": 1350.0, "far": 0.5, "pause": 0.2, "base": 137},
+	]
+	for profile: Dictionary in profiles:
+		Config.data.jelly_tap_common_push = bool(profile["common"])
+		Config.data.blast_speed = float(profile["speed"])
+		Config.data.blast_far_factor = float(profile["far"])
+		Config.data.blast_gravity_pause_time = float(profile["pause"])
+		await _capture_blast_push_case(
+			board, resolver, str(profile["tag"]), "big", int(profile["base"])
+		)
+		await _capture_blast_push_case(
+			board, resolver, str(profile["tag"]), "yellow", int(profile["base"]) + 4
+		)
+	await _capture("145_jelly_blast_push_full.png")
+
+
+func _capture_blast_push_case(
+	board: Board3D,
+	resolver: CollisionResolver,
+	profile_tag: String,
+	kind: String,
+	first_file_number: int
+) -> void:
+	resolver.cancel_active_jelly_merges()
+	board.clear()
+	board.set_gravity(Vector2i.DOWN)
+	await get_tree().process_frame
+	for row: int in range(4):
+		for column: int in range(6):
+			var color: int = (column + row * 2) % 5
+			var position: Vector2 = Vector2(
+				(float(column) - 2.5) * 110.0,
+				(float(row) - 1.5) * 110.0
+			)
+			if kind == "yellow":
+				position = Vector2(
+					(float(column) - 2.5) * 110.0,
+					board.half_size() - 52.0 - float(row) * 108.0
+				)
+			board.spawn_orb(color, 3, position)
+	if kind == "big":
+		var first: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, 8, Vector2(-4.0, 0.0))
+		var second: Orb3D = board.spawn_orb(OrbTypes.OrbColor.BLUE, 8, Vector2(4.0, 0.0))
+		resolver.report_contact(first, second, "capture_blast_push_big")
+		if resolver.flush() != 1:
+			_fail("%s big blast evidence did not trigger" % profile_tag)
+	else:
+		var source: Orb3D = board.spawn_orb(
+			OrbTypes.OrbColor.YELLOW,
+			10,
+			Vector2(0.0, board.half_size() - 52.0 - 4.8 * 108.0)
+		)
+		if not resolver.apply_jelly_tap_blast(source):
+			_fail("%s yellow tap evidence did not trigger" % profile_tag)
+	var suffixes: Array[String] = ["000", "010", "020", "040"]
+	var waits: Array[int] = [0, 12, 12, 24]
+	for index: int in range(suffixes.size()):
+		await _wait_physics_frames(waits[index])
+		await _capture("%03d_jelly_blast_push_%s_%s_%s.png" % [
+			first_file_number + index,
+			profile_tag,
+			kind,
+			suffixes[index],
+		])
 
 
 func _capture_tap_blast_progress(

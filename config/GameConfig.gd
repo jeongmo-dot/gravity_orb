@@ -148,8 +148,10 @@ enum GameMode {
 @export var jelly_tap_quake_speed: float = 900.0
 @export var jelly_tap_bonus_points_per_orb: int = 100
 @export var jelly_tap_magnet_time: float = 0.5
-@export var blast_speed: float = 900.0
-@export var blast_far_factor: float = 0.4
+@export var jelly_tap_common_push: bool = true
+@export var blast_gravity_pause_time: float = 0.2
+@export var blast_speed: float = 1350.0
+@export var blast_far_factor: float = 0.5
 @export var blast_score_factor: float = 15.0
 @export var blast_blink_period: float = 0.8
 @export var fx_enabled: bool = true
