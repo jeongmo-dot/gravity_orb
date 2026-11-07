@@ -33,7 +33,7 @@
 ## 대기 중
 
 ### [2026-11-07 #139] 색은 4가지로 — 30·60턴 새 색 없애기·빌드 0.16.7
-- 상태: 대기 (**#138 병합 뒤** main 위에서)
+- 상태: 대기 (#138 병합됨 `80c3c9c` — main 위에서)
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.30**
 - 배경: 사용자 (2026-11-07) "색상 종류 지금 6가지 인거 4가지로 줄이자". 지금은 4색으로 시작해 30턴 보라·60턴 주황이 더해진다
 - 앵커: `config/GameConfig.gd`·`default_config.tres` `turn_color_unlock_turns`, `GameConfig.color_count_for_turn()`·`newly_unlocked_color_for_turn()`, `scripts/core/Spawner.gd` `_draw_candidate_for_turn()`, `scripts/ui/Hud.gd` `_track_preview_unlocks()`, 판 균형 측정 도구, `tests/test_config.gd`·`tests/test_spawner.gd`·`tests/test_jelly_regression.gd`, 캡처, `project.godot`
@@ -55,8 +55,13 @@
 - QA: §12-ONE.30 2·6번
 - 커밋: 항목 단위 브랜치 (`four-colors`), **push·PR까지** (병합은 Claude 검수 뒤)
 
-### [2026-11-07 #138] 소폭발은 사방으로 크게 — 위로 터짐 끄기·소폭발 전용 반경·속도·빌드 0.16.6
-- 상태: 대기
+---
+
+## 처리 완료
+
+### [2026-11-07 #138] 소폭발은 사방으로 크게 — 위로 터짐 끄기·소폭발 전용 반경·속도·빌드 0.16.6 — 완료
+- 상태: 완료 (2026-11-07 사용자 "병합" · [PR #138](https://github.com/jeongmo-dot/gravity_orb/pull/138) 병합 `80c3c9c`)
+- 검수: 코드 diff, 회신 측정표 (밀림 L9·T0~T4·판 균형 T3), 캡처 `165`·`169`·`173`·`177`·`178`, `build/windows/GravityOrb_v0.16.6.exe` 크기·SHA-256·`_BUILD.txt` (커밋 `93e19f9` = 브랜치 끝, Release) 직접 확인. 테스트 341/4/5·해시·스모크·`save.cfg`는 Codex 관측 (Claude 재실행 없음). 맨 앞 경고 최대 관통 34px은 모든 이름이 같은 값 (측정 장면 배치 탓) → Claude가 물음 → 사용자 "병합". 꽉 찬 판 가운데 0.4초 중앙값 23 → 40px (목표 100px에 못 미침), 캡처에서는 사방 벽까지 퍼짐. 판 길이 +2.4%. 결과: §12-ONE.29 "#138 결과"
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.29**
 - 배경: 사용자 (2026-11-07, 0.16.5 뒤) "위로 터지는게 아니라 사방으로 크게". #136 사방 밀기는 가운데에서도 0.4초 뒤 중앙값 47px — 반경 288px 밖의 젤리에 막힌다
 - 앵커: `scripts/spike/Board3D.gd` `apply_blast_with_radius_factor()` (소폭발 경로), `scripts/core/CollisionResolver.gd` `apply_jelly_tap_blast()` (청소 반경 `_jelly_tap_clean_targets()`·그림 `blast_radius_factor`는 그대로), `config/GameConfig.gd`·`default_config.tres`, 밀림·판 균형 측정 도구, `tests/test_jolt_3d.gd`·`tests/test_config.gd`·`tests/test_jelly_regression.gd`, `tests/spike/capture_screens.gd`, `project.godot`
@@ -80,10 +85,6 @@
   - [ ] `build/windows/GravityOrb_v0.16.6.exe` (`mode=Release`, `_BUILD.txt` 커밋 = 브랜치 끝), 0.16.1~0.16.5 파일 그대로
 - QA: §12-ONE.29 4·5·9번
 - 커밋: 항목 단위 브랜치 (`tap-push-wide`), **push·PR까지** (병합은 Claude 검수 뒤)
-
----
-
-## 처리 완료
 
 ### [2026-11-07 #137] 소폭발은 위로 터지게·들어오는 공 줄이기·합치는 레벨 3 × 3 측정 — 완료
 - 상태: 완료 (2026-11-07 사용자 "S4-G1" · [PR #137](https://github.com/jeongmo-dot/gravity_orb/pull/137) 병합 `2aab05c`)
