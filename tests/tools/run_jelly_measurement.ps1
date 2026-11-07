@@ -12,7 +12,7 @@ param(
 	[ValidateSet("None", "Save", "All")]
 	[string]$TapBlastBotMode = "None",
 	[ValidateRange(0, 10)]
-	[int]$JellyMergeLevelGap = 2,
+	[int]$JellyMergeLevelGap = 1,
 	[ValidateRange(0, 10)]
 	[int]$JellyBlastMinLevel = 8,
 	[ValidateRange(0, 10)]
@@ -165,6 +165,7 @@ function Get-Summary($Rows) {
     $finalMoves = [double](($Rows | Measure-Object -Property final_move_count -Sum).Sum)
     $finalSuccess = [double](($Rows | Measure-Object -Property final_move_success_count -Sum).Sum)
     $merges = [double](($Rows | Measure-Object -Property merge_count -Sum).Sum)
+    $levelUps = [double](($Rows | Measure-Object -Property level_up_count -Sum).Sum)
     $absorptions = [double](($Rows | Measure-Object -Property one_level_absorption_count -Sum).Sum)
     $decisions = [double](($Rows | Measure-Object -Property preview_decision_turns -Sum).Sum)
     $fatalAvoidance = [double](($Rows | Measure-Object -Property preview_fatal_avoidance_turns -Sum).Sum)
@@ -238,6 +239,8 @@ function Get-Summary($Rows) {
 		score_per_turn = Get-Ratio $scoreTotal $turnTotal
 		score_by_reaction_type = $reactionScoreTotals
 		score_share_by_reaction_type = $reactionScoreShares
+		merges_per_turn = Get-Ratio $merges $turnTotal
+		level_ups_per_turn = Get-Ratio $levelUps $turnTotal
 		peak_active_orbs = ($Rows | Measure-Object -Property max_active_orbs -Maximum).Maximum
         early_merges_per_turn_1_30 = Get-Ratio $earlyMerges $earlyTurns
         final_move_occurrences = [int]$finalMoves

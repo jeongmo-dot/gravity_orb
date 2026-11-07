@@ -107,9 +107,9 @@ const CAPTURE_FILES: Array[String] = [
 	"97_jelly_l10_jackpot_a.png",
 	"98_jelly_l10_jackpot_b.png",
 	"99_jelly_result_l10_max.png",
-	"100_jelly_default_l7_l5_00.png",
-	"101_jelly_default_l7_l5_50.png",
-	"102_jelly_default_l7_l5_100.png",
+	"100_jelly_default_l7_l6_00.png",
+	"101_jelly_default_l7_l6_50.png",
+	"102_jelly_default_l7_l6_100.png",
 	"103_jelly_default_l8_blast.png",
 	"104_jelly_l8_tap_turn_before.png",
 	"105_jelly_l8_tap_turn_entering.png",
@@ -341,7 +341,7 @@ func _capture_level_ten_scenes(main: Main, board: Board3D) -> void:
 		await _capture_tap_blast_progress(board, director, profile)
 		await _capture_level_ten_pair_effect(main, board, director, profile, false)
 		await _capture_level_ten_pair_effect(main, board, director, profile, true)
-	await _capture_default_c8_scenes(main, board, director)
+	await _capture_default_g1_scenes(main, board, director)
 	await _capture_default_d_scenes(main, board, director)
 
 	_set_jelly_level_profile("B")
@@ -365,7 +365,7 @@ func _capture_level_ten_scenes(main: Main, board: Board3D) -> void:
 	await _capture("99_jelly_result_l10_max.png")
 
 
-func _capture_default_c8_scenes(
+func _capture_default_g1_scenes(
 	main: Main,
 	board: Board3D,
 	director: FeedbackDirector
@@ -392,7 +392,7 @@ func _capture_default_c8_scenes(
 	)
 	var smaller: Orb3D = board.spawn_orb(
 		OrbTypes.OrbColor.PURPLE,
-		5,
+		6,
 		Vector2.ZERO
 	)
 	var touching_distance: float = larger.get_current_radius() + smaller.get_current_radius()
@@ -400,21 +400,21 @@ func _capture_default_c8_scenes(
 	smaller.position = Vector2(touching_distance * 0.5, 0.0)
 	larger.linear_velocity = Vector2.ZERO
 	smaller.linear_velocity = Vector2.ZERO
-	resolver.report_contact(larger, smaller, "default_c8_capture")
+	resolver.report_contact(larger, smaller, "default_g1_capture")
 	resolver.flush()
-	await _capture("100_jelly_default_l7_l5_00.png")
+	await _capture("100_jelly_default_l7_l6_00.png")
 	var active_before: Array[Orb3D] = board.get_orbs()
 	resolver.flush(Config.data.jelly_merge_duration * 0.5)
 	for orb: Orb3D in active_before:
 		if is_instance_valid(orb):
 			orb._physics_process(Config.data.jelly_merge_duration * 0.5)
-	await _capture("101_jelly_default_l7_l5_50.png")
+	await _capture("101_jelly_default_l7_l6_50.png")
 	active_before = board.get_orbs()
 	resolver.flush(Config.data.jelly_merge_duration * 0.5)
 	for orb: Orb3D in active_before:
 		if is_instance_valid(orb):
 			orb._physics_process(Config.data.jelly_merge_duration * 0.5)
-	await _capture("102_jelly_default_l7_l5_100.png")
+	await _capture("102_jelly_default_l7_l6_100.png")
 
 	board.clear()
 	director.clear_effects()
@@ -774,7 +774,7 @@ func _capture_level_ten_pair_effect(
 
 func _set_jelly_level_profile(profile: String) -> void:
 	Config.data.orb_max_level = 10
-	Config.data.jelly_merge_level_gap = 2
+	Config.data.jelly_merge_level_gap = 1
 	Config.data.jelly_blast_min_level = 8
 	Config.data.jelly_blast_requires_same_level = false
 	Config.data.jelly_tap_blast_min_level = 8

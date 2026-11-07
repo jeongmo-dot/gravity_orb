@@ -752,6 +752,7 @@ func has_pending_reactions() -> bool:
 
 func _has_pending_jelly_reactions(active_orbs: Array) -> bool:
 	var level_stride: int = Config.data.orb_max_level + 1
+	var merge_level_gap: int = maxi(Config.data.jelly_merge_level_gap, 0)
 	var groups: Array = []
 	groups.resize(Config.data.color_display.size() * level_stride)
 	for candidate: Variant in active_orbs:
@@ -771,8 +772,8 @@ func _has_pending_jelly_reactions(active_orbs: Array) -> bool:
 			continue
 		var orb_radius: float = _orb_contact_radius(orb)
 		for candidate_level: int in range(
-			maxi(int(orb.level) - 1, 1),
-			mini(int(orb.level) + 1, Config.data.orb_max_level) + 1
+			maxi(int(orb.level) - merge_level_gap, 1),
+			mini(int(orb.level) + merge_level_gap, Config.data.orb_max_level) + 1
 		):
 			var same_color_index: int = int(orb.color) * level_stride + candidate_level
 			if _group_has_touching_partner(
@@ -781,18 +782,22 @@ func _has_pending_jelly_reactions(active_orbs: Array) -> bool:
 				groups[same_color_index]
 			):
 				return true
-		if not Config.data.blast_enabled_for_level(int(orb.level)):
-			continue
 		for color: int in range(Config.data.color_display.size()):
 			if color == int(orb.color):
 				continue
-			var blast_index: int = color * level_stride + int(orb.level)
-			if _group_has_touching_partner(
-				orb,
-				orb_radius,
-				groups[blast_index]
-			):
-				return true
+			for candidate_level: int in range(1, Config.data.orb_max_level + 1):
+				if not Config.data.jelly_blast_enabled_for_pair(
+					int(orb.level),
+					candidate_level
+				):
+					continue
+				var blast_index: int = color * level_stride + candidate_level
+				if _group_has_touching_partner(
+					orb,
+					orb_radius,
+					groups[blast_index]
+				):
+					return true
 	return false
 
 
@@ -805,6 +810,8 @@ func _group_has_touching_partner(
 		return false
 	for candidate: Variant in group_value as Array:
 		if candidate == orb:
+			continue
+		if not _pair_can_react(orb, candidate):
 			continue
 		var contact_distance: float = (
 			orb_radius
