@@ -37,6 +37,7 @@ var _gravity_transition_finish_pending: bool = false
 var _gravity_transition_id: int = 0
 var _tap_magnet_origin: Vector2 = Vector2.ZERO
 var _tap_magnet_time_remaining: float = 0.0
+var _tap_magnet_delay_remaining: float = 0.0
 var _warning_directions: Array[Vector2i] = []
 var _visual_walls: Dictionary = {}
 var _wall_materials: Dictionary = {}
@@ -147,7 +148,9 @@ func is_gravity_transition_active() -> bool:
 	return (
 		_gravity_transition_frames_remaining > 0
 		or _gravity_transition_finish_pending
+		or _tap_magnet_delay_remaining > 0.0
 		or _tap_magnet_time_remaining > 0.0
+		or _has_blast_gravity_pause()
 	)
 
 
@@ -184,27 +187,44 @@ func _apply_actual_gravity_to_orbs() -> void:
 		orb.set_gravity_vector(_actual_gravity_direction, Config.data.gravity_strength)
 
 
-func start_tap_magnet(origin: Vector2, duration: float) -> void:
+func start_tap_magnet(origin: Vector2, duration: float, delay: float = 0.0) -> void:
 	_tap_magnet_origin = origin
 	_tap_magnet_time_remaining = maxf(duration, 0.0)
-	if _tap_magnet_time_remaining > 0.0:
+	_tap_magnet_delay_remaining = maxf(delay, 0.0)
+	if _tap_magnet_delay_remaining <= 0.0 and _tap_magnet_time_remaining > 0.0:
 		_apply_tap_magnet_gravity()
 
 
 func tap_magnet_active() -> bool:
-	return _tap_magnet_time_remaining > 0.0
+	return _tap_magnet_delay_remaining > 0.0 or _tap_magnet_time_remaining > 0.0
 
 
 func _advance_tap_magnet(delta: float) -> void:
+	var remaining_delta: float = maxf(delta, 0.0)
+	if _tap_magnet_delay_remaining > 0.0:
+		var consumed_delay: float = minf(_tap_magnet_delay_remaining, remaining_delta)
+		_tap_magnet_delay_remaining -= consumed_delay
+		remaining_delta -= consumed_delay
+		if _tap_magnet_delay_remaining > 0.0:
+			return
+		if _tap_magnet_time_remaining > 0.0:
+			_apply_tap_magnet_gravity()
 	if _tap_magnet_time_remaining <= 0.0:
 		return
 	_apply_tap_magnet_gravity()
 	_tap_magnet_time_remaining = maxf(
-		_tap_magnet_time_remaining - maxf(delta, 0.0),
+		_tap_magnet_time_remaining - remaining_delta,
 		0.0
 	)
 	if _tap_magnet_time_remaining <= 0.0:
 		_apply_actual_gravity_to_orbs()
+
+
+func _has_blast_gravity_pause() -> bool:
+	for orb: Orb3D in get_orbs():
+		if orb.blast_gravity_pause_active():
+			return true
+	return false
 
 
 func _apply_tap_magnet_gravity() -> void:
@@ -395,12 +415,13 @@ func apply_blast(origin: Vector2, blast_level: int) -> Array[Dictionary]:
 
 func apply_blast_with_radius_factor(
 	origin: Vector2,
-	radius_factor: float
+	radius_factor: float,
+	excluded_orb: Variant = null
 ) -> Array[Dictionary]:
 	var targets: Array[Dictionary] = []
 	var limited_radius: float = radius_factor * Config.data.board_size
 	for orb: Orb3D in get_orbs():
-		if orb.is_ghost or orb.is_waiting_at_entrance:
+		if orb == excluded_orb or orb.is_ghost or orb.is_waiting_at_entrance:
 			continue
 		var offset: Vector2 = orb.position - origin
 		var distance: float = offset.length()
@@ -423,6 +444,7 @@ func apply_blast_with_radius_factor(
 		var velocity_change: Vector2 = direction * speed if in_range else Vector2.ZERO
 		if not velocity_change.is_zero_approx():
 			orb.apply_plane_velocity_change(velocity_change)
+			orb.start_blast_gravity_pause(Config.data.blast_gravity_pause_time)
 		targets.append({
 			"orb": orb,
 			"stable_spawn_id": orb.stable_spawn_id,
@@ -490,6 +512,7 @@ func _next_shake_direction(provider: Callable) -> Vector2:
 
 func clear() -> void:
 	_tap_magnet_time_remaining = 0.0
+	_tap_magnet_delay_remaining = 0.0
 	var to_remove: Array[Orb3D] = _orbs.duplicate()
 	for orb: Orb3D in to_remove:
 		remove_orb(orb)

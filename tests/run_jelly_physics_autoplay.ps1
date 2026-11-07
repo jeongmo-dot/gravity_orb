@@ -30,6 +30,14 @@ param(
 	[string]$JellyTapEffectModes = "Color",
 	[ValidateSet("On", "Off")]
 	[string]$JellyBlastRequiresSameLevel = "Off",
+	[ValidateSet("On", "Off")]
+	[string]$JellyTapCommonPush = "On",
+	[ValidateRange(0.0, 10.0)]
+	[double]$BlastGravityPauseTime = 0.2,
+	[ValidateRange(0.0, 10000.0)]
+	[double]$BlastSpeed = 1350.0,
+	[ValidateRange(0.0, 1.0)]
+	[double]$BlastFarFactor = 0.5,
 	[string]$OrbFrictionByLevel = "0.3,0.3,0.3,0.4,0.4,0.4,0.4,0.5,0.5,0.5",
     [ValidateRange(1, 600)]
     [int]$MaxTurns = 400,
@@ -71,6 +79,10 @@ $physicsArguments += "--jelly-tap-clean-max-level=$JellyTapCleanMaxLevel"
 $physicsArguments += "--jelly-tap-grow-min-clean=$JellyTapGrowMinClean"
 $physicsArguments += "--jelly-tap-effect-modes=$($JellyTapEffectModes.ToLower())"
 $physicsArguments += "--jelly-blast-requires-same-level=$($JellyBlastRequiresSameLevel.ToLower())"
+$physicsArguments += "--jelly-tap-common-push=$($JellyTapCommonPush.ToLower())"
+$physicsArguments += "--blast-gravity-pause-time=$($BlastGravityPauseTime.ToString($culture))"
+$physicsArguments += "--blast-speed=$($BlastSpeed.ToString($culture))"
+$physicsArguments += "--blast-far-factor=$($BlastFarFactor.ToString($culture))"
 if ($OrbFrictionByLevel -ne "none" -and $OrbFrictionByLevel -notmatch '^\d+(\.\d+)?(,\d+(\.\d+)?)*$') {
 	throw "OrbFrictionByLevel must be 'none' or comma-separated non-negative numbers"
 }
@@ -171,6 +183,12 @@ $tapCleanCountByColor = @{}
 $tapCleanCountTotal = 0
 $tapCleanCountMax = 0
 $purpleSameTurnBlastCount = 0
+$bigReactionWindows = 0
+$bigReactionMerges = 0
+$bigReactionBlasts = 0
+$tapReactionWindows = 0
+$tapReactionMerges = 0
+$tapReactionBlasts = 0
 $levelCreationCounts = @{}
 $maximumLevelDistribution = @{}
 $levelTenGameCount = 0
@@ -222,6 +240,12 @@ foreach ($task in $tasks) {
 	$tapCleanCountTotal += [int]$seedRow.tap_clean_count_total
 	$tapCleanCountMax = [Math]::Max($tapCleanCountMax, [int]$seedRow.tap_clean_count_max)
 	$purpleSameTurnBlastCount += [int]$seedRow.purple_same_turn_blast_count
+	$bigReactionWindows += [int]$seedRow.reactions_within_one_second_after_blast.big.windows
+	$bigReactionMerges += [int]$seedRow.reactions_within_one_second_after_blast.big.merges
+	$bigReactionBlasts += [int]$seedRow.reactions_within_one_second_after_blast.big.blasts
+	$tapReactionWindows += [int]$seedRow.reactions_within_one_second_after_blast.tap.windows
+	$tapReactionMerges += [int]$seedRow.reactions_within_one_second_after_blast.tap.merges
+	$tapReactionBlasts += [int]$seedRow.reactions_within_one_second_after_blast.tap.blasts
 	foreach ($colorProperty in $seedRow.tap_blast_count_by_color.PSObject.Properties) {
 		$color = $colorProperty.Name
 		if (-not $tapBlastCountByColor.ContainsKey($color)) { $tapBlastCountByColor[$color] = 0 }
@@ -364,6 +388,10 @@ $summary = [ordered]@{
 	jelly_merge_level_gap = $JellyMergeLevelGap
 	jelly_tap_blast_min_level = $JellyTapBlastMinLevel
 	jelly_blast_requires_same_level = $JellyBlastRequiresSameLevel -eq "On"
+	jelly_tap_common_push = $JellyTapCommonPush -eq "On"
+	blast_gravity_pause_time = $BlastGravityPauseTime
+	blast_speed = $BlastSpeed
+	blast_far_factor = $BlastFarFactor
 	orb_friction_by_level = $OrbFrictionByLevel
     friction = if ($Friction -gt 0.0) { $Friction } else { $null }
     angular_damp = if ($AngularDamp -ge 0.0) { $AngularDamp } else { $null }
@@ -432,6 +460,10 @@ $summary = [ordered]@{
 	average_clean_count_per_tap = if ($totalTapBlastCount -gt 0) { [double]$tapCleanCountTotal / $totalTapBlastCount } else { 0.0 }
 	maximum_clean_count_per_tap = $tapCleanCountMax
 	purple_same_turn_blast_count = $purpleSameTurnBlastCount
+	reactions_within_one_second_after_blast = [ordered]@{
+		big = [ordered]@{ windows = $bigReactionWindows; merges = $bigReactionMerges; blasts = $bigReactionBlasts }
+		tap = [ordered]@{ windows = $tapReactionWindows; merges = $tapReactionMerges; blasts = $tapReactionBlasts }
+	}
     blast_count_by_level = $blastCountByLevel
 	same_level_blast_count_by_level = $sameLevelBlastCountByLevel
 	mixed_level_blast_count_by_level = $mixedLevelBlastCountByLevel

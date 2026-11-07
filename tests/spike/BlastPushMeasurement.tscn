@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/spike/run_blast_push_measurement.gd" id="1_measurement"]
+
+[node name="BlastPushMeasurement" type="Node"]
+script = ExtResource("1_measurement")

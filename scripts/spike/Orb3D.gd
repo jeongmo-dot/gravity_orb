@@ -84,6 +84,9 @@ var _merge_visual_active: bool = false
 var _merge_visual_scale: Vector2 = Vector2.ONE
 var _merge_visual_rotation: float = 0.0
 var _merge_visual_depth: float = 0.0
+var _blast_gravity_pause_remaining: float = 0.0
+var _requested_gravity_direction: Vector2 = Vector2.DOWN
+var _requested_gravity_strength: float = 0.0
 
 var position: Vector2:
 	get:
@@ -282,6 +285,7 @@ func set_symbols_enabled(enabled: bool) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_advance_blast_gravity_pause(delta)
 	_sample_physics_position()
 	_advance_growth(delta)
 	_advance_jelly_impact(delta)
@@ -509,11 +513,48 @@ func set_gravity(direction: Vector2i, strength: float) -> void:
 
 
 func set_gravity_vector(direction: Vector2, strength: float) -> void:
+	_requested_gravity_direction = direction.normalized()
+	_requested_gravity_strength = strength
 	if is_waiting_at_entrance:
 		_body.constant_force = Vector3.ZERO
 		return
-	var normalized_direction: Vector2 = direction.normalized()
-	var level_strength: float = strength * (
+	if blast_gravity_pause_active():
+		_body.constant_force = Vector3.ZERO
+		return
+	_apply_requested_gravity()
+
+
+func start_blast_gravity_pause(duration: float) -> void:
+	if is_ghost or is_waiting_at_entrance:
+		return
+	_blast_gravity_pause_remaining = maxf(duration, 0.0)
+	if _blast_gravity_pause_remaining > 0.0:
+		_body.constant_force = Vector3.ZERO
+		_body.sleeping = false
+
+
+func blast_gravity_pause_active() -> bool:
+	return _blast_gravity_pause_remaining > 0.0
+
+
+func advance_blast_gravity_pause(delta: float) -> void:
+	_advance_blast_gravity_pause(delta)
+
+
+func _advance_blast_gravity_pause(delta: float) -> void:
+	if _blast_gravity_pause_remaining <= 0.0:
+		return
+	_blast_gravity_pause_remaining = maxf(
+		_blast_gravity_pause_remaining - maxf(delta, 0.0),
+		0.0
+	)
+	if _blast_gravity_pause_remaining <= 0.0 and not is_waiting_at_entrance:
+		_apply_requested_gravity()
+
+
+func _apply_requested_gravity() -> void:
+	var normalized_direction: Vector2 = _requested_gravity_direction
+	var level_strength: float = _requested_gravity_strength * (
 		1.0 + Config.data.gravity_level_scale * float(level - 1)
 	)
 	var acceleration_px: Vector2 = normalized_direction * level_strength

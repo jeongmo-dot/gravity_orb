@@ -10,6 +10,7 @@ const WARMUP_SECONDS: float = 0.75
 const SAMPLE_SECONDS: float = 4.0
 const MERGE_SAMPLE_SECONDS: float = 2.0
 const TAP_MAGNET_SAMPLE_SECONDS: float = 0.5
+const BLAST_SAMPLE_SECONDS: float = 0.8
 
 var _main: Main
 var _board: Board3D
@@ -135,6 +136,28 @@ func _run() -> void:
 	)
 	purple_tap_result["tap_blast_applied"] = purple_tap_applied
 	(results["scenarios"] as Array).append(purple_tap_result)
+	var k0_blast_applied: bool = await _prepare_center_big_blast(false)
+	var k0_blast_result: Dictionary = await _measure_scenario(
+		"05_center_big_blast_k0_%d" % (_full_board_orb_count - 2),
+		BLAST_SAMPLE_SECONDS,
+		false
+	)
+	k0_blast_result["blast_applied"] = k0_blast_applied
+	k0_blast_result["blast_profile"] = {
+		"common": false, "speed": 900.0, "far": 0.4, "pause": 0.0,
+	}
+	(results["scenarios"] as Array).append(k0_blast_result)
+	var k4_blast_applied: bool = await _prepare_center_big_blast(true)
+	var k4_blast_result: Dictionary = await _measure_scenario(
+		"06_center_big_blast_k4_%d" % (_full_board_orb_count - 2),
+		BLAST_SAMPLE_SECONDS,
+		false
+	)
+	k4_blast_result["blast_applied"] = k4_blast_applied
+	k4_blast_result["blast_profile"] = {
+		"common": true, "speed": 1350.0, "far": 0.5, "pause": 0.2,
+	}
+	(results["scenarios"] as Array).append(k4_blast_result)
 	results["microbenchmarks"] = await _measure_microbenchmarks()
 	var output_path: String = _argument_value(
 		OUTPUT_PREFIX,
@@ -188,9 +211,8 @@ func _prepare_full_board(add_waiters: bool) -> void:
 	_simulate = false
 	_recording = false
 	_merge_activation_pairs.clear()
+	_resolver.cancel_active_jelly_merges()
 	_board.clear()
-	_resolver._pending.clear()
-	_resolver._reaction_locks.clear()
 	await get_tree().process_frame
 	await get_tree().process_frame
 	for column: int in range(18):
@@ -289,6 +311,28 @@ func _prepare_purple_tap_board() -> bool:
 	source.linear_velocity = Vector2.ZERO
 	source.angular_velocity = 0.0
 	return _resolver.apply_jelly_tap_blast(source)
+
+
+func _prepare_center_big_blast(k4: bool) -> bool:
+	Config.data.jelly_tap_common_push = k4
+	Config.data.blast_speed = 1350.0 if k4 else 900.0
+	Config.data.blast_far_factor = 0.5 if k4 else 0.4
+	Config.data.blast_gravity_pause_time = 0.2 if k4 else 0.0
+	await _prepare_full_board(false)
+	var orbs: Array[Orb3D] = _board.get_orbs()
+	if orbs.size() < 100:
+		push_error("Center blast performance scene requires at least 100 orbs")
+		return false
+	var first: Orb3D = orbs[0]
+	var second: Orb3D = orbs[1]
+	first.setup(OrbTypes.OrbColor.RED, 8, Config.data)
+	second.setup(OrbTypes.OrbColor.BLUE, 8, Config.data)
+	first.position = Vector2(-4.0, 0.0)
+	second.position = Vector2(4.0, 0.0)
+	first.linear_velocity = Vector2.ZERO
+	second.linear_velocity = Vector2.ZERO
+	_resolver.report_contact(first, second, "full_board_center_blast")
+	return _resolver.flush() == 1
 
 
 func _spawn_stopped_orb(color: int, level: int, position: Vector2) -> Orb3D:

@@ -73,6 +73,7 @@ var _seed_tap_clean_count_total: int = 0
 var _seed_tap_clean_count_max: int = 0
 var _seed_purple_tap_turns: Dictionary = {}
 var _seed_purple_same_turn_blast_count: int = 0
+var _seed_blast_reaction_windows: Array[Dictionary] = []
 var _seed_score_by_reaction_type: Dictionary = {}
 var _seed_spawn_count: int = 0
 var _seed_spawn_count_by_level: Dictionary = {}
@@ -129,6 +130,8 @@ func _run() -> void:
 		"jelly_tap_grow_min_clean": Config.data.jelly_tap_grow_min_clean,
 		"jelly_tap_effect_profile": _jelly_tap_effect_profile,
 		"jelly_tap_effect_modes": Array(Config.data.jelly_tap_effect_modes),
+		"jelly_tap_common_push": Config.data.jelly_tap_common_push,
+		"blast_gravity_pause_time": Config.data.blast_gravity_pause_time,
 		"jelly_merge_duration": Config.data.jelly_merge_duration,
 		"jelly_merge_level_gap": Config.data.jelly_merge_level_gap,
 		"blast_push_radius_by_level": Array(Config.data.blast_push_radius_by_level),
@@ -302,6 +305,7 @@ func _run_seed(
 	_seed_tap_clean_count_max = 0
 	_seed_purple_tap_turns.clear()
 	_seed_purple_same_turn_blast_count = 0
+	_seed_blast_reaction_windows.clear()
 	_seed_score_by_reaction_type = {
 		"merge": 0,
 		"blast": 0,
@@ -569,6 +573,7 @@ func _run_seed(
 		"tap_clean_count_total": _seed_tap_clean_count_total,
 		"tap_clean_count_max": _seed_tap_clean_count_max,
 		"purple_same_turn_blast_count": _seed_purple_same_turn_blast_count,
+		"reactions_within_one_second_after_blast": _blast_reaction_window_summary(),
 		"score_by_reaction_type": _seed_score_by_reaction_type.duplicate(true),
 		"same_level_blast_count_by_level": _seed_same_level_blast_count_by_level.duplicate(true),
 		"mixed_level_blast_count_by_level": _seed_mixed_level_blast_count_by_level.duplicate(true),
@@ -1010,6 +1015,7 @@ func _record_spawned_orb(level: int) -> void:
 
 func _record_shock_event(reaction: Dictionary) -> void:
 	var reaction_type: ReactionRules.Type = reaction["type"] as ReactionRules.Type
+	_record_followup_for_blast_windows(reaction_type)
 	var score_key: String = ""
 	match reaction_type:
 		ReactionRules.Type.MERGE:
@@ -1050,6 +1056,12 @@ func _record_shock_event(reaction: Dictionary) -> void:
 		if bool(reaction.get("jelly_absorption", false)):
 			_seed_absorption_count += 1
 	if reaction_type == ReactionRules.Type.TAP_BLAST:
+		_seed_blast_reaction_windows.append({
+			"kind": "tap",
+			"frame": Engine.get_physics_frames(),
+			"merges": 0,
+			"blasts": 0,
+		})
 		_seed_tap_blast_count += 1
 		var tap_levels: Array = reaction.get("levels", []) as Array
 		var tap_level: int = int(tap_levels[0]) if not tap_levels.is_empty() else 0
@@ -1072,6 +1084,12 @@ func _record_shock_event(reaction: Dictionary) -> void:
 			_seed_purple_tap_turns[_current_measurement_turn] = true
 		return
 	if reaction_type == ReactionRules.Type.BLAST:
+		_seed_blast_reaction_windows.append({
+			"kind": "big",
+			"frame": Engine.get_physics_frames(),
+			"merges": 0,
+			"blasts": 0,
+		})
 		_turn_blast_count += 1
 		_seed_blast_count += 1
 		if _seed_purple_tap_turns.has(_current_measurement_turn):
@@ -1135,6 +1153,34 @@ func _record_shock_event(reaction: Dictionary) -> void:
 		)
 	var targets: Array[Dictionary] = reaction["shock_targets"] as Array[Dictionary]
 	_turn_shock_events.append({"targets": targets})
+
+
+func _record_followup_for_blast_windows(reaction_type: ReactionRules.Type) -> void:
+	if reaction_type not in [ReactionRules.Type.MERGE, ReactionRules.Type.BLAST]:
+		return
+	var current_frame: int = Engine.get_physics_frames()
+	for window: Dictionary in _seed_blast_reaction_windows:
+		var elapsed_frames: int = current_frame - int(window["frame"])
+		if elapsed_frames <= 0 or elapsed_frames > Engine.physics_ticks_per_second:
+			continue
+		if reaction_type == ReactionRules.Type.MERGE:
+			window["merges"] = int(window["merges"]) + 1
+		else:
+			window["blasts"] = int(window["blasts"]) + 1
+
+
+func _blast_reaction_window_summary() -> Dictionary:
+	var result: Dictionary = {
+		"big": {"windows": 0, "merges": 0, "blasts": 0},
+		"tap": {"windows": 0, "merges": 0, "blasts": 0},
+	}
+	for window: Dictionary in _seed_blast_reaction_windows:
+		var kind: String = str(window["kind"])
+		var bucket: Dictionary = result[kind] as Dictionary
+		bucket["windows"] = int(bucket["windows"]) + 1
+		bucket["merges"] = int(bucket["merges"]) + int(window["merges"])
+		bucket["blasts"] = int(bucket["blasts"]) + int(window["blasts"])
+	return result
 
 
 func _measurement_color_name(color: int) -> String:
@@ -2169,6 +2215,19 @@ func _apply_arguments() -> void:
 			Config.data.blast_enabled = false
 		elif argument.begins_with("--blast-speed="):
 			Config.data.blast_speed = argument.trim_prefix("--blast-speed=").to_float()
+		elif argument.begins_with("--blast-far-factor="):
+			Config.data.blast_far_factor = argument.trim_prefix(
+				"--blast-far-factor="
+			).to_float()
+		elif argument.begins_with("--blast-gravity-pause-time="):
+			Config.data.blast_gravity_pause_time = maxf(
+				argument.trim_prefix("--blast-gravity-pause-time=").to_float(),
+				0.0
+			)
+		elif argument.begins_with("--jelly-tap-common-push="):
+			Config.data.jelly_tap_common_push = (
+				argument.trim_prefix("--jelly-tap-common-push=") == "on"
+			)
 		elif argument.begins_with("--blast-min-level="):
 			Config.data.blast_min_level = maxi(
 				argument.trim_prefix("--blast-min-level=").to_int(),
