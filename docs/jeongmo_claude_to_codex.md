@@ -32,6 +32,29 @@
 
 ## 대기 중
 
+### [2026-11-07 #139] 색은 4가지로 — 30·60턴 새 색 없애기·빌드 0.16.7
+- 상태: 대기 (**#138 병합 뒤** main 위에서)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.30**
+- 배경: 사용자 (2026-11-07) "색상 종류 지금 6가지 인거 4가지로 줄이자". 지금은 4색으로 시작해 30턴 보라·60턴 주황이 더해진다
+- 앵커: `config/GameConfig.gd`·`default_config.tres` `turn_color_unlock_turns`, `GameConfig.color_count_for_turn()`·`newly_unlocked_color_for_turn()`, `scripts/core/Spawner.gd` `_draw_candidate_for_turn()`, `scripts/ui/Hud.gd` `_track_preview_unlocks()`, 판 균형 측정 도구, `tests/test_config.gd`·`tests/test_spawner.gd`·`tests/test_jelly_regression.gd`, 캡처, `project.godot`
+- 요구 (§12-ONE.30 1~6):
+  1. `turn_color_unlock_turns` [30, 60] → **[]**: 판 내내 분홍·파랑·초록·노랑 4색. 보라 자석·주황 휴식 코드·문구는 그대로 둔다
+  2. 판 균형 C6·C4·C4-S5 (자동 D-save·D-all, R D-save, L-합체 D-save·D-all × 20, 600턴 상한). 색별 소폭발 수·청소/회 평균 추가
+  3. 해시: 예전 JELLY 묶음 ([30, 60] 고정) 그대로, CLASSIC 생성 진행은 새 값으로 고정 (회신에), C4 고정
+  4. 테스트 (§12-ONE.30 4번)
+  5. 캡처: 전체를 새 기본값으로, 두 비율. 보라·주황·새 색 반짝임 고정 장면은 남기고 목록을 회신에
+  6. 버전 **0.16.7**, 커밋 뒤 깨끗한 트리에서 Release. 보고는 #136과 같다
+- 수치 (Claude): `turn_color_unlock_turns` **[]**, 버전 **0.16.7**. 그 밖의 값은 그대로
+- 건드리지 말 것: 색 그림·표시 색·시작 4색 순서, 색별 효과 코드, 생성 비율·상한·램프, 합치는 레벨, 소폭발·대폭발, 점수, 물리, 그림·연출 (명세에 없는 것 금지, 고리 모양 금지), 사용자 저장 파일, `docs/` (회신 파일 제외)
+- **회신 맨 앞에**: C4 L-합체 D-all 미완료 3판 이상, C4 자동 D-save 평균 턴이 C6과 30% 넘게 다름
+- Done-when:
+  - [ ] 테스트 통과, 예전 JELLY 해시 그대로, CLASSIC 생성 진행·C4 해시 고정
+  - [ ] 판 균형표 C6·C4·C4-S5
+  - [ ] 캡처 (두 비율)
+  - [ ] `build/windows/GravityOrb_v0.16.7.exe` (`mode=Release`, `_BUILD.txt` 커밋 = 브랜치 끝), 0.16.1~0.16.6 파일 그대로
+- QA: §12-ONE.30 2·6번
+- 커밋: 항목 단위 브랜치 (`four-colors`), **push·PR까지** (병합은 Claude 검수 뒤)
+
 ### [2026-11-07 #138] 소폭발은 사방으로 크게 — 위로 터짐 끄기·소폭발 전용 반경·속도·빌드 0.16.6
 - 상태: 대기
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.29**
