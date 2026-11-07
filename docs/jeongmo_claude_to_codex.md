@@ -32,7 +32,28 @@
 
 ## 대기 중
 
-- 없음
+### [2026-11-07 #135] 같은 색 합체는 레벨 차 1까지·턴 대기 판정 정리·빌드 0.16.3
+- 상태: 대기
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.26**
+- 배경: 사용자 (2026-11-07) "정리 명세 넘겨줘", "이제 게임이 장기화 되니까 합체 규칙을 더 좁혀서, 1레벨 차이만 합치게 해줘"
+- 앵커: `config/GameConfig.gd`·`config/default_config.tres` `jelly_merge_level_gap`, `scripts/core/CollisionResolver.gd` `_has_pending_jelly_reactions()`, `scripts/core/ReactionRules.gd` `can_react()` (규칙 기준 — 판정은 그대로), `tests/test_config.gd`·`tests/test_rules.gd`·`tests/test_jelly_regression.gd`, `tests/spike/capture_screens.gd`, 측정 도구, `project.godot`
+- 요구 (§12-ONE.26 1~7):
+  1. 기본 `jelly_merge_level_gap` 2 → **1** (`GameConfig.gd`·`default_config.tres`)
+  2. `_has_pending_jelly_reactions()`가 `_pair_can_react()`로 짝을 정한다 (레벨 ±1·같은 레벨 대폭발을 따로 적지 않음). 레벨 차·대폭발 조건을 따로 적은 곳 목록을 회신에
+  3. 해시: 예전 6종 그대로, 지금 기본은 묶음 F2 (`4c4ab4aa…`)로 남기고, 새 기본 G1 해시 고정
+  4. 테스트: 기본값 판정, `can_react()` = `classify()`, 대기 판정 (합체 과정 0 묶음)
+  5. 측정 G1: 자동·R·G·L-합체 × D-save·D-all (F2와 같은 조건·항목). **L-합체 D-all 미완료 3판 이상이면 회신 맨 앞**
+  6. 캡처: 레벨 차에 따라 달라지는 장면을 새 기본값으로 (같은 색 L7이 L6을 먹는 과정), 두 비율, 마지막 전체 캡처
+  7. 버전 **0.16.3**, 커밋 뒤 깨끗한 트리에서 Release 빌드. 그 전 검증 빌드는 `-Debug`. 보고는 #134와 같다
+- 수치 (Claude): `jelly_merge_level_gap` **1**, 버전 **0.16.3**. 그 밖의 값은 그대로
+- 건드리지 말 것: 다른 규칙·수치, 그림·연출 (명세에 없는 것 금지, 고리 모양 금지), 사용자 저장 파일, `docs/` (회신 파일 제외)
+- Done-when:
+  - [ ] 테스트 통과, 예전 해시 6종·F2 그대로, G1 해시 고정
+  - [ ] G1 측정표 (F2 옆)
+  - [ ] 캡처 (두 비율)
+  - [ ] `build/windows/GravityOrb_v0.16.3.exe` (`mode=Release`, `_BUILD.txt` 커밋 = 브랜치 끝), 0.16.1·0.16.2 파일 그대로
+- QA: §12-ONE.26 5·7번
+- 커밋: 항목 단위 브랜치 (`merge-gap-1`), **push·PR까지** (병합은 Claude 검수 뒤)
 
 ---
 
