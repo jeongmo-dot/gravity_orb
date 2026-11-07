@@ -32,8 +32,15 @@
 
 ## 대기 중
 
-### [2026-11-07 #135] 같은 색 합체는 레벨 차 1까지·턴 대기 판정 정리·빌드 0.16.3
-- 상태: 대기
+- 없음
+
+---
+
+## 처리 완료
+
+### [2026-11-07 #135] 같은 색 합체는 레벨 차 1까지·턴 대기 판정 정리·빌드 0.16.3 — 완료
+- 상태: 완료 (2026-11-07 사용자 "그대로 병합" · [PR #135](https://github.com/jeongmo-dot/gravity_orb/pull/135) 병합 `1001f14`)
+- 검수: 코드 diff, 회신 측정표, 캡처 `100`·`102` (같은 색 L7 + L6 → L8 — 회신의 "L7만 남는"은 표기 잘못), `build/windows/GravityOrb_v0.16.3.exe` 크기·SHA-256·`_BUILD.txt` (커밋 `dce78a4` = 브랜치 끝, Release) 직접 확인. 테스트 336/4/5·해시·스모크·격리 창·`save.cfg`는 Codex 관측 (Claude 재실행 없음). G1: 모든 봇 약 100~120턴에 끝남, 대신 대폭발 63 → 3·점수 −87% (#128 1차 B와 비슷) — Claude가 병합 전에 사용자에게 물음. 결과: §12-ONE.26 "#135 결과"
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.26**
 - 배경: 사용자 (2026-11-07) "정리 명세 넘겨줘", "이제 게임이 장기화 되니까 합체 규칙을 더 좁혀서, 1레벨 차이만 합치게 해줘"
 - 앵커: `config/GameConfig.gd`·`config/default_config.tres` `jelly_merge_level_gap`, `scripts/core/CollisionResolver.gd` `_has_pending_jelly_reactions()`, `scripts/core/ReactionRules.gd` `can_react()` (규칙 기준 — 판정은 그대로), `tests/test_config.gd`·`tests/test_rules.gd`·`tests/test_jelly_regression.gd`, `tests/spike/capture_screens.gd`, 측정 도구, `project.godot`
@@ -54,10 +61,6 @@
   - [ ] `build/windows/GravityOrb_v0.16.3.exe` (`mode=Release`, `_BUILD.txt` 커밋 = 브랜치 끝), 0.16.1·0.16.2 파일 그대로
 - QA: §12-ONE.26 5·7번
 - 커밋: 항목 단위 브랜치 (`merge-gap-1`), **push·PR까지** (병합은 Claude 검수 뒤)
-
----
-
-## 처리 완료
 
 ### [2026-11-06 #134] Windows 빌드 0.16.2 (#133 포함)·0.16.1 복구·Release 덮어쓰기 막기·초록 안내 문구 — 완료
 - 상태: 완료 (2026-11-06 Claude 검수 · [PR #134](https://github.com/jeongmo-dot/gravity_orb/pull/134) 병합 `eecfcec`)
