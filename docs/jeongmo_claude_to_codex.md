@@ -32,7 +32,32 @@
 
 ## 대기 중
 
-- 없음
+### [2026-11-07 #136] 소폭발·대폭발이 주변 젤리를 확실히 밀기·빌드 0.16.4
+- 상태: 대기
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.27**
+- 배경: 사용자 (2026-11-07, 0.16.3 뒤) "소폭발과 대폭발 모두 확실하게 주변 젤리들을 밀어냈으면 좋겠어". 지금 소폭발은 분홍만 밀고, 밀린 젤리는 중력 3600에 바로 눌린다 (위로 900 px/s → 약 112px)
+- 앵커: `scripts/core/CollisionResolver.gd` `apply_jelly_tap_blast()`, `scripts/spike/Board3D.gd` `apply_blast_with_radius_factor()`·`start_tap_magnet()`·`_advance_tap_magnet()`·`set_gravity()`·`_apply_actual_gravity_to_orbs()`·`is_gravity_transition_active()`, `scripts/spike/Orb3D.gd` `set_gravity_vector()`, `config/GameConfig.gd`·`default_config.tres`, 측정 도구, `tests/test_jelly_regression.gd`, 캡처, `project.godot`
+- 요구 (§12-ONE.27 1~10):
+  1. 새 필드 `jelly_tap_common_push` **true**: 모든 색 소폭발이 반경 0.3 안을 민다 (터치한 젤리 제외, 분홍은 한 번만, 파랑은 밀기 + 지진, 보라는 밀기 → 무중력 → 자석)
+  2. 새 필드 `blast_gravity_pause_time` **0.2**: 대폭발·소폭발로 밀린 젤리는 0.2초 무중력, 끝나면 그때 중력. 지진·합체 충격파는 걸지 않음
+  3. 값: `blast_speed` 900 → **1350**, `blast_far_factor` 0.4 → **0.5**
+  4. 밀림 측정 K0~K4 (바깥쪽 이동 거리 0.1·0.2·0.4·0.8초, 50px 이상 비율, 최대 속도·관통·이탈)
+  5. 판 균형 측정 K4 (G1과 같은 조건·항목, 밀려서 생긴 반응 수)
+  6. 성능: 공 100개 이상 + 대폭발 장면 K0·K4
+  7. 해시: 예전 8종 (G1 포함) 그대로, K4 고정
+  8. 테스트 (§12-ONE.27 8번)
+  9. 캡처: K0·K4 대폭발·노랑 소폭발 0·0.1·0.2·0.4초, 두 비율, 마지막 전체 캡처
+  10. 버전 **0.16.4**, 커밋 뒤 깨끗한 트리에서 Release (그 전 검증 빌드는 `-Debug`). 보고는 #135와 같다
+- 수치 (Claude): `jelly_tap_common_push` **true**, `blast_gravity_pause_time` **0.2**, `blast_speed` **1350**, `blast_far_factor` **0.5**, 버전 **0.16.4**. 그 밖의 값은 그대로
+- 건드리지 말 것: 대폭발·소폭발 조건·반경·점수, 색 청소·색별 효과 (1번 말고), 합체 충격파, 물리 값, 생성, 그림·연출 (명세에 없는 것 금지, 고리 모양 금지), 사용자 저장 파일, `docs/` (회신 파일 제외)
+- **회신 맨 앞에**: K4 판 밖 이탈 1회 이상 또는 최대 관통 30px 초과, K4 자동 D-save 평균 턴이 G1 (101.70)과 20% 넘게 다름, K4 L-합체 D-all 미완료 3판 이상
+- Done-when:
+  - [ ] 테스트 통과, 예전 해시 8종 그대로, K4 해시 고정
+  - [ ] 밀림 측정표 K0~K4, 판 균형표 K4 (G1 옆), 성능표
+  - [ ] 캡처 (두 비율)
+  - [ ] `build/windows/GravityOrb_v0.16.4.exe` (`mode=Release`, `_BUILD.txt` 커밋 = 브랜치 끝), 0.16.1~0.16.3 파일 그대로
+- QA: §12-ONE.27 4~6·10번
+- 커밋: 항목 단위 브랜치 (`blast-push`), **push·PR까지** (병합은 Claude 검수 뒤)
 
 ---
 
