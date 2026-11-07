@@ -340,9 +340,12 @@ func apply_jelly_tap_blast(orb: Variant) -> bool:
 	var shock_targets: Array[Dictionary] = []
 	var common_push: bool = Config.data.jelly_tap_common_push
 	if common_push or tap_effect in [GameConfig.JellyTapEffect.PUSH, GameConfig.JellyTapEffect.BOMB]:
+		var push_radius_factor: float = Config.data.jelly_tap_push_radius_factor
+		if push_radius_factor <= 0.0:
+			push_radius_factor = Config.data.jelly_tap_blast_radius_factor
 		blast_targets = _board.apply_blast_with_radius_factor(
 			position,
-			Config.data.jelly_tap_blast_radius_factor,
+			push_radius_factor,
 			orb,
 			true
 		)

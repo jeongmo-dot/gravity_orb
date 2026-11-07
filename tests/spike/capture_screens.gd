@@ -682,6 +682,7 @@ func _capture_jelly_tap_effect_scenes(
 	await _capture("128_jelly_tap_effects_full.png")
 	await _capture_blast_push_evidence(main, board, resolver)
 	await _capture_tap_lift_evidence(board, resolver)
+	await _capture_tap_push_evidence(main, board, resolver)
 	Config.data.fx_hitstop_enabled = original_hitstop_enabled
 
 
@@ -702,6 +703,8 @@ func _capture_blast_push_evidence(
 		Config.data.blast_far_factor = float(profile["far"])
 		Config.data.blast_gravity_pause_time = float(profile["pause"])
 		Config.data.jelly_tap_lift_speed = float(profile["lift"])
+		Config.data.jelly_tap_push_radius_factor = 0.0
+		Config.data.jelly_tap_push_speed = 0.0
 		await _capture_blast_push_case(
 			board, resolver, str(profile["tag"]), "big", int(profile["base"])
 		)
@@ -716,6 +719,8 @@ func _capture_tap_lift_evidence(board: Board3D, resolver: CollisionResolver) -> 
 	Config.data.blast_speed = 1350.0
 	Config.data.blast_far_factor = 0.5
 	Config.data.blast_gravity_pause_time = 0.2
+	Config.data.jelly_tap_push_radius_factor = 0.0
+	Config.data.jelly_tap_push_speed = 0.0
 	var profiles: Array[Dictionary] = [
 		{"tag": "0", "lift": 0.0, "base": 146},
 		{"tag": "900", "lift": 900.0, "base": 150},
@@ -734,13 +739,73 @@ func _capture_tap_lift_evidence(board: Board3D, resolver: CollisionResolver) -> 
 	await _capture("154_jelly_tap_lift_full.png")
 
 
+func _capture_tap_push_evidence(
+	main: Main,
+	board: Board3D,
+	resolver: CollisionResolver
+) -> void:
+	Config.data.jelly_tap_common_push = true
+	Config.data.blast_speed = 1350.0
+	Config.data.blast_far_factor = 0.5
+	Config.data.blast_gravity_pause_time = 0.2
+	var profiles: Array[Dictionary] = [
+		{"tag": "l9", "lift": 900.0, "radius": 0.0, "speed": 0.0, "base": 155},
+		{"tag": "t0", "lift": 0.0, "radius": 0.0, "speed": 0.0, "base": 163},
+		{"tag": "t3", "lift": 0.0, "radius": 0.5, "speed": 1800.0, "base": 171},
+	]
+	for profile: Dictionary in profiles:
+		Config.data.jelly_tap_lift_speed = float(profile["lift"])
+		Config.data.jelly_tap_push_radius_factor = float(profile["radius"])
+		Config.data.jelly_tap_push_speed = float(profile["speed"])
+		_clear_tap_push_capture_residue(main)
+		await _capture_blast_push_case(
+			board,
+			resolver,
+			str(profile["tag"]),
+			"center",
+			int(profile["base"]),
+			"tap_push",
+			main
+		)
+		_clear_tap_push_capture_residue(main)
+		await _capture_blast_push_case(
+			board,
+			resolver,
+			str(profile["tag"]),
+			"yellow",
+			int(profile["base"]) + 4,
+			"tap_push",
+			main
+		)
+	Config.data.jelly_tap_lift_speed = 0.0
+	Config.data.jelly_tap_push_radius_factor = 0.5
+	Config.data.jelly_tap_push_speed = 1800.0
+	_clear_tap_push_capture_residue(main)
+	await _capture("179_jelly_tap_push_full.png")
+
+
+func _clear_tap_push_capture_residue(main: Main) -> void:
+	var director: FeedbackDirector = main.get_node("FeedbackDirector") as FeedbackDirector
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
+	director.clear_effects()
+	for popup: ScorePopup in hud.active_score_popups():
+		popup.deactivate()
+	if hud._callout_tween != null and hud._callout_tween.is_valid():
+		hud._callout_tween.kill()
+	hud._hide_callout_label()
+	manager.turn_combo = 0
+	manager._emit_combo_changed()
+
+
 func _capture_blast_push_case(
 	board: Board3D,
 	resolver: CollisionResolver,
 	profile_tag: String,
 	kind: String,
 	first_file_number: int,
-	file_prefix: String = "blast_push"
+	file_prefix: String = "blast_push",
+	main: Main = null
 ) -> void:
 	resolver.cancel_active_jelly_merges()
 	board.clear()
@@ -766,13 +831,21 @@ func _capture_blast_push_case(
 		if resolver.flush() != 1:
 			_fail("%s big blast evidence did not trigger" % profile_tag)
 	else:
+		var source_position: Vector2 = (
+			Vector2.ZERO
+			if kind == "center"
+			else Vector2(0.0, board.half_size() - 52.0 - 4.8 * 108.0)
+		)
+		var source_level: int = 8 if file_prefix == "tap_push" else 10
 		var source: Orb3D = board.spawn_orb(
 			OrbTypes.OrbColor.YELLOW,
-			10,
-			Vector2(0.0, board.half_size() - 52.0 - 4.8 * 108.0)
+			source_level,
+			source_position
 		)
 		if not resolver.apply_jelly_tap_blast(source):
 			_fail("%s yellow tap evidence did not trigger" % profile_tag)
+		if main != null:
+			_clear_tap_push_capture_residue(main)
 	var suffixes: Array[String] = ["000", "010", "020", "040"]
 	var waits: Array[int] = [0, 12, 12, 24]
 	for index: int in range(suffixes.size()):

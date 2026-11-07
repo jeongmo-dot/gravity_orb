@@ -132,6 +132,8 @@ func _run() -> void:
 		"jelly_tap_effect_modes": Array(Config.data.jelly_tap_effect_modes),
 		"jelly_tap_common_push": Config.data.jelly_tap_common_push,
 		"jelly_tap_lift_speed": Config.data.jelly_tap_lift_speed,
+		"jelly_tap_push_radius_factor": Config.data.jelly_tap_push_radius_factor,
+		"jelly_tap_push_speed": Config.data.jelly_tap_push_speed,
 		"blast_gravity_pause_time": Config.data.blast_gravity_pause_time,
 		"jelly_merge_duration": Config.data.jelly_merge_duration,
 		"jelly_merge_level_gap": Config.data.jelly_merge_level_gap,
@@ -2244,6 +2246,16 @@ func _apply_arguments() -> void:
 		elif argument.begins_with("--jelly-tap-lift-speed="):
 			Config.data.jelly_tap_lift_speed = maxf(
 				argument.trim_prefix("--jelly-tap-lift-speed=").to_float(),
+				0.0
+			)
+		elif argument.begins_with("--jelly-tap-push-radius-factor="):
+			Config.data.jelly_tap_push_radius_factor = maxf(
+				argument.trim_prefix("--jelly-tap-push-radius-factor=").to_float(),
+				0.0
+			)
+		elif argument.begins_with("--jelly-tap-push-speed="):
+			Config.data.jelly_tap_push_speed = maxf(
+				argument.trim_prefix("--jelly-tap-push-speed=").to_float(),
 				0.0
 			)
 		elif argument.begins_with("--blast-min-level="):

@@ -150,7 +150,9 @@ enum GameMode {
 @export var jelly_tap_bonus_points_per_orb: int = 100
 @export var jelly_tap_magnet_time: float = 0.5
 @export var jelly_tap_common_push: bool = true
-@export var jelly_tap_lift_speed: float = 900.0
+@export var jelly_tap_lift_speed: float = 0.0
+@export var jelly_tap_push_radius_factor: float = 0.5
+@export var jelly_tap_push_speed: float = 1800.0
 @export var blast_gravity_pause_time: float = 0.2
 @export var blast_speed: float = 1350.0
 @export var blast_far_factor: float = 0.5

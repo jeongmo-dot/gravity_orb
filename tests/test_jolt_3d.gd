@@ -1163,7 +1163,7 @@ func test_all_six_tap_colors_push_only_nearby_orbs_and_exclude_source() -> void:
 		await tree.process_frame
 		var source: Orb3D = board.spawn_orb(color, 10, Vector2.ZERO)
 		var near: Orb3D = board.spawn_orb((color + 1) % 6, 4, Vector2(180.0, 0.0))
-		var far: Orb3D = board.spawn_orb((color + 2) % 6, 4, Vector2(380.0, 0.0))
+		var far: Orb3D = board.spawn_orb((color + 2) % 6, 4, Vector2(500.0, 0.0))
 		assert_true(resolver.apply_jelly_tap_blast(source), "color %d tap applies" % color)
 		var source_seen: bool = false
 		var near_speed: float = -1.0
@@ -1227,8 +1227,12 @@ func test_blast_pause_defers_latest_gravity_repushes_and_skips_excluded_orbs() -
 
 func test_tap_lift_uses_opposite_current_gravity_without_changing_big_blast() -> void:
 	var original_lift: float = Config.data.jelly_tap_lift_speed
+	var original_push_radius: float = Config.data.jelly_tap_push_radius_factor
+	var original_push_speed: float = Config.data.jelly_tap_push_speed
 	var original_diagonal_time: float = Config.data.gravity_turn_diagonal_time
 	Config.data.jelly_tap_lift_speed = 900.0
+	Config.data.jelly_tap_push_radius_factor = 0.0
+	Config.data.jelly_tap_push_speed = 0.0
 	Config.data.gravity_turn_diagonal_time = 0.0
 	var board: Board3D = await _create_board()
 	board.set_gravity(Vector2i.DOWN)
@@ -1284,7 +1288,76 @@ func test_tap_lift_uses_opposite_current_gravity_without_changing_big_blast() ->
 	assert_near(zero_change.y, 0.0, 0.001, "zero lift adds no gravity-opposite component")
 	assert_eq(int(zero_rows[0]["stable_spawn_id"]), zero_target.stable_spawn_id, "zero-lift target row")
 	Config.data.jelly_tap_lift_speed = original_lift
+	Config.data.jelly_tap_push_radius_factor = original_push_radius
+	Config.data.jelly_tap_push_speed = original_push_speed
 	Config.data.gravity_turn_diagonal_time = original_diagonal_time
+	await _cleanup(board)
+
+
+func test_tap_push_uses_dedicated_radius_speed_and_keeps_big_blast_profile() -> void:
+	var original_lift: float = Config.data.jelly_tap_lift_speed
+	var original_push_radius: float = Config.data.jelly_tap_push_radius_factor
+	var original_push_speed: float = Config.data.jelly_tap_push_speed
+	var original_blast_speed: float = Config.data.blast_speed
+	var original_far_factor: float = Config.data.blast_far_factor
+	Config.data.jelly_tap_lift_speed = 0.0
+	Config.data.jelly_tap_push_radius_factor = 0.5
+	Config.data.jelly_tap_push_speed = 1800.0
+	Config.data.blast_speed = 1350.0
+	Config.data.blast_far_factor = 0.5
+	var board: Board3D = await _create_board()
+	var source: Orb3D = board.spawn_orb(3, 8, Vector2.ZERO)
+	var side: Orb3D = board.spawn_orb(0, 4, Vector2(400.0, 0.0))
+	var below: Orb3D = board.spawn_orb(1, 4, Vector2(0.0, 400.0))
+	var outside: Orb3D = board.spawn_orb(2, 4, Vector2(500.0, 0.0))
+	var tap_rows: Array[Dictionary] = board.apply_blast_with_radius_factor(
+		Vector2.ZERO,
+		Config.data.jelly_tap_push_radius_factor,
+		source,
+		true
+	)
+	var tap_changes: Dictionary = {}
+	for row: Dictionary in tap_rows:
+		tap_changes[int(row["stable_spawn_id"])] = row["velocity_change"] as Vector2
+	assert_true(not tap_changes.has(source.stable_spawn_id), "tap source remains excluded")
+	var expected_tap_speed: float = 1800.0 * lerpf(1.0, 0.5, 400.0 / 480.0)
+	assert_near(
+		(tap_changes[side.stable_spawn_id] as Vector2).x,
+		expected_tap_speed,
+		0.01,
+		"tap target at 400px uses dedicated speed and 0.5 radius"
+	)
+	assert_near(
+		(tap_changes[below.stable_spawn_id] as Vector2).y,
+		expected_tap_speed,
+		0.01,
+		"tap target below moves outward rather than upward"
+	)
+	assert_true(
+		(tap_changes[outside.stable_spawn_id] as Vector2).is_zero_approx(),
+		"tap target outside 0.5 board radius stays still"
+	)
+
+	board.clear()
+	await tree.process_frame
+	var big_target: Orb3D = board.spawn_orb(0, 4, Vector2(400.0, 0.0))
+	var big_rows: Array[Dictionary] = board.apply_blast_with_radius_factor(
+		Vector2.ZERO,
+		1.0
+	)
+	var expected_big_speed: float = 1350.0 * lerpf(1.0, 0.5, 400.0 / 960.0)
+	assert_near(
+		(big_rows[0]["velocity_change"] as Vector2).length(),
+		expected_big_speed,
+		0.01,
+		"big blast keeps shared blast speed"
+	)
+	assert_eq(int(big_rows[0]["stable_spawn_id"]), big_target.stable_spawn_id, "big target row")
+	Config.data.jelly_tap_lift_speed = original_lift
+	Config.data.jelly_tap_push_radius_factor = original_push_radius
+	Config.data.jelly_tap_push_speed = original_push_speed
+	Config.data.blast_speed = original_blast_speed
+	Config.data.blast_far_factor = original_far_factor
 	await _cleanup(board)
 
 
@@ -1308,11 +1381,15 @@ func test_bomb_quake_and_grow_tap_effects_follow_color_rules() -> void:
 	assert_true(not blue_far.consumed, "far other-color orb remains")
 	assert_true(not blue_high.consumed, "other-color L4 remains")
 	var bomb_moved: bool = false
+	var bomb_far_moved: bool = false
 	for target_value: Variant in reactions[-1]["blast_targets"] as Array:
 		var target_row: Dictionary = target_value as Dictionary
 		if int(target_row["stable_spawn_id"]) == blue_high.stable_spawn_id:
 			bomb_moved = (target_row["velocity_change"] as Vector2).x > 0.0
+		elif int(target_row["stable_spawn_id"]) == blue_far.stable_spawn_id:
+			bomb_far_moved = (target_row["velocity_change"] as Vector2).x > 0.0
 	assert_true(bomb_moved, "remaining near orb is pushed")
+	assert_true(bomb_far_moved, "400px other-color L2 is pushed but not bomb-cleaned")
 
 	board.clear()
 	await tree.process_frame
@@ -1337,7 +1414,7 @@ func test_bomb_quake_and_grow_tap_effects_follow_color_rules() -> void:
 			target_row["velocity_change"] as Vector2
 		).length()
 	assert_true(float(quake_push_speeds[light.stable_spawn_id]) > 0.0, "blue near gets push plus quake")
-	assert_near(float(quake_push_speeds[outside.stable_spawn_id]), 0.0, 0.01, "blue outside gets quake only")
+	assert_true(float(quake_push_speeds[outside.stable_spawn_id]) > 0.0, "blue 400px target gets wide push plus quake")
 
 	board.clear()
 	await tree.process_frame

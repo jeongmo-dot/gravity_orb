@@ -50,6 +50,8 @@ foreach ($profile in $profiles) {
                 JellyMergeLevelGap = $profile.Gap
                 JellyMergeWideGapMinLevel = $profile.Wide
                 JellyTapLiftSpeed = 900.0
+                JellyTapPushRadiusFactor = 0.0
+                JellyTapPushSpeed = 0.0
             }
             if ($AggregateOnly) { $autoArguments.AggregateOnly = $true }
             & $autoScript @autoArguments
@@ -69,6 +71,8 @@ foreach ($profile in $profiles) {
             JellyMergeLevelGap = $profile.Gap
             JellyMergeWideGapMinLevel = $profile.Wide
             JellyTapLiftSpeed = 900.0
+            JellyTapPushRadiusFactor = 0.0
+            JellyTapPushSpeed = 0.0
             Strategies = if ($mode -eq "save") { "r,l_merge" } else { "l_merge" }
             MeasurementLabel = $strategyLabel
         }
