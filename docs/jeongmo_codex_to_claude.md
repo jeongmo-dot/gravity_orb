@@ -39,8 +39,8 @@
 ## 미확인
 
 ### [2026-11-07] 대상 #136 — 소폭발·대폭발 주변 젤리 밀기·Windows 0.16.4
-- 상태: 완료 — **회신 맨 앞 경고 조건 없음**. K4 판 밖 이탈 `0`회, 전체 K4 최대 관통 `22.68px`, 자동 D-save 평균 `103.55`턴(G1 `101.70` 대비 `+1.8%`), L-합체 D-all 미완료 `0/20`판을 관측했다. 구현·자동 검증·측정·두 비율 실제 창 캡처·Debug 빌드를 마쳤고 Release/PR 정보는 생성 뒤 이 항목에 갱신한다
-- 브랜치 / PR: `blast-push` / 생성 전
+- 상태: 완료 — **회신 맨 앞 경고 조건 없음**. K4 판 밖 이탈 `0`회, 전체 K4 최대 관통 `22.68px`, 자동 D-save 평균 `103.55`턴(G1 `101.70` 대비 `+1.8%`), L-합체 D-all 미완료 `0/20`판을 관측했다. 구현·자동 검증·측정·두 비율 실제 창 캡처·0.16.4 Release·PR까지 마쳤다. 합격·병합 판정은 Claude/사용자 대기
+- 브랜치 / PR: `blast-push` / https://github.com/jeongmo-dot/gravity_orb/pull/136
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/{core/CollisionResolver.gd,spike/Board3D.gd,spike/Orb3D.gd,platform/FullBoardPerformanceMeasurement.gd}`, `project.godot`, `tests/{capture_screens.ps1,run_jelly_physics_autoplay.ps1,test_config.gd,test_jelly_regression.gd,test_jolt_3d.gd}`, `tests/spike/{BlastPushMeasurement.tscn,capture_screens.gd,run_blast_push_measurement.gd,run_jolt_3d_measurement.gd}`, `tests/tools/{run_blast_push_measurement.ps1,run_jelly_measurement.ps1}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 모든 색 소폭발이 반경 안 다른 젤리를 한 번 밀고 터치 원본은 제외. 분홍 중복 없음, 파랑 밀기+지진, 보라는 밀기→0.2초 무중력→0.5초 자석 — 자동 (`test_jolt_3d`)
@@ -49,7 +49,7 @@
   - [x] 이전 M·B·C8·D·ST·잭팟·F2·G1 해시 유지, K4 해시 고정 — 자동 (`test_jelly_regression`)
   - [x] K0~K4 밀림, K4 자동·전략 봇, 폭발 뒤 1초 반응, 118개 공 성능 측정 — 자동 측정
   - [x] K0·K4 대폭발/바닥 노랑 0·0.1·0.2·0.4초와 마지막 전체를 두 비율에서 생성·직접 확인 — 실제 창 관측
-  - [ ] 깨끗한 트리 Release·내보낸 스모크·저장/이전 빌드 보존·PR — 아래 Release 항목을 최종 커밋 뒤 갱신
+  - [x] 깨끗한 트리 Release·내보낸 스모크·저장/이전 빌드 보존·PR — 자동 + 파일 해시 대조
 
 - K0~K4 밀림 측정 (약 80개 대상, 거리 단위 px, `중앙값/p90`; 50px 비율은 실제 밀린 뒤 0.4초까지 남은 대상 기준):
 
@@ -137,7 +137,14 @@
   - `tools/build_windows.ps1 -Debug` → `WINDOWS_BUILD_RESULT version=0.16.4 mode=Debug exit=0 bytes=104996128 preserved=30`
   - `git diff --check` 오류 0건. Input 검색은 `InputRouter.gd`와 허용 예외 `Haptics.gd`뿐. RNG 검색은 `Spawner.gd`와 기존 `ColorEffectVisual.gd`의 전용 `RandomNumberGenerator` 호출뿐이며 이번 diff의 새 위반 0건
 
-- Release 보호·빌드 관측: 최종 커밋 뒤 갱신 예정
+- Release 보호·빌드 관측:
+  - 첫 깨끗한 커밋 Release → `WINDOWS_BUILD_RESULT version=0.16.4 mode=Release exit=0 bytes=111126304 preserved=10`; 같은 명령 재실행은 종료 코드 `1`, `Release artifact already exists`로 멈췄고 exe는 불변
+  - 회신 최종 커밋 뒤 `-ReplaceSameVersion`으로 다시 만든 최종 Release: exe `111,126,304`바이트, SHA-256 `993ab162ecb2d01655dd2778f9c7366c92f559efb60fe0ce63373145e43e560d`; console `50,176`바이트, SHA-256 `677b750fe878008ef223092fd9966800b8291b0e305eb3f11466e5069a233f00`; sidecar PCK `0`개
+  - 최종 `_BUILD.txt` `Version: 0.16.4`, `Mode: Release`, `Engine: 4.8.dev3.official.51105ccbe`, Commit과 브랜치 끝 `git rev-parse HEAD` 일치
+  - 내보낸 `.console.exe` 기본/`--mode=jelly` 300프레임 격리 스모크 각각 종료 코드 0, 출력의 `SCRIPT ERROR|Parse Error|ERROR:` 0건
+  - 묶음 금지 패턴 `res://tests/`, `res://artifacts/`, `res://docs/`, `run_tests.gd`, `capture_screens.gd`, 설계·두 인박스 문서 각 0건; 양성 앵커 `OrbitStage 8 + JellyOrbArt 6 + StartScreen 8 + Main3D 5 = 27`건
+  - 사용자 `save.cfg`: 전후 `2,101`바이트, SHA-256 `2243b278dbf10afa50c73d54baeee316d4560658de75ac45658e620c6272db3a`, 수정 시각 `2026-11-01T16:04:57.1973977Z` 불변
+  - 0.16.1의 exe/console/BUILD/zip 4개, 0.16.2의 exe/console/BUILD 3개, 0.16.3의 exe/console/BUILD 3개는 크기·SHA-256·수정 시각 전후 동일
 - 수동 확인 절차:
   1. JELLY에서 각 색 L8+ 젤리를 터치 → 터치 원본을 제외한 반경 안 젤리가 바깥으로 밀리고 색별 효과도 함께 나와야 한다
   2. 파랑은 반경 밖도 지진으로 흔들리되 반경 안은 추가로 바깥 밀림, 보라는 먼저 퍼졌다가 약 0.2초 뒤 0.5초 동안 터진 자리로 모여야 한다
