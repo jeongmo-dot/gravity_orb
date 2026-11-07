@@ -32,6 +32,8 @@ param(
 	[string]$JellyBlastRequiresSameLevel = "Off",
 	[ValidateSet("On", "Off")]
 	[string]$JellyTapCommonPush = "On",
+	[ValidateRange(0.0, 10000.0)]
+	[double]$JellyTapLiftSpeed = 900.0,
 	[ValidateRange(0.0, 10.0)]
 	[double]$BlastGravityPauseTime = 0.2,
 	[ValidateRange(0.0, 10000.0)]
@@ -48,6 +50,8 @@ param(
 	[double]$JellyMergeDuration = 0.3,
 	[ValidateRange(0, 10)]
 	[int]$JellyMergeLevelGap = 1,
+	[ValidateRange(0, 10)]
+	[int]$JellyMergeWideGapMinLevel = 0,
     [switch]$AggregateOnly
 )
 
@@ -71,6 +75,7 @@ $resolvedTapBlastBotMode = if ($TapBlastBot -and $TapBlastBotMode -eq "None") { 
 $physicsArguments += "--jelly-tap-blast-bot=$($resolvedTapBlastBotMode.ToLower())"
 $physicsArguments += "--jelly-merge-duration=$($JellyMergeDuration.ToString($culture))"
 $physicsArguments += "--jelly-merge-level-gap=$JellyMergeLevelGap"
+$physicsArguments += "--jelly-merge-wide-gap-min-level=$JellyMergeWideGapMinLevel"
 $physicsArguments += "--jelly-tap-blast-min-level=$JellyTapBlastMinLevel"
 $physicsArguments += "--blast-score-factor=$($BlastScoreFactor.ToString($culture))"
 $physicsArguments += "--jelly-tap-blast-score-factor=$($JellyTapBlastScoreFactor.ToString($culture))"
@@ -80,6 +85,7 @@ $physicsArguments += "--jelly-tap-grow-min-clean=$JellyTapGrowMinClean"
 $physicsArguments += "--jelly-tap-effect-modes=$($JellyTapEffectModes.ToLower())"
 $physicsArguments += "--jelly-blast-requires-same-level=$($JellyBlastRequiresSameLevel.ToLower())"
 $physicsArguments += "--jelly-tap-common-push=$($JellyTapCommonPush.ToLower())"
+$physicsArguments += "--jelly-tap-lift-speed=$($JellyTapLiftSpeed.ToString($culture))"
 $physicsArguments += "--blast-gravity-pause-time=$($BlastGravityPauseTime.ToString($culture))"
 $physicsArguments += "--blast-speed=$($BlastSpeed.ToString($culture))"
 $physicsArguments += "--blast-far-factor=$($BlastFarFactor.ToString($culture))"
@@ -336,6 +342,13 @@ foreach ($task in $tasks) {
 
 $completedGames = @($seedRows | Where-Object { $_.game_over })
 $incompleteGames = @($seedRows | Where-Object { -not $_.game_over })
+$levelEightPlusGameCount = @($seedRows | Where-Object { [int]$_.max_level_reached -ge 8 }).Count
+$levelEightPlusCreationCount = 0
+foreach ($levelKey in $levelCreationCounts.Keys) {
+	if ([int]($levelKey -replace '^L', '') -ge 8) {
+		$levelEightPlusCreationCount += [int]$levelCreationCounts[$levelKey]
+	}
+}
 $allTurns = @($seedRows | ForEach-Object { [double]$_.completed_turns })
 $gameOverTurns = @($completedGames | ForEach-Object { [double]$_.completed_turns })
 $scores = @($seedRows | ForEach-Object { [double]$_.score })
@@ -386,9 +399,11 @@ $summary = [ordered]@{
 	jelly_tap_effect_modes = $JellyTapEffectModes.ToLower()
 	jelly_merge_duration = $JellyMergeDuration
 	jelly_merge_level_gap = $JellyMergeLevelGap
+	jelly_merge_wide_gap_min_level = $JellyMergeWideGapMinLevel
 	jelly_tap_blast_min_level = $JellyTapBlastMinLevel
 	jelly_blast_requires_same_level = $JellyBlastRequiresSameLevel -eq "On"
 	jelly_tap_common_push = $JellyTapCommonPush -eq "On"
+	jelly_tap_lift_speed = $JellyTapLiftSpeed
 	blast_gravity_pause_time = $BlastGravityPauseTime
 	blast_speed = $BlastSpeed
 	blast_far_factor = $BlastFarFactor
@@ -450,6 +465,9 @@ $summary = [ordered]@{
     merges_per_turn = if ($totalTurns -gt 0) { [double]$totalMerges / $totalTurns } else { 0.0 }
 	level_ups_per_turn = if ($totalTurns -gt 0) { [double]$totalLevelUpCount / $totalTurns } else { 0.0 }
 	level_creation_count_by_level = $levelCreationCounts
+	level_eight_plus_game_count = $levelEightPlusGameCount
+	level_eight_plus_creation_count = $levelEightPlusCreationCount
+	average_level_eight_plus_creations_per_game = [double]$levelEightPlusCreationCount / $seedRows.Count
 	maximum_level_distribution = $maximumLevelDistribution
 	level_ten_game_count = $levelTenGameCount
     blast_count = $totalBlasts

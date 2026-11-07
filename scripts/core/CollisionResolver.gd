@@ -343,7 +343,8 @@ func apply_jelly_tap_blast(orb: Variant) -> bool:
 		blast_targets = _board.apply_blast_with_radius_factor(
 			position,
 			Config.data.jelly_tap_blast_radius_factor,
-			orb
+			orb,
+			true
 		)
 	if tap_effect == GameConfig.JellyTapEffect.QUAKE:
 		shock_targets = _board.apply_tap_quake(
@@ -759,6 +760,9 @@ func has_pending_reactions() -> bool:
 func _has_pending_jelly_reactions(active_orbs: Array) -> bool:
 	var level_stride: int = Config.data.orb_max_level + 1
 	var merge_level_gap: int = maxi(Config.data.jelly_merge_level_gap, 0)
+	var candidate_level_gap: int = merge_level_gap
+	if Config.data.jelly_merge_wide_gap_min_level > 0:
+		candidate_level_gap += 1
 	var groups: Array = []
 	groups.resize(Config.data.color_display.size() * level_stride)
 	for candidate: Variant in active_orbs:
@@ -778,8 +782,8 @@ func _has_pending_jelly_reactions(active_orbs: Array) -> bool:
 			continue
 		var orb_radius: float = _orb_contact_radius(orb)
 		for candidate_level: int in range(
-			maxi(int(orb.level) - merge_level_gap, 1),
-			mini(int(orb.level) + merge_level_gap, Config.data.orb_max_level) + 1
+			maxi(int(orb.level) - candidate_level_gap, 1),
+			mini(int(orb.level) + candidate_level_gap, Config.data.orb_max_level) + 1
 		):
 			var same_color_index: int = int(orb.color) * level_stride + candidate_level
 			if _group_has_touching_partner(

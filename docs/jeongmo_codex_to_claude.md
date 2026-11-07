@@ -38,6 +38,79 @@
 
 ## 미확인
 
+### [2026-11-07] 대상 #137 — 소폭발 위쪽 리프트·생성 상한 4·합체 후보 3×3 측정
+- 상태: 완료 — 1차 구현·측정 뒤 사용자가 고른 `S4-G1`을 확정하고 추가 요구 1의 H 규칙 대기 판정·버전 0.16.5·Release까지 마쳤다. 합격·병합 판정은 Claude/사용자 대기
+- 브랜치 / PR: `tap-lift-spawn-merge` / https://github.com/jeongmo-dot/gravity_orb/pull/137
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/{core/CollisionResolver.gd,core/ReactionRules.gd,spike/Board3D.gd}`, `project.godot`, `tests/{capture_screens.ps1,run_jelly_physics_autoplay.ps1,test_config.gd,test_full_board_performance_equivalence.gd,test_jelly_regression.gd,test_jolt_3d.gd,test_rules.gd,test_spawner.gd}`, `tests/spike/{capture_screens.gd,run_blast_push_measurement.gd,run_jolt_3d_measurement.gd}`, `tests/tools/{run_blast_push_measurement.ps1,run_jelly_measurement.ps1,run_spawn_merge_matrix.ps1}`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 소폭발만 중력 방향 속도 성분을 버리고 같은 거리 감쇠의 중력 반대 리프트 `900`을 더함. 대폭발 불변, lift `0`은 #136 동작 — 자동 (`test_jolt_3d` + lift 측정)
+  - [x] 기본 `spawn_count_max=4`, `jelly_merge_wide_gap_min_level=0`; H6은 같은 색 `기본 gap+1`이면서 큰 쪽 L6 이상일 때만 허용 — 자동 (`test_config`, `test_spawner`, `test_rules`)
+  - [x] 상한 5·4·3 × G1·G2·H6, 각 5조합 × 20게임 = `900`게임, 600턴 상한 측정. L8 이상 판 수·판당 생성 수 포함 — 자동 측정
+  - [x] lift 0·600·900·1200, 중앙·바닥 더미 노랑의 중력 반대 이동·관통·이탈 측정 — 자동 측정
+  - [x] 이전 해시 9종 유지, 새 기본 `S4-G1 + lift 900` 해시 고정 — 자동 (`test_jelly_regression`)
+  - [x] lift 0·900 × 0·0.1·0.2·0.4초와 마지막 전체 장면을 두 비율에서 생성·직접 확인 — 실제 창 관측
+  - [x] Standard Godot 전체 검증·스모크·Debug 빌드와 0.16.5 Release 생성 — 자동
+  - [x] 추가 요구 1: H6에서 잠긴 같은 색 L6+L4 대기는 `true`, L5+L3은 `false`, H0의 L6+L4는 `false` — 자동 (`test_full_board_performance_equivalence`)
+  - [x] 추가 요구 1: 예전 9종·새 기본·CLASSIC 생성 진행 해시 유지, 측정·캡처 재실행 없음 — 자동 + 명세
+
+- 추가 요구 1 구현·검색 관측:
+  - `_has_pending_jelly_reactions()`의 후보 범위를 H가 켜졌을 때만 `jelly_merge_level_gap + 1`까지 넓혔다. 최종 짝 판정은 기존 `_pair_can_react()`라 큰 쪽 레벨 문턱은 `ReactionRules.can_react()`와 같다
+  - `scripts/`에서 합체 레벨 차를 별도 범위로 적은 곳은 이 함수와 규칙 원본 `ReactionRules.can_react()`·`_classify_jelly()`뿐이었다. 추가 수정 대상은 없었다
+  - 확정 기본값은 `spawn_count_max=4`, `jelly_merge_level_gap=1`, `jelly_tap_lift_speed=900`, `jelly_merge_wide_gap_min_level=0`
+
+- 3×3 측정 (`게임오버/미완료; 턴 중앙값; L8 이상 판/판당 L8+ 생성`, 각 칸 20게임, **미완료 3판 이상** 강조):
+
+| 프로필 | 자동 D-save | 자동 D-all | R D-save | L-합체 D-save | L-합체 D-all |
+|---|---|---|---|---|---|
+| S5-G1 | 20/0; 101; 15/1.50 | 20/0; 102; 15/2.20 | 20/0; 93.5; 10/0.60 | 20/0; 108.5; 17/2.30 | 20/0; 104.5; 17/2.90 |
+| **S4-G1 기본** | **20/0; 123; 18/2.35** | **20/0; 127.5; 18/3.35** | **20/0; 115.5; 13/1.45** | **20/0; 129; 17/2.80** | **20/0; 150; 17/5.40** |
+| S3-G1 | 20/0; 155; 20/2.70 | 20/0; 224.5; 20/8.30 | 20/0; 150.5; 17/1.90 | 20/0; 192; 19/5.20 | 18/2; 234; 19/12.35 |
+| S5-G2 | 20/0; 140.5; 20/8.50 | 18/2; 280; 20/26.30 | 20/0; 135; 20/7.05 | 20/0; 184.5; 20/16.20 | **9/11; 600; 20/59.60** |
+| S4-G2 | 20/0; 204; 20/18.35 | **4/16; 600; 20/52.20** | 20/0; 157.5; 20/8.40 | **15/5; 327; 20/37.05** | **0/20; 600; 20/60.75** |
+| S3-G2 | **9/11; 600; 20/42.95** | **2/18; 600; 20/43.35** | 19/1; 272; 20/17.30 | **1/19; 600; 20/52.95** | **0/20; 600; 20/47.90** |
+| S5-H6 | 20/0; 122.5; 20/4.50 | 20/0; 135.5; 20/7.70 | 20/0; 109.5; 19/2.90 | 20/0; 131; 20/7.00 | 19/1; 183; 20/19.55 |
+| S4-H6 | 20/0; 151; 20/7.05 | 20/0; 244; 20/17.65 | 20/0; 135.5; 20/3.90 | 20/0; 165; 20/9.55 | **7/13; 600; 20/47.05** |
+| S3-H6 | 20/0; 231.5; 20/11.30 | **5/15; 600; 20/37.70** | 20/0; 182; 19/6.15 | **16/4; 366; 20/25.15** | **1/19; 600; 20/44.60** |
+
+- lift 측정 (`중력 반대 이동 중앙값/p90 px`; 0.4초 ≥50px 비율, 최대 관통, 이탈):
+
+| lift | 장면 | 0.1초 | 0.2초 | 0.4초 | 0.8초 | 0.4초 ≥50px | 최대 관통 | 이탈 |
+|---:|---|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 중앙 | -13.8/52.0 | -35.0/94.2 | -29.4/82.5 | -27.9/61.1 | 25.0% | 6.1 | 0 |
+| 0 | 바닥 더미 | 15.3/22.9 | 24.2/36.1 | 29.8/44.0 | 40.0/79.0 | 6.2% | 14.5 | 0 |
+| 600 | 중앙 | 36.3/90.2 | 35.6/109.6 | 4.4/62.7 | -29.6/29.3 | 18.8% | 6.2 | 0 |
+| 600 | 바닥 더미 | 38.2/56.0 | 78.0/106.6 | 102.8/135.9 | 102.4/145.6 | 87.5% | 14.8 | 0 |
+| **900** | 중앙 | **53.6/107.3** | **49.4/116.0** | **-4.4/50.4** | **-34.7/33.5** | **15.6%** | **6.9** | **0** |
+| **900** | 바닥 더미 | **55.1/73.9** | **116.1/143.0** | **154.3/207.8** | **131.2/157.0** | **100.0%** | **14.7** | **0** |
+| 1200 | 중앙 | 64.2/107.0 | 52.4/111.2 | -24.9/39.9 | -32.2/31.0 | 6.2% | 5.8 | 0 |
+| 1200 | 바닥 더미 | 70.5/91.6 | 145.1/182.2 | 214.4/256.5 | 137.8/187.0 | 100.0% | 14.6 | 0 |
+
+- 회귀 해시: M `ee67b19ca82ddb2e35ea7a5ed605e83eedbae4d0c044106ec5b86622a21ac45d`, B `5a525e46718f3befc3c4101e5a4fe1c3b392fc1c172f7166ed0b0517f6d74dc7`, C8 `8c1a02e9dfa345a31828276e917dad0f8dda35282a34cb5a0ced15a670752184`, D `2cdf79475d340e34252a3d295ccc23e092c719038e2362f5df6ac80dc8e5979f`, ST `f3ff93474eb3765cdc611ae941c89ec96052a20f16fff75efe8ad6a6c8fb816c`, 잭팟 `3254c77f2bcf478239f023f08af2bae5f48bc68aee56aa246894908d0b9ab5e7`, F2 `4c4ab4aa9cf014d4d266a6fdfd75a03bbd4f40c5e9a540bd6f682da3c0835974`, G1 `d5175565a24fa4d0e00e1eb3ccbd5529a0c489852c00437fed58197bd20e4c7d`, K4 `3e929d90b33f6617322e96a2f53e0e790a32c9c5c11f045e9d7fa05c3a88c42f` 유지. 새 기본 `bc5951c060d635cb6e43d72f4854afbf38ef6a48bea693e224e118677ca736b2`; 생성 진행 해시 `cd9b8fed034153324ddbfaf2f966ab848225b75f8ba6ad5e8cf6ae4d70a38a85`
+
+- 캡처 관측:
+  - `SCREEN_CAPTURE_SUITE exit=0 ratios=2 files=308` — 540×960·540×1170 각 154장
+  - `146~149` lift 0, `150~153` lift 900의 0·0.1·0.2·0.4초, `154` 전체. `149/153/154`를 두 비율에서 직접 비교해 lift 0은 바닥 더미 유지, lift 900은 중력 반대로 분리, 보드·HUD 잘림 0건을 관측
+
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard; `--headless --path . --import` 종료 코드 0
+  - `tests/run_tests.ps1` → 일반 `340/340`, 장기 `4/4`, 성능 `5/5`; 각각 새 프로세스, 전체 `92.993초`, 종료 코드 0
+  - 기본/`--mode=blitz` 300프레임 smoke → 각각 종료 코드 0, 출력의 `SCRIPT ERROR`·`Parse Error` 0건
+  - `tools/build_windows.ps1 -Debug` → `WINDOWS_BUILD_RESULT version=0.16.5 mode=Debug exit=0 bytes=104997120 preserved=33`
+  - 첫 깨끗한 Release → `WINDOWS_BUILD_RESULT version=0.16.5 mode=Release exit=0 bytes=111127296 preserved=13`; 같은 명령 재실행은 종료 코드 `1`, `Release artifact already exists`, exe 해시 불변
+  - 회신 최종 커밋 뒤 `-ReplaceSameVersion` 최종 Release: exe `111,127,296`바이트, SHA-256 `08d41488c8a279d02cf7f29ed591799e08300077acb30d1b14ee3ea2dbbdde8e`; console `50,176`바이트, SHA-256 `2a3b31dcb6237d9a8abe4024a1e88c502ef1d61ffef22dd13f9948517444ba07`; sidecar PCK `0`개
+  - 최종 `_BUILD.txt`: `Version: 0.16.5`, `Mode: Release`, `Engine: 4.8.dev3.official.51105ccbe`, Commit과 브랜치 끝 일치
+  - 내보낸 console 기본/`--mode=jelly` 300프레임 스모크 각각 종료 코드 0, `SCRIPT ERROR|Parse Error|ERROR:` 0건
+  - 묶음 금지 패턴 `res://tests/`, `res://artifacts/`, `res://docs/`, `run_tests.gd`, `capture_screens.gd`, 설계·두 인박스 문서 각 0건; 양성 앵커 `OrbitStage 8 + JellyOrbArt 6 + StartScreen 8 + Main3D 5 = 27`건
+  - 사용자 `save.cfg` SHA-256 `2243b278dbf10afa50c73d54baeee316d4560658de75ac45658e620c6272db3a` 불변. 0.16.1~0.16.4 파일 13개의 이름·크기·SHA-256 매니페스트 `065742122039c892bc078c3f48527d8c57c058cbd7fcf22c1697b6f8871e568e` 불변
+  - `git diff --check` 오류 0건. Input 검색은 `InputRouter.gd`와 허용 예외 `Haptics.gd`뿐. RNG 검색은 `Spawner.gd`와 기존 `ColorEffectVisual.gd`의 전용 `RandomNumberGenerator` 호출뿐이며 이번 diff 새 위반 0건
+
+- 수동 확인 절차:
+  1. JELLY 판 바닥에 젤리를 쌓고 노랑 L8 이상을 터치 → 인접 젤리가 중력 반대 방향으로 솟고, 0.2초 무중력 뒤 현재 중력을 다시 받는지 본다
+  2. 같은 판에서 같은 레벨·다른 색 대폭발 유도 → #136 대폭발의 방사형 밀기 방향이 바뀌지 않았는지 본다
+  3. 10턴 간격으로 진행 → 한 턴 생성 상한이 4에서 멈추고 NEXT·THEN의 비용도 4인지 본다
+- 결정 사항: 명세 수치 외 밸런스 값은 바꾸지 않았다. 캡처의 125턴 프리뷰 검증은 하드코딩 `5` 대신 `spawn_count_for_turn(125)`를 사용해 새 기본 상한을 검증한다. Windows 작업 실행기에서 마지막 20개 장기 worker 수집이 멈춘 구간은 동일 Godot 인자를 직접 8병렬 실행해 20개 결과를 모두 기록한 뒤 같은 집계기로 합쳤다
+- 남은 것 · 질문: 구현·검증 잔여 없음. 합격·병합 판정은 Claude/사용자 몫. 측정 산출물은 `artifacts/measurements/spawn_merge_matrix_3x3.json`, `blast_push_k0_k4_lift.json`에 있으며 git에는 포함하지 않는다
+
 ### [2026-11-07] 대상 #136 — 소폭발·대폭발 주변 젤리 밀기·Windows 0.16.4
 - 상태: 완료 — **회신 맨 앞 경고 조건 없음**. K4 판 밖 이탈 `0`회, 전체 K4 최대 관통 `22.68px`, 자동 D-save 평균 `103.55`턴(G1 `101.70` 대비 `+1.8%`), L-합체 D-all 미완료 `0/20`판을 관측했다. 구현·자동 검증·측정·두 비율 실제 창 캡처·0.16.4 Release·PR까지 마쳤다. 합격·병합 판정은 Claude/사용자 대기
 - 브랜치 / PR: `blast-push` / https://github.com/jeongmo-dot/gravity_orb/pull/136

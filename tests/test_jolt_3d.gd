@@ -1225,6 +1225,69 @@ func test_blast_pause_defers_latest_gravity_repushes_and_skips_excluded_orbs() -
 	await _cleanup(board)
 
 
+func test_tap_lift_uses_opposite_current_gravity_without_changing_big_blast() -> void:
+	var original_lift: float = Config.data.jelly_tap_lift_speed
+	var original_diagonal_time: float = Config.data.gravity_turn_diagonal_time
+	Config.data.jelly_tap_lift_speed = 900.0
+	Config.data.gravity_turn_diagonal_time = 0.0
+	var board: Board3D = await _create_board()
+	board.set_gravity(Vector2i.DOWN)
+	var source: Orb3D = board.spawn_orb(3, 10, Vector2.ZERO)
+	var below: Orb3D = board.spawn_orb(0, 4, Vector2(0.0, 100.0))
+	var side: Orb3D = board.spawn_orb(1, 4, Vector2(100.0, 0.0))
+	var above: Orb3D = board.spawn_orb(2, 4, Vector2(0.0, -100.0))
+	var far: Orb3D = board.spawn_orb(4, 4, Vector2(400.0, 0.0))
+	var rows: Array[Dictionary] = board.apply_blast_with_radius_factor(
+		Vector2.ZERO, 0.3, source, true
+	)
+	var changes: Dictionary = {}
+	for row: Dictionary in rows:
+		changes[int(row["stable_spawn_id"])] = row["velocity_change"] as Vector2
+	assert_true(not changes.has(source.stable_spawn_id), "tap source is excluded")
+	var below_change: Vector2 = changes[below.stable_spawn_id] as Vector2
+	var side_change: Vector2 = changes[side.stable_spawn_id] as Vector2
+	var above_change: Vector2 = changes[above.stable_spawn_id] as Vector2
+	assert_near(below_change.x, 0.0, 0.001, "below target has no sideways component")
+	assert_true(below_change.y < 0.0, "below target moves only upward")
+	assert_true(side_change.x > 0.0 and side_change.y < 0.0, "side target moves outward and upward")
+	assert_true(above_change.y < below_change.y, "above target keeps outward up plus lift")
+	assert_true((changes[far.stable_spawn_id] as Vector2).is_zero_approx(), "out-of-radius target stays still")
+
+	board.clear()
+	await tree.process_frame
+	board.set_gravity(Vector2i.LEFT)
+	var left_target: Orb3D = board.spawn_orb(0, 4, Vector2(-100.0, 0.0))
+	var left_rows: Array[Dictionary] = board.apply_blast_with_radius_factor(
+		Vector2.ZERO, 0.3, null, true
+	)
+	var left_change: Vector2 = left_rows[0]["velocity_change"] as Vector2
+	assert_true(left_change.x > 0.0, "left gravity makes tap lift point right")
+	assert_near(left_change.y, 0.0, 0.001, "left gravity lift stays horizontal")
+	assert_eq(int(left_rows[0]["stable_spawn_id"]), left_target.stable_spawn_id, "left target row")
+
+	board.clear()
+	await tree.process_frame
+	board.set_gravity(Vector2i.DOWN)
+	var big_target: Orb3D = board.spawn_orb(0, 4, Vector2(0.0, 100.0))
+	var big_rows: Array[Dictionary] = board.apply_blast_with_radius_factor(Vector2.ZERO, 0.3)
+	var big_change: Vector2 = big_rows[0]["velocity_change"] as Vector2
+	assert_true(big_change.y > 0.0, "big blast keeps radial downward push")
+	assert_eq(int(big_rows[0]["stable_spawn_id"]), big_target.stable_spawn_id, "big target row")
+
+	Config.data.jelly_tap_lift_speed = 0.0
+	var zero_target: Orb3D = board.spawn_orb(1, 4, Vector2(100.0, 0.0))
+	var zero_rows: Array[Dictionary] = board.apply_blast_with_radius_factor(
+		Vector2.ZERO, 0.3, big_target, true
+	)
+	var zero_change: Vector2 = zero_rows[0]["velocity_change"] as Vector2
+	assert_true(zero_change.x > 0.0, "zero lift keeps #136 radial push")
+	assert_near(zero_change.y, 0.0, 0.001, "zero lift adds no gravity-opposite component")
+	assert_eq(int(zero_rows[0]["stable_spawn_id"]), zero_target.stable_spawn_id, "zero-lift target row")
+	Config.data.jelly_tap_lift_speed = original_lift
+	Config.data.gravity_turn_diagonal_time = original_diagonal_time
+	await _cleanup(board)
+
+
 func test_bomb_quake_and_grow_tap_effects_follow_color_rules() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var fixture: Dictionary = await _create_turn_fixture()

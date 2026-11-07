@@ -121,6 +121,7 @@ func test_pending_reaction_fast_path_matches_classification() -> void:
 func test_pending_jelly_reactions_follow_merge_gap_and_blast_rule() -> void:
 	var original_duration: float = Config.data.jelly_merge_duration
 	var original_gap: int = Config.data.jelly_merge_level_gap
+	var original_wide_gap_min_level: int = Config.data.jelly_merge_wide_gap_min_level
 	var original_requires_same: bool = Config.data.jelly_blast_requires_same_level
 	Config.data.jelly_merge_duration = 0.0
 	Config.data.jelly_blast_requires_same_level = false
@@ -136,6 +137,20 @@ func test_pending_jelly_reactions_follow_merge_gap_and_blast_rule() -> void:
 	assert_true(
 		not _pending_for_pair(board, resolver, 2, 5, 2, 3),
 		"gap one releases touching same-color L5/L3"
+	)
+	Config.data.jelly_merge_wide_gap_min_level = 6
+	assert_true(
+		_pending_for_pair(board, resolver, 2, 6, 2, 4),
+		"H6 keeps touching locked same-color L6/L4 pending"
+	)
+	assert_true(
+		not _pending_for_pair(board, resolver, 2, 5, 2, 3),
+		"H6 rejects touching locked same-color L5/L3 below threshold"
+	)
+	Config.data.jelly_merge_wide_gap_min_level = 0
+	assert_true(
+		not _pending_for_pair(board, resolver, 2, 6, 2, 4),
+		"disabled wide gap rejects touching locked same-color L6/L4"
 	)
 	assert_true(
 		_pending_for_pair(board, resolver, 0, 8, 1, 10),
@@ -153,6 +168,7 @@ func test_pending_jelly_reactions_follow_merge_gap_and_blast_rule() -> void:
 	await _cleanup_fixture(fixture)
 	Config.data.jelly_merge_duration = original_duration
 	Config.data.jelly_merge_level_gap = original_gap
+	Config.data.jelly_merge_wide_gap_min_level = original_wide_gap_min_level
 	Config.data.jelly_blast_requires_same_level = original_requires_same
 
 

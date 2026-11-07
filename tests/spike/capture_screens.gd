@@ -153,6 +153,15 @@ const CAPTURE_FILES: Array[String] = [
 	"143_jelly_blast_push_k4_yellow_020.png",
 	"144_jelly_blast_push_k4_yellow_040.png",
 	"145_jelly_blast_push_full.png",
+	"146_jelly_tap_lift_0_yellow_000.png",
+	"147_jelly_tap_lift_0_yellow_010.png",
+	"148_jelly_tap_lift_0_yellow_020.png",
+	"149_jelly_tap_lift_0_yellow_040.png",
+	"150_jelly_tap_lift_900_yellow_000.png",
+	"151_jelly_tap_lift_900_yellow_010.png",
+	"152_jelly_tap_lift_900_yellow_020.png",
+	"153_jelly_tap_lift_900_yellow_040.png",
+	"154_jelly_tap_lift_full.png",
 ]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
@@ -672,6 +681,7 @@ func _capture_jelly_tap_effect_scenes(
 		orb.disable_physics()
 	await _capture("128_jelly_tap_effects_full.png")
 	await _capture_blast_push_evidence(main, board, resolver)
+	await _capture_tap_lift_evidence(board, resolver)
 	Config.data.fx_hitstop_enabled = original_hitstop_enabled
 
 
@@ -683,14 +693,15 @@ func _capture_blast_push_evidence(
 	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
 	manager.set_physics_process(false)
 	var profiles: Array[Dictionary] = [
-		{"tag": "k0", "common": false, "speed": 900.0, "far": 0.4, "pause": 0.0, "base": 129},
-		{"tag": "k4", "common": true, "speed": 1350.0, "far": 0.5, "pause": 0.2, "base": 137},
+		{"tag": "k0", "common": false, "speed": 900.0, "far": 0.4, "pause": 0.0, "lift": 0.0, "base": 129},
+		{"tag": "k4", "common": true, "speed": 1350.0, "far": 0.5, "pause": 0.2, "lift": 0.0, "base": 137},
 	]
 	for profile: Dictionary in profiles:
 		Config.data.jelly_tap_common_push = bool(profile["common"])
 		Config.data.blast_speed = float(profile["speed"])
 		Config.data.blast_far_factor = float(profile["far"])
 		Config.data.blast_gravity_pause_time = float(profile["pause"])
+		Config.data.jelly_tap_lift_speed = float(profile["lift"])
 		await _capture_blast_push_case(
 			board, resolver, str(profile["tag"]), "big", int(profile["base"])
 		)
@@ -700,12 +711,36 @@ func _capture_blast_push_evidence(
 	await _capture("145_jelly_blast_push_full.png")
 
 
+func _capture_tap_lift_evidence(board: Board3D, resolver: CollisionResolver) -> void:
+	Config.data.jelly_tap_common_push = true
+	Config.data.blast_speed = 1350.0
+	Config.data.blast_far_factor = 0.5
+	Config.data.blast_gravity_pause_time = 0.2
+	var profiles: Array[Dictionary] = [
+		{"tag": "0", "lift": 0.0, "base": 146},
+		{"tag": "900", "lift": 900.0, "base": 150},
+	]
+	for profile: Dictionary in profiles:
+		Config.data.jelly_tap_lift_speed = float(profile["lift"])
+		await _capture_blast_push_case(
+			board,
+			resolver,
+			str(profile["tag"]),
+			"yellow",
+			int(profile["base"]),
+			"tap_lift"
+		)
+	Config.data.jelly_tap_lift_speed = 900.0
+	await _capture("154_jelly_tap_lift_full.png")
+
+
 func _capture_blast_push_case(
 	board: Board3D,
 	resolver: CollisionResolver,
 	profile_tag: String,
 	kind: String,
-	first_file_number: int
+	first_file_number: int,
+	file_prefix: String = "blast_push"
 ) -> void:
 	resolver.cancel_active_jelly_merges()
 	board.clear()
@@ -742,8 +777,9 @@ func _capture_blast_push_case(
 	var waits: Array[int] = [0, 12, 12, 24]
 	for index: int in range(suffixes.size()):
 		await _wait_physics_frames(waits[index])
-		await _capture("%03d_jelly_blast_push_%s_%s_%s.png" % [
+		await _capture("%03d_jelly_%s_%s_%s_%s.png" % [
 			first_file_number + index,
+			file_prefix,
 			profile_tag,
 			kind,
 			suffixes[index],
@@ -915,8 +951,9 @@ func _capture_turn_hud_scene(main: Main, manager: TurnManager, hud: Hud) -> void
 		_fail("three-digit TURN capture does not show 125")
 	if hud._score_label.text != "1234567":
 		_fail("seven-digit SCORE capture does not show 1234567")
+	var expected_budget: int = Config.data.spawn_count_for_turn(125)
 	for batch: Array in spawner.peek_preview():
-		if _preview_batch_cost(batch) != 5:
+		if _preview_batch_cost(batch) != expected_budget:
 			_fail("three-digit TURN capture preview does not use turn 125 budget")
 	await _capture("71_jelly_turn_hud_three_digit.png")
 
