@@ -32,7 +32,29 @@
 
 ## 대기 중
 
-(없음)
+### [2026-11-08 #141] 초록 휴식 청소는 위쪽 초록 L1 2개·빌드 0.16.9
+- 상태: 대기 (#140 병합됨 `264c85a` — main 위에서)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.32**
+- 배경: #140 Z1 초록 청소 0개 터치 96.3% (입구 쪽 띠에 초록 L1이 거의 없음) → 사용자 (2026-11-08) "병합 + 초록 조건 다시" → "위쪽 초록 L1 2개"
+- 앵커: `scripts/core/CollisionResolver.gd` `_jelly_tap_clean_targets()`·`_matches_jelly_tap_clean_rule()`, `config/GameConfig.gd`·`default_config.tres`, `scripts/ui/Hud.gd` `_jelly_tap_effect_callout_text()`, 판 균형 측정 도구 (`tests/tools/run_four_color_balance.ps1` 등), `tests/test_jolt_3d.gd`·`tests/test_config.gd`·`tests/test_callouts.gd`·`tests/test_jelly_regression.gd`, `tests/spike/capture_screens.gd`, `project.godot`
+- 요구 (§12-ONE.32 1~7):
+  1. 새 필드 `jelly_tap_rest_clean_count` (2): 규칙 true이고 값 > 0이면 REST 청소 = 청소 후보 조건을 만족하는 같은 색 젤리를 입구 벽까지 거리 오름차순 (같으면 `stable_spawn_id`)으로 세워 앞에서 N개. 판 어디든. 0 이하 = 0.16.8 띠 규칙
+  2. 안내 한 줄: `초록 L8: 휴식 · 위쪽 초록 L1 2개 청소` (값 0이면 0.16.8 문구)
+  3. 판 균형 Z1 (다시 잼)·G2·G3 × 5봇 × 20판, 600턴 상한, §12-ONE.31과 같은 항목
+  4. 해시: 예전 JELLY 묶음 (T3·C4E)·Z1은 값 0 주입으로 그대로, G2 고정, CLASSIC 그대로
+  5. 테스트 (§12-ONE.32 5번)
+  6. 캡처: 전체를 새 기본값으로 + 초록 청소 전·후 (`195`·`196`)·초록 안내 (`188`), 두 비율. 장면 사이 팝업·칭찬 글자·콤보 잔여 지우기 (캡처 도구만)
+  7. 버전 **0.16.9**, 커밋 뒤 깨끗한 트리에서 Release. 보고는 #136과 같다
+- 수치 (Claude): `jelly_tap_rest_clean_count` **2**, 버전 **0.16.9**. 그 밖의 값은 그대로
+- 건드리지 말 것: 4색·효과 배정·효과 값, 청소 L1·분홍·파랑·노랑 조건과 값, `jelly_tap_rest_clean_band_factor` 0.4, 터치 후보 조건, 사방 밀기, 소폭발·청소 그림, 점수 계산, 생성, 합치는 레벨, 대폭발, 물리, 그림·연출 (명세에 없는 것 금지, 고리 모양 금지), 사용자 저장 파일, `docs/` (회신 파일 제외)
+- **회신 맨 앞에**: Z1 다시 잰 값이 §12-ONE.31과 다름, G2 초록 청소 0개 비율 30% 이상, G2 자동 D-save 평균 턴이 Z1 353.70의 ±10% 밖, 안내 한 줄 잘림
+- Done-when:
+  - [ ] 테스트 통과, 예전 JELLY 해시 (T3·C4E)·Z1·CLASSIC 그대로, G2 해시 고정
+  - [ ] 판 균형표 Z1·G2·G3 (색별 항목 포함)
+  - [ ] 캡처 (두 비율)
+  - [ ] `build/windows/GravityOrb_v0.16.9.exe` (`mode=Release`, `_BUILD.txt` 커밋 = 브랜치 끝), 0.16.1~0.16.8 파일 그대로
+- QA: §12-ONE.32 3·7번
+- 커밋: 항목 단위 브랜치 (`green-top-clean`), **push·PR까지** (병합은 Claude 검수 뒤)
 
 ---
 
