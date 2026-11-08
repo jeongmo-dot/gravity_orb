@@ -32,7 +32,30 @@
 
 ## 대기 중
 
-(없음)
+### [2026-11-08 #140] 청소는 L1만·색마다 자리 조건·안내 한 줄에 조건·빌드 0.16.8
+- 상태: 대기 (#139 병합됨 `bdbdce4` — main 위에서)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.31**
+- 배경: 사용자 (2026-11-08, #139 병합 뒤) "청소를 항상 하는 것이 아니라, 다른 조건을 만드는게 좋을 것 같아. 색깔별로 다르면 더 좋고. 그리고 l1만 청소하는게 좋을 것 같고" → "효과 따라 자리", "조건도 짧게". 4색이 된 뒤 판이 C6의 약 3배 (§12-ONE.30)
+- 앵커: `scripts/core/CollisionResolver.gd` `_jelly_tap_clean_targets()`·`apply_jelly_tap_blast()`, `scripts/spike/Board3D.gd` `gravity_direction()` (판정에 읽기만), `config/GameConfig.gd`·`default_config.tres`, `scripts/ui/Hud.gd` `_jelly_tap_effect_callout_text()`, 판 균형 측정 도구 (`tests/tools/run_four_color_balance.ps1` 등), `tests/test_jolt_3d.gd`·`tests/test_config.gd`·`tests/test_callouts.gd`·`tests/test_jelly_regression.gd`, `tests/spike/capture_screens.gd`, `project.godot`
+- 요구 (§12-ONE.31 1~8):
+  1. `jelly_tap_clean_max_level` 2 → **1**
+  2. 새 필드 `jelly_tap_clean_zone_rule` (true): 분홍 = 288px 안 **모든 색** L1, 파랑 = **바닥에 닿은** 파랑 L1 (판 어디든), 초록 = **입구 벽에서 384px 안** 초록 L1, 노랑 = **480px 안** 노랑 L1. 조건 0개여도 터치·효과·턴·사라짐은 그대로. false = 0.16.7 규칙
+  3. 안내 한 줄: `분홍 L8: 폭탄 · 주변 L1 청소`·`파랑 L8: 지진 · 바닥 파랑 L1 청소`·`초록 L8: 휴식 · 입구 쪽 초록 L1 청소`·`노랑 L8: 자석 · 끌린 노랑 L1 청소` (효과·설정에서 만든다)
+  4. 판 균형 C4E (다시 잼)·C4E-L1·Z2·Z1 × 5봇 × 20판, 600턴 상한. 색별 터치 수·청소/터치·청소 0개 비율·휴식 턴
+  5. 해시: 예전 JELLY 묶음 (T3·C4E 포함)은 규칙 false·L2 주입으로 그대로, Z1 고정, CLASSIC 그대로
+  6. 테스트 (§12-ONE.31 6번)
+  7. 캡처: 전체를 새 기본값으로 + 네 색 청소 전·후 + 네 색 안내 한 줄, 두 비율. `180` TURN 칸 갱신 (캡처 도구만)
+  8. 버전 **0.16.8**, 커밋 뒤 깨끗한 트리에서 Release. 보고는 #136과 같다
+- 수치 (Claude): `jelly_tap_clean_max_level` **1**, `jelly_tap_clean_zone_rule` **true**, `jelly_tap_quake_floor_margin` **8.0**, `jelly_tap_rest_clean_band_factor` **0.4**, `jelly_tap_magnet_clean_radius_factor` **0.5**, 분홍은 기존 `jelly_tap_blast_radius_factor` 0.3, 버전 **0.16.8**. 그 밖의 값은 그대로
+- 건드리지 말 것: 4색·효과 배정·효과 값, 터치 후보 조건, 사방 밀기, 소폭발 그림, 청소 그림·점수 계산, 생성, 합치는 레벨, 대폭발, 물리, 그림·연출 (명세에 없는 것 금지, 고리 모양 금지), 사용자 저장 파일, `docs/` (회신 파일 제외)
+- **회신 맨 앞에**: C4E 다시 잰 값이 §12-ONE.30과 다름, Z1 자동 D-save 평균 턴이 C6 127.85의 ±30% 밖, Z1 L-합체 D-all 미완료 3판 이상, 청소 0개 터치 90% 이상인 색, 안내 한 줄 잘림
+- Done-when:
+  - [ ] 테스트 통과, 예전 JELLY 해시 (T3·C4E 포함)·CLASSIC 그대로, Z1 해시 고정
+  - [ ] 판 균형표 C4E·C4E-L1·Z2·Z1 (색별 항목 포함)
+  - [ ] 캡처 (두 비율)
+  - [ ] `build/windows/GravityOrb_v0.16.8.exe` (`mode=Release`, `_BUILD.txt` 커밋 = 브랜치 끝), 0.16.1~0.16.7 파일 그대로
+- QA: §12-ONE.31 4·8번
+- 커밋: 항목 단위 브랜치 (`clean-zones`), **push·PR까지** (병합은 Claude 검수 뒤)
 
 ---
 
