@@ -1108,9 +1108,13 @@ func test_tap_clean_removes_only_eligible_same_color_without_push() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
 	var original_common_push: bool = Config.data.jelly_tap_common_push
+	var original_clean_max: int = Config.data.jelly_tap_clean_max_level
+	var original_zone_rule: bool = Config.data.jelly_tap_clean_zone_rule
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.jelly_tap_effect_modes = PackedInt32Array([1, 1, 1, 1, 1, 1])
 	Config.data.jelly_tap_common_push = false
+	Config.data.jelly_tap_clean_max_level = 2
+	Config.data.jelly_tap_clean_zone_rule = false
 	var fixture: Dictionary = await _create_turn_fixture()
 	var board: Board3D = fixture["board"] as Board3D
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
@@ -1143,7 +1147,148 @@ func test_tap_clean_removes_only_eligible_same_color_without_push() -> void:
 	Config.data.game_mode = original_mode
 	Config.data.jelly_tap_effect_modes = original_modes
 	Config.data.jelly_tap_common_push = original_common_push
+	Config.data.jelly_tap_clean_max_level = original_clean_max
+	Config.data.jelly_tap_clean_zone_rule = original_zone_rule
 	await _cleanup(fixture["root"] as Node)
+
+
+func test_tap_clean_zone_rules_follow_each_effect_and_current_gravity() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_clean_max: int = Config.data.jelly_tap_clean_max_level
+	var original_zone_rule: bool = Config.data.jelly_tap_clean_zone_rule
+	var original_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
+	var original_diagonal_time: float = Config.data.gravity_turn_diagonal_time
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_tap_clean_max_level = 1
+	Config.data.jelly_tap_clean_zone_rule = true
+	Config.data.jelly_tap_effect_modes = PackedInt32Array([2, 3, 7, 6, 1, 1])
+	Config.data.gravity_turn_diagonal_time = 0.0
+	var fixture: Dictionary = await _create_turn_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+
+	var bomb: Orb3D = board.spawn_orb(0, 8, Vector2.ZERO)
+	var bomb_same: Orb3D = board.spawn_orb(0, 1, Vector2(0.0, 288.0))
+	var bomb_other: Orb3D = board.spawn_orb(1, 1, Vector2(288.0, 0.0))
+	var bomb_outside: Orb3D = board.spawn_orb(0, 1, Vector2(300.0, 0.0))
+	var bomb_l2: Orb3D = board.spawn_orb(1, 2, Vector2(100.0, 0.0))
+	assert_eq(resolver.jelly_tap_clean_count(bomb), 2, "bomb cleans all-color L1 within 288px")
+	assert_true(resolver.apply_jelly_tap_blast(bomb), "bomb tap applies")
+	assert_true(bomb_same.consumed and bomb_other.consumed, "bomb consumes in-radius L1")
+	assert_true(not bomb_outside.consumed and not bomb_l2.consumed, "bomb leaves 300px L1 and L2")
+
+	board.clear()
+	await tree.process_frame
+	board.set_gravity(Vector2i.DOWN)
+	var quake: Orb3D = board.spawn_orb(1, 8, Vector2.ZERO)
+	var quake_floor_left: Orb3D = board.spawn_orb(1, 1, Vector2(-400.0, 450.0))
+	var quake_floor_right: Orb3D = board.spawn_orb(1, 1, Vector2(400.0, 450.0))
+	var quake_supported: Orb3D = board.spawn_orb(1, 1, Vector2(0.0, 400.0))
+	var quake_other: Orb3D = board.spawn_orb(0, 1, Vector2(100.0, 450.0))
+	assert_eq(resolver.jelly_tap_clean_count(quake), 2, "quake cleans blue L1 touching down floor anywhere")
+	assert_true(resolver.apply_jelly_tap_blast(quake), "quake tap applies")
+	assert_true(quake_floor_left.consumed and quake_floor_right.consumed, "quake cleans both floor ends")
+	assert_true(not quake_supported.consumed and not quake_other.consumed, "quake leaves supported blue and other color")
+
+	board.clear()
+	await tree.process_frame
+	board.set_gravity(Vector2i.LEFT)
+	var quake_left: Orb3D = board.spawn_orb(1, 8, Vector2.ZERO)
+	var left_floor: Orb3D = board.spawn_orb(1, 1, Vector2(-450.0, 300.0))
+	var old_down_floor: Orb3D = board.spawn_orb(1, 1, Vector2(300.0, 450.0))
+	assert_eq(resolver.jelly_tap_clean_count(quake_left), 1, "quake follows left gravity floor")
+	assert_true(left_floor.stable_spawn_id != old_down_floor.stable_spawn_id, "left floor fixture ids differ")
+
+	board.clear()
+	await tree.process_frame
+	board.set_gravity(Vector2i.DOWN)
+	var rest: Orb3D = board.spawn_orb(2, 8, Vector2.ZERO)
+	var rest_inside: Orb3D = board.spawn_orb(2, 1, Vector2(-200.0, -96.0))
+	var rest_outside: Orb3D = board.spawn_orb(2, 1, Vector2(200.0, -95.0))
+	assert_eq(resolver.jelly_tap_clean_count(rest), 1, "rest cleans green L1 within 384px of entrance")
+	assert_true(rest_inside.stable_spawn_id != rest_outside.stable_spawn_id, "rest fixture ids differ")
+	board.set_gravity(Vector2i.LEFT)
+	var rest_left: Orb3D = board.spawn_orb(2, 8, Vector2(-200.0, 200.0))
+	var rest_right_entrance: Orb3D = board.spawn_orb(2, 1, Vector2(96.0, 200.0))
+	assert_true(resolver.jelly_tap_clean_count(rest_left) >= 1, "rest entrance follows changed gravity")
+	assert_true(rest_right_entrance.stable_spawn_id > 0, "rest changed-gravity fixture is valid")
+
+	board.clear()
+	await tree.process_frame
+	var magnet: Orb3D = board.spawn_orb(3, 8, Vector2(-200.0, 0.0))
+	var magnet_inside: Orb3D = board.spawn_orb(3, 1, Vector2(280.0, 0.0))
+	var magnet_outside: Orb3D = board.spawn_orb(3, 1, Vector2(281.0, 0.0))
+	var magnet_other: Orb3D = board.spawn_orb(0, 1, Vector2(0.0, 0.0))
+	assert_eq(resolver.jelly_tap_clean_count(magnet), 1, "magnet cleans same-color L1 within 480px")
+	assert_true(magnet_inside.stable_spawn_id != magnet_outside.stable_spawn_id, "magnet fixture ids differ")
+	assert_true(magnet_other.stable_spawn_id > 0, "magnet other-color fixture is valid")
+
+	Config.data.game_mode = original_mode
+	Config.data.jelly_tap_clean_max_level = original_clean_max
+	Config.data.jelly_tap_clean_zone_rule = original_zone_rule
+	Config.data.jelly_tap_effect_modes = original_modes
+	Config.data.gravity_turn_diagonal_time = original_diagonal_time
+	await _cleanup(fixture["root"] as Node)
+
+
+func test_zero_match_zone_taps_keep_all_four_effects_and_turn_rules() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_clean_max: int = Config.data.jelly_tap_clean_max_level
+	var original_zone_rule: bool = Config.data.jelly_tap_clean_zone_rule
+	var original_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_tap_clean_max_level = 1
+	Config.data.jelly_tap_clean_zone_rule = true
+	Config.data.jelly_tap_effect_modes = PackedInt32Array([2, 3, 7, 6, 1, 1])
+	for color: int in range(4):
+		var color_fixture: Dictionary = await _create_turn_fixture()
+		var board: Board3D = color_fixture["board"] as Board3D
+		var resolver: CollisionResolver = color_fixture["resolver"] as CollisionResolver
+		var manager: TurnManager = color_fixture["manager"] as TurnManager
+		var spawner: Spawner = color_fixture["spawner"] as Spawner
+		var reactions: Array[Dictionary] = []
+		resolver.reaction_applied.connect(
+			func(reaction: Dictionary) -> void: reactions.append(reaction)
+		)
+		board.set_gravity(Vector2i.DOWN)
+		manager.gravity = Vector2i.DOWN
+		manager.turn_index = 40 + color
+		manager.turn_combo = 0
+		manager.final_move_pending = false
+		manager.final_move_active = false
+		manager._is_initial_settle = false
+		manager._is_tap_blast_settle = false
+		manager.state = TurnManager.State.WAITING_INPUT
+		spawner.init_rng(1400 + color)
+		spawner.sync_next_batch_size(manager.turn_index + 1)
+		var preview_before: Array = spawner.peek_preview()
+		InputRouter.set_locked(false)
+		var source: Orb3D = board.spawn_orb(color, 8, Vector2.ZERO)
+		var effect_target: Orb3D = board.spawn_orb((color + 1) % 4, 4, Vector2(150.0, 0.0))
+		assert_true(resolver.is_jelly_tap_blast_candidate(source), "color %d remains a tap candidate" % color)
+		assert_eq(resolver.jelly_tap_clean_count(source), 0, "color %d has zero matching clean targets" % color)
+		var turn_before: int = manager.turn_index
+		assert_true(manager.try_tap_blast_orb(source), "color %d zero-clean tap starts" % color)
+		assert_eq(manager.turn_index, turn_before + 1, "color %d zero-clean tap spends a turn" % color)
+		assert_true(source.consumed, "color %d zero-clean tap removes source" % color)
+		assert_eq(int(reactions[-1]["clean_count"]), 0, "color %d reaction records zero clean" % color)
+		match color:
+			OrbTypes.OrbColor.RED:
+				assert_true(not (reactions[-1]["blast_targets"] as Array).is_empty(), "pink keeps bomb push")
+			OrbTypes.OrbColor.BLUE:
+				assert_true(not (reactions[-1]["shock_targets"] as Array).is_empty(), "blue keeps quake")
+			OrbTypes.OrbColor.GREEN:
+				assert_eq(manager.state, TurnManager.State.SIMULATING, "green REST skips spawning")
+				assert_eq(spawner.peek_preview(), preview_before, "green REST preserves preview")
+			OrbTypes.OrbColor.YELLOW:
+				assert_true(board.tap_magnet_active(), "yellow keeps magnet")
+		assert_true(effect_target.stable_spawn_id > 0, "color %d effect target is valid" % color)
+		await _cleanup(color_fixture["root"] as Node)
+
+	Config.data.game_mode = original_mode
+	Config.data.jelly_tap_clean_max_level = original_clean_max
+	Config.data.jelly_tap_clean_zone_rule = original_zone_rule
+	Config.data.jelly_tap_effect_modes = original_modes
 
 
 func test_all_six_tap_colors_push_only_nearby_orbs_and_exclude_source() -> void:
@@ -1364,7 +1509,11 @@ func test_tap_push_uses_dedicated_radius_speed_and_keeps_big_blast_profile() -> 
 func test_bomb_quake_and_grow_tap_effects_follow_color_rules() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_tap_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
+	var original_zone_rule: bool = Config.data.jelly_tap_clean_zone_rule
+	var original_clean_max: int = Config.data.jelly_tap_clean_max_level
 	Config.data.jelly_tap_effect_modes = PackedInt32Array([2, 3, 4, 5, 6, 7])
+	Config.data.jelly_tap_clean_zone_rule = false
+	Config.data.jelly_tap_clean_max_level = 2
 	var fixture: Dictionary = await _create_turn_fixture()
 	var board: Board3D = fixture["board"] as Board3D
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
@@ -1440,6 +1589,8 @@ func test_bomb_quake_and_grow_tap_effects_follow_color_rules() -> void:
 
 	Config.data.game_mode = original_mode
 	Config.data.jelly_tap_effect_modes = original_tap_modes
+	Config.data.jelly_tap_clean_zone_rule = original_zone_rule
+	Config.data.jelly_tap_clean_max_level = original_clean_max
 	await _cleanup(fixture["root"] as Node)
 
 

@@ -344,9 +344,10 @@ func test_m9_blast_defaults() -> void:
 	assert_near(config.jelly_tap_blast_score_factor, 0.5, TOLERANCE, "tap score")
 	assert_true(config.jelly_tap_blast_uses_turn, "tap blast consumes a turn")
 	assert_near(config.jelly_tap_blast_touch_margin, 16.0, TOLERANCE, "tap margin")
-	assert_eq(config.jelly_tap_clean_max_level, 2, "tap clean maximum level")
+	assert_eq(config.jelly_tap_clean_max_level, 1, "tap clean maximum level")
 	assert_near(config.jelly_tap_clean_score_factor, 1.0, TOLERANCE, "tap clean score")
 	assert_near(config.jelly_tap_clean_visual_time, 0.25, TOLERANCE, "tap clean visual")
+	assert_true(config.jelly_tap_clean_zone_rule, "tap clean zone rule")
 	assert_eq(config.jelly_tap_grow_min_clean, 3, "green grow minimum clean targets")
 	assert_eq(
 		Array(config.jelly_tap_effect_modes),
@@ -358,6 +359,9 @@ func test_m9_blast_defaults() -> void:
 	assert_eq(config.jelly_tap_effect_for_color(2), GameConfig.JellyTapEffect.REST, "green rest")
 	assert_eq(config.jelly_tap_effect_for_color(3), GameConfig.JellyTapEffect.MAGNET, "yellow magnet")
 	assert_near(config.jelly_tap_quake_speed, 900.0, TOLERANCE, "tap quake speed")
+	assert_near(config.jelly_tap_quake_floor_margin, 8.0, TOLERANCE, "tap quake floor margin")
+	assert_near(config.jelly_tap_rest_clean_band_factor, 0.4, TOLERANCE, "tap rest clean band")
+	assert_near(config.jelly_tap_magnet_clean_radius_factor, 0.5, TOLERANCE, "tap magnet clean radius")
 	assert_eq(config.jelly_tap_bonus_points_per_orb, 100, "tap bonus per orb")
 	assert_near(config.jelly_tap_magnet_time, 0.5, TOLERANCE, "tap magnet time")
 	assert_true(config.jelly_tap_common_push, "all tap colors push nearby jelly")

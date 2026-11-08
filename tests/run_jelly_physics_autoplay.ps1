@@ -24,6 +24,8 @@ param(
 	[string]$JellyTapBlastUsesTurn = "On",
 	[ValidateRange(0, 10)]
 	[int]$JellyTapCleanMaxLevel = 2,
+	[ValidateSet("On", "Off")]
+	[string]$JellyTapCleanZoneRule = "On",
 	[ValidateRange(0, 100)]
 	[int]$JellyTapGrowMinClean = 3,
 	[ValidateSet("Push", "None", "Color", "Four")]
@@ -89,6 +91,7 @@ $physicsArguments += "--blast-score-factor=$($BlastScoreFactor.ToString($culture
 $physicsArguments += "--jelly-tap-blast-score-factor=$($JellyTapBlastScoreFactor.ToString($culture))"
 $physicsArguments += "--jelly-tap-blast-uses-turn=$($JellyTapBlastUsesTurn.ToLower())"
 $physicsArguments += "--jelly-tap-clean-max-level=$JellyTapCleanMaxLevel"
+$physicsArguments += "--jelly-tap-clean-zone-rule=$($JellyTapCleanZoneRule.ToLower())"
 $physicsArguments += "--jelly-tap-grow-min-clean=$JellyTapGrowMinClean"
 $physicsArguments += "--jelly-tap-effect-modes=$($JellyTapEffectModes.ToLower())"
 $physicsArguments += "--turn-start-colors=$TurnStartColors"
@@ -200,6 +203,7 @@ $totalTapBlastCount = 0
 $tapBlastCountByLevel = @{}
 $tapBlastCountByColor = @{}
 $tapCleanCountByColor = @{}
+$tapZeroCleanCountByColor = @{}
 $tapCleanCountTotal = 0
 $tapCleanCountMax = 0
 $tapRestTurnCount = 0
@@ -277,6 +281,11 @@ foreach ($task in $tasks) {
 		$color = $colorProperty.Name
 		if (-not $tapCleanCountByColor.ContainsKey($color)) { $tapCleanCountByColor[$color] = 0 }
 		$tapCleanCountByColor[$color] += [int]$colorProperty.Value
+	}
+	foreach ($colorProperty in $seedRow.tap_zero_clean_count_by_color.PSObject.Properties) {
+		$color = $colorProperty.Name
+		if (-not $tapZeroCleanCountByColor.ContainsKey($color)) { $tapZeroCleanCountByColor[$color] = 0 }
+		$tapZeroCleanCountByColor[$color] += [int]$colorProperty.Value
 	}
 	foreach ($scoreProperty in $seedRow.score_by_reaction_type.PSObject.Properties) {
 		$scoreKey = [string]$scoreProperty.Name
@@ -393,6 +402,13 @@ function Get-Median($Values) {
     return ([double]$items[$middle - 1] + [double]$items[$middle]) / 2.0
 }
 $reactionScoreTotal = [double](($reactionScoreTotals.Values | Measure-Object -Sum).Sum)
+$averageCleanCountPerTapByColor = [ordered]@{}
+$zeroCleanTapRatioByColor = [ordered]@{}
+foreach ($color in @($tapBlastCountByColor.Keys | Sort-Object)) {
+	$tapCount = [double]$tapBlastCountByColor[$color]
+	$averageCleanCountPerTapByColor[$color] = if ($tapCount -gt 0.0) { [double]$tapCleanCountByColor[$color] / $tapCount } else { 0.0 }
+	$zeroCleanTapRatioByColor[$color] = if ($tapCount -gt 0.0) { [double]$tapZeroCleanCountByColor[$color] / $tapCount } else { 0.0 }
+}
 $reactionScoreShares = [ordered]@{}
 foreach ($scoreKey in $reactionScoreTotals.Keys) {
     $reactionScoreShares[$scoreKey] = if ($reactionScoreTotal -gt 0.0) {
@@ -411,6 +427,7 @@ $summary = [ordered]@{
 	jelly_tap_blast_score_factor = $JellyTapBlastScoreFactor
 	jelly_tap_blast_uses_turn = $JellyTapBlastUsesTurn -eq "On"
 	jelly_tap_clean_max_level = $JellyTapCleanMaxLevel
+	jelly_tap_clean_zone_rule = $JellyTapCleanZoneRule -eq "On"
 	jelly_tap_grow_min_clean = $JellyTapGrowMinClean
 	jelly_tap_effect_modes = $JellyTapEffectModes.ToLower()
 	turn_start_colors = $TurnStartColors
@@ -495,6 +512,9 @@ $summary = [ordered]@{
 	tap_blast_count_by_level = $tapBlastCountByLevel
 	tap_blast_count_by_color = $tapBlastCountByColor
 	tap_clean_count_by_color = $tapCleanCountByColor
+	average_clean_count_per_tap_by_color = $averageCleanCountPerTapByColor
+	zero_clean_tap_count_by_color = $tapZeroCleanCountByColor
+	zero_clean_tap_ratio_by_color = $zeroCleanTapRatioByColor
 	average_clean_count_per_tap = if ($totalTapBlastCount -gt 0) { [double]$tapCleanCountTotal / $totalTapBlastCount } else { 0.0 }
 	maximum_clean_count_per_tap = $tapCleanCountMax
 	rest_skipped_turns = $tapRestTurnCount
