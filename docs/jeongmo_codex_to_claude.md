@@ -46,6 +46,7 @@
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/CollisionResolver.gd`, `scripts/ui/Hud.gd`, `project.godot`, `tests/{run_jelly_physics_autoplay.ps1,test_callouts.gd,test_config.gd,test_jelly_regression.gd,test_jolt_3d.gd}`, `tests/spike/{capture_screens.gd,run_jolt_3d_measurement.gd}`, `tests/tools/{run_four_color_balance.ps1,run_jelly_measurement.ps1}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 규칙 true·값 2에서 같은 색 L1 후보를 현재 중력 입구 거리, 동률 `stable_spawn_id` 순으로 N개 선택하고 최종 목록은 stable ID 순. 판 전체 대상 — 자동 (`test_jolt_3d`)
+  - [x] ChatGPT 구현 검토 권고 후속: 거리 선정 순서와 최종 stable ID 처리 순서를 반대로 배치해 독립 검증, 사방 중력, 동률 마지막 자리, 유령·입구 대기·잠김 제외, 1개 실제 턴 경로, 값 0·음수, 다른 효과·규칙 false 비침범 — 자동 (`test_jolt_3d` 37/37). 구현 오류 0건으로 런타임 코드 수정 없음
   - [x] 중력 아래 4개 중 위쪽 2개, 1개/0개, 중력 왼쪽의 오른쪽 2개, 거리 동률을 검증. 가까운 L2·다른 색 L1 제외와 원본 제거·휴식·턴 사용 유지 — 자동 (`test_jolt_3d`)
   - [x] 값 0은 0.16.8 입구 띠 규칙·문구·Z1 해시를 유지하고 값 2는 새 문구·G2 해시를 고정 — 자동 (`test_callouts`, `test_jelly_regression`)
   - [x] Z1·G2·G3 × 5행 × 20게임 = 300게임, 600턴 상한. 색별 터치·청소/터치·0개 비율·휴식 턴 집계 — 자동 측정
@@ -84,7 +85,8 @@
   - `188`: 두 비율 모두 오른쪽 글자가 잘림. 설계 지시대로 폰트 크기 변경 없음
 - QA 관측값:
   - Godot `4.8.dev3.official.51105ccbe` Standard; `--headless --path . --import`, 기본/`--mode=blitz` 300프레임 smoke 각각 종료 코드 0, SCRIPT/Parse Error 0건
-  - `tests/run_tests.ps1` → 일반 `346/346`, 장기 `4/4`, 성능 `5/5`; 각각 새 프로세스, 전체 `82.633초`, 종료 코드 0
+  - 권고 보강 대상 `test_jolt_3d.gd` 단독 → `37/37`, 종료 코드 0
+  - `tests/run_tests.ps1` → 일반 `347/347`, 장기 `4/4`, 성능 `5/5`; 각각 새 프로세스, 전체 `81.922초`, 종료 코드 0
   - `tools/build_windows.ps1 -Debug` → `version=0.16.9 mode=Debug exit=0 bytes=105000736 preserved=45`; 내보낸 console 기본/`--mode=jelly` 300프레임 smoke 각각 종료 코드 0
   - 변경 PowerShell 3개 구문 분석 오류 0건, `git diff --check` 오류 0건. Input/RNG 검색 이번 diff 새 위반 0건
   - 깨끗한 트리 첫 Release → `version=0.16.9 mode=Release exit=0 bytes=111130912 preserved=25`; 같은 명령 재실행은 `Release artifact already exists`, 종료 코드 `1`, exe 해시 불변
@@ -98,7 +100,7 @@
   2. 중력을 왼쪽으로 바꾸고 초록 L8 터치 → 입구인 오른쪽 벽에 가까운 같은 색 L1 두 개가 사라지는지 본다
   3. 초록 L1을 1개·0개로 두고 터치 → 있는 만큼만 청소되며 원본 제거·휴식(그 턴 생성 없음)·턴 사용은 유지되는지 본다
   4. 초록 최초 L8 안내 → 정확한 한 줄 문구와 현재 관측된 오른쪽 잘림을 확인한다
-- 결정 사항: 문서 밖 밸런스 수치·공개 API·글자 크기 변경 없음. 300게임 측정의 긴 자식 프로세스는 임시 Windows 예약 작업으로 실행하고 완료 뒤 작업·임시 래퍼·로그를 삭제했다
+- 결정 사항: 문서 밖 밸런스 수치·공개 API·글자 크기 변경 없음. ChatGPT 권고 테스트에서 구현 오류가 발견되지 않아 `tests/test_jolt_3d.gd`만 보강했다. 300게임 측정의 긴 자식 프로세스는 임시 Windows 예약 작업으로 실행하고 완료 뒤 작업·임시 래퍼·로그를 삭제했다
 - 남은 것 · 질문: 안내 한 줄 잘림의 처리·합격·병합 판단은 Claude/사용자 대기
 
 ### [2026-11-08] 대상 #140 — L1 자리별 청소 규칙·조건 안내·Windows 0.16.8

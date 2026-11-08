@@ -1248,35 +1248,68 @@ func test_rest_clean_count_selects_nearest_entrance_orbs_deterministically() -> 
 	var fixture: Dictionary = await _create_turn_fixture()
 	var board: Board3D = fixture["board"] as Board3D
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	var spawner: Spawner = fixture["spawner"] as Spawner
 
 	board.set_gravity(Vector2i.DOWN)
 	var source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 8, Vector2.ZERO)
-	var top_first: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(-180.0, -300.0))
-	var top_second: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(180.0, -200.0))
 	var lower_first: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(-180.0, 0.0))
+	var top_second: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(180.0, -200.0))
 	var lower_second: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(180.0, 200.0))
+	var top_first: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(-180.0, -300.0))
 	var closer_l2: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 2, Vector2.ZERO + Vector2.UP * 400.0)
 	var closer_other: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(300.0, -420.0))
+	var closer_ghost: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(-300.0, -430.0))
+	var closer_waiting: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(-100.0, -420.0))
+	var closer_locked: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(100.0, -410.0))
+	closer_ghost.is_ghost = true
+	closer_waiting.is_waiting_at_entrance = true
+	resolver._lock_reaction_result(closer_locked)
 	var down_targets: Array[Variant] = resolver._jelly_tap_clean_targets(
 		source, GameConfig.JellyTapEffect.REST
 	)
 	assert_eq(down_targets.size(), 2, "REST takes configured two green L1 targets")
+	assert_true(top_first.stable_spawn_id > top_second.stable_spawn_id, "entrance rank intentionally opposes spawn-id rank")
 	assert_eq(
 		down_targets.map(func(target: Variant) -> int: return int(target.stable_spawn_id)),
-		[top_first.stable_spawn_id, top_second.stable_spawn_id],
-		"returned targets keep stable_spawn_id order after entrance selection"
+		[top_second.stable_spawn_id, top_first.stable_spawn_id],
+		"entrance selection happens before final stable_spawn_id ordering"
 	)
 	assert_true(resolver.apply_jelly_tap_blast(source), "REST count tap applies")
 	assert_true(top_first.consumed and top_second.consumed, "top two green L1 are consumed")
 	assert_true(not lower_first.consumed and not lower_second.consumed, "lower green L1 remain")
 	assert_true(not closer_l2.consumed and not closer_other.consumed, "closer invalid level and color remain")
+	assert_true(
+		not closer_ghost.consumed and not closer_waiting.consumed and not closer_locked.consumed,
+		"closer ghost, entrance waiter, and reaction-locked L1 remain"
+	)
 
 	board.clear()
 	await tree.process_frame
 	board.set_gravity(Vector2i.DOWN)
 	var one_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 8, Vector2.ZERO)
-	board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(0.0, 200.0))
+	var one_target: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(0.0, 200.0))
 	assert_eq(resolver.jelly_tap_clean_count(one_source), 1, "one valid green L1 yields one target")
+	var one_reactions: Array[Dictionary] = []
+	resolver.reaction_applied.connect(func(reaction: Dictionary) -> void: one_reactions.append(reaction))
+	manager.gravity = Vector2i.DOWN
+	manager.turn_index = 42
+	manager.turn_combo = 0
+	manager.final_move_pending = false
+	manager.final_move_active = false
+	manager._is_initial_settle = false
+	manager._is_tap_blast_settle = false
+	manager.state = TurnManager.State.WAITING_INPUT
+	spawner.init_rng(1410)
+	spawner.sync_next_batch_size(manager.turn_index + 1)
+	var one_preview_before: Array = spawner.peek_preview()
+	InputRouter.set_locked(false)
+	assert_true(manager.try_tap_blast_orb(one_source), "one-target REST starts through TurnManager")
+	assert_eq(manager.turn_index, 43, "one-target REST spends exactly one turn")
+	assert_true(one_source.consumed and one_target.consumed, "one-target REST removes source and target")
+	assert_eq(int(one_reactions[-1]["clean_count"]), 1, "one-target REST reaction records one clean")
+	assert_eq(manager.state, TurnManager.State.SIMULATING, "one-target REST skips spawning")
+	assert_eq(spawner.peek_preview(), one_preview_before, "one-target REST preserves next preview")
 	board.clear()
 	await tree.process_frame
 	var zero_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 8, Vector2.ZERO)
@@ -1297,15 +1330,41 @@ func test_rest_clean_count_selects_nearest_entrance_orbs_deterministically() -> 
 
 	board.clear()
 	await tree.process_frame
-	Config.data.jelly_tap_rest_clean_count = 1
+	board.set_gravity(Vector2i.UP)
+	var up_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 8, Vector2.ZERO)
+	var bottom_nearest: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(-200.0, 420.0))
+	var bottom_second: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(200.0, 320.0))
+	board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(0.0, -300.0))
+	var up_targets: Array[Variant] = resolver._jelly_tap_clean_targets(
+		up_source, GameConfig.JellyTapEffect.REST
+	)
+	assert_true(up_targets.has(bottom_nearest) and up_targets.has(bottom_second), "up gravity selects two nearest bottom-wall targets")
+
+	board.clear()
+	await tree.process_frame
+	board.set_gravity(Vector2i.RIGHT)
+	var right_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 8, Vector2.ZERO)
+	var left_nearest: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(-420.0, -200.0))
+	var left_second: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(-320.0, 200.0))
+	board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(300.0, 0.0))
+	var right_targets: Array[Variant] = resolver._jelly_tap_clean_targets(
+		right_source, GameConfig.JellyTapEffect.REST
+	)
+	assert_true(right_targets.has(left_nearest) and right_targets.has(left_second), "right gravity selects two nearest left-wall targets")
+
+	board.clear()
+	await tree.process_frame
+	Config.data.jelly_tap_rest_clean_count = 2
 	board.set_gravity(Vector2i.LEFT)
 	var tie_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 8, Vector2.ZERO)
+	var closest: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(430.0, 0.0))
 	var lower_id: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(400.0, -150.0))
 	var higher_id: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(400.0, 150.0))
 	var tie_targets: Array[Variant] = resolver._jelly_tap_clean_targets(
 		tie_source, GameConfig.JellyTapEffect.REST
 	)
-	assert_eq(tie_targets, [lower_id], "equal entrance distance uses lower stable_spawn_id")
+	assert_eq(tie_targets, [closest, lower_id], "equal-distance cutoff uses lower stable_spawn_id for last slot")
+	assert_true(not tie_targets.has(higher_id), "higher stable_spawn_id loses equal-distance cutoff")
 	assert_true(higher_id.stable_spawn_id > lower_id.stable_spawn_id, "tie fixture ids are ordered")
 
 	Config.data.game_mode = original_mode
@@ -1313,6 +1372,71 @@ func test_rest_clean_count_selects_nearest_entrance_orbs_deterministically() -> 
 	Config.data.jelly_tap_clean_zone_rule = original_zone_rule
 	Config.data.jelly_tap_rest_clean_count = original_rest_count
 	Config.data.jelly_tap_effect_modes = original_modes
+	await _cleanup(fixture["root"] as Node)
+
+
+func test_rest_clean_count_fallback_and_other_effects_remain_independent() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_clean_max: int = Config.data.jelly_tap_clean_max_level
+	var original_zone_rule: bool = Config.data.jelly_tap_clean_zone_rule
+	var original_rest_count: int = Config.data.jelly_tap_rest_clean_count
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_tap_clean_max_level = 1
+	Config.data.jelly_tap_clean_zone_rule = true
+	var fixture: Dictionary = await _create_turn_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+
+	board.set_gravity(Vector2i.DOWN)
+	var fallback_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 8, Vector2.ZERO)
+	board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(-200.0, -300.0))
+	board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(0.0, -200.0))
+	board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(200.0, -96.0))
+	board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(300.0, -95.0))
+	Config.data.jelly_tap_rest_clean_count = 0
+	assert_eq(resolver.jelly_tap_clean_count(fallback_source), 3, "zero count keeps inclusive 384px entrance band")
+	Config.data.jelly_tap_rest_clean_count = -1
+	assert_eq(resolver.jelly_tap_clean_count(fallback_source), 3, "negative count keeps 0.16.8 entrance band")
+
+	board.clear()
+	await tree.process_frame
+	Config.data.jelly_tap_rest_clean_count = 1
+	var bomb_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, 8, Vector2.ZERO)
+	board.spawn_orb(OrbTypes.OrbColor.BLUE, 1, Vector2(100.0, 0.0))
+	board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(0.0, 100.0))
+	board.spawn_orb(OrbTypes.OrbColor.YELLOW, 1, Vector2(-100.0, 0.0))
+	assert_eq(resolver._jelly_tap_clean_targets(bomb_source, GameConfig.JellyTapEffect.BOMB).size(), 3, "REST count does not limit BOMB")
+
+	board.clear()
+	await tree.process_frame
+	board.set_gravity(Vector2i.DOWN)
+	var quake_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.BLUE, 8, Vector2.ZERO)
+	board.spawn_orb(OrbTypes.OrbColor.BLUE, 1, Vector2(-200.0, 455.0))
+	board.spawn_orb(OrbTypes.OrbColor.BLUE, 1, Vector2(0.0, 455.0))
+	board.spawn_orb(OrbTypes.OrbColor.BLUE, 1, Vector2(200.0, 455.0))
+	assert_eq(resolver._jelly_tap_clean_targets(quake_source, GameConfig.JellyTapEffect.QUAKE).size(), 3, "REST count does not limit QUAKE")
+
+	board.clear()
+	await tree.process_frame
+	var magnet_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.YELLOW, 8, Vector2.ZERO)
+	board.spawn_orb(OrbTypes.OrbColor.YELLOW, 1, Vector2(100.0, 0.0))
+	board.spawn_orb(OrbTypes.OrbColor.YELLOW, 1, Vector2(200.0, 0.0))
+	board.spawn_orb(OrbTypes.OrbColor.YELLOW, 1, Vector2(300.0, 0.0))
+	assert_eq(resolver._jelly_tap_clean_targets(magnet_source, GameConfig.JellyTapEffect.MAGNET).size(), 3, "REST count does not limit MAGNET")
+
+	board.clear()
+	await tree.process_frame
+	Config.data.jelly_tap_clean_zone_rule = false
+	var legacy_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 8, Vector2.ZERO)
+	board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(-400.0, 300.0))
+	board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(0.0, 300.0))
+	board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(400.0, 300.0))
+	assert_eq(resolver._jelly_tap_clean_targets(legacy_source, GameConfig.JellyTapEffect.REST).size(), 3, "disabled zone rule ignores REST count")
+
+	Config.data.game_mode = original_mode
+	Config.data.jelly_tap_clean_max_level = original_clean_max
+	Config.data.jelly_tap_clean_zone_rule = original_zone_rule
+	Config.data.jelly_tap_rest_clean_count = original_rest_count
 	await _cleanup(fixture["root"] as Node)
 
 
