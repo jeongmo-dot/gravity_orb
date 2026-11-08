@@ -21,16 +21,16 @@ $measurementDirectory = Join-Path $repoPath "artifacts\measurements"
 New-Item -ItemType Directory -Path $measurementDirectory -Force | Out-Null
 
 $profiles = @(
-    [pscustomobject]@{ Slug = "c6"; Name = "C6"; Unlocks = "30,60"; Effects = "Color"; SpawnMax = 4 },
-    [pscustomobject]@{ Slug = "c4"; Name = "C4"; Unlocks = "None"; Effects = "Color"; SpawnMax = 4 },
-    [pscustomobject]@{ Slug = "c4e"; Name = "C4E"; Unlocks = "None"; Effects = "Four"; SpawnMax = 4 },
-    [pscustomobject]@{ Slug = "c4e_s5"; Name = "C4E-S5"; Unlocks = "None"; Effects = "Four"; SpawnMax = 5 }
+    [pscustomobject]@{ Slug = "c4e"; Name = "C4E"; CleanMax = 2; Zone = "Off" },
+    [pscustomobject]@{ Slug = "c4e_l1"; Name = "C4E-L1"; CleanMax = 1; Zone = "Off" },
+    [pscustomobject]@{ Slug = "z2"; Name = "Z2"; CleanMax = 2; Zone = "On" },
+    [pscustomobject]@{ Slug = "z1"; Name = "Z1"; CleanMax = 1; Zone = "On" }
 )
 
 foreach ($profile in $profiles) {
     foreach ($mode in @("save", "all")) {
         $tapMode = if ($mode -eq "save") { "Save" } else { "All" }
-        $autoLabel = "139_$($profile.Slug)_auto_$mode"
+        $autoLabel = "140_$($profile.Slug)_auto_$mode"
         $autoSummaryPath = Join-Path $repoPath "artifacts\jelly_physics_autoplay_$autoLabel.json"
         if (-not ($ReuseCompleted -and (Test-Path -LiteralPath $autoSummaryPath))) {
             $autoArguments = @{
@@ -41,18 +41,20 @@ foreach ($profile in $profiles) {
                 MaxTurns = 600
                 LevelProfile = "D"
                 TapBlastBotMode = $tapMode
-                SpawnCountMax = $profile.SpawnMax
+                SpawnCountMax = 4
                 JellyMergeLevelGap = 1
                 JellyMergeWideGapMinLevel = 0
-                JellyTapEffectModes = $profile.Effects
+                JellyTapEffectModes = "Four"
                 TurnStartColors = 4
-                TurnColorUnlockTurns = $profile.Unlocks
+                TurnColorUnlockTurns = "None"
+                JellyTapCleanMaxLevel = $profile.CleanMax
+                JellyTapCleanZoneRule = $profile.Zone
             }
             if ($AggregateOnly) { $autoArguments.AggregateOnly = $true }
             & $autoScript @autoArguments
         }
 
-        $strategyLabel = "139_$($profile.Slug)_strategy_$mode"
+        $strategyLabel = "140_$($profile.Slug)_strategy_$mode"
         $strategyArguments = @{
             GodotPath = $GodotPath
             SeedCount = 20
@@ -60,12 +62,14 @@ foreach ($profile in $profiles) {
             TurnCap = 600
             LevelProfile = "D"
             TapBlastBotMode = $tapMode
-            SpawnCountMax = $profile.SpawnMax
+            SpawnCountMax = 4
             JellyMergeLevelGap = 1
             JellyMergeWideGapMinLevel = 0
-            JellyTapEffectModes = $profile.Effects
+            JellyTapEffectModes = "Four"
             TurnStartColors = 4
-            TurnColorUnlockTurns = $profile.Unlocks
+            TurnColorUnlockTurns = "None"
+            JellyTapCleanMaxLevel = $profile.CleanMax
+            JellyTapCleanZoneRule = $profile.Zone
             Strategies = if ($mode -eq "save") { "r,l_merge" } else { "l_merge" }
             MeasurementLabel = $strategyLabel
         }
@@ -96,6 +100,8 @@ function Get-AutoRow($Summary) {
         tap_blasts = [int]$Summary.tap_blast_count
         tap_blast_count_by_color = $Summary.tap_blast_count_by_color
         tap_clean_count_by_color = $Summary.tap_clean_count_by_color
+        average_clean_count_per_tap_by_color = $Summary.average_clean_count_per_tap_by_color
+        zero_clean_tap_ratio_by_color = $Summary.zero_clean_tap_ratio_by_color
         average_clean_count_per_tap = [double]$Summary.average_clean_count_per_tap
         rest_skipped_turns = [int]$Summary.rest_skipped_turns
         peak_active_orbs = [int]$Summary.maximum_active_sample.active_orbs
@@ -125,6 +131,8 @@ function Get-StrategyRow($Summary) {
         tap_blasts = [int]$Summary.tap_blasts
         tap_blast_count_by_color = $Summary.tap_blast_count_by_color
         tap_clean_count_by_color = $Summary.tap_clean_count_by_color
+        average_clean_count_per_tap_by_color = $Summary.average_clean_count_per_tap_by_color
+        zero_clean_tap_ratio_by_color = $Summary.zero_clean_tap_ratio_by_color
         average_clean_count_per_tap = [double]$Summary.average_clean_count_per_tap
         rest_skipped_turns = [int]$Summary.rest_skipped_turns
         peak_active_orbs = [int]$Summary.peak_active_orbs
@@ -135,15 +143,17 @@ function Get-StrategyRow($Summary) {
 
 $profileReports = [ordered]@{}
 foreach ($profile in $profiles) {
-    $autoSave = Get-Content -LiteralPath (Join-Path $repoPath "artifacts\jelly_physics_autoplay_139_$($profile.Slug)_auto_save.json") -Raw | ConvertFrom-Json
-    $autoAll = Get-Content -LiteralPath (Join-Path $repoPath "artifacts\jelly_physics_autoplay_139_$($profile.Slug)_auto_all.json") -Raw | ConvertFrom-Json
-    $strategySave = Get-Content -LiteralPath (Join-Path $measurementDirectory "jelly_rules_measurement_139_$($profile.Slug)_strategy_save.json") -Raw | ConvertFrom-Json
-    $strategyAll = Get-Content -LiteralPath (Join-Path $measurementDirectory "jelly_rules_measurement_139_$($profile.Slug)_strategy_all.json") -Raw | ConvertFrom-Json
+    $autoSave = Get-Content -LiteralPath (Join-Path $repoPath "artifacts\jelly_physics_autoplay_140_$($profile.Slug)_auto_save.json") -Raw | ConvertFrom-Json
+    $autoAll = Get-Content -LiteralPath (Join-Path $repoPath "artifacts\jelly_physics_autoplay_140_$($profile.Slug)_auto_all.json") -Raw | ConvertFrom-Json
+    $strategySave = Get-Content -LiteralPath (Join-Path $measurementDirectory "jelly_rules_measurement_140_$($profile.Slug)_strategy_save.json") -Raw | ConvertFrom-Json
+    $strategyAll = Get-Content -LiteralPath (Join-Path $measurementDirectory "jelly_rules_measurement_140_$($profile.Slug)_strategy_all.json") -Raw | ConvertFrom-Json
     $profileReports[$profile.Name] = [ordered]@{
-        colors = if ($profile.Unlocks -eq "None") { 4 } else { 6 }
-        turn_color_unlock_turns = $profile.Unlocks
-        jelly_tap_effect_modes = $profile.Effects
-        spawn_count_max = $profile.SpawnMax
+        colors = 4
+        turn_color_unlock_turns = "None"
+        jelly_tap_effect_modes = "Four"
+        spawn_count_max = 4
+        jelly_tap_clean_max_level = $profile.CleanMax
+        jelly_tap_clean_zone_rule = $profile.Zone -eq "On"
         auto_d_save = Get-AutoRow $autoSave
         auto_d_all = Get-AutoRow $autoAll
         r_d_save = Get-StrategyRow $strategySave.strategies.r
@@ -155,9 +165,9 @@ foreach ($profile in $profiles) {
 $report = [ordered]@{
     generated_at = (Get-Date).ToUniversalTime().ToString("o")
     engine = "Godot 4.8-dev3 standard"
-    conditions = "C6/C4/C4E/C4E-S5; auto seeds 101-120; strategy seeds 1-20; 600 turns; fixed 120 fps"
+    conditions = "C4E/C4E-L1/Z2/Z1; auto seeds 101-120; strategy seeds 1-20; 600 turns; fixed 120 fps"
     profiles = $profileReports
 }
-$outputPath = Join-Path $measurementDirectory "four_color_balance.json"
+$outputPath = Join-Path $measurementDirectory "clean_zone_balance.json"
 $report | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $outputPath -Encoding utf8
-Write-Output "FOUR_COLOR_BALANCE_REPORT $outputPath"
+Write-Output "CLEAN_ZONE_BALANCE_REPORT $outputPath"

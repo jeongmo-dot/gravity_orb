@@ -69,6 +69,7 @@ var _seed_tap_blast_count: int = 0
 var _seed_tap_blast_count_by_level: Dictionary = {}
 var _seed_tap_blast_count_by_color: Dictionary = {}
 var _seed_tap_clean_count_by_color: Dictionary = {}
+var _seed_tap_zero_clean_count_by_color: Dictionary = {}
 var _seed_tap_clean_count_total: int = 0
 var _seed_tap_clean_count_max: int = 0
 var _seed_tap_rest_turn_count: int = 0
@@ -128,6 +129,10 @@ func _run() -> void:
 		"jelly_tap_blast_score_factor": Config.data.jelly_tap_blast_score_factor,
 		"jelly_tap_blast_uses_turn": Config.data.jelly_tap_blast_uses_turn,
 		"jelly_tap_clean_max_level": Config.data.jelly_tap_clean_max_level,
+		"jelly_tap_clean_zone_rule": Config.data.jelly_tap_clean_zone_rule,
+		"jelly_tap_quake_floor_margin": Config.data.jelly_tap_quake_floor_margin,
+		"jelly_tap_rest_clean_band_factor": Config.data.jelly_tap_rest_clean_band_factor,
+		"jelly_tap_magnet_clean_radius_factor": Config.data.jelly_tap_magnet_clean_radius_factor,
 		"jelly_tap_grow_min_clean": Config.data.jelly_tap_grow_min_clean,
 		"jelly_tap_effect_profile": _jelly_tap_effect_profile,
 		"jelly_tap_effect_modes": Array(Config.data.jelly_tap_effect_modes),
@@ -306,6 +311,7 @@ func _run_seed(
 	_seed_tap_blast_count_by_level.clear()
 	_seed_tap_blast_count_by_color.clear()
 	_seed_tap_clean_count_by_color.clear()
+	_seed_tap_zero_clean_count_by_color.clear()
 	_seed_tap_clean_count_total = 0
 	_seed_tap_clean_count_max = 0
 	_seed_tap_rest_turn_count = 0
@@ -578,6 +584,7 @@ func _run_seed(
 		"tap_blast_count_by_level": _seed_tap_blast_count_by_level.duplicate(true),
 		"tap_blast_count_by_color": _seed_tap_blast_count_by_color.duplicate(true),
 		"tap_clean_count_by_color": _seed_tap_clean_count_by_color.duplicate(true),
+		"tap_zero_clean_count_by_color": _seed_tap_zero_clean_count_by_color.duplicate(true),
 		"tap_clean_count_total": _seed_tap_clean_count_total,
 		"tap_clean_count_max": _seed_tap_clean_count_max,
 		"tap_rest_turn_count": _seed_tap_rest_turn_count,
@@ -1089,6 +1096,10 @@ func _record_shock_event(reaction: Dictionary) -> void:
 		_seed_tap_clean_count_by_color[color_key] = int(
 			_seed_tap_clean_count_by_color.get(color_key, 0)
 		) + clean_count
+		if clean_count == 0:
+			_seed_tap_zero_clean_count_by_color[color_key] = int(
+				_seed_tap_zero_clean_count_by_color.get(color_key, 0)
+			) + 1
 		if int(reaction.get("tap_effect", -1)) == GameConfig.JellyTapEffect.REST:
 			_seed_tap_rest_turn_count += 1
 		if tap_color == OrbTypes.OrbColor.PURPLE:
@@ -2299,6 +2310,10 @@ func _apply_arguments() -> void:
 				argument.trim_prefix("--jelly-tap-clean-max-level=").to_int(),
 				0,
 				Config.data.orb_max_level
+			)
+		elif argument.begins_with("--jelly-tap-clean-zone-rule="):
+			Config.data.jelly_tap_clean_zone_rule = (
+				argument.trim_prefix("--jelly-tap-clean-zone-rule=") == "on"
 			)
 		elif argument.begins_with("--jelly-tap-grow-min-clean="):
 			Config.data.jelly_tap_grow_min_clean = maxi(

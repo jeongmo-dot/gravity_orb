@@ -106,7 +106,7 @@ func test_combo_replaces_effect_hint_and_defers_next_hint_to_next_input_wait() -
 	hud._on_jelly_tap_effect_unlocked(OrbTypes.OrbColor.BLUE)
 	hud._on_jelly_tap_effect_unlocked(OrbTypes.OrbColor.GREEN)
 	manager._set_state(TurnManager.State.WAITING_INPUT)
-	assert_eq(callout.text, "파랑 L8: 터치하면 지진", "first queued hint appears")
+	assert_eq(callout.text, "파랑 L8: 지진 · 바닥 파랑 L1 청소", "first queued hint appears")
 	hud._on_combo_changed(3, 1.0, 3)
 	assert_eq(callout.text, "NICE!", "combo immediately replaces the visible hint")
 	if hud._callout_tween != null and hud._callout_tween.is_valid():
@@ -274,12 +274,12 @@ func test_six_jelly_tap_effect_callouts_show_once_without_art_or_sound() -> void
 	var callout: Label = main.get_node("UI/Hud/CalloutLabel") as Label
 	var unlock_visual: OrbVisual = main.get_node("UI/Hud/PlanetUnlockVisual") as OrbVisual
 	var expected: Array[String] = [
-		"분홍 L8: 터치하면 폭탄",
-		"파랑 L8: 터치하면 지진",
+		"분홍 L8: 폭탄 · 주변 L1 청소",
+		"파랑 L8: 지진 · 바닥 파랑 L1 청소",
 		"초록 L8: 작은 초록 3개면 성장",
 		"노랑 L8: 터치하면 보너스",
-		"보라 L8: 터치하면 자석",
-		"주황 L8: 터치하면 휴식",
+		"보라 L8: 자석 · 끌린 보라 L1 청소",
+		"주황 L8: 휴식 · 입구 쪽 주황 L1 청소",
 	]
 	manager.state = TurnManager.State.SIMULATING
 	for color_index: int in range(6):
@@ -323,32 +323,33 @@ func test_six_jelly_tap_effect_callouts_show_once_without_art_or_sound() -> void
 
 func test_jelly_tap_effect_callout_text_follows_configured_effect() -> void:
 	var original_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
+	var original_zone_rule: bool = Config.data.jelly_tap_clean_zone_rule
 	var main: Main = await _create_main()
 	var hud: Hud = main.get_node("UI/Hud") as Hud
 	assert_eq(
 		hud._jelly_tap_effect_callout_text(OrbTypes.OrbColor.RED),
-		"분홍 L8: 터치하면 폭탄",
+		"분홍 L8: 폭탄 · 주변 L1 청소",
 		"default pink hint follows BOMB"
 	)
 	assert_eq(
 		hud._jelly_tap_effect_callout_text(OrbTypes.OrbColor.BLUE),
-		"파랑 L8: 터치하면 지진",
+		"파랑 L8: 지진 · 바닥 파랑 L1 청소",
 		"default blue hint follows QUAKE"
 	)
 	assert_eq(
 		hud._jelly_tap_effect_callout_text(OrbTypes.OrbColor.GREEN),
-		"초록 L8: 터치하면 휴식",
+		"초록 L8: 휴식 · 입구 쪽 초록 L1 청소",
 		"default green hint follows REST"
 	)
 	assert_eq(
 		hud._jelly_tap_effect_callout_text(OrbTypes.OrbColor.YELLOW),
-		"노랑 L8: 터치하면 자석",
+		"노랑 L8: 자석 · 끌린 노랑 L1 청소",
 		"default yellow hint follows MAGNET"
 	)
 	Config.data.jelly_tap_effect_modes = PackedInt32Array([7, 6, 5, 4, 3, 2])
 	assert_eq(
 		hud._jelly_tap_effect_callout_text(OrbTypes.OrbColor.RED),
-		"분홍 L8: 터치하면 휴식",
+		"분홍 L8: 휴식 · 입구 쪽 분홍 L1 청소",
 		"remapped hint follows effect rather than color index"
 	)
 	assert_eq(
@@ -356,8 +357,15 @@ func test_jelly_tap_effect_callout_text_follows_configured_effect() -> void:
 		"노랑 L8: 작은 노랑 3개면 성장",
 		"GROW hint follows remapped color and configured clean count"
 	)
+	Config.data.jelly_tap_clean_zone_rule = false
+	assert_eq(
+		hud._jelly_tap_effect_callout_text(OrbTypes.OrbColor.RED),
+		"분홍 L8: 터치하면 휴식",
+		"disabled zone rule keeps 0.16.7 hint"
+	)
 	await _destroy_main(main)
 	Config.data.jelly_tap_effect_modes = original_modes
+	Config.data.jelly_tap_clean_zone_rule = original_zone_rule
 
 
 func test_callout_frame_cost_report() -> void:

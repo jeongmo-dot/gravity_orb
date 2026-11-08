@@ -438,9 +438,6 @@ func _jelly_tap_clean_targets(
 	var max_level: int = maxi(Config.data.jelly_tap_clean_max_level, 0)
 	if max_level <= 0 or not is_instance_valid(source):
 		return targets
-	var bomb_radius: float = (
-		Config.data.jelly_tap_blast_radius_factor * Config.data.board_size
-	)
 	for candidate: Variant in _board.get_orbs():
 		if candidate == source or not _is_valid_reaction_orb(candidate):
 			continue
@@ -448,18 +445,65 @@ func _jelly_tap_clean_targets(
 			continue
 		if _is_reaction_locked(candidate) or int(candidate.level) > max_level:
 			continue
-		var same_color: bool = int(candidate.color) == int(source.color)
-		var bomb_extra: bool = (
-			tap_effect == GameConfig.JellyTapEffect.BOMB
-			and not same_color
-			and candidate.position.distance_to(source.position) <= bomb_radius
-		)
-		if same_color or bomb_extra:
+		if _matches_jelly_tap_clean_rule(source, candidate, tap_effect):
 			targets.append(candidate)
 	targets.sort_custom(func(a: Variant, b: Variant) -> bool:
 		return int(a.stable_spawn_id) < int(b.stable_spawn_id)
 	)
 	return targets
+
+
+func _matches_jelly_tap_clean_rule(
+	source: Variant,
+	candidate: Variant,
+	tap_effect: GameConfig.JellyTapEffect
+) -> bool:
+	var same_color: bool = int(candidate.color) == int(source.color)
+	var source_position: Vector2 = source.position
+	var candidate_position: Vector2 = candidate.position
+	var bomb_radius: float = (
+		Config.data.jelly_tap_blast_radius_factor * Config.data.board_size
+	)
+	if not Config.data.jelly_tap_clean_zone_rule:
+		return (
+			same_color
+			or (
+				tap_effect == GameConfig.JellyTapEffect.BOMB
+				and candidate_position.distance_to(source_position) <= bomb_radius
+			)
+		)
+	match tap_effect:
+		GameConfig.JellyTapEffect.BOMB:
+			return candidate_position.distance_to(source_position) <= bomb_radius
+		GameConfig.JellyTapEffect.QUAKE:
+			if not same_color:
+				return false
+			var gravity: Vector2 = Vector2(_board.gravity_direction()).normalized()
+			var floor_distance: float = candidate_position.dot(gravity)
+			return (
+				floor_distance + _orb_contact_radius(candidate)
+				>= Config.data.board_size * 0.5 - Config.data.jelly_tap_quake_floor_margin
+			)
+		GameConfig.JellyTapEffect.REST:
+			if not same_color:
+				return false
+			var rest_gravity: Vector2 = Vector2(_board.gravity_direction()).normalized()
+			var entrance_distance: float = (
+				candidate_position.dot(rest_gravity) + Config.data.board_size * 0.5
+			)
+			return entrance_distance <= (
+				Config.data.jelly_tap_rest_clean_band_factor * Config.data.board_size
+			)
+		GameConfig.JellyTapEffect.MAGNET:
+			return (
+				same_color
+				and candidate_position.distance_to(source_position) <= (
+					Config.data.jelly_tap_magnet_clean_radius_factor
+					* Config.data.board_size
+				)
+			)
+		_:
+			return same_color
 
 
 func _start_tap_clean_visual(orb: Variant, target: Vector2) -> void:

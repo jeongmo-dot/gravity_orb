@@ -173,6 +173,14 @@ const CAPTURE_FILES: Array[String] = [
 	"188_jelly_four_green_callout.png",
 	"189_jelly_four_yellow_callout.png",
 	"190_jelly_four_effects_full.png",
+	"191_jelly_clean_zone_pink_before.png",
+	"192_jelly_clean_zone_pink_after.png",
+	"193_jelly_clean_zone_blue_before.png",
+	"194_jelly_clean_zone_blue_after.png",
+	"195_jelly_clean_zone_green_before.png",
+	"196_jelly_clean_zone_green_after.png",
+	"197_jelly_clean_zone_yellow_before.png",
+	"198_jelly_clean_zone_yellow_after.png",
 ]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
@@ -708,6 +716,8 @@ func _capture_four_color_effect_scenes(
 ) -> void:
 	Config.data.turn_color_unlock_turns.clear()
 	Config.data.jelly_tap_effect_modes = PackedInt32Array([2, 3, 7, 6, 1, 1])
+	Config.data.jelly_tap_clean_max_level = 1
+	Config.data.jelly_tap_clean_zone_rule = true
 	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
 	resolver.cancel_active_jelly_merges()
 	board.clear()
@@ -723,6 +733,7 @@ func _capture_four_color_effect_scenes(
 	spawner.init_rng(1390)
 	spawner.sync_next_batch_size(30)
 	InputRouter.set_locked(false)
+	hud._refresh_turn_number()
 	var rest_source: Orb3D = board.spawn_orb(
 		OrbTypes.OrbColor.GREEN, 8, Vector2(0.0, 120.0)
 	)
@@ -792,6 +803,107 @@ func _capture_four_color_effect_scenes(
 		await _capture(callout_files[color_index])
 		hud._hide_callout_label()
 	await _capture("190_jelly_four_effects_full.png")
+	await _capture_clean_zone_evidence(board, resolver, director)
+
+
+func _capture_clean_zone_evidence(
+	board: Board3D,
+	resolver: CollisionResolver,
+	director: FeedbackDirector
+) -> void:
+	var cases: Array[Dictionary] = [
+		{
+			"name": "pink",
+			"color": OrbTypes.OrbColor.RED,
+			"source": Vector2.ZERO,
+			"matching": [
+				{"color": OrbTypes.OrbColor.RED, "level": 1, "position": Vector2(-220.0, 0.0)},
+				{"color": OrbTypes.OrbColor.BLUE, "level": 1, "position": Vector2(220.0, 0.0)},
+			],
+			"remaining": [
+				{"color": OrbTypes.OrbColor.RED, "level": 1, "position": Vector2(340.0, 0.0)},
+				{"color": OrbTypes.OrbColor.BLUE, "level": 2, "position": Vector2(0.0, -180.0)},
+			],
+			"base": 191,
+		},
+		{
+			"name": "blue",
+			"color": OrbTypes.OrbColor.BLUE,
+			"source": Vector2.ZERO,
+			"matching": [
+				{"color": OrbTypes.OrbColor.BLUE, "level": 1, "position": Vector2(-300.0, 450.0)},
+				{"color": OrbTypes.OrbColor.BLUE, "level": 1, "position": Vector2(300.0, 450.0)},
+			],
+			"remaining": [
+				{"color": OrbTypes.OrbColor.BLUE, "level": 1, "position": Vector2(0.0, 380.0)},
+				{"color": OrbTypes.OrbColor.RED, "level": 1, "position": Vector2(150.0, 450.0)},
+				{"color": OrbTypes.OrbColor.BLUE, "level": 2, "position": Vector2(-150.0, 450.0)},
+			],
+			"base": 193,
+		},
+		{
+			"name": "green",
+			"color": OrbTypes.OrbColor.GREEN,
+			"source": Vector2.ZERO,
+			"matching": [
+				{"color": OrbTypes.OrbColor.GREEN, "level": 1, "position": Vector2(-220.0, -120.0)},
+			],
+			"remaining": [
+				{"color": OrbTypes.OrbColor.GREEN, "level": 1, "position": Vector2(220.0, -40.0)},
+				{"color": OrbTypes.OrbColor.GREEN, "level": 2, "position": Vector2(0.0, -220.0)},
+			],
+			"base": 195,
+		},
+		{
+			"name": "yellow",
+			"color": OrbTypes.OrbColor.YELLOW,
+			"source": Vector2(-220.0, 0.0),
+			"matching": [
+				{"color": OrbTypes.OrbColor.YELLOW, "level": 1, "position": Vector2(240.0, 0.0)},
+			],
+			"remaining": [
+				{"color": OrbTypes.OrbColor.YELLOW, "level": 1, "position": Vector2(280.0, 0.0)},
+				{"color": OrbTypes.OrbColor.YELLOW, "level": 2, "position": Vector2(0.0, -180.0)},
+			],
+			"base": 197,
+		},
+	]
+	for capture_case: Dictionary in cases:
+		resolver.cancel_active_jelly_merges()
+		board.clear()
+		director.clear_effects()
+		board.set_gravity(Vector2i.DOWN)
+		var source: Orb3D = board.spawn_orb(
+			int(capture_case["color"]),
+			8,
+			capture_case["source"] as Vector2
+		)
+		source.disable_physics()
+		for spec_value: Variant in capture_case["matching"] as Array:
+			var matching_spec: Dictionary = spec_value as Dictionary
+			var matching: Orb3D = board.spawn_orb(
+				int(matching_spec["color"]),
+				int(matching_spec["level"]),
+				matching_spec["position"] as Vector2
+			)
+			matching.disable_physics()
+		for remaining_value: Variant in capture_case["remaining"] as Array:
+			var remaining_spec: Dictionary = remaining_value as Dictionary
+			var remaining: Orb3D = board.spawn_orb(
+				int(remaining_spec["color"]),
+				int(remaining_spec["level"]),
+				remaining_spec["position"] as Vector2
+			)
+			remaining.disable_physics()
+		await get_tree().process_frame
+		var base: int = int(capture_case["base"])
+		var name: String = str(capture_case["name"])
+		await _capture("%03d_jelly_clean_zone_%s_before.png" % [base, name])
+		if not resolver.apply_jelly_tap_blast(source):
+			_fail("%s clean-zone evidence tap did not trigger" % name)
+		resolver.flush(Config.data.jelly_tap_clean_visual_time + 0.05)
+		await get_tree().process_frame
+		await _capture("%03d_jelly_clean_zone_%s_after.png" % [base + 1, name])
 
 
 func _capture_blast_push_evidence(

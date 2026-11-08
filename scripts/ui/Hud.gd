@@ -1451,6 +1451,25 @@ func _jelly_tap_effect_callout_text(color_index: int) -> String:
 			Config.data.jelly_tap_grow_min_clean,
 		]
 	var effect_name: String = str(JELLY_TAP_EFFECT_NAMES.get(tap_effect, "청소"))
+	if Config.data.jelly_tap_clean_zone_rule:
+		var clean_condition: String = ""
+		match tap_effect:
+			GameConfig.JellyTapEffect.BOMB:
+				clean_condition = "주변"
+			GameConfig.JellyTapEffect.QUAKE:
+				clean_condition = "바닥 %s" % color_name
+			GameConfig.JellyTapEffect.REST:
+				clean_condition = "입구 쪽 %s" % color_name
+			GameConfig.JellyTapEffect.MAGNET:
+				clean_condition = "끌린 %s" % color_name
+		if not clean_condition.is_empty():
+			return "%s L%d: %s · %s L%d 청소" % [
+				color_name,
+				minimum_level,
+				effect_name,
+				clean_condition,
+				Config.data.jelly_tap_clean_max_level,
+			]
 	return "%s L%d: 터치하면 %s" % [color_name, minimum_level, effect_name]
 
 

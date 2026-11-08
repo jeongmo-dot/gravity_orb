@@ -132,9 +132,10 @@ enum GameMode {
 @export var jelly_tap_blast_score_factor: float = 0.5
 @export var jelly_tap_blast_uses_turn: bool = true
 @export var jelly_tap_blast_touch_margin: float = 16.0
-@export var jelly_tap_clean_max_level: int = 2
+@export var jelly_tap_clean_max_level: int = 1
 @export var jelly_tap_clean_score_factor: float = 1.0
 @export var jelly_tap_clean_visual_time: float = 0.25
+@export var jelly_tap_clean_zone_rule: bool = true
 @export var jelly_tap_grow_min_clean: int = 3
 @export var jelly_tap_effect_modes: PackedInt32Array = PackedInt32Array(
 	[
@@ -147,8 +148,11 @@ enum GameMode {
 	]
 )
 @export var jelly_tap_quake_speed: float = 900.0
+@export var jelly_tap_quake_floor_margin: float = 8.0
 @export var jelly_tap_bonus_points_per_orb: int = 100
 @export var jelly_tap_magnet_time: float = 0.5
+@export var jelly_tap_rest_clean_band_factor: float = 0.4
+@export var jelly_tap_magnet_clean_radius_factor: float = 0.5
 @export var jelly_tap_common_push: bool = true
 @export var jelly_tap_lift_speed: float = 0.0
 @export var jelly_tap_push_radius_factor: float = 0.5

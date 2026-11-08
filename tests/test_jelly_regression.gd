@@ -13,6 +13,7 @@ const EXPECTED_K4_DEFAULT_HASH: String = "3e929d90b33f6617322e96a2f53e0e790a32c9
 const EXPECTED_S4_G1_LIFT_DEFAULT_HASH: String = "bc5951c060d635cb6e43d72f4854afbf38ef6a48bea693e224e118677ca736b2"
 const EXPECTED_T3_DEFAULT_HASH: String = "7a20210c45a5e68cb8be6d4e2bc310eca31b3b450d20d0a9bf37a38f892b9c63"
 const EXPECTED_C4E_DEFAULT_HASH: String = "4a0c467d83177f3e0fb6acd302529fea572083896cac45e5885f8e90160438f6"
+const EXPECTED_Z1_DEFAULT_HASH: String = "4be0489704ba1c8cebad7863cd487c9032236cfa4be00e808801609d74e25c2b"
 
 
 func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
@@ -25,6 +26,11 @@ func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.sfx_enabled = false
 	Config.data.jelly_merge_duration = 0.3
+	var z1_visible_result: Dictionary = await _run_rule_path(true)
+	var z1_hidden_result: Dictionary = await _run_rule_path(false)
+	assert_eq(z1_visible_result["hash"], z1_hidden_result["hash"], "Z1 hash ignores rendering")
+	print("JELLY_Z1_DEFAULT_HASH hash=%s" % str(z1_hidden_result["hash"]))
+	assert_eq(z1_hidden_result["hash"], EXPECTED_Z1_DEFAULT_HASH, "Z1 default hash")
 	_apply_legacy_color_profile()
 	var default_visible_result: Dictionary = await _run_rule_path(true)
 	var default_hidden_result: Dictionary = await _run_rule_path(false)
@@ -382,6 +388,17 @@ func _run_rule_path(visuals_enabled: bool) -> Dictionary:
 			state["tap_turn_rules"]["jelly_tap_effect_modes"] = Array(
 				Config.data.jelly_tap_effect_modes
 			)
+			if Config.data.jelly_tap_clean_zone_rule:
+				state["tap_turn_rules"]["jelly_tap_clean_zone_rule"] = true
+				state["tap_turn_rules"]["jelly_tap_quake_floor_margin"] = (
+					Config.data.jelly_tap_quake_floor_margin
+				)
+				state["tap_turn_rules"]["jelly_tap_rest_clean_band_factor"] = (
+					Config.data.jelly_tap_rest_clean_band_factor
+				)
+				state["tap_turn_rules"]["jelly_tap_magnet_clean_radius_factor"] = (
+					Config.data.jelly_tap_magnet_clean_radius_factor
+				)
 	if not is_equal_approx(Config.data.max_merge_bonus_factor, 5.0):
 		state["jackpot_score_factor"] = Config.data.max_merge_bonus_factor
 	if (
@@ -437,6 +454,10 @@ func _snapshot_level_profile() -> Dictionary:
 		"jelly_tap_blast_score_factor": Config.data.jelly_tap_blast_score_factor,
 		"jelly_tap_blast_uses_turn": Config.data.jelly_tap_blast_uses_turn,
 		"jelly_tap_clean_max_level": Config.data.jelly_tap_clean_max_level,
+		"jelly_tap_clean_zone_rule": Config.data.jelly_tap_clean_zone_rule,
+		"jelly_tap_quake_floor_margin": Config.data.jelly_tap_quake_floor_margin,
+		"jelly_tap_rest_clean_band_factor": Config.data.jelly_tap_rest_clean_band_factor,
+		"jelly_tap_magnet_clean_radius_factor": Config.data.jelly_tap_magnet_clean_radius_factor,
 		"jelly_tap_grow_min_clean": Config.data.jelly_tap_grow_min_clean,
 		"jelly_tap_effect_modes": Config.data.jelly_tap_effect_modes.duplicate(),
 		"max_merge_bonus_factor": Config.data.max_merge_bonus_factor,
@@ -470,6 +491,10 @@ func _restore_level_profile(snapshot: Dictionary) -> void:
 	Config.data.jelly_tap_blast_score_factor = float(snapshot["jelly_tap_blast_score_factor"])
 	Config.data.jelly_tap_blast_uses_turn = bool(snapshot["jelly_tap_blast_uses_turn"])
 	Config.data.jelly_tap_clean_max_level = int(snapshot["jelly_tap_clean_max_level"])
+	Config.data.jelly_tap_clean_zone_rule = bool(snapshot["jelly_tap_clean_zone_rule"])
+	Config.data.jelly_tap_quake_floor_margin = float(snapshot["jelly_tap_quake_floor_margin"])
+	Config.data.jelly_tap_rest_clean_band_factor = float(snapshot["jelly_tap_rest_clean_band_factor"])
+	Config.data.jelly_tap_magnet_clean_radius_factor = float(snapshot["jelly_tap_magnet_clean_radius_factor"])
 	Config.data.jelly_tap_grow_min_clean = int(snapshot["jelly_tap_grow_min_clean"])
 	Config.data.jelly_tap_effect_modes = snapshot["jelly_tap_effect_modes"] as PackedInt32Array
 	Config.data.max_merge_bonus_factor = float(snapshot["max_merge_bonus_factor"])
@@ -589,6 +614,8 @@ func _apply_legacy_blast_push_profile() -> void:
 func _apply_legacy_color_profile() -> void:
 	Config.data.turn_color_unlock_turns.assign([30, 60])
 	Config.data.jelly_tap_effect_modes = PackedInt32Array([2, 3, 4, 5, 6, 7])
+	Config.data.jelly_tap_clean_max_level = 2
+	Config.data.jelly_tap_clean_zone_rule = false
 
 
 func _apply_c4e_profile() -> void:
