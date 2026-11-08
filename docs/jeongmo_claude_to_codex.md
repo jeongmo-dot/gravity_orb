@@ -32,8 +32,15 @@
 
 ## 대기 중
 
-### [2026-11-08 #140] 청소는 L1만·색마다 자리 조건·안내 한 줄에 조건·빌드 0.16.8
-- 상태: 대기 (#139 병합됨 `bdbdce4` — main 위에서)
+(없음)
+
+---
+
+## 처리 완료
+
+### [2026-11-08 #140] 청소는 L1만·색마다 자리 조건·안내 한 줄에 조건·빌드 0.16.8 — 완료
+- 상태: 완료 (2026-11-08 사용자 "병합 + 초록 조건 다시" · [PR #140](https://github.com/jeongmo-dot/gravity_orb/pull/140) 병합 `264c85a`)
+- 검수: 코드 diff, 회신 판 균형표 (C4E·C4E-L1·Z2·Z1 × 5봇 × 20판, 색별), 캡처 `180`·`181`·`186`~`198` (540×960), `build/windows/GravityOrb_v0.16.8.exe` 크기·SHA-256·`_BUILD.txt` (커밋 `0e40f0a` = 브랜치 끝, Release) 직접 확인. 테스트 345/4/5·해시·스모크·`save.cfg`는 Codex 관측 (Claude 재실행 없음). 맨 앞 경고 세 건 — Z1 자동 D-save 353.70턴 (C6 +177%), L-합체 D-all 20/20 미완료, 초록 청소 0개 96.3% → Claude가 물음 → 사용자 "병합 + 초록 조건 다시" → "위쪽 초록 L1 2개" (#141). 흠: 캡처 `192`~`198`에 앞 장면 팝업·콤보 잔여. 결과: §12-ONE.31 "#140 결과"
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.31**
 - 배경: 사용자 (2026-11-08, #139 병합 뒤) "청소를 항상 하는 것이 아니라, 다른 조건을 만드는게 좋을 것 같아. 색깔별로 다르면 더 좋고. 그리고 l1만 청소하는게 좋을 것 같고" → "효과 따라 자리", "조건도 짧게". 4색이 된 뒤 판이 C6의 약 3배 (§12-ONE.30)
 - 앵커: `scripts/core/CollisionResolver.gd` `_jelly_tap_clean_targets()`·`apply_jelly_tap_blast()`, `scripts/spike/Board3D.gd` `gravity_direction()` (판정에 읽기만), `config/GameConfig.gd`·`default_config.tres`, `scripts/ui/Hud.gd` `_jelly_tap_effect_callout_text()`, 판 균형 측정 도구 (`tests/tools/run_four_color_balance.ps1` 등), `tests/test_jolt_3d.gd`·`tests/test_config.gd`·`tests/test_callouts.gd`·`tests/test_jelly_regression.gd`, `tests/spike/capture_screens.gd`, `project.godot`
@@ -56,10 +63,6 @@
   - [ ] `build/windows/GravityOrb_v0.16.8.exe` (`mode=Release`, `_BUILD.txt` 커밋 = 브랜치 끝), 0.16.1~0.16.7 파일 그대로
 - QA: §12-ONE.31 4·8번
 - 커밋: 항목 단위 브랜치 (`clean-zones`), **push·PR까지** (병합은 Claude 검수 뒤)
-
----
-
-## 처리 완료
 
 ### [2026-11-07 #139] 색은 4가지로·네 색 소폭발 효과 다시 정리 (폭탄·지진·휴식·자석)·빌드 0.16.7 — 완료
 - 상태: 완료 (2026-11-08 사용자 "그대로 병합" · [PR #139](https://github.com/jeongmo-dot/gravity_orb/pull/139) 병합 `bdbdce4`)
