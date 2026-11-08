@@ -44,8 +44,8 @@
 - **경고 3: Z1 다섯 봇 합산 초록 청소 0개 터치는 `572/594 = 96.3%`로, 명세 경고선 `90%`를 넘었다.** 행별로는 자동 D-all `99.0%`, L-합체 D-all `99.3%`; L-합체 D-save의 파랑도 표본 1회에서 `100%`였다
 - C4E 회귀 불일치 경고는 없음: #139 표의 다섯 행과 종료/미완료·턴·점수·L8+·색별 터치·청소/터치·휴식 턴이 모두 일치했다
 - 안내 잘림 경고는 없음: 540×960·540×1170의 네 문구를 직접 열어 양 끝 글자가 화면 안에 있음을 확인했다
-- 상태: 구현·자동 검증·400게임 판 균형·두 비율 실제 창 캡처·Debug 빌드 완료. Release·push·PR은 아래 최종 단계에서 갱신
-- 브랜치 / PR: `clean-zones` / 생성 뒤 갱신
+- 상태: 완료 — 구현·자동 검증·400게임 판 균형·두 비율 실제 창 캡처·0.16.8 Release·PR까지 마쳤다. 합격·병합 판정은 Claude/사용자 대기
+- 브랜치 / PR: `clean-zones` / https://github.com/jeongmo-dot/gravity_orb/pull/140
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/CollisionResolver.gd`, `scripts/ui/Hud.gd`, `project.godot`, `tests/{capture_screens.ps1,run_jelly_physics_autoplay.ps1,test_callouts.gd,test_config.gd,test_jelly_regression.gd,test_jolt_3d.gd}`, `tests/spike/{capture_screens.gd,run_jolt_3d_measurement.gd}`, `tests/tools/{run_four_color_balance.ps1,run_jelly_measurement.ps1}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 기본 청소 상한 L1, 자리 규칙 true, 지진 바닥 여유 8px·휴식 입구 띠 0.4·자석 반경 0.5 — 자동 (`test_config`)
@@ -56,7 +56,7 @@
   - [x] 예전 JELLY 해시(T3·C4E 포함)·CLASSIC 유지, 새 Z1 해시 고정 — 자동 (`test_jelly_regression`, `test_spawner`)
   - [x] 네 색 조건 청소 전/후 `191~198`, 안내 `186~189`, 전체 새 기본값을 두 비율로 생성·직접 확인. `180` TURN 207 잔존을 30으로 갱신 — 실제 창 관측
   - [x] Godot 4.8 Standard import·전체 테스트·기본/blitz 스모크·Debug 빌드·내보낸 Debug 스모크 — 자동
-  - [ ] 0.16.8 Release·이전 빌드/저장 보존·push·PR — 구현 커밋 뒤 깨끗한 트리에서 진행
+  - [x] 0.16.8 Release·내보낸 스모크·이전 빌드/저장 보존·push·PR — 자동 + 파일 해시 대조
 
 - 판 균형 (`종료/미완료`; 턴 평균/중앙값(범위); 색 순서 `분홍/파랑/초록/노랑`; 각 행 20게임):
 
@@ -95,7 +95,12 @@
   - 기본/`--mode=blitz` 300프레임 smoke → 각각 종료 코드 0, 오류 출력 0건
   - `tools/build_windows.ps1 -Debug` → `WINDOWS_BUILD_RESULT version=0.16.8 mode=Debug exit=0 bytes=105000096 preserved=42`; 내보낸 console 기본/`--mode=jelly` 300프레임 smoke 각각 종료 코드 0
   - PowerShell 변경 스크립트 4개 구문 분석 오류 0건, `git diff --check` 오류 0건. Input/RNG 검색 이번 diff 새 위반 0건
-  - Release 관측값·exe/console SHA-256·`_BUILD.txt`·패키지 금지 패턴·이전 빌드와 `save.cfg` 보존: 깨끗한 구현 커밋 뒤 갱신
+  - 깨끗한 트리 첫 Release → `WINDOWS_BUILD_RESULT version=0.16.8 mode=Release exit=0 bytes=111130272 preserved=22`; 같은 명령 재실행은 종료 코드 `1`, `Release artifact already exists`, exe 해시 불변
+  - 회신 최종 커밋 뒤 `-ReplaceSameVersion` 최종 Release: exe `111,130,272`바이트, SHA-256 `0b2254cfb70cb8344ff822a35a987dc606edd60abf274dca59c2b526a4ef6b99`; console `50,176`바이트, SHA-256 `f04428261fcd45a0334fca3c10a5592027125a55c05131b7508eaebb370f883f`; sidecar PCK `0`개
+  - 최종 `_BUILD.txt`: `Version: 0.16.8`, `Mode: Release`, `Engine: 4.8.dev3.official.51105ccbe`, Commit과 브랜치 끝 일치
+  - 내보낸 Release console 기본/`--mode=jelly` 300프레임 스모크 각각 종료 코드 0, 오류 출력 0건
+  - 묶음 금지 패턴 `res://tests/`, `res://artifacts/`, `res://docs/`, 테스트·캡처·설계·두 인박스 파일명 각 0건; 양성 앵커 `OrbitStage 8 + JellyOrbArt 6 + StartScreen 8 + Main3D 5 = 27`건
+  - 사용자 `save.cfg` 2,101바이트, SHA-256 `2243b278dbf10afa50c73d54baeee316d4560658de75ac45658e620c6272db3a` 불변. 0.16.1~0.16.7 파일 22개의 이름·크기·SHA-256 매니페스트 `48c1755b63423a8f07d78a45a5985dd9b8354e4e5d5e30f2f567074ff1eff661` 불변
 - 수동 확인 절차:
   1. JELLY에서 분홍 L8을 주변의 같은/다른 색 L1과 범위 밖 L1·범위 안 L2 옆에서 터치 → 288px 안 L1만 청소되고 원본은 사라지는지 본다
   2. 파랑은 현재 중력 바닥 접촉 L1, 초록은 입구 384px 띠 L1, 노랑은 원본 480px 안 L1을 각각 터치 → 조건 대상만 0.25초 동안 원본 쪽으로 작아지며 사라지는지 본다
