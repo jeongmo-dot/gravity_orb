@@ -32,8 +32,15 @@
 
 ## 대기 중
 
-### [2026-11-07 #139] 색은 4가지로·네 색 소폭발 효과 다시 정리 (폭탄·지진·휴식·자석)·빌드 0.16.7
-- 상태: 대기 (#138 병합됨 `80c3c9c` — main 위에서. 2026-11-07 처음 명세에 2·3번을 더해 다시 썼다)
+(없음)
+
+---
+
+## 처리 완료
+
+### [2026-11-07 #139] 색은 4가지로·네 색 소폭발 효과 다시 정리 (폭탄·지진·휴식·자석)·빌드 0.16.7 — 완료
+- 상태: 완료 (2026-11-08 사용자 "그대로 병합" · [PR #139](https://github.com/jeongmo-dot/gravity_orb/pull/139) 병합 `bdbdce4`)
+- 검수: 코드 diff, 회신 판 균형표 (C6·C4·C4E·C4E-S5 × 5봇 × 20판), 캡처 `180`~`190` (두 비율), `build/windows/GravityOrb_v0.16.7.exe` 크기·SHA-256·`_BUILD.txt` (커밋 `7a9d2d0` = 브랜치 끝, Release) 직접 확인. 테스트 343/4/5·해시·스모크·`save.cfg`는 Codex 관측 (Claude 재실행 없음). 휴식 램프 경계는 지금 구현이 이미 미리보기 = 실제. 맨 앞 경고 두 건 — C4E 자동 D-save 367.50턴 (C6 +187%), L-합체 D-all 20/20 미완료 → Claude가 물음 → 사용자 "그대로 병합". 흠: 캡처 `180` TURN 칸이 207 (HUD 미갱신). 결과: §12-ONE.30 "#139 결과"
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.30**
 - 배경: 사용자 (2026-11-07) "색상 종류 지금 6가지 인거 4가지로 줄이자", (0.16.6 플레이) "녹색은 터치가 안되네?" → "녹색도 터질 수 있게 함" → "늘 사라짐", "4개의 색깔 터짐 효과 다시 정리" → "폭탄·지진·휴식·자석"
 - 앵커: `config/GameConfig.gd`·`default_config.tres` `turn_color_unlock_turns`·`jelly_tap_effect_modes`, `GameConfig.color_count_for_turn()`·`newly_unlocked_color_for_turn()`, `scripts/core/Spawner.gd` `_draw_candidate_for_turn()`, `scripts/core/TurnManager.gd` (REST·미리보기), `scripts/core/CollisionResolver.gd` `apply_jelly_tap_blast()`·`is_jelly_tap_blast_candidate()`, `scripts/ui/Hud.gd` `JELLY_TAP_EFFECT_CALLOUTS`·`_on_jelly_tap_effect_unlocked()`·`_track_preview_unlocks()`, 판 균형 측정 도구, `tests/test_config.gd`·`tests/test_spawner.gd`·`tests/test_jolt_3d.gd`·`tests/test_callouts.gd`·`tests/test_jelly_regression.gd`, 캡처, `project.godot`
@@ -56,10 +63,6 @@
   - [ ] `build/windows/GravityOrb_v0.16.7.exe` (`mode=Release`, `_BUILD.txt` 커밋 = 브랜치 끝), 0.16.1~0.16.6 파일 그대로
 - QA: §12-ONE.30 4·8번
 - 커밋: 항목 단위 브랜치 (`four-colors`), **push·PR까지** (병합은 Claude 검수 뒤)
-
----
-
-## 처리 완료
 
 ### [2026-11-07 #138] 소폭발은 사방으로 크게 — 위로 터짐 끄기·소폭발 전용 반경·속도·빌드 0.16.6 — 완료
 - 상태: 완료 (2026-11-07 사용자 "병합" · [PR #138](https://github.com/jeongmo-dot/gravity_orb/pull/138) 병합 `80c3c9c`)
