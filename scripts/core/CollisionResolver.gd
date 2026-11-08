@@ -447,6 +447,20 @@ func _jelly_tap_clean_targets(
 			continue
 		if _matches_jelly_tap_clean_rule(source, candidate, tap_effect):
 			targets.append(candidate)
+	if (
+		Config.data.jelly_tap_clean_zone_rule
+		and tap_effect == GameConfig.JellyTapEffect.REST
+		and Config.data.jelly_tap_rest_clean_count > 0
+	):
+		var gravity: Vector2 = Vector2(_board.gravity_direction()).normalized()
+		targets.sort_custom(func(a: Variant, b: Variant) -> bool:
+			var a_distance: float = a.position.dot(gravity) + Config.data.board_size * 0.5
+			var b_distance: float = b.position.dot(gravity) + Config.data.board_size * 0.5
+			if a_distance != b_distance:
+				return a_distance < b_distance
+			return int(a.stable_spawn_id) < int(b.stable_spawn_id)
+		)
+		targets.resize(mini(targets.size(), Config.data.jelly_tap_rest_clean_count))
 	targets.sort_custom(func(a: Variant, b: Variant) -> bool:
 		return int(a.stable_spawn_id) < int(b.stable_spawn_id)
 	)
@@ -487,6 +501,8 @@ func _matches_jelly_tap_clean_rule(
 		GameConfig.JellyTapEffect.REST:
 			if not same_color:
 				return false
+			if Config.data.jelly_tap_rest_clean_count > 0:
+				return true
 			var rest_gravity: Vector2 = Vector2(_board.gravity_direction()).normalized()
 			var entrance_distance: float = (
 				candidate_position.dot(rest_gravity) + Config.data.board_size * 0.5

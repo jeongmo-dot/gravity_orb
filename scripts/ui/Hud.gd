@@ -1459,6 +1459,15 @@ func _jelly_tap_effect_callout_text(color_index: int) -> String:
 			GameConfig.JellyTapEffect.QUAKE:
 				clean_condition = "바닥 %s" % color_name
 			GameConfig.JellyTapEffect.REST:
+				if Config.data.jelly_tap_rest_clean_count > 0:
+					return "%s L%d: %s · 위쪽 %s L%d %d개 청소" % [
+						color_name,
+						minimum_level,
+						effect_name,
+						color_name,
+						Config.data.jelly_tap_clean_max_level,
+						Config.data.jelly_tap_rest_clean_count,
+					]
 				clean_condition = "입구 쪽 %s" % color_name
 			GameConfig.JellyTapEffect.MAGNET:
 				clean_condition = "끌린 %s" % color_name

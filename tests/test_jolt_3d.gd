@@ -1156,11 +1156,13 @@ func test_tap_clean_zone_rules_follow_each_effect_and_current_gravity() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_clean_max: int = Config.data.jelly_tap_clean_max_level
 	var original_zone_rule: bool = Config.data.jelly_tap_clean_zone_rule
+	var original_rest_count: int = Config.data.jelly_tap_rest_clean_count
 	var original_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
 	var original_diagonal_time: float = Config.data.gravity_turn_diagonal_time
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.jelly_tap_clean_max_level = 1
 	Config.data.jelly_tap_clean_zone_rule = true
+	Config.data.jelly_tap_rest_clean_count = 0
 	Config.data.jelly_tap_effect_modes = PackedInt32Array([2, 3, 7, 6, 1, 1])
 	Config.data.gravity_turn_diagonal_time = 0.0
 	var fixture: Dictionary = await _create_turn_fixture()
@@ -1226,8 +1228,91 @@ func test_tap_clean_zone_rules_follow_each_effect_and_current_gravity() -> void:
 	Config.data.game_mode = original_mode
 	Config.data.jelly_tap_clean_max_level = original_clean_max
 	Config.data.jelly_tap_clean_zone_rule = original_zone_rule
+	Config.data.jelly_tap_rest_clean_count = original_rest_count
 	Config.data.jelly_tap_effect_modes = original_modes
 	Config.data.gravity_turn_diagonal_time = original_diagonal_time
+	await _cleanup(fixture["root"] as Node)
+
+
+func test_rest_clean_count_selects_nearest_entrance_orbs_deterministically() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_clean_max: int = Config.data.jelly_tap_clean_max_level
+	var original_zone_rule: bool = Config.data.jelly_tap_clean_zone_rule
+	var original_rest_count: int = Config.data.jelly_tap_rest_clean_count
+	var original_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_tap_clean_max_level = 1
+	Config.data.jelly_tap_clean_zone_rule = true
+	Config.data.jelly_tap_rest_clean_count = 2
+	Config.data.jelly_tap_effect_modes = PackedInt32Array([2, 3, 7, 6, 1, 1])
+	var fixture: Dictionary = await _create_turn_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+
+	board.set_gravity(Vector2i.DOWN)
+	var source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 8, Vector2.ZERO)
+	var top_first: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(-180.0, -300.0))
+	var top_second: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(180.0, -200.0))
+	var lower_first: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(-180.0, 0.0))
+	var lower_second: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(180.0, 200.0))
+	var closer_l2: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 2, Vector2.ZERO + Vector2.UP * 400.0)
+	var closer_other: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, 1, Vector2(300.0, -420.0))
+	var down_targets: Array[Variant] = resolver._jelly_tap_clean_targets(
+		source, GameConfig.JellyTapEffect.REST
+	)
+	assert_eq(down_targets.size(), 2, "REST takes configured two green L1 targets")
+	assert_eq(
+		down_targets.map(func(target: Variant) -> int: return int(target.stable_spawn_id)),
+		[top_first.stable_spawn_id, top_second.stable_spawn_id],
+		"returned targets keep stable_spawn_id order after entrance selection"
+	)
+	assert_true(resolver.apply_jelly_tap_blast(source), "REST count tap applies")
+	assert_true(top_first.consumed and top_second.consumed, "top two green L1 are consumed")
+	assert_true(not lower_first.consumed and not lower_second.consumed, "lower green L1 remain")
+	assert_true(not closer_l2.consumed and not closer_other.consumed, "closer invalid level and color remain")
+
+	board.clear()
+	await tree.process_frame
+	board.set_gravity(Vector2i.DOWN)
+	var one_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 8, Vector2.ZERO)
+	board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(0.0, 200.0))
+	assert_eq(resolver.jelly_tap_clean_count(one_source), 1, "one valid green L1 yields one target")
+	board.clear()
+	await tree.process_frame
+	var zero_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 8, Vector2.ZERO)
+	board.spawn_orb(OrbTypes.OrbColor.GREEN, 2, Vector2(0.0, -300.0))
+	assert_eq(resolver.jelly_tap_clean_count(zero_source), 0, "no valid green L1 yields zero targets")
+
+	board.clear()
+	await tree.process_frame
+	board.set_gravity(Vector2i.LEFT)
+	var left_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 8, Vector2.ZERO)
+	var right_nearest: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(420.0, -200.0))
+	var right_second: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(320.0, 200.0))
+	board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(-300.0, 0.0))
+	var left_targets: Array[Variant] = resolver._jelly_tap_clean_targets(
+		left_source, GameConfig.JellyTapEffect.REST
+	)
+	assert_true(left_targets.has(right_nearest) and left_targets.has(right_second), "left gravity selects two nearest right-wall targets")
+
+	board.clear()
+	await tree.process_frame
+	Config.data.jelly_tap_rest_clean_count = 1
+	board.set_gravity(Vector2i.LEFT)
+	var tie_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 8, Vector2.ZERO)
+	var lower_id: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(400.0, -150.0))
+	var higher_id: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(400.0, 150.0))
+	var tie_targets: Array[Variant] = resolver._jelly_tap_clean_targets(
+		tie_source, GameConfig.JellyTapEffect.REST
+	)
+	assert_eq(tie_targets, [lower_id], "equal entrance distance uses lower stable_spawn_id")
+	assert_true(higher_id.stable_spawn_id > lower_id.stable_spawn_id, "tie fixture ids are ordered")
+
+	Config.data.game_mode = original_mode
+	Config.data.jelly_tap_clean_max_level = original_clean_max
+	Config.data.jelly_tap_clean_zone_rule = original_zone_rule
+	Config.data.jelly_tap_rest_clean_count = original_rest_count
+	Config.data.jelly_tap_effect_modes = original_modes
 	await _cleanup(fixture["root"] as Node)
 
 

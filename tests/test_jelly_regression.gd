@@ -14,6 +14,7 @@ const EXPECTED_S4_G1_LIFT_DEFAULT_HASH: String = "bc5951c060d635cb6e43d72f4854af
 const EXPECTED_T3_DEFAULT_HASH: String = "7a20210c45a5e68cb8be6d4e2bc310eca31b3b450d20d0a9bf37a38f892b9c63"
 const EXPECTED_C4E_DEFAULT_HASH: String = "4a0c467d83177f3e0fb6acd302529fea572083896cac45e5885f8e90160438f6"
 const EXPECTED_Z1_DEFAULT_HASH: String = "4be0489704ba1c8cebad7863cd487c9032236cfa4be00e808801609d74e25c2b"
+const EXPECTED_G2_DEFAULT_HASH: String = "3e688a78984fafee02bda4299de720de710337219c8bdf9af4ce2c295e0d6455"
 
 
 func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
@@ -26,6 +27,12 @@ func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.sfx_enabled = false
 	Config.data.jelly_merge_duration = 0.3
+	var g2_visible_result: Dictionary = await _run_rule_path(true)
+	var g2_hidden_result: Dictionary = await _run_rule_path(false)
+	assert_eq(g2_visible_result["hash"], g2_hidden_result["hash"], "G2 hash ignores rendering")
+	print("JELLY_G2_DEFAULT_HASH hash=%s" % str(g2_hidden_result["hash"]))
+	assert_eq(g2_hidden_result["hash"], EXPECTED_G2_DEFAULT_HASH, "G2 default hash")
+	Config.data.jelly_tap_rest_clean_count = 0
 	var z1_visible_result: Dictionary = await _run_rule_path(true)
 	var z1_hidden_result: Dictionary = await _run_rule_path(false)
 	assert_eq(z1_visible_result["hash"], z1_hidden_result["hash"], "Z1 hash ignores rendering")
@@ -393,9 +400,14 @@ func _run_rule_path(visuals_enabled: bool) -> Dictionary:
 				state["tap_turn_rules"]["jelly_tap_quake_floor_margin"] = (
 					Config.data.jelly_tap_quake_floor_margin
 				)
-				state["tap_turn_rules"]["jelly_tap_rest_clean_band_factor"] = (
-					Config.data.jelly_tap_rest_clean_band_factor
-				)
+				if Config.data.jelly_tap_rest_clean_count > 0:
+					state["tap_turn_rules"]["jelly_tap_rest_clean_count"] = (
+						Config.data.jelly_tap_rest_clean_count
+					)
+				else:
+					state["tap_turn_rules"]["jelly_tap_rest_clean_band_factor"] = (
+						Config.data.jelly_tap_rest_clean_band_factor
+					)
 				state["tap_turn_rules"]["jelly_tap_magnet_clean_radius_factor"] = (
 					Config.data.jelly_tap_magnet_clean_radius_factor
 				)
@@ -456,6 +468,7 @@ func _snapshot_level_profile() -> Dictionary:
 		"jelly_tap_clean_max_level": Config.data.jelly_tap_clean_max_level,
 		"jelly_tap_clean_zone_rule": Config.data.jelly_tap_clean_zone_rule,
 		"jelly_tap_quake_floor_margin": Config.data.jelly_tap_quake_floor_margin,
+		"jelly_tap_rest_clean_count": Config.data.jelly_tap_rest_clean_count,
 		"jelly_tap_rest_clean_band_factor": Config.data.jelly_tap_rest_clean_band_factor,
 		"jelly_tap_magnet_clean_radius_factor": Config.data.jelly_tap_magnet_clean_radius_factor,
 		"jelly_tap_grow_min_clean": Config.data.jelly_tap_grow_min_clean,
@@ -493,6 +506,7 @@ func _restore_level_profile(snapshot: Dictionary) -> void:
 	Config.data.jelly_tap_clean_max_level = int(snapshot["jelly_tap_clean_max_level"])
 	Config.data.jelly_tap_clean_zone_rule = bool(snapshot["jelly_tap_clean_zone_rule"])
 	Config.data.jelly_tap_quake_floor_margin = float(snapshot["jelly_tap_quake_floor_margin"])
+	Config.data.jelly_tap_rest_clean_count = int(snapshot["jelly_tap_rest_clean_count"])
 	Config.data.jelly_tap_rest_clean_band_factor = float(snapshot["jelly_tap_rest_clean_band_factor"])
 	Config.data.jelly_tap_magnet_clean_radius_factor = float(snapshot["jelly_tap_magnet_clean_radius_factor"])
 	Config.data.jelly_tap_grow_min_clean = int(snapshot["jelly_tap_grow_min_clean"])

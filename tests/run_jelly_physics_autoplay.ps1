@@ -27,6 +27,8 @@ param(
 	[ValidateSet("On", "Off")]
 	[string]$JellyTapCleanZoneRule = "On",
 	[ValidateRange(0, 100)]
+	[int]$JellyTapRestCleanCount = 2,
+	[ValidateRange(0, 100)]
 	[int]$JellyTapGrowMinClean = 3,
 	[ValidateSet("Push", "None", "Color", "Four")]
 	[string]$JellyTapEffectModes = "Color",
@@ -92,6 +94,7 @@ $physicsArguments += "--jelly-tap-blast-score-factor=$($JellyTapBlastScoreFactor
 $physicsArguments += "--jelly-tap-blast-uses-turn=$($JellyTapBlastUsesTurn.ToLower())"
 $physicsArguments += "--jelly-tap-clean-max-level=$JellyTapCleanMaxLevel"
 $physicsArguments += "--jelly-tap-clean-zone-rule=$($JellyTapCleanZoneRule.ToLower())"
+$physicsArguments += "--jelly-tap-rest-clean-count=$JellyTapRestCleanCount"
 $physicsArguments += "--jelly-tap-grow-min-clean=$JellyTapGrowMinClean"
 $physicsArguments += "--jelly-tap-effect-modes=$($JellyTapEffectModes.ToLower())"
 $physicsArguments += "--turn-start-colors=$TurnStartColors"
@@ -428,6 +431,7 @@ $summary = [ordered]@{
 	jelly_tap_blast_uses_turn = $JellyTapBlastUsesTurn -eq "On"
 	jelly_tap_clean_max_level = $JellyTapCleanMaxLevel
 	jelly_tap_clean_zone_rule = $JellyTapCleanZoneRule -eq "On"
+	jelly_tap_rest_clean_count = $JellyTapRestCleanCount
 	jelly_tap_grow_min_clean = $JellyTapGrowMinClean
 	jelly_tap_effect_modes = $JellyTapEffectModes.ToLower()
 	turn_start_colors = $TurnStartColors

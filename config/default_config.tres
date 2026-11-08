@@ -100,6 +100,7 @@ jelly_tap_quake_speed = 900.0
 jelly_tap_quake_floor_margin = 8.0
 jelly_tap_bonus_points_per_orb = 100
 jelly_tap_magnet_time = 0.5
+jelly_tap_rest_clean_count = 2
 jelly_tap_rest_clean_band_factor = 0.4
 jelly_tap_magnet_clean_radius_factor = 0.5
 jelly_tap_common_push = true

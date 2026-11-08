@@ -279,7 +279,7 @@ func test_six_jelly_tap_effect_callouts_show_once_without_art_or_sound() -> void
 		"초록 L8: 작은 초록 3개면 성장",
 		"노랑 L8: 터치하면 보너스",
 		"보라 L8: 자석 · 끌린 보라 L1 청소",
-		"주황 L8: 휴식 · 입구 쪽 주황 L1 청소",
+		"주황 L8: 휴식 · 위쪽 주황 L1 2개 청소",
 	]
 	manager.state = TurnManager.State.SIMULATING
 	for color_index: int in range(6):
@@ -324,6 +324,7 @@ func test_six_jelly_tap_effect_callouts_show_once_without_art_or_sound() -> void
 func test_jelly_tap_effect_callout_text_follows_configured_effect() -> void:
 	var original_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
 	var original_zone_rule: bool = Config.data.jelly_tap_clean_zone_rule
+	var original_rest_count: int = Config.data.jelly_tap_rest_clean_count
 	var main: Main = await _create_main()
 	var hud: Hud = main.get_node("UI/Hud") as Hud
 	assert_eq(
@@ -338,7 +339,7 @@ func test_jelly_tap_effect_callout_text_follows_configured_effect() -> void:
 	)
 	assert_eq(
 		hud._jelly_tap_effect_callout_text(OrbTypes.OrbColor.GREEN),
-		"초록 L8: 휴식 · 입구 쪽 초록 L1 청소",
+		"초록 L8: 휴식 · 위쪽 초록 L1 2개 청소",
 		"default green hint follows REST"
 	)
 	assert_eq(
@@ -349,8 +350,14 @@ func test_jelly_tap_effect_callout_text_follows_configured_effect() -> void:
 	Config.data.jelly_tap_effect_modes = PackedInt32Array([7, 6, 5, 4, 3, 2])
 	assert_eq(
 		hud._jelly_tap_effect_callout_text(OrbTypes.OrbColor.RED),
-		"분홍 L8: 휴식 · 입구 쪽 분홍 L1 청소",
+		"분홍 L8: 휴식 · 위쪽 분홍 L1 2개 청소",
 		"remapped hint follows effect rather than color index"
+	)
+	Config.data.jelly_tap_rest_clean_count = 0
+	assert_eq(
+		hud._jelly_tap_effect_callout_text(OrbTypes.OrbColor.RED),
+		"분홍 L8: 휴식 · 입구 쪽 분홍 L1 청소",
+		"zero count keeps 0.16.8 entrance-band hint"
 	)
 	assert_eq(
 		hud._jelly_tap_effect_callout_text(OrbTypes.OrbColor.YELLOW),
@@ -366,6 +373,7 @@ func test_jelly_tap_effect_callout_text_follows_configured_effect() -> void:
 	await _destroy_main(main)
 	Config.data.jelly_tap_effect_modes = original_modes
 	Config.data.jelly_tap_clean_zone_rule = original_zone_rule
+	Config.data.jelly_tap_rest_clean_count = original_rest_count
 
 
 func test_callout_frame_cost_report() -> void:
