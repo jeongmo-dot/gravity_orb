@@ -74,7 +74,9 @@ func test_jelly_effect_hint_uses_configured_tap_minimum_level() -> void:
 
 func test_green_effect_hint_uses_configured_minimum_clean_count() -> void:
 	var original_grow_min_clean: int = Config.data.jelly_tap_grow_min_clean
+	var original_tap_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
 	Config.data.jelly_tap_grow_min_clean = 4
+	Config.data.jelly_tap_effect_modes = PackedInt32Array([2, 3, 4, 5, 6, 7])
 	var main: Main = await _create_main()
 	var hud: Hud = main.get_node("UI/Hud") as Hud
 	var callout: Label = main.get_node("UI/Hud/CalloutLabel") as Label
@@ -86,13 +88,16 @@ func test_green_effect_hint_uses_configured_minimum_clean_count() -> void:
 	)
 	await _destroy_main(main)
 	Config.data.jelly_tap_grow_min_clean = original_grow_min_clean
+	Config.data.jelly_tap_effect_modes = original_tap_modes
 
 
 func test_combo_replaces_effect_hint_and_defers_next_hint_to_next_input_wait() -> void:
 	var original_enabled: bool = Config.data.fx_callouts_enabled
 	var original_sfx_enabled: bool = Config.data.sfx_enabled
+	var original_tap_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
 	Config.data.fx_callouts_enabled = true
 	Config.data.sfx_enabled = false
+	Config.data.jelly_tap_effect_modes = PackedInt32Array([2, 3, 4, 5, 6, 7])
 	var main: Main = await _create_main()
 	var hud: Hud = main.get_node("UI/Hud") as Hud
 	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
@@ -120,6 +125,7 @@ func test_combo_replaces_effect_hint_and_defers_next_hint_to_next_input_wait() -
 	await _destroy_main(main)
 	Config.data.fx_callouts_enabled = original_enabled
 	Config.data.sfx_enabled = original_sfx_enabled
+	Config.data.jelly_tap_effect_modes = original_tap_modes
 
 
 func test_jelly_preview_and_unlock_use_jelly_art_and_names() -> void:
@@ -257,9 +263,11 @@ func test_six_jelly_tap_effect_callouts_show_once_without_art_or_sound() -> void
 	var original_enabled: bool = Config.data.fx_callouts_enabled
 	var original_sfx_enabled: bool = Config.data.sfx_enabled
 	var original_min_level: int = Config.data.jelly_tap_blast_min_level
+	var original_tap_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
 	Config.data.fx_callouts_enabled = true
 	Config.data.sfx_enabled = false
 	Config.data.jelly_tap_blast_min_level = 8
+	Config.data.jelly_tap_effect_modes = PackedInt32Array([2, 3, 4, 5, 6, 7])
 	var main: Main = await _create_main()
 	var hud: Hud = main.get_node("UI/Hud") as Hud
 	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
@@ -310,6 +318,46 @@ func test_six_jelly_tap_effect_callouts_show_once_without_art_or_sound() -> void
 	Config.data.fx_callouts_enabled = original_enabled
 	Config.data.sfx_enabled = original_sfx_enabled
 	Config.data.jelly_tap_blast_min_level = original_min_level
+	Config.data.jelly_tap_effect_modes = original_tap_modes
+
+
+func test_jelly_tap_effect_callout_text_follows_configured_effect() -> void:
+	var original_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
+	var main: Main = await _create_main()
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	assert_eq(
+		hud._jelly_tap_effect_callout_text(OrbTypes.OrbColor.RED),
+		"분홍 L8: 터치하면 폭탄",
+		"default pink hint follows BOMB"
+	)
+	assert_eq(
+		hud._jelly_tap_effect_callout_text(OrbTypes.OrbColor.BLUE),
+		"파랑 L8: 터치하면 지진",
+		"default blue hint follows QUAKE"
+	)
+	assert_eq(
+		hud._jelly_tap_effect_callout_text(OrbTypes.OrbColor.GREEN),
+		"초록 L8: 터치하면 휴식",
+		"default green hint follows REST"
+	)
+	assert_eq(
+		hud._jelly_tap_effect_callout_text(OrbTypes.OrbColor.YELLOW),
+		"노랑 L8: 터치하면 자석",
+		"default yellow hint follows MAGNET"
+	)
+	Config.data.jelly_tap_effect_modes = PackedInt32Array([7, 6, 5, 4, 3, 2])
+	assert_eq(
+		hud._jelly_tap_effect_callout_text(OrbTypes.OrbColor.RED),
+		"분홍 L8: 터치하면 휴식",
+		"remapped hint follows effect rather than color index"
+	)
+	assert_eq(
+		hud._jelly_tap_effect_callout_text(OrbTypes.OrbColor.YELLOW),
+		"노랑 L8: 작은 노랑 3개면 성장",
+		"GROW hint follows remapped color and configured clean count"
+	)
+	await _destroy_main(main)
+	Config.data.jelly_tap_effect_modes = original_modes
 
 
 func test_callout_frame_cost_report() -> void:

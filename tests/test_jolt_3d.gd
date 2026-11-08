@@ -1363,6 +1363,8 @@ func test_tap_push_uses_dedicated_radius_speed_and_keeps_big_blast_profile() -> 
 
 func test_bomb_quake_and_grow_tap_effects_follow_color_rules() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_tap_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
+	Config.data.jelly_tap_effect_modes = PackedInt32Array([2, 3, 4, 5, 6, 7])
 	var fixture: Dictionary = await _create_turn_fixture()
 	var board: Board3D = fixture["board"] as Board3D
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
@@ -1437,10 +1439,11 @@ func test_bomb_quake_and_grow_tap_effects_follow_color_rules() -> void:
 	assert_true(max_green.consumed, "green L10 source is removed")
 
 	Config.data.game_mode = original_mode
+	Config.data.jelly_tap_effect_modes = original_tap_modes
 	await _cleanup(fixture["root"] as Node)
 
 
-func test_magnet_and_rest_tap_effects_hold_gravity_and_skip_next_spawn() -> void:
+func test_default_yellow_magnet_and_green_rest_preserve_ramp_preview() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	var fixture: Dictionary = await _create_turn_fixture()
@@ -1448,14 +1451,14 @@ func test_magnet_and_rest_tap_effects_hold_gravity_and_skip_next_spawn() -> void
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
 	var spawner: Spawner = fixture["spawner"] as Spawner
 	var manager: TurnManager = fixture["manager"] as TurnManager
-	var purple: Orb3D = board.spawn_orb(4, 8, Vector2.ZERO)
+	var yellow: Orb3D = board.spawn_orb(3, 8, Vector2.ZERO)
 	var target: Orb3D = board.spawn_orb(0, 4, Vector2(200.0, 0.0))
-	assert_true(resolver.apply_jelly_tap_blast(purple), "MAGNET tap applies")
+	assert_true(resolver.apply_jelly_tap_blast(yellow), "yellow MAGNET tap applies")
 	assert_true(board.tap_magnet_active(), "magnet sequence starts")
 	assert_true(board.is_gravity_transition_active(), "pause and magnet block settling")
 	assert_true(
 		target.get_physics_body().constant_force.is_zero_approx(),
-		"purple starts with blast gravity pause"
+		"yellow starts with blast gravity pause"
 	)
 	board._advance_tap_magnet(0.19)
 	target.advance_blast_gravity_pause(0.19)
@@ -1475,15 +1478,35 @@ func test_magnet_and_rest_tap_effects_hold_gravity_and_skip_next_spawn() -> void
 	board.clear()
 	await tree.process_frame
 	spawner.init_rng(133)
-	spawner.sync_next_batch_size(1)
+	spawner.sync_next_batch_size(30)
 	var preview_before: Array = spawner.peek_preview()
 	manager.state = TurnManager.State.WAITING_INPUT
+	manager.turn_index = 29
 	InputRouter.set_locked(false)
-	var rest: Orb3D = board.spawn_orb(5, 8, Vector2.ZERO)
-	assert_true(manager.try_tap_blast_orb(rest), "REST tap starts turn")
+	var rest: Orb3D = board.spawn_orb(2, 8, Vector2.ZERO)
+	assert_true(resolver.is_jelly_tap_blast_candidate(rest), "empty green REST is a tap candidate")
+	assert_true(manager.try_tap_blast_orb(rest), "green REST tap starts turn")
 	assert_eq(manager.state, TurnManager.State.SIMULATING, "REST skips SPAWNING")
-	assert_eq(manager.turn_index, 1, "REST consumes turn")
+	assert_eq(manager.turn_index, 30, "REST consumes ramp-boundary turn")
+	assert_true(rest.consumed, "green REST source is removed")
 	assert_eq(spawner.peek_preview(), preview_before, "REST preserves NEXT and THEN")
+	var expected_next: Array = (preview_before[0] as Array).duplicate(true)
+	manager.state = TurnManager.State.WAITING_INPUT
+	InputRouter.set_locked(false)
+	manager.on_swipe(Vector2i.RIGHT)
+	assert_eq(manager.turn_index, 31, "next input advances after REST")
+	manager._physics_process(0.0)
+	var preview_after_spawn: Array = spawner.peek_preview()
+	var actual_next: Array[Dictionary] = []
+	var spawned_orbs: Array = board.get_orbs()
+	spawned_orbs.sort_custom(
+		func(a: Orb3D, b: Orb3D) -> bool: return a.stable_spawn_id < b.stable_spawn_id
+	)
+	for spawned_orb: Orb3D in spawned_orbs:
+		actual_next.append({"color": spawned_orb.color, "level": spawned_orb.level})
+	assert_eq((preview_before[0] as Array).size(), 3, "turn 30 preview keeps three-orb ramp budget")
+	assert_eq(actual_next, expected_next, "turn 31 spawns the exact NEXT shown before REST")
+	assert_eq(preview_after_spawn[0], preview_before[1], "next turn consumed the previewed NEXT exactly")
 	Config.data.game_mode = original_mode
 	await _cleanup(fixture["root"] as Node)
 

@@ -305,6 +305,17 @@ func test_turn_color_preview_uses_target_turn_and_forces_new_color_first() -> vo
 	_restore_spawn_config(snapshot)
 
 
+func test_default_spawn_batches_never_draw_fifth_or_sixth_color() -> void:
+	var snapshot: Dictionary = _snapshot_spawn_config()
+	var spawner := Spawner.new()
+	spawner.init_rng(9139)
+	for turn_index: int in range(1, 601):
+		for candidate: Dictionary in spawner._draw_batch(turn_index):
+			assert_true(int(candidate["color"]) < 4, "default turn %d stays four-color" % turn_index)
+	spawner.free()
+	_restore_spawn_config(snapshot)
+
+
 func test_default_classic_progression_hash() -> void:
 	var snapshot: Dictionary = _snapshot_spawn_config()
 	var spawner := Spawner.new()
@@ -323,7 +334,7 @@ func test_default_classic_progression_hash() -> void:
 	print("STAGED_DIFFICULTY_HASH classic=%s" % hash_value)
 	assert_eq(
 		hash_value,
-		"cd9b8fed034153324ddbfaf2f966ab848225b75f8ba6ad5e8cf6ae4d70a38a85",
+		"52ae7da72853f167058f6134a01a06d35b8eab222cb48a2534831e2ace5ebe35",
 		"CLASSIC staged progression hash"
 	)
 	spawner.free()
