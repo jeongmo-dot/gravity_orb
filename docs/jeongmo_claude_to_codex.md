@@ -32,8 +32,15 @@
 
 ## 대기 중
 
-### [2026-11-09 #142] 안내 한 줄이 넘칠 때만 글자 줄이기·빌드 0.16.10
-- 상태: 대기 (#141 병합됨 `d138c85` — main 위에서)
+(없음)
+
+---
+
+## 처리 완료
+
+### [2026-11-09 #142] 안내 한 줄이 넘칠 때만 글자 줄이기·빌드 0.16.10 — 완료
+- 상태: 완료 (2026-11-09 사용자 "확인" · [PR #142](https://github.com/jeongmo-dot/gravity_orb/pull/142) 병합 `f9324e2`)
+- 검수: 코드 diff, 테스트 diff, 캡처 `188` (두 비율)·`187` (540×960), `build/windows/GravityOrb_v0.16.10.exe` 크기·SHA-256·`_BUILD.txt` (커밋 `4218717` = 브랜치 끝, Release) 직접 확인. 테스트 348/4/5·해시·글자 크기 수치·스모크·`save.cfg`는 Codex 관측 (Claude 재실행 없음). 맨 앞 경고 없음. 초록 안내 64 → 56, 나머지 64 그대로. 결과: §12-ONE.33 "#142 결과"
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.33**
 - 배경: #141 새 안내 `초록 L8: 휴식 · 위쪽 초록 L1 2개 청소`가 두 비율 모두 오른쪽 끝이 잘림 (캡처 `188`) → 사용자 (2026-11-09) "병합 + 넘칠 때만 글자 줄이기"
 - 앵커: `scripts/ui/Hud.gd` `_apply_responsive_layout()`·`_callout_layout_rect()`·`_show_callout()`·`_show_planet_unlock()`·`_show_jelly_tap_effect()`·`_layout_planet_callout_visual()`, `scenes/UI.tscn` `CalloutLabel` (읽기), `tests/test_callouts.gd`, `tests/spike/capture_screens.gd`, `project.godot`
@@ -52,10 +59,6 @@
   - [ ] `build/windows/GravityOrb_v0.16.10.exe` (`mode=Release`, `_BUILD.txt` 커밋 = 브랜치 끝), 0.16.1~0.16.9 파일 그대로
 - QA: §12-ONE.33 3~5번
 - 커밋: 항목 단위 브랜치 (`callout-fit`), **push·PR까지** (병합은 Claude 검수 뒤)
-
----
-
-## 처리 완료
 
 ### [2026-11-08 #141] 초록 휴식 청소는 위쪽 초록 L1 2개·빌드 0.16.9 — 완료
 - 상태: 완료 (2026-11-09 사용자 "병합 + 넘칠 때만 글자 줄이기" · [PR #141](https://github.com/jeongmo-dot/gravity_orb/pull/141) 병합 `d138c85`)

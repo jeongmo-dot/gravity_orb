@@ -864,6 +864,7 @@ godot --headless --path . --quit-after 300 -- --mode=blitz
 | 0.16.7 | 2026-11-08 ([PR #139](https://github.com/jeongmo-dot/gravity_orb/pull/139) `bdbdce4`, 빌드 커밋 `7a9d2d0` — 같은 코드, 커밋 뒤 깨끗한 트리에서 빌드) | `GravityOrb_v0.16.7.exe` 111,128,240바이트, SHA-256 `b5252ac0…`. 기획서 0.16.22. 0.16.6 뒤 병합: 판 내내 4색, 소폭발 효과 분홍 폭탄·파랑 지진·초록 휴식·노랑 자석 (#139) |
 | 0.16.8 | 2026-11-08 ([PR #140](https://github.com/jeongmo-dot/gravity_orb/pull/140) `264c85a`, 빌드 커밋 `0e40f0a` — 같은 트리, 커밋 뒤 깨끗한 트리에서 빌드) | `GravityOrb_v0.16.8.exe` 111,130,272바이트, SHA-256 `0b2254cf…`. 기획서 0.16.23. 0.16.7 뒤 병합: 청소는 L1만, 색마다 자리 조건 (분홍 주변 모든 색·파랑 바닥·초록 입구 쪽·노랑 480px), 안내 한 줄에 조건 (#140) |
 | 0.16.9 | 2026-11-09 ([PR #141](https://github.com/jeongmo-dot/gravity_orb/pull/141) `d138c85`, 빌드 커밋 `25c1857` — 같은 트리, 커밋 뒤 깨끗한 트리에서 빌드) | `GravityOrb_v0.16.9.exe` 111,130,912바이트, SHA-256 `fb44f13c…`. 기획서 0.16.24. 0.16.8 뒤 병합: 초록 휴식 청소는 입구에 가장 가까운 초록 L1 2개 (판 어디든), 안내 `초록 L8: 휴식 · 위쪽 초록 L1 2개 청소` — 이 안내는 오른쪽 끝이 잘림 (#142에서 고침) (#141) |
+| 0.16.10 | 2026-11-09 ([PR #142](https://github.com/jeongmo-dot/gravity_orb/pull/142) `f9324e2`, 빌드 커밋 `4218717` — 같은 트리, 커밋 뒤 깨끗한 트리에서 빌드) | `GravityOrb_v0.16.10.exe` 111,131,712바이트, SHA-256 `019521f9…`. 기획서 0.16.25. 0.16.9 뒤 병합: 안내 한 줄이 칸보다 넓을 때만 그 안내의 글자를 줄임 — 초록 휴식 안내 64 → 56, 잘림 없음 (#142) |
 
 #### 10.5.2 출시 절차
 한국 모바일 출시에 필요한 법·행정·스토어·기술 절차와 M10 인박스 후보는 [release_checklist_kr.md](release_checklist_kr.md)에 둔다 (2026-10-11). 결정·확인 결과는 그 문서에 체크한다
@@ -5039,6 +5040,14 @@ G1 전략 봇 (시드 1~20, 600턴 상한, 턴 평균 / 총점 평균):
 - 회신 맨 앞에 적을 것: `188`이 여전히 잘림, 28로도 넘치는 안내가 있음, 넘치지 않는 안내의 글자 크기가 바뀜, 규칙 해시가 바뀜, `0.16.10` 이름·비교 문제
 - 병합: Claude 검수 뒤 병합. "맨 앞" 조건이 있으면 병합 전에 사용자에게 묻는다
 
+**#142 결과 — 병합** ([PR #142](https://github.com/jeongmo-dot/gravity_orb/pull/142) `f9324e2`, 2026-11-09 사용자 "확인" — 맨 앞 경고 없음. 브랜치 끝·빌드 커밋 `4218717`, 병합 커밋 트리 = `4218717` 트리. 캡처·빌드는 Codex, 검수는 Claude — Claude 재실행 없음)
+- 구현은 명세대로다 (diff 대조): `Hud._fit_callout_font_to_layout()` → `_fit_callout_font_to_rect()` — 세 안내 함수에서 문구를 넣은 직후 부른다. 잰 폭 (`get_string_size().x` + `outline_size` × 2)이 칸 폭보다 크면 `floori(크기 × 칸 폭 ÷ 폭)`, 그래도 넘치면 1씩 (하한 28). 끝에 `_set_control_rect()`로 칸을 다시 맞추고 `pivot_offset`·`_callout_base_position`을 갱신 (문구를 넣는 순간 늘어난 칸을 되돌림). 레이아웃 계산은 `_apply_responsive_layout()`과 같은 식 (`hud_layout(viewport, _logical_safe_area())`)
+- 테스트 348/4/5 (새 `test_callout_font_shrinks_only_for_overflow_and_resets` — 두 비율에서 초록 안내 축소·폭 ≤ 칸·칸이 화면 안, 짧은 안내·칭찬 글자 전부 기본 크기, 긴 안내 다음 기본 크기로 돌아옴). 규칙 해시 G2 `3e688a78…`·Z1 `4be04897…`·T3·C4E·CLASSIC 그대로 (Codex)
+- 글자 크기 (Codex 실제 창, 두 비율 같음): `188` 초록 64 → **56**, 외곽선 포함 폭 992 / 칸 1000, 화면 좌우 여유 각 46.8px. `186` (폭 850)·`187` (998)·`189` (998)·칭찬 글자 5개·새 젤리 안내는 64 그대로
+- 0.16.10: Claude 직접 확인 — `build/windows/GravityOrb_v0.16.10.exe` 111,131,712바이트, SHA-256 `019521f9…` = 회신 값, `_BUILD.txt` 커밋 `4218717` = 브랜치 끝·Mode Release. 0.16.1~0.16.9 파일 28개 그대로 (모두 31개). 검증 빌드 `mode=Debug`. `0.16.10` 이름·비교 문제 없음 (Codex). Release 보호·스모크·묶음 검사·`save.cfg`는 Codex 관측
+- 캡처 직접 확인: `188` (540×960·540×1170) — 문구 한 줄이 판 위 가운데에 다 보인다. `187` (540×960) 파랑 64 그대로
+- 참고: `187`·`189`는 64에서 폭 998 / 1000이다. 지금 형식에서 한 글자만 길어져도 이번 규칙으로 줄어든다
+
 ### 12-ONE.3 다음 (JELLY 개선)
 - CLASSIC 전용 분기 정리 (행성 그림·연출·규칙 — JELLY가 안 쓰는 것)
 - 결정 대기에서 이어지는 것: 효과음 (합성·녹음), 시작 화면 그림 (지금 행성 — JELLY에 맞게?)
@@ -5051,6 +5060,7 @@ G1 전략 봇 (시드 1~20, 600턴 상한, 턴 평균 / 총점 평균):
 | `Orb.tscn`의 `CircleShape2D`가 인스턴스 간 공유되어 반지름을 바꾸면 모든 구체가 같이 변함 | `setup()`에서 `CircleShape2D.new()` |
 | `FontVariation.variation_opentype`에 문자열 키 `"wght"`를 넣으면 (4.8-dev3, `.tres`·코드 모두) 굵기가 적용되지 않고 기본 인스턴스로 그려진다 (#66) | 키를 `TextServerManager.get_primary_interface().name_to_tag("wght")` 정수(2003265652)로. 적용 여부는 글리프 윤곽 비교로 검사 |
 | `window/stretch/aspect="expand"`에서 `Camera3D` 기본 `keep_aspect`(세로 기준)는 세로로 긴 화면에서 3D 장면을 키워 좌우를 자른다 (#66) | 9:16보다 긴 화면은 `KEEP_WIDTH` + 9:16 환산 가로 화각 (`Main.configure_camera_for_viewport`). 배치 검사는 실제 카메라 투영으로 |
+| `Label`에 칸보다 넓은 문구를 넣으면 최소 크기가 칸을 넘어 칸이 `grow_horizontal` 쪽 (기본 오른쪽)으로만 늘어난다. 가운데 정렬이어도 화면 밖으로 잘리고 `pivot_offset`도 어긋난다. 문구를 줄여도 칸은 저절로 줄지 않는다 (#141) | 문구를 넣은 뒤 폭을 재서 넘치면 글자 크기를 줄이고 칸 크기를 다시 맞춘다 (`Hud._fit_callout_font_to_rect()`, #142) |
 | RigidBody2D·CollisionShape2D 스케일 변경은 물리가 무시하거나 깨짐 | 크기 연출은 `Visual` 노드만 |
 | `body_entered` 안에서 `add_child`/`queue_free` → "Can't change this state while flushing queries" | 기록 후 `flush()`에서 처리 (7장) |
 | 잠든 바디가 새 힘에 반응하지 않음 | `can_sleep = false` |
