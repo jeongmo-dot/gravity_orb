@@ -259,6 +259,99 @@ func test_jelly_callout_sits_between_combo_and_board() -> void:
 	Config.data.sfx_enabled = original_sfx_enabled
 
 
+func test_callout_font_shrinks_only_for_overflow_and_resets() -> void:
+	var original_sfx_enabled: bool = Config.data.sfx_enabled
+	var original_tap_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
+	var original_zone_rule: bool = Config.data.jelly_tap_clean_zone_rule
+	var original_rest_count: int = Config.data.jelly_tap_rest_clean_count
+	Config.data.sfx_enabled = false
+	Config.data.jelly_tap_effect_modes = PackedInt32Array([2, 3, 7, 6, 1, 1])
+	Config.data.jelly_tap_clean_zone_rule = true
+	Config.data.jelly_tap_rest_clean_count = 2
+	var main: Main = await _create_main()
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	var callout: Label = main.get_node("UI/Hud/CalloutLabel") as Label
+	var simulated_viewports: Array[Vector2] = [
+		Vector2(1080.0, 1920.0),
+		Vector2(1080.0, 1080.0 * 1170.0 / 540.0),
+	]
+	var short_texts: Array[String] = [
+		hud._jelly_tap_effect_callout_text(OrbTypes.OrbColor.RED),
+		"새 젤리 — 초록",
+	]
+	short_texts.append_array(Hud.CALLOUT_WORDS)
+	for viewport_size: Vector2 in simulated_viewports:
+		var layout: Dictionary = Hud.hud_layout(viewport_size)
+		var callout_rect: Rect2 = hud._callout_layout_rect(viewport_size, layout)
+		var base_font_size: int = clampi(
+			roundi(callout_rect.size.y * 0.48),
+			Hud.CALLOUT_FONT_MIN,
+			Hud.CALLOUT_FONT_MAX
+		)
+		callout.add_theme_font_size_override("font_size", base_font_size)
+		callout.text = hud._jelly_tap_effect_callout_text(OrbTypes.OrbColor.GREEN)
+		hud._fit_callout_font_to_rect(callout_rect)
+		var fitted_font_size: int = callout.get_theme_font_size("font_size")
+		assert_true(
+			fitted_font_size < base_font_size,
+			"green REST hint shrinks at the 540-wide window ratio"
+		)
+		assert_true(
+			hud._callout_text_width() <= callout_rect.size.x,
+			"fitted green REST hint including outline stays inside its rect"
+		)
+		var fitted_global_rect: Rect2 = callout.get_global_rect()
+		assert_true(
+			fitted_global_rect.position.x >= 0.0
+			and fitted_global_rect.end.x <= viewport_size.x,
+			"fitted callout control stays inside the simulated viewport"
+		)
+		for short_text: String in short_texts:
+			callout.add_theme_font_size_override("font_size", base_font_size)
+			callout.text = short_text
+			hud._fit_callout_font_to_rect(callout_rect)
+			assert_eq(
+				callout.get_theme_font_size("font_size"),
+				base_font_size,
+				"non-overflow callout keeps its responsive base font"
+			)
+
+	var actual_viewport_size: Vector2 = main.get_viewport().get_visible_rect().size
+	var actual_layout: Dictionary = Hud.hud_layout(
+		actual_viewport_size,
+		hud._logical_safe_area(actual_viewport_size)
+	)
+	var actual_rect: Rect2 = hud._callout_layout_rect(
+		actual_viewport_size,
+		actual_layout
+	)
+	var actual_base_size: int = clampi(
+		roundi(actual_rect.size.y * 0.48),
+		Hud.CALLOUT_FONT_MIN,
+		Hud.CALLOUT_FONT_MAX
+	)
+	var reset_layout: Dictionary = Hud.hud_layout(simulated_viewports[0])
+	var reset_rect: Rect2 = hud._callout_layout_rect(simulated_viewports[0], reset_layout)
+	callout.add_theme_font_size_override("font_size", Hud.CALLOUT_FONT_MAX)
+	callout.text = hud._jelly_tap_effect_callout_text(OrbTypes.OrbColor.GREEN)
+	hud._fit_callout_font_to_rect(reset_rect)
+	assert_true(
+		callout.get_theme_font_size("font_size") < Hud.CALLOUT_FONT_MAX,
+		"long green hint establishes a reduced font before the reset check"
+	)
+	hud._show_jelly_tap_effect(OrbTypes.OrbColor.RED)
+	assert_eq(
+		callout.get_theme_font_size("font_size"),
+		actual_base_size,
+		"the next short hint restores the responsive base font"
+	)
+	await _destroy_main(main)
+	Config.data.sfx_enabled = original_sfx_enabled
+	Config.data.jelly_tap_effect_modes = original_tap_modes
+	Config.data.jelly_tap_clean_zone_rule = original_zone_rule
+	Config.data.jelly_tap_rest_clean_count = original_rest_count
+
+
 func test_six_jelly_tap_effect_callouts_show_once_without_art_or_sound() -> void:
 	var original_enabled: bool = Config.data.fx_callouts_enabled
 	var original_sfx_enabled: bool = Config.data.sfx_enabled

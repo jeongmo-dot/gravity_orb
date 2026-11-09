@@ -805,6 +805,7 @@ func _capture_four_color_effect_scenes(
 		hud._show_jelly_tap_effect(color_index)
 		if hud._callout_tween != null and hud._callout_tween.is_valid():
 			hud._callout_tween.kill()
+		_report_callout_fit(callout_files[color_index].trim_suffix(".png"), hud)
 		await _capture(callout_files[color_index])
 		hud._hide_callout_label()
 	await _capture("190_jelly_four_effects_full.png")
@@ -1563,9 +1564,11 @@ func _capture_recovered_hud_scenes(
 
 	hud._show_callout("GREAT!", 1)
 	await get_tree().create_timer(0.10).timeout
+	_report_callout_fit("34_callout_great", hud)
 	await _capture("34_callout_great.png")
 	hud._show_callout("INCREDIBLE!", 3)
 	await get_tree().create_timer(0.10).timeout
+	_report_callout_fit("35_callout_incredible", hud)
 	await _capture("35_callout_incredible.png")
 	if hud._callout_tween != null and hud._callout_tween.is_valid():
 		hud._callout_tween.kill()
@@ -1608,6 +1611,7 @@ func _capture_recovered_hud_scenes(
 	for callout: Dictionary in extra_callouts:
 		hud._show_callout(str(callout["text"]), int(callout["stage"]))
 		await get_tree().create_timer(0.10).timeout
+		_report_callout_fit(str(callout["file"]).trim_suffix(".png"), hud)
 		await _capture(str(callout["file"]))
 	if hud._callout_tween != null and hud._callout_tween.is_valid():
 		hud._callout_tween.kill()
@@ -1743,6 +1747,7 @@ func _capture_recovered_jelly_scenes(
 	])
 	hud._on_planet_unlocked(OrbTypes.OrbColor.PURPLE)
 	await get_tree().create_timer(0.08).timeout
+	_report_callout_fit("43_jelly_look_unlock", hud)
 	await _capture("43_jelly_look_unlock.png")
 	if hud._callout_tween != null and hud._callout_tween.is_valid():
 		hud._callout_tween.kill()
@@ -2644,6 +2649,52 @@ func _capture(file_name: String) -> void:
 		_fail("Could not save %s: %s" % [path, error_string(error)])
 		return
 	print("SCREEN_CAPTURE file=%s size=%dx%d" % [path, image.get_width(), image.get_height()])
+
+
+func _report_callout_fit(scene_name: String, hud: Hud) -> void:
+	var label: Label = hud._callout_label
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var layout: Dictionary = Hud.hud_layout(
+		viewport_size,
+		hud._logical_safe_area(viewport_size)
+	)
+	var callout_rect: Rect2 = hud._callout_layout_rect(viewport_size, layout)
+	var base_font_size: int = clampi(
+		roundi(callout_rect.size.y * 0.48),
+		Hud.CALLOUT_FONT_MIN,
+		Hud.CALLOUT_FONT_MAX
+	)
+	var text_width: float = hud._callout_text_width()
+	var local_left: Vector2 = Vector2((label.size.x - text_width) * 0.5, label.size.y * 0.5)
+	var local_right: Vector2 = local_left + Vector2(text_width, 0.0)
+	var canvas_transform: Transform2D = label.get_global_transform_with_canvas()
+	var text_left: float = (canvas_transform * local_left).x
+	var text_right: float = (canvas_transform * local_right).x
+	var left_margin: float = text_left
+	var right_margin: float = viewport_size.x - text_right
+	var window_size: Vector2 = Vector2(DisplayServer.window_get_size())
+	var pixel_scale_x: float = window_size.x / viewport_size.x
+	print(
+		(
+			"CALLOUT_FIT_CAPTURE scene=%s viewport=%.2fx%.2f font=%d base=%d "
+			+ "text_width=%.2f rect_width=%.2f left_margin=%.2f right_margin=%.2f "
+			+ "left_margin_px=%.2f right_margin_px=%.2f"
+		) % [
+			scene_name,
+			viewport_size.x,
+			viewport_size.y,
+			label.get_theme_font_size("font_size"),
+			base_font_size,
+			text_width,
+			callout_rect.size.x,
+			left_margin,
+			right_margin,
+			left_margin * pixel_scale_x,
+			right_margin * pixel_scale_x,
+		]
+	)
+	if left_margin < -0.5 or right_margin < -0.5:
+		_fail("callout text is outside the viewport in %s" % scene_name)
 
 
 func _capture_zoom(file_name: String, center: Vector2, half_size: int) -> void:

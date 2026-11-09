@@ -38,6 +38,38 @@
 
 ## 미확인
 
+### [2026-11-09] 대상 #142 — 안내 한 줄이 넘칠 때만 글자 줄이기·Windows 0.16.10
+- 상태: 완료 — 구현·전체 검증·두 비율 전체 장면 캡처·0.16.10 Release·push·PR까지 완료
+- 브랜치 / PR: `callout-fit` / https://github.com/jeongmo-dot/gravity_orb/pull/142
+- 변경 파일: `scripts/ui/Hud.gd`, `tests/{test_callouts.gd,spike/capture_screens.gd}`, `project.godot`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] 세 안내 함수에서 문구 입력 직후 현재 폰트·외곽선 포함 폭을 재고, 영역 초과 시에만 비례 축소 후 1px씩 맞춤. 하한 28 — 자동 (`test_callout_font_shrinks_only_for_overflow_and_resets`)
+  - [x] 다음 안내마다 반응형 기본 크기·영역을 먼저 복원. 긴 문구 뒤 짧은 분홍 안내가 기본 크기로 돌아옴 — 자동
+  - [x] 540×960·540×1170에서 초록 휴식 문구는 64→56, 폭 `992/1000`; 나머지 `186·187·189`, 칭찬 5개, 새 젤리 안내는 모두 기본 64 유지 — 실제 창 수치·캡처 관측
+  - [x] 두 비율 전체 장면 198개씩 생성, `188` 양 끝이 화면 안이며 캡처 시점 실화면 좌우 여백 각각 `46.80px` — 실제 창 관측
+  - [x] G2·Z1·T3·C4E·CLASSIC 규칙 해시 유지 — 자동 (`test_jelly_regression`, `test_spawner`)
+  - [x] 버전 `0.16.10`; 빌드 도구가 `0.16.1`과 혼동하지 않고 Debug 산출물 이름·버전을 `0.16.10`으로 기록 — 자동
+  - [x] 깨끗한 트리 Release, 같은 버전 보호, 이전 빌드·저장 보존 — 자동 + 파일 해시 대조
+  - [x] push·PR — 자동
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` Standard; `--headless --path . --import`, 기본/`--mode=blitz` 300프레임 스모크 각각 종료 코드 0, SCRIPT/Parse Error 0건
+  - `tests/run_tests.ps1` → 일반 `348/348`, 장기 `4/4`, 성능 `5/5`; 각각 새 프로세스, 전체 `84.004초`, 종료 코드 0
+  - 해시: G2 `3e688a78984fafee02bda4299de720de710337219c8bdf9af4ce2c295e0d6455`, Z1 `4be0489704ba1c8cebad7863cd487c9032236cfa4be00e808801609d74e25c2b`, T3 `7a20210c45a5e68cb8be6d4e2bc310eca31b3b450d20d0a9bf37a38f892b9c63`, C4E `4a0c467d83177f3e0fb6acd302529fea572083896cac45e5885f8e90160438f6`, CLASSIC `52ae7da72853f167058f6134a01a06d35b8eab222cb48a2534831e2ace5ebe35`
+  - `tests/capture_screens.ps1` → `SCREEN_CAPTURE_SUITE exit=0 ratios=2 files=396`; 각 비율에서 198개 존재, landing 10/10 고유. `188`는 두 비율 모두 font 56/base 64, 외곽선 포함 폭 `992/1000`, 캡처 시점 좌우 여백 `46.80px/46.80px`
+  - 비초과 장면은 두 비율 모두 font/base `64/64`: `186` 폭 850, `187` 998, `189` 998, 새 젤리 440, 칭찬 문구 191~590. 캡처를 직접 열어 잘림 0건 확인
+  - `tools/build_windows.ps1 -Debug` → `version=0.16.10 mode=Debug exit=0 bytes=105001536 preserved=48`; 내보낸 Debug console 기본/`--mode=jelly` 스모크 각각 종료 코드 0
+  - 깨끗한 트리 첫 Release → `version=0.16.10 mode=Release exit=0 bytes=111131712 preserved=28`; 같은 명령 재실행은 `Release artifact already exists`, 파일 해시 불변
+  - Release exe `111,131,712`바이트, SHA-256 `019521f9e299e5a8740b47dd0ccc907528b845e12edfee19ed9e0b482e5f18fc`; console `50,176`바이트, SHA-256 `04e67b38fba46d0128ebff8e8eb9130555494ebe69c84cf470ed22343e0e7b4c`; sidecar PCK 0개
+  - 최종 `_BUILD.txt`: `Version: 0.16.10`, `Mode: Release`, `Engine: 4.8.dev3.official.51105ccbe`, Commit과 브랜치 끝 일치
+  - 내보낸 Release console 기본/`--mode=jelly` 스모크 각각 종료 코드 0. 패키지 금지 문자열 8종 각 0건, 양성 앵커 `OrbitStage 8 + JellyOrbArt 6 + StartScreen 8 + Main3D 5 = 27`건
+  - 사용자 `save.cfg` 2,101바이트, SHA-256 `2243b278dbf10afa50c73d54baeee316d4560658de75ac45658e620c6272db3a` 불변. 0.16.1~0.16.9 파일 28개 이름·크기·SHA-256 매니페스트 `b64ac9942774d965d8120e8a3b3d761915436b469fe67bdcd8eb8caa104f691b` 불변
+  - 규칙 검색: Input은 `InputRouter.gd`와 `Haptics.gd`만, 이번 diff 난수 호출 추가 0건. `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. 540×960 또는 540×1170 JELLY에서 초록 L8 최초 안내를 띄움 → `초록 L8: 휴식 · 위쪽 초록 L1 2개 청소`가 한 줄로 끝까지 보이며 다른 레이아웃·시간·색·애니메이션은 그대로인지 본다
+  2. 이어서 분홍 L8 안내, `NICE!`부터 `UNSTOPPABLE!`, `새 젤리 — 보라`를 띄움 → 각 글자가 기존 64 크기로 돌아오고 화면 안에 있는지 본다
+- 결정 사항: 문서 밖 수치·공개 API·문구·높이·여백·색·애니메이션·시간·규칙 변경 없음. 명세대로 판 균형 측정은 실행하지 않았다
+- 남은 것 · 질문: 없음
+
 ### [2026-11-09] 대상 #141 — 초록 휴식은 위쪽 초록 L1 2개 청소·Windows 0.16.9
 - **경고: 새 안내 `초록 L8: 휴식 · 위쪽 초록 L1 2개 청소`가 540×960·540×1170 모두 오른쪽에서 잘린다.** 명세 §12-ONE.32 지시대로 글자 크기는 바꾸지 않았다
 - 나머지 맨 앞 조건은 발생하지 않았다: Z1 5행은 §12-ONE.31과 전 항목 일치, G2 초록 0개 청소는 `47/571 = 8.2%` (<30%), G2 자동 D-save `352.70`턴은 Z1 `353.70`의 `-0.28%`로 ±10% 범위 안이다

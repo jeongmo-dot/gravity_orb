@@ -367,6 +367,49 @@ func _callout_layout_rect(viewport_size: Vector2, layout: Dictionary) -> Rect2:
 	)
 
 
+func _callout_text_width(font_size: int = -1) -> float:
+	var resolved_font_size: int = (
+		_callout_label.get_theme_font_size("font_size")
+		if font_size < 0
+		else font_size
+	)
+	var font: Font = _callout_label.get_theme_font("font")
+	var outline_size: int = _callout_label.get_theme_constant("outline_size")
+	return font.get_string_size(
+		_callout_label.text,
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1.0,
+		resolved_font_size
+	).x + float(outline_size * 2)
+
+
+func _fit_callout_font_to_rect(callout_rect: Rect2) -> void:
+	var current_size: int = _callout_label.get_theme_font_size("font_size")
+	var measured_width: float = _callout_text_width(current_size)
+	if measured_width > callout_rect.size.x and measured_width > 0.0:
+		var fitted_size: int = maxi(
+			CALLOUT_FONT_MIN,
+			floori(float(current_size) * callout_rect.size.x / measured_width)
+		)
+		while (
+			fitted_size > CALLOUT_FONT_MIN
+			and _callout_text_width(fitted_size) > callout_rect.size.x
+		):
+			fitted_size -= 1
+		_callout_label.add_theme_font_size_override("font_size", fitted_size)
+	# Assigning a long string can expand a Label to its new minimum size. Restore the
+	# responsive rect after fitting so its center and animation path remain unchanged.
+	_set_control_rect(_callout_label, callout_rect)
+	_callout_label.pivot_offset = _callout_label.size * 0.5
+	_callout_base_position = _callout_label.position
+
+
+func _fit_callout_font_to_layout() -> void:
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var layout: Dictionary = hud_layout(viewport_size, _logical_safe_area(viewport_size))
+	_fit_callout_font_to_rect(_callout_layout_rect(viewport_size, layout))
+
+
 func _projected_board_rect() -> Rect2:
 	if _board is Board3D:
 		var camera: Camera3D = get_viewport().get_camera_3d()
@@ -1280,6 +1323,7 @@ func _show_callout(text: String, stage_index: int = 0) -> void:
 	var cosmic: bool = clamped_stage >= 3
 	var duration: float = CALLOUT_COSMIC_DURATION if cosmic else CALLOUT_TOTAL_DURATION
 	_callout_label.text = text
+	_fit_callout_font_to_layout()
 	_callout_label.add_theme_color_override("font_color", CALLOUT_COLORS[clamped_stage])
 	_callout_label.add_theme_color_override(
 		"font_outline_color",
@@ -1352,6 +1396,7 @@ func _show_planet_unlock(color_index: int) -> void:
 		else Config.data.color_display[color_index]
 	)
 	_callout_label.text = text
+	_fit_callout_font_to_layout()
 	_callout_label.add_theme_color_override("font_color", display_color)
 	_callout_label.add_theme_color_override(
 		"font_outline_color", Color(0.02, 0.035, 0.07, 0.92)
@@ -1491,6 +1536,7 @@ func _show_jelly_tap_effect(color_index: int) -> void:
 	_planet_callout_visual.visible = false
 	var callout_text: String = _jelly_tap_effect_callout_text(color_index)
 	_callout_label.text = callout_text
+	_fit_callout_font_to_layout()
 	_callout_label.add_theme_color_override(
 		"font_color",
 		JellyOrbArt.color_for(color_index, Config.data.jelly_tap_blast_min_level)
