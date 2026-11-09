@@ -361,6 +361,7 @@ func test_m9_blast_defaults() -> void:
 	assert_near(config.jelly_tap_quake_speed, 900.0, TOLERANCE, "tap quake speed")
 	assert_near(config.jelly_tap_quake_floor_margin, 8.0, TOLERANCE, "tap quake floor margin")
 	assert_near(config.jelly_tap_rest_clean_band_factor, 0.4, TOLERANCE, "tap rest clean band")
+	assert_eq(config.jelly_tap_rest_clean_count, 2, "tap rest clean count")
 	assert_near(config.jelly_tap_magnet_clean_radius_factor, 0.5, TOLERANCE, "tap magnet clean radius")
 	assert_eq(config.jelly_tap_bonus_points_per_orb, 100, "tap bonus per orb")
 	assert_near(config.jelly_tap_magnet_time, 0.5, TOLERANCE, "tap magnet time")

@@ -131,6 +131,7 @@ func _run() -> void:
 		"jelly_tap_clean_max_level": Config.data.jelly_tap_clean_max_level,
 		"jelly_tap_clean_zone_rule": Config.data.jelly_tap_clean_zone_rule,
 		"jelly_tap_quake_floor_margin": Config.data.jelly_tap_quake_floor_margin,
+		"jelly_tap_rest_clean_count": Config.data.jelly_tap_rest_clean_count,
 		"jelly_tap_rest_clean_band_factor": Config.data.jelly_tap_rest_clean_band_factor,
 		"jelly_tap_magnet_clean_radius_factor": Config.data.jelly_tap_magnet_clean_radius_factor,
 		"jelly_tap_grow_min_clean": Config.data.jelly_tap_grow_min_clean,
@@ -2314,6 +2315,11 @@ func _apply_arguments() -> void:
 		elif argument.begins_with("--jelly-tap-clean-zone-rule="):
 			Config.data.jelly_tap_clean_zone_rule = (
 				argument.trim_prefix("--jelly-tap-clean-zone-rule=") == "on"
+			)
+		elif argument.begins_with("--jelly-tap-rest-clean-count="):
+			Config.data.jelly_tap_rest_clean_count = maxi(
+				argument.trim_prefix("--jelly-tap-rest-clean-count=").to_int(),
+				0
 			)
 		elif argument.begins_with("--jelly-tap-grow-min-clean="):
 			Config.data.jelly_tap_grow_min_clean = maxi(

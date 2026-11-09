@@ -718,10 +718,12 @@ func _capture_four_color_effect_scenes(
 	Config.data.jelly_tap_effect_modes = PackedInt32Array([2, 3, 7, 6, 1, 1])
 	Config.data.jelly_tap_clean_max_level = 1
 	Config.data.jelly_tap_clean_zone_rule = true
+	Config.data.jelly_tap_rest_clean_count = 2
 	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
 	resolver.cancel_active_jelly_merges()
 	board.clear()
 	director.clear_effects()
+	_clear_capture_hud_residue(hud)
 	board.set_gravity(Vector2i.DOWN)
 	manager.gravity = Vector2i.DOWN
 	manager.turn_index = 29
@@ -756,6 +758,7 @@ func _capture_four_color_effect_scenes(
 	resolver.cancel_active_jelly_merges()
 	board.clear()
 	director.clear_effects()
+	_clear_capture_hud_residue(hud)
 	board.set_gravity(Vector2i.DOWN)
 	var magnet_source: Orb3D = board.spawn_orb(
 		OrbTypes.OrbColor.YELLOW, 8, Vector2.ZERO
@@ -781,6 +784,7 @@ func _capture_four_color_effect_scenes(
 	resolver.cancel_active_jelly_merges()
 	board.clear()
 	director.clear_effects()
+	_clear_capture_hud_residue(hud)
 	for color_index: int in range(4):
 		var column: int = color_index % 2
 		var row: int = color_index / 2
@@ -797,19 +801,21 @@ func _capture_four_color_effect_scenes(
 		"189_jelly_four_yellow_callout.png",
 	]
 	for color_index: int in range(4):
+		_clear_capture_hud_residue(hud)
 		hud._show_jelly_tap_effect(color_index)
 		if hud._callout_tween != null and hud._callout_tween.is_valid():
 			hud._callout_tween.kill()
 		await _capture(callout_files[color_index])
 		hud._hide_callout_label()
 	await _capture("190_jelly_four_effects_full.png")
-	await _capture_clean_zone_evidence(board, resolver, director)
+	await _capture_clean_zone_evidence(board, resolver, director, hud)
 
 
 func _capture_clean_zone_evidence(
 	board: Board3D,
 	resolver: CollisionResolver,
-	director: FeedbackDirector
+	director: FeedbackDirector,
+	hud: Hud
 ) -> void:
 	var cases: Array[Dictionary] = [
 		{
@@ -844,13 +850,16 @@ func _capture_clean_zone_evidence(
 		{
 			"name": "green",
 			"color": OrbTypes.OrbColor.GREEN,
-			"source": Vector2.ZERO,
+			"source": Vector2(300.0, 260.0),
 			"matching": [
-				{"color": OrbTypes.OrbColor.GREEN, "level": 1, "position": Vector2(-220.0, -120.0)},
+				{"color": OrbTypes.OrbColor.GREEN, "level": 1, "position": Vector2(-260.0, -340.0)},
+				{"color": OrbTypes.OrbColor.GREEN, "level": 1, "position": Vector2(160.0, -210.0)},
 			],
 			"remaining": [
-				{"color": OrbTypes.OrbColor.GREEN, "level": 1, "position": Vector2(220.0, -40.0)},
-				{"color": OrbTypes.OrbColor.GREEN, "level": 2, "position": Vector2(0.0, -220.0)},
+				{"color": OrbTypes.OrbColor.GREEN, "level": 1, "position": Vector2(-180.0, -40.0)},
+				{"color": OrbTypes.OrbColor.GREEN, "level": 1, "position": Vector2(120.0, 140.0)},
+				{"color": OrbTypes.OrbColor.GREEN, "level": 2, "position": Vector2(40.0, -410.0)},
+				{"color": OrbTypes.OrbColor.RED, "level": 1, "position": Vector2(330.0, -430.0)},
 			],
 			"base": 195,
 		},
@@ -872,6 +881,7 @@ func _capture_clean_zone_evidence(
 		resolver.cancel_active_jelly_merges()
 		board.clear()
 		director.clear_effects()
+		_clear_capture_hud_residue(hud)
 		board.set_gravity(Vector2i.DOWN)
 		var source: Orb3D = board.spawn_orb(
 			int(capture_case["color"]),
@@ -903,7 +913,17 @@ func _capture_clean_zone_evidence(
 			_fail("%s clean-zone evidence tap did not trigger" % name)
 		resolver.flush(Config.data.jelly_tap_clean_visual_time + 0.05)
 		await get_tree().process_frame
+		_clear_capture_hud_residue(hud)
 		await _capture("%03d_jelly_clean_zone_%s_after.png" % [base + 1, name])
+
+
+func _clear_capture_hud_residue(hud: Hud) -> void:
+	if hud._callout_tween != null and hud._callout_tween.is_valid():
+		hud._callout_tween.kill()
+	hud._hide_callout_label()
+	hud._on_combo_changed(0, 1.0, 0)
+	for popup: ScorePopup in hud.active_score_popups():
+		popup.deactivate()
 
 
 func _capture_blast_push_evidence(

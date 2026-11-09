@@ -30,6 +30,8 @@ param(
 	[ValidateSet("On", "Off")]
 	[string]$JellyTapCleanZoneRule = "On",
 	[ValidateRange(0, 100)]
+	[int]$JellyTapRestCleanCount = 2,
+	[ValidateRange(0, 100)]
 	[int]$JellyTapGrowMinClean = 3,
 	[ValidateSet("Push", "None", "Color", "Four")]
 	[string]$JellyTapEffectModes = "Color",
@@ -127,6 +129,7 @@ if (-not $AggregateOnly) {
 					"--jelly-tap-blast-uses-turn=$($JellyTapBlastUsesTurn.ToLower())",
 					"--jelly-tap-clean-max-level=$JellyTapCleanMaxLevel",
 					"--jelly-tap-clean-zone-rule=$($JellyTapCleanZoneRule.ToLower())",
+					"--jelly-tap-rest-clean-count=$JellyTapRestCleanCount",
 					"--jelly-tap-grow-min-clean=$JellyTapGrowMinClean",
 					"--jelly-tap-effect-modes=$($JellyTapEffectModes.ToLower())",
 					"--turn-start-colors=$TurnStartColors",
@@ -401,6 +404,7 @@ $report = [ordered]@{
 	jelly_tap_blast_uses_turn = $JellyTapBlastUsesTurn -eq "On"
 	jelly_tap_clean_max_level = $JellyTapCleanMaxLevel
 	jelly_tap_clean_zone_rule = $JellyTapCleanZoneRule -eq "On"
+	jelly_tap_rest_clean_count = $JellyTapRestCleanCount
 	jelly_tap_grow_min_clean = $JellyTapGrowMinClean
 	jelly_tap_effect_modes = $JellyTapEffectModes.ToLower()
 	turn_start_colors = $TurnStartColors

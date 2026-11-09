@@ -151,6 +151,7 @@ enum GameMode {
 @export var jelly_tap_quake_floor_margin: float = 8.0
 @export var jelly_tap_bonus_points_per_orb: int = 100
 @export var jelly_tap_magnet_time: float = 0.5
+@export var jelly_tap_rest_clean_count: int = 2
 @export var jelly_tap_rest_clean_band_factor: float = 0.4
 @export var jelly_tap_magnet_clean_radius_factor: float = 0.5
 @export var jelly_tap_common_push: bool = true
