@@ -32,8 +32,34 @@
 
 ## 대기 중
 
-### [2026-11-08 #141] 초록 휴식 청소는 위쪽 초록 L1 2개·빌드 0.16.9
-- 상태: 대기 (#140 병합됨 `264c85a` — main 위에서)
+### [2026-11-09 #142] 안내 한 줄이 넘칠 때만 글자 줄이기·빌드 0.16.10
+- 상태: 대기 (#141 병합됨 `d138c85` — main 위에서)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.33**
+- 배경: #141 새 안내 `초록 L8: 휴식 · 위쪽 초록 L1 2개 청소`가 두 비율 모두 오른쪽 끝이 잘림 (캡처 `188`) → 사용자 (2026-11-09) "병합 + 넘칠 때만 글자 줄이기"
+- 앵커: `scripts/ui/Hud.gd` `_apply_responsive_layout()`·`_callout_layout_rect()`·`_show_callout()`·`_show_planet_unlock()`·`_show_jelly_tap_effect()`·`_layout_planet_callout_visual()`, `scenes/UI.tscn` `CalloutLabel` (읽기), `tests/test_callouts.gd`, `tests/spike/capture_screens.gd`, `project.godot`
+- 요구 (§12-ONE.33 1~5):
+  1. 세 안내 함수에서 문구를 넣은 직후, 잰 문구 폭 (+ 외곽선 × 2)이 칸 폭보다 크면 그 안내만 글자 크기를 폭에 맞게 줄인다 (하한 `CALLOUT_FONT_MIN` 28). 넘치지 않는 안내는 0.16.9와 같은 크기
+  2. 문구·칸 자리·높이·여백·색·연출·시간은 그대로
+  3. 테스트 (§12-ONE.33 3번)
+  4. 캡처: 전체 다시, 두 비율. `188` 양 끝 화면 안 (여유 px), 다른 안내 글자 크기 0.16.9와 비교
+  5. 버전 **0.16.10**, 커밋 뒤 깨끗한 트리에서 Release. 보고는 #136과 같다
+- 수치 (Claude): 하한은 기존 `CALLOUT_FONT_MIN` 28, 버전 **0.16.10**. 그 밖의 값은 그대로
+- 건드리지 말 것: 모든 안내 문구, `CALLOUT_SIDE_MARGIN`·`CALLOUT_FONT_MIN`·`CALLOUT_FONT_MAX`, 칸 자리·높이, 색·외곽선·연출·시간, 게임 규칙·수치·생성·물리, 그림 (명세에 없는 것 금지, 고리 모양 금지), 사용자 저장 파일, `docs/` (회신 파일 제외)
+- **회신 맨 앞에**: `188`이 여전히 잘림, 28로도 넘치는 안내, 넘치지 않는 안내의 글자 크기가 바뀜, 규칙 해시가 바뀜, `0.16.10` 이름·비교 문제
+- Done-when:
+  - [ ] 테스트 통과, 규칙 해시 (G2·Z1·T3·C4E·CLASSIC) 그대로
+  - [ ] 캡처 (두 비율) — `188` 양 끝 화면 안
+  - [ ] `build/windows/GravityOrb_v0.16.10.exe` (`mode=Release`, `_BUILD.txt` 커밋 = 브랜치 끝), 0.16.1~0.16.9 파일 그대로
+- QA: §12-ONE.33 3~5번
+- 커밋: 항목 단위 브랜치 (`callout-fit`), **push·PR까지** (병합은 Claude 검수 뒤)
+
+---
+
+## 처리 완료
+
+### [2026-11-08 #141] 초록 휴식 청소는 위쪽 초록 L1 2개·빌드 0.16.9 — 완료
+- 상태: 완료 (2026-11-09 사용자 "병합 + 넘칠 때만 글자 줄이기" · [PR #141](https://github.com/jeongmo-dot/gravity_orb/pull/141) 병합 `d138c85`)
+- 검수: 코드 diff, 회신 판 균형표 (Z1·G2·G3 × 5봇 × 20판, 색별), 캡처 `188` (두 비율)·`195`·`196` (540×960), `build/windows/GravityOrb_v0.16.9.exe` 크기·SHA-256·`_BUILD.txt` (커밋 `25c1857` = 브랜치 끝, Release) 직접 확인. 테스트 347/4/5·해시·스모크·`save.cfg`는 Codex 관측 (Claude 재실행 없음). 맨 앞 경고 한 건 — 새 초록 안내 오른쪽 끝 잘림 → Claude가 물음 → 사용자 "병합 + 넘칠 때만 글자 줄이기" (#142). Z1 = §12-ONE.31, G2 초록 0개 8.2%, 판 길이 −0.3%. 결과: §12-ONE.32 "#141 결과"
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.32**
 - 배경: #140 Z1 초록 청소 0개 터치 96.3% (입구 쪽 띠에 초록 L1이 거의 없음) → 사용자 (2026-11-08) "병합 + 초록 조건 다시" → "위쪽 초록 L1 2개"
 - 앵커: `scripts/core/CollisionResolver.gd` `_jelly_tap_clean_targets()`·`_matches_jelly_tap_clean_rule()`, `config/GameConfig.gd`·`default_config.tres`, `scripts/ui/Hud.gd` `_jelly_tap_effect_callout_text()`, 판 균형 측정 도구 (`tests/tools/run_four_color_balance.ps1` 등), `tests/test_jolt_3d.gd`·`tests/test_config.gd`·`tests/test_callouts.gd`·`tests/test_jelly_regression.gd`, `tests/spike/capture_screens.gd`, `project.godot`
@@ -55,10 +81,6 @@
   - [ ] `build/windows/GravityOrb_v0.16.9.exe` (`mode=Release`, `_BUILD.txt` 커밋 = 브랜치 끝), 0.16.1~0.16.8 파일 그대로
 - QA: §12-ONE.32 3·7번
 - 커밋: 항목 단위 브랜치 (`green-top-clean`), **push·PR까지** (병합은 Claude 검수 뒤)
-
----
-
-## 처리 완료
 
 ### [2026-11-08 #140] 청소는 L1만·색마다 자리 조건·안내 한 줄에 조건·빌드 0.16.8 — 완료
 - 상태: 완료 (2026-11-08 사용자 "병합 + 초록 조건 다시" · [PR #140](https://github.com/jeongmo-dot/gravity_orb/pull/140) 병합 `264c85a`)
