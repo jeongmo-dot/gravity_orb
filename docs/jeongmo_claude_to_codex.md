@@ -32,7 +32,30 @@
 
 ## 대기 중
 
-(없음)
+### [2026-11-11 #143] 시한 젤리 (숫자가 0이 되기 전에 합치기)
+- 상태: 대기 (#142 병합됨 `f9324e2` — main 위에서)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.34**
+- 배경: 사용자 (2026-11-11) "전략성과 긴장감이 과제야" → "지금 있는 걸 바꾸는게 아니라 새로운 시도가 필요해. 그리고 매번 빌드를 만들 필요는 없어" → "시한 젤리"
+- 앵커: `scripts/core/Spawner.gd` `_draw_batch()`·`try_spawn()`·`_public_batch()`·`sync_next_batch_size()`, `scripts/core/TurnManager.gd` `_on_settled()`, `scripts/core/ReactionRules.gd` `_classify_jelly()`·`scripts/core/CollisionResolver.gd` (합체 결과), `scripts/spike/Orb3D.gd` (시한 상태·숫자), NEXT·THEN 미리보기, `scripts/ui/Hud.gd` (안내 한 줄), `config/GameConfig.gd`·`default_config.tres`, 판 균형 측정 도구, `tests/` (해시·새 테스트), `tests/spike/capture_screens.gd`
+- 요구 (§12-ONE.34 1~13):
+  1. 새 필드 7개: `jelly_timed_enabled` true, `first_turn` 20, `interval_turns` 12, `level` 3, `turns` 8, `burst_count` 6, `bonus_levels` 1 (모두 `jelly_timed_` 접두)
+  2. 차례 20·32·44…의 묶음 첫 젤리 = 시한 젤리 (새 난수 없음, 레벨만 3). 미리보기에도 숫자
+  3. 턴이 끝날 때마다 숫자 −1 (입구 대기 중 제외)
+  4. 0 전에 합치면 결과 레벨 +1 (L3 + L3 → L5)
+  5. 0이 되면 그 자리에 같은 색 L1 6개 (유령으로 시작), 점수 없음, 정착 뒤 입구 대기 판정
+  6. 숫자 그림 (고리 금지, 새 연출 없음), 첫 안내 한 줄 `시한 젤리: 8턴 안에 합치면 한 단계 더`
+  7. 판 균형 H8·H6·H10·H8-L2 × 5봇 × 20판, 600턴 상한. 시한 젤리 성공·0이 됨·남음 비율 포함
+  8. 해시: 예전 JELLY 묶음 (T3·C4E·Z1·G2)은 false 주입으로 그대로, H8 고정, CLASSIC 그대로
+  9. 테스트·캡처 (§12-ONE.34 11·12번)
+- 수치 (Claude): 위 7개 값. 그 밖의 값은 그대로
+- 건드리지 말 것: 지금 규칙·수치 전부, 그림·연출 (명세에 없는 것 금지, 고리 모양 금지), 사용자 저장 파일, `project.godot` 버전·`build/windows/` Release 파일 (**빌드 없음**), `docs/` (회신 파일 제외)
+- **회신 맨 앞에**: H8 성공 비율 20% 미만 또는 80% 초과, H8 자동 D-save 평균 176.4턴 미만, 판 밖 이탈, 숫자 읽기 어려움·젤리 밖, 안내 잘림, 예전 해시 바뀜
+- Done-when:
+  - [ ] 테스트 통과, 예전 JELLY 해시 (T3·C4E·Z1·G2)·CLASSIC 그대로, H8 해시 고정
+  - [ ] 판 균형표 H8·H6·H10·H8-L2 (시한 젤리 항목 포함)
+  - [ ] 캡처 (두 비율)
+- QA: §12-ONE.34 9~12번
+- 커밋: 항목 단위 브랜치 (`timed-jelly`), **push·PR까지** (병합은 Claude 검수 뒤)
 
 ---
 
