@@ -42,7 +42,7 @@
 - **경고: H8 성공 비율이 `자동 D-all 90.4%`, `L-합체 D-save 90.3%`, `L-합체 D-all 93.1%`로 명세 상한 80%를 넘었다.** 자동 D-save `79.7%`, R D-save `74.1%`는 20~80% 안이다
 - 나머지 맨 앞 조건은 발생하지 않았다: H8 자동 D-save 평균 `301.20`턴(176.4 이상), 400게임 판 밖 이탈 0건, 두 비율 숫자 8·1은 젤리 안에서 읽힘, 안내 한 줄 잘림 없음, 예전 해시 불변
 - 상태: 완료 — 구현·400게임 판 균형·전체 자동 검증·두 비율 전체 캡처·Debug 빌드까지 완료. Release와 버전 변경은 하지 않음
-- 브랜치 / PR: `timed-jelly` / PR 생성 후 갱신
+- 브랜치 / PR: `timed-jelly` / https://github.com/jeongmo-dot/gravity_orb/pull/143
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scenes/Orb3D.tscn`, `scripts/core/{CollisionResolver.gd,Orb.gd,OrbVisual.gd,Spawner.gd,TurnManager.gd}`, `scripts/spike/Orb3D.gd`, `scripts/ui/Hud.gd`, `tests/{capture_screens.ps1,run_jelly_physics_autoplay.ps1,test_config.gd,test_jelly_regression.gd,test_timed_jelly.gd}`, `tests/spike/{capture_screens.gd,run_jolt_3d_measurement.gd}`, `tests/tools/{run_jelly_measurement.ps1,run_timed_jelly_balance.ps1}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 7개 설정 기본값 true/20/12/3/8/6/1, 20·32·44… 묶음 첫 젤리에 표시. 뽑힌 레벨로 예산을 쓰고 색·자리·다음 난수는 유지, 공개 미리보기·실제 생성만 설정 레벨/숫자 사용 — 자동
