@@ -1,0 +1,322 @@
+extends TestCase
+
+const BOARD_SCENE: PackedScene = preload("res://scenes/Board3D.tscn")
+const MAIN_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
+const EXPECTED_H8_HASH: String = "af427045d52629bdc02da6e368fc39301999ec6442285f1b00fc55125bd67fc9"
+
+
+func test_h8_marker_countdown_success_and_failure_hash() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_timed_enabled = true
+	Config.data.jelly_timed_turns = 8
+	Config.data.jelly_timed_level = 3
+	var spawner: Spawner = Spawner.new()
+	spawner.init_rng(14308)
+	var scheduled_rows: Array[Dictionary] = []
+	for turn_index: int in range(1, 45):
+		var batch: Array[Dictionary] = spawner._draw_batch(turn_index)
+		if bool(batch[0].get("timed", false)):
+			scheduled_rows.append({
+				"turn": turn_index,
+				"drawn_level": int(batch[0]["level"]),
+				"preview": spawner._public_batch(batch)[0],
+			})
+	var base: Dictionary = ReactionRules.classify(
+		OrbTypes.OrbColor.RED,
+		3,
+		OrbTypes.OrbColor.RED,
+		3,
+		Config.data,
+		Config.data.jelly_mass_for_level(3),
+		Config.data.jelly_mass_for_level(3)
+	)
+	var bonus_level: int = mini(
+		int(base["result_level"]) + Config.data.jelly_timed_bonus_levels,
+		Config.data.orb_max_level
+	)
+	var state: Dictionary = {
+		"scheduled": scheduled_rows,
+		"countdown": [8, 7, 6, 5, 4, 3, 2, 1, 0],
+		"success": {
+			"base_level": int(base["result_level"]),
+			"result_level": bonus_level,
+			"result_mass": Config.data.jelly_mass_for_level(bonus_level),
+			"timed_after": false,
+		},
+		"failure": {
+			"source_level": Config.data.jelly_timed_level,
+			"burst_level": 1,
+			"burst_count": Config.data.jelly_timed_burst_count,
+			"score": 0,
+		},
+	}
+	var hash_value: String = JSON.stringify(state).sha256_text()
+	print("JELLY_H8_TIMED_HASH hash=%s" % hash_value)
+	assert_eq(hash_value, EXPECTED_H8_HASH, "H8 timed rule hash")
+	spawner.free()
+	_restore_config(snapshot)
+
+
+func test_timed_batches_preserve_rng_and_mark_only_scheduled_first_orb() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_timed_enabled = true
+	var enabled: Spawner = Spawner.new()
+	enabled.init_rng(14320)
+	var enabled_rows: Array[Array] = []
+	for turn_index: int in range(1, 46):
+		enabled_rows.append(enabled._draw_batch(turn_index))
+	Config.data.jelly_timed_enabled = false
+	var disabled: Spawner = Spawner.new()
+	disabled.init_rng(14320)
+	for turn_index: int in range(1, 46):
+		var enabled_batch: Array = enabled_rows[turn_index - 1]
+		var disabled_batch: Array[Dictionary] = disabled._draw_batch(turn_index)
+		assert_eq(enabled_batch.size(), disabled_batch.size(), "turn %d batch size" % turn_index)
+		for index: int in range(disabled_batch.size()):
+			assert_eq(
+				_enabled_candidate_rng_row(enabled_batch[index] as Dictionary),
+				_enabled_candidate_rng_row(disabled_batch[index]),
+				"turn %d candidate %d RNG row" % [turn_index, index]
+			)
+		var scheduled: bool = turn_index in [20, 32, 44]
+		assert_eq(
+			bool((enabled_batch[0] as Dictionary).get("timed", false)),
+			scheduled,
+			"turn %d timed marker" % turn_index
+		)
+		for index: int in range(1, enabled_batch.size()):
+			assert_true(
+				not bool((enabled_batch[index] as Dictionary).get("timed", false)),
+				"only first candidate is timed at turn %d" % turn_index
+			)
+	enabled.free()
+	disabled.free()
+	_restore_config(snapshot)
+
+
+func test_timed_preview_uses_configured_level_and_count_without_changing_budget() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_timed_enabled = true
+	var spawner: Spawner = Spawner.new()
+	spawner.init_rng(14321)
+	spawner.sync_next_batch_size(20)
+	var internal_batch: Array = spawner._preview_batches[0]
+	var preview_batch: Array = spawner.peek_preview()[0] as Array
+	assert_true(bool((internal_batch[0] as Dictionary)["timed"]), "internal marker")
+	assert_eq(int((preview_batch[0] as Dictionary)["level"]), Config.data.jelly_timed_level, "preview level")
+	assert_eq(int((preview_batch[0] as Dictionary)["timed_turns"]), Config.data.jelly_timed_turns, "preview count")
+	assert_eq(
+		spawner._batch_cost(internal_batch),
+		Config.data.spawn_count_for_turn(20),
+		"drawn level still owns the spawn budget"
+	)
+	var before: Array = spawner.peek_preview().duplicate(true)
+	spawner.sync_next_batch_size(20)
+	assert_eq(spawner.peek_preview(), before, "deferred preview keeps its marker")
+	spawner.free()
+	_restore_config(snapshot)
+
+
+func test_timed_merge_bonus_applies_for_absorber_and_absorbed_sources() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_merge_duration = 0.0
+	var fixture: Dictionary = await _create_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var first: Dictionary = await _resolve_timed_pair(board, resolver, 3, true, 2, false)
+	assert_eq(int(first["result_level"]), 5, "timed L3 absorber gets bonus")
+	assert_near(float(first["result_mass"]), Config.data.jelly_mass_for_level(5), 0.0001, "bonus mass")
+	assert_true(bool(first["timed_success"]), "success marker")
+	assert_true(not bool((first["result_orb"] as Orb3D).is_timed), "result is normal")
+	var second: Dictionary = await _resolve_timed_pair(board, resolver, 2, true, 3, false)
+	assert_eq(int(second["result_level"]), 5, "timed absorbed source gets bonus")
+	assert_near(float(second["result_mass"]), Config.data.jelly_mass_for_level(5), 0.0001, "absorbed bonus mass")
+	assert_true(not bool((second["result_orb"] as Orb3D).is_timed), "absorber result is normal")
+	await _cleanup(fixture["root"] as Node)
+	_restore_config(snapshot)
+
+
+func test_countdown_skips_entrance_waiter_and_timeout_waits_an_extra_settle() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_timed_enabled = true
+	Config.data.jelly_timed_turns = 1
+	Config.data.jelly_timed_burst_count = 6
+	var fixture: Dictionary = await _create_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	var score: ScoreManager = fixture["score"] as ScoreManager
+	var source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 3, Vector2.ZERO)
+	source.set_timed(1, 20)
+	source.disable_physics()
+	var waiter: Orb3D = board.spawn_orb(OrbTypes.OrbColor.BLUE, 3, Vector2(0.0, -300.0))
+	waiter.set_timed(4, 20)
+	waiter.enter_entrance_wait(waiter.position, Vector2i.DOWN)
+	manager._is_initial_settle = false
+	manager.turn_index = 21
+	manager._set_state(TurnManager.State.SIMULATING)
+	manager._on_settled()
+	assert_eq(manager.state, TurnManager.State.SIMULATING, "timeout starts another settle")
+	assert_true(manager._is_timed_burst_settle, "extra settle flag")
+	assert_eq(waiter.timed_turns_remaining, 4, "entrance waiter does not count down")
+	var burst: Array[Orb3D] = []
+	for orb: Orb3D in board.get_orbs():
+		if orb != waiter:
+			burst.append(orb)
+	assert_eq(burst.size(), 6, "six burst jellies")
+	for orb: Orb3D in burst:
+		assert_eq(orb.level, 1, "burst is L1")
+		assert_eq(orb.color, OrbTypes.OrbColor.GREEN, "burst keeps color")
+		assert_true(orb.is_ghost, "burst starts ghosted")
+	assert_eq(score.score, 0, "timeout has no score")
+	assert_eq(manager.timed_jelly_failure_count, 1, "failure measurement")
+	manager._on_settled()
+	assert_true(manager.state != TurnManager.State.SIMULATING, "second settle reaches entrance check")
+	board.remove_orb(waiter)
+	var turn_path: Orb3D = board.spawn_orb(OrbTypes.OrbColor.YELLOW, 3, Vector2.ZERO)
+	turn_path.set_timed(3, 21)
+	turn_path.disable_physics()
+	manager._is_tap_blast_settle = false
+	manager._set_state(TurnManager.State.SIMULATING)
+	manager._on_settled()
+	assert_eq(turn_path.timed_turns_remaining, 2, "turn-consuming settle decrements timer")
+	manager._is_tap_blast_settle = true
+	manager._set_state(TurnManager.State.SIMULATING)
+	manager._on_settled()
+	assert_eq(turn_path.timed_turns_remaining, 2, "non-turn tap settle does not decrement timer")
+	await _cleanup(fixture["root"] as Node)
+	_restore_config(snapshot)
+
+
+func test_first_placement_callout_is_queued_once() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var main: Main = MAIN_SCENE.instantiate() as Main
+	main.launch_immediately(GameConfig.GameMode.JELLY)
+	tree.root.add_child(main)
+	await tree.process_frame
+	await tree.process_frame
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	hud._on_timed_jelly_placed(8, 1)
+	hud._on_timed_jelly_placed(8, 1)
+	assert_eq(hud.timed_jelly_callout_history().size(), 1, "one first-placement callout")
+	assert_eq(
+		hud.timed_jelly_callout_history()[0],
+		"시한 젤리: 8턴 안에 합치면 한 단계 더",
+		"configured callout text"
+	)
+	await _cleanup(main)
+	_restore_config(snapshot)
+
+
+func _resolve_timed_pair(
+	board: Board3D,
+	resolver: CollisionResolver,
+	first_level: int,
+	first_timed: bool,
+	second_level: int,
+	second_timed: bool
+) -> Dictionary:
+	board.clear()
+	await tree.process_frame
+	var first: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, first_level, Vector2(-10.0, 0.0))
+	var second: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, second_level, Vector2(10.0, 0.0))
+	if first_timed:
+		first.set_timed(8, 20)
+	if second_timed:
+		second.set_timed(8, 20)
+	first.disable_physics()
+	second.disable_physics()
+	var captured: Array[Dictionary] = []
+	resolver.reaction_applied.connect(
+		func(reaction: Dictionary) -> void: captured.append(reaction.duplicate(false)),
+		CONNECT_ONE_SHOT
+	)
+	resolver.report_contact(first, second, "timed_test")
+	assert_eq(resolver.flush(), 1, "timed pair resolves")
+	await tree.process_frame
+	return captured[0]
+
+
+func _create_fixture() -> Dictionary:
+	var root: Node3D = Node3D.new()
+	var board: Board3D = BOARD_SCENE.instantiate() as Board3D
+	board.name = "Board"
+	board.unique_name_in_owner = true
+	root.add_child(board)
+	board.owner = root
+	var resolver: CollisionResolver = CollisionResolver.new()
+	resolver.name = "CollisionResolver"
+	resolver.unique_name_in_owner = true
+	root.add_child(resolver)
+	resolver.owner = root
+	var spawner: Spawner = Spawner.new()
+	spawner.name = "Spawner"
+	spawner.unique_name_in_owner = true
+	root.add_child(spawner)
+	spawner.owner = root
+	var score: ScoreManager = ScoreManager.new()
+	score.name = "ScoreManager"
+	score.unique_name_in_owner = true
+	score.save_path = ""
+	root.add_child(score)
+	score.owner = root
+	var manager: TurnManager = TurnManager.new()
+	manager.name = "TurnManager"
+	root.add_child(manager)
+	manager.owner = root
+	tree.root.add_child(root)
+	await tree.process_frame
+	manager.set_physics_process(false)
+	board.set_physics_process(false)
+	resolver.proximity_reaction_scan_enabled = false
+	return {
+		"root": root,
+		"board": board,
+		"resolver": resolver,
+		"spawner": spawner,
+		"score": score,
+		"manager": manager,
+	}
+
+
+func _enabled_candidate_rng_row(candidate: Dictionary) -> Array:
+	return [int(candidate["level"]), int(candidate["color"]), float(candidate["t"])]
+
+
+func _snapshot_config() -> Dictionary:
+	return {
+		"game_mode": Config.data.game_mode,
+		"jelly_merge_duration": Config.data.jelly_merge_duration,
+		"jelly_timed_enabled": Config.data.jelly_timed_enabled,
+		"jelly_timed_first_turn": Config.data.jelly_timed_first_turn,
+		"jelly_timed_interval_turns": Config.data.jelly_timed_interval_turns,
+		"jelly_timed_level": Config.data.jelly_timed_level,
+		"jelly_timed_turns": Config.data.jelly_timed_turns,
+		"jelly_timed_burst_count": Config.data.jelly_timed_burst_count,
+		"jelly_timed_bonus_levels": Config.data.jelly_timed_bonus_levels,
+	}
+
+
+func _restore_config(snapshot: Dictionary) -> void:
+	Config.data.game_mode = int(snapshot["game_mode"]) as GameConfig.GameMode
+	Config.data.jelly_merge_duration = float(snapshot["jelly_merge_duration"])
+	Config.data.jelly_timed_enabled = bool(snapshot["jelly_timed_enabled"])
+	Config.data.jelly_timed_first_turn = int(snapshot["jelly_timed_first_turn"])
+	Config.data.jelly_timed_interval_turns = int(snapshot["jelly_timed_interval_turns"])
+	Config.data.jelly_timed_level = int(snapshot["jelly_timed_level"])
+	Config.data.jelly_timed_turns = int(snapshot["jelly_timed_turns"])
+	Config.data.jelly_timed_burst_count = int(snapshot["jelly_timed_burst_count"])
+	Config.data.jelly_timed_bonus_levels = int(snapshot["jelly_timed_bonus_levels"])
+
+
+func _cleanup(node: Node) -> void:
+	if is_instance_valid(node):
+		node.queue_free()
+	await tree.process_frame
+	await tree.physics_frame
+	InputRouter.set_locked(false)

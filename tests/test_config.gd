@@ -330,6 +330,13 @@ func test_m9_blast_defaults() -> void:
 	assert_true(not config.jelly_blast_requires_same_level, "JELLY blast allows mixed levels")
 	assert_eq(config.jelly_merge_level_gap, 1, "JELLY merge level gap defaults to one")
 	assert_eq(config.jelly_merge_wide_gap_min_level, 0, "JELLY wide merge gap defaults off")
+	assert_true(config.jelly_timed_enabled, "timed jelly enabled")
+	assert_eq(config.jelly_timed_first_turn, 20, "timed jelly first turn")
+	assert_eq(config.jelly_timed_interval_turns, 12, "timed jelly interval")
+	assert_eq(config.jelly_timed_level, 3, "timed jelly level")
+	assert_eq(config.jelly_timed_turns, 8, "timed jelly turns")
+	assert_eq(config.jelly_timed_burst_count, 6, "timed jelly burst count")
+	assert_eq(config.jelly_timed_bonus_levels, 1, "timed jelly bonus levels")
 	assert_eq(
 		config.blast_push_radius_by_level,
 		PackedFloat32Array([0.0, 0.0, 0.0, 0.3, 0.55, 1.0, 1.0, 1.0, 1.0, 1.0]),

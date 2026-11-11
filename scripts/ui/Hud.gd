@@ -119,6 +119,9 @@ var _best_initialized: bool = false
 var _best_flash_count: int = 0
 var _current_multiplier: float = 1.0
 var _danger_multiplier: float = 1.0
+var _timed_jelly_callout_seen: bool = false
+var _timed_jelly_callout_pending: bool = false
+var _timed_jelly_callout_history: Array[String] = []
 var _danger_refresh_elapsed: float = 0.0
 var _pulse_elapsed: float = 0.0
 var _badge_punching: bool = false
@@ -515,6 +518,8 @@ func bind_game_state(
 		turn_manager.planet_unlocked.connect(_on_planet_unlocked)
 	if not turn_manager.jelly_tap_effect_unlocked.is_connected(_on_jelly_tap_effect_unlocked):
 		turn_manager.jelly_tap_effect_unlocked.connect(_on_jelly_tap_effect_unlocked)
+	if not turn_manager.timed_jelly_placed.is_connected(_on_timed_jelly_placed):
+		turn_manager.timed_jelly_placed.connect(_on_timed_jelly_placed)
 	if not turn_manager.final_move_changed.is_connected(_on_final_move_changed):
 		turn_manager.final_move_changed.connect(_on_final_move_changed)
 	if not turn_manager.game_started.is_connected(_reset_callout_tracking):
@@ -540,6 +545,7 @@ func _on_turn_state_changed(state: int) -> void:
 	if state == int(TurnManager.State.WAITING_INPUT):
 		_defer_jelly_tap_effect_until_next_wait = false
 		_show_next_jelly_tap_effect()
+		_show_next_timed_jelly_callout()
 
 
 func _refresh_turn_number() -> void:
@@ -689,6 +695,7 @@ func _render_preview(preview_root: Node2D, batch: Array) -> void:
 				preview_level,
 				Config.data.orb_symbols_enabled
 			)
+			visual.set_timed_turns(int(candidate.get("timed_turns", 0)))
 		else:
 			visual.setup_celestial_preview(
 				Config.data.color_display[preview_color],
@@ -1593,6 +1600,46 @@ func _complete_callout() -> void:
 		call_deferred("_show_next_planet_unlock")
 	elif not _pending_jelly_tap_effects.is_empty():
 		call_deferred("_show_next_jelly_tap_effect")
+	elif _timed_jelly_callout_pending:
+		call_deferred("_show_next_timed_jelly_callout")
+
+
+func _on_timed_jelly_placed(turns: int, bonus_levels: int) -> void:
+	if _timed_jelly_callout_seen:
+		return
+	_timed_jelly_callout_seen = true
+	if not Config.data.fx_callouts_enabled:
+		return
+	_timed_jelly_callout_pending = true
+	if not _callout_label.visible:
+		_show_next_timed_jelly_callout(turns, bonus_levels)
+
+
+func _show_next_timed_jelly_callout(
+	turns: int = -1,
+	bonus_levels: int = -1
+) -> void:
+	if (
+		not _timed_jelly_callout_pending
+		or _callout_label.visible
+		or not _pending_planet_unlocks.is_empty()
+		or not _pending_jelly_tap_effects.is_empty()
+	):
+		return
+	_timed_jelly_callout_pending = false
+	var configured_turns: int = Config.data.jelly_timed_turns if turns < 0 else turns
+	var configured_bonus: int = (
+		Config.data.jelly_timed_bonus_levels if bonus_levels < 0 else bonus_levels
+	)
+	var bonus_text: String = (
+		"한 단계 더" if configured_bonus == 1 else "%d단계 더" % configured_bonus
+	)
+	var text: String = "시한 젤리: %d턴 안에 합치면 %s" % [
+		configured_turns,
+		bonus_text,
+	]
+	_timed_jelly_callout_history.append(text)
+	_show_callout(text, 0)
 
 
 func _show_callout_sparkles(stage_index: int, duration: float) -> void:
@@ -1636,6 +1683,9 @@ func _reset_callout_tracking() -> void:
 	_pending_planet_unlocks.clear()
 	_jelly_tap_effect_history.clear()
 	_pending_jelly_tap_effects.clear()
+	_timed_jelly_callout_seen = false
+	_timed_jelly_callout_pending = false
+	_timed_jelly_callout_history.clear()
 	_showing_jelly_tap_effect = false
 	_defer_jelly_tap_effect_until_next_wait = false
 	_preview_unlock_seen.clear()
@@ -1672,6 +1722,10 @@ func jelly_tap_effect_history() -> Array[int]:
 
 func preview_unlock_flash_history() -> Array[int]:
 	return _preview_unlock_flash_history.duplicate()
+
+
+func timed_jelly_callout_history() -> Array[String]:
+	return _timed_jelly_callout_history.duplicate()
 
 
 func active_ui_sparkle_count() -> int:

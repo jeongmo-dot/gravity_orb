@@ -118,6 +118,24 @@ func flush(delta: float = 0.0) -> int:
 		var result_mass: float = float(classified.get("result_mass", 0.0))
 		var jelly_absorption: bool = bool(classified.get("jelly_absorption", false))
 		var absorber: int = int(classified.get("absorber", 0))
+		var timed_success: bool = (
+			reaction_type == ReactionRules.Type.MERGE
+			and (bool(a.get("is_timed")) or bool(b.get("is_timed")))
+		)
+		var timed_source_placed_turn: int = 0
+		if timed_success:
+			var placed_turn_a: int = int(a.get("timed_placed_turn"))
+			var placed_turn_b: int = int(b.get("timed_placed_turn"))
+			timed_source_placed_turn = (
+				placed_turn_a if placed_turn_a > 0 else placed_turn_b
+			)
+			result_level = mini(
+				result_level + maxi(Config.data.jelly_timed_bonus_levels, 0),
+				Config.data.orb_max_level
+			)
+			result_mass = Config.data.jelly_mass_for_level(result_level)
+			classified["result_level"] = result_level
+			classified["result_mass"] = result_mass
 		if absorber == 1:
 			reaction_position = position_a
 		elif absorber == 2:
@@ -183,6 +201,8 @@ func flush(delta: float = 0.0) -> int:
 				chain
 			)
 			if Config.data.game_mode == GameConfig.GameMode.JELLY:
+				if timed_success:
+					result_orb.clear_timed()
 				var growth_start_radius: float = -1.0
 				if jelly_absorption and absorber >= 1 and absorber <= source_radii.size():
 					growth_start_radius = source_radii[absorber - 1]
@@ -260,6 +280,8 @@ func flush(delta: float = 0.0) -> int:
 			"jelly_absorption": jelly_absorption,
 			"absorbed_level": int(classified.get("absorbed_level", 0)),
 			"absorber": absorber,
+			"timed_success": timed_success,
+			"timed_source_placed_turn": timed_source_placed_turn,
 			"shock_level": shock_level,
 			"shock_targets": shock_targets,
 			"blast_targets": blast_targets,
@@ -619,6 +641,15 @@ func _start_delayed_jelly_merge(
 	var reaction_type: ReactionRules.Type = classified["type"] as ReactionRules.Type
 	var duration: float = maxf(Config.data.jelly_merge_duration, 0.0)
 	var result_orb: Variant = null
+	var timed_success: bool = (
+		reaction_type == ReactionRules.Type.MERGE
+		and (bool(a.get("is_timed")) or bool(b.get("is_timed")))
+	)
+	var timed_source_placed_turn: int = 0
+	if timed_success:
+		var placed_turn_a: int = int(a.get("timed_placed_turn"))
+		var placed_turn_b: int = int(b.get("timed_placed_turn"))
+		timed_source_placed_turn = placed_turn_a if placed_turn_a > 0 else placed_turn_b
 	var visual_sources: Array[Dictionary] = []
 	if reaction_type == ReactionRules.Type.MAX_CLEAR:
 		_board.detach_orb_for_merge_visual(a)
@@ -637,6 +668,8 @@ func _start_delayed_jelly_merge(
 			visual_sources = [{"orb": absorbed_orb, "start": absorbed_position}]
 			result_orb = absorber_orb
 			result_orb.generation = chain
+			if timed_success:
+				result_orb.clear_timed()
 			result_orb.set_jelly_mass(
 				result_mass,
 				Config.data,
@@ -695,6 +728,8 @@ func _start_delayed_jelly_merge(
 		"jelly_absorption": jelly_absorption,
 		"absorbed_level": int(classified.get("absorbed_level", 0)),
 		"absorber": absorber,
+		"timed_success": timed_success,
+		"timed_source_placed_turn": timed_source_placed_turn,
 		"shock_level": shock_level,
 		"shock_targets": [],
 		"blast_targets": [],

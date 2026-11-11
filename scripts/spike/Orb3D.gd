@@ -28,12 +28,16 @@ static var _shared_meshes: Dictionary = {}
 @onready var _belly: MeshInstance3D = %Belly
 @onready var _face: MeshInstance3D = %Face
 @onready var _symbol_mesh: MeshInstance3D = %Symbol
+@onready var _timed_label: Label3D = %TimedLabel
 
 var color: int = 0
 var level: int = 1
 var generation: int = 0
 var stable_spawn_id: int = 0
 var jelly_mass: float = 1.0
+var is_timed: bool = false
+var timed_turns_remaining: int = 0
+var timed_placed_turn: int = 0
 var consumed: bool = false
 var is_ghost: bool = false
 var ghost_elapsed: float = 0.0
@@ -282,6 +286,35 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 
 func set_symbols_enabled(enabled: bool) -> void:
 	_symbol_mesh.visible = enabled
+
+
+func set_timed(turns: int, placed_turn: int = 0) -> void:
+	is_timed = turns > 0
+	timed_turns_remaining = maxi(turns, 0)
+	timed_placed_turn = maxi(placed_turn, 0)
+	_update_timed_label()
+
+
+func clear_timed() -> void:
+	is_timed = false
+	timed_turns_remaining = 0
+	timed_placed_turn = 0
+	_update_timed_label()
+
+
+func decrement_timed_turn() -> int:
+	if not is_timed:
+		return 0
+	timed_turns_remaining = maxi(timed_turns_remaining - 1, 0)
+	_update_timed_label()
+	return timed_turns_remaining
+
+
+func _update_timed_label() -> void:
+	if not is_instance_valid(_timed_label):
+		return
+	_timed_label.visible = is_timed and timed_turns_remaining > 0
+	_timed_label.text = str(timed_turns_remaining) if _timed_label.visible else ""
 
 
 func _physics_process(delta: float) -> void:
@@ -1075,6 +1108,12 @@ func _update_visual_transform() -> void:
 		0.42 if _is_jelly_visual else 1.0
 	)
 	_symbol_mesh.scale = Vector3(symbol_size_m, symbol_size_m, 1.0)
+	_timed_label.position = _front_overlay_position(
+		render_world_position,
+		body_front_offset + 0.08
+	) + Vector3(0.0, radius_m * 0.1, 0.0)
+	_timed_label.font_size = clampi(roundi(_current_radius * 0.28), 20, 22)
+	_timed_label.outline_size = 3
 	if _merge_visual_active:
 		_symbol_mesh.rotation.z = _merge_visual_rotation
 		_symbol_mesh.scale *= Vector3(

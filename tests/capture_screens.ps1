@@ -210,7 +210,15 @@ $expectedFiles = @(
     "195_jelly_clean_zone_green_before.png",
     "196_jelly_clean_zone_green_after.png",
     "197_jelly_clean_zone_yellow_before.png",
-    "198_jelly_clean_zone_yellow_after.png"
+    "198_jelly_clean_zone_yellow_after.png",
+    "199_jelly_timed_board_8.png",
+    "200_jelly_timed_board_1.png",
+    "201_jelly_timed_preview_next.png",
+    "202_jelly_timed_success_before.png",
+    "203_jelly_timed_success_after_l5.png",
+    "204_jelly_timed_timeout_before.png",
+    "205_jelly_timed_timeout_after_six_l1.png",
+    "206_jelly_timed_first_callout.png"
 )
 
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {
