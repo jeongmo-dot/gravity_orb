@@ -15,6 +15,7 @@ var _celestial_level: int = 0
 var _jelly_level: int = 0
 var _jelly_color_index: int = 0
 var _planet_animation_elapsed: float = 0.0
+var _timed_turns: int = 0
 
 
 func setup(
@@ -25,6 +26,7 @@ func setup(
 ) -> void:
 	_celestial_level = 0
 	_jelly_level = 0
+	_timed_turns = 0
 	_display_color = display_color
 	_symbol_color = symbol_color
 	_symbols_enabled = symbols_enabled
@@ -42,6 +44,7 @@ func setup_celestial_preview(
 ) -> void:
 	_celestial_level = clampi(level, 1, 7)
 	_jelly_level = 0
+	_timed_turns = 0
 	_planet_animation_elapsed = 0.0
 	_display_color = display_color
 	_symbol_color = symbol_color
@@ -60,6 +63,7 @@ func setup_jelly_preview(
 	_celestial_level = 0
 	_jelly_level = clampi(level, 1, Config.data.orb_max_level)
 	_jelly_color_index = clampi(color_index, 0, JellyOrbArt.PALETTE.size() - 1)
+	_timed_turns = 0
 	_planet_animation_elapsed = 0.0
 	_display_color = JellyOrbArt.color_for(_jelly_color_index, _jelly_level)
 	_symbol_color = _jelly_color_index
@@ -67,6 +71,15 @@ func setup_jelly_preview(
 	_symbol_polygons = OrbSymbols.polygons_for_color(_symbol_color)
 	_update_processing()
 	set_radius(radius)
+
+
+func set_timed_turns(turns: int) -> void:
+	_timed_turns = maxi(turns, 0)
+	queue_redraw()
+
+
+func timed_turns() -> int:
+	return _timed_turns
 
 
 func set_radius(radius: float) -> void:
@@ -160,6 +173,7 @@ func _draw() -> void:
 	if _jelly_level > 0:
 		_draw_jelly()
 		_draw_symbol()
+		_draw_timed_number()
 		return
 	var draw_color: Color = _display_color
 	if _blast_armed:
@@ -182,6 +196,40 @@ func _draw_jelly() -> void:
 		Color(1.0, 1.0, 1.0, _display_color.a)
 	)
 	_draw_jelly_face()
+
+
+func _draw_timed_number() -> void:
+	if _timed_turns <= 0:
+		return
+	var font: Font = ThemeDB.fallback_font
+	var font_size: int = clampi(roundi(_radius * 0.78), 24, 72)
+	var text: String = str(_timed_turns)
+	var text_size: Vector2 = font.get_string_size(
+		text,
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1.0,
+		font_size
+	)
+	var baseline: Vector2 = Vector2(-text_size.x * 0.5, text_size.y * 0.34)
+	draw_string_outline(
+		font,
+		baseline,
+		text,
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1.0,
+		font_size,
+		maxi(roundi(float(font_size) * 0.12), 3),
+		Color(0.02, 0.035, 0.07, 0.96)
+	)
+	draw_string(
+		font,
+		baseline,
+		text,
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1.0,
+		font_size,
+		Color(1.0, 0.96, 0.72, 1.0)
+	)
 
 
 func _draw_jelly_face() -> void:

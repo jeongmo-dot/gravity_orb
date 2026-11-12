@@ -9,6 +9,7 @@ signal turn_started(turn_index: int, dir: Vector2i)
 signal turn_finished(turn_index: int, combo: int)
 signal planet_unlocked(color_index: int)
 signal jelly_tap_effect_unlocked(color_index: int)
+signal timed_jelly_placed(turns: int, bonus_levels: int)
 signal combo_changed(combo: int, multiplier: float, max_combo: int)
 signal reaction_ready(reaction: Dictionary)
 signal warning_changed(walls: Array[Vector2i])
@@ -40,6 +41,11 @@ var final_move_active: bool = false
 var final_move_count: int = 0
 var final_move_success_count: int = 0
 var settle_elapsed: float = 0.0
+var timed_jelly_placed_count: int = 0
+var timed_jelly_success_count: int = 0
+var timed_jelly_failure_count: int = 0
+var timed_jelly_success_turns_sum: int = 0
+var timed_jelly_success_result_levels: Dictionary = {}
 var _settle_elapsed: float:
 	get:
 		return settle_elapsed
@@ -49,6 +55,8 @@ var _settle_elapsed: float:
 var _stable_time: float = 0.0
 var _is_initial_settle: bool = false
 var _is_tap_blast_settle: bool = false
+var _is_timed_burst_settle: bool = false
+var _timed_jelly_callout_seen: bool = false
 var _current_merge_delay_seconds: float = 0.0
 var _jelly_tap_effect_callout_seen: Dictionary = {}
 
@@ -74,6 +82,13 @@ func start_game() -> void:
 	final_move_count = 0
 	final_move_success_count = 0
 	_jelly_tap_effect_callout_seen.clear()
+	_is_timed_burst_settle = false
+	_timed_jelly_callout_seen = false
+	timed_jelly_placed_count = 0
+	timed_jelly_success_count = 0
+	timed_jelly_failure_count = 0
+	timed_jelly_success_turns_sum = 0
+	timed_jelly_success_result_levels.clear()
 	final_move_changed.emit(false, "")
 	gravity = Vector2i.DOWN
 	_is_initial_settle = true
@@ -186,6 +201,16 @@ func _physics_process(delta: float) -> void:
 
 	if state == State.SPAWNING:
 		var spawned: Array = _spawner.try_spawn(_board, gravity, turn_index)
+		for orb: Variant in spawned:
+			if not bool(orb.get("is_timed")):
+				continue
+			timed_jelly_placed_count += 1
+			if not _timed_jelly_callout_seen:
+				_timed_jelly_callout_seen = true
+				timed_jelly_placed.emit(
+					Config.data.jelly_timed_turns,
+					Config.data.jelly_timed_bonus_levels
+				)
 		var unlocked_color: int = Config.data.newly_unlocked_color_for_turn(turn_index)
 		if unlocked_color >= 0:
 			for orb: Variant in spawned:
@@ -256,7 +281,21 @@ func on_reaction(reaction: Dictionary) -> void:
 	reaction["combo"] = turn_combo
 	_emit_combo_changed()
 	_track_jelly_tap_effect_callout(reaction)
+	_track_timed_jelly_success(reaction)
 	reaction_ready.emit(reaction)
+
+
+func _track_timed_jelly_success(reaction: Dictionary) -> void:
+	if not bool(reaction.get("timed_success", false)):
+		return
+	timed_jelly_success_count += 1
+	var placed_turn: int = int(reaction.get("timed_source_placed_turn", 0))
+	if placed_turn > 0:
+		timed_jelly_success_turns_sum += maxi(turn_index - placed_turn, 0)
+	var result_level: int = int(reaction.get("result_level", 0))
+	timed_jelly_success_result_levels[result_level] = int(
+		timed_jelly_success_result_levels.get(result_level, 0)
+	) + 1
 
 
 func _track_jelly_tap_effect_callout(reaction: Dictionary) -> void:
@@ -313,6 +352,13 @@ func _on_settled() -> void:
 		InputRouter.set_locked(false)
 		_set_state(State.WAITING_INPUT)
 		return
+	if _is_timed_burst_settle:
+		_is_timed_burst_settle = false
+	elif _advance_timed_jellies():
+		_is_timed_burst_settle = true
+		_begin_settle()
+		_set_state(State.SIMULATING)
+		return
 
 	_set_state(State.CHECK_GAMEOVER)
 	turn_finished.emit(turn_index, turn_combo)
@@ -342,6 +388,53 @@ func _on_settled() -> void:
 	_update_warnings()
 	InputRouter.set_locked(false)
 	_set_state(State.WAITING_INPUT)
+
+
+func _advance_timed_jellies() -> bool:
+	if not Config.data.jelly_timed_enabled:
+		return false
+	var expired: Array = []
+	for orb: Variant in _board.get_orbs():
+		if not bool(orb.get("is_timed")) or bool(orb.get("is_waiting_at_entrance")):
+			continue
+		if int(orb.decrement_timed_turn()) <= 0:
+			expired.append(orb)
+	for orb: Variant in expired:
+		_spawn_timed_burst(orb)
+	return not expired.is_empty()
+
+
+func _spawn_timed_burst(source: Variant) -> void:
+	if not is_instance_valid(source) or bool(source.get("consumed")):
+		return
+	var color_index: int = int(source.color)
+	var center: Vector2 = source.position
+	var source_radius: float = float(source.get_current_radius())
+	var level_one_radius: float = Config.data.radius_for_level(1)
+	var distance: float = source_radius + level_one_radius + Config.data.spawn_margin
+	var count: int = maxi(Config.data.jelly_timed_burst_count, 0)
+	_board.remove_orb(source)
+	for index: int in range(count):
+		var angle: float = TAU * float(index) / float(maxi(count, 1))
+		var position: Vector2 = center + Vector2.from_angle(angle) * distance
+		var center_limit: float = maxf(
+			Config.data.board_size * 0.5 - level_one_radius,
+			0.0
+		)
+		position = Vector2(
+			clampf(position.x, -center_limit, center_limit),
+			clampf(position.y, -center_limit, center_limit)
+		)
+		var burst_orb: Variant = _board.spawn_orb(
+			color_index,
+			1,
+			position,
+			Vector2.ZERO,
+			0
+		)
+		burst_orb.enter_ghost_state(Config.data.ghost_alpha)
+		burst_orb.note_diagnostic_event("timed_burst")
+	timed_jelly_failure_count += 1
 
 
 func _commit_completed_ranking() -> Dictionary:

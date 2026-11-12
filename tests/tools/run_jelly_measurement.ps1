@@ -15,6 +15,12 @@ param(
 	[int]$JellyMergeLevelGap = 1,
 	[ValidateRange(0, 10)]
 	[int]$JellyMergeWideGapMinLevel = 0,
+	[ValidateSet("On", "Off")]
+	[string]$JellyTimedEnabled = "On",
+	[ValidateRange(1, 100)]
+	[int]$JellyTimedTurns = 8,
+	[ValidateRange(1, 10)]
+	[int]$JellyTimedLevel = 3,
 	[ValidateRange(0, 10)]
 	[int]$JellyBlastMinLevel = 8,
 	[ValidateRange(0, 10)]
@@ -122,6 +128,9 @@ if (-not $AggregateOnly) {
 					"--jelly-level-profile=$LevelProfile",
 					"--jelly-merge-level-gap=$JellyMergeLevelGap",
 					"--jelly-merge-wide-gap-min-level=$JellyMergeWideGapMinLevel",
+					"--jelly-timed-enabled=$($JellyTimedEnabled.ToLower())",
+					"--jelly-timed-turns=$JellyTimedTurns",
+					"--jelly-timed-level=$JellyTimedLevel",
 					"--jelly-blast-min-level=$JellyBlastMinLevel",
 					"--jelly-tap-blast-min-level=$JellyTapBlastMinLevel",
 					"--blast-score-factor=$($BlastScoreFactor.ToString([Globalization.CultureInfo]::InvariantCulture))",
@@ -231,7 +240,13 @@ function Get-Summary($Rows) {
 	$sameLevelBlastCountByLevel = [ordered]@{}
 	$mixedLevelBlastCountByLevel = [ordered]@{}
 	$reactionScoreTotals = [ordered]@{ merge = 0; blast = 0; tap = 0; jackpot = 0 }
+	$timedSuccessLevels = [ordered]@{}
     foreach ($row in @($Rows)) {
+		foreach ($levelProperty in $row.timed_jelly_success_result_levels.PSObject.Properties) {
+			$levelKey = [string]$levelProperty.Name
+			if (-not $timedSuccessLevels.Contains($levelKey)) { $timedSuccessLevels[$levelKey] = 0 }
+			$timedSuccessLevels[$levelKey] += [int]$levelProperty.Value
+		}
         foreach ($levelProperty in $row.blast_count_by_level.PSObject.Properties) {
             $levelKey = [string]$levelProperty.Name
             if (-not $blastCountByLevel.Contains($levelKey)) {
@@ -280,6 +295,11 @@ function Get-Summary($Rows) {
 	$tapBlastTotal = [double](($Rows | Measure-Object -Property tap_blast_count -Sum).Sum)
 	$tapCleanTotal = [double](($Rows | Measure-Object -Property tap_clean_count_total -Sum).Sum)
 	$tapRestTurnTotal = [double](($Rows | Measure-Object -Property tap_rest_turn_count -Sum).Sum)
+	$timedPlaced = [double](($Rows | Measure-Object -Property timed_jelly_placed_count -Sum).Sum)
+	$timedSuccess = [double](($Rows | Measure-Object -Property timed_jelly_success_count -Sum).Sum)
+	$timedFailure = [double](($Rows | Measure-Object -Property timed_jelly_failure_count -Sum).Sum)
+	$timedRemaining = [double](($Rows | Measure-Object -Property timed_jelly_remaining_count -Sum).Sum)
+	$timedSuccessTurns = [double](($Rows | Measure-Object -Property timed_jelly_success_turns_sum -Sum).Sum)
 	$averageCleanCountPerTapByColor = [ordered]@{}
 	$zeroCleanTapRatioByColor = [ordered]@{}
 	foreach ($colorKey in @($tapBlastCountByColor.Keys | Sort-Object)) {
@@ -346,6 +366,16 @@ function Get-Summary($Rows) {
 		}
 		maximum_pair_penetration_px = ($Rows | ForEach-Object { [double]$_.max_turn_end_pair.penetration_px } | Measure-Object -Maximum).Maximum
 		departures = [int](($Rows | Measure-Object -Property departures -Sum).Sum)
+		timed_jelly_placed_count = [int]$timedPlaced
+		timed_jelly_per_game = Get-Ratio $timedPlaced @($Rows).Count
+		timed_jelly_success_count = [int]$timedSuccess
+		timed_jelly_failure_count = [int]$timedFailure
+		timed_jelly_remaining_count = [int]$timedRemaining
+		timed_jelly_success_ratio = Get-Ratio $timedSuccess $timedPlaced
+		timed_jelly_failure_ratio = Get-Ratio $timedFailure $timedPlaced
+		timed_jelly_remaining_ratio = Get-Ratio $timedRemaining $timedPlaced
+		timed_jelly_average_turns_to_success = Get-Ratio $timedSuccessTurns $timedSuccess
+		timed_jelly_success_result_levels = $timedSuccessLevels
 		forced_settle_turns = [int](($Rows | Measure-Object -Property capped_turn_count -Sum).Sum)
 		same_level_blast_count_by_level = $sameLevelBlastCountByLevel
 		mixed_level_blast_count_by_level = $mixedLevelBlastCountByLevel
@@ -411,6 +441,9 @@ $report = [ordered]@{
 	turn_color_unlock_turns = $TurnColorUnlockTurns.ToLower()
 	jelly_merge_level_gap = $JellyMergeLevelGap
 	jelly_merge_wide_gap_min_level = $JellyMergeWideGapMinLevel
+	jelly_timed_enabled = $JellyTimedEnabled -eq "On"
+	jelly_timed_turns = $JellyTimedTurns
+	jelly_timed_level = $JellyTimedLevel
 	jelly_blast_min_level = $JellyBlastMinLevel
 	jelly_tap_blast_min_level = $JellyTapBlastMinLevel
 	jelly_blast_requires_same_level = $JellyBlastRequiresSameLevel -eq "On"

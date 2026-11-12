@@ -181,6 +181,14 @@ const CAPTURE_FILES: Array[String] = [
 	"196_jelly_clean_zone_green_after.png",
 	"197_jelly_clean_zone_yellow_before.png",
 	"198_jelly_clean_zone_yellow_after.png",
+	"199_jelly_timed_board_8.png",
+	"200_jelly_timed_board_1.png",
+	"201_jelly_timed_preview_next.png",
+	"202_jelly_timed_success_before.png",
+	"203_jelly_timed_success_after_l5.png",
+	"204_jelly_timed_timeout_before.png",
+	"205_jelly_timed_timeout_after_six_l1.png",
+	"206_jelly_timed_first_callout.png",
 ]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
@@ -367,6 +375,9 @@ func _capture_gameplay_scenes() -> void:
 
 func _capture_level_ten_scenes(main: Main, board: Board3D) -> void:
 	var director: FeedbackDirector = main.get_node("FeedbackDirector") as FeedbackDirector
+	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
+	var resolver: CollisionResolver = main.get_node("CollisionResolver") as CollisionResolver
+	var hud: Hud = main.get_node("UI/Hud") as Hud
 	for profile: String in ["A", "B"]:
 		_set_jelly_level_profile(profile)
 		board.clear()
@@ -388,11 +399,11 @@ func _capture_level_ten_scenes(main: Main, board: Board3D) -> void:
 		await _capture_level_ten_pair_effect(main, board, director, profile, true)
 	await _capture_default_g1_scenes(main, board, director)
 	await _capture_default_d_scenes(main, board, director)
+	await _capture_timed_jelly_scenes(main, manager, board, resolver, hud)
 
 	_set_jelly_level_profile("B")
 	board.clear()
 	director.clear_effects()
-	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
 	var score: ScoreManager = main.get_node("ScoreManager") as ScoreManager
 	manager.turn_index = 128
 	manager.max_combo = 10
@@ -408,6 +419,97 @@ func _capture_level_ten_scenes(main: Main, board: Board3D) -> void:
 	manager.game_over.emit()
 	await get_tree().create_timer(0.85).timeout
 	await _capture("99_jelly_result_l10_max.png")
+
+
+func _capture_timed_jelly_scenes(
+	main: Main,
+	manager: TurnManager,
+	board: Board3D,
+	resolver: CollisionResolver,
+	hud: Hud
+) -> void:
+	_set_jelly_level_profile("B")
+	resolver.set_physics_process(false)
+	resolver.cancel_active_jelly_merges()
+	Config.data.jelly_timed_enabled = true
+	Config.data.jelly_timed_level = 3
+	Config.data.jelly_timed_turns = 8
+	Config.data.jelly_timed_burst_count = 6
+	Config.data.jelly_timed_bonus_levels = 1
+	Config.data.fx_callouts_enabled = true
+	board.clear()
+	var timed: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.YELLOW,
+		Config.data.jelly_timed_level,
+		Vector2.ZERO
+	)
+	timed.set_timed(8, 20)
+	timed.disable_physics()
+	await get_tree().process_frame
+	await _capture("199_jelly_timed_board_8.png")
+	timed.set_timed(1, 20)
+	await _capture("200_jelly_timed_board_1.png")
+
+	hud._on_preview_changed([
+		[{
+			"color": OrbTypes.OrbColor.YELLOW,
+			"level": Config.data.jelly_timed_level,
+			"timed": true,
+			"timed_turns": Config.data.jelly_timed_turns,
+		}],
+		[{"color": OrbTypes.OrbColor.BLUE, "level": 1}],
+	])
+	await _capture("201_jelly_timed_preview_next.png")
+
+	board.clear()
+	var first: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, 3, Vector2(-80.0, 0.0))
+	var second: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, 3, Vector2(80.0, 0.0))
+	first.set_timed(8, 20)
+	first.disable_physics()
+	second.disable_physics()
+	await _capture("202_jelly_timed_success_before.png")
+	var original_duration: float = Config.data.jelly_merge_duration
+	Config.data.jelly_merge_duration = 0.0
+	resolver.report_contact(first, second, "capture_timed_success")
+	if resolver.flush() != 1:
+		_fail("timed success capture did not resolve exactly once")
+	Config.data.jelly_merge_duration = original_duration
+	await get_tree().process_frame
+	var success_orbs: Array[Orb3D] = board.get_orbs()
+	if success_orbs.size() != 1 or success_orbs[0].level != 5 or success_orbs[0].is_timed:
+		_fail("timed success capture expected one normal L5")
+	await _capture("203_jelly_timed_success_after_l5.png")
+
+	board.clear()
+	var expiring: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 3, Vector2.ZERO)
+	expiring.set_timed(1, 32)
+	expiring.disable_physics()
+	await _capture("204_jelly_timed_timeout_before.png")
+	var score: ScoreManager = main.get_node("ScoreManager") as ScoreManager
+	var score_before: int = score.score
+	manager._spawn_timed_burst(expiring)
+	await get_tree().process_frame
+	var burst_count: int = 0
+	for orb: Orb3D in board.get_orbs():
+		if orb.level == 1 and orb.color == OrbTypes.OrbColor.GREEN:
+			burst_count += 1
+	if burst_count != 6 or score.score != score_before:
+		_fail("timed timeout capture expected six scoreless same-color L1 jellies")
+	await _capture("205_jelly_timed_timeout_after_six_l1.png")
+
+	if hud._callout_tween != null and hud._callout_tween.is_valid():
+		hud._callout_tween.kill()
+	hud._hide_callout_label()
+	hud._pending_planet_unlocks.clear()
+	hud._pending_jelly_tap_effects.clear()
+	hud._timed_jelly_callout_seen = false
+	hud._timed_jelly_callout_pending = false
+	hud._on_timed_jelly_placed(8, 1)
+	if hud._callout_tween != null and hud._callout_tween.is_valid():
+		hud._callout_tween.kill()
+	_report_callout_fit("206_jelly_timed_first_callout", hud)
+	await _capture("206_jelly_timed_first_callout.png")
+	hud._hide_callout_label()
 
 
 func _capture_default_g1_scenes(

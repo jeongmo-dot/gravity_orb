@@ -23,10 +23,12 @@ func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_sfx_enabled: bool = Config.data.sfx_enabled
 	var original_merge_duration: float = Config.data.jelly_merge_duration
+	var original_timed_enabled: bool = Config.data.jelly_timed_enabled
 	Config.data.rng_seed = 1085050
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.sfx_enabled = false
 	Config.data.jelly_merge_duration = 0.3
+	Config.data.jelly_timed_enabled = false
 	var g2_visible_result: Dictionary = await _run_rule_path(true)
 	var g2_hidden_result: Dictionary = await _run_rule_path(false)
 	assert_eq(g2_visible_result["hash"], g2_hidden_result["hash"], "G2 hash ignores rendering")
@@ -194,6 +196,7 @@ func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
 	Config.data.game_mode = original_mode
 	Config.data.sfx_enabled = original_sfx_enabled
 	Config.data.jelly_merge_duration = original_merge_duration
+	Config.data.jelly_timed_enabled = original_timed_enabled
 
 
 func _run_rule_path(visuals_enabled: bool) -> Dictionary:

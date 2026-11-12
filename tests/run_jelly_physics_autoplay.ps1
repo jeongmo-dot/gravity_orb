@@ -64,6 +64,12 @@ param(
 	[int]$JellyMergeLevelGap = 1,
 	[ValidateRange(0, 10)]
 	[int]$JellyMergeWideGapMinLevel = 0,
+	[ValidateSet("On", "Off")]
+	[string]$JellyTimedEnabled = "On",
+	[ValidateRange(1, 100)]
+	[int]$JellyTimedTurns = 8,
+	[ValidateRange(1, 10)]
+	[int]$JellyTimedLevel = 3,
     [switch]$AggregateOnly
 )
 
@@ -88,6 +94,9 @@ $physicsArguments += "--jelly-tap-blast-bot=$($resolvedTapBlastBotMode.ToLower()
 $physicsArguments += "--jelly-merge-duration=$($JellyMergeDuration.ToString($culture))"
 $physicsArguments += "--jelly-merge-level-gap=$JellyMergeLevelGap"
 $physicsArguments += "--jelly-merge-wide-gap-min-level=$JellyMergeWideGapMinLevel"
+$physicsArguments += "--jelly-timed-enabled=$($JellyTimedEnabled.ToLower())"
+$physicsArguments += "--jelly-timed-turns=$JellyTimedTurns"
+$physicsArguments += "--jelly-timed-level=$JellyTimedLevel"
 $physicsArguments += "--jelly-tap-blast-min-level=$JellyTapBlastMinLevel"
 $physicsArguments += "--blast-score-factor=$($BlastScoreFactor.ToString($culture))"
 $physicsArguments += "--jelly-tap-blast-score-factor=$($JellyTapBlastScoreFactor.ToString($culture))"
@@ -243,6 +252,12 @@ $inputWaitingTouchingMergePairCountMax = 0
 $deferredJellyMergeCount = 0
 $shockTotals = @{}
 $reactionScoreTotals = [ordered]@{ merge = 0; blast = 0; tap = 0; jackpot = 0 }
+$timedPlaced = 0
+$timedSuccess = 0
+$timedFailure = 0
+$timedRemaining = 0
+$timedSuccessTurns = 0
+$timedSuccessLevels = @{}
 foreach ($task in $tasks) {
     $report = Get-Content -LiteralPath $task.Output -Raw | ConvertFrom-Json
     $tick = $report.ticks[0]
@@ -259,6 +274,16 @@ foreach ($task in $tasks) {
 	$inputWaitingTouchingMergePairCountSum += [int]$seedRow.input_waiting_touching_merge_pair_count_sum
 	$inputWaitingTouchingMergePairCountMax = [Math]::Max($inputWaitingTouchingMergePairCountMax, [int]$seedRow.input_waiting_touching_merge_pair_count_max)
 	$deferredJellyMergeCount += [int]$seedRow.deferred_jelly_merge_count
+	$timedPlaced += [int]$seedRow.timed_jelly_placed_count
+	$timedSuccess += [int]$seedRow.timed_jelly_success_count
+	$timedFailure += [int]$seedRow.timed_jelly_failure_count
+	$timedRemaining += [int]$seedRow.timed_jelly_remaining_count
+	$timedSuccessTurns += [int]$seedRow.timed_jelly_success_turns_sum
+	foreach ($levelProperty in $seedRow.timed_jelly_success_result_levels.PSObject.Properties) {
+		$level = $levelProperty.Name
+		if (-not $timedSuccessLevels.ContainsKey($level)) { $timedSuccessLevels[$level] = 0 }
+		$timedSuccessLevels[$level] += [int]$levelProperty.Value
+	}
     $totalMerges += [int]$seedRow.merge_count
     $totalBlasts += [int]$seedRow.blast_count
     $totalJackpots += [int]$seedRow.max_clear_count
@@ -503,6 +528,16 @@ $summary = [ordered]@{
 	average_touching_merge_pairs_per_affected_turn = if ($inputWaitingTouchingMergeTurns -gt 0) { [double]$inputWaitingTouchingMergePairCountSum / $inputWaitingTouchingMergeTurns } else { 0.0 }
 	maximum_touching_merge_pairs_at_input_waiting = $inputWaitingTouchingMergePairCountMax
 	deferred_jelly_merge_count = $deferredJellyMergeCount
+	timed_jelly_placed_count = $timedPlaced
+	timed_jelly_per_game = [double]$timedPlaced / $seedRows.Count
+	timed_jelly_success_count = $timedSuccess
+	timed_jelly_failure_count = $timedFailure
+	timed_jelly_remaining_count = $timedRemaining
+	timed_jelly_success_ratio = if ($timedPlaced -gt 0) { [double]$timedSuccess / $timedPlaced } else { 0.0 }
+	timed_jelly_failure_ratio = if ($timedPlaced -gt 0) { [double]$timedFailure / $timedPlaced } else { 0.0 }
+	timed_jelly_remaining_ratio = if ($timedPlaced -gt 0) { [double]$timedRemaining / $timedPlaced } else { 0.0 }
+	timed_jelly_average_turns_to_success = if ($timedSuccess -gt 0) { [double]$timedSuccessTurns / $timedSuccess } else { 0.0 }
+	timed_jelly_success_result_levels = $timedSuccessLevels
     merges_per_turn = if ($totalTurns -gt 0) { [double]$totalMerges / $totalTurns } else { 0.0 }
 	level_ups_per_turn = if ($totalTurns -gt 0) { [double]$totalLevelUpCount / $totalTurns } else { 0.0 }
 	level_creation_count_by_level = $levelCreationCounts

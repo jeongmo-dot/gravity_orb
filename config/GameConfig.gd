@@ -120,6 +120,13 @@ enum GameMode {
 @export var jelly_merge_duration: float = 0.3
 @export var jelly_merge_level_gap: int = 1
 @export var jelly_merge_wide_gap_min_level: int = 0
+@export var jelly_timed_enabled: bool = true
+@export var jelly_timed_first_turn: int = 20
+@export var jelly_timed_interval_turns: int = 12
+@export var jelly_timed_level: int = 3
+@export var jelly_timed_turns: int = 8
+@export var jelly_timed_burst_count: int = 6
+@export var jelly_timed_bonus_levels: int = 1
 @export var blast_enabled: bool = true
 @export var blast_min_level: int = 4
 @export var jelly_blast_min_level: int = 8

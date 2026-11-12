@@ -20,6 +20,9 @@ var level: int
 var generation: int = 0
 var stable_spawn_id: int = 0
 var jelly_mass: float = 1.0
+var is_timed: bool = false
+var timed_turns_remaining: int = 0
+var timed_placed_turn: int = 0
 var consumed: bool = false
 var is_ghost: bool = false
 var ghost_elapsed: float = 0.0
@@ -134,6 +137,28 @@ func is_blast_armed() -> bool:
 
 func set_symbols_enabled(enabled: bool) -> void:
 	_visual.set_symbols_enabled(enabled)
+
+
+func set_timed(turns: int, placed_turn: int = 0) -> void:
+	is_timed = turns > 0
+	timed_turns_remaining = maxi(turns, 0)
+	timed_placed_turn = maxi(placed_turn, 0)
+	_visual.set_timed_turns(timed_turns_remaining)
+
+
+func clear_timed() -> void:
+	is_timed = false
+	timed_turns_remaining = 0
+	timed_placed_turn = 0
+	_visual.set_timed_turns(0)
+
+
+func decrement_timed_turn() -> int:
+	if not is_timed:
+		return 0
+	timed_turns_remaining = maxi(timed_turns_remaining - 1, 0)
+	_visual.set_timed_turns(timed_turns_remaining)
+	return timed_turns_remaining
 
 
 func blast_brightness() -> float:

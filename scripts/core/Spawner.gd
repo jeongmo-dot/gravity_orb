@@ -76,7 +76,10 @@ func try_spawn(board: Variant, gravity: Vector2i, turn_index: int = 1) -> Array:
 	var spawned: Array = []
 	var placed: Array[Dictionary] = []
 	for candidate: Dictionary in next_batch:
-		var level: int = int(candidate["level"])
+		var timed: bool = bool(candidate.get("timed", false))
+		var level: int = (
+			Config.data.jelly_timed_level if timed else int(candidate["level"])
+		)
 		var radius: float = Config.data.radius_for_level(level)
 		var line: Dictionary = board.spawn_line(gravity, radius)
 		var offset: float = 0.0
@@ -113,6 +116,8 @@ func try_spawn(board: Variant, gravity: Vector2i, turn_index: int = 1) -> Array:
 			placed.append({"position": position, "radius": radius})
 		else:
 			orb.enter_entrance_wait(preferred_position, gravity)
+		if timed:
+			orb.set_timed(Config.data.jelly_timed_turns, turn_index)
 		spawned.append(orb)
 		orb_spawned.emit(level)
 	_preview_batches.pop_front()
@@ -151,6 +156,7 @@ func sync_next_batch_size(next_turn_index: int = 1) -> void:
 			)
 			batch.append(candidate)
 			remaining_budget -= Config.data.spawn_cost_for_level(int(candidate["level"]))
+		_apply_timed_marker(batch, turn_index)
 	_publish_preview()
 
 
@@ -192,7 +198,33 @@ func _draw_batch(turn_index: int = 1) -> Array[Dictionary]:
 		)
 		batch.append(candidate)
 		remaining_budget -= Config.data.spawn_cost_for_level(int(candidate["level"]))
+	_apply_timed_marker(batch, turn_index)
 	return batch
+
+
+func _apply_timed_marker(batch: Array, turn_index: int) -> void:
+	for candidate: Dictionary in batch:
+		candidate.erase("timed")
+		candidate.erase("timed_turns")
+	if not _is_timed_turn(turn_index) or batch.is_empty():
+		return
+	var first: Dictionary = batch[0] as Dictionary
+	first["timed"] = true
+	first["timed_turns"] = Config.data.jelly_timed_turns
+
+
+func _is_timed_turn(turn_index: int) -> bool:
+	if (
+		not Config.data.jelly_timed_enabled
+		or Config.data.game_mode != GameConfig.GameMode.JELLY
+		or Config.data.jelly_timed_interval_turns <= 0
+		or turn_index < Config.data.jelly_timed_first_turn
+	):
+		return false
+	return (
+		(turn_index - Config.data.jelly_timed_first_turn)
+		% Config.data.jelly_timed_interval_turns
+	) == 0
 
 
 func _draw_level_for_budget(remaining_budget: int) -> int:
@@ -247,10 +279,16 @@ func _emit_preview() -> void:
 func _public_batch(batch: Array) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for candidate: Dictionary in batch:
-		result.append(
-			{
-				"color": int(candidate["color"]),
-				"level": int(candidate["level"]),
-			}
-		)
+		var public_candidate: Dictionary = {
+			"color": int(candidate["color"]),
+			"level": (
+				Config.data.jelly_timed_level
+				if bool(candidate.get("timed", false))
+				else int(candidate["level"])
+			),
+		}
+		if bool(candidate.get("timed", false)):
+			public_candidate["timed"] = true
+			public_candidate["timed_turns"] = int(candidate["timed_turns"])
+		result.append(public_candidate)
 	return result

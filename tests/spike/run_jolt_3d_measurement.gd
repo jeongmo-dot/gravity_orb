@@ -642,6 +642,12 @@ func _run_seed(
 		"max_wall_penetration_px": seed_max_wall,
 		"departures": seed_departures,
 		"capped_turn_count": manager.capped_turn_count,
+		"timed_jelly_placed_count": manager.timed_jelly_placed_count,
+		"timed_jelly_success_count": manager.timed_jelly_success_count,
+		"timed_jelly_failure_count": manager.timed_jelly_failure_count,
+		"timed_jelly_remaining_count": _timed_jelly_remaining_count(board),
+		"timed_jelly_success_turns_sum": manager.timed_jelly_success_turns_sum,
+		"timed_jelly_success_result_levels": manager.timed_jelly_success_result_levels.duplicate(true),
 		"layer_distance_by_level": _finalize_layer_distances(layer_distances),
 		"ghost_completed_count": board.ghost_completed_count,
 		"ghost_timeout_count": board.ghost_timeout_count,
@@ -2361,6 +2367,21 @@ func _apply_arguments() -> void:
 				argument.trim_prefix("--jelly-merge-wide-gap-min-level=").to_int(),
 				0
 			)
+		elif argument.begins_with("--jelly-timed-enabled="):
+			Config.data.jelly_timed_enabled = (
+				argument.trim_prefix("--jelly-timed-enabled=") == "on"
+			)
+		elif argument.begins_with("--jelly-timed-turns="):
+			Config.data.jelly_timed_turns = maxi(
+				argument.trim_prefix("--jelly-timed-turns=").to_int(),
+				1
+			)
+		elif argument.begins_with("--jelly-timed-level="):
+			Config.data.jelly_timed_level = clampi(
+				argument.trim_prefix("--jelly-timed-level=").to_int(),
+				1,
+				Config.data.orb_max_level
+			)
 		elif argument.begins_with("--blast-push-radius-by-level="):
 			Config.data.blast_push_radius_by_level = _parse_float_list(
 				argument.trim_prefix("--blast-push-radius-by-level=")
@@ -2413,6 +2434,14 @@ func _apply_arguments() -> void:
 
 func _mode_name(mode: GameConfig.GameMode) -> String:
 	return "jelly" if mode == GameConfig.GameMode.JELLY else "classic"
+
+
+func _timed_jelly_remaining_count(board: Board3D) -> int:
+	var count: int = 0
+	for orb: Orb3D in board.get_orbs():
+		if orb.is_timed:
+			count += 1
+	return count
 
 
 func _parse_int_list(csv: String) -> Array[int]:
