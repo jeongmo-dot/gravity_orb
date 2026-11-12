@@ -32,8 +32,35 @@
 
 ## 대기 중
 
-### [2026-11-12 #144] 시한 젤리 다듬기 — 짝이 드문 레벨·큰 숫자·뭉친 L1
-- 상태: 대기 (#143 병합됨 `d738bfa` — main 위에서)
+### [2026-11-12 #145] 시한 젤리 숫자 자리·외곽선, 숫자 (턴) 다시 재기
+- 상태: 대기 (#144 병합됨 `bd2ccbe` — main 위에서)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.36**
+- 배경: #144 K5-8은 40~60% 규칙에 맞는 이름이 없어 평균이 가장 가까운 값으로 골라짐 (65.4% / 62.0%). 판 위 숫자는 32~35px로 커졌지만 눈과 10~11줄 겹치고 어두운 외곽선이 캡처에 보이지 않음 (Claude 캡처 픽셀 측정, §12-ONE.35 "#144 결과") → 사용자 (2026-11-12) "병합 + 후속 #145"
+- 앵커: `scenes/Orb3D.tscn` `TimedLabel`·`scripts/spike/Orb3D.gd` `_update_visual_transform()`, `config/default_config.tres` (`jelly_timed_turns` 기본), `tests/tools/run_timed_jelly_balance.ps1`, `tests/test_timed_jelly.gd`·`tests/test_config.gd`, `tests/spike/capture_screens.gd`
+- 요구 (§12-ONE.36 1~7):
+  1. 판 위 숫자: 540×960 L5에서 흰 획 높이 18~22px, 외곽선 포함 전체가 눈 아래 끝보다 2px 이상 아래·젤리 윤곽 안 (2px 여유), 입·하이라이트와도 안 겹침
+  2. 어두운 외곽선이 캡처에 보이게 — 안 보이던 원인을 회신에 적고 고침. 노랑·초록·빨강 젤리에서 테두리·몸통 밝기 (0~255)
+  3. 판 균형 K5-7·K5-6·K5-5·K5-4 (L5·L1 10개, 숫자만 다름) × 5봇 × 20판, 600턴 상한, §12-ONE.35와 같은 칸. K5-8은 #144 값 사용
+  4. 새 기본 = 자동 D-save·R D-save 성공 둘 다 40~60% **그리고** 자동 D-save 평균 176.4턴 이상 (여럿이면 평균이 50%에 가장 가까운 것, 같으면 숫자가 큰 것). **없으면 K5-8 그대로** + 회신 맨 앞
+  5. 해시: T3·C4E·Z1·G2·H8·CLASSIC 그대로, 기본이 바뀌면 K5-8 `0aade400…` 주입으로 그대로, 새 기본 고정
+  6. 테스트 (숫자 위 끝 < 눈 아래 끝, 같은 좌표계)·캡처 `199`~`206` 두 비율 — 눈·숫자 y 범위·간격·획 높이를 캡처 픽셀로 잰 값
+- 수치 (Claude): 위 네 이름의 숫자, 기본 고르는 규칙, 숫자 18~22px·간격 2px. 그 밖의 값은 그대로
+- 건드리지 말 것: 시한 젤리 규칙 (차례·숫자 줄어드는 때·성공 +1·0이 되면 L1 뭉쳐 놓기·점수 없음·안내 문구 형식), 레벨 5·L1 10개, NEXT·THEN 숫자, 지금 규칙·수치 전부, 그림·연출 (명세에 없는 것 금지, 숫자 뒤 원판·고리 금지), 사용자 저장 파일, `project.godot` 버전·`build/windows/` Release 파일 (**빌드 없음**), `docs/` (회신 파일 제외)
+- **회신 맨 앞에**: 규칙에 맞는 이름 없음 (K5-8 유지), 판 밖 이탈, 숫자가 눈·입·하이라이트와 겹침 또는 획 높이 18~22px 밖, 외곽선이 캡처에 안 보임, 예전 해시 (K5-8 포함) 바뀜
+- Done-when:
+  - [ ] 테스트 통과, 예전 해시 그대로, (기본이 바뀌면) 새 기본 해시 고정
+  - [ ] 판 균형표 K5-7·K5-6·K5-5·K5-4 (+ #144 K5-8)와 고른 기본
+  - [ ] 캡처 (두 비율) — 숫자·눈 픽셀 측정값, 외곽선 밝기
+- QA: §12-ONE.36 2·3·4·6번
+- 커밋: 항목 단위 브랜치 (`timed-number`), **push·PR까지** (병합은 Claude 검수 뒤)
+
+---
+
+## 처리 완료
+
+### [2026-11-12 #144] 시한 젤리 다듬기 — 짝이 드문 레벨·큰 숫자·뭉친 L1 — 완료
+- 상태: 완료 (2026-11-12 사용자 "병합 + 후속 #145" · [PR #144](https://github.com/jeongmo-dot/gravity_orb/pull/144) 병합 `bd2ccbe`)
+- 검수: 코드 diff, 테스트 diff, 회신 판 균형표 (K4-8·K5-8·K5-10·K6-10 × 5봇 × 20판), 캡처 `199`~`206` (540×960)·`199`·`200` (540×1170) 직접 확인·픽셀 측정 (캡처 파일만 읽음). 테스트 357/4/5·해시·스모크·Debug 빌드는 Codex 관측 (Claude 재실행 없음). 빌드 없음 (`project.godot` 변경 0). 맨 앞 경고 한 건 — 40~60%에 맞는 이름 없음 → K5-8 (평균 63.69%). Claude 지적: 판 위 숫자가 눈과 10~11줄 겹침·어두운 외곽선 안 보임 (Codex는 "겹치지 않음"). 뭉친 L1 (`205`)·캡처 잔여 제거는 명세대로. → Claude가 물음 → 사용자 "병합 + 후속 #145". 결과: §12-ONE.35 "#144 결과"
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.35**
 - 배경: #143 H8은 봇이 노리지 않아도 성공 74~93%, 놓인 뒤 평균 1.5턴 만에 저절로 합쳐짐. 판 위 숫자가 작아 읽기 어려움 (`199`·`200`), 0이 되면 L1 6개가 원형으로 놓임 (`205`) → 사용자 (2026-11-12) "병합 + 후속에서 다듬기"
 - 앵커: `config/default_config.tres` (`jelly_timed_level`·`jelly_timed_turns`·`jelly_timed_burst_count` 기본), `scenes/Orb3D.tscn` `TimedLabel`·`scripts/spike/Orb3D.gd` `_update_visual_transform()`, `scripts/core/TurnManager.gd` `_spawn_timed_burst()`, `tests/tools/run_timed_jelly_balance.ps1`, `tests/test_timed_jelly.gd`·`tests/test_jelly_regression.gd`, `tests/spike/capture_screens.gd`
@@ -53,10 +80,6 @@
   - [ ] 캡처 (두 비율) — 숫자 글자 높이 px, 뭉친 L1
 - QA: §12-ONE.35 1·4·6번
 - 커밋: 항목 단위 브랜치 (`timed-tune`), **push·PR까지** (병합은 Claude 검수 뒤)
-
----
-
-## 처리 완료
 
 ### [2026-11-11 #143] 시한 젤리 (숫자가 0이 되기 전에 합치기) — 완료
 - 상태: 완료 (2026-11-12 사용자 "병합 + 후속에서 다듬기" · [PR #143](https://github.com/jeongmo-dot/gravity_orb/pull/143) 병합 `d738bfa`)
