@@ -185,9 +185,9 @@ const CAPTURE_FILES: Array[String] = [
 	"200_jelly_timed_board_1.png",
 	"201_jelly_timed_preview_next.png",
 	"202_jelly_timed_success_before.png",
-	"203_jelly_timed_success_after_l5.png",
+	"203_jelly_timed_success_after_bonus.png",
 	"204_jelly_timed_timeout_before.png",
-	"205_jelly_timed_timeout_after_six_l1.png",
+	"205_jelly_timed_timeout_after_clustered_l1.png",
 	"206_jelly_timed_first_callout.png",
 ]
 
@@ -429,15 +429,14 @@ func _capture_timed_jelly_scenes(
 	hud: Hud
 ) -> void:
 	_set_jelly_level_profile("B")
+	var director: FeedbackDirector = main.get_node("FeedbackDirector") as FeedbackDirector
 	resolver.set_physics_process(false)
 	resolver.cancel_active_jelly_merges()
 	Config.data.jelly_timed_enabled = true
-	Config.data.jelly_timed_level = 3
-	Config.data.jelly_timed_turns = 8
-	Config.data.jelly_timed_burst_count = 6
-	Config.data.jelly_timed_bonus_levels = 1
 	Config.data.fx_callouts_enabled = true
+	director.clear_effects()
 	board.clear()
+	_clear_capture_hud_residue(hud)
 	var timed: Orb3D = board.spawn_orb(
 		OrbTypes.OrbColor.YELLOW,
 		Config.data.jelly_timed_level,
@@ -450,6 +449,7 @@ func _capture_timed_jelly_scenes(
 	timed.set_timed(1, 20)
 	await _capture("200_jelly_timed_board_1.png")
 
+	_clear_capture_hud_residue(hud)
 	hud._on_preview_changed([
 		[{
 			"color": OrbTypes.OrbColor.YELLOW,
@@ -461,9 +461,20 @@ func _capture_timed_jelly_scenes(
 	])
 	await _capture("201_jelly_timed_preview_next.png")
 
+	director.clear_effects()
 	board.clear()
-	var first: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, 3, Vector2(-80.0, 0.0))
-	var second: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, 3, Vector2(80.0, 0.0))
+	_clear_capture_hud_residue(hud)
+	var timed_level: int = Config.data.jelly_timed_level
+	var first: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		timed_level,
+		Vector2(-80.0, 0.0)
+	)
+	var second: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		timed_level,
+		Vector2(80.0, 0.0)
+	)
 	first.set_timed(8, 20)
 	first.disable_physics()
 	second.disable_physics()
@@ -476,12 +487,35 @@ func _capture_timed_jelly_scenes(
 	Config.data.jelly_merge_duration = original_duration
 	await get_tree().process_frame
 	var success_orbs: Array[Orb3D] = board.get_orbs()
-	if success_orbs.size() != 1 or success_orbs[0].level != 5 or success_orbs[0].is_timed:
-		_fail("timed success capture expected one normal L5")
-	await _capture("203_jelly_timed_success_after_l5.png")
+	var classified: Dictionary = ReactionRules.classify(
+		OrbTypes.OrbColor.RED,
+		timed_level,
+		OrbTypes.OrbColor.RED,
+		timed_level,
+		Config.data,
+		Config.data.jelly_mass_for_level(timed_level),
+		Config.data.jelly_mass_for_level(timed_level)
+	)
+	var expected_result_level: int = mini(
+		int(classified["result_level"]) + Config.data.jelly_timed_bonus_levels,
+		Config.data.orb_max_level
+	)
+	if (
+		success_orbs.size() != 1
+		or success_orbs[0].level != expected_result_level
+		or success_orbs[0].is_timed
+	):
+		_fail("timed success capture expected one normal bonus result")
+	await _capture("203_jelly_timed_success_after_bonus.png")
 
+	director.clear_effects()
 	board.clear()
-	var expiring: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 3, Vector2.ZERO)
+	_clear_capture_hud_residue(hud)
+	var expiring: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.GREEN,
+		timed_level,
+		Vector2.ZERO
+	)
 	expiring.set_timed(1, 32)
 	expiring.disable_physics()
 	await _capture("204_jelly_timed_timeout_before.png")
@@ -493,18 +527,20 @@ func _capture_timed_jelly_scenes(
 	for orb: Orb3D in board.get_orbs():
 		if orb.level == 1 and orb.color == OrbTypes.OrbColor.GREEN:
 			burst_count += 1
-	if burst_count != 6 or score.score != score_before:
-		_fail("timed timeout capture expected six scoreless same-color L1 jellies")
-	await _capture("205_jelly_timed_timeout_after_six_l1.png")
+	if burst_count != Config.data.jelly_timed_burst_count or score.score != score_before:
+		_fail("timed timeout capture expected configured scoreless same-color L1 jellies")
+	await _capture("205_jelly_timed_timeout_after_clustered_l1.png")
 
-	if hud._callout_tween != null and hud._callout_tween.is_valid():
-		hud._callout_tween.kill()
-	hud._hide_callout_label()
+	director.clear_effects()
+	_clear_capture_hud_residue(hud)
 	hud._pending_planet_unlocks.clear()
 	hud._pending_jelly_tap_effects.clear()
 	hud._timed_jelly_callout_seen = false
 	hud._timed_jelly_callout_pending = false
-	hud._on_timed_jelly_placed(8, 1)
+	hud._on_timed_jelly_placed(
+		Config.data.jelly_timed_turns,
+		Config.data.jelly_timed_bonus_levels
+	)
 	if hud._callout_tween != null and hud._callout_tween.is_valid():
 		hud._callout_tween.kill()
 	_report_callout_fit("206_jelly_timed_first_callout", hud)

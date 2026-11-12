@@ -2382,6 +2382,11 @@ func _apply_arguments() -> void:
 				1,
 				Config.data.orb_max_level
 			)
+		elif argument.begins_with("--jelly-timed-burst-count="):
+			Config.data.jelly_timed_burst_count = maxi(
+				argument.trim_prefix("--jelly-timed-burst-count=").to_int(),
+				1
+			)
 		elif argument.begins_with("--blast-push-radius-by-level="):
 			Config.data.blast_push_radius_by_level = _parse_float_list(
 				argument.trim_prefix("--blast-push-radius-by-level=")

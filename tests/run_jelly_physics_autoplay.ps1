@@ -2,7 +2,7 @@ param(
     [string]$GodotPath = "C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe",
     [string]$RepoPath = "",
     [string]$Label = "after",
-    [ValidateRange(1, 8)]
+    [ValidateRange(1, 16)]
     [int]$Parallelism = 4,
     [double]$Friction = -1.0,
     [double]$AngularDamp = -1.0,
@@ -70,6 +70,8 @@ param(
 	[int]$JellyTimedTurns = 8,
 	[ValidateRange(1, 10)]
 	[int]$JellyTimedLevel = 3,
+	[ValidateRange(1, 100)]
+	[int]$JellyTimedBurstCount = 6,
     [switch]$AggregateOnly
 )
 
@@ -97,6 +99,7 @@ $physicsArguments += "--jelly-merge-wide-gap-min-level=$JellyMergeWideGapMinLeve
 $physicsArguments += "--jelly-timed-enabled=$($JellyTimedEnabled.ToLower())"
 $physicsArguments += "--jelly-timed-turns=$JellyTimedTurns"
 $physicsArguments += "--jelly-timed-level=$JellyTimedLevel"
+$physicsArguments += "--jelly-timed-burst-count=$JellyTimedBurstCount"
 $physicsArguments += "--jelly-tap-blast-min-level=$JellyTapBlastMinLevel"
 $physicsArguments += "--blast-score-factor=$($BlastScoreFactor.ToString($culture))"
 $physicsArguments += "--jelly-tap-blast-score-factor=$($JellyTapBlastScoreFactor.ToString($culture))"
