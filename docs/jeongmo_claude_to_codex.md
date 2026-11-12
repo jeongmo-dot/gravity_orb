@@ -32,8 +32,35 @@
 
 ## 대기 중
 
-### [2026-11-11 #143] 시한 젤리 (숫자가 0이 되기 전에 합치기)
-- 상태: 대기 (#142 병합됨 `f9324e2` — main 위에서)
+### [2026-11-12 #144] 시한 젤리 다듬기 — 짝이 드문 레벨·큰 숫자·뭉친 L1
+- 상태: 대기 (#143 병합됨 `d738bfa` — main 위에서)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.35**
+- 배경: #143 H8은 봇이 노리지 않아도 성공 74~93%, 놓인 뒤 평균 1.5턴 만에 저절로 합쳐짐. 판 위 숫자가 작아 읽기 어려움 (`199`·`200`), 0이 되면 L1 6개가 원형으로 놓임 (`205`) → 사용자 (2026-11-12) "병합 + 후속에서 다듬기"
+- 앵커: `config/default_config.tres` (`jelly_timed_level`·`jelly_timed_turns`·`jelly_timed_burst_count` 기본), `scenes/Orb3D.tscn` `TimedLabel`·`scripts/spike/Orb3D.gd` `_update_visual_transform()`, `scripts/core/TurnManager.gd` `_spawn_timed_burst()`, `tests/tools/run_timed_jelly_balance.ps1`, `tests/test_timed_jelly.gd`·`tests/test_jelly_regression.gd`, `tests/spike/capture_screens.gd`
+- 요구 (§12-ONE.35 1~7):
+  1. 판 균형 K4-8 (L4·8·8)·K5-8 (L5·8·10)·K5-10 (L5·10·10)·K6-10 (L6·10·14) × 5봇 × 20판, 600턴 상한, §12-ONE.34와 같은 칸
+  2. 새 기본 = 자동 D-save·R D-save 성공이 둘 다 40~60%인 이름 (여럿이면 평균이 50%에 가장 가까운 것, 같으면 낮은 레벨). 없으면 평균이 50%에 가장 가까운 것 + 회신 맨 앞
+  3. 판 위 숫자: 540×960에서 글자 높이 18px 이상, 굵은 서체, 흰 글자 + 어두운 외곽선 4 이상, 젤리 아래쪽 절반 가운데 (눈·하이라이트와 안 겹침)
+  4. 0이 되면 L1을 원본 원 안을 채우듯 뭉쳐 놓기 (같은 간격 원형 배치 금지)
+  5. 해시: 예전 JELLY 묶음·H8 `af427045…` 그대로 (주입), 새 기본 고정, CLASSIC 그대로
+  6. 테스트·캡처 (§12-ONE.35 4·6번) — 캡처 장면 사이 잔여 지우기 포함
+- 수치 (Claude): 위 네 이름의 값과 기본 고르는 규칙. 그 밖의 값은 그대로
+- 건드리지 말 것: 시한 젤리 규칙 (차례·숫자 줄어드는 때·성공 +1·0이 되면 L1·점수 없음·안내 문구 형식), 지금 규칙·수치 전부, 그림·연출 (명세에 없는 것 금지, 고리 모양 금지), 사용자 저장 파일, `project.godot` 버전·`build/windows/` Release 파일 (**빌드 없음**), `docs/` (회신 파일 제외)
+- **회신 맨 앞에**: 40~60% 규칙에 맞는 이름 없음, 새 기본 자동 D-save 평균 176.4턴 미만, 판 밖 이탈, 숫자 18px 미만·눈/하이라이트와 겹침, 예전 해시 (H8 포함) 바뀜
+- Done-when:
+  - [ ] 테스트 통과, 예전 JELLY 해시 (T3·C4E·Z1·G2·H8)·CLASSIC 그대로, 새 기본 해시 고정
+  - [ ] 판 균형표 K4-8·K5-8·K5-10·K6-10과 고른 기본
+  - [ ] 캡처 (두 비율) — 숫자 글자 높이 px, 뭉친 L1
+- QA: §12-ONE.35 1·4·6번
+- 커밋: 항목 단위 브랜치 (`timed-tune`), **push·PR까지** (병합은 Claude 검수 뒤)
+
+---
+
+## 처리 완료
+
+### [2026-11-11 #143] 시한 젤리 (숫자가 0이 되기 전에 합치기) — 완료
+- 상태: 완료 (2026-11-12 사용자 "병합 + 후속에서 다듬기" · [PR #143](https://github.com/jeongmo-dot/gravity_orb/pull/143) 병합 `d738bfa`)
+- 검수: 코드 diff, 회신 판 균형표 (H8·H6·H10·H8-L2 × 5봇 × 20판), 캡처 `199`·`200`·`201`·`204`·`205` (540×960)·`200` (540×1170) 직접 확인. 테스트 354/4/5·해시·스모크는 Codex 관측 (Claude 재실행 없음). 빌드 없음 (Release 미생성 확인). 맨 앞 경고 한 건 — H8 성공 90% 넘는 행 셋. Claude 지적: 판 위 숫자 읽기 어려움 (`199`·`200`), L1 6개 원형 배치 (`205`, 명세 표현 탓), 캡처 잔여 (`204`·`205`). → Claude가 물음 → 사용자 "병합 + 후속에서 다듬기" (#144). 결과: §12-ONE.34 "#143 결과"
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.34**
 - 배경: 사용자 (2026-11-11) "전략성과 긴장감이 과제야" → "지금 있는 걸 바꾸는게 아니라 새로운 시도가 필요해. 그리고 매번 빌드를 만들 필요는 없어" → "시한 젤리"
 - 앵커: `scripts/core/Spawner.gd` `_draw_batch()`·`try_spawn()`·`_public_batch()`·`sync_next_batch_size()`, `scripts/core/TurnManager.gd` `_on_settled()`, `scripts/core/ReactionRules.gd` `_classify_jelly()`·`scripts/core/CollisionResolver.gd` (합체 결과), `scripts/spike/Orb3D.gd` (시한 상태·숫자), NEXT·THEN 미리보기, `scripts/ui/Hud.gd` (안내 한 줄), `config/GameConfig.gd`·`default_config.tres`, 판 균형 측정 도구, `tests/` (해시·새 테스트), `tests/spike/capture_screens.gd`
@@ -56,10 +83,6 @@
   - [ ] 캡처 (두 비율)
 - QA: §12-ONE.34 9~12번
 - 커밋: 항목 단위 브랜치 (`timed-jelly`), **push·PR까지** (병합은 Claude 검수 뒤)
-
----
-
-## 처리 완료
 
 ### [2026-11-09 #142] 안내 한 줄이 넘칠 때만 글자 줄이기·빌드 0.16.10 — 완료
 - 상태: 완료 (2026-11-09 사용자 "확인" · [PR #142](https://github.com/jeongmo-dot/gravity_orb/pull/142) 병합 `f9324e2`)
