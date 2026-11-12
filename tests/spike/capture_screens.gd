@@ -181,7 +181,7 @@ const CAPTURE_FILES: Array[String] = [
 	"196_jelly_clean_zone_green_after.png",
 	"197_jelly_clean_zone_yellow_before.png",
 	"198_jelly_clean_zone_yellow_after.png",
-	"199_jelly_timed_board_8.png",
+	"199_jelly_timed_board_initial.png",
 	"200_jelly_timed_board_1.png",
 	"201_jelly_timed_preview_next.png",
 	"202_jelly_timed_success_before.png",
@@ -442,10 +442,10 @@ func _capture_timed_jelly_scenes(
 		Config.data.jelly_timed_level,
 		Vector2.ZERO
 	)
-	timed.set_timed(8, 20)
+	timed.set_timed(Config.data.jelly_timed_turns, 20)
 	timed.disable_physics()
 	await get_tree().process_frame
-	await _capture("199_jelly_timed_board_8.png")
+	await _capture("199_jelly_timed_board_initial.png")
 	timed.set_timed(1, 20)
 	await _capture("200_jelly_timed_board_1.png")
 

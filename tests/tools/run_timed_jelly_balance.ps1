@@ -21,16 +21,16 @@ $measurementDirectory = Join-Path $repoPath "artifacts\measurements"
 New-Item -ItemType Directory -Path $measurementDirectory -Force | Out-Null
 
 $profiles = @(
-    [pscustomobject]@{ Slug = "k4_8"; Name = "K4-8"; Turns = 8; Level = 4; BurstCount = 8 },
-    [pscustomobject]@{ Slug = "k5_8"; Name = "K5-8"; Turns = 8; Level = 5; BurstCount = 10 },
-    [pscustomobject]@{ Slug = "k5_10"; Name = "K5-10"; Turns = 10; Level = 5; BurstCount = 10 },
-    [pscustomobject]@{ Slug = "k6_10"; Name = "K6-10"; Turns = 10; Level = 6; BurstCount = 14 }
+    [pscustomobject]@{ Slug = "k5_7"; Name = "K5-7"; Turns = 7; Level = 5; BurstCount = 10 },
+    [pscustomobject]@{ Slug = "k5_6"; Name = "K5-6"; Turns = 6; Level = 5; BurstCount = 10 },
+    [pscustomobject]@{ Slug = "k5_5"; Name = "K5-5"; Turns = 5; Level = 5; BurstCount = 10 },
+    [pscustomobject]@{ Slug = "k5_4"; Name = "K5-4"; Turns = 4; Level = 5; BurstCount = 10 }
 )
 
 foreach ($profile in $profiles) {
     foreach ($mode in @("save", "all")) {
         $tapMode = if ($mode -eq "save") { "Save" } else { "All" }
-        $autoLabel = "144_$($profile.Slug)_auto_$mode"
+        $autoLabel = "145_$($profile.Slug)_auto_$mode"
         $autoSummaryPath = Join-Path $repoPath "artifacts\jelly_physics_autoplay_$autoLabel.json"
         if (-not ($ReuseCompleted -and (Test-Path -LiteralPath $autoSummaryPath))) {
             $autoArguments = @{
@@ -59,7 +59,7 @@ foreach ($profile in $profiles) {
             & $autoScript @autoArguments
         }
 
-        $strategyLabel = "144_$($profile.Slug)_strategy_$mode"
+        $strategyLabel = "145_$($profile.Slug)_strategy_$mode"
         $strategyArguments = @{
             GodotPath = $GodotPath
             SeedCount = 20
@@ -138,10 +138,10 @@ function Get-StrategyRow($Summary) {
 
 $profileReports = [ordered]@{}
 foreach ($profile in $profiles) {
-    $autoSave = Get-Content -LiteralPath (Join-Path $repoPath "artifacts\jelly_physics_autoplay_144_$($profile.Slug)_auto_save.json") -Raw | ConvertFrom-Json
-    $autoAll = Get-Content -LiteralPath (Join-Path $repoPath "artifacts\jelly_physics_autoplay_144_$($profile.Slug)_auto_all.json") -Raw | ConvertFrom-Json
-    $strategySave = Get-Content -LiteralPath (Join-Path $measurementDirectory "jelly_rules_measurement_144_$($profile.Slug)_strategy_save.json") -Raw | ConvertFrom-Json
-    $strategyAll = Get-Content -LiteralPath (Join-Path $measurementDirectory "jelly_rules_measurement_144_$($profile.Slug)_strategy_all.json") -Raw | ConvertFrom-Json
+    $autoSave = Get-Content -LiteralPath (Join-Path $repoPath "artifacts\jelly_physics_autoplay_145_$($profile.Slug)_auto_save.json") -Raw | ConvertFrom-Json
+    $autoAll = Get-Content -LiteralPath (Join-Path $repoPath "artifacts\jelly_physics_autoplay_145_$($profile.Slug)_auto_all.json") -Raw | ConvertFrom-Json
+    $strategySave = Get-Content -LiteralPath (Join-Path $measurementDirectory "jelly_rules_measurement_145_$($profile.Slug)_strategy_save.json") -Raw | ConvertFrom-Json
+    $strategyAll = Get-Content -LiteralPath (Join-Path $measurementDirectory "jelly_rules_measurement_145_$($profile.Slug)_strategy_all.json") -Raw | ConvertFrom-Json
     $profileReports[$profile.Name] = [ordered]@{
         timed_turns = $profile.Turns
         timed_level = $profile.Level
@@ -154,8 +154,18 @@ foreach ($profile in $profiles) {
     }
 }
 
+$baseline = [pscustomobject]@{
+    Name = "K5-8"
+    Level = 5
+    Turns = 8
+    BurstCount = 10
+    AutoSuccess = 0.6536144578313253
+    RSuccess = 0.620253164556962
+    AutoTurns = 211.15
+    AverageSuccess = 0.6369338111941436
+    DistanceFromHalf = 0.1369338111941436
+}
 $eligibleProfiles = @()
-$rankedProfiles = @()
 foreach ($profile in $profiles) {
     $profileReport = $profileReports[$profile.Name]
     $autoSuccess = [double]$profileReport.auto_d_save.success_ratio
@@ -168,22 +178,32 @@ foreach ($profile in $profiles) {
         BurstCount = $profile.BurstCount
         AutoSuccess = $autoSuccess
         RSuccess = $rSuccess
+        AutoTurns = [double]$profileReport.auto_d_save.turns_average
         AverageSuccess = $averageSuccess
         DistanceFromHalf = [Math]::Abs($averageSuccess - 0.5)
     }
-    $rankedProfiles += $candidate
-    if ($autoSuccess -ge 0.4 -and $autoSuccess -le 0.6 -and $rSuccess -ge 0.4 -and $rSuccess -le 0.6) {
+    if (
+        $autoSuccess -ge 0.4 -and $autoSuccess -le 0.6 -and
+        $rSuccess -ge 0.4 -and $rSuccess -le 0.6 -and
+        $candidate.AutoTurns -ge 176.4
+    ) {
         $eligibleProfiles += $candidate
     }
 }
-$selectionPool = if ($eligibleProfiles.Count -gt 0) { $eligibleProfiles } else { $rankedProfiles }
-$selectedProfile = @($selectionPool | Sort-Object DistanceFromHalf, Level | Select-Object -First 1)[0]
+$selectedProfile = if ($eligibleProfiles.Count -gt 0) {
+    @(
+        $eligibleProfiles |
+            Sort-Object `
+                @{ Expression = "DistanceFromHalf"; Ascending = $true },
+                @{ Expression = "Turns"; Descending = $true } |
+            Select-Object -First 1
+    )[0]
+} else {
+    $baseline
+}
 $warnings = @()
 if ($eligibleProfiles.Count -eq 0) {
-    $warnings += "No profile has both auto D-save and R D-save success ratios inside 40-60%"
-}
-if ([double]$profileReports[$selectedProfile.Name].auto_d_save.turns_average -lt 176.4) {
-    $warnings += "$($selectedProfile.Name) auto D-save average turn below 176.4: $($profileReports[$selectedProfile.Name].auto_d_save.turns_average)"
+    $warnings += "No new profile meets both 40-60% success ratios and auto D-save average turns >= 176.4; keep K5-8"
 }
 foreach ($profileEntry in $profileReports.GetEnumerator()) {
     foreach ($rowEntry in $profileEntry.Value.GetEnumerator()) {
@@ -197,7 +217,8 @@ foreach ($profileEntry in $profileReports.GetEnumerator()) {
 $report = [ordered]@{
     generated_at = (Get-Date).ToUniversalTime().ToString("o")
     engine = "Godot 4.8-dev3 standard"
-    conditions = "K4-8/K5-8/K5-10/K6-10; auto seeds 101-120; strategy seeds 1-20; five bots; 600 turns; fixed 120 fps"
+    conditions = "K5-7/K5-6/K5-5/K5-4; K5-8 from #144; auto seeds 101-120; strategy seeds 1-20; five bots; 600 turns; fixed 120 fps"
+    baseline_k5_8 = $baseline
     profiles = $profileReports
     selection = [ordered]@{
         eligible_profile_names = @($eligibleProfiles | ForEach-Object { $_.Name })
@@ -209,6 +230,6 @@ $report = [ordered]@{
     }
     warnings = $warnings
 }
-$outputPath = Join-Path $measurementDirectory "timed_jelly_tune_balance.json"
+$outputPath = Join-Path $measurementDirectory "timed_jelly_number_balance.json"
 $report | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $outputPath -Encoding utf8
 Write-Output "TIMED_JELLY_BALANCE_REPORT $outputPath"

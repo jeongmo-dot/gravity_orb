@@ -4,6 +4,7 @@ const BOARD_SCENE: PackedScene = preload("res://scenes/Board3D.tscn")
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
 const EXPECTED_H8_HASH: String = "af427045d52629bdc02da6e368fc39301999ec6442285f1b00fc55125bd67fc9"
 const EXPECTED_K5_8_HASH: String = "0aade400f3932750531c74d4e47dc0a61d4227ccd92081ccdd4627afae0f2212"
+const EXPECTED_K5_4_HASH: String = "bc86d2571e89ed78fcb10d0fb69d03c33048f362ea8395d164605e3d7e21dab7"
 
 
 func test_h8_marker_countdown_success_and_failure_hash() -> void:
@@ -60,7 +61,7 @@ func test_h8_marker_countdown_success_and_failure_hash() -> void:
 	_restore_config(snapshot)
 
 
-func test_k5_8_default_marker_countdown_success_and_failure_hash() -> void:
+func test_k5_8_marker_countdown_success_and_failure_hash() -> void:
 	var snapshot: Dictionary = _snapshot_config()
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.jelly_timed_enabled = true
@@ -110,7 +111,62 @@ func test_k5_8_default_marker_countdown_success_and_failure_hash() -> void:
 	}
 	var hash_value: String = JSON.stringify(state).sha256_text()
 	print("JELLY_K5_8_TIMED_HASH hash=%s" % hash_value)
-	assert_eq(hash_value, EXPECTED_K5_8_HASH, "K5-8 default timed rule hash")
+	assert_eq(hash_value, EXPECTED_K5_8_HASH, "K5-8 timed rule hash")
+	spawner.free()
+	_restore_config(snapshot)
+
+
+func test_k5_4_default_marker_countdown_success_and_failure_hash() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_timed_enabled = true
+	Config.data.jelly_timed_turns = 4
+	Config.data.jelly_timed_level = 5
+	Config.data.jelly_timed_burst_count = 10
+	var spawner: Spawner = Spawner.new()
+	spawner.init_rng(14504)
+	var scheduled_rows: Array[Dictionary] = []
+	for turn_index: int in range(1, 45):
+		var batch: Array[Dictionary] = spawner._draw_batch(turn_index)
+		if bool(batch[0].get("timed", false)):
+			scheduled_rows.append({
+				"turn": turn_index,
+				"drawn_level": int(batch[0]["level"]),
+				"preview": spawner._public_batch(batch)[0],
+			})
+	var base: Dictionary = ReactionRules.classify(
+		OrbTypes.OrbColor.RED,
+		Config.data.jelly_timed_level,
+		OrbTypes.OrbColor.RED,
+		Config.data.jelly_timed_level,
+		Config.data,
+		Config.data.jelly_mass_for_level(Config.data.jelly_timed_level),
+		Config.data.jelly_mass_for_level(Config.data.jelly_timed_level)
+	)
+	var bonus_level: int = mini(
+		int(base["result_level"]) + Config.data.jelly_timed_bonus_levels,
+		Config.data.orb_max_level
+	)
+	var state: Dictionary = {
+		"scheduled": scheduled_rows,
+		"countdown": [4, 3, 2, 1, 0],
+		"success": {
+			"base_level": int(base["result_level"]),
+			"result_level": bonus_level,
+			"result_mass": Config.data.jelly_mass_for_level(bonus_level),
+			"timed_after": false,
+		},
+		"failure": {
+			"source_level": Config.data.jelly_timed_level,
+			"burst_level": 1,
+			"burst_count": Config.data.jelly_timed_burst_count,
+			"burst_layout": "compact_hex_fill",
+			"score": 0,
+		},
+	}
+	var hash_value: String = JSON.stringify(state).sha256_text()
+	print("JELLY_K5_4_TIMED_HASH hash=%s" % hash_value)
+	assert_eq(hash_value, EXPECTED_K5_4_HASH, "K5-4 default timed rule hash")
 	spawner.free()
 	_restore_config(snapshot)
 
@@ -322,7 +378,7 @@ func test_timed_burst_uses_compact_hex_fill_inside_source_and_board() -> void:
 	_restore_config(snapshot)
 
 
-func test_board_timed_number_uses_bold_font_lower_half_and_dark_outline() -> void:
+func test_board_timed_number_stays_below_eyes_inside_orb_with_visible_outline() -> void:
 	var snapshot: Dictionary = _snapshot_config()
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	var fixture: Dictionary = await _create_fixture()
@@ -334,10 +390,33 @@ func test_board_timed_number_uses_bold_font_lower_half_and_dark_outline() -> voi
 	var label: Label3D = orb.get_node("TimedLabel") as Label3D
 	assert_true(label.visible, "timed number is visible")
 	assert_true(label.font is FontVariation, "timed number uses the HUD variable font")
-	assert_true(label.font_size >= 12, "timed number keeps a readable fixed-size font")
+	assert_eq(label.font_size, 7, "default L5 timed number uses the capture-verified size")
 	assert_true(label.outline_size >= 4, "timed number uses a dark outline at least four pixels")
+	assert_true(
+		label.outline_render_priority > 12,
+		"outline renders in front of the jelly face material"
+	)
+	assert_true(
+		label.outline_render_priority < label.render_priority,
+		"outline remains directly behind the white glyph"
+	)
 	assert_eq(label.modulate, Color.WHITE, "timed number is white")
-	assert_true(label.position.y < orb._mesh.position.y, "timed number sits in the lower half")
+	var label_bounds: AABB = label.get_aabb()
+	var label_top_y: float = label.position.y + label_bounds.end.y
+	var label_bottom_y: float = label.position.y + label_bounds.position.y
+	var face_scale_y: float = orb._face.basis.y.length()
+	var normal_eye_bottom_y: float = orb._face.position.y - face_scale_y * (0.22 + 0.105)
+	var radius_m: float = Config.data.radius_for_level(5) / Orb3D.PIXELS_PER_METER
+	var orb_bottom_y: float = orb._mesh.position.y - radius_m * orb._mesh.scale.y
+	var two_pixel_margin_m: float = 2.0 / Orb3D.PIXELS_PER_METER
+	assert_true(
+		label_top_y <= normal_eye_bottom_y - two_pixel_margin_m,
+		"number top stays at least two pixels below the resting eyes in world Y"
+	)
+	assert_true(
+		label_bottom_y >= orb_bottom_y + two_pixel_margin_m,
+		"number bottom stays at least two pixels inside the jelly contour in world Y"
+	)
 	await _cleanup(fixture["root"] as Node)
 	_restore_config(snapshot)
 
