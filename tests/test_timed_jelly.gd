@@ -3,6 +3,7 @@ extends TestCase
 const BOARD_SCENE: PackedScene = preload("res://scenes/Board3D.tscn")
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
 const EXPECTED_H8_HASH: String = "af427045d52629bdc02da6e368fc39301999ec6442285f1b00fc55125bd67fc9"
+const EXPECTED_K5_8_HASH: String = "0aade400f3932750531c74d4e47dc0a61d4227ccd92081ccdd4627afae0f2212"
 
 
 func test_h8_marker_countdown_success_and_failure_hash() -> void:
@@ -11,6 +12,7 @@ func test_h8_marker_countdown_success_and_failure_hash() -> void:
 	Config.data.jelly_timed_enabled = true
 	Config.data.jelly_timed_turns = 8
 	Config.data.jelly_timed_level = 3
+	Config.data.jelly_timed_burst_count = 6
 	var spawner: Spawner = Spawner.new()
 	spawner.init_rng(14308)
 	var scheduled_rows: Array[Dictionary] = []
@@ -54,6 +56,61 @@ func test_h8_marker_countdown_success_and_failure_hash() -> void:
 	var hash_value: String = JSON.stringify(state).sha256_text()
 	print("JELLY_H8_TIMED_HASH hash=%s" % hash_value)
 	assert_eq(hash_value, EXPECTED_H8_HASH, "H8 timed rule hash")
+	spawner.free()
+	_restore_config(snapshot)
+
+
+func test_k5_8_default_marker_countdown_success_and_failure_hash() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_timed_enabled = true
+	Config.data.jelly_timed_turns = 8
+	Config.data.jelly_timed_level = 5
+	Config.data.jelly_timed_burst_count = 10
+	var spawner: Spawner = Spawner.new()
+	spawner.init_rng(14408)
+	var scheduled_rows: Array[Dictionary] = []
+	for turn_index: int in range(1, 45):
+		var batch: Array[Dictionary] = spawner._draw_batch(turn_index)
+		if bool(batch[0].get("timed", false)):
+			scheduled_rows.append({
+				"turn": turn_index,
+				"drawn_level": int(batch[0]["level"]),
+				"preview": spawner._public_batch(batch)[0],
+			})
+	var base: Dictionary = ReactionRules.classify(
+		OrbTypes.OrbColor.RED,
+		Config.data.jelly_timed_level,
+		OrbTypes.OrbColor.RED,
+		Config.data.jelly_timed_level,
+		Config.data,
+		Config.data.jelly_mass_for_level(Config.data.jelly_timed_level),
+		Config.data.jelly_mass_for_level(Config.data.jelly_timed_level)
+	)
+	var bonus_level: int = mini(
+		int(base["result_level"]) + Config.data.jelly_timed_bonus_levels,
+		Config.data.orb_max_level
+	)
+	var state: Dictionary = {
+		"scheduled": scheduled_rows,
+		"countdown": [8, 7, 6, 5, 4, 3, 2, 1, 0],
+		"success": {
+			"base_level": int(base["result_level"]),
+			"result_level": bonus_level,
+			"result_mass": Config.data.jelly_mass_for_level(bonus_level),
+			"timed_after": false,
+		},
+		"failure": {
+			"source_level": Config.data.jelly_timed_level,
+			"burst_level": 1,
+			"burst_count": Config.data.jelly_timed_burst_count,
+			"burst_layout": "compact_hex_fill",
+			"score": 0,
+		},
+	}
+	var hash_value: String = JSON.stringify(state).sha256_text()
+	print("JELLY_K5_8_TIMED_HASH hash=%s" % hash_value)
+	assert_eq(hash_value, EXPECTED_K5_8_HASH, "K5-8 default timed rule hash")
 	spawner.free()
 	_restore_config(snapshot)
 
@@ -210,6 +267,78 @@ func test_first_placement_callout_is_queued_once() -> void:
 		"configured callout text"
 	)
 	await _cleanup(main)
+	_restore_config(snapshot)
+
+
+func test_timed_burst_uses_compact_hex_fill_inside_source_and_board() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_timed_burst_count = 14
+	var fixture: Dictionary = await _create_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	var source_radius: float = Config.data.radius_for_level(6)
+	var level_one_radius: float = Config.data.radius_for_level(1)
+	var offsets: Array[Vector2] = manager._timed_burst_offsets(
+		14,
+		source_radius,
+		level_one_radius
+	)
+	assert_eq(offsets.size(), 14, "K6 burst offset count")
+	assert_eq(offsets[0], Vector2.ZERO, "compact fill starts at the source center")
+	var radial_bands: Dictionary = {}
+	for offset: Vector2 in offsets:
+		assert_true(
+			offset.length() <= source_radius + level_one_radius + 0.001,
+			"burst center stays within the source circle plus one L1 radius"
+		)
+		radial_bands[roundi(offset.length())] = true
+	assert_true(radial_bands.size() >= 3, "burst is a filled cluster rather than one ring")
+	var source_center: Vector2 = Vector2(350.0, 350.0)
+	var source: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.BLUE,
+		6,
+		source_center
+	)
+	source.set_timed(1, 20)
+	source.disable_physics()
+	manager._spawn_timed_burst(source)
+	var half_board: float = Config.data.board_size * 0.5
+	var burst_orbs: Array[Orb3D] = board.get_orbs()
+	assert_eq(burst_orbs.size(), 14, "K6 timeout spawns fourteen L1 jellies")
+	for orb: Orb3D in burst_orbs:
+		assert_eq(orb.level, 1, "cluster member is L1")
+		assert_eq(orb.color, OrbTypes.OrbColor.BLUE, "cluster keeps source color")
+		assert_true(orb.is_ghost, "cluster member starts ghosted")
+		assert_true(
+			absf(orb.position.x) + level_one_radius <= half_board + 0.001,
+			"cluster member stays inside horizontal board bounds"
+		)
+		assert_true(
+			absf(orb.position.y) + level_one_radius <= half_board + 0.001,
+			"cluster member stays inside vertical board bounds"
+		)
+	await _cleanup(fixture["root"] as Node)
+	_restore_config(snapshot)
+
+
+func test_board_timed_number_uses_bold_font_lower_half_and_dark_outline() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var fixture: Dictionary = await _create_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var orb: Orb3D = board.spawn_orb(OrbTypes.OrbColor.YELLOW, 5, Vector2.ZERO)
+	orb.set_timed(8, 20)
+	orb.disable_physics()
+	await tree.process_frame
+	var label: Label3D = orb.get_node("TimedLabel") as Label3D
+	assert_true(label.visible, "timed number is visible")
+	assert_true(label.font is FontVariation, "timed number uses the HUD variable font")
+	assert_true(label.font_size >= 12, "timed number keeps a readable fixed-size font")
+	assert_true(label.outline_size >= 4, "timed number uses a dark outline at least four pixels")
+	assert_eq(label.modulate, Color.WHITE, "timed number is white")
+	assert_true(label.position.y < orb._mesh.position.y, "timed number sits in the lower half")
+	await _cleanup(fixture["root"] as Node)
 	_restore_config(snapshot)
 
 

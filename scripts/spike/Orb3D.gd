@@ -1111,9 +1111,9 @@ func _update_visual_transform() -> void:
 	_timed_label.position = _front_overlay_position(
 		render_world_position,
 		body_front_offset + 0.08
-	) + Vector3(0.0, radius_m * 0.1, 0.0)
-	_timed_label.font_size = clampi(roundi(_current_radius * 0.28), 20, 22)
-	_timed_label.outline_size = 3
+	) + Vector3(0.0, -radius_m * 0.34, 0.0)
+	_timed_label.font_size = clampi(roundi(_current_radius * 0.14), 12, 16)
+	_timed_label.outline_size = 4
 	if _merge_visual_active:
 		_symbol_mesh.rotation.z = _merge_visual_rotation
 		_symbol_mesh.scale *= Vector3(

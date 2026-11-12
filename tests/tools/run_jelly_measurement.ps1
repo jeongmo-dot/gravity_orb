@@ -2,7 +2,7 @@ param(
     [string]$GodotPath = "",
     [ValidateRange(1, 20)]
     [int]$SeedCount = 20,
-    [ValidateRange(1, 8)]
+    [ValidateRange(1, 16)]
     [int]$Parallelism = 3,
     [ValidateRange(1, 600)]
     [int]$TurnCap = 600,
@@ -21,6 +21,8 @@ param(
 	[int]$JellyTimedTurns = 8,
 	[ValidateRange(1, 10)]
 	[int]$JellyTimedLevel = 3,
+	[ValidateRange(1, 100)]
+	[int]$JellyTimedBurstCount = 6,
 	[ValidateRange(0, 10)]
 	[int]$JellyBlastMinLevel = 8,
 	[ValidateRange(0, 10)]
@@ -131,6 +133,7 @@ if (-not $AggregateOnly) {
 					"--jelly-timed-enabled=$($JellyTimedEnabled.ToLower())",
 					"--jelly-timed-turns=$JellyTimedTurns",
 					"--jelly-timed-level=$JellyTimedLevel",
+					"--jelly-timed-burst-count=$JellyTimedBurstCount",
 					"--jelly-blast-min-level=$JellyBlastMinLevel",
 					"--jelly-tap-blast-min-level=$JellyTapBlastMinLevel",
 					"--blast-score-factor=$($BlastScoreFactor.ToString([Globalization.CultureInfo]::InvariantCulture))",

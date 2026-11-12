@@ -1,6 +1,13 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/spike/Orb3D.gd" id="1_orb_3d"]
+[ext_resource type="FontFile" path="res://assets/fonts/Orbitron[wght].ttf" id="2_orbitron_variable"]
+
+[sub_resource type="FontVariation" id="FontVariation_orbitron_bold"]
+base_font = ExtResource("2_orbitron_variable")
+variation_opentype = {
+2003265652: 700.0
+}
 
 [node name="Orb3D" type="Node"]
 script = ExtResource("1_orb_3d")
@@ -31,8 +38,9 @@ cast_shadow = 0
 unique_name_in_owner = true
 visible = false
 pixel_size = 0.0018
-font_size = 20
-outline_size = 3
+font = SubResource("FontVariation_orbitron_bold")
+font_size = 14
+outline_size = 4
 modulate = Color(1, 1, 1, 1)
 outline_modulate = Color(0.02, 0.035, 0.07, 0.96)
 billboard = 1

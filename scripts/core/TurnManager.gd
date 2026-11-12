@@ -411,12 +411,15 @@ func _spawn_timed_burst(source: Variant) -> void:
 	var center: Vector2 = source.position
 	var source_radius: float = float(source.get_current_radius())
 	var level_one_radius: float = Config.data.radius_for_level(1)
-	var distance: float = source_radius + level_one_radius + Config.data.spawn_margin
 	var count: int = maxi(Config.data.jelly_timed_burst_count, 0)
+	var offsets: Array[Vector2] = _timed_burst_offsets(
+		count,
+		source_radius,
+		level_one_radius
+	)
 	_board.remove_orb(source)
 	for index: int in range(count):
-		var angle: float = TAU * float(index) / float(maxi(count, 1))
-		var position: Vector2 = center + Vector2.from_angle(angle) * distance
+		var position: Vector2 = center + offsets[index]
 		var center_limit: float = maxf(
 			Config.data.board_size * 0.5 - level_one_radius,
 			0.0
@@ -435,6 +438,69 @@ func _spawn_timed_burst(source: Variant) -> void:
 		burst_orb.enter_ghost_state(Config.data.ghost_alpha)
 		burst_orb.note_diagnostic_event("timed_burst")
 	timed_jelly_failure_count += 1
+
+
+func _timed_burst_offsets(
+	count: int,
+	source_radius: float,
+	level_one_radius: float
+) -> Array[Vector2]:
+	var safe_count: int = maxi(count, 0)
+	var unit_offsets: Array[Vector2] = []
+	if safe_count <= 0:
+		return unit_offsets
+	unit_offsets.append(Vector2.ZERO)
+	var ring_index: int = 1
+	while unit_offsets.size() < safe_count:
+		var ring: Array[Vector2] = _hex_ring_offsets(ring_index)
+		var remaining: int = safe_count - unit_offsets.size()
+		var take_count: int = mini(remaining, ring.size())
+		if take_count == ring.size():
+			unit_offsets.append_array(ring)
+		else:
+			for selection_index: int in range(take_count):
+				var ring_offset_index: int = floori(
+					float(selection_index) * float(ring.size()) / float(take_count)
+				)
+				unit_offsets.append(ring[ring_offset_index])
+		ring_index += 1
+	var maximum_unit_distance: float = 0.0
+	for offset: Vector2 in unit_offsets:
+		maximum_unit_distance = maxf(maximum_unit_distance, offset.length())
+	var natural_spacing: float = level_one_radius * 2.0 + Config.data.spawn_margin
+	var fit_spacing: float = natural_spacing
+	if maximum_unit_distance > 0.0:
+		fit_spacing = minf(
+			natural_spacing,
+			(maxf(source_radius, 0.0) + maxf(level_one_radius, 0.0))
+			/ maximum_unit_distance
+		)
+	var result: Array[Vector2] = []
+	for offset: Vector2 in unit_offsets:
+		result.append(offset * fit_spacing)
+	return result
+
+
+func _hex_ring_offsets(ring_index: int) -> Array[Vector2]:
+	var safe_ring: int = maxi(ring_index, 1)
+	var axial_directions: Array[Vector2i] = [
+		Vector2i(1, 0),
+		Vector2i(0, 1),
+		Vector2i(-1, 1),
+		Vector2i(-1, 0),
+		Vector2i(0, -1),
+		Vector2i(1, -1),
+	]
+	var axial: Vector2i = axial_directions[4] * safe_ring
+	var result: Array[Vector2] = []
+	for side_index: int in range(axial_directions.size()):
+		for _step_index: int in range(safe_ring):
+			result.append(Vector2(
+				float(axial.x) + float(axial.y) * 0.5,
+				float(axial.y) * sqrt(3.0) * 0.5
+			))
+			axial += axial_directions[side_index]
+	return result
 
 
 func _commit_completed_ranking() -> Dictionary:
