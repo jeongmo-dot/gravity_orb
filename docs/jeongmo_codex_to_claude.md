@@ -41,7 +41,7 @@
 ### [2026-11-12] 대상 #145 — 시한 젤리 숫자 자리·외곽선, 숫자 다시 재기
 - 맨 앞 경고 조건 0건: 조건에 맞는 `K5-5`·`K5-4`가 있고 `K5-4`를 선택했다. 신규 400게임 판 밖 이탈 0건, 선택값 자동 D-save 평균 `273.40`턴, 숫자·눈/입/하이라이트 비겹침과 흰 획 `19~20px`, 외곽선 표시, T3·C4E·Z1·G2·H8·K5-8·CLASSIC 해시 불변을 관측했다
 - 상태: 완료 — 구현·신규 400게임 판 균형·전체 자동 검증·두 비율 전체 캡처·Debug 빌드까지 완료. Release와 버전 변경은 하지 않음
-- 브랜치 / PR: `timed-number` / 생성 전
+- 브랜치 / PR: `timed-number` / https://github.com/jeongmo-dot/gravity_orb/pull/145
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scenes/Orb3D.tscn`, `scripts/spike/Orb3D.gd`, `tests/{capture_screens.ps1,test_config.gd,test_timed_jelly.gd}`, `tests/spike/capture_screens.gd`, `tests/tools/run_timed_jelly_balance.ps1`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] L5 판 숫자를 눈 아래로 옮기고 흰 획을 `19~20px`로 축소. 외곽선 포함 숫자와 눈 사이 `3px`, 젤리 윤곽 안 2px 이상이며 입·하이라이트와 비겹침 — 좌표계 자동 테스트 + 실제 창 픽셀 관측
