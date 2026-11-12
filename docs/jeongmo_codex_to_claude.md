@@ -42,7 +42,7 @@
 - **경고: 자동 D-save와 R D-save 성공 비율이 모두 40~60%인 후보가 없다.** 두 비율 평균이 50%에 가장 가까운 `K5-8`을 새 기본으로 골랐지만 성공 비율은 각각 `65.4%`·`62.0%`, 평균 `63.69%`다. 명세대로 Claude 검수와 사용자 확인 전에는 병합하지 않는다
 - 나머지 맨 앞 조건은 발생하지 않았다: K5-8 자동 D-save 평균 `211.15`턴(176.4 이상), 400게임 판 밖 이탈 0건, 숫자 실제 글자 높이 `32px`(18px 이상)이고 눈·하이라이트와 겹치지 않음, T3·C4E·Z1·G2·H8·CLASSIC 해시 불변
 - 상태: 완료 — 구현·400게임 판 균형·전체 자동 검증·두 비율 전체 캡처·Debug 빌드까지 완료. Release와 버전 변경은 하지 않음
-- 브랜치 / PR: `timed-tune` / 생성 예정
+- 브랜치 / PR: `timed-tune` / https://github.com/jeongmo-dot/gravity_orb/pull/144
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scenes/Orb3D.tscn`, `scripts/{core/TurnManager.gd,spike/Orb3D.gd}`, `tests/{capture_screens.ps1,run_jelly_physics_autoplay.ps1,test_config.gd,test_timed_jelly.gd}`, `tests/spike/{capture_screens.gd,run_jolt_3d_measurement.gd}`, `tests/tools/{run_jelly_measurement.ps1,run_timed_jelly_balance.ps1}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] K4-8·K5-8·K5-10·K6-10 × 다섯 봇 × 20게임 = 400게임, 각 600턴 상한 측정. 성공/0/남음·성공 턴·결과 레벨·이탈 포함 — 자동 측정
