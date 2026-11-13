@@ -32,8 +32,38 @@
 
 ## 대기 중
 
-### [2026-11-13 #146] 시한 젤리가 0이 되면 다른 색 L1
-- 상태: 대기 (#145 병합됨 `53487f0` — main 위에서)
+### [2026-11-14 #147] 시한 젤리가 0이 되면 회색 굳은 젤리
+- 상태: 대기 (main `0d0dedb` 위에서 — **#146 브랜치 `timed-burst-colors`를 쓰지 않는다**)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.38**
+- 배경: 0이 되면 L1을 쏟는 벌은 약했다 — 같은 색 (#145)은 바로 L5로 다시 뭉치고, 다른 색 (#146)도 0이 될 때마다 1.5~1.9쌍이 합쳐지며 콤보·칭찬 (`x8 COMBO 4`·`NICE!`)이 떴고 봇 판 길이도 줄지 않았다 (§12-ONE.37 "#146 결과"). 사용자 (2026-11-14) "병합 보류·벌 다시 설계" → "회색 돌로 굳기"
+- 앵커: `scripts/core/TurnManager.gd` `_advance_timed_jellies()`·`_spawn_timed_burst()`·`_on_settled()`, `scripts/core/CollisionResolver.gd` `_pair_can_react()`·청소 대상 고르기, `scenes/Orb3D.tscn` `TimedLabel`·`scripts/spike/Orb3D.gd`, `scripts/ui/Hud.gd` 시한 젤리 안내 줄, `config/GameConfig.gd`·`default_config.tres` 새 필드, `tests/test_timed_jelly.gd`, `tests/tools/run_timed_jelly_balance.ps1`, `tests/spike/capture_screens.gd`
+- 요구 (§12-ONE.38 1~9):
+  1. 숫자 0 → 그 자리에서 굳은 젤리 (자리·레벨·크기·질량 그대로, L1 없음, 점수 없음)
+  2. 굳은 젤리는 어떤 반응에도 안 들어감 (합체·대폭발·터치 청소·색 청소·터치 소폭발). 물리·입구·경고·게임 오버는 보통 젤리처럼
+  3. 남은 턴 `jelly_timed_stone_turns` — 굳은 턴 끝에는 줄지 않고 그 뒤 턴 끝마다 −1, 0이면 사라짐 (점수 없음) → 정착 한 번 더
+  4. 그림: 몸통만 회색 sRGB (0.55, 0.57, 0.60), 얼굴·하이라이트 그대로, `%TimedLabel`에 남은 턴. 새 연출 없음 (사라짐은 지금 있는 그림 하나 — 회신에 이름)
+  5. 첫 굳은 젤리 때 안내 한 줄 `굳은 젤리: <N>턴 동안 합칠 수 없음`
+  6. 새 필드 `jelly_timed_stone_enabled` (true, false = #145 그대로 — K5-4 해시 `bc86d257…`)·`jelly_timed_stone_turns`
+  7. 판 균형 S6·S12·S18 × 5봇 × 20판, 600턴 상한, §12-ONE.36과 같은 칸 + 판당 굳은 젤리·동시 최대·끝날 때 판에 있던 수·굳은 젤리 반응 수
+  8. 새 기본 = 자동 D-save·R D-save 성공 둘 다 40~60% **그리고** 자동 D-save 평균 176.4턴 이상인 이름 중 **남은 턴이 가장 긴 것**. **없으면 S6** + 회신 맨 앞
+  9. 캡처 `204`·`205`·새 `207`·`208`·`209`·`202` (숫자 기본값), 두 비율
+- 수치 (Claude): 위 세 이름의 남은 턴, 기본 고르는 규칙, 회색 기준값, 안내 문구. 그 밖의 값은 그대로
+- 건드리지 말 것: 시한 젤리 규칙 나머지 (차례·숫자 4·성공 +1·L5·미리보기·시한 젤리 안내 문구), 판 위 숫자 자리·모양, 지금 규칙·수치 전부, 그림·연출 (명세에 없는 것 금지, 고리·파편 금지), 사용자 저장 파일, `project.godot` 버전·`build/windows/` Release 파일 (**빌드 없음**), `docs/` (회신 파일 제외)
+- **회신 맨 앞에**: 규칙에 맞는 이름 없음 (S6 기본), 굳은 젤리가 반응에 들어간 일, 판 밖 이탈, 시한 젤리를 끈 해시 바뀜, false 주입 K5-4 해시 바뀜
+- Done-when:
+  - [ ] 테스트 통과, 시한 젤리를 끈 해시·false 주입 K5-4 해시 그대로, 새 기본 해시 고정
+  - [ ] 판 균형표 S6·S12·S18 (+ #145 K5-4)와 고른 기본, 굳은 젤리 반응 0
+  - [ ] 캡처 `204`·`205`·`207`·`208`·`209`·`202` (두 비율)
+- QA: §12-ONE.38 6·7·8번
+- 커밋: 항목 단위 브랜치 (`timed-stone`), **push·PR까지** (병합은 Claude 검수 뒤)
+
+---
+
+## 처리 완료
+
+### [2026-11-13 #146] 시한 젤리가 0이 되면 다른 색 L1 — 완료 (병합 안 함)
+- 상태: 완료 — **병합 안 함** (2026-11-14 사용자 "병합 보류·벌 다시 설계" → "회색 돌로 굳기", #147로 대체. [PR #146](https://github.com/jeongmo-dot/gravity_orb/pull/146)은 #147 병합 때 닫는다)
+- 검수: 코드 diff, 테스트 diff, 회신 판 균형표 (B10·B8·B6 × 5봇 × 20판 + #145 K5-4), 캡처 `202`·`205`·`207` 두 비율 직접 확인 (캡처 파일만 읽음). 테스트 361/4/5·해시·스모크·Debug 빌드는 Codex 관측 (Claude 재실행 없음). 구현은 명세대로. 맨 앞 경고 한 건 — B10에서 터진 L1끼리 0이 될 때마다 1.5~1.9쌍 합체. Claude 추가 지적: `207` 실패 직후 `x8 COMBO 4`·`NICE!`·`+32`, 봇 판 길이로 벌이 보이지 않음. 결과: §12-ONE.37 "#146 결과"
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.37**
 - 배경: 0이 되면 원본 색 L1 10개가 원래 자리에 거의 붙어 (간격 52.5, L1 지름 50) 놓여 유령이 풀리자마자 서로 합쳐진다 — L5 언저리로 돌아가고 콤보·점수까지 붙어 벌이 되지 않는다 (Claude 코드 읽기). 사용자 (2026-11-13) "같은 색깔로 L1이 생기면 아무 의미가 없잖아. 바로 합쳐지는데" → "다른 색 L1로"
 - 앵커: `scripts/core/TurnManager.gd` `_spawn_timed_burst()`·`_timed_burst_offsets()`·`_hex_ring_offsets()`, `config/GameConfig.gd` `color_count_for_turn()`·새 필드, `config/default_config.tres`, `tests/test_timed_jelly.gd`, `tests/tools/run_timed_jelly_balance.ps1`, `tests/spike/capture_screens.gd`
@@ -54,10 +84,6 @@
   - [ ] 캡처 `205`·`207`·`202` (두 비율)
 - QA: §12-ONE.37 4·5·6번
 - 커밋: 항목 단위 브랜치 (`timed-burst-colors`), **push·PR까지** (병합은 Claude 검수 뒤)
-
----
-
-## 처리 완료
 
 ### [2026-11-12 #145] 시한 젤리 숫자 자리·외곽선, 숫자 (턴) 다시 재기 — 완료
 - 상태: 완료 (2026-11-13 사용자 "인박스 확인" · [PR #145](https://github.com/jeongmo-dot/gravity_orb/pull/145) 병합 `53487f0`)
