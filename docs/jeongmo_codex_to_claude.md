@@ -41,7 +41,7 @@
 ### [2026-11-14] 대상 #147 — 시한 젤리가 0이 되면 회색 굳은 젤리
 - 맨 앞 경고 조건 0건: S6·S12·S18 모두 선택 조건을 만족해 가장 긴 `S18`을 골랐다. 신규 300게임에서 굳은 젤리 반응 `0`건·판 밖 이탈 `0`건, 시한 젤리를 끈 해시와 `jelly_timed_stone_enabled=false` 주입 K5-4 해시 불변을 관측했다. 선택값 자동 D-save 성공 `49.7%`, R D-save 성공 `49.0%`, 자동 D-save 평균 `197.00`턴이다
 - 상태: 완료 — 구현·신규 300게임 판 균형·전체 자동 검증·두 비율 전체 캡처·Debug 빌드까지 완료. Release와 버전 변경은 하지 않음
-- 브랜치 / PR: `timed-stone` / 생성 예정
+- 브랜치 / PR: `timed-stone` / https://github.com/jeongmo-dot/gravity_orb/pull/147
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/{CollisionResolver.gd,JellyOrbArt.gd,Orb.gd,OrbVisual.gd,TurnManager.gd}`, `scripts/spike/Orb3D.gd`, `scripts/ui/Hud.gd`, `tests/{capture_screens.ps1,run_jelly_physics_autoplay.ps1,test_config.gd,test_timed_jelly.gd}`, `tests/spike/{capture_screens.gd,run_jolt_3d_measurement.gd}`, `tests/tools/{run_jelly_measurement.ps1,run_timed_jelly_balance.ps1}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 시한 숫자 0에서 원래 자리·레벨·반지름·질량·속도를 보존한 굳은 젤리로 전환. L1 생성·점수 추가 없음 — 상태/보존값/점수 자동 테스트
