@@ -42,7 +42,7 @@
 - **경고: 선택된 B10에서 터진 L1끼리의 합체가 0회당 평균 1건 이상이다.** 다섯 봇의 관측값은 자동 D-save `1.908`, 자동 D-all `1.786`, R D-save `1.543`, L-합체 D-save `1.667`, L-합체 D-all `1.835`건이다. B8 L-합체 D-all도 `1.025`건이다. 캡처 `207`에서도 정착 뒤 일부 L1이 합쳐져 더 큰 젤리가 된 것을 관측했다
 - 나머지 맨 앞 경고 조건은 발생하지 않았다: 조건에 맞는 B10·B8·B6이 모두 있고 가장 큰 B10을 선택했다. 신규 300게임 판 밖 이탈 0건, 시한 젤리를 끈 G2·Z1·T3·C4E·CLASSIC 해시와 `false` 주입 K5-4 해시는 불변이다
 - 상태: 완료 — 구현·신규 300게임 판 균형·전체 자동 검증·두 비율 전체 캡처·Debug 빌드까지 완료. Release와 버전 변경은 하지 않음
-- 브랜치 / PR: `timed-burst-colors` / 생성 예정
+- 브랜치 / PR: `timed-burst-colors` / https://github.com/jeongmo-dot/gravity_orb/pull/146
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/TurnManager.gd`, `tests/{capture_screens.ps1,run_jelly_physics_autoplay.ps1,test_timed_jelly.gd}`, `tests/spike/{capture_screens.gd,run_jolt_3d_measurement.gd}`, `tests/tools/{run_jelly_measurement.ps1,run_timed_jelly_balance.ps1}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 시한 L5가 0이 되면 현재 차례의 활성 색 중 원본 색을 제외한 L1을 기존 자리·개수·유령 시작·점수 0 규칙으로 생성. 축 좌표 `(q-r) mod 색 수`로 이웃 칸 색이 다르고 새 난수를 쓰지 않음 — 자동 테스트 + 실제 창 관측
