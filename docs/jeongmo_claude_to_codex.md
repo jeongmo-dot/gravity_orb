@@ -32,8 +32,15 @@
 
 ## 대기 중
 
-### [2026-11-12 #145] 시한 젤리 숫자 자리·외곽선, 숫자 (턴) 다시 재기
-- 상태: 대기 (#144 병합됨 `bd2ccbe` — main 위에서)
+(없음)
+
+---
+
+## 처리 완료
+
+### [2026-11-12 #145] 시한 젤리 숫자 자리·외곽선, 숫자 (턴) 다시 재기 — 완료
+- 상태: 완료 (2026-11-13 사용자 "인박스 확인" · [PR #145](https://github.com/jeongmo-dot/gravity_orb/pull/145) 병합 `53487f0`)
+- 검수: 코드 diff, 테스트 diff, 회신 판 균형표 (K5-7·K5-6·K5-5·K5-4 × 5봇 × 20판 + #144 K5-8), 캡처 `199`~`206` 두 비율 직접 확인·`199` 줄별 픽셀 측정 (캡처 파일만 읽음). 테스트 358/4/5·해시·스모크·Debug 빌드는 Codex 관측 (Claude 재실행 없음). 빌드 없음 (`project.godot` 변경 0). 맨 앞 경고 0건 — 규칙대로 K5-4 (자동 49.8% · R 46.2%). 숫자는 눈 아래 (Claude 측정 사이 2줄, Codex 3px — 기준 2px 충족), 외곽선 보임 (원인: `outline_render_priority` −1 → 126). 작은 흠: 캡처 `202`가 숫자 8 고정 (게임 영향 없음). 사용자가 함께 보라고 준 외부 검토 페이지는 로그인 화면이라 읽지 못함. 결과: §12-ONE.36 "#145 결과"
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.36**
 - 배경: #144 K5-8은 40~60% 규칙에 맞는 이름이 없어 평균이 가장 가까운 값으로 골라짐 (65.4% / 62.0%). 판 위 숫자는 32~35px로 커졌지만 눈과 10~11줄 겹치고 어두운 외곽선이 캡처에 보이지 않음 (Claude 캡처 픽셀 측정, §12-ONE.35 "#144 결과") → 사용자 (2026-11-12) "병합 + 후속 #145"
 - 앵커: `scenes/Orb3D.tscn` `TimedLabel`·`scripts/spike/Orb3D.gd` `_update_visual_transform()`, `config/default_config.tres` (`jelly_timed_turns` 기본), `tests/tools/run_timed_jelly_balance.ps1`, `tests/test_timed_jelly.gd`·`tests/test_config.gd`, `tests/spike/capture_screens.gd`
@@ -53,10 +60,6 @@
   - [ ] 캡처 (두 비율) — 숫자·눈 픽셀 측정값, 외곽선 밝기
 - QA: §12-ONE.36 2·3·4·6번
 - 커밋: 항목 단위 브랜치 (`timed-number`), **push·PR까지** (병합은 Claude 검수 뒤)
-
----
-
-## 처리 완료
 
 ### [2026-11-12 #144] 시한 젤리 다듬기 — 짝이 드문 레벨·큰 숫자·뭉친 L1 — 완료
 - 상태: 완료 (2026-11-12 사용자 "병합 + 후속 #145" · [PR #144](https://github.com/jeongmo-dot/gravity_orb/pull/144) 병합 `bd2ccbe`)
