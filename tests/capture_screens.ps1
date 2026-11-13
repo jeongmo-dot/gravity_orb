@@ -211,7 +211,7 @@ $expectedFiles = @(
     "196_jelly_clean_zone_green_after.png",
     "197_jelly_clean_zone_yellow_before.png",
     "198_jelly_clean_zone_yellow_after.png",
-    "199_jelly_timed_board_8.png",
+    "199_jelly_timed_board_initial.png",
     "200_jelly_timed_board_1.png",
     "201_jelly_timed_preview_next.png",
     "202_jelly_timed_success_before.png",
