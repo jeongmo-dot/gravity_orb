@@ -72,6 +72,8 @@ param(
 	[int]$JellyTimedLevel = 3,
 	[ValidateRange(1, 100)]
 	[int]$JellyTimedBurstCount = 6,
+	[ValidateSet("On", "Off")]
+	[string]$JellyTimedBurstOtherColors = "On",
     [switch]$AggregateOnly
 )
 
@@ -100,6 +102,7 @@ $physicsArguments += "--jelly-timed-enabled=$($JellyTimedEnabled.ToLower())"
 $physicsArguments += "--jelly-timed-turns=$JellyTimedTurns"
 $physicsArguments += "--jelly-timed-level=$JellyTimedLevel"
 $physicsArguments += "--jelly-timed-burst-count=$JellyTimedBurstCount"
+$physicsArguments += "--jelly-timed-burst-other-colors=$($JellyTimedBurstOtherColors.ToLower())"
 $physicsArguments += "--jelly-tap-blast-min-level=$JellyTapBlastMinLevel"
 $physicsArguments += "--blast-score-factor=$($BlastScoreFactor.ToString($culture))"
 $physicsArguments += "--jelly-tap-blast-score-factor=$($JellyTapBlastScoreFactor.ToString($culture))"
@@ -261,6 +264,8 @@ $timedFailure = 0
 $timedRemaining = 0
 $timedSuccessTurns = 0
 $timedSuccessLevels = @{}
+$timedBurstInternalMerges = 0
+$timedBurstBoardMerges = 0
 foreach ($task in $tasks) {
     $report = Get-Content -LiteralPath $task.Output -Raw | ConvertFrom-Json
     $tick = $report.ticks[0]
@@ -282,6 +287,8 @@ foreach ($task in $tasks) {
 	$timedFailure += [int]$seedRow.timed_jelly_failure_count
 	$timedRemaining += [int]$seedRow.timed_jelly_remaining_count
 	$timedSuccessTurns += [int]$seedRow.timed_jelly_success_turns_sum
+	$timedBurstInternalMerges += [int]$seedRow.timed_burst_internal_merge_count
+	$timedBurstBoardMerges += [int]$seedRow.timed_burst_board_merge_count
 	foreach ($levelProperty in $seedRow.timed_jelly_success_result_levels.PSObject.Properties) {
 		$level = $levelProperty.Name
 		if (-not $timedSuccessLevels.ContainsKey($level)) { $timedSuccessLevels[$level] = 0 }
@@ -541,6 +548,12 @@ $summary = [ordered]@{
 	timed_jelly_remaining_ratio = if ($timedPlaced -gt 0) { [double]$timedRemaining / $timedPlaced } else { 0.0 }
 	timed_jelly_average_turns_to_success = if ($timedSuccess -gt 0) { [double]$timedSuccessTurns / $timedSuccess } else { 0.0 }
 	timed_jelly_success_result_levels = $timedSuccessLevels
+	timed_burst_internal_merge_count = $timedBurstInternalMerges
+	timed_burst_internal_merges_per_game = [double]$timedBurstInternalMerges / $seedRows.Count
+	timed_burst_internal_merges_per_timeout = if ($timedFailure -gt 0) { [double]$timedBurstInternalMerges / $timedFailure } else { 0.0 }
+	timed_burst_board_merge_count = $timedBurstBoardMerges
+	timed_burst_board_merges_per_game = [double]$timedBurstBoardMerges / $seedRows.Count
+	timed_burst_board_merges_per_timeout = if ($timedFailure -gt 0) { [double]$timedBurstBoardMerges / $timedFailure } else { 0.0 }
     merges_per_turn = if ($totalTurns -gt 0) { [double]$totalMerges / $totalTurns } else { 0.0 }
 	level_ups_per_turn = if ($totalTurns -gt 0) { [double]$totalLevelUpCount / $totalTurns } else { 0.0 }
 	level_creation_count_by_level = $levelCreationCounts

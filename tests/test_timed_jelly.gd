@@ -2,9 +2,10 @@ extends TestCase
 
 const BOARD_SCENE: PackedScene = preload("res://scenes/Board3D.tscn")
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
-const EXPECTED_H8_HASH: String = "af427045d52629bdc02da6e368fc39301999ec6442285f1b00fc55125bd67fc9"
-const EXPECTED_K5_8_HASH: String = "0aade400f3932750531c74d4e47dc0a61d4227ccd92081ccdd4627afae0f2212"
+const EXPECTED_H8_HASH: String = "26bb12f474cce490128988c780f52ed98ab8d6b90505f11eacbb50868c9a2049"
+const EXPECTED_K5_8_HASH: String = "604944c5715e5a1b67dc41cf31741b938bcec461fbd8a065ec8da7df10ad3fa7"
 const EXPECTED_K5_4_HASH: String = "bc86d2571e89ed78fcb10d0fb69d03c33048f362ea8395d164605e3d7e21dab7"
+const EXPECTED_K5_4_OTHER_COLOR_HASH: String = "808f37d918ff2fd65b4f4d0007868b65bead51349bcbdf34b309f21ac349dbb1"
 
 
 func test_h8_marker_countdown_success_and_failure_hash() -> void:
@@ -14,6 +15,9 @@ func test_h8_marker_countdown_success_and_failure_hash() -> void:
 	Config.data.jelly_timed_turns = 8
 	Config.data.jelly_timed_level = 3
 	Config.data.jelly_timed_burst_count = 6
+	Config.data.jelly_timed_burst_other_colors = true
+	var manager: TurnManager = TurnManager.new()
+	var burst_colors: Array[int] = _burst_colors(manager, OrbTypes.OrbColor.RED, 6)
 	var spawner: Spawner = Spawner.new()
 	spawner.init_rng(14308)
 	var scheduled_rows: Array[Dictionary] = []
@@ -51,12 +55,14 @@ func test_h8_marker_countdown_success_and_failure_hash() -> void:
 			"source_level": Config.data.jelly_timed_level,
 			"burst_level": 1,
 			"burst_count": Config.data.jelly_timed_burst_count,
+			"burst_colors": burst_colors,
 			"score": 0,
 		},
 	}
 	var hash_value: String = JSON.stringify(state).sha256_text()
 	print("JELLY_H8_TIMED_HASH hash=%s" % hash_value)
 	assert_eq(hash_value, EXPECTED_H8_HASH, "H8 timed rule hash")
+	manager.free()
 	spawner.free()
 	_restore_config(snapshot)
 
@@ -68,6 +74,9 @@ func test_k5_8_marker_countdown_success_and_failure_hash() -> void:
 	Config.data.jelly_timed_turns = 8
 	Config.data.jelly_timed_level = 5
 	Config.data.jelly_timed_burst_count = 10
+	Config.data.jelly_timed_burst_other_colors = true
+	var manager: TurnManager = TurnManager.new()
+	var burst_colors: Array[int] = _burst_colors(manager, OrbTypes.OrbColor.RED, 10)
 	var spawner: Spawner = Spawner.new()
 	spawner.init_rng(14408)
 	var scheduled_rows: Array[Dictionary] = []
@@ -106,12 +115,14 @@ func test_k5_8_marker_countdown_success_and_failure_hash() -> void:
 			"burst_level": 1,
 			"burst_count": Config.data.jelly_timed_burst_count,
 			"burst_layout": "compact_hex_fill",
+			"burst_colors": burst_colors,
 			"score": 0,
 		},
 	}
 	var hash_value: String = JSON.stringify(state).sha256_text()
 	print("JELLY_K5_8_TIMED_HASH hash=%s" % hash_value)
 	assert_eq(hash_value, EXPECTED_K5_8_HASH, "K5-8 timed rule hash")
+	manager.free()
 	spawner.free()
 	_restore_config(snapshot)
 
@@ -123,6 +134,7 @@ func test_k5_4_default_marker_countdown_success_and_failure_hash() -> void:
 	Config.data.jelly_timed_turns = 4
 	Config.data.jelly_timed_level = 5
 	Config.data.jelly_timed_burst_count = 10
+	Config.data.jelly_timed_burst_other_colors = false
 	var spawner: Spawner = Spawner.new()
 	spawner.init_rng(14504)
 	var scheduled_rows: Array[Dictionary] = []
@@ -168,6 +180,39 @@ func test_k5_4_default_marker_countdown_success_and_failure_hash() -> void:
 	print("JELLY_K5_4_TIMED_HASH hash=%s" % hash_value)
 	assert_eq(hash_value, EXPECTED_K5_4_HASH, "K5-4 default timed rule hash")
 	spawner.free()
+	_restore_config(snapshot)
+
+
+func test_k5_4_default_other_color_hash() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	assert_true(
+		Config.data.jelly_timed_burst_other_colors,
+		"timed burst other-color mode defaults to enabled"
+	)
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_timed_enabled = true
+	Config.data.jelly_timed_turns = 4
+	Config.data.jelly_timed_level = 5
+	Config.data.jelly_timed_burst_other_colors = true
+	var manager: TurnManager = TurnManager.new()
+	var burst_colors: Array[int] = _burst_colors(
+		manager,
+		OrbTypes.OrbColor.RED,
+		Config.data.jelly_timed_burst_count
+	)
+	var state: Dictionary = {
+		"turns": Config.data.jelly_timed_turns,
+		"source_level": Config.data.jelly_timed_level,
+		"burst_level": 1,
+		"burst_count": Config.data.jelly_timed_burst_count,
+		"burst_layout": "compact_hex_fill",
+		"burst_colors": burst_colors,
+		"score": 0,
+	}
+	var hash_value: String = JSON.stringify(state).sha256_text()
+	print("JELLY_K5_4_OTHER_COLOR_HASH hash=%s" % hash_value)
+	assert_eq(hash_value, EXPECTED_K5_4_OTHER_COLOR_HASH, "K5-4 other-color hash")
+	manager.free()
 	_restore_config(snapshot)
 
 
@@ -259,6 +304,7 @@ func test_countdown_skips_entrance_waiter_and_timeout_waits_an_extra_settle() ->
 	Config.data.jelly_timed_enabled = true
 	Config.data.jelly_timed_turns = 1
 	Config.data.jelly_timed_burst_count = 6
+	Config.data.jelly_timed_burst_other_colors = true
 	var fixture: Dictionary = await _create_fixture()
 	var board: Board3D = fixture["board"] as Board3D
 	var manager: TurnManager = fixture["manager"] as TurnManager
@@ -283,8 +329,10 @@ func test_countdown_skips_entrance_waiter_and_timeout_waits_an_extra_settle() ->
 	assert_eq(burst.size(), 6, "six burst jellies")
 	for orb: Orb3D in burst:
 		assert_eq(orb.level, 1, "burst is L1")
-		assert_eq(orb.color, OrbTypes.OrbColor.GREEN, "burst keeps color")
+		assert_true(orb.color != OrbTypes.OrbColor.GREEN, "burst excludes source color")
+		assert_true(orb.color >= 0 and orb.color < 4, "burst uses available turn colors")
 		assert_true(orb.is_ghost, "burst starts ghosted")
+	_assert_adjacent_cells_differ(manager, burst)
 	assert_eq(score.score, 0, "timeout has no score")
 	assert_eq(manager.timed_jelly_failure_count, 1, "failure measurement")
 	manager._on_settled()
@@ -330,6 +378,7 @@ func test_timed_burst_uses_compact_hex_fill_inside_source_and_board() -> void:
 	var snapshot: Dictionary = _snapshot_config()
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.jelly_timed_burst_count = 14
+	Config.data.jelly_timed_burst_other_colors = true
 	var fixture: Dictionary = await _create_fixture()
 	var board: Board3D = fixture["board"] as Board3D
 	var manager: TurnManager = fixture["manager"] as TurnManager
@@ -364,7 +413,8 @@ func test_timed_burst_uses_compact_hex_fill_inside_source_and_board() -> void:
 	assert_eq(burst_orbs.size(), 14, "K6 timeout spawns fourteen L1 jellies")
 	for orb: Orb3D in burst_orbs:
 		assert_eq(orb.level, 1, "cluster member is L1")
-		assert_eq(orb.color, OrbTypes.OrbColor.BLUE, "cluster keeps source color")
+		assert_true(orb.color != OrbTypes.OrbColor.BLUE, "cluster excludes source color")
+		assert_true(orb.color >= 0 and orb.color < 4, "cluster uses available turn colors")
 		assert_true(orb.is_ghost, "cluster member starts ghosted")
 		assert_true(
 			absf(orb.position.x) + level_one_radius <= half_board + 0.001,
@@ -374,8 +424,48 @@ func test_timed_burst_uses_compact_hex_fill_inside_source_and_board() -> void:
 			absf(orb.position.y) + level_one_radius <= half_board + 0.001,
 			"cluster member stays inside vertical board bounds"
 		)
+	_assert_adjacent_cells_differ(manager, burst_orbs)
 	await _cleanup(fixture["root"] as Node)
 	_restore_config(snapshot)
+
+
+func test_timed_burst_other_colors_false_preserves_source_color() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_timed_burst_count = 10
+	Config.data.jelly_timed_burst_other_colors = false
+	var fixture: Dictionary = await _create_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	var source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.YELLOW, 5, Vector2.ZERO)
+	source.set_timed(1, 20)
+	source.disable_physics()
+	manager._spawn_timed_burst(source)
+	for orb: Orb3D in board.get_orbs():
+		assert_eq(orb.color, OrbTypes.OrbColor.YELLOW, "disabled rule keeps source color")
+	await _cleanup(fixture["root"] as Node)
+	_restore_config(snapshot)
+
+
+func test_timed_burst_merge_metrics_distinguish_burst_and_board_sources() -> void:
+	var manager: TurnManager = TurnManager.new()
+	manager._is_timed_burst_settle = true
+	manager._timed_burst_spawn_ids = {10: true, 11: true}
+	manager._track_timed_burst_merge({
+		"type": ReactionRules.Type.MERGE,
+		"stable_spawn_ids": [10, 11],
+	})
+	manager._track_timed_burst_merge({
+		"type": ReactionRules.Type.MERGE,
+		"stable_spawn_ids": [10, 30],
+	})
+	manager._track_timed_burst_merge({
+		"type": ReactionRules.Type.BLAST,
+		"stable_spawn_ids": [10, 11],
+	})
+	assert_eq(manager.timed_burst_internal_merge_count, 1, "burst-burst merge count")
+	assert_eq(manager.timed_burst_board_merge_count, 1, "burst-board merge count")
+	manager.free()
 
 
 func test_board_timed_number_stays_below_eyes_inside_orb_with_visible_outline() -> void:
@@ -496,6 +586,32 @@ func _enabled_candidate_rng_row(candidate: Dictionary) -> Array:
 	return [int(candidate["level"]), int(candidate["color"]), float(candidate["t"])]
 
 
+func _burst_colors(manager: TurnManager, source_color: int, count: int) -> Array[int]:
+	var result: Array[int] = []
+	for cell: Vector2i in manager._timed_burst_cells(count):
+		result.append(manager._timed_burst_color(source_color, cell))
+	return result
+
+
+func _assert_adjacent_cells_differ(
+	manager: TurnManager,
+	burst_orbs: Array[Orb3D]
+) -> void:
+	var cells: Array[Vector2i] = manager._timed_burst_cells(burst_orbs.size())
+	for first_index: int in range(cells.size()):
+		for second_index: int in range(first_index + 1, cells.size()):
+			var delta: Vector2i = cells[first_index] - cells[second_index]
+			var axial_distance: int = maxi(
+				absi(delta.x),
+				maxi(absi(delta.y), absi(delta.x + delta.y))
+			)
+			if axial_distance == 1:
+				assert_true(
+					burst_orbs[first_index].color != burst_orbs[second_index].color,
+					"adjacent burst cells use different colors"
+				)
+
+
 func _snapshot_config() -> Dictionary:
 	return {
 		"game_mode": Config.data.game_mode,
@@ -506,6 +622,7 @@ func _snapshot_config() -> Dictionary:
 		"jelly_timed_level": Config.data.jelly_timed_level,
 		"jelly_timed_turns": Config.data.jelly_timed_turns,
 		"jelly_timed_burst_count": Config.data.jelly_timed_burst_count,
+		"jelly_timed_burst_other_colors": Config.data.jelly_timed_burst_other_colors,
 		"jelly_timed_bonus_levels": Config.data.jelly_timed_bonus_levels,
 	}
 
@@ -519,6 +636,9 @@ func _restore_config(snapshot: Dictionary) -> void:
 	Config.data.jelly_timed_level = int(snapshot["jelly_timed_level"])
 	Config.data.jelly_timed_turns = int(snapshot["jelly_timed_turns"])
 	Config.data.jelly_timed_burst_count = int(snapshot["jelly_timed_burst_count"])
+	Config.data.jelly_timed_burst_other_colors = bool(
+		snapshot["jelly_timed_burst_other_colors"]
+	)
 	Config.data.jelly_timed_bonus_levels = int(snapshot["jelly_timed_bonus_levels"])
 
 

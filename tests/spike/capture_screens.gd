@@ -189,6 +189,7 @@ const CAPTURE_FILES: Array[String] = [
 	"204_jelly_timed_timeout_before.png",
 	"205_jelly_timed_timeout_after_clustered_l1.png",
 	"206_jelly_timed_first_callout.png",
+	"207_jelly_timed_timeout_after_settle.png",
 ]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
@@ -475,7 +476,7 @@ func _capture_timed_jelly_scenes(
 		timed_level,
 		Vector2(80.0, 0.0)
 	)
-	first.set_timed(8, 20)
+	first.set_timed(Config.data.jelly_timed_turns, 20)
 	first.disable_physics()
 	second.disable_physics()
 	await _capture("202_jelly_timed_success_before.png")
@@ -523,13 +524,60 @@ func _capture_timed_jelly_scenes(
 	var score_before: int = score.score
 	manager._spawn_timed_burst(expiring)
 	await get_tree().process_frame
-	var burst_count: int = 0
-	for orb: Orb3D in board.get_orbs():
-		if orb.level == 1 and orb.color == OrbTypes.OrbColor.GREEN:
-			burst_count += 1
-	if burst_count != Config.data.jelly_timed_burst_count or score.score != score_before:
-		_fail("timed timeout capture expected configured scoreless same-color L1 jellies")
+	var burst_orbs: Array[Orb3D] = board.get_orbs()
+	if burst_orbs.size() != Config.data.jelly_timed_burst_count or score.score != score_before:
+		_fail("timed timeout capture expected configured scoreless L1 jellies")
+	var burst_cells: Array[Vector2i] = manager._timed_burst_cells(burst_orbs.size())
+	for first_index: int in range(burst_orbs.size()):
+		var orb: Orb3D = burst_orbs[first_index]
+		if orb.level != 1 or orb.color == OrbTypes.OrbColor.GREEN or orb.color < 0 or orb.color >= 4:
+			_fail("timed timeout capture found an invalid burst L1 color")
+		for second_index: int in range(first_index + 1, burst_orbs.size()):
+			var delta: Vector2i = burst_cells[first_index] - burst_cells[second_index]
+			var axial_distance: int = maxi(
+				absi(delta.x),
+				maxi(absi(delta.y), absi(delta.x + delta.y))
+			)
+			if axial_distance == 1 and orb.color == burst_orbs[second_index].color:
+				_fail("timed timeout capture found equal colors in adjacent burst cells")
 	await _capture("205_jelly_timed_timeout_after_clustered_l1.png")
+
+	manager._is_initial_settle = false
+	manager._is_tap_blast_settle = false
+	manager._is_timed_burst_settle = true
+	manager._begin_settle()
+	manager._set_state(TurnManager.State.SIMULATING)
+	manager.set_physics_process(true)
+	for _frame: int in range(600):
+		if manager.state == TurnManager.State.WAITING_INPUT:
+			break
+		await get_tree().physics_frame
+	if manager.state != TurnManager.State.WAITING_INPUT:
+		_fail("timed timeout capture did not finish its settle")
+	for _frame: int in range(240):
+		var all_released_and_still: bool = true
+		for orb: Orb3D in board.get_orbs():
+			if (
+				orb.is_ghost
+				or orb.linear_velocity.length() > Config.data.stable_linear_speed
+				or absf(orb.angular_velocity) > Config.data.stable_angular_speed
+			):
+				all_released_and_still = false
+				break
+		if all_released_and_still:
+			break
+		await get_tree().physics_frame
+	manager.set_physics_process(false)
+	var settled_burst_orbs: Array[Orb3D] = board.get_orbs()
+	var remaining_level_one_count: int = 0
+	for orb: Orb3D in settled_burst_orbs:
+		if orb.level == 1:
+			remaining_level_one_count += 1
+		if orb.is_ghost:
+			_fail("timed timeout settle expected all jellies released")
+	if remaining_level_one_count <= 0:
+		_fail("timed timeout settle expected at least one unmerged burst L1")
+	await _capture("207_jelly_timed_timeout_after_settle.png")
 
 	director.clear_effects()
 	_clear_capture_hud_residue(hud)

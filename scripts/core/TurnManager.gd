@@ -46,6 +46,8 @@ var timed_jelly_success_count: int = 0
 var timed_jelly_failure_count: int = 0
 var timed_jelly_success_turns_sum: int = 0
 var timed_jelly_success_result_levels: Dictionary = {}
+var timed_burst_internal_merge_count: int = 0
+var timed_burst_board_merge_count: int = 0
 var _settle_elapsed: float:
 	get:
 		return settle_elapsed
@@ -56,6 +58,7 @@ var _stable_time: float = 0.0
 var _is_initial_settle: bool = false
 var _is_tap_blast_settle: bool = false
 var _is_timed_burst_settle: bool = false
+var _timed_burst_spawn_ids: Dictionary = {}
 var _timed_jelly_callout_seen: bool = false
 var _current_merge_delay_seconds: float = 0.0
 var _jelly_tap_effect_callout_seen: Dictionary = {}
@@ -89,6 +92,9 @@ func start_game() -> void:
 	timed_jelly_failure_count = 0
 	timed_jelly_success_turns_sum = 0
 	timed_jelly_success_result_levels.clear()
+	timed_burst_internal_merge_count = 0
+	timed_burst_board_merge_count = 0
+	_timed_burst_spawn_ids.clear()
 	final_move_changed.emit(false, "")
 	gravity = Vector2i.DOWN
 	_is_initial_settle = true
@@ -282,6 +288,7 @@ func on_reaction(reaction: Dictionary) -> void:
 	_emit_combo_changed()
 	_track_jelly_tap_effect_callout(reaction)
 	_track_timed_jelly_success(reaction)
+	_track_timed_burst_merge(reaction)
 	reaction_ready.emit(reaction)
 
 
@@ -296,6 +303,25 @@ func _track_timed_jelly_success(reaction: Dictionary) -> void:
 	timed_jelly_success_result_levels[result_level] = int(
 		timed_jelly_success_result_levels.get(result_level, 0)
 	) + 1
+
+
+func _track_timed_burst_merge(reaction: Dictionary) -> void:
+	if not _is_timed_burst_settle:
+		return
+	var reaction_type: ReactionRules.Type = reaction.get(
+		"type", ReactionRules.Type.NONE
+	) as ReactionRules.Type
+	if reaction_type != ReactionRules.Type.MERGE:
+		return
+	var stable_spawn_ids: Array = reaction.get("stable_spawn_ids", []) as Array
+	if stable_spawn_ids.size() != 2:
+		return
+	var first_is_burst: bool = _timed_burst_spawn_ids.has(int(stable_spawn_ids[0]))
+	var second_is_burst: bool = _timed_burst_spawn_ids.has(int(stable_spawn_ids[1]))
+	if first_is_burst and second_is_burst:
+		timed_burst_internal_merge_count += 1
+	elif first_is_burst != second_is_burst:
+		timed_burst_board_merge_count += 1
 
 
 func _track_jelly_tap_effect_callout(reaction: Dictionary) -> void:
@@ -354,6 +380,7 @@ func _on_settled() -> void:
 		return
 	if _is_timed_burst_settle:
 		_is_timed_burst_settle = false
+		_timed_burst_spawn_ids.clear()
 	elif _advance_timed_jellies():
 		_is_timed_burst_settle = true
 		_begin_settle()
@@ -412,6 +439,7 @@ func _spawn_timed_burst(source: Variant) -> void:
 	var source_radius: float = float(source.get_current_radius())
 	var level_one_radius: float = Config.data.radius_for_level(1)
 	var count: int = maxi(Config.data.jelly_timed_burst_count, 0)
+	var cells: Array[Vector2i] = _timed_burst_cells(count)
 	var offsets: Array[Vector2] = _timed_burst_offsets(
 		count,
 		source_radius,
@@ -429,7 +457,7 @@ func _spawn_timed_burst(source: Variant) -> void:
 			clampf(position.y, -center_limit, center_limit)
 		)
 		var burst_orb: Variant = _board.spawn_orb(
-			color_index,
+			_timed_burst_color(color_index, cells[index]),
 			1,
 			position,
 			Vector2.ZERO,
@@ -437,6 +465,7 @@ func _spawn_timed_burst(source: Variant) -> void:
 		)
 		burst_orb.enter_ghost_state(Config.data.ghost_alpha)
 		burst_orb.note_diagnostic_event("timed_burst")
+		_timed_burst_spawn_ids[int(burst_orb.stable_spawn_id)] = true
 	timed_jelly_failure_count += 1
 
 
@@ -445,25 +474,10 @@ func _timed_burst_offsets(
 	source_radius: float,
 	level_one_radius: float
 ) -> Array[Vector2]:
-	var safe_count: int = maxi(count, 0)
+	var cells: Array[Vector2i] = _timed_burst_cells(count)
 	var unit_offsets: Array[Vector2] = []
-	if safe_count <= 0:
-		return unit_offsets
-	unit_offsets.append(Vector2.ZERO)
-	var ring_index: int = 1
-	while unit_offsets.size() < safe_count:
-		var ring: Array[Vector2] = _hex_ring_offsets(ring_index)
-		var remaining: int = safe_count - unit_offsets.size()
-		var take_count: int = mini(remaining, ring.size())
-		if take_count == ring.size():
-			unit_offsets.append_array(ring)
-		else:
-			for selection_index: int in range(take_count):
-				var ring_offset_index: int = floori(
-					float(selection_index) * float(ring.size()) / float(take_count)
-				)
-				unit_offsets.append(ring[ring_offset_index])
-		ring_index += 1
+	for cell: Vector2i in cells:
+		unit_offsets.append(_project_hex_cell(cell))
 	var maximum_unit_distance: float = 0.0
 	for offset: Vector2 in unit_offsets:
 		maximum_unit_distance = maxf(maximum_unit_distance, offset.length())
@@ -481,7 +495,55 @@ func _timed_burst_offsets(
 	return result
 
 
+func _timed_burst_cells(count: int) -> Array[Vector2i]:
+	var safe_count: int = maxi(count, 0)
+	var cells: Array[Vector2i] = []
+	if safe_count <= 0:
+		return cells
+	cells.append(Vector2i.ZERO)
+	var ring_index: int = 1
+	while cells.size() < safe_count:
+		var ring: Array[Vector2i] = _hex_ring_cells(ring_index)
+		var remaining: int = safe_count - cells.size()
+		var take_count: int = mini(remaining, ring.size())
+		if take_count == ring.size():
+			cells.append_array(ring)
+		else:
+			for selection_index: int in range(take_count):
+				var ring_cell_index: int = floori(
+					float(selection_index) * float(ring.size()) / float(take_count)
+				)
+				cells.append(ring[ring_cell_index])
+		ring_index += 1
+	return cells
+
+
+func _timed_burst_color(source_color: int, cell: Vector2i) -> int:
+	if not Config.data.jelly_timed_burst_other_colors:
+		return source_color
+	var color_count: int = Config.data.color_count_for_turn(turn_index)
+	var available_colors: Array[int] = []
+	for offset: int in range(1, color_count + 1):
+		var candidate: int = (source_color + offset) % color_count
+		if candidate != source_color:
+			available_colors.append(candidate)
+	if available_colors.is_empty():
+		return source_color
+	var cell_class: int = cell.x - cell.y
+	var color_index: int = (
+		(cell_class % available_colors.size()) + available_colors.size()
+	) % available_colors.size()
+	return available_colors[color_index]
+
+
 func _hex_ring_offsets(ring_index: int) -> Array[Vector2]:
+	var result: Array[Vector2] = []
+	for cell: Vector2i in _hex_ring_cells(ring_index):
+		result.append(_project_hex_cell(cell))
+	return result
+
+
+func _hex_ring_cells(ring_index: int) -> Array[Vector2i]:
 	var safe_ring: int = maxi(ring_index, 1)
 	var axial_directions: Array[Vector2i] = [
 		Vector2i(1, 0),
@@ -492,15 +554,19 @@ func _hex_ring_offsets(ring_index: int) -> Array[Vector2]:
 		Vector2i(1, -1),
 	]
 	var axial: Vector2i = axial_directions[4] * safe_ring
-	var result: Array[Vector2] = []
+	var result: Array[Vector2i] = []
 	for side_index: int in range(axial_directions.size()):
 		for _step_index: int in range(safe_ring):
-			result.append(Vector2(
-				float(axial.x) + float(axial.y) * 0.5,
-				float(axial.y) * sqrt(3.0) * 0.5
-			))
+			result.append(axial)
 			axial += axial_directions[side_index]
 	return result
+
+
+func _project_hex_cell(cell: Vector2i) -> Vector2:
+	return Vector2(
+		float(cell.x) + float(cell.y) * 0.5,
+		float(cell.y) * sqrt(3.0) * 0.5
+	)
 
 
 func _commit_completed_ranking() -> Dictionary:

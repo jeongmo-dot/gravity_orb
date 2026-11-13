@@ -23,6 +23,8 @@ param(
 	[int]$JellyTimedLevel = 3,
 	[ValidateRange(1, 100)]
 	[int]$JellyTimedBurstCount = 6,
+	[ValidateSet("On", "Off")]
+	[string]$JellyTimedBurstOtherColors = "On",
 	[ValidateRange(0, 10)]
 	[int]$JellyBlastMinLevel = 8,
 	[ValidateRange(0, 10)]
@@ -134,6 +136,7 @@ if (-not $AggregateOnly) {
 					"--jelly-timed-turns=$JellyTimedTurns",
 					"--jelly-timed-level=$JellyTimedLevel",
 					"--jelly-timed-burst-count=$JellyTimedBurstCount",
+					"--jelly-timed-burst-other-colors=$($JellyTimedBurstOtherColors.ToLower())",
 					"--jelly-blast-min-level=$JellyBlastMinLevel",
 					"--jelly-tap-blast-min-level=$JellyTapBlastMinLevel",
 					"--blast-score-factor=$($BlastScoreFactor.ToString([Globalization.CultureInfo]::InvariantCulture))",
@@ -303,6 +306,8 @@ function Get-Summary($Rows) {
 	$timedFailure = [double](($Rows | Measure-Object -Property timed_jelly_failure_count -Sum).Sum)
 	$timedRemaining = [double](($Rows | Measure-Object -Property timed_jelly_remaining_count -Sum).Sum)
 	$timedSuccessTurns = [double](($Rows | Measure-Object -Property timed_jelly_success_turns_sum -Sum).Sum)
+	$timedBurstInternalMerges = [double](($Rows | Measure-Object -Property timed_burst_internal_merge_count -Sum).Sum)
+	$timedBurstBoardMerges = [double](($Rows | Measure-Object -Property timed_burst_board_merge_count -Sum).Sum)
 	$averageCleanCountPerTapByColor = [ordered]@{}
 	$zeroCleanTapRatioByColor = [ordered]@{}
 	foreach ($colorKey in @($tapBlastCountByColor.Keys | Sort-Object)) {
@@ -379,6 +384,12 @@ function Get-Summary($Rows) {
 		timed_jelly_remaining_ratio = Get-Ratio $timedRemaining $timedPlaced
 		timed_jelly_average_turns_to_success = Get-Ratio $timedSuccessTurns $timedSuccess
 		timed_jelly_success_result_levels = $timedSuccessLevels
+		timed_burst_internal_merge_count = [int]$timedBurstInternalMerges
+		timed_burst_internal_merges_per_game = Get-Ratio $timedBurstInternalMerges @($Rows).Count
+		timed_burst_internal_merges_per_timeout = Get-Ratio $timedBurstInternalMerges $timedFailure
+		timed_burst_board_merge_count = [int]$timedBurstBoardMerges
+		timed_burst_board_merges_per_game = Get-Ratio $timedBurstBoardMerges @($Rows).Count
+		timed_burst_board_merges_per_timeout = Get-Ratio $timedBurstBoardMerges $timedFailure
 		forced_settle_turns = [int](($Rows | Measure-Object -Property capped_turn_count -Sum).Sum)
 		same_level_blast_count_by_level = $sameLevelBlastCountByLevel
 		mixed_level_blast_count_by_level = $mixedLevelBlastCountByLevel

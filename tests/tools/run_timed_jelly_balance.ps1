@@ -21,16 +21,15 @@ $measurementDirectory = Join-Path $repoPath "artifacts\measurements"
 New-Item -ItemType Directory -Path $measurementDirectory -Force | Out-Null
 
 $profiles = @(
-    [pscustomobject]@{ Slug = "k5_7"; Name = "K5-7"; Turns = 7; Level = 5; BurstCount = 10 },
-    [pscustomobject]@{ Slug = "k5_6"; Name = "K5-6"; Turns = 6; Level = 5; BurstCount = 10 },
-    [pscustomobject]@{ Slug = "k5_5"; Name = "K5-5"; Turns = 5; Level = 5; BurstCount = 10 },
-    [pscustomobject]@{ Slug = "k5_4"; Name = "K5-4"; Turns = 4; Level = 5; BurstCount = 10 }
+    [pscustomobject]@{ Slug = "b10"; Name = "B10"; Turns = 4; Level = 5; BurstCount = 10 },
+    [pscustomobject]@{ Slug = "b8"; Name = "B8"; Turns = 4; Level = 5; BurstCount = 8 },
+    [pscustomobject]@{ Slug = "b6"; Name = "B6"; Turns = 4; Level = 5; BurstCount = 6 }
 )
 
 foreach ($profile in $profiles) {
     foreach ($mode in @("save", "all")) {
         $tapMode = if ($mode -eq "save") { "Save" } else { "All" }
-        $autoLabel = "145_$($profile.Slug)_auto_$mode"
+        $autoLabel = "146_$($profile.Slug)_auto_$mode"
         $autoSummaryPath = Join-Path $repoPath "artifacts\jelly_physics_autoplay_$autoLabel.json"
         if (-not ($ReuseCompleted -and (Test-Path -LiteralPath $autoSummaryPath))) {
             $autoArguments = @{
@@ -54,12 +53,13 @@ foreach ($profile in $profiles) {
                 JellyTimedTurns = $profile.Turns
                 JellyTimedLevel = $profile.Level
                 JellyTimedBurstCount = $profile.BurstCount
+                JellyTimedBurstOtherColors = "On"
             }
             if ($AggregateOnly) { $autoArguments.AggregateOnly = $true }
             & $autoScript @autoArguments
         }
 
-        $strategyLabel = "145_$($profile.Slug)_strategy_$mode"
+        $strategyLabel = "146_$($profile.Slug)_strategy_$mode"
         $strategyArguments = @{
             GodotPath = $GodotPath
             SeedCount = 20
@@ -80,6 +80,7 @@ foreach ($profile in $profiles) {
             JellyTimedTurns = $profile.Turns
             JellyTimedLevel = $profile.Level
             JellyTimedBurstCount = $profile.BurstCount
+            JellyTimedBurstOtherColors = "On"
             Strategies = if ($mode -eq "save") { "r,l_merge" } else { "l_merge" }
             MeasurementLabel = $strategyLabel
         }
@@ -97,6 +98,10 @@ function Get-TimedFields($Summary) {
         remain_end_ratio = [double]$Summary.timed_jelly_remaining_ratio
         average_turns_to_success = [double]$Summary.timed_jelly_average_turns_to_success
         success_result_levels = $Summary.timed_jelly_success_result_levels
+        burst_internal_merges_per_game = [double]$Summary.timed_burst_internal_merges_per_game
+        burst_internal_merges_per_timeout = [double]$Summary.timed_burst_internal_merges_per_timeout
+        burst_board_merges_per_game = [double]$Summary.timed_burst_board_merges_per_game
+        burst_board_merges_per_timeout = [double]$Summary.timed_burst_board_merges_per_timeout
     }
 }
 
@@ -138,10 +143,10 @@ function Get-StrategyRow($Summary) {
 
 $profileReports = [ordered]@{}
 foreach ($profile in $profiles) {
-    $autoSave = Get-Content -LiteralPath (Join-Path $repoPath "artifacts\jelly_physics_autoplay_145_$($profile.Slug)_auto_save.json") -Raw | ConvertFrom-Json
-    $autoAll = Get-Content -LiteralPath (Join-Path $repoPath "artifacts\jelly_physics_autoplay_145_$($profile.Slug)_auto_all.json") -Raw | ConvertFrom-Json
-    $strategySave = Get-Content -LiteralPath (Join-Path $measurementDirectory "jelly_rules_measurement_145_$($profile.Slug)_strategy_save.json") -Raw | ConvertFrom-Json
-    $strategyAll = Get-Content -LiteralPath (Join-Path $measurementDirectory "jelly_rules_measurement_145_$($profile.Slug)_strategy_all.json") -Raw | ConvertFrom-Json
+    $autoSave = Get-Content -LiteralPath (Join-Path $repoPath "artifacts\jelly_physics_autoplay_146_$($profile.Slug)_auto_save.json") -Raw | ConvertFrom-Json
+    $autoAll = Get-Content -LiteralPath (Join-Path $repoPath "artifacts\jelly_physics_autoplay_146_$($profile.Slug)_auto_all.json") -Raw | ConvertFrom-Json
+    $strategySave = Get-Content -LiteralPath (Join-Path $measurementDirectory "jelly_rules_measurement_146_$($profile.Slug)_strategy_save.json") -Raw | ConvertFrom-Json
+    $strategyAll = Get-Content -LiteralPath (Join-Path $measurementDirectory "jelly_rules_measurement_146_$($profile.Slug)_strategy_all.json") -Raw | ConvertFrom-Json
     $profileReports[$profile.Name] = [ordered]@{
         timed_turns = $profile.Turns
         timed_level = $profile.Level
@@ -155,15 +160,14 @@ foreach ($profile in $profiles) {
 }
 
 $baseline = [pscustomobject]@{
-    Name = "K5-8"
+    Name = "#145 K5-4 same-color B10"
     Level = 5
-    Turns = 8
+    Turns = 4
     BurstCount = 10
-    AutoSuccess = 0.6536144578313253
-    RSuccess = 0.620253164556962
-    AutoTurns = 211.15
-    AverageSuccess = 0.6369338111941436
-    DistanceFromHalf = 0.1369338111941436
+    AutoSuccess = 0.4976958525345622
+    RSuccess = 0.4620938628158845
+    AutoTurns = 273.4
+    AverageSuccess = 0.47989485767522333
 }
 $eligibleProfiles = @()
 foreach ($profile in $profiles) {
@@ -193,17 +197,26 @@ foreach ($profile in $profiles) {
 $selectedProfile = if ($eligibleProfiles.Count -gt 0) {
     @(
         $eligibleProfiles |
-            Sort-Object `
-                @{ Expression = "DistanceFromHalf"; Ascending = $true },
-                @{ Expression = "Turns"; Descending = $true } |
+            Sort-Object @{ Expression = "BurstCount"; Descending = $true } |
             Select-Object -First 1
     )[0]
 } else {
-    $baseline
+    @($profiles | Where-Object { $_.Name -eq "B10" } | ForEach-Object {
+        [pscustomobject]@{
+            Name = $_.Name
+            Level = $_.Level
+            Turns = $_.Turns
+            BurstCount = $_.BurstCount
+            AutoSuccess = [double]$profileReports[$_.Name].auto_d_save.success_ratio
+            RSuccess = [double]$profileReports[$_.Name].r_d_save.success_ratio
+            AutoTurns = [double]$profileReports[$_.Name].auto_d_save.turns_average
+            AverageSuccess = ([double]$profileReports[$_.Name].auto_d_save.success_ratio + [double]$profileReports[$_.Name].r_d_save.success_ratio) / 2.0
+        }
+    })[0]
 }
 $warnings = @()
 if ($eligibleProfiles.Count -eq 0) {
-    $warnings += "No new profile meets both 40-60% success ratios and auto D-save average turns >= 176.4; keep K5-8"
+    $warnings += "No profile meets both 40-60% success ratios and auto D-save average turns >= 176.4; keep B10"
 }
 foreach ($profileEntry in $profileReports.GetEnumerator()) {
     foreach ($rowEntry in $profileEntry.Value.GetEnumerator()) {
@@ -211,14 +224,17 @@ foreach ($profileEntry in $profileReports.GetEnumerator()) {
         if ([int]$rowEntry.Value.departures -gt 0) {
             $warnings += "$($profileEntry.Key) $($rowEntry.Key) departures: $($rowEntry.Value.departures)"
         }
+        if ([double]$rowEntry.Value.burst_internal_merges_per_timeout -ge 1.0) {
+            $warnings += "$($profileEntry.Key) $($rowEntry.Key) burst-burst merges per timeout: $($rowEntry.Value.burst_internal_merges_per_timeout)"
+        }
     }
 }
 
 $report = [ordered]@{
     generated_at = (Get-Date).ToUniversalTime().ToString("o")
     engine = "Godot 4.8-dev3 standard"
-    conditions = "K5-7/K5-6/K5-5/K5-4; K5-8 from #144; auto seeds 101-120; strategy seeds 1-20; five bots; 600 turns; fixed 120 fps"
-    baseline_k5_8 = $baseline
+    conditions = "B10/B8/B6 other-color L1; L5/4 turns; #145 K5-4 same-color B10 baseline not rerun; auto seeds 101-120; strategy seeds 1-20; five bots; 600 turns; fixed 120 fps"
+    baseline_145_k5_4 = $baseline
     profiles = $profileReports
     selection = [ordered]@{
         eligible_profile_names = @($eligibleProfiles | ForEach-Object { $_.Name })
@@ -230,6 +246,6 @@ $report = [ordered]@{
     }
     warnings = $warnings
 }
-$outputPath = Join-Path $measurementDirectory "timed_jelly_number_balance.json"
+$outputPath = Join-Path $measurementDirectory "timed_jelly_burst_color_balance.json"
 $report | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $outputPath -Encoding utf8
 Write-Output "TIMED_JELLY_BALANCE_REPORT $outputPath"

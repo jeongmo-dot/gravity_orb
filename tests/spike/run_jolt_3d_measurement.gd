@@ -648,6 +648,8 @@ func _run_seed(
 		"timed_jelly_remaining_count": _timed_jelly_remaining_count(board),
 		"timed_jelly_success_turns_sum": manager.timed_jelly_success_turns_sum,
 		"timed_jelly_success_result_levels": manager.timed_jelly_success_result_levels.duplicate(true),
+		"timed_burst_internal_merge_count": manager.timed_burst_internal_merge_count,
+		"timed_burst_board_merge_count": manager.timed_burst_board_merge_count,
 		"layer_distance_by_level": _finalize_layer_distances(layer_distances),
 		"ghost_completed_count": board.ghost_completed_count,
 		"ghost_timeout_count": board.ghost_timeout_count,
@@ -2386,6 +2388,10 @@ func _apply_arguments() -> void:
 			Config.data.jelly_timed_burst_count = maxi(
 				argument.trim_prefix("--jelly-timed-burst-count=").to_int(),
 				1
+			)
+		elif argument.begins_with("--jelly-timed-burst-other-colors="):
+			Config.data.jelly_timed_burst_other_colors = (
+				argument.trim_prefix("--jelly-timed-burst-other-colors=") == "on"
 			)
 		elif argument.begins_with("--blast-push-radius-by-level="):
 			Config.data.blast_push_radius_by_level = _parse_float_list(
