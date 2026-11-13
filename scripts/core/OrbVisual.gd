@@ -16,6 +16,7 @@ var _jelly_level: int = 0
 var _jelly_color_index: int = 0
 var _planet_animation_elapsed: float = 0.0
 var _timed_turns: int = 0
+var _is_timed_stone: bool = false
 
 
 func setup(
@@ -27,6 +28,7 @@ func setup(
 	_celestial_level = 0
 	_jelly_level = 0
 	_timed_turns = 0
+	_is_timed_stone = false
 	_display_color = display_color
 	_symbol_color = symbol_color
 	_symbols_enabled = symbols_enabled
@@ -45,6 +47,7 @@ func setup_celestial_preview(
 	_celestial_level = clampi(level, 1, 7)
 	_jelly_level = 0
 	_timed_turns = 0
+	_is_timed_stone = false
 	_planet_animation_elapsed = 0.0
 	_display_color = display_color
 	_symbol_color = symbol_color
@@ -64,6 +67,7 @@ func setup_jelly_preview(
 	_jelly_level = clampi(level, 1, Config.data.orb_max_level)
 	_jelly_color_index = clampi(color_index, 0, JellyOrbArt.PALETTE.size() - 1)
 	_timed_turns = 0
+	_is_timed_stone = false
 	_planet_animation_elapsed = 0.0
 	_display_color = JellyOrbArt.color_for(_jelly_color_index, _jelly_level)
 	_symbol_color = _jelly_color_index
@@ -75,6 +79,12 @@ func setup_jelly_preview(
 
 func set_timed_turns(turns: int) -> void:
 	_timed_turns = maxi(turns, 0)
+	queue_redraw()
+
+
+func set_timed_stone(enabled: bool, turns: int = 0) -> void:
+	_is_timed_stone = enabled
+	_timed_turns = maxi(turns, 0) if enabled else 0
 	queue_redraw()
 
 
@@ -185,9 +195,10 @@ func _draw() -> void:
 
 
 func _draw_jelly() -> void:
-	var texture: Texture2D = JellyOrbArt.preview_texture_for(
-		_jelly_color_index,
-		_jelly_level
+	var texture: Texture2D = (
+		JellyOrbArt.stone_preview_texture_for(_jelly_level)
+		if _is_timed_stone
+		else JellyOrbArt.preview_texture_for(_jelly_color_index, _jelly_level)
 	)
 	draw_texture_rect(
 		texture,

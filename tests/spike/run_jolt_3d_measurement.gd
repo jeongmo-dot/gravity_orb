@@ -83,6 +83,8 @@ var _seed_jelly_outline_visible_frames: int = 0
 var _seed_jelly_unarmed_outline_visible_frames: int = 0
 var _seed_jelly_outline_max_alpha: float = 0.0
 var _seed_jelly_visible_mesh_frames: Dictionary = {}
+var _seed_timed_stone_ids: Dictionary = {}
+var _seed_timed_stone_reaction_count: int = 0
 
 
 func _ready() -> void:
@@ -331,6 +333,8 @@ func _run_seed(
 	_seed_jelly_unarmed_outline_visible_frames = 0
 	_seed_jelly_outline_max_alpha = 0.0
 	_seed_jelly_visible_mesh_frames.clear()
+	_seed_timed_stone_ids.clear()
+	_seed_timed_stone_reaction_count = 0
 	_current_measurement_turn = 0
 	var fixture: Dictionary = await _create_fixture(seed)
 	var fixture_root: Node = fixture["root"] as Node
@@ -648,6 +652,10 @@ func _run_seed(
 		"timed_jelly_remaining_count": _timed_jelly_remaining_count(board),
 		"timed_jelly_success_turns_sum": manager.timed_jelly_success_turns_sum,
 		"timed_jelly_success_result_levels": manager.timed_jelly_success_result_levels.duplicate(true),
+		"timed_stone_created_count": manager.timed_stone_created_count,
+		"timed_stone_max_concurrent": manager.timed_stone_max_concurrent,
+		"timed_stone_remaining_count": _timed_stone_remaining_count(board),
+		"timed_stone_reaction_count": _seed_timed_stone_reaction_count,
 		"layer_distance_by_level": _finalize_layer_distances(layer_distances),
 		"ghost_completed_count": board.ghost_completed_count,
 		"ghost_timeout_count": board.ghost_timeout_count,
@@ -696,6 +704,9 @@ func _create_fixture(seed: int) -> Dictionary:
 	get_tree().root.add_child(fixture_root)
 	await get_tree().process_frame
 	manager.reaction_ready.connect(score_manager.on_reaction)
+	manager.timed_stone_created.connect(
+		func(_turns: int) -> void: _record_timed_stone_ids(board)
+	)
 	resolver.reaction_applied.connect(_record_shock_event)
 	spawner.orb_spawned.connect(score_manager.on_orb_spawned)
 	spawner.orb_spawned.connect(_record_spawned_orb)
@@ -1037,6 +1048,18 @@ func _record_spawned_orb(level: int) -> void:
 
 
 func _record_shock_event(reaction: Dictionary) -> void:
+	var reaction_involves_stone: bool = false
+	for id_value: Variant in reaction.get("stable_spawn_ids", []) as Array:
+		if _seed_timed_stone_ids.has(int(id_value)):
+			reaction_involves_stone = true
+			break
+	if not reaction_involves_stone:
+		for id_value: Variant in reaction.get("clean_stable_spawn_ids", []) as Array:
+			if _seed_timed_stone_ids.has(int(id_value)):
+				reaction_involves_stone = true
+				break
+	if reaction_involves_stone:
+		_seed_timed_stone_reaction_count += 1
 	var reaction_type: ReactionRules.Type = reaction["type"] as ReactionRules.Type
 	_record_followup_for_blast_windows(reaction_type)
 	var score_key: String = ""
@@ -2387,6 +2410,15 @@ func _apply_arguments() -> void:
 				argument.trim_prefix("--jelly-timed-burst-count=").to_int(),
 				1
 			)
+		elif argument.begins_with("--jelly-timed-stone-enabled="):
+			Config.data.jelly_timed_stone_enabled = (
+				argument.trim_prefix("--jelly-timed-stone-enabled=") == "on"
+			)
+		elif argument.begins_with("--jelly-timed-stone-turns="):
+			Config.data.jelly_timed_stone_turns = maxi(
+				argument.trim_prefix("--jelly-timed-stone-turns=").to_int(),
+				1
+			)
 		elif argument.begins_with("--blast-push-radius-by-level="):
 			Config.data.blast_push_radius_by_level = _parse_float_list(
 				argument.trim_prefix("--blast-push-radius-by-level=")
@@ -2447,6 +2479,20 @@ func _timed_jelly_remaining_count(board: Board3D) -> int:
 		if orb.is_timed:
 			count += 1
 	return count
+
+
+func _timed_stone_remaining_count(board: Board3D) -> int:
+	var count: int = 0
+	for orb: Orb3D in board.get_orbs():
+		if orb.is_timed_stone:
+			count += 1
+	return count
+
+
+func _record_timed_stone_ids(board: Board3D) -> void:
+	for orb: Orb3D in board.get_orbs():
+		if orb.is_timed_stone:
+			_seed_timed_stone_ids[orb.stable_spawn_id] = true
 
 
 func _parse_int_list(csv: String) -> Array[int]:

@@ -336,6 +336,8 @@ func test_m9_blast_defaults() -> void:
 	assert_eq(config.jelly_timed_level, 5, "timed jelly level")
 	assert_eq(config.jelly_timed_turns, 4, "timed jelly turns")
 	assert_eq(config.jelly_timed_burst_count, 10, "timed jelly burst count")
+	assert_true(config.jelly_timed_stone_enabled, "timed stone enabled")
+	assert_eq(config.jelly_timed_stone_turns, 18, "timed stone turns")
 	assert_eq(config.jelly_timed_bonus_levels, 1, "timed jelly bonus levels")
 	assert_eq(
 		config.blast_push_radius_by_level,

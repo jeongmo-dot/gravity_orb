@@ -122,6 +122,9 @@ var _danger_multiplier: float = 1.0
 var _timed_jelly_callout_seen: bool = false
 var _timed_jelly_callout_pending: bool = false
 var _timed_jelly_callout_history: Array[String] = []
+var _timed_stone_callout_seen: bool = false
+var _timed_stone_callout_pending: bool = false
+var _timed_stone_callout_history: Array[String] = []
 var _danger_refresh_elapsed: float = 0.0
 var _pulse_elapsed: float = 0.0
 var _badge_punching: bool = false
@@ -520,6 +523,8 @@ func bind_game_state(
 		turn_manager.jelly_tap_effect_unlocked.connect(_on_jelly_tap_effect_unlocked)
 	if not turn_manager.timed_jelly_placed.is_connected(_on_timed_jelly_placed):
 		turn_manager.timed_jelly_placed.connect(_on_timed_jelly_placed)
+	if not turn_manager.timed_stone_created.is_connected(_on_timed_stone_created):
+		turn_manager.timed_stone_created.connect(_on_timed_stone_created)
 	if not turn_manager.final_move_changed.is_connected(_on_final_move_changed):
 		turn_manager.final_move_changed.connect(_on_final_move_changed)
 	if not turn_manager.game_started.is_connected(_reset_callout_tracking):
@@ -546,6 +551,7 @@ func _on_turn_state_changed(state: int) -> void:
 		_defer_jelly_tap_effect_until_next_wait = false
 		_show_next_jelly_tap_effect()
 		_show_next_timed_jelly_callout()
+		_show_next_timed_stone_callout()
 
 
 func _refresh_turn_number() -> void:
@@ -1602,6 +1608,8 @@ func _complete_callout() -> void:
 		call_deferred("_show_next_jelly_tap_effect")
 	elif _timed_jelly_callout_pending:
 		call_deferred("_show_next_timed_jelly_callout")
+	elif _timed_stone_callout_pending:
+		call_deferred("_show_next_timed_stone_callout")
 
 
 func _on_timed_jelly_placed(turns: int, bonus_levels: int) -> void:
@@ -1639,6 +1647,35 @@ func _show_next_timed_jelly_callout(
 		bonus_text,
 	]
 	_timed_jelly_callout_history.append(text)
+	_show_callout(text, 0)
+
+
+func _on_timed_stone_created(turns: int) -> void:
+	if _timed_stone_callout_seen:
+		return
+	_timed_stone_callout_seen = true
+	if not Config.data.fx_callouts_enabled:
+		return
+	_timed_stone_callout_pending = true
+	if not _callout_label.visible:
+		_show_next_timed_stone_callout(turns)
+
+
+func _show_next_timed_stone_callout(turns: int = -1) -> void:
+	if (
+		not _timed_stone_callout_pending
+		or _callout_label.visible
+		or not _pending_planet_unlocks.is_empty()
+		or not _pending_jelly_tap_effects.is_empty()
+		or _timed_jelly_callout_pending
+	):
+		return
+	_timed_stone_callout_pending = false
+	var configured_turns: int = (
+		Config.data.jelly_timed_stone_turns if turns < 0 else turns
+	)
+	var text: String = "굳은 젤리: %d턴 동안 합칠 수 없음" % configured_turns
+	_timed_stone_callout_history.append(text)
 	_show_callout(text, 0)
 
 
@@ -1686,6 +1723,9 @@ func _reset_callout_tracking() -> void:
 	_timed_jelly_callout_seen = false
 	_timed_jelly_callout_pending = false
 	_timed_jelly_callout_history.clear()
+	_timed_stone_callout_seen = false
+	_timed_stone_callout_pending = false
+	_timed_stone_callout_history.clear()
 	_showing_jelly_tap_effect = false
 	_defer_jelly_tap_effect_until_next_wait = false
 	_preview_unlock_seen.clear()
@@ -1726,6 +1766,10 @@ func preview_unlock_flash_history() -> Array[int]:
 
 func timed_jelly_callout_history() -> Array[String]:
 	return _timed_jelly_callout_history.duplicate()
+
+
+func timed_stone_callout_history() -> Array[String]:
+	return _timed_stone_callout_history.duplicate()
 
 
 func active_ui_sparkle_count() -> int:
