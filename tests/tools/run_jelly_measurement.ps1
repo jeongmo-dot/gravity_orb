@@ -23,6 +23,10 @@ param(
 	[int]$JellyTimedLevel = 3,
 	[ValidateRange(1, 100)]
 	[int]$JellyTimedBurstCount = 6,
+	[ValidateSet("On", "Off")]
+	[string]$JellyTimedStoneEnabled = "On",
+	[ValidateRange(1, 100)]
+	[int]$JellyTimedStoneTurns = 6,
 	[ValidateRange(0, 10)]
 	[int]$JellyBlastMinLevel = 8,
 	[ValidateRange(0, 10)]
@@ -134,6 +138,8 @@ if (-not $AggregateOnly) {
 					"--jelly-timed-turns=$JellyTimedTurns",
 					"--jelly-timed-level=$JellyTimedLevel",
 					"--jelly-timed-burst-count=$JellyTimedBurstCount",
+					"--jelly-timed-stone-enabled=$($JellyTimedStoneEnabled.ToLower())",
+					"--jelly-timed-stone-turns=$JellyTimedStoneTurns",
 					"--jelly-blast-min-level=$JellyBlastMinLevel",
 					"--jelly-tap-blast-min-level=$JellyTapBlastMinLevel",
 					"--blast-score-factor=$($BlastScoreFactor.ToString([Globalization.CultureInfo]::InvariantCulture))",
@@ -303,6 +309,10 @@ function Get-Summary($Rows) {
 	$timedFailure = [double](($Rows | Measure-Object -Property timed_jelly_failure_count -Sum).Sum)
 	$timedRemaining = [double](($Rows | Measure-Object -Property timed_jelly_remaining_count -Sum).Sum)
 	$timedSuccessTurns = [double](($Rows | Measure-Object -Property timed_jelly_success_turns_sum -Sum).Sum)
+	$timedStoneCreated = [double](($Rows | Measure-Object -Property timed_stone_created_count -Sum).Sum)
+	$timedStoneMaxConcurrent = [double](($Rows | Measure-Object -Property timed_stone_max_concurrent -Maximum).Maximum)
+	$timedStoneRemaining = [double](($Rows | Measure-Object -Property timed_stone_remaining_count -Sum).Sum)
+	$timedStoneReactions = [double](($Rows | Measure-Object -Property timed_stone_reaction_count -Sum).Sum)
 	$averageCleanCountPerTapByColor = [ordered]@{}
 	$zeroCleanTapRatioByColor = [ordered]@{}
 	foreach ($colorKey in @($tapBlastCountByColor.Keys | Sort-Object)) {
@@ -379,6 +389,12 @@ function Get-Summary($Rows) {
 		timed_jelly_remaining_ratio = Get-Ratio $timedRemaining $timedPlaced
 		timed_jelly_average_turns_to_success = Get-Ratio $timedSuccessTurns $timedSuccess
 		timed_jelly_success_result_levels = $timedSuccessLevels
+		timed_stone_created_count = [int]$timedStoneCreated
+		timed_stone_created_per_game = Get-Ratio $timedStoneCreated @($Rows).Count
+		timed_stone_max_concurrent = [int]$timedStoneMaxConcurrent
+		timed_stone_remaining_count = [int]$timedStoneRemaining
+		timed_stone_remaining_per_game = Get-Ratio $timedStoneRemaining @($Rows).Count
+		timed_stone_reaction_count = [int]$timedStoneReactions
 		forced_settle_turns = [int](($Rows | Measure-Object -Property capped_turn_count -Sum).Sum)
 		same_level_blast_count_by_level = $sameLevelBlastCountByLevel
 		mixed_level_blast_count_by_level = $mixedLevelBlastCountByLevel
@@ -447,6 +463,8 @@ $report = [ordered]@{
 	jelly_timed_enabled = $JellyTimedEnabled -eq "On"
 	jelly_timed_turns = $JellyTimedTurns
 	jelly_timed_level = $JellyTimedLevel
+	jelly_timed_stone_enabled = $JellyTimedStoneEnabled -eq "On"
+	jelly_timed_stone_turns = $JellyTimedStoneTurns
 	jelly_blast_min_level = $JellyBlastMinLevel
 	jelly_tap_blast_min_level = $JellyTapBlastMinLevel
 	jelly_blast_requires_same_level = $JellyBlastRequiresSameLevel -eq "On"

@@ -23,6 +23,8 @@ var jelly_mass: float = 1.0
 var is_timed: bool = false
 var timed_turns_remaining: int = 0
 var timed_placed_turn: int = 0
+var is_timed_stone: bool = false
+var timed_stone_turns_remaining: int = 0
 var consumed: bool = false
 var is_ghost: bool = false
 var ghost_elapsed: float = 0.0
@@ -140,6 +142,9 @@ func set_symbols_enabled(enabled: bool) -> void:
 
 
 func set_timed(turns: int, placed_turn: int = 0) -> void:
+	is_timed_stone = false
+	timed_stone_turns_remaining = 0
+	_visual.set_timed_stone(false)
 	is_timed = turns > 0
 	timed_turns_remaining = maxi(turns, 0)
 	timed_placed_turn = maxi(placed_turn, 0)
@@ -159,6 +164,21 @@ func decrement_timed_turn() -> int:
 	timed_turns_remaining = maxi(timed_turns_remaining - 1, 0)
 	_visual.set_timed_turns(timed_turns_remaining)
 	return timed_turns_remaining
+
+
+func set_timed_stone(turns: int) -> void:
+	clear_timed()
+	is_timed_stone = turns > 0
+	timed_stone_turns_remaining = maxi(turns, 0)
+	_visual.set_timed_stone(is_timed_stone, timed_stone_turns_remaining)
+
+
+func decrement_timed_stone_turn() -> int:
+	if not is_timed_stone:
+		return 0
+	timed_stone_turns_remaining = maxi(timed_stone_turns_remaining - 1, 0)
+	_visual.set_timed_stone(true, timed_stone_turns_remaining)
+	return timed_stone_turns_remaining
 
 
 func blast_brightness() -> float:

@@ -38,6 +38,8 @@ var jelly_mass: float = 1.0
 var is_timed: bool = false
 var timed_turns_remaining: int = 0
 var timed_placed_turn: int = 0
+var is_timed_stone: bool = false
+var timed_stone_turns_remaining: int = 0
 var consumed: bool = false
 var is_ghost: bool = false
 var ghost_elapsed: float = 0.0
@@ -289,6 +291,12 @@ func set_symbols_enabled(enabled: bool) -> void:
 
 
 func set_timed(turns: int, placed_turn: int = 0) -> void:
+	var was_stone: bool = is_timed_stone
+	is_timed_stone = false
+	timed_stone_turns_remaining = 0
+	if was_stone:
+		_mesh.material_override = JellyOrbArt.body_material_for(color, level)
+		_apply_visual_transparency()
 	is_timed = turns > 0
 	timed_turns_remaining = maxi(turns, 0)
 	timed_placed_turn = maxi(placed_turn, 0)
@@ -310,11 +318,35 @@ func decrement_timed_turn() -> int:
 	return timed_turns_remaining
 
 
+func set_timed_stone(turns: int) -> void:
+	clear_timed()
+	is_timed_stone = turns > 0
+	timed_stone_turns_remaining = maxi(turns, 0)
+	_mesh.material_override = (
+		JellyOrbArt.stone_body_material(level)
+		if is_timed_stone
+		else JellyOrbArt.body_material_for(color, level)
+	)
+	_apply_visual_transparency()
+	_update_timed_label()
+
+
+func decrement_timed_stone_turn() -> int:
+	if not is_timed_stone:
+		return 0
+	timed_stone_turns_remaining = maxi(timed_stone_turns_remaining - 1, 0)
+	_update_timed_label()
+	return timed_stone_turns_remaining
+
+
 func _update_timed_label() -> void:
 	if not is_instance_valid(_timed_label):
 		return
-	_timed_label.visible = is_timed and timed_turns_remaining > 0
-	_timed_label.text = str(timed_turns_remaining) if _timed_label.visible else ""
+	var display_turns: int = (
+		timed_stone_turns_remaining if is_timed_stone else timed_turns_remaining
+	)
+	_timed_label.visible = (is_timed or is_timed_stone) and display_turns > 0
+	_timed_label.text = str(display_turns) if _timed_label.visible else ""
 
 
 func _physics_process(delta: float) -> void:

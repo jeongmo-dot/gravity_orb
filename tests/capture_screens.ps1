@@ -217,8 +217,11 @@ $expectedFiles = @(
     "202_jelly_timed_success_before.png",
     "203_jelly_timed_success_after_bonus.png",
     "204_jelly_timed_timeout_before.png",
-    "205_jelly_timed_timeout_after_clustered_l1.png",
-    "206_jelly_timed_first_callout.png"
+    "205_jelly_timed_stone_after_harden.png",
+    "206_jelly_timed_first_callout.png",
+    "207_jelly_timed_stone_1.png",
+    "208_jelly_timed_stone_broken_settled.png",
+    "209_jelly_timed_stone_first_callout.png"
 )
 
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {

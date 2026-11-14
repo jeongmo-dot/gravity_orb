@@ -187,8 +187,11 @@ const CAPTURE_FILES: Array[String] = [
 	"202_jelly_timed_success_before.png",
 	"203_jelly_timed_success_after_bonus.png",
 	"204_jelly_timed_timeout_before.png",
-	"205_jelly_timed_timeout_after_clustered_l1.png",
+	"205_jelly_timed_stone_after_harden.png",
 	"206_jelly_timed_first_callout.png",
+	"207_jelly_timed_stone_1.png",
+	"208_jelly_timed_stone_broken_settled.png",
+	"209_jelly_timed_stone_first_callout.png",
 ]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
@@ -475,7 +478,7 @@ func _capture_timed_jelly_scenes(
 		timed_level,
 		Vector2(80.0, 0.0)
 	)
-	first.set_timed(8, 20)
+	first.set_timed(Config.data.jelly_timed_turns, 20)
 	first.disable_physics()
 	second.disable_physics()
 	await _capture("202_jelly_timed_success_before.png")
@@ -521,15 +524,25 @@ func _capture_timed_jelly_scenes(
 	await _capture("204_jelly_timed_timeout_before.png")
 	var score: ScoreManager = main.get_node("ScoreManager") as ScoreManager
 	var score_before: int = score.score
-	manager._spawn_timed_burst(expiring)
+	manager._timed_stone_callout_seen = true
+	manager._harden_timed_jelly(expiring)
 	await get_tree().process_frame
-	var burst_count: int = 0
-	for orb: Orb3D in board.get_orbs():
-		if orb.level == 1 and orb.color == OrbTypes.OrbColor.GREEN:
-			burst_count += 1
-	if burst_count != Config.data.jelly_timed_burst_count or score.score != score_before:
-		_fail("timed timeout capture expected configured scoreless same-color L1 jellies")
-	await _capture("205_jelly_timed_timeout_after_clustered_l1.png")
+	if (
+		board.get_orbs().size() != 1
+		or not expiring.is_timed_stone
+		or expiring.timed_stone_turns_remaining != Config.data.jelly_timed_stone_turns
+		or score.score != score_before
+	):
+		_fail("timed timeout capture expected one scoreless stone in place")
+	await _capture("205_jelly_timed_stone_after_harden.png")
+	expiring.set_timed_stone(1)
+	await _capture("207_jelly_timed_stone_1.png")
+	manager._remove_timed_stone(expiring)
+	resolver._advance_tap_clean_visuals(Config.data.jelly_tap_clean_visual_time + 0.01)
+	await get_tree().process_frame
+	if not board.get_orbs().is_empty() or score.score != score_before:
+		_fail("timed stone break capture expected an empty scoreless settled board")
+	await _capture("208_jelly_timed_stone_broken_settled.png")
 
 	director.clear_effects()
 	_clear_capture_hud_residue(hud)
@@ -545,6 +558,25 @@ func _capture_timed_jelly_scenes(
 		hud._callout_tween.kill()
 	_report_callout_fit("206_jelly_timed_first_callout", hud)
 	await _capture("206_jelly_timed_first_callout.png")
+	hud._hide_callout_label()
+
+	director.clear_effects()
+	board.clear()
+	_clear_capture_hud_residue(hud)
+	var callout_stone: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.BLUE,
+		timed_level,
+		Vector2.ZERO
+	)
+	callout_stone.set_timed_stone(Config.data.jelly_timed_stone_turns)
+	callout_stone.disable_physics()
+	hud._timed_stone_callout_seen = false
+	hud._timed_stone_callout_pending = false
+	hud._on_timed_stone_created(Config.data.jelly_timed_stone_turns)
+	if hud._callout_tween != null and hud._callout_tween.is_valid():
+		hud._callout_tween.kill()
+	_report_callout_fit("209_jelly_timed_stone_first_callout", hud)
+	await _capture("209_jelly_timed_stone_first_callout.png")
 	hud._hide_callout_label()
 
 

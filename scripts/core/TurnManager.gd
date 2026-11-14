@@ -10,6 +10,7 @@ signal turn_finished(turn_index: int, combo: int)
 signal planet_unlocked(color_index: int)
 signal jelly_tap_effect_unlocked(color_index: int)
 signal timed_jelly_placed(turns: int, bonus_levels: int)
+signal timed_stone_created(turns: int)
 signal combo_changed(combo: int, multiplier: float, max_combo: int)
 signal reaction_ready(reaction: Dictionary)
 signal warning_changed(walls: Array[Vector2i])
@@ -46,6 +47,8 @@ var timed_jelly_success_count: int = 0
 var timed_jelly_failure_count: int = 0
 var timed_jelly_success_turns_sum: int = 0
 var timed_jelly_success_result_levels: Dictionary = {}
+var timed_stone_created_count: int = 0
+var timed_stone_max_concurrent: int = 0
 var _settle_elapsed: float:
 	get:
 		return settle_elapsed
@@ -57,6 +60,7 @@ var _is_initial_settle: bool = false
 var _is_tap_blast_settle: bool = false
 var _is_timed_burst_settle: bool = false
 var _timed_jelly_callout_seen: bool = false
+var _timed_stone_callout_seen: bool = false
 var _current_merge_delay_seconds: float = 0.0
 var _jelly_tap_effect_callout_seen: Dictionary = {}
 
@@ -84,11 +88,14 @@ func start_game() -> void:
 	_jelly_tap_effect_callout_seen.clear()
 	_is_timed_burst_settle = false
 	_timed_jelly_callout_seen = false
+	_timed_stone_callout_seen = false
 	timed_jelly_placed_count = 0
 	timed_jelly_success_count = 0
 	timed_jelly_failure_count = 0
 	timed_jelly_success_turns_sum = 0
 	timed_jelly_success_result_levels.clear()
+	timed_stone_created_count = 0
+	timed_stone_max_concurrent = 0
 	final_move_changed.emit(false, "")
 	gravity = Vector2i.DOWN
 	_is_initial_settle = true
@@ -393,6 +400,16 @@ func _on_settled() -> void:
 func _advance_timed_jellies() -> bool:
 	if not Config.data.jelly_timed_enabled:
 		return false
+	var transition_started: bool = false
+	var expired_stones: Array = []
+	for orb: Variant in _board.get_orbs():
+		if not bool(orb.get("is_timed_stone")):
+			continue
+		if int(orb.decrement_timed_stone_turn()) <= 0:
+			expired_stones.append(orb)
+	for orb: Variant in expired_stones:
+		_remove_timed_stone(orb)
+		transition_started = true
 	var expired: Array = []
 	for orb: Variant in _board.get_orbs():
 		if not bool(orb.get("is_timed")) or bool(orb.get("is_waiting_at_entrance")):
@@ -400,8 +417,40 @@ func _advance_timed_jellies() -> bool:
 		if int(orb.decrement_timed_turn()) <= 0:
 			expired.append(orb)
 	for orb: Variant in expired:
-		_spawn_timed_burst(orb)
-	return not expired.is_empty()
+		if Config.data.jelly_timed_stone_enabled:
+			_harden_timed_jelly(orb)
+		else:
+			_spawn_timed_burst(orb)
+		transition_started = true
+	_update_timed_stone_maximum()
+	return transition_started
+
+
+func _harden_timed_jelly(source: Variant) -> void:
+	if not is_instance_valid(source) or bool(source.get("consumed")):
+		return
+	source.set_timed_stone(maxi(Config.data.jelly_timed_stone_turns, 0))
+	source.note_diagnostic_event("timed_stone")
+	timed_jelly_failure_count += 1
+	timed_stone_created_count += 1
+	if not _timed_stone_callout_seen:
+		_timed_stone_callout_seen = true
+		timed_stone_created.emit(Config.data.jelly_timed_stone_turns)
+
+
+func _remove_timed_stone(source: Variant) -> void:
+	if not is_instance_valid(source) or bool(source.get("consumed")):
+		return
+	source.note_diagnostic_event("timed_stone_expired")
+	_collision_resolver.remove_jelly_with_clean_visual(source)
+
+
+func _update_timed_stone_maximum() -> void:
+	var active_count: int = 0
+	for orb: Variant in _board.get_orbs():
+		if bool(orb.get("is_timed_stone")):
+			active_count += 1
+	timed_stone_max_concurrent = maxi(timed_stone_max_concurrent, active_count)
 
 
 func _spawn_timed_burst(source: Variant) -> void:

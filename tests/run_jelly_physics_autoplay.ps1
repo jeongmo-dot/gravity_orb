@@ -72,6 +72,10 @@ param(
 	[int]$JellyTimedLevel = 3,
 	[ValidateRange(1, 100)]
 	[int]$JellyTimedBurstCount = 6,
+	[ValidateSet("On", "Off")]
+	[string]$JellyTimedStoneEnabled = "On",
+	[ValidateRange(1, 100)]
+	[int]$JellyTimedStoneTurns = 6,
     [switch]$AggregateOnly
 )
 
@@ -100,6 +104,8 @@ $physicsArguments += "--jelly-timed-enabled=$($JellyTimedEnabled.ToLower())"
 $physicsArguments += "--jelly-timed-turns=$JellyTimedTurns"
 $physicsArguments += "--jelly-timed-level=$JellyTimedLevel"
 $physicsArguments += "--jelly-timed-burst-count=$JellyTimedBurstCount"
+$physicsArguments += "--jelly-timed-stone-enabled=$($JellyTimedStoneEnabled.ToLower())"
+$physicsArguments += "--jelly-timed-stone-turns=$JellyTimedStoneTurns"
 $physicsArguments += "--jelly-tap-blast-min-level=$JellyTapBlastMinLevel"
 $physicsArguments += "--blast-score-factor=$($BlastScoreFactor.ToString($culture))"
 $physicsArguments += "--jelly-tap-blast-score-factor=$($JellyTapBlastScoreFactor.ToString($culture))"
@@ -261,6 +267,10 @@ $timedFailure = 0
 $timedRemaining = 0
 $timedSuccessTurns = 0
 $timedSuccessLevels = @{}
+$timedStoneCreated = 0
+$timedStoneMaxConcurrent = 0
+$timedStoneRemaining = 0
+$timedStoneReactions = 0
 foreach ($task in $tasks) {
     $report = Get-Content -LiteralPath $task.Output -Raw | ConvertFrom-Json
     $tick = $report.ticks[0]
@@ -282,6 +292,10 @@ foreach ($task in $tasks) {
 	$timedFailure += [int]$seedRow.timed_jelly_failure_count
 	$timedRemaining += [int]$seedRow.timed_jelly_remaining_count
 	$timedSuccessTurns += [int]$seedRow.timed_jelly_success_turns_sum
+	$timedStoneCreated += [int]$seedRow.timed_stone_created_count
+	$timedStoneMaxConcurrent = [Math]::Max($timedStoneMaxConcurrent, [int]$seedRow.timed_stone_max_concurrent)
+	$timedStoneRemaining += [int]$seedRow.timed_stone_remaining_count
+	$timedStoneReactions += [int]$seedRow.timed_stone_reaction_count
 	foreach ($levelProperty in $seedRow.timed_jelly_success_result_levels.PSObject.Properties) {
 		$level = $levelProperty.Name
 		if (-not $timedSuccessLevels.ContainsKey($level)) { $timedSuccessLevels[$level] = 0 }
@@ -541,6 +555,12 @@ $summary = [ordered]@{
 	timed_jelly_remaining_ratio = if ($timedPlaced -gt 0) { [double]$timedRemaining / $timedPlaced } else { 0.0 }
 	timed_jelly_average_turns_to_success = if ($timedSuccess -gt 0) { [double]$timedSuccessTurns / $timedSuccess } else { 0.0 }
 	timed_jelly_success_result_levels = $timedSuccessLevels
+	timed_stone_created_count = $timedStoneCreated
+	timed_stone_per_game = [double]$timedStoneCreated / $seedRows.Count
+	timed_stone_max_concurrent = $timedStoneMaxConcurrent
+	timed_stone_remaining_count = $timedStoneRemaining
+	timed_stone_remaining_per_game = [double]$timedStoneRemaining / $seedRows.Count
+	timed_stone_reaction_count = $timedStoneReactions
     merges_per_turn = if ($totalTurns -gt 0) { [double]$totalMerges / $totalTurns } else { 0.0 }
 	level_ups_per_turn = if ($totalTurns -gt 0) { [double]$totalLevelUpCount / $totalTurns } else { 0.0 }
 	level_creation_count_by_level = $levelCreationCounts

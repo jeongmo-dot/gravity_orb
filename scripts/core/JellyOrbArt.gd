@@ -13,6 +13,7 @@ const LEVEL_LIGHTEN_AMOUNT: float = 0.018
 const CAPTURE_ANIMATION_TIME: float = 4.25
 const MAX_FACE_COLOR: Color = Color("1b1630")
 const MAX_BLUSH_COLOR: Color = Color("ff4f7f")
+const STONE_BODY_COLOR: Color = Color(0.55, 0.57, 0.60)
 const MAX_EYE_CENTER_X: float = 0.26
 const MAX_EYE_CENTER_Y: float = -0.08
 const MAX_EYE_RADIUS_X: float = 0.09
@@ -52,6 +53,7 @@ static var _body_shader: Shader
 static var _face_shader: Shader
 static var _belly_shader: Shader
 static var _body_materials: Dictionary = {}
+static var _stone_body_materials: Dictionary = {}
 static var _face_materials: Dictionary = {}
 static var _belly_materials: Dictionary = {}
 static var _preview_textures: Dictionary = {}
@@ -83,6 +85,7 @@ static func prewarm(cfg: GameConfig) -> void:
 
 static func clear_cache() -> void:
 	_body_materials.clear()
+	_stone_body_materials.clear()
 	_face_materials.clear()
 	_belly_materials.clear()
 	_preview_textures.clear()
@@ -96,7 +99,12 @@ static func clear_cache() -> void:
 
 
 static func shared_material_count() -> int:
-	return _body_materials.size() + _face_materials.size() + _belly_materials.size()
+	return (
+		_body_materials.size()
+		+ _stone_body_materials.size()
+		+ _face_materials.size()
+		+ _belly_materials.size()
+	)
 
 
 static func advance_animation(delta: float) -> void:
@@ -129,6 +137,23 @@ static func preview_texture_for(color_index: int, level: int) -> Texture2D:
 	var safe_color: int = clampi(color_index, 0, PALETTE.size() - 1)
 	var safe_level: int = clampi(level, 1, Config.data.orb_max_level)
 	var key: String = "%d:%d" % [safe_color, safe_level]
+	return _preview_texture_for_base(key, safe_level, color_for(safe_color, safe_level))
+
+
+static func stone_preview_texture_for(level: int) -> Texture2D:
+	var safe_level: int = clampi(level, 1, Config.data.orb_max_level)
+	return _preview_texture_for_base(
+		"stone:%d" % safe_level,
+		safe_level,
+		STONE_BODY_COLOR
+	)
+
+
+static func _preview_texture_for_base(
+	key: String,
+	safe_level: int,
+	base_color: Color
+) -> Texture2D:
 	if _preview_textures.has(key):
 		return _preview_textures[key] as Texture2D
 	var texture_size: int = (
@@ -136,7 +161,6 @@ static func preview_texture_for(color_index: int, level: int) -> Texture2D:
 		if safe_level == Config.data.orb_max_level
 		else PREVIEW_TEXTURE_SIZE
 	)
-	var base_color: Color = color_for(safe_color, safe_level)
 	var image: Image = Image.create(texture_size, texture_size, false, Image.FORMAT_RGBA8)
 	var light: Vector3 = Vector3(-0.20, -0.86, 0.48).normalized()
 	var half_vector: Vector3 = (light + Vector3(0.0, 0.0, 1.0)).normalized()
@@ -181,6 +205,21 @@ static func body_material_for(color_index: int, level: int) -> ShaderMaterial:
 		material.set_shader_parameter("animation_time", _animation_time)
 		_body_materials[key] = material
 	return _body_materials[key] as ShaderMaterial
+
+
+static func stone_body_material(level: int) -> ShaderMaterial:
+	var safe_level: int = clampi(level, 1, Config.data.orb_max_level)
+	if not _stone_body_materials.has(safe_level):
+		var material: ShaderMaterial = ShaderMaterial.new()
+		material.resource_name = "jelly_stone_body_l%d" % safe_level
+		material.render_priority = 10
+		material.shader = _get_body_shader()
+		material.set_shader_parameter("base_color", STONE_BODY_COLOR)
+		material.set_shader_parameter("level_id", safe_level)
+		material.set_shader_parameter("max_level_id", Config.data.orb_max_level)
+		material.set_shader_parameter("animation_time", _animation_time)
+		_stone_body_materials[safe_level] = material
+	return _stone_body_materials[safe_level] as ShaderMaterial
 
 
 static func face_material_for(
@@ -286,6 +325,8 @@ static func face_mesh() -> ArrayMesh:
 
 static func _apply_animation_time() -> void:
 	for value: Variant in _body_materials.values():
+		(value as ShaderMaterial).set_shader_parameter("animation_time", _animation_time)
+	for value: Variant in _stone_body_materials.values():
 		(value as ShaderMaterial).set_shader_parameter("animation_time", _animation_time)
 	for value: Variant in _face_materials.values():
 		(value as ShaderMaterial).set_shader_parameter("animation_time", _animation_time)

@@ -77,6 +77,8 @@ func flush(delta: float = 0.0) -> int:
 			continue
 		if _is_reaction_locked(a) or _is_reaction_locked(b):
 			continue
+		if not _pair_can_react(a, b):
+			continue
 		var pair_key: int = (
 			(int(a.stable_spawn_id) << 32) | int(b.stable_spawn_id)
 		)
@@ -416,6 +418,12 @@ func apply_jelly_tap_blast(orb: Variant) -> bool:
 	}
 	reaction_applied.emit(reaction)
 	return true
+
+
+func remove_jelly_with_clean_visual(orb: Variant) -> void:
+	if not is_instance_valid(orb) or bool(orb.get("consumed")):
+		return
+	_start_tap_clean_visual(orb, orb.position)
 
 
 func is_jelly_tap_blast_candidate(orb: Variant) -> bool:
@@ -1042,6 +1050,8 @@ func _current_reaction_partners(orb: Variant, active_orbs: Array) -> Array:
 
 
 func _pair_can_react(a: Variant, b: Variant) -> bool:
+	if bool(a.get("is_timed_stone")) or bool(b.get("is_timed_stone")):
+		return false
 	return ReactionRules.can_react(
 		a.color,
 		a.level,
@@ -1061,6 +1071,7 @@ func _is_valid_reaction_orb(orb: Variant) -> bool:
 	return (
 		is_instance_valid(orb)
 		and not orb.consumed
+		and not bool(orb.get("is_timed_stone"))
 		and not _merge_reserved.has(orb.get_instance_id())
 	)
 
