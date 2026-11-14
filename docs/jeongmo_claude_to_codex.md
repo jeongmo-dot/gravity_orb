@@ -36,8 +36,15 @@
 
 ## 대기 중
 
-### [2026-11-14 #150] 시한 젤리 숫자 5~10·실패하면 회색 돌 (1안·2안)
-- 상태: 대기 (#149 병합됨 `7876b8f` — main 위에서). **주말 — 가벼운 모드** (작성 규칙)
+(없음)
+
+---
+
+## 처리 완료
+
+### [2026-11-14 #150] 시한 젤리 숫자 5~10·실패하면 회색 돌 (1안·2안) — 완료
+- 상태: 완료 (2026-11-14 사용자 "그대로 병합" · [PR #150](https://github.com/jeongmo-dot/gravity_orb/pull/150) 병합 `7b80999`)
+- 검수: 코드 diff (`_timed_rng` 분리, 실패 방식 0·1·2, 돌 깨짐 대상), 테스트 diff, 캡처 `199`·`205`·`209`·`211`·`212` (540×960) 직접 확인. 바뀐 테스트 2파일은 Codex 관측 (Claude 재실행 없음). 가벼운 모드 — 전체 회귀·봇 측정·540×1170·Debug 빌드 없음, 시한 젤리를 끈 해시는 평일에. 맨 앞 경고 0건. Claude 지적: 파랑 지진이 판 전체 돌을 깸 (명세는 판의 절반) → 사용자 "그대로 병합". 결과: §12-ONE.41 "#150 결과"
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.41**
 - 배경: 사용자 (2026-11-14) "하나도 재미없는 구조야. 벌칙도 아니고" — 숫자 4는 운으로 갈리고, 굳은 젤리는 18턴 뒤 그냥 사라진다. 사용자 안: 숫자 5~10, 실패하면 1안 (판 전체에 회색 공) 또는 2안 (그 자리에서 영구 회색 돌, 폭발로만 깨짐). Claude 질문 답: 매번 무작위·둘 다 만들어 비교 (기본 2안)·1안은 회색 L1 5개·깨지는 범위는 폭발이 미는 범위
 - 앵커: `scripts/core/Spawner.gd` (시한 표시·숫자), `scripts/core/TurnManager.gd` `_advance_timed_jellies()`·`_harden_timed_jelly()`·`_remove_timed_stone()`, `scripts/core/CollisionResolver.gd` `apply_jelly_tap_blast()`·BLAST·MAX_CLEAR 처리, `scripts/spike/Board3D.gd` `apply_blast()`·`apply_blast_with_radius_factor()`·`apply_shockwave()`, `scripts/core/Orb.gd`·`scripts/spike/Orb3D.gd` 굳은 젤리, `scripts/ui/Hud.gd` 안내 줄, `config/GameConfig.gd`·`default_config.tres` 새 필드, `tests/test_timed_jelly.gd`, `tests/spike/capture_screens.gd`
@@ -59,10 +66,6 @@
   - [ ] 캡처 `199`·`205`·`209`·`211`·`212` (540×960)
 - QA: §12-ONE.41 7·8번
 - 커밋: 항목 단위 브랜치 (`timed-fail-modes`), **push·PR까지** (병합은 Claude 검수 뒤)
-
----
-
-## 처리 완료
 
 ### [2026-11-14 #149] 상한 뒤에 닿은 합체도 그 턴 안에 — 완료
 - 상태: 완료 (2026-11-14 사용자 "측정 없이 병합" · [PR #149](https://github.com/jeongmo-dot/gravity_orb/pull/149) 병합 `7876b8f`)
