@@ -40,17 +40,18 @@
 
 ### [2026-11-14] 대상 #154 — 시한 젤리 처음 숫자: 100턴 미만 10~15, 이후 5~10
 - 맨 앞 경고 조건: 제공된 자동 검증에서 같은 시드의 젤리 색·자리·레벨 순서 변경, 숫자 고정 해시 4개 변경, limit 0 해시 변경, 범위 밖 숫자로 인한 실패 보고 없음. 범위·경계·난수 순서 테스트 PASS, 보존 대상 해시 5개는 아래 관측값과 일치. 새 기본 해시 변경은 명세에서 허용한 변경이다.
-- 상태: 부분완료 — 지정 테스트와 이미지 캡처 완료. 이미지 육안 확인은 아직 하지 않았으며 Claude 이미지 검수 대기. 합격·불합격 판정은 Claude에게 요청한다.
-- 브랜치: `codex/pm-8c0d20b9`. 기존 작업은 작업 브랜치에 남아 있으며 main 병합 없음.
+- 상태: 완료 — Codex 구현·변경 대상 테스트 38/38·장면 199 한 장·Claude 코드/이미지 검수 통과. 실제 플레이의 THEN·안내 문구 확인 등 아래 수동 항목은 별도이며 main 병합은 하지 않았다.
+- 작업 브랜치: `codex/pm-8c0d20b9`. PR 제출 브랜치: `codex/timed-early-range`. main 병합 없음.
 - 코드·검증·캡처 기준 커밋: `207fe6fe2f70db8bfcacc1a5146b0f6c3b7a07da`.
-- 근거: `technical_design.md` §12-ONE.44 및 제공된 실제 실행 로그. 변경 파일 전체 목록과 diff는 제공되지 않아 여기서 단정하지 않는다.
+- 근거: `technical_design.md` §12-ONE.44 및 실제 실행 로그. 변경 파일은 `config/GameConfig.gd`, `config/default_config.tres`, `scripts/core/Spawner.gd`, `tests/test_config.gd`, `tests/test_timed_jelly.gd`, 이 회신 파일 6개다.
 - Done-when 대조:
   - [x] 자동: `test_config.gd` 16/16 PASS, 실패 0. 개별 필드 값 출력은 제공 로그에 없음.
   - [x] 자동: `test_early_timed_ranges_boundary_and_rng_sequence` PASS — 초기·후기 범위, 경계 및 난수 순서 검증 항목. 시드별 숫자와 1~45턴 대조 상세값은 로그에 출력되지 않음.
   - [x] 자동: `test_early_timed_fallbacks_and_fixed_precedence` PASS — 초기 구간 fallback 및 숫자 고정 우선순위 검증 항목.
   - [x] 자동: 숫자 고정 해시 4개와 limit 0 해시 보존, 새 기본 해시 관측·고정 테스트 PASS.
   - [x] 캡처: 장면 `199`, 540×960 이미지 1장 생성. 로그 `GRAVITY154_CAPTURE turns=10 count=1`.
-  - [ ] 수동: 판 위·NEXT 두 자리 숫자의 선명도, THEN·안내 문구와 해당 젤리 숫자의 일치 여부 — Claude 이미지 및 화면 검수 대기.
+  - [x] 이미지: Claude가 실제 PNG를 확인해 판 위 10, NEXT 15가 범위 안이고 잘림 없이 또렷함을 확인했다.
+  - [ ] 수동: 실제 플레이의 THEN·안내 문구 일치 및 104턴 이후 체감 확인은 별도.
 - QA 관측값:
   - 엔진: Godot `4.8.dev3.official.51105ccbe` 일반 빌드.
   - `godot-import` → 종료 코드 0 (`TEST-5386b51e`). 제공 로그에 `SCRIPT ERROR`·`Parse Error` 0건.
@@ -59,7 +60,7 @@
   - `capture-199-540x960` → 종료 코드 0 (`TEST-154b5c63`), 이미지 1장, 540×960, 시한 숫자 로그값 10.
 - 관측 해시:
   - 새 기본 100 / 10 / 15: `8c6eb2f7c241b8d2e94f2f977083ebf084428e91ce4bdc0920e898ae2484921a` (`JELLY_EARLY_DEFAULT_HASH`) — 허용된 새 기본값.
-  - limit 0: `83e4f6c8de772cd3a0ff5c6d0853a0ca74996572b45019541c08be9eb1affb91` — 기존 기본 해시 유지。
+  - limit 0: `83e4f6c8de772cd3a0ff5c6d0853a0ca74996572b45019541c08be9eb1affb91` — 기존 기본 해시 유지.
   - 숫자 고정·방식 0: `463995c4a2188c1639fcc7efaa9e0ce0c294a0b3633ae1c859d7b98eec0ff390` — 유지.
   - 숫자 고정·K5-4: `bc86d2571e89ed78fcb10d0fb69d03c33048f362ea8395d164605e3d7e21dab7` — 유지.
   - 숫자 고정·H8: `790bb962860e741976447a88c3a0635b556ec4b47613ee84ea3743fa8d1f0fd0` — 유지.
@@ -67,14 +68,15 @@
 - 캡처 산출물:
   - `C:\Workspace\repos\tools\ProjectManager\.runtime\artifacts\PM-8c0d20b9\revision-2\199_jelly_timed_board_initial.png`
   - SHA-256: `6cd8b722aa9c3c5cd122bff683859d94b3518f3aece363ee5fd005c4972e5245`.
-  - 이미지 생성 사실만 확인된 상태이며 Codex·Claude의 육안 검수 완료를 뜻하지 않는다.
+  - Codex와 Claude가 실제 이미지를 확인했다. 보드 10·NEXT 15, 숫자 잘림 없음.
 - 수동 확인 절차:
   1. 위 PNG를 열어 판 위·NEXT의 두 자리 숫자가 잘리지 않고 또렷한지 확인한다.
   2. JELLY에서 미리보기와 판 진입을 관찰해 NEXT·THEN·판 위 숫자 및 `시한 젤리: <N>턴 안에 합치면 한 단계 더`의 숫자가 해당 젤리와 일치하는지 확인한다.
   3. 판 진입 턴 기준 20·32·44·56·68·80·92턴은 10~15, 104턴부터는 5~10인지 확인한다. limit 32 경계는 20턴 초기 범위, 32턴 후기 범위가 기준이다.
 - 미실행: 주말 가벼운 모드 지시에 따라 전체 회귀(일반·장기·성능), 봇 측정, Windows Release·Debug 빌드 생략. 이 항목들의 통과나 난도 변화 측정 결과는 주장하지 않는다.
-- 결정 사항·알려진 제한: 제공 증거 외 임의 수치·API 결정 없음. `project.godot` 버전·Release 파일·사용자 저장 파일의 변경 여부는 제공 로그만으로 별도 검증하지 못함.
-- 남은 것 · 질문: Claude 이미지 검수와 최종 판정·병합 검토. 순서 변경·보존 대상 해시 변경·범위 이탈이 추가로 발견되면 병합 전에 사용자에게 질문한다. 현재 main 병합 없음.
+- 결정 사항·알려진 제한: 임의 수치 변경 없음. Git 변경은 위 6개 파일에 한정되어 `project.godot`과 Release 파일은 변경하지 않았다. 테스트·캡처는 별도 APPDATA/LOCALAPPDATA와 임시 save 경로를 사용했다. 전체 플레이 검증은 하지 않았다.
+- Claude 검수: 2026-11-14 코드·이미지 pass. 동일 코드 커밋의 테스트 증거와 최종 문서 보완을 구분해 기록한다.
+- 남은 것 · 질문: PR 검토와 사용자 병합 판단. 순서 변경·보존 대상 해시 변경·범위 이탈이 발견되면 병합 전에 질문한다. 실제 플레이 수동 항목은 위 목록과 같다. main 병합 없음.
 
 
 ### [2026-11-14] 대상 #152 — Windows Release 0.16.11 빌드
