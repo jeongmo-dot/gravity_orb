@@ -533,14 +533,35 @@ func test_board_timed_number_stays_below_eyes_inside_orb_with_visible_outline() 
 	var fixture: Dictionary = await _create_fixture()
 	var board: Board3D = fixture["board"] as Board3D
 	var orb: Orb3D = board.spawn_orb(OrbTypes.OrbColor.YELLOW, 5, Vector2.ZERO)
-	orb.set_timed(8, 20)
+	orb.set_timed_stone(18)
 	orb.disable_physics()
 	await tree.process_frame
 	var label: Label3D = orb.get_node("TimedLabel") as Label3D
 	assert_true(label.visible, "timed number is visible")
 	assert_true(label.font is FontVariation, "timed number uses the HUD variable font")
-	assert_eq(label.font_size, 7, "default L5 timed number uses the capture-verified size")
-	assert_true(label.outline_size >= 4, "timed number uses a dark outline at least four pixels")
+	assert_eq(label.text, "18", "two-digit stone number exercises the widest required label")
+	assert_eq(
+		label.font_size,
+		Orb3D.TIMED_LABEL_FONT_MIN,
+		"default L5 timed number is rasterized near its screen size"
+	)
+	assert_near(
+		label.pixel_size,
+		Orb3D.TIMED_LABEL_PIXEL_SIZE,
+		0.000001,
+		"higher raster size is balanced by a smaller pixel size"
+	)
+	var target_white_height_px: float = 20.0
+	var display_to_raster_ratio: float = target_white_height_px / float(label.font_size)
+	assert_true(
+		display_to_raster_ratio <= 1.2,
+		"target screen height is not enlarged from the glyph raster"
+	)
+	var target_outline_px: float = float(label.outline_size) * display_to_raster_ratio
+	assert_true(
+		target_outline_px >= 2.0 and target_outline_px <= 3.0,
+		"outline projects to the required two-to-three pixel range"
+	)
 	assert_true(
 		label.outline_render_priority > 12,
 		"outline renders in front of the jelly face material"
@@ -553,11 +574,16 @@ func test_board_timed_number_stays_below_eyes_inside_orb_with_visible_outline() 
 	var label_bounds: AABB = label.get_aabb()
 	var label_top_y: float = label.position.y + label_bounds.end.y
 	var label_bottom_y: float = label.position.y + label_bounds.position.y
+	var label_left_x: float = label.position.x + label_bounds.position.x
+	var label_right_x: float = label.position.x + label_bounds.end.x
 	var face_scale_y: float = orb._face.basis.y.length()
 	var normal_eye_bottom_y: float = orb._face.position.y - face_scale_y * (0.22 + 0.105)
 	var radius_m: float = Config.data.radius_for_level(5) / Orb3D.PIXELS_PER_METER
 	var orb_bottom_y: float = orb._mesh.position.y - radius_m * orb._mesh.scale.y
+	var orb_left_x: float = orb._mesh.position.x - radius_m * orb._mesh.scale.x
+	var orb_right_x: float = orb._mesh.position.x + radius_m * orb._mesh.scale.x
 	var two_pixel_margin_m: float = 2.0 / Orb3D.PIXELS_PER_METER
+	var three_pixel_margin_m: float = 3.0 / Orb3D.PIXELS_PER_METER
 	assert_true(
 		label_top_y <= normal_eye_bottom_y - two_pixel_margin_m,
 		"number top stays at least two pixels below the resting eyes in world Y"
@@ -565,6 +591,14 @@ func test_board_timed_number_stays_below_eyes_inside_orb_with_visible_outline() 
 	assert_true(
 		label_bottom_y >= orb_bottom_y + two_pixel_margin_m,
 		"number bottom stays at least two pixels inside the jelly contour in world Y"
+	)
+	assert_true(
+		label_left_x >= orb_left_x + three_pixel_margin_m,
+		"two-digit number left edge stays at least three pixels inside the contour"
+	)
+	assert_true(
+		label_right_x <= orb_right_x - three_pixel_margin_m,
+		"two-digit number right edge stays at least three pixels inside the contour"
 	)
 	await _cleanup(fixture["root"] as Node)
 	_restore_config(snapshot)

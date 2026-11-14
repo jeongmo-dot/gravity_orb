@@ -2,6 +2,11 @@ class_name Orb3D
 extends Node
 
 const PIXELS_PER_METER: float = 100.0
+const TIMED_LABEL_PIXEL_SIZE: float = 0.00045
+const TIMED_LABEL_FONT_SCALE: float = 0.32
+const TIMED_LABEL_FONT_MIN: int = 28
+const TIMED_LABEL_FONT_MAX: int = 44
+const TIMED_LABEL_OUTLINE_SIZE: int = 4
 const STRETCH_SPEED_MIN: float = 700.0
 const STRETCH_SPEED_MAX: float = 1100.0
 const STRETCH_ALONG_SCALE: float = 1.15
@@ -1144,8 +1149,13 @@ func _update_visual_transform() -> void:
 		render_world_position,
 		body_front_offset + 0.08
 	) + Vector3(0.0, -radius_m * 0.52, 0.0)
-	_timed_label.font_size = clampi(roundi(_current_radius * 0.08), 7, 11)
-	_timed_label.outline_size = 4
+	_timed_label.pixel_size = TIMED_LABEL_PIXEL_SIZE
+	_timed_label.font_size = clampi(
+		roundi(_current_radius * TIMED_LABEL_FONT_SCALE),
+		TIMED_LABEL_FONT_MIN,
+		TIMED_LABEL_FONT_MAX
+	)
+	_timed_label.outline_size = TIMED_LABEL_OUTLINE_SIZE
 	if _merge_visual_active:
 		_symbol_mesh.rotation.z = _merge_visual_rotation
 		_symbol_mesh.scale *= Vector3(

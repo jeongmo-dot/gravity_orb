@@ -192,6 +192,7 @@ const CAPTURE_FILES: Array[String] = [
 	"207_jelly_timed_stone_1.png",
 	"208_jelly_timed_stone_broken_settled.png",
 	"209_jelly_timed_stone_first_callout.png",
+	"210_jelly_timed_stone_10.png",
 ]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
@@ -433,6 +434,7 @@ func _capture_timed_jelly_scenes(
 ) -> void:
 	_set_jelly_level_profile("B")
 	var director: FeedbackDirector = main.get_node("FeedbackDirector") as FeedbackDirector
+	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
 	resolver.set_physics_process(false)
 	resolver.cancel_active_jelly_merges()
 	Config.data.jelly_timed_enabled = true
@@ -449,8 +451,18 @@ func _capture_timed_jelly_scenes(
 	timed.disable_physics()
 	await get_tree().process_frame
 	await _capture("199_jelly_timed_board_initial.png")
+	await _capture_timed_number_zoom(
+		"199_jelly_timed_4_5x.png",
+		camera,
+		timed
+	)
 	timed.set_timed(1, 20)
 	await _capture("200_jelly_timed_board_1.png")
+	await _capture_timed_number_zoom(
+		"200_jelly_timed_1_5x.png",
+		camera,
+		timed
+	)
 
 	_clear_capture_hud_residue(hud)
 	hud._on_preview_changed([
@@ -535,8 +547,25 @@ func _capture_timed_jelly_scenes(
 	):
 		_fail("timed timeout capture expected one scoreless stone in place")
 	await _capture("205_jelly_timed_stone_after_harden.png")
+	await _capture_timed_number_zoom(
+		"205_jelly_timed_stone_18_5x.png",
+		camera,
+		expiring
+	)
 	expiring.set_timed_stone(1)
 	await _capture("207_jelly_timed_stone_1.png")
+	await _capture_timed_number_zoom(
+		"207_jelly_timed_stone_1_5x.png",
+		camera,
+		expiring
+	)
+	expiring.set_timed_stone(10)
+	await _capture("210_jelly_timed_stone_10.png")
+	await _capture_timed_number_zoom(
+		"210_jelly_timed_stone_10_5x.png",
+		camera,
+		expiring
+	)
 	manager._remove_timed_stone(expiring)
 	resolver._advance_tap_clean_visuals(Config.data.jelly_tap_clean_visual_time + 0.01)
 	await get_tree().process_frame
@@ -2883,6 +2912,38 @@ func _capture_zoom(file_name: String, center: Vector2, half_size: int) -> void:
 		_fail("Could not save %s: %s" % [path, error_string(error)])
 		return
 	print("SCREEN_CAPTURE_ZOOM file=%s source=%dx%d output=480x480" % [path, size, size])
+
+
+func _capture_timed_number_zoom(
+	file_name: String,
+	camera: Camera3D,
+	orb: Orb3D
+) -> void:
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var image: Image = get_viewport().get_texture().get_image()
+	var label: Label3D = orb.get_node("TimedLabel") as Label3D
+	var center: Vector2 = _image_point(image, camera.unproject_position(label.global_position))
+	var half_size: int = 24
+	var size: int = half_size * 2
+	var x: int = clampi(roundi(center.x) - half_size, 0, image.get_width() - size)
+	var y: int = clampi(roundi(center.y) - half_size, 0, image.get_height() - size)
+	var zoom: Image = image.get_region(Rect2i(x, y, size, size))
+	zoom.resize(size * 5, size * 5, Image.INTERPOLATE_NEAREST)
+	var zoom_directory: String = _output_directory.path_join("zoom")
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(zoom_directory))
+	var path: String = zoom_directory.path_join(file_name)
+	var error: Error = zoom.save_png(path)
+	if error != OK:
+		_fail("Could not save %s: %s" % [path, error_string(error)])
+		return
+	print(
+		"TIMED_NUMBER_ZOOM file=%s source=%dx%d scale=5 interpolation=nearest" % [
+			path,
+			size,
+			size,
+		]
+	)
 
 
 func _verify_belly_pixel(camera: Camera3D, orb: Orb3D, fraction_label: String) -> void:
