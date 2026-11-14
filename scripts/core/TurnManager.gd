@@ -35,6 +35,10 @@ var capped_turn_count: int = 0
 var merge_delayed_turn_count: int = 0
 var merge_delay_seconds_sum: float = 0.0
 var merge_delay_seconds_max: float = 0.0
+var merge_extension_turn_count: int = 0
+var merge_extension_seconds_sum: float = 0.0
+var merge_extension_seconds_max: float = 0.0
+var merge_extension_capped_turn_count: int = 0
 var blocked_directions: Array[Vector2i] = []
 var game_over_details: Dictionary = {}
 var final_move_pending: bool = false
@@ -62,6 +66,8 @@ var _is_timed_burst_settle: bool = false
 var _timed_jelly_callout_seen: bool = false
 var _timed_stone_callout_seen: bool = false
 var _current_merge_delay_seconds: float = 0.0
+var _merge_extension_used: bool = false
+var _merge_extension_cap_reached: bool = false
 var _jelly_tap_effect_callout_seen: Dictionary = {}
 
 
@@ -79,6 +85,10 @@ func start_game() -> void:
 	merge_delayed_turn_count = 0
 	merge_delay_seconds_sum = 0.0
 	merge_delay_seconds_max = 0.0
+	merge_extension_turn_count = 0
+	merge_extension_seconds_sum = 0.0
+	merge_extension_seconds_max = 0.0
+	merge_extension_capped_turn_count = 0
 	blocked_directions.clear()
 	game_over_details.clear()
 	final_move_pending = false
@@ -246,17 +256,30 @@ func _physics_process(delta: float) -> void:
 		_stable_time = 0.0
 
 	if settle_elapsed >= Config.data.max_settle_time:
+		if _should_extend_jelly_merges():
+			var extension_limit: float = (
+				Config.data.max_settle_time
+				+ maxf(Config.data.jelly_merge_extension_max, 0.0)
+			)
+			if settle_elapsed < extension_limit:
+				_collision_resolver.sweep_resting_contacts()
+				var active_merges: int = _collision_resolver.active_jelly_merge_count()
+				var touching_pairs: int = (
+					_collision_resolver.touching_jelly_merge_pair_count()
+				)
+				if active_merges > 0 or touching_pairs > 0:
+					_merge_extension_used = true
+					_track_active_merge_delay(delta)
+					return
+				_finish_capped_settle()
+				return
+			_merge_extension_cap_reached = true
 		_collision_resolver.set_accepting_new_jelly_merges(false)
 		if _collision_resolver.active_jelly_merge_count() > 0:
-			if not _is_initial_settle and not _is_tap_blast_settle:
-				if _current_merge_delay_seconds <= 0.0:
-					merge_delayed_turn_count += 1
-				_current_merge_delay_seconds += delta
+			_track_active_merge_delay(delta)
 			return
 		_collision_resolver.sweep_resting_contacts()
-		if not _is_initial_settle and not _is_tap_blast_settle:
-			capped_turn_count += 1
-		_on_settled()
+		_finish_capped_settle()
 	elif _stable_time >= Config.data.stable_duration:
 		var swept_reactions: int = _collision_resolver.sweep_resting_contacts()
 		if (
@@ -266,6 +289,27 @@ func _physics_process(delta: float) -> void:
 			_stable_time = 0.0
 			return
 		_on_settled()
+
+
+func _should_extend_jelly_merges() -> bool:
+	return (
+		Config.data.game_mode == GameConfig.GameMode.JELLY
+		and Config.data.jelly_merge_extension_max > 0.0
+	)
+
+
+func _track_active_merge_delay(delta: float) -> void:
+	if _is_initial_settle or _is_tap_blast_settle:
+		return
+	if _current_merge_delay_seconds <= 0.0:
+		merge_delayed_turn_count += 1
+	_current_merge_delay_seconds += delta
+
+
+func _finish_capped_settle() -> void:
+	if not _is_initial_settle and not _is_tap_blast_settle:
+		capped_turn_count += 1
+	_on_settled()
 
 
 func _all_below_threshold() -> bool:
@@ -337,11 +381,14 @@ func _emit_combo_changed() -> void:
 func _begin_settle() -> void:
 	_collision_resolver.set_accepting_new_jelly_merges(true)
 	_current_merge_delay_seconds = 0.0
+	_merge_extension_used = false
+	_merge_extension_cap_reached = false
 	_stable_time = 0.0
 	settle_elapsed = 0.0
 
 
 func _on_settled() -> void:
+	_record_merge_extension_metrics()
 	merge_delay_seconds_sum += _current_merge_delay_seconds
 	merge_delay_seconds_max = maxf(
 		merge_delay_seconds_max,
@@ -395,6 +442,24 @@ func _on_settled() -> void:
 	_update_warnings()
 	InputRouter.set_locked(false)
 	_set_state(State.WAITING_INPUT)
+
+
+func _record_merge_extension_metrics() -> void:
+	if not _merge_extension_used or _is_initial_settle or _is_tap_blast_settle:
+		return
+	var extension_seconds: float = clampf(
+		settle_elapsed - Config.data.max_settle_time,
+		0.0,
+		maxf(Config.data.jelly_merge_extension_max, 0.0)
+	)
+	merge_extension_turn_count += 1
+	merge_extension_seconds_sum += extension_seconds
+	merge_extension_seconds_max = maxf(
+		merge_extension_seconds_max,
+		extension_seconds
+	)
+	if _merge_extension_cap_reached:
+		merge_extension_capped_turn_count += 1
 
 
 func _advance_timed_jellies() -> bool:

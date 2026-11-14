@@ -130,6 +130,7 @@ func test_m3_turn_defaults() -> void:
 	assert_near(config.max_settle_time, 1.5, TOLERANCE, "maximum settle time")
 	assert_eq(config.allow_same_direction_swipe, false, "same direction default")
 	assert_near(config.jelly_merge_duration, 0.3, TOLERANCE, "jelly merge duration")
+	assert_near(config.jelly_merge_extension_max, 1.5, TOLERANCE, "jelly merge extension")
 
 
 func test_m4_spawn_defaults() -> void:

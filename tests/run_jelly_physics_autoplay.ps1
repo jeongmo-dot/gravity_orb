@@ -60,6 +60,8 @@ param(
     [string]$SpawnLevelCosts = "",
 	[ValidateRange(0.0, 10.0)]
 	[double]$JellyMergeDuration = 0.3,
+	[ValidateRange(0.0, 10.0)]
+	[double]$JellyMergeExtensionMax = 1.5,
 	[ValidateRange(0, 10)]
 	[int]$JellyMergeLevelGap = 1,
 	[ValidateRange(0, 10)]
@@ -98,6 +100,7 @@ $physicsArguments += if ($LevelProfile -eq "Default") { "--jelly-level-profile=D
 $resolvedTapBlastBotMode = if ($TapBlastBot -and $TapBlastBotMode -eq "None") { "All" } else { $TapBlastBotMode }
 $physicsArguments += "--jelly-tap-blast-bot=$($resolvedTapBlastBotMode.ToLower())"
 $physicsArguments += "--jelly-merge-duration=$($JellyMergeDuration.ToString($culture))"
+$physicsArguments += "--jelly-merge-extension-max=$($JellyMergeExtensionMax.ToString($culture))"
 $physicsArguments += "--jelly-merge-level-gap=$JellyMergeLevelGap"
 $physicsArguments += "--jelly-merge-wide-gap-min-level=$JellyMergeWideGapMinLevel"
 $physicsArguments += "--jelly-timed-enabled=$($JellyTimedEnabled.ToLower())"
@@ -252,6 +255,10 @@ $maximumActiveSample = $null
 $mergeDelayedTurns = 0
 $mergeDelaySecondsSum = 0.0
 $mergeDelaySecondsMax = 0.0
+$mergeExtensionTurns = 0
+$mergeExtensionSecondsSum = 0.0
+$mergeExtensionSecondsMax = 0.0
+$mergeExtensionCappedTurns = 0
 $maxConcurrentJellyMerges = 0
 $maxTurnChain = 0
 $inputWaitingTurns = 0
@@ -280,6 +287,10 @@ foreach ($task in $tasks) {
 	$mergeDelayedTurns += [int]$seedRow.merge_delayed_turn_count
 	$mergeDelaySecondsSum += [double]$seedRow.merge_delay_seconds_sum
 	$mergeDelaySecondsMax = [Math]::Max($mergeDelaySecondsMax, [double]$seedRow.merge_delay_seconds_max)
+	$mergeExtensionTurns += [int]$seedRow.merge_extension_turn_count
+	$mergeExtensionSecondsSum += [double]$seedRow.merge_extension_seconds_sum
+	$mergeExtensionSecondsMax = [Math]::Max($mergeExtensionSecondsMax, [double]$seedRow.merge_extension_seconds_max)
+	$mergeExtensionCappedTurns += [int]$seedRow.merge_extension_capped_turn_count
 	$maxConcurrentJellyMerges = [Math]::Max($maxConcurrentJellyMerges, [int]$seedRow.max_concurrent_jelly_merges)
 	$maxTurnChain = [Math]::Max($maxTurnChain, [int]$seedRow.max_combo)
 	$inputWaitingTurns += [int]$seedRow.input_waiting_turn_count
@@ -479,6 +490,7 @@ $summary = [ordered]@{
 	turn_start_colors = $TurnStartColors
 	turn_color_unlock_turns = $TurnColorUnlockTurns.ToLower()
 	jelly_merge_duration = $JellyMergeDuration
+	jelly_merge_extension_max = $JellyMergeExtensionMax
 	jelly_merge_level_gap = $JellyMergeLevelGap
 	jelly_merge_wide_gap_min_level = $JellyMergeWideGapMinLevel
 	jelly_tap_blast_min_level = $JellyTapBlastMinLevel
@@ -536,6 +548,12 @@ $summary = [ordered]@{
 	merge_delayed_turn_ratio = if ($totalTurns -gt 0) { [double]$mergeDelayedTurns / $totalTurns } else { 0.0 }
 	average_merge_delay_seconds = if ($mergeDelayedTurns -gt 0) { $mergeDelaySecondsSum / $mergeDelayedTurns } else { 0.0 }
 	maximum_merge_delay_seconds = $mergeDelaySecondsMax
+	merge_extension_turns = $mergeExtensionTurns
+	merge_extension_turn_ratio = if ($totalTurns -gt 0) { [double]$mergeExtensionTurns / $totalTurns } else { 0.0 }
+	average_merge_extension_seconds = if ($mergeExtensionTurns -gt 0) { $mergeExtensionSecondsSum / $mergeExtensionTurns } else { 0.0 }
+	maximum_merge_extension_seconds = $mergeExtensionSecondsMax
+	merge_extension_capped_turns = $mergeExtensionCappedTurns
+	merge_extension_capped_turn_ratio = if ($totalTurns -gt 0) { [double]$mergeExtensionCappedTurns / $totalTurns } else { 0.0 }
 	maximum_turn_chain = $maxTurnChain
 	maximum_concurrent_jelly_merges = $maxConcurrentJellyMerges
 	input_waiting_turns = $inputWaitingTurns
