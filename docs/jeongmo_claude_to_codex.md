@@ -32,8 +32,33 @@
 
 ## 대기 중
 
-### [2026-11-14 #147] 시한 젤리가 0이 되면 회색 굳은 젤리
-- 상태: 대기 (main `0d0dedb` 위에서 — **#146 브랜치 `timed-burst-colors`를 쓰지 않는다**)
+### [2026-11-14 #148] 시한 젤리·굳은 젤리 숫자를 또렷하게
+- 상태: 대기 (#147 병합됨 `2371786` — main 위에서)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.39**
+- 배경: 굳은 젤리 위 '18'이 '13'·'1目'처럼 뭉개진다 — 흰 획 대부분 밝기 175~224 (몸통 124~154), 숫자 둘레가 어두운 상자처럼 보인다 (Claude 캡처 `205` ×5 확대·줄별 밝기, 두 비율). 추정 원인: `font_size` 7로 그린 글자를 화면에서 약 3배로 늘림 (Orbitron MSDF 꺼짐), `outline_size` 4가 화면 약 12px. 사용자 (2026-11-14) "병합 + 후속: 숫자 고치기"
+- 앵커: `scenes/Orb3D.tscn` `TimedLabel`, `scripts/spike/Orb3D.gd` (`_timed_label.font_size`·`outline_size`), `assets/fonts/Orbitron[wght].ttf.import` (바꾸면 HUD 영향 확인), `tests/test_timed_jelly.gd`, `tests/spike/capture_screens.gd`
+- 요구 (§12-ONE.39 1~8):
+  1. 화면 크기는 그대로, 글자를 화면 크기에 가깝게 그리기 (화면 글자 높이 ÷ 그리는 크기 ≤ 1.2, 또는 MSDF) — 원인 확인·고른 방법과 이유를 회신에
+  2. 외곽선 화면 2~3px, 색 그대로
+  3. 540×960 L5 흰 획 높이 18~22px, 눈 아래 2px 이상, 윤곽 안 3px 이상 여유 (두 자리 포함)
+  4. 읽힘: 모든 획 가운데 밝기 225 이상, '8'·'0' 구멍 가운데 175 미만, 외곽선이 몸통보다 40 이상 어둡다 — 굳은 '18'·'10'·'1', 시한 (노랑) '4'·'1'
+  5. 캡처 `199`·`200`·`205`·`207`·새 `210` (굳은 10), 두 비율 + 숫자별 ×5 확대 조각 `artifacts/screens/<비율>/zoom/`
+- 수치 (Claude): 외곽선 2~3px, 비율 1.2, 읽힘 밝기 기준. 크기·자리는 #145 기준 그대로
+- 건드리지 말 것: 글꼴·굵기·흰 글자·외곽선 색, 굳은 젤리 몸통 색, 숫자 자리 규칙, NEXT·THEN 숫자, HUD 글자, 규칙·수치 전부, 연출 (명세에 없는 것 금지, 숫자 뒤 원판·고리 금지), 사용자 저장 파일, `project.godot` 버전·`build/windows/` Release 파일 (**빌드 없음**), `docs/` (회신 파일 제외)
+- **회신 맨 앞에**: 읽힘 기준을 못 맞춘 숫자, 흰 획 높이 18~22px 밖, 눈·윤곽과 겹침, HUD 등 다른 글자 모양 바뀜, 해시 바뀜
+- Done-when:
+  - [ ] 테스트 통과 (비율 ≤ 1.2·외곽선 두께·두 자리 눈 아래/윤곽 안), 해시 모두 그대로
+  - [ ] 캡처 두 비율 + ×5 확대 조각, 숫자별 4번 측정값
+- QA: §12-ONE.39 4·6·7번
+- 커밋: 항목 단위 브랜치 (`timed-number-crisp`), **push·PR까지** (병합은 Claude 검수 뒤)
+
+---
+
+## 처리 완료
+
+### [2026-11-14 #147] 시한 젤리가 0이 되면 회색 굳은 젤리 — 완료
+- 상태: 완료 (2026-11-14 사용자 "병합 + 후속: 숫자 고치기" · [PR #147](https://github.com/jeongmo-dot/gravity_orb/pull/147) 병합 `2371786`. [PR #146](https://github.com/jeongmo-dot/gravity_orb/pull/146) 닫음)
+- 검수: 코드 diff, 테스트 diff, 회신 판 균형표 (S6·S12·S18 × 5봇 × 20판 + #145 K5-4), 캡처 `202`·`205`·`207`·`208`·`209` 두 비율 직접 확인·`205` ×5 확대와 줄별 밝기 (캡처 파일만 읽음). 테스트 362/4/5·해시·스모크·Debug 빌드는 Codex 관측 (Claude 재실행 없음). 빌드 없음 (`project.godot` 변경 0). 맨 앞 경고 0건 — 규칙대로 S18 (자동 D-save 197.00턴, 같은 색 대비 −28%). 굳은 젤리 반응 0. Claude 지적: 굳은 젤리 위 두 자리 숫자 ('18')가 뭉개져 읽기 어려움 → 사용자 "병합 + 후속: 숫자 고치기" (#148). 결과: §12-ONE.38 "#147 결과"
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.38**
 - 배경: 0이 되면 L1을 쏟는 벌은 약했다 — 같은 색 (#145)은 바로 L5로 다시 뭉치고, 다른 색 (#146)도 0이 될 때마다 1.5~1.9쌍이 합쳐지며 콤보·칭찬 (`x8 COMBO 4`·`NICE!`)이 떴고 봇 판 길이도 줄지 않았다 (§12-ONE.37 "#146 결과"). 사용자 (2026-11-14) "병합 보류·벌 다시 설계" → "회색 돌로 굳기"
 - 앵커: `scripts/core/TurnManager.gd` `_advance_timed_jellies()`·`_spawn_timed_burst()`·`_on_settled()`, `scripts/core/CollisionResolver.gd` `_pair_can_react()`·청소 대상 고르기, `scenes/Orb3D.tscn` `TimedLabel`·`scripts/spike/Orb3D.gd`, `scripts/ui/Hud.gd` 시한 젤리 안내 줄, `config/GameConfig.gd`·`default_config.tres` 새 필드, `tests/test_timed_jelly.gd`, `tests/tools/run_timed_jelly_balance.ps1`, `tests/spike/capture_screens.gd`
@@ -57,12 +82,8 @@
 - QA: §12-ONE.38 6·7·8번
 - 커밋: 항목 단위 브랜치 (`timed-stone`), **push·PR까지** (병합은 Claude 검수 뒤)
 
----
-
-## 처리 완료
-
 ### [2026-11-13 #146] 시한 젤리가 0이 되면 다른 색 L1 — 완료 (병합 안 함)
-- 상태: 완료 — **병합 안 함** (2026-11-14 사용자 "병합 보류·벌 다시 설계" → "회색 돌로 굳기", #147로 대체. [PR #146](https://github.com/jeongmo-dot/gravity_orb/pull/146)은 #147 병합 때 닫는다)
+- 상태: 완료 — **병합 안 함** (2026-11-14 사용자 "병합 보류·벌 다시 설계" → "회색 돌로 굳기", #147로 대체. [PR #146](https://github.com/jeongmo-dot/gravity_orb/pull/146)은 2026-11-14 #147 병합 때 닫음 — 브랜치 `timed-burst-colors`는 남김)
 - 검수: 코드 diff, 테스트 diff, 회신 판 균형표 (B10·B8·B6 × 5봇 × 20판 + #145 K5-4), 캡처 `202`·`205`·`207` 두 비율 직접 확인 (캡처 파일만 읽음). 테스트 361/4/5·해시·스모크·Debug 빌드는 Codex 관측 (Claude 재실행 없음). 구현은 명세대로. 맨 앞 경고 한 건 — B10에서 터진 L1끼리 0이 될 때마다 1.5~1.9쌍 합체. Claude 추가 지적: `207` 실패 직후 `x8 COMBO 4`·`NICE!`·`+32`, 봇 판 길이로 벌이 보이지 않음. 결과: §12-ONE.37 "#146 결과"
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.37**
 - 배경: 0이 되면 원본 색 L1 10개가 원래 자리에 거의 붙어 (간격 52.5, L1 지름 50) 놓여 유령이 풀리자마자 서로 합쳐진다 — L5 언저리로 돌아가고 콤보·점수까지 붙어 벌이 되지 않는다 (Claude 코드 읽기). 사용자 (2026-11-13) "같은 색깔로 L1이 생기면 아무 의미가 없잖아. 바로 합쳐지는데" → "다른 색 L1로"
