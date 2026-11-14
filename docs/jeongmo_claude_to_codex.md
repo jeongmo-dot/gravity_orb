@@ -11,6 +11,7 @@
 - Codex는 「대기 중」에서 **번호가 가장 낮은 항목 하나만** 처리한다 (항목에 "먼저"라고 적힌 예외는 그것부터)
 - 항목 검증용 Windows 빌드는 `-Debug`로 (`build/windows-debug/`). 릴리스 이름 파일은 빌드 항목에서만 만든다 ([technical_design.md](technical_design.md) §10.5.1)
 - 완료 항목이 30건을 넘으면 `docs/archive/`로 옮긴다 — #1~#100은 [archive/claude_to_codex_001-100.md](archive/claude_to_codex_001-100.md) (2026-10-25)
+- **테스트는 기본 최소** (사용자 2026-11-14 "풀테스트를 요청하기 전까지 대규모 시뮬레이션을 반복하지 말고 최소 테스트만" → Claude 확인 "네, 기본은 최소 테스트"): 항목의 핵심 테스트와 필요한 캡처만 한다. 여러 판 봇 측정·전체 회귀 (`tests/run_tests.ps1` 전체)는 항목에 **풀테스트**라고 적혀 있거나 사용자가 요청할 때만
 - **고리 모양 연출·그림 금지** (사용자 2026-10-25 "고리를 그리는 거 다 지워", "다시 사용하지 마") — 도넛·원 테두리·타원 선 모양은 만들지 않는다. **명세에 없는 연출·기능은 넣지 않는다** ([technical_design.md](technical_design.md) §12-ONE.4)
 
 ## 항목 양식
@@ -32,8 +33,15 @@
 
 ## 대기 중
 
-### [2026-11-14 #149] 상한 뒤에 닿은 합체도 그 턴 안에
-- 상태: 대기 (#148 병합됨 `ea253f5` — main 위에서)
+(없음)
+
+---
+
+## 처리 완료
+
+### [2026-11-14 #149] 상한 뒤에 닿은 합체도 그 턴 안에 — 완료
+- 상태: 완료 (2026-11-14 사용자 "측정 없이 병합" · [PR #149](https://github.com/jeongmo-dot/gravity_orb/pull/149) 병합 `7876b8f`)
+- 검수: 코드 diff (상한 분기·닿은 쌍 세기 기준이 proximity 판정과 같은지), 테스트 diff. 테스트 364/4/5·해시·캡처·Debug 빌드는 Codex 관측 (Claude 재실행 없음). 빌드 없음 (`project.godot` 변경 0). E0·E1.5 200판 측정은 사용자 지시로 하지 않음 → 사용자 "측정 없이 병합", 앞으로 "기본은 최소 테스트" (작성 규칙). 결과: §12-ONE.40 "#149 결과"
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.40**
 - 배경: 턴이 1.5초 상한 (`max_settle_time`)에 닿으면 `set_accepting_new_jelly_merges(false)`로 새 합체를 막아, 그 뒤 닿은 같은 색 쌍이 입력 대기 내내 붙은 채 있다가 다음 턴에 합쳐진다 (#127에서 남겨 둔 규칙). 사용자 (2026-11-14) "턴 타임 아웃 때문에 공이 안합쳐지는 경우가 있는데, 타임 아웃 추가 시간 줘서 그 턴 안에 합쳐지게 해줘"
 - 앵커: `scripts/core/TurnManager.gd` `_physics_process()`·`_begin_settle()`·`_on_settled()`, `scripts/core/CollisionResolver.gd` `set_accepting_new_jelly_merges()`·`sweep_resting_contacts()`·`flush()`, `scripts/ui/TurnInputIndicator.gd` `_classic_busy_progress()`, `config/GameConfig.gd`·`default_config.tres` 새 필드, `tests/spike/run_jolt_3d_measurement.gd`, `tests/tools/run_jelly_measurement.ps1`
@@ -54,10 +62,6 @@
   - [ ] 전체 캡처 두 비율
 - QA: §12-ONE.40 4·5·6번
 - 커밋: 항목 단위 브랜치 (`merge-extension`), **push·PR까지** (병합은 Claude 검수 뒤)
-
----
-
-## 처리 완료
 
 ### [2026-11-14 #148] 시한 젤리·굳은 젤리 숫자를 또렷하게 — 완료
 - 상태: 완료 (2026-11-14 사용자 "확인" · [PR #148](https://github.com/jeongmo-dot/gravity_orb/pull/148) 병합 `ea253f5`)
