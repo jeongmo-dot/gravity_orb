@@ -32,8 +32,15 @@
 
 ## 대기 중
 
-### [2026-11-14 #148] 시한 젤리·굳은 젤리 숫자를 또렷하게
-- 상태: 대기 (#147 병합됨 `2371786` — main 위에서)
+(없음)
+
+---
+
+## 처리 완료
+
+### [2026-11-14 #148] 시한 젤리·굳은 젤리 숫자를 또렷하게 — 완료
+- 상태: 완료 (2026-11-14 사용자 "확인" · [PR #148](https://github.com/jeongmo-dot/gravity_orb/pull/148) 병합 `ea253f5`)
+- 검수: 코드 diff, 테스트 diff, 캡처 `199`·`200`·`205`·`207`·`210` 두 비율 ×5 확대 조각 직접 확인, `205`·`210` 줄별 밝기 (캡처 파일만 읽음). 테스트 362/4/5·해시·스모크·Debug 빌드는 Codex 관측 (Claude 재실행 없음). 빌드 없음 (`project.godot` 변경 0). 맨 앞 경고 0건. `%TimedLabel`만 `font_size` 28·`pixel_size` 0.00045 (화면 크기 그대로) — 숫자 모두 또렷, 눈 아래 빈 줄 3, 윤곽까지 5px 이상. 결과: §12-ONE.39 "#148 결과"
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.39**
 - 배경: 굳은 젤리 위 '18'이 '13'·'1目'처럼 뭉개진다 — 흰 획 대부분 밝기 175~224 (몸통 124~154), 숫자 둘레가 어두운 상자처럼 보인다 (Claude 캡처 `205` ×5 확대·줄별 밝기, 두 비율). 추정 원인: `font_size` 7로 그린 글자를 화면에서 약 3배로 늘림 (Orbitron MSDF 꺼짐), `outline_size` 4가 화면 약 12px. 사용자 (2026-11-14) "병합 + 후속: 숫자 고치기"
 - 앵커: `scenes/Orb3D.tscn` `TimedLabel`, `scripts/spike/Orb3D.gd` (`_timed_label.font_size`·`outline_size`), `assets/fonts/Orbitron[wght].ttf.import` (바꾸면 HUD 영향 확인), `tests/test_timed_jelly.gd`, `tests/spike/capture_screens.gd`
@@ -51,10 +58,6 @@
   - [ ] 캡처 두 비율 + ×5 확대 조각, 숫자별 4번 측정값
 - QA: §12-ONE.39 4·6·7번
 - 커밋: 항목 단위 브랜치 (`timed-number-crisp`), **push·PR까지** (병합은 Claude 검수 뒤)
-
----
-
-## 처리 완료
 
 ### [2026-11-14 #147] 시한 젤리가 0이 되면 회색 굳은 젤리 — 완료
 - 상태: 완료 (2026-11-14 사용자 "병합 + 후속: 숫자 고치기" · [PR #147](https://github.com/jeongmo-dot/gravity_orb/pull/147) 병합 `2371786`. [PR #146](https://github.com/jeongmo-dot/gravity_orb/pull/146) 닫음)
