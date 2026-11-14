@@ -263,6 +263,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | #149 | `jelly_merge_extension_max` | float | (새 필드) **1.5** (#149, 2026-11-14 사용자 "턴 타임 아웃 때문에 공이 안합쳐지는 경우가 있는데, 타임 아웃 추가 시간 줘서 그 턴 안에 합쳐지게 해줘" — 값은 Claude, §12-ONE.40. 봇 측정 없이 병합) | JELLY만: `max_settle_time`에 닿아도 새 합체를 받는 합체 연장 (초). 진행 중 합체 0이고 닿은 합체 가능 쌍 0이면 바로 턴 끝 — 닿은 쌍이 없으면 지금처럼 1.5초. 연장이 이만큼 지나면 새 합체를 막고 진행 중 합체 완성 뒤 턴 끝 (턴 최대 3.0초). 연장 중 합체는 그 턴 콤보·점수. 진행 표시는 1 그대로. 0 = #148까지 그대로 |
 | #150 | `jelly_timed_turns_min` / `jelly_timed_turns_max` / `jelly_timed_fail_mode` / `jelly_timed_scatter_count` | int × 4 | (새 필드) **5 / 10 / 2 / 5** (#150, 2026-11-14 사용자 "시한 젤리 들어올 때 숫자 5 ~ 10 사이"·1안·2안 → Claude 질문 답 "매번 5~10 무작위"·"둘 다 만들어 비교" (기본 2안)·"회색 L1 5개"·"폭발이 미는 범위 안", §12-ONE.41. 측정 없음 — 주말 가벼운 모드) | 시한 젤리 처음 숫자 = `Spawner._timed_rng` (판 시드 ^ `TIMED_SEED_SALT`)에서 min~max 고르게 (min ≤ 0이면 `jelly_timed_turns` 고정). 실패 방식: 0 = #147 (위 행), 1 = 시한 젤리 사라짐 + 회색 L1 `scatter_count`개를 5 × 5 격자 후보 중 가장 먼 자리부터 (유령 시작), **2 = 그 자리에서 영구 회색 돌**. 1·2의 회색 돌: 반응 없음, 시간으로 안 풀림, 폭발이 미는 범위 (대폭발 `apply_blast()`, 터치 소폭발 미는 범위·파랑 지진은 판 전체, 잭팟 `apply_shockwave()`) 안이면 폭발 한 번에 한 단계, L2 이하에서 맞으면 점수 없이 사라짐 |
 | #153 | `sfx_pitch_jitter` | float | 0.03 (#35, §12-F) → **0.0** (#153, 2026-11-14 사용자 "합칠 때 나오는 사운드는 합치는 크기에 따라서 소리가 달라지게 해줘" → "C 커질수록 높은 음" → 흔들림 on·off를 들어 보고 "끄기" — §12-ONE.43) | 합체 소리 음 높이 흔들림 (± 비율, `stable_spawn_id` 해시로 정함). #153부터 합체 소리가 레벨마다 정해진 음이라 0.03이면 음이 최대 반음 절반 어긋난다. 0이면 연쇄 상승만. 코드는 남아 있어 값을 넣으면 되살아난다 |
+| #154 | `jelly_timed_early_turn_limit` / `jelly_timed_early_turns_min` / `jelly_timed_early_turns_max` | int × 3 | (새 필드) **100 / 10 / 15** (#154, 2026-11-14 사용자 "시한젤리는 5는 좀 난이도가 높은 것 같아 처음 100 턴 미만 구간에서는 10~15 로 하고, 그 이상이 되면 5~10으로 하자" — §12-ONE.44) | 시한 젤리가 판에 들어오는 턴이 limit **미만**이면 처음 숫자를 early min~max에서 고르게 (`_timed_rng` 한 번), limit 이상이면 `jelly_timed_turns_min`~`max` (5~10). limit ≤ 0 또는 early min ≤ 0이면 끔 (#150 그대로). `jelly_timed_turns_min` ≤ 0이면 셋 다 무시하고 `jelly_timed_turns` 고정. 기본 차례로는 20~92턴 (7개)이 10~15, 104턴부터 5~10 |
 | #21 | `combo_multiplier_base` | float | 2.0 | 콤보 배수 밑 (§8.2) |
 | #62 | `combo_multiplier_max` | float | **128.0** | 턴제 콤보 배수 상한 — `min(base^(combo − 1), max)`, 콤보 8부터 ×128 고정 (§8.2, 2026-10-11 사용자). BLITZ 체인 배수(최대 ×5)와 무관 |
 | #21 | `danger_start` / `danger_doubling` | float | 0.30 / 0.20 | 위험 배수 시작 점유율 / 2배가 되는 점유율 간격 (§8.2) |
@@ -5606,6 +5607,38 @@ G1 전략 봇 (시드 1~20, 600턴 상한, 턴 평균 / 총점 평균):
 - `_ready()` 합성 시간 (9개): headless 55.9·61.5 ms (Codex)
 - 테스트 `test_feedback.gd` 14/14·`test_config.gd` 16/16·`test_timed_jelly.gd` 19/19 (새: 9개 길이·결정성, Goertzel 0.05~0.20초 목표 음 > 이웃 레벨 음, 레벨별 스트림·음 높이 1.0·+0~+3 dB, L1 → L2·L11 → L10, 연쇄 2 → 2^(1/12)·13·30 → 2.0, 흔들림 0.03이면 같은 id 같은 음, 끄면 재생 0, 기본 지터 0.0). 해시 기본 `83e4f6c8…`·방식 0 `463995c4…`·K5-4 `bc86d257…`·H8 `790bb962…`·K5-8 `3b814220…` 그대로 (Codex). 맨 앞 경고 0건
 - 남은 것: 크기 차이가 들리는지, 합체가 몰릴 때 시끄러운지, 연쇄 중 음이 어긋나게 들리는지, 12보이스에서 폭발·돌 소리가 끊기는지는 인박스 #152 빌드에서 손으로 (`manual_qa_pending.md`)
+
+### 12-ONE.44 시한 젤리 숫자 — 100턴 전 10~15, 뒤 5~10 (#154)
+사용자 (2026-11-14, 0.16.11 빌드 뒤): **"시한젤리는 5는 좀 난이도가 높은 것 같아 처음 100 턴 미만 구간에서는 10~15 로 하고, 그 이상이 되면 5~10으로 하자"**
+
+**지금** (main `f700710`):
+- `Spawner._apply_timed_marker(batch, turn_index)` — 시한 차례 (`_is_timed_turn()`: 20턴부터 12턴마다)면 묶음 첫 젤리에 `timed_turns = _draw_timed_turns()`
+- `_draw_timed_turns()`: `jelly_timed_turns_min` ≤ 0이면 `jelly_timed_turns` (4) 고정, 아니면 `_timed_rng.randi_range(5, 10)` (#150)
+- `turn_index`는 그 묶음이 판에 들어오는 턴 (위 턴 수와 같은 값). 묶음이 미리보기에 뽑힐 때 숫자도 정해진다
+
+**바꿀 것** (JELLY 시한 젤리 처음 숫자만):
+1. 새 필드 `jelly_timed_early_turn_limit` (int) **100**, `jelly_timed_early_turns_min` (int) **10**, `jelly_timed_early_turns_max` (int) **15** (§4 #154 행)
+2. `_draw_timed_turns(turn_index)` — 그 시한 젤리가 **판에 들어오는 턴**으로 고른다:
+   - `jelly_timed_turns_min` ≤ 0 → 지금처럼 `jelly_timed_turns` 고정 (맨 먼저 — 숫자 고정 해시 그대로)
+   - `turn_index` < `jelly_timed_early_turn_limit`이고 `jelly_timed_early_turns_min` > 0 → `_timed_rng.randi_range(early_min, max(early_max, early_min))`
+   - 그 밖 → 지금처럼 `randi_range(min, max(max, min))` (5~10)
+   - 기본 차례로는 20·32·44·56·68·80·92턴 (7개)이 10~15, 104턴부터 5~10
+   - 시한 젤리 하나에 `_timed_rng` 한 번 — 뽑는 횟수는 지금과 같다. `_rng` (색·자리·레벨)는 건드리지 않는다
+   - `jelly_timed_early_turn_limit` ≤ 0 → 지금과 똑같다 (회귀용)
+3. NEXT·THEN·판 위 숫자·안내 한 줄 (`시한 젤리: <N>턴 안에 합치면 한 단계 더`)은 지금처럼 그 젤리의 숫자. 두 자리는 지금도 10이 나오므로 새 그림 없음
+4. **테스트** (가벼운 모드 — `test_timed_jelly.gd`·`test_config.gd`만, 전체 회귀·봇 측정·Debug 빌드 없음):
+   - 기본값 100 / 10 / 15
+   - 여러 시드에서 20~92턴 시한 젤리 숫자는 10~15 안, 104턴 뒤는 5~10 안
+   - 경계: limit 32를 넣으면 20턴 → 10~15, 32턴 → 5~10 (미만 기준)
+   - 같은 시드 → 같은 숫자. 같은 시드의 젤리 색·자리·레벨 순서가 지금과 같음 (#150처럼 1~45턴 대조)
+   - 해시: `jelly_timed_early_turn_limit` 0 주입 → 지금 기본 `83e4f6c8…` 그대로. 숫자 고정 해시 (`jelly_timed_turns_min` 0) — 방식 0 `463995c4…`·K5-4 `bc86d257…`·H8 `790bb962…`·K5-8 `3b814220…` 그대로. 새 기본 (100 / 10 / 15) 해시 고정, 회신에 값
+5. **캡처** (가벼운 모드 — 540×960 한 장): `199` (시한 젤리 처음 숫자 — 이제 10~15 중 하나). 두 자리 숫자가 판 위·NEXT에서 또렷한지 (#148)
+6. **빌드 없음**: `project.godot` 버전·Release 파일은 건드리지 않는다
+
+- 그대로: 시한 젤리 차례 (20턴부터 12턴마다)·L5·성공 +1·실패 2안 (영구 회색 돌)·돌 깨짐, `jelly_timed_turns_min` 5·`jelly_timed_turns_max` 10 (100턴부터 그대로 쓴다), 다른 규칙·수치, 사용자 저장 파일
+- 위험 (Claude 추정, 측정 없음): 100턴 전 숫자가 평균 7.5 → 12.5로 길어져 성공이 늘고 돌이 덜 생긴다. 104턴에 숫자가 갑자기 짧아져 난도가 계단처럼 오른다 (따로 알리는 안내 없음). 봇 측정은 평일에 사용자가 원하면
+- 회신 맨 앞에 적을 것: 같은 시드의 젤리 순서가 바뀜, 숫자 고정 해시 4개나 limit 0 해시가 바뀜, 범위 밖 숫자
+- 병합: Claude 검수 뒤. "맨 앞" 조건이 있으면 병합 전에 사용자에게 묻는다
 
 ### 12-ONE.3 다음 (JELLY 개선)
 - CLASSIC 전용 분기 정리 (행성 그림·연출·규칙 — JELLY가 안 쓰는 것)

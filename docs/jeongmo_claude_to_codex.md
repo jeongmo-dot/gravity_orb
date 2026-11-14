@@ -36,7 +36,25 @@
 
 ## 대기 중
 
-(없음)
+### [2026-11-14 #154] 시한 젤리 숫자 — 100턴 전 10~15, 뒤 5~10
+- 상태: 대기 (main 위에서 — 이 명세 커밋 뒤)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.44**, §4 #154 행
+- 배경: 사용자 (2026-11-14, 0.16.11 빌드 뒤) "시한젤리는 5는 좀 난이도가 높은 것 같아 처음 100 턴 미만 구간에서는 10~15 로 하고, 그 이상이 되면 5~10으로 하자"
+- 앵커: `scripts/core/Spawner.gd` `_apply_timed_marker()`·`_draw_timed_turns()`·`_is_timed_turn()`, `config/GameConfig.gd` 시한 젤리 필드, `config/default_config.tres` (새 필드 3개), `tests/test_timed_jelly.gd`·`tests/test_config.gd`
+- 요구 (§12-ONE.44 1~6):
+  1. 새 필드 `jelly_timed_early_turn_limit` 100·`jelly_timed_early_turns_min` 10·`jelly_timed_early_turns_max` 15 (`GameConfig.gd` 선언과 `default_config.tres` 둘 다)
+  2. `_draw_timed_turns(turn_index)` — 판에 들어오는 턴으로: `jelly_timed_turns_min` ≤ 0 → 고정 (맨 먼저), 턴 < limit (그리고 early min > 0) → 10~15, 아니면 5~10. `_timed_rng` 한 번, `_rng` 그대로. limit ≤ 0이면 지금과 같음
+  3. 숫자 표시·안내 한 줄은 지금처럼 그 젤리의 숫자
+  4. 테스트 (§12-ONE.44 4번) — 범위·경계 (limit 32)·같은 시드·젤리 순서·해시
+  5. 캡처 `199` 540×960 한 장
+- 수치 (Claude): 100 / 10 / 15
+- 건드리지 말 것: 시한 차례·L5·성공 +1·실패 2안·돌 깨짐, `jelly_timed_turns_min`·`jelly_timed_turns_max` 값, `_rng` 뽑기 순서, 다른 규칙·수치·소리·그림 (명세에 없는 것 금지, 고리 금지), 사용자 저장 파일, `project.godot` 버전·`build/windows/` (**빌드 없음**), `docs/` (회신 파일 제외)
+- **가벼운 모드 (주말)**: 바뀐 테스트 파일 2개와 캡처 한 장만. 전체 회귀·봇 측정·Debug 빌드 하지 않음
+- **회신 맨 앞에**: 같은 시드의 젤리 순서가 바뀜, 숫자 고정 해시 4개 (`463995c4…`·`bc86d257…`·`790bb962…`·`3b814220…`)나 limit 0 해시 (`83e4f6c8…`)가 바뀜, 범위 밖 숫자
+- Done-when:
+  - [ ] 테스트 통과, 숫자 고정 해시 4개·limit 0 해시 그대로, 새 기본 해시 값
+  - [ ] 캡처 `199` (540×960) — 10~15 두 자리 숫자
+- 커밋: 항목 단위 브랜치 (`timed-early-range`), **push·PR까지** (병합은 Claude 검수 뒤)
 
 ---
 
