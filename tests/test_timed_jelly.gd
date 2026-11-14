@@ -7,6 +7,7 @@ const EXPECTED_K5_8_HASH: String = "3b814220f95318056b5665a591fdd9c4289a9bb5646c
 const EXPECTED_K5_4_HASH: String = "bc86d2571e89ed78fcb10d0fb69d03c33048f362ea8395d164605e3d7e21dab7"
 const EXPECTED_K5_4_STONE_HASH: String = "463995c4a2188c1639fcc7efaa9e0ce0c294a0b3633ae1c859d7b98eec0ff390"
 const EXPECTED_RANDOM_PERMANENT_HASH: String = "83e4f6c8de772cd3a0ff5c6d0853a0ca74996572b45019541c08be9eb1affb91"
+const EXPECTED_EARLY_DEFAULT_HASH: String = "8c6eb2f7c241b8d2e94f2f977083ebf084428e91ce4bdc0920e898ae2484921a"
 
 
 func test_h8_marker_countdown_success_and_failure_hash() -> void:
@@ -206,8 +207,21 @@ func test_k5_4_default_stone_hash() -> void:
 
 
 func test_random_timed_permanent_stone_default_hash() -> void:
+	_assert_random_timed_permanent_stone_hash(100, "JELLY_EARLY_DEFAULT_HASH", EXPECTED_EARLY_DEFAULT_HASH)
+
+
+func test_random_timed_permanent_stone_limit_zero_hash() -> void:
+	_assert_random_timed_permanent_stone_hash(0, "JELLY_RANDOM_PERMANENT_HASH", EXPECTED_RANDOM_PERMANENT_HASH)
+
+
+func _assert_random_timed_permanent_stone_hash(
+	early_limit: int,
+	hash_label: String,
+	expected_hash: String
+) -> void:
 	var snapshot: Dictionary = _snapshot_config()
 	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_timed_early_turn_limit = early_limit
 	var spawner: Spawner = Spawner.new()
 	spawner.init_rng(150510)
 	var scheduled: Array[Dictionary] = []
@@ -231,8 +245,8 @@ func test_random_timed_permanent_stone_default_hash() -> void:
 		"score": 0,
 	}
 	var hash_value: String = JSON.stringify(state).sha256_text()
-	print("JELLY_RANDOM_PERMANENT_HASH hash=%s" % hash_value)
-	assert_eq(hash_value, EXPECTED_RANDOM_PERMANENT_HASH, "random permanent timed rule hash")
+	print("%s hash=%s" % [hash_label, hash_value])
+	assert_eq(hash_value, expected_hash, "%s timed rule hash" % hash_label)
 	spawner.free()
 	_restore_config(snapshot)
 
@@ -256,8 +270,8 @@ func test_timed_batches_preserve_rng_and_mark_only_scheduled_first_orb() -> void
 				"same seed reproduces the timed number"
 			)
 			assert_true(
-				int((repeated_batch[0] as Dictionary)["timed_turns"]) in range(5, 11),
-				"timed number is between five and ten"
+				int((repeated_batch[0] as Dictionary)["timed_turns"]) in range(10, 16),
+				"early timed number is between ten and fifteen"
 			)
 	Config.data.jelly_timed_enabled = false
 	var disabled: Spawner = Spawner.new()
@@ -301,7 +315,7 @@ func test_timed_preview_uses_configured_level_and_count_without_changing_budget(
 	assert_true(bool((internal_batch[0] as Dictionary)["timed"]), "internal marker")
 	assert_eq(int((preview_batch[0] as Dictionary)["level"]), Config.data.jelly_timed_level, "preview level")
 	assert_true(
-		int((preview_batch[0] as Dictionary)["timed_turns"]) in range(5, 11),
+		int((preview_batch[0] as Dictionary)["timed_turns"]) in range(10, 16),
 		"preview uses the selected random count"
 	)
 	assert_eq(
@@ -312,6 +326,74 @@ func test_timed_preview_uses_configured_level_and_count_without_changing_budget(
 	var before: Array = spawner.peek_preview().duplicate(true)
 	spawner.sync_next_batch_size(20)
 	assert_eq(spawner.peek_preview(), before, "deferred preview keeps its marker")
+	spawner.free()
+	_restore_config(snapshot)
+
+
+func test_early_timed_ranges_boundary_and_rng_sequence() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_timed_enabled = true
+	for seed_value: int in [14320, 150510, 154100]:
+		for early_limit: int in [100, 32]:
+			Config.data.jelly_timed_early_turn_limit = early_limit
+			var early: Spawner = Spawner.new()
+			var repeated: Spawner = Spawner.new()
+			var legacy: Spawner = Spawner.new()
+			early.init_rng(seed_value)
+			repeated.init_rng(seed_value)
+			legacy.init_rng(seed_value)
+			var scheduled_turns: Array[int] = []
+			for turn_index: int in range(1, 141):
+				Config.data.jelly_timed_early_turn_limit = early_limit
+				var batch: Array[Dictionary] = early._draw_batch(turn_index)
+				var repeated_batch: Array[Dictionary] = repeated._draw_batch(turn_index)
+				assert_eq(batch, repeated_batch, "same seed reproduces complete batch")
+				Config.data.jelly_timed_early_turn_limit = 0
+				var legacy_batch: Array[Dictionary] = legacy._draw_batch(turn_index)
+				assert_eq(batch.size(), legacy_batch.size(), "early range preserves batch size")
+				for index: int in range(batch.size()):
+					assert_eq(
+						_enabled_candidate_rng_row(batch[index]),
+						_enabled_candidate_rng_row(legacy_batch[index]),
+						"early range preserves level color and position sequence"
+					)
+				if not bool(batch[0].get("timed", false)):
+					continue
+				scheduled_turns.append(turn_index)
+				var turns: int = int(batch[0]["timed_turns"])
+				if turn_index < early_limit:
+					assert_true(turns >= 10 and turns <= 15, "early range at turn %d" % turn_index)
+				else:
+					assert_true(turns >= 5 and turns <= 10, "late range at turn %d" % turn_index)
+					assert_eq(turns, int(legacy_batch[0]["timed_turns"]), "one timed draw per scheduled jelly")
+			assert_eq(scheduled_turns, [20, 32, 44, 56, 68, 80, 92, 104, 116, 128, 140], "schedule unchanged")
+			early.free()
+			repeated.free()
+			legacy.free()
+	_restore_config(snapshot)
+
+
+func test_early_timed_fallbacks_and_fixed_precedence() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	var spawner: Spawner = Spawner.new()
+	spawner.init_rng(154100)
+	Config.data.jelly_timed_early_turn_limit = 100
+	Config.data.jelly_timed_turns_min = 0
+	var timed_state: int = spawner._timed_rng.state
+	assert_eq(spawner._draw_timed_turns(20), Config.data.jelly_timed_turns, "fixed count precedes early range")
+	assert_eq(spawner._timed_rng.state, timed_state, "fixed count consumes no timed draw")
+	Config.data.jelly_timed_turns_min = 5
+	for early_minimum: int in [0, -1]:
+		Config.data.jelly_timed_early_turns_min = early_minimum
+		var turns: int = spawner._draw_timed_turns(20)
+		assert_true(turns >= 5 and turns <= 10, "nonpositive early minimum uses late range")
+	Config.data.jelly_timed_early_turns_min = 10
+	Config.data.jelly_timed_early_turns_max = 9
+	assert_eq(spawner._draw_timed_turns(20), 10, "early maximum clamps to minimum")
+	Config.data.jelly_timed_early_turn_limit = -1
+	var late_turns: int = spawner._draw_timed_turns(20)
+	assert_true(late_turns >= 5 and late_turns <= 10, "negative limit disables early range")
 	spawner.free()
 	_restore_config(snapshot)
 
@@ -958,6 +1040,9 @@ func _snapshot_config() -> Dictionary:
 		"jelly_timed_turns": Config.data.jelly_timed_turns,
 		"jelly_timed_turns_min": Config.data.jelly_timed_turns_min,
 		"jelly_timed_turns_max": Config.data.jelly_timed_turns_max,
+		"jelly_timed_early_turn_limit": Config.data.jelly_timed_early_turn_limit,
+		"jelly_timed_early_turns_min": Config.data.jelly_timed_early_turns_min,
+		"jelly_timed_early_turns_max": Config.data.jelly_timed_early_turns_max,
 		"jelly_timed_burst_count": Config.data.jelly_timed_burst_count,
 		"jelly_timed_stone_enabled": Config.data.jelly_timed_stone_enabled,
 		"jelly_timed_stone_turns": Config.data.jelly_timed_stone_turns,
@@ -977,6 +1062,9 @@ func _restore_config(snapshot: Dictionary) -> void:
 	Config.data.jelly_timed_turns = int(snapshot["jelly_timed_turns"])
 	Config.data.jelly_timed_turns_min = int(snapshot["jelly_timed_turns_min"])
 	Config.data.jelly_timed_turns_max = int(snapshot["jelly_timed_turns_max"])
+	Config.data.jelly_timed_early_turn_limit = int(snapshot["jelly_timed_early_turn_limit"])
+	Config.data.jelly_timed_early_turns_min = int(snapshot["jelly_timed_early_turns_min"])
+	Config.data.jelly_timed_early_turns_max = int(snapshot["jelly_timed_early_turns_max"])
 	Config.data.jelly_timed_burst_count = int(snapshot["jelly_timed_burst_count"])
 	Config.data.jelly_timed_stone_enabled = bool(snapshot["jelly_timed_stone_enabled"])
 	Config.data.jelly_timed_stone_turns = int(snapshot["jelly_timed_stone_turns"])
