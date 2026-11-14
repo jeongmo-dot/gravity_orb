@@ -36,7 +36,47 @@
 
 ## 대기 중
 
-(없음)
+### [2026-11-14 #152] Windows 빌드 0.16.11 — 0.16.10 뒤 JELLY 변경 (#143~#151)
+- 상태: 대기 (**#151 병합 뒤** — main 위에서. #151이 「처리 완료」로 옮겨진 뒤 시작)
+- 근거: [technical_design.md](technical_design.md) **§10.5·§10.5.1** (빌드 절차·파일 이름·Release 보호)
+- 배경: 사용자 (2026-11-14) "빌드해줘" → 빌드 전에 효과음 추가 (#151). 0.16.10 (2026-11-09, #142) 뒤 병합된 변경을 직접 해 볼 빌드. 들어가는 것: 시한 젤리 (#143~#145), 0이 되면 회색 굳은 젤리 (#147), 숫자 선명도 (#148), 상한 뒤 합체 연장 (#149), 시한 숫자 5~10·영구 회색 돌 기본 (#150), 굳을 때·깨질 때 효과음 (#151). #146은 병합하지 않았다
+- 앵커: `project.godot` `application/config/version`, `tools/build_windows.ps1` (실행만)
+- 요구:
+  1. `project.godot` `application/config/version` `0.16.10` → **`0.16.11`**
+  2. 버전 한 줄만 커밋한 뒤 **깨끗한 작업 트리에서** Release 빌드 `.\tools\build_windows.ps1` (`-ReplaceSameVersion` 쓰지 않음) → `build/windows/GravityOrb_v0.16.11.exe` + `.console.exe` + `_BUILD.txt`
+  3. 내보낸 콘솔 exe로 스모크 2종 (기본·`-- --mode=jelly`, `--headless`) 종료 코드 0·`SCRIPT ERROR` 0
+  4. 사용자 `save.cfg` 해시 전후 동일 (없으면 없는 채로), 내보낸 묶음에 `tests/`·`artifacts/`·`docs/` 없음
+- **가벼운 모드 (주말)**: 전체 회귀·격리 창 실행·캡처·Debug 빌드는 하지 않는다. 게임 창을 띄우지 않는다 (스모크는 headless)
+- 수치 (Claude): 버전 **0.16.11** (기획서 0.16, PATCH +1)
+- 건드리지 말 것: 버전 외 모든 파일, 사용자 저장 파일, 다른 버전 빌드 파일 (`GravityOrb_v0.16.9.*`·`GravityOrb_v0.16.10.*` — 사용자가 만든 `GravityOrb_v0.16.10.zip` 포함), `docs/` (회신 파일 제외)
+- **회신 맨 앞에**: 빌드 실패·`mode=Release`가 아님, `_BUILD.txt` 커밋이 브랜치 끝과 다름, 버전 외 변경이 커밋에 들어감, 다른 버전 파일 변화, `save.cfg` 해시 바뀜, 스모크 에러
+- Done-when:
+  - [ ] `build/windows/GravityOrb_v0.16.11.exe` — `WINDOWS_BUILD_RESULT` 줄 (`mode=Release`), 크기·SHA-256, `_BUILD.txt` 커밋 = 브랜치 끝
+  - [ ] 스모크 2종 에러 0, `save.cfg` 해시 동일, 묶음 검사
+  - [ ] `build/windows/` 목록 — 0.16.9·0.16.10 파일 (zip 포함) 이름·크기 그대로
+- 커밋: 항목 단위 브랜치 (`build-0.16.11`), **push·PR까지** (병합은 Claude 검수 뒤)
+
+### [2026-11-14 #151] 시한 젤리가 굳을 때·돌이 깨질 때 효과음
+- 상태: 대기 (#150 병합됨 `7b80999` — main 위에서)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.42**
+- 배경: 사용자 (2026-11-14) 빌드 요청을 멈추고 "시한 젤리가 회색 젤리로 바뀔 때 효과음을 추가하고 싶어. 어떤게 좋을까" → Claude가 후보 A·B·C를 합성해 들려줌 → 사용자 "C 쩌적·쿵" (갈라지는 딱딱 소리 4번 뒤 낮은 쿵), 돌이 폭발에 깨질 때도 "깨질 때도"
+- 앵커: `scripts/fx/SfxBank.gd` (새 합성·재생 함수), `scripts/fx/FeedbackDirector.gd` `bind()`·`_play_reaction_sfx()`, `scripts/core/TurnManager.gd` `_advance_timed_jellies()`·`_harden_timed_jelly()`·`_spawn_timed_scatter()` (새 신호), `tests/test_feedback.gd`
+- 요구 (§12-ONE.42 1~7):
+  1. 새 소리 `stone` 합성 — 갈라짐 4번 + 쿵, 0.34초, 최대 진폭 0.80 (값은 §12-ONE.42 1번 그대로). `res://assets/sfx/stone.*`가 있으면 그것
+  2. 굳을 때 한 번 (음 높이 1.0, `sfx_volume_db` + 2 dB) — 2안·1안·방식 0 18턴 돌 모두, 같은 턴에 여럿이어도 한 번. #145 L1 터짐·18턴 돌 사라짐은 소리 없음. 판마다 첫 번만인 `timed_stone_created`와 따로 실패마다 나오는 새 신호
+  3. 깨질 때 반응당 한 번 (음 높이 `pow(2, 4/12)`, `sfx_volume_db` − 3 dB) — `timed_stone_break_count` > 0인 BLAST·TAP_BLAST (GROW 포함)·MAX_CLEAR
+  4. 효과음 끄기를 따름. `play_called` 이름 `stone`·`stone_break`
+  5. 검수용 `artifacts/sfx/stone.wav` (게임은 읽지 않음)
+  6. 테스트 (§12-ONE.42 6번)
+- 수치 (Claude): §12-ONE.42 1번 합성 값, 굳을 때 +2 dB, 깨질 때 1.26배·−3 dB
+- 건드리지 말 것: 다른 소리 전부, 진동, 안내 한 줄, 그림·연출 (명세에 없는 것 금지, 고리 금지), 규칙·수치, 사용자 저장 파일, `project.godot` 버전·`build/windows/` Release 파일 (**빌드 없음** — #152), `docs/` (회신 파일 제외)
+- **가벼운 모드 (주말)**: 바뀐 테스트 파일과 해시 테스트만 돌린다. 전체 회귀·캡처·Debug 빌드 하지 않음
+- **회신 맨 앞에**: 해시 바뀜, 다른 소리의 합성·크기·시점이 바뀜, 굳을 때 한 턴에 소리가 두 번 이상, 효과음 끄기를 따르지 않음
+- Done-when:
+  - [ ] 테스트 통과, 지금 기본 해시 그대로
+  - [ ] `artifacts/sfx/stone.wav` — 길이·최대 진폭 보고
+- QA: §12-ONE.42 6번
+- 커밋: 항목 단위 브랜치 (`stone-sfx`), **push·PR까지** (병합은 Claude 검수 뒤)
 
 ---
 
