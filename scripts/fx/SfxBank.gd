@@ -14,6 +14,9 @@ signal play_called(
 
 const SAMPLE_RATE: int = 44100
 const POP_DURATION: float = 0.045
+const MERGE_DURATION: float = 0.300
+const MERGE_MIN_LEVEL: int = 2
+const MERGE_MAX_LEVEL: int = 10
 const BLAST_DURATION: float = 0.460
 const CHIME_DURATION: float = 0.340
 const SWIPE_DURATION: float = 0.120
@@ -22,9 +25,16 @@ const STONE_DURATION: float = 0.340
 const STONE_BREAK_PITCH: float = 1.2599210498948732
 const VOICE_COUNT: int = 12
 const SFX_BUS: StringName = &"SFX"
-const POP_ASSET_PATHS: Array[String] = [
-	"res://assets/sfx/pop.wav",
-	"res://assets/sfx/pop.ogg",
+const MERGE_FREQUENCIES: Array[float] = [
+	523.25,
+	587.33,
+	659.26,
+	783.99,
+	880.00,
+	1046.50,
+	1174.66,
+	1318.51,
+	1567.98,
 ]
 const BLAST_ASSET_PATHS: Array[String] = [
 	"res://assets/sfx/blast.wav",
@@ -71,7 +81,8 @@ const BLAST_POP_PITCHES: Array[float] = [
 
 @export var save_path: String = ""
 
-var _pop_stream: AudioStream
+var _merge_streams: Array[AudioStream] = []
+var _merge_stream_init_usec: int = 0
 var _blast_stream: AudioStream
 var _callout_stream: AudioStream
 var _swipe_stream: AudioStream
@@ -86,9 +97,13 @@ var _last_voice: AudioStreamPlayer
 func _ready() -> void:
 	_ensure_sfx_bus()
 	set_muted(SaveStore.load_sfx_muted(save_path), false)
-	_pop_stream = _load_first(POP_ASSET_PATHS)
-	if _pop_stream == null:
-		_pop_stream = _synthesize_pop()
+	var merge_init_started_usec: int = Time.get_ticks_usec()
+	for level: int in range(MERGE_MIN_LEVEL, MERGE_MAX_LEVEL + 1):
+		var merge_stream: AudioStream = _load_first(_merge_asset_paths(level))
+		if merge_stream == null:
+			merge_stream = _synthesize_merge(level)
+		_merge_streams.append(merge_stream)
+	_merge_stream_init_usec = Time.get_ticks_usec() - merge_init_started_usec
 	_blast_stream = _load_first(BLAST_ASSET_PATHS)
 	if _blast_stream == null:
 		_blast_stream = _synthesize_blast()
@@ -122,7 +137,7 @@ func _exit_tree() -> void:
 		voice.stream = null
 	_voices.clear()
 	_last_voice = null
-	_pop_stream = null
+	_merge_streams.clear()
 	_blast_stream = null
 	_callout_stream = null
 	_swipe_stream = null
@@ -140,10 +155,11 @@ func play_merge(
 ) -> void:
 	if not Config.data.sfx_enabled:
 		return
+	var clamped_level: int = clampi(result_level, MERGE_MIN_LEVEL, MERGE_MAX_LEVEL)
 	_play(
-		_pop_stream,
+		merge_stream(clamped_level),
 		merge_pitch(result_level, chain, stable_spawn_id),
-		Config.data.sfx_volume_db,
+		merge_volume_db(clamped_level),
 		"merge",
 		reaction_usec,
 		reaction_physics_frame,
@@ -237,19 +253,22 @@ func play_stone_break(
 	)
 
 
-func merge_pitch(result_level: int, chain: int, stable_spawn_id: int) -> float:
-	var maximum_level: int = maxi(Config.data.orb_max_level, 2)
-	var clamped_level: int = clampi(result_level, 2, maximum_level)
-	var level_ratio: float = (
-		float(clamped_level - 2) / float(maxi(maximum_level - 2, 1))
-	)
-	var level_pitch: float = lerpf(1.35, 0.75, level_ratio)
+func merge_pitch(_result_level: int, chain: int, stable_spawn_id: int) -> float:
 	var semitones: int = mini(
 		maxi(chain - 1, 0),
 		Config.data.sfx_chain_semitones_max
 	)
 	var chain_pitch: float = pow(2.0, float(semitones) / 12.0)
-	return level_pitch * chain_pitch * (1.0 + pitch_jitter(stable_spawn_id))
+	return chain_pitch * (1.0 + pitch_jitter(stable_spawn_id))
+
+
+func merge_volume_db(result_level: int) -> float:
+	var clamped_level: int = clampi(result_level, MERGE_MIN_LEVEL, MERGE_MAX_LEVEL)
+	return (
+		Config.data.sfx_volume_db
+		+ 3.0 * float(clamped_level - MERGE_MIN_LEVEL)
+		/ float(MERGE_MAX_LEVEL - MERGE_MIN_LEVEL)
+	)
 
 
 func pitch_jitter(stable_spawn_id: int) -> float:
@@ -260,8 +279,15 @@ func pitch_jitter(stable_spawn_id: int) -> float:
 	return centered * Config.data.sfx_pitch_jitter
 
 
-func pop_stream() -> AudioStream:
-	return _pop_stream
+func merge_stream(result_level: int) -> AudioStream:
+	if _merge_streams.is_empty():
+		return null
+	var clamped_level: int = clampi(result_level, MERGE_MIN_LEVEL, MERGE_MAX_LEVEL)
+	return _merge_streams[clamped_level - MERGE_MIN_LEVEL]
+
+
+func merge_stream_init_usec() -> int:
+	return _merge_stream_init_usec
 
 
 func blast_stream() -> AudioStream:
@@ -360,13 +386,33 @@ func _load_first(paths: Array[String]) -> AudioStream:
 	return null
 
 
-func _synthesize_pop() -> AudioStreamWAV:
-	var sample_count: int = ceili(POP_DURATION * float(SAMPLE_RATE))
+func _merge_asset_paths(level: int) -> Array[String]:
+	return [
+		"res://assets/sfx/merge_%d.wav" % level,
+		"res://assets/sfx/merge_%d.ogg" % level,
+	]
+
+
+func _synthesize_merge(result_level: int) -> AudioStreamWAV:
+	var clamped_level: int = clampi(result_level, MERGE_MIN_LEVEL, MERGE_MAX_LEVEL)
+	var frequency: float = MERGE_FREQUENCIES[clamped_level - MERGE_MIN_LEVEL]
+	var sample_count: int = ceili(MERGE_DURATION * float(SAMPLE_RATE))
 	var samples: PackedFloat32Array = PackedFloat32Array()
 	samples.resize(sample_count)
 	for index: int in range(sample_count):
 		var time: float = float(index) / float(SAMPLE_RATE)
-		samples[index] = _pop_sample(time, 1.0, index) * 0.82
+		var pop: float = _pop_sample(time, 1.0, index) * 0.82
+		var note: float = (
+			(
+				sin(TAU * frequency * time)
+				+ 0.25
+				* sin(TAU * 3.9 * frequency * time)
+				* exp(-time / 0.02)
+			)
+			* minf(time / 0.002, 1.0)
+			* exp(-time / 0.09)
+		)
+		samples[index] = clampf(pop * 0.70 + note * 0.55, -1.0, 1.0)
 	return _make_wav(samples)
 
 

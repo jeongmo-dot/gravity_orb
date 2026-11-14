@@ -38,6 +38,40 @@
 
 ## 미확인
 
+### [2026-11-14] 대상 #153 — 합체 소리: 합쳐진 크기마다 다른 음
+- 맨 앞 경고 조건 0건: 기존 해시 5개 변경 0건, 합체 외 소리의 합성·크기·시점 변경 0건, 합체 소리 횟수·재생 시점 변경 0건, `sfx_enabled=false`에서 합체 재생 0회
+- 상태: 완료 — L2~L10 합체음 9개·재생 라우팅·검수용 WAV·변경 대상 자동 테스트 완료. 주말 가벼운 모드에 따라 전체 회귀·캡처·Debug 빌드는 실행하지 않음
+- 브랜치 / PR: `merge-sfx-levels` / PR 생성 예정
+- 변경 파일: `config/GameConfig.gd`, `scripts/fx/SfxBank.gd`, `tests/{test_config.gd,test_feedback.gd}`, `artifacts/sfx/merge_levels.wav`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] L2~L10 각 0.30초·44.1kHz·16비트·모노 합체음을 명세의 `pop × 0.70 + note_L × 0.55` 식과 9개 주파수로 결정적 합성. `assets/sfx/merge_<L>.wav/.ogg` 우선 로드 — 길이·두 번 합성 바이트 자동 테스트
+  - [x] 0.05~0.20초 구간에서 각 목표 주파수의 Goertzel 세기가 이웃 레벨 주파수보다 큼 — 9개 스트림 자동 테스트
+  - [x] `play_merge()`가 L2~L10 각 스트림, pitch 1.0, +0~+3dB를 사용. L1→L2·L11→L10 clamp — 실제 voice 속성·stream identity 자동 테스트
+  - [x] 레벨 pitch 계수 제거, chain 2=`2^(1/12)`, chain 13·30=`2.0`; 테스트에서 jitter 0.03을 주면 같은 stable id의 pitch 반복 — 자동 테스트
+  - [x] `GameConfig.gd` 선언 기본 `sfx_pitch_jitter=0.0`, `test_config` 기대값 0.0. Claude가 이미 바꾼 `default_config.tres`는 수정하지 않음
+  - [x] 미사용 `_pop_stream`·`POP_ASSET_PATHS`·`pop_stream()`·`_synthesize_pop()` 제거. 대폭발과 새 합체가 쓰는 `_pop_sample()` 유지
+  - [x] `sfx_enabled=false`에서 합체 `play_called` 0회. 기존 반응 핸들러·호출 횟수·시점은 수정하지 않음
+  - [x] 기본 `83e4f6c8…`, mode 0 stone `463995c4…`, K5-4 `bc86d257…`, H8 `790bb962…`, K5-8 `3b814220…` 유지
+  - [x] 검수용 `artifacts/sfx/merge_levels.wav` 생성. 게임 로드 경로와 분리
+- WAV·합성 관측:
+  - 형식·길이: 44,100Hz, 16비트, 모노, `5.050s`, 파일 `445,454 bytes`; 앞 0.25초 무음, L2→L10 0.5초 간격, 마지막 음 뒤 0.5초 무음
+  - 최대 진폭 `1.000000`; SHA-256 `EBDE289C2C88CEA0E69BD74A0D94C31BEA4F9DC22BE1EA8859FCEA7D996B53D1`
+  - `_ready()` 9개 합성 시간: headless 두 관측 `55.943ms`, `61.514ms`
+- QA 관측값:
+  - `test_feedback.gd` → `14/14` 통과, 종료 코드 0. 9개 합성·Goertzel·라우팅·pitch/volume/clamp·disabled와 기존 다른 효과음 테스트 포함
+  - `test_config.gd` → `16/16` 통과, 종료 코드 0
+  - `test_timed_jelly.gd` → `19/19` 통과, 종료 코드 0. 해시: `83e4f6c8…`, `463995c4…`, `bc86d257…`, `790bb962…`, `3b814220…`
+  - 세 headless 테스트 프로세스 모두 `SCRIPT ERROR`·`Parse Error` 0건
+  - 규칙 검색: 이번 diff의 신규 `Input`·전역 난수 사용 0건. `git diff --check` 오류 0건
+  - 미실행(주말 가벼운 모드): 전체 `tests/run_tests.ps1`, 화면 캡처(명세도 캡처 없음), 기본/BLITZ 장시간 스모크, Debug/Release 빌드
+- 수동 확인 절차:
+  1. 효과음을 켜고 L1 두 개부터 차례로 합쳐 L2→L10 생성 → 기존 짧은 `똑` 뒤 결과가 클수록 도·레·미·솔·라 순서로 계단처럼 높은 음, L10은 L2보다 +3dB
+  2. 같은 턴 연쇄 2회 이상 만들기 → 결과 레벨 고유 음 위에 연쇄마다 반음 상승, chain 13 이후 한 옥타브 상한
+  3. 효과음을 끄고 같은 합체 반복 → 합체 소리 없음
+  4. [merge_levels.wav](../artifacts/sfx/merge_levels.wav) 재생 → 0.25초 무음 뒤 L2~L10 아홉 음이 0.5초 간격으로 높아지고 끝 0.5초 무음
+- 결정 사항: 기존 공개 테스트 호환을 위해 `merge_pitch(result_level, chain, stable_spawn_id)` 시그니처는 유지하고 첫 인자만 사용하지 않도록 했다. 합체 재생 경로 이외의 보이스 풀·대폭발 합성은 변경하지 않음
+- 남은 것 · 질문: 실제 여러 합체가 겹칠 때 청감과 12보이스 라운드로빈의 끊김 여부는 #152 Release 빌드에서 수동 확인. Claude 검수·병합 대기
+
 ### [2026-11-14] 대상 #151 — 시한 젤리가 굳을 때·돌이 깨질 때 효과음
 - 맨 앞 경고 조건 0건: 기본·mode 0 해시 모두 기존값 유지, 기존 합체/대폭발 합성 테스트 통과, 한 턴에 시한 젤리 2개가 굳어도 `stone` 호출 1회, `sfx_enabled=false`에서 `stone`·`stone_break` 호출 0회
 - 상태: 완료 — 합성음·굳기/깨짐 재생 경로·자동 테스트·검수용 WAV 완료. 주말 경량 규칙에 따라 전체 회귀·캡처·Debug 빌드는 실행하지 않음

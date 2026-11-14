@@ -198,7 +198,7 @@ enum GameMode {
 @export var sfx_enabled: bool = true
 @export var sfx_volume_db: float = 0.0
 @export var sfx_chain_semitones_max: int = 12
-@export var sfx_pitch_jitter: float = 0.03
+@export var sfx_pitch_jitter: float = 0.0
 
 
 func radius_for_level(level: int) -> float:

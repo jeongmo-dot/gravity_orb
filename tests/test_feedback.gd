@@ -320,52 +320,21 @@ func test_maximum_reaction_burst_uses_only_prewarmed_nodes() -> void:
 
 
 func test_synthesized_sfx_pitch_volume_jitter_and_voice_pool() -> void:
-	var original_jitter: float = Config.data.sfx_pitch_jitter
 	var original_enabled: bool = Config.data.sfx_enabled
 	var original_volume: float = Config.data.sfx_volume_db
 	Config.data.sfx_enabled = true
 	Config.data.sfx_volume_db = 0.0
 	var fixture: Dictionary = await _create_director_fixture()
 	var bank: SfxBank = (fixture["director"] as FeedbackDirector).sfx_bank()
-	var pop: AudioStreamWAV = bank.pop_stream() as AudioStreamWAV
 	var blast: AudioStreamWAV = bank.blast_stream() as AudioStreamWAV
-	assert_true(pop != null and not pop.data.is_empty(), "pop synth is nonempty")
 	assert_true(blast != null and not blast.data.is_empty(), "blast synth is nonempty")
-	assert_near(pop.get_length(), 0.045, 0.002, "pop synth duration")
 	assert_near(blast.get_length(), 0.460, 0.002, "blast synth duration")
-	var pop_metrics: Dictionary = _waveform_metrics(pop)
 	var blast_metrics: Dictionary = _waveform_metrics(blast)
-	assert_true(float(pop_metrics["peak_time_ms"]) <= 5.0, "pop peak is within first 5ms")
 	assert_true(
 		float(blast_metrics["peak_time_ms"]) <= 10.0,
 		"blast peak is within first 10ms"
 	)
-	print("SFX_WAVEFORM pop=%s blast=%s" % [
-		JSON.stringify(pop_metrics),
-		JSON.stringify(blast_metrics),
-	])
-	Config.data.sfx_pitch_jitter = 0.0
-	assert_near(bank.merge_pitch(2, 1, 1), 1.35, TOLERANCE, "L2 base pitch")
-	assert_near(
-		bank.merge_pitch(Config.data.orb_max_level, 1, 1),
-		0.75,
-		TOLERANCE,
-		"maximum-level base pitch"
-	)
-	assert_near(
-		bank.merge_pitch(2, 2, 1),
-		1.35 * pow(2.0, 1.0 / 12.0),
-		TOLERANCE,
-		"chain two rises one semitone"
-	)
-	assert_near(bank.merge_pitch(2, 13, 1), 2.70, TOLERANCE, "chain thirteen caps at octave")
-	assert_near(bank.merge_pitch(2, 30, 1), 2.70, TOLERANCE, "later chains stay capped")
-	Config.data.sfx_pitch_jitter = 0.03
-	var first_jitter: float = bank.pitch_jitter(37)
-	assert_near(bank.pitch_jitter(37), first_jitter, TOLERANCE, "stable id jitter repeats")
-	assert_true(absf(first_jitter) <= 0.03, "stable jitter is bounded")
-	bank.play_merge(2, 1, 37)
-	assert_near(bank.last_voice().volume_db, 0.0, TOLERANCE, "merge volume")
+	print("SFX_WAVEFORM blast=%s" % JSON.stringify(blast_metrics))
 	bank.play_blast(false)
 	assert_near(bank.last_voice().volume_db, 4.0, TOLERANCE, "blast volume")
 	bank.play_blast(false, 1, 0, -1, -1, 0.5)
@@ -387,6 +356,75 @@ func test_synthesized_sfx_pitch_volume_jitter_and_voice_pool() -> void:
 		bank.play_merge(2, 1, index)
 	assert_eq(bank.voice_count(), 12, "voice pool capacity")
 	assert_true(bank.active_voice_count() <= 12, "voice pool never exceeds capacity")
+	await _cleanup(fixture["root"] as Node)
+	Config.data.sfx_enabled = original_enabled
+	Config.data.sfx_volume_db = original_volume
+
+
+func test_merge_level_sfx_synthesis_routing_and_pitch() -> void:
+	var original_jitter: float = Config.data.sfx_pitch_jitter
+	var original_enabled: bool = Config.data.sfx_enabled
+	var original_volume: float = Config.data.sfx_volume_db
+	Config.data.sfx_enabled = true
+	Config.data.sfx_pitch_jitter = 0.0
+	Config.data.sfx_volume_db = 0.0
+	var fixture: Dictionary = await _create_director_fixture()
+	var bank: SfxBank = (fixture["director"] as FeedbackDirector).sfx_bank()
+	print("MERGE_SFX_INIT_MS %.3f" % (float(bank.merge_stream_init_usec()) / 1000.0))
+
+	for level: int in range(SfxBank.MERGE_MIN_LEVEL, SfxBank.MERGE_MAX_LEVEL + 1):
+		var first_synth: AudioStreamWAV = bank._synthesize_merge(level)
+		var second_synth: AudioStreamWAV = bank._synthesize_merge(level)
+		assert_near(first_synth.get_length(), 0.300, 0.005, "L%d synth duration" % level)
+		assert_eq(first_synth.data, second_synth.data, "L%d synth is deterministic" % level)
+		var target_frequency: float = SfxBank.MERGE_FREQUENCIES[level - 2]
+		var target_power: float = _goertzel_power(first_synth, target_frequency, 0.05, 0.20)
+		if level > SfxBank.MERGE_MIN_LEVEL:
+			var lower_frequency: float = SfxBank.MERGE_FREQUENCIES[level - 3]
+			assert_true(
+				target_power > _goertzel_power(first_synth, lower_frequency, 0.05, 0.20),
+				"L%d target frequency dominates L%d frequency" % [level, level - 1]
+			)
+		if level < SfxBank.MERGE_MAX_LEVEL:
+			var upper_frequency: float = SfxBank.MERGE_FREQUENCIES[level - 1]
+			assert_true(
+				target_power > _goertzel_power(first_synth, upper_frequency, 0.05, 0.20),
+				"L%d target frequency dominates L%d frequency" % [level, level + 1]
+			)
+		bank.play_merge(level, 1, 37)
+		assert_true(
+			bank.last_voice().stream == bank.merge_stream(level),
+			"L%d playback routes its stream" % level
+		)
+		assert_near(bank.last_voice().pitch_scale, 1.0, TOLERANCE, "L%d base pitch" % level)
+		assert_near(
+			bank.last_voice().volume_db,
+			3.0 * float(level - 2) / 8.0,
+			TOLERANCE,
+			"L%d level volume" % level
+		)
+
+	bank.play_merge(1, 1, 37)
+	assert_true(bank.last_voice().stream == bank.merge_stream(2), "L1 clamps to L2")
+	bank.play_merge(11, 1, 37)
+	assert_true(bank.last_voice().stream == bank.merge_stream(10), "L11 clamps to L10")
+	assert_near(bank.merge_pitch(2, 2, 1), pow(2.0, 1.0 / 12.0), TOLERANCE, "chain two")
+	assert_near(bank.merge_pitch(2, 13, 1), 2.0, TOLERANCE, "chain thirteen caps")
+	assert_near(bank.merge_pitch(10, 30, 1), 2.0, TOLERANCE, "later chains stay capped")
+
+	Config.data.sfx_pitch_jitter = 0.03
+	var first_pitch: float = bank.merge_pitch(7, 1, 37)
+	assert_near(bank.merge_pitch(7, 1, 37), first_pitch, TOLERANCE, "stable id pitch repeats")
+	assert_true(absf(first_pitch - 1.0) <= 0.03, "stable jitter is bounded")
+
+	_observed_play_calls.clear()
+	bank.play_called.connect(_record_play_called)
+	Config.data.sfx_enabled = false
+	bank.play_merge(5, 1, 37)
+	assert_eq(_observed_play_calls.size(), 0, "disabled SFX suppresses merge playback")
+	var review_stream: AudioStreamWAV = _merge_level_review_stream(bank)
+	assert_near(review_stream.get_length(), 5.050, 0.005, "review stream duration")
+
 	await _cleanup(fixture["root"] as Node)
 	Config.data.sfx_pitch_jitter = original_jitter
 	Config.data.sfx_enabled = original_enabled
@@ -636,3 +674,40 @@ func _waveform_metrics(stream: AudioStreamWAV) -> Dictionary:
 			first_ten_ms_energy / total_energy if total_energy > 0.0 else 0.0
 		),
 	}
+
+
+func _goertzel_power(
+	stream: AudioStreamWAV,
+	frequency: float,
+	start_time: float,
+	end_time: float
+) -> float:
+	var start_index: int = clampi(roundi(start_time * float(stream.mix_rate)), 0, stream.data.size() / 2)
+	var end_index: int = clampi(roundi(end_time * float(stream.mix_rate)), start_index, stream.data.size() / 2)
+	var coefficient: float = 2.0 * cos(TAU * frequency / float(stream.mix_rate))
+	var previous: float = 0.0
+	var previous_two: float = 0.0
+	for sample_index: int in range(start_index, end_index):
+		var sample: float = float(stream.data.decode_s16(sample_index * 2)) / 32767.0
+		var current: float = sample + coefficient * previous - previous_two
+		previous_two = previous
+		previous = current
+	return previous * previous + previous_two * previous_two - coefficient * previous * previous_two
+
+
+func _merge_level_review_stream(bank: SfxBank) -> AudioStreamWAV:
+	var total_duration: float = 5.050
+	var samples: PackedFloat32Array = PackedFloat32Array()
+	samples.resize(ceili(total_duration * float(SfxBank.SAMPLE_RATE)))
+	for level: int in range(SfxBank.MERGE_MIN_LEVEL, SfxBank.MERGE_MAX_LEVEL + 1):
+		var stream: AudioStreamWAV = bank._synthesize_merge(level)
+		var start_index: int = roundi(
+			(0.25 + 0.5 * float(level - SfxBank.MERGE_MIN_LEVEL))
+			* float(SfxBank.SAMPLE_RATE)
+		)
+		var gain: float = db_to_linear(3.0 * float(level - 2) / 8.0)
+		for sample_index: int in range(stream.data.size() / 2):
+			var source: float = float(stream.data.decode_s16(sample_index * 2)) / 32767.0
+			var target_index: int = start_index + sample_index
+			samples[target_index] = clampf(samples[target_index] + source * gain, -1.0, 1.0)
+	return bank._make_wav(samples)
