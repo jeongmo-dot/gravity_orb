@@ -41,7 +41,7 @@
 ### [2026-11-14] 대상 #150 — 시한 젤리 숫자 5~10·실패하면 회색 돌 (1안·2안)
 - 맨 앞 경고 조건: 같은 시드의 젤리 색·자리·레벨 순서 변경 `0`건(1~45턴 대조), mode 0 + min 0 회귀 해시 `463995c4a2188c1639fcc7efaa9e0ce0c294a0b3633ae1c859d7b98eec0ff390` 유지, 회색 돌의 합체·청소·터치 소폭발 원본 반응 `0`건. 표적 테스트·540×960 캡처에서 판 밖 배치 `0`건. 주말 경량 모드라 여러 판 물리 이탈 측정은 미실행
 - 상태: 완료 — 구현, 변경 테스트 2파일, 지정 540×960 장면 5개를 완료. 주말 작성 규칙에 따라 전체 회귀·봇 측정·두 번째 비율·Debug 빌드는 실행하지 않음
-- 브랜치 / PR: `timed-fail-modes` / 생성 후 갱신
+- 브랜치 / PR: `timed-fail-modes` / https://github.com/jeongmo-dot/gravity_orb/pull/150
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/{CollisionResolver.gd,Orb.gd,Spawner.gd,TurnManager.gd}`, `scripts/spike/{Board3D.gd,Orb3D.gd}`, `scripts/ui/Hud.gd`, `tests/{capture_screens.ps1,test_config.gd,test_timed_jelly.gd}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] 시한 젤리마다 5~10 정수 균등 난수, 같은 시드 재현. `Spawner`의 별도 `_timed_rng`를 써 기존 색·자리·레벨 난수열과 분리 — 1~45턴 대조와 반복 시드 자동 테스트
