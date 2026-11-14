@@ -41,7 +41,7 @@
 ### [2026-11-14] 대상 #148 — 시한 젤리·굳은 젤리 숫자를 또렷하게
 - 맨 앞 경고 조건 0건: 굳은 `18`·`10`·`1`, 시한 노랑 `4`·`1` 모두 읽힘 기준을 충족했다. 흰 획 `18~19px`, 눈과 외곽선 비겹침, 두 자리 숫자 윤곽 안 최소 `6px`(아래)·`19px`(가로), HUD·다른 글자 변경 없음, 모든 규칙 해시 불변을 관측했다
 - 상태: 완료 — 구현·단위/전체 테스트·두 비율 전체 캡처·픽셀 측정·Debug 빌드까지 완료. Release와 버전 변경은 하지 않음
-- 브랜치 / PR: `timed-number-crisp` / 생성 예정
+- 브랜치 / PR: `timed-number-crisp` / https://github.com/jeongmo-dot/gravity_orb/pull/148
 - 변경 파일: `scenes/Orb3D.tscn`, `scripts/spike/Orb3D.gd`, `tests/{capture_screens.ps1,test_timed_jelly.gd}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
 - 원인과 방법:
   - 원인 확인: L5 `%TimedLabel`은 `font_size=7`, `pixel_size=0.0018`로 그린 글자가 화면에서 약 3배 확대됐다. 소스 4px 외곽선도 함께 약 12px로 확대되어 작은 `8`의 구멍과 획 사이를 덮고, 흰 획에는 보간된 중간 밝기 픽셀이 많았다
