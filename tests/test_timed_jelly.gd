@@ -7,6 +7,7 @@ const EXPECTED_K5_8_HASH: String = "3b814220f95318056b5665a591fdd9c4289a9bb5646c
 const EXPECTED_K5_4_HASH: String = "bc86d2571e89ed78fcb10d0fb69d03c33048f362ea8395d164605e3d7e21dab7"
 const EXPECTED_K5_4_STONE_HASH: String = "463995c4a2188c1639fcc7efaa9e0ce0c294a0b3633ae1c859d7b98eec0ff390"
 const EXPECTED_RANDOM_PERMANENT_HASH: String = "83e4f6c8de772cd3a0ff5c6d0853a0ca74996572b45019541c08be9eb1affb91"
+const EXPECTED_EARLY_DEFAULT_HASH: String = "8c6eb2f7c241b8d2e94f2f977083ebf084428e91ce4bdc0920e898ae2484921a"
 
 
 func test_h8_marker_countdown_success_and_failure_hash() -> void:
@@ -206,14 +207,18 @@ func test_k5_4_default_stone_hash() -> void:
 
 
 func test_random_timed_permanent_stone_default_hash() -> void:
-	_assert_random_timed_permanent_stone_hash(100, "JELLY_EARLY_DEFAULT_HASH")
+	_assert_random_timed_permanent_stone_hash(100, "JELLY_EARLY_DEFAULT_HASH", EXPECTED_EARLY_DEFAULT_HASH)
 
 
 func test_random_timed_permanent_stone_limit_zero_hash() -> void:
-	_assert_random_timed_permanent_stone_hash(0, "JELLY_RANDOM_PERMANENT_HASH")
+	_assert_random_timed_permanent_stone_hash(0, "JELLY_RANDOM_PERMANENT_HASH", EXPECTED_RANDOM_PERMANENT_HASH)
 
 
-func _assert_random_timed_permanent_stone_hash(early_limit: int, hash_label: String) -> void:
+func _assert_random_timed_permanent_stone_hash(
+	early_limit: int,
+	hash_label: String,
+	expected_hash: String
+) -> void:
 	var snapshot: Dictionary = _snapshot_config()
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.jelly_timed_early_turn_limit = early_limit
@@ -241,8 +246,7 @@ func _assert_random_timed_permanent_stone_hash(early_limit: int, hash_label: Str
 	}
 	var hash_value: String = JSON.stringify(state).sha256_text()
 	print("%s hash=%s" % [hash_label, hash_value])
-	# Keep the old expectation until the first real run prints the new default hash.
-	assert_eq(hash_value, EXPECTED_RANDOM_PERMANENT_HASH, "%s timed rule hash" % hash_label)
+	assert_eq(hash_value, expected_hash, "%s timed rule hash" % hash_label)
 	spawner.free()
 	_restore_config(snapshot)
 
