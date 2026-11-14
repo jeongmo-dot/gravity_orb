@@ -221,7 +221,15 @@ $expectedFiles = @(
     "206_jelly_timed_first_callout.png",
     "207_jelly_timed_stone_1.png",
     "208_jelly_timed_stone_broken_settled.png",
-    "209_jelly_timed_stone_first_callout.png"
+    "209_jelly_timed_stone_first_callout.png",
+    "210_jelly_timed_stone_10.png"
+)
+$expectedZoomFiles = @(
+    "199_jelly_timed_4_5x.png",
+    "200_jelly_timed_1_5x.png",
+    "205_jelly_timed_stone_18_5x.png",
+    "207_jelly_timed_stone_1_5x.png",
+    "210_jelly_timed_stone_10_5x.png"
 )
 
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {
@@ -259,6 +267,14 @@ foreach ($captureSpec in $captureSpecs) {
             throw "Screenshot capture did not create $filePath"
         }
         Write-Output ("SCREEN_CAPTURE_RESULT ratio={0} file={1}" -f $captureSpec.Name, $filePath)
+        $capturedFileCount += 1
+    }
+    foreach ($fileName in $expectedZoomFiles) {
+        $filePath = Join-Path (Join-Path $outputPath "zoom") $fileName
+        if (-not (Test-Path -LiteralPath $filePath)) {
+            throw "Screenshot capture did not create $filePath"
+        }
+        Write-Output ("SCREEN_CAPTURE_ZOOM_RESULT ratio={0} file={1}" -f $captureSpec.Name, $filePath)
         $capturedFileCount += 1
     }
     $landingFiles = @(1..10 | ForEach-Object {

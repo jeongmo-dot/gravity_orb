@@ -38,6 +38,56 @@
 
 ## 미확인
 
+### [2026-11-14] 대상 #148 — 시한 젤리·굳은 젤리 숫자를 또렷하게
+- 맨 앞 경고 조건 0건: 굳은 `18`·`10`·`1`, 시한 노랑 `4`·`1` 모두 읽힘 기준을 충족했다. 흰 획 `18~19px`, 눈과 외곽선 비겹침, 두 자리 숫자 윤곽 안 최소 `6px`(아래)·`19px`(가로), HUD·다른 글자 변경 없음, 모든 규칙 해시 불변을 관측했다
+- 상태: 완료 — 구현·단위/전체 테스트·두 비율 전체 캡처·픽셀 측정·Debug 빌드까지 완료. Release와 버전 변경은 하지 않음
+- 브랜치 / PR: `timed-number-crisp` / 생성 예정
+- 변경 파일: `scenes/Orb3D.tscn`, `scripts/spike/Orb3D.gd`, `tests/{capture_screens.ps1,test_timed_jelly.gd}`, `tests/spike/capture_screens.gd`, `docs/jeongmo_codex_to_claude.md`
+- 원인과 방법:
+  - 원인 확인: L5 `%TimedLabel`은 `font_size=7`, `pixel_size=0.0018`로 그린 글자가 화면에서 약 3배 확대됐다. 소스 4px 외곽선도 함께 약 12px로 확대되어 작은 `8`의 구멍과 획 사이를 덮고, 흰 획에는 보간된 중간 밝기 픽셀이 많았다
+  - 선택: 전역 Orbitron import/MSDF는 건드리지 않고 `%TimedLabel`만 `font_size=28`(기존의 4배), `pixel_size=0.00045`(기존의 1/4)로 변경했다. 곱 `font_size × pixel_size=0.0126`을 유지해 화면 크기·자리를 보존하면서 원본 래스터 해상도만 높였다. L5 외곽선은 소스 4px을 유지해 실제 화면 `2.57~2.71px`로 관측됐다
+  - 이유: MSDF를 전역 Orbitron에 켜면 HUD·NEXT/THEN 등 다른 글자까지 바뀔 위험이 있으므로 라벨 한 곳만 격리해 수정했다
+- Done-when 대조:
+  - [x] 화면 흰 획 높이 ÷ 그리는 크기: 굳은 숫자 `18/28=0.643`, 시한 숫자 `19/28=0.679`로 모두 1.2 이하 — 실제 창 픽셀 측정 + 설정 자동 테스트
+  - [x] 화면 외곽선 `2.57~2.71px`, 색 불변 — 실제 흰 획/래스터 비율 계산 + 확대 조각 직접 관측
+  - [x] 540×960 L5 흰 획 `18~19px`, 숫자 외곽선 위와 눈 아래 사이 `3px`, 두 자리 숫자 윤곽 안 아래 `6px`·가로 최소 `19px`, 가로 중앙 — 픽셀 측정 + `18` AABB 자동 테스트
+  - [x] 모든 대상 획 중심 밝기 225 이상, `8` 두 구멍·`0` 슬래시 양쪽 내부 175 미만, 외곽선이 인접 몸통보다 40 이상 어두움 — 두 비율 실제 창 픽셀 측정
+  - [x] `199`·`200`·`205`·`207`·`210` 두 비율과 각 최근접 ×5 확대 조각 생성. 전체 캡처 210장×2 + 확대 5장×2 = 430개 — 실제 창
+  - [x] 새 기본·false 주입·G2·Z1·T3·C4E·CLASSIC·H8·K5-8 해시 모두 유지 — 전체 자동 테스트
+  - [x] Orbitron import·HUD·NEXT/THEN·규칙·수치·버전·Release 변경 없음 — diff 및 전체 장면 직접 확인
+- 픽셀 관측 (BT.709, 0~255; 두 비율에서 같은 값/배치):
+
+|대상|흰 획 높이|화면/래스터|획 중심 최저|구멍 중심|외곽선 화면 두께|외곽선 대비|
+|---|---:|---:|---:|---|---:|---:|
+|굳은 `18`|18px|0.643|255|`8` 위 135, 아래 128|2.57px|40 이상|
+|굳은 `10`|18px|0.643|255|`0` 슬래시 양쪽 135, 102|2.57px|40 이상|
+|굳은 `1`|18px|0.643|255|해당 없음|2.57px|40 이상|
+|시한 노랑 `4`|19px|0.679|226|해당 없음|2.71px|100 이상|
+|시한 노랑 `1`|19px|0.679|225|해당 없음|2.71px|100 이상|
+
+- 확대 조각 경로 (각 경로가 540×960·540×1170 아래에 동일하게 존재):
+  - `artifacts/screens/<비율>/zoom/199_jelly_timed_4_5x.png`
+  - `artifacts/screens/<비율>/zoom/200_jelly_timed_1_5x.png`
+  - `artifacts/screens/<비율>/zoom/205_jelly_timed_stone_18_5x.png`
+  - `artifacts/screens/<비율>/zoom/207_jelly_timed_stone_1_5x.png`
+  - `artifacts/screens/<비율>/zoom/210_jelly_timed_stone_10_5x.png`
+- 해시 관측: 새 기본 K5-4+S18 `463995c4…`, false K5-4 `bc86d257…`, G2 `3e688a78…`, Z1 `4be04897…`, T3 `7a20210c…`, C4E `4a0c467d…`, CLASSIC `52ae7da7…`, H8 `790bb962…`, K5-8 `3b814220…` — 모두 기존값 유지
+- QA 관측값:
+  - `test_timed_jelly.gd` → `14/14` 통과, 종료 코드 0
+  - `tests/run_tests.ps1` → general `362/362`, long `4/4`, performance `5/5`, 각 새 프로세스, 전체 종료 코드 0 (`92.230s`)
+  - `godot --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR|Parse Error|ERROR:` 0건
+  - 기본/`--mode=blitz` `--quit-after 300` → 각각 종료 코드 0, 같은 오류 패턴 0건
+  - `tests/capture_screens.ps1` → 종료 코드 0, 두 비율, 전체/확대 합계 430개, 확대 방식 `nearest` ×5
+  - `tools/build_windows.ps1 -Debug` → 종료 코드 0, `build/windows-debug/GravityOrb_v0.16.10.exe`, `105,017,824` bytes, SHA-256 `3FD33D16380FDF3FA72E0A7AD066B47BDC78627C3133130990D036987069D375`; Release 미생성
+  - 규칙 검색 → `Input`은 `InputRouter.gd`·`Haptics.gd`만, RNG는 `Spawner.gd`와 기존 `ColorEffectVisual.gd` 전용 RNG만. 신규 위반 0건. `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. JELLY 판에서 시한 L5 숫자 `4`와 `1` 확인 → 글자 높이와 자리는 기존과 같고, 흰 획·2~3px 외곽선이 분리되어 읽힘
+  2. 시한 젤리를 굳혀 `18`, 이후 `10`, `1` 확인 → `18`의 두 구멍과 `10`의 0 내부가 몸통색으로 분리되고 `13`처럼 보이지 않음
+  3. `artifacts/screens/540x960/zoom/`과 `540x1170/zoom/`의 다섯 파일 확인 → 최근접 ×5라 원본 픽셀 경계·밝기를 그대로 셀 수 있음
+  4. `01`·`71`·`199~210` 전체 장면을 #147과 비교 → HUD·NEXT/THEN·몸통·얼굴·숫자 위치는 유지되고 판 위 `%TimedLabel` 획만 선명해짐
+- 결정 사항: 명세가 허용한 방법 중 전역 폰트 import 변경 대신 `%TimedLabel`의 래스터 크기/픽셀 크기 역비례 조정을 선택했다. 게임 규칙·밸런스 수치는 변경하지 않음
+- 남은 것 · 질문: Claude 검수와 병합만 남음
+
 ### [2026-11-14] 대상 #147 — 시한 젤리가 0이 되면 회색 굳은 젤리
 - 맨 앞 경고 조건 0건: S6·S12·S18 모두 선택 조건을 만족해 가장 긴 `S18`을 골랐다. 신규 300게임에서 굳은 젤리 반응 `0`건·판 밖 이탈 `0`건, 시한 젤리를 끈 해시와 `jelly_timed_stone_enabled=false` 주입 K5-4 해시 불변을 관측했다. 선택값 자동 D-save 성공 `49.7%`, R D-save 성공 `49.0%`, 자동 D-save 평균 `197.00`턴이다
 - 상태: 완료 — 구현·신규 300게임 판 균형·전체 자동 검증·두 비율 전체 캡처·Debug 빌드까지 완료. Release와 버전 변경은 하지 않음
