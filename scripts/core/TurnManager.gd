@@ -11,6 +11,7 @@ signal planet_unlocked(color_index: int)
 signal jelly_tap_effect_unlocked(color_index: int)
 signal timed_jelly_placed(turns: int, bonus_levels: int)
 signal timed_stone_created(turns: int)
+signal timed_stone_hardened
 signal combo_changed(combo: int, multiplier: float, max_combo: int)
 signal reaction_ready(reaction: Dictionary)
 signal warning_changed(walls: Array[Vector2i])
@@ -483,25 +484,28 @@ func _advance_timed_jellies() -> bool:
 			continue
 		if int(orb.decrement_timed_turn()) <= 0:
 			expired.append(orb)
+	var stone_hardened: bool = false
 	for orb: Variant in expired:
 		match Config.data.jelly_timed_fail_mode:
 			1:
-				_spawn_timed_scatter(orb)
+				stone_hardened = _spawn_timed_scatter(orb) or stone_hardened
 			2:
-				_harden_timed_jelly(orb, true)
+				stone_hardened = _harden_timed_jelly(orb, true) or stone_hardened
 			_:
 				if Config.data.jelly_timed_stone_enabled:
-					_harden_timed_jelly(orb)
+					stone_hardened = _harden_timed_jelly(orb) or stone_hardened
 				else:
 					_spawn_timed_burst(orb)
 		transition_started = true
+	if stone_hardened:
+		timed_stone_hardened.emit()
 	_update_timed_stone_maximum()
 	return transition_started
 
 
-func _harden_timed_jelly(source: Variant, permanent: bool = false) -> void:
+func _harden_timed_jelly(source: Variant, permanent: bool = false) -> bool:
 	if not is_instance_valid(source) or bool(source.get("consumed")):
-		return
+		return false
 	var stone_turns: int = 0 if permanent else maxi(Config.data.jelly_timed_stone_turns, 0)
 	source.set_timed_stone(stone_turns, permanent)
 	source.note_diagnostic_event("timed_stone")
@@ -510,11 +514,12 @@ func _harden_timed_jelly(source: Variant, permanent: bool = false) -> void:
 	if not _timed_stone_callout_seen:
 		_timed_stone_callout_seen = true
 		timed_stone_created.emit(stone_turns)
+	return true
 
 
-func _spawn_timed_scatter(source: Variant) -> void:
+func _spawn_timed_scatter(source: Variant) -> bool:
 	if not is_instance_valid(source) or bool(source.get("consumed")):
-		return
+		return false
 	var color_index: int = int(source.color)
 	_collision_resolver.remove_jelly_with_clean_visual(source)
 	var count: int = maxi(Config.data.jelly_timed_scatter_count, 0)
@@ -535,6 +540,7 @@ func _spawn_timed_scatter(source: Variant) -> void:
 	if not _timed_stone_callout_seen:
 		_timed_stone_callout_seen = true
 		timed_stone_created.emit(0)
+	return true
 
 
 func _timed_scatter_positions(count: int) -> Array[Vector2]:

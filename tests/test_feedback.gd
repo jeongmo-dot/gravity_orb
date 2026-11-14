@@ -393,6 +393,94 @@ func test_synthesized_sfx_pitch_volume_jitter_and_voice_pool() -> void:
 	Config.data.sfx_volume_db = original_volume
 
 
+func test_stone_sfx_waveform_and_playback_routing() -> void:
+	var original_enabled: bool = Config.data.sfx_enabled
+	var original_volume: float = Config.data.sfx_volume_db
+	Config.data.sfx_enabled = true
+	Config.data.sfx_volume_db = 0.0
+	var fixture: Dictionary = await _create_director_fixture()
+	var director: FeedbackDirector = fixture["director"] as FeedbackDirector
+	var bank: SfxBank = director.sfx_bank()
+	var first_synth: AudioStreamWAV = bank._synthesize_stone()
+	var second_synth: AudioStreamWAV = bank._synthesize_stone()
+	assert_near(first_synth.get_length(), 0.340, 0.005, "stone synth duration")
+	var metrics: Dictionary = _waveform_metrics(first_synth)
+	assert_near(float(metrics["peak_amplitude"]), 0.80, 0.01, "stone synth peak")
+	assert_eq(first_synth.data, second_synth.data, "stone synth bytes are deterministic")
+	assert_eq(
+		(bank.stone_stream() as AudioStreamWAV).data,
+		first_synth.data,
+		"runtime uses the synthesized stone stream when no asset exists"
+	)
+	print("STONE_SFX_WAVEFORM %s" % JSON.stringify(metrics))
+
+	var manager: TurnManager = TurnManager.new()
+	director.bind(manager, null)
+	_observed_play_calls.clear()
+	bank.play_called.connect(_record_play_called)
+	manager.timed_stone_hardened.emit()
+	assert_eq(_play_kinds(), ["stone"], "hardening signal plays stone once")
+	assert_near(bank.last_voice().pitch_scale, 1.0, TOLERANCE, "stone pitch")
+	assert_near(bank.last_voice().volume_db, 2.0, TOLERANCE, "stone volume")
+
+	_observed_play_calls.clear()
+	director._play_reaction_sfx({
+		"type": ReactionRules.Type.BLAST,
+		"timed_stone_break_count": 3,
+	})
+	assert_eq(_play_kinds(), ["blast", "stone_break"], "BLAST plays one break sound")
+	assert_near(
+		bank.last_voice().pitch_scale,
+		pow(2.0, 4.0 / 12.0),
+		TOLERANCE,
+		"stone break pitch"
+	)
+	assert_near(bank.last_voice().volume_db, -3.0, TOLERANCE, "stone break volume")
+
+	_observed_play_calls.clear()
+	director._play_reaction_sfx({
+		"type": ReactionRules.Type.TAP_BLAST,
+		"tap_effect": GameConfig.JellyTapEffect.GROW,
+		"timed_stone_break_count": 2,
+	})
+	assert_eq(_play_kinds(), ["stone_break"], "GROW tap still plays stone break")
+
+	_observed_play_calls.clear()
+	director._play_reaction_sfx({
+		"type": ReactionRules.Type.TAP_BLAST,
+		"tap_effect": GameConfig.JellyTapEffect.PUSH,
+		"timed_stone_break_count": 1,
+	})
+	assert_eq(_play_kinds(), ["blast", "stone_break"], "tap blast plays one break sound")
+
+	_observed_play_calls.clear()
+	director._play_reaction_sfx({
+		"type": ReactionRules.Type.MAX_CLEAR,
+		"timed_stone_break_count": 4,
+	})
+	assert_eq(_play_kinds(), ["blast", "stone_break"], "MAX_CLEAR plays one break sound")
+
+	_observed_play_calls.clear()
+	director._play_reaction_sfx({
+		"type": ReactionRules.Type.BLAST,
+		"timed_stone_break_count": 0,
+	})
+	assert_eq(_play_kinds(), ["blast"], "no broken stone adds no break sound")
+
+	Config.data.sfx_enabled = false
+	_observed_play_calls.clear()
+	manager.timed_stone_hardened.emit()
+	director._play_reaction_sfx({
+		"type": ReactionRules.Type.BLAST,
+		"timed_stone_break_count": 1,
+	})
+	assert_eq(_observed_play_calls.size(), 0, "disabled SFX suppresses stone sounds")
+	manager.free()
+	await _cleanup(fixture["root"] as Node)
+	Config.data.sfx_enabled = original_enabled
+	Config.data.sfx_volume_db = original_volume
+
+
 func test_reaction_signal_calls_sfx_play_synchronously_once() -> void:
 	var original_fx: bool = Config.data.fx_enabled
 	var original_sfx: bool = Config.data.sfx_enabled
@@ -514,6 +602,13 @@ func _record_play_called(
 		"reaction_process_frame": reaction_process_frame,
 		"play_process_frame": play_process_frame,
 	})
+
+
+func _play_kinds() -> Array[String]:
+	var kinds: Array[String] = []
+	for call: Dictionary in _observed_play_calls:
+		kinds.append(str(call["kind"]))
+	return kinds
 
 
 func _waveform_metrics(stream: AudioStreamWAV) -> Dictionary:
