@@ -41,7 +41,7 @@
 ### [2026-11-14] 대상 #149 — 상한 뒤에 닿은 합체도 그 턴 안에
 - 맨 앞: E0/E1.5 다섯 봇 200판 비교는 **미완료**다. 사용자가 “풀테스트를 요청하기 전까지 대규모 시뮬레이션을 반복하지 말고 최소 테스트만”이라고 지시해 실행 중 계측을 중단했다. 따라서 입력 대기 접촉 쌍 0.5%, 평균 턴 시간 +0.2초, 연장 상한 1%, 이탈 조건의 판정값은 아직 없다
 - 상태: 부분완료 — 구현·핵심 단위 테스트·기존 전체 회귀·두 비율 캡처·Debug 빌드는 완료. 200판 균형 계측만 사용자 요청 전까지 보류
-- 브랜치 / PR: `merge-extension` / PR 생성 예정
+- 브랜치 / PR: `merge-extension` / https://github.com/jeongmo-dot/gravity_orb/pull/149
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/{CollisionResolver.gd,TurnManager.gd}`, `tests/{run_jelly_physics_autoplay.ps1,test_config.gd,test_jolt_3d.gd,test_turn_input_indicator.gd}`, `tests/spike/run_jolt_3d_measurement.gd`, `tests/tools/{run_jelly_measurement.ps1,run_merge_extension_balance.ps1}`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] JELLY가 1.5초 상한에 닿은 뒤에도 새 합체를 받고, 진행 중 합체와 닿은 합체 가능 쌍이 모두 0이면 즉시 종료 — `test_turn_manager_merge_extension_accepts_post_cap_pair_in_same_combo`
