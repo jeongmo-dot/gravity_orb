@@ -2,7 +2,8 @@ param(
     [string]$GodotPath = "",
     [ValidateRange(1, [int]::MaxValue)]
     [int]$FixedFps = 120,
-    [switch]$HudScenesOnly
+    [switch]$HudScenesOnly,
+    [switch]$TimedOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -232,6 +233,20 @@ $expectedZoomFiles = @(
     "210_jelly_timed_stone_10_5x.png"
 )
 
+if ($TimedOnly) {
+    $captureSpecs = @(
+        [ordered]@{ Name = "540x960"; Resolution = "540x960" }
+    )
+    $expectedFiles = @(
+        "199_jelly_timed_board_initial.png",
+        "205_jelly_timed_stone_after_harden.png",
+        "209_jelly_timed_stone_first_callout.png",
+        "211_jelly_timed_stone_broken_l4.png",
+        "212_jelly_timed_scatter_five.png"
+    )
+    $expectedZoomFiles = @()
+}
+
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {
     if (-not [string]::IsNullOrWhiteSpace($env:GODOT)) {
         $GodotPath = $env:GODOT
@@ -257,6 +272,9 @@ foreach ($captureSpec in $captureSpecs) {
         "--capture-output-directory=res://artifacts/screens/$($captureSpec.Name)",
         "--capture-save-path=res://artifacts/screens/$($captureSpec.Name)/capture_save.tmp.cfg"
     )
+    if ($TimedOnly) {
+        $arguments += "--capture-timed-only"
+    }
     & $GodotPath @arguments
     if ($LASTEXITCODE -ne 0) {
         throw "Screenshot capture $($captureSpec.Name) failed with exit code $LASTEXITCODE"
@@ -277,26 +295,28 @@ foreach ($captureSpec in $captureSpecs) {
         Write-Output ("SCREEN_CAPTURE_ZOOM_RESULT ratio={0} file={1}" -f $captureSpec.Name, $filePath)
         $capturedFileCount += 1
     }
-    $landingFiles = @(1..10 | ForEach-Object {
-        Join-Path $outputPath ("{0:D2}_jelly_motion_land_{1:D2}.png" -f (43 + $_), $_)
-    })
-    $uniqueLandingHashes = @(
-        $landingFiles |
-            ForEach-Object { (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash } |
-            Sort-Object -Unique
-    )
-    if ($uniqueLandingHashes.Count -ne $landingFiles.Count) {
-        throw (
-            "JELLY landing strip must contain 10 distinct frames for {0}; found {1}" -f `
+    if (-not $TimedOnly) {
+        $landingFiles = @(1..10 | ForEach-Object {
+            Join-Path $outputPath ("{0:D2}_jelly_motion_land_{1:D2}.png" -f (43 + $_), $_)
+        })
+        $uniqueLandingHashes = @(
+            $landingFiles |
+                ForEach-Object { (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash } |
+                Sort-Object -Unique
+        )
+        if ($uniqueLandingHashes.Count -ne $landingFiles.Count) {
+            throw (
+                "JELLY landing strip must contain 10 distinct frames for {0}; found {1}" -f `
+                    $captureSpec.Name,
+                    $uniqueLandingHashes.Count
+            )
+        }
+        Write-Output (
+            "SCREEN_CAPTURE_MOTION_CHECK ratio={0} landing_unique={1}/10" -f `
                 $captureSpec.Name,
                 $uniqueLandingHashes.Count
         )
     }
-    Write-Output (
-        "SCREEN_CAPTURE_MOTION_CHECK ratio={0} landing_unique={1}/10" -f `
-            $captureSpec.Name,
-            $uniqueLandingHashes.Count
-    )
     $temporarySave = Join-Path $outputPath "capture_save.tmp.cfg"
     if (Test-Path -LiteralPath $temporarySave) {
         Remove-Item -LiteralPath $temporarySave -Force

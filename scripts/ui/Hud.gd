@@ -1671,10 +1671,17 @@ func _show_next_timed_stone_callout(turns: int = -1) -> void:
 	):
 		return
 	_timed_stone_callout_pending = false
-	var configured_turns: int = (
-		Config.data.jelly_timed_stone_turns if turns < 0 else turns
-	)
-	var text: String = "굳은 젤리: %d턴 동안 합칠 수 없음" % configured_turns
+	var text: String = ""
+	match Config.data.jelly_timed_fail_mode:
+		1:
+			text = "회색 공: 폭발로만 깰 수 있음"
+		2:
+			text = "굳은 젤리: 폭발로만 깰 수 있음"
+		_:
+			var configured_turns: int = (
+				Config.data.jelly_timed_stone_turns if turns < 0 else turns
+			)
+			text = "굳은 젤리: %d턴 동안 합칠 수 없음" % configured_turns
 	_timed_stone_callout_history.append(text)
 	_show_callout(text, 0)
 

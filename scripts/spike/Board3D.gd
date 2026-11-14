@@ -379,23 +379,24 @@ func apply_shockwave(
 			impulse = velocity_change * orb.get_physics_body().mass
 			orb.apply_plane_velocity_change(velocity_change)
 		else:
-			if is_zero_approx(distance) or shock_radius <= 0.0 or distance >= shock_radius:
+			if shock_radius <= 0.0 or distance >= shock_radius:
 				continue
-			var impulse_strength: float = (
-				Config.data.shock_impulse
-				* impulse_scale
-				* level_multiplier
-				* (1.0 - distance / shock_radius)
-				* jackpot_multiplier
-			)
-			var direction: Vector2 = offset / distance
-			if effect_mode == GameConfig.ShockMode.PULL:
-				direction = -direction
-			elif effect_mode == GameConfig.ShockMode.LIFT:
-				direction = -Vector2(_gravity_direction).normalized()
-			impulse = direction * impulse_strength
-			if not impulse.is_zero_approx():
-				orb.apply_plane_impulse(impulse)
+			if not is_zero_approx(distance):
+				var impulse_strength: float = (
+					Config.data.shock_impulse
+					* impulse_scale
+					* level_multiplier
+					* (1.0 - distance / shock_radius)
+					* jackpot_multiplier
+				)
+				var direction: Vector2 = offset / distance
+				if effect_mode == GameConfig.ShockMode.PULL:
+					direction = -direction
+				elif effect_mode == GameConfig.ShockMode.LIFT:
+					direction = -Vector2(_gravity_direction).normalized()
+				impulse = direction * impulse_strength
+				if not impulse.is_zero_approx():
+					orb.apply_plane_impulse(impulse)
 		targets.append({
 			"orb": orb,
 			"stable_spawn_id": orb.stable_spawn_id,
@@ -466,6 +467,7 @@ func apply_blast_with_radius_factor(
 			"level": orb.level,
 			"position": orb.position,
 			"velocity_change": velocity_change,
+			"in_range": in_range,
 		})
 	return targets
 

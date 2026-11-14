@@ -45,6 +45,7 @@ var timed_turns_remaining: int = 0
 var timed_placed_turn: int = 0
 var is_timed_stone: bool = false
 var timed_stone_turns_remaining: int = 0
+var timed_stone_permanent: bool = false
 var consumed: bool = false
 var is_ghost: bool = false
 var ghost_elapsed: float = 0.0
@@ -299,6 +300,7 @@ func set_timed(turns: int, placed_turn: int = 0) -> void:
 	var was_stone: bool = is_timed_stone
 	is_timed_stone = false
 	timed_stone_turns_remaining = 0
+	timed_stone_permanent = false
 	if was_stone:
 		_mesh.material_override = JellyOrbArt.body_material_for(color, level)
 		_apply_visual_transparency()
@@ -323,10 +325,11 @@ func decrement_timed_turn() -> int:
 	return timed_turns_remaining
 
 
-func set_timed_stone(turns: int) -> void:
+func set_timed_stone(turns: int, permanent: bool = false) -> void:
 	clear_timed()
-	is_timed_stone = turns > 0
+	is_timed_stone = permanent or turns > 0
 	timed_stone_turns_remaining = maxi(turns, 0)
+	timed_stone_permanent = permanent
 	_mesh.material_override = (
 		JellyOrbArt.stone_body_material(level)
 		if is_timed_stone
@@ -339,6 +342,8 @@ func set_timed_stone(turns: int) -> void:
 func decrement_timed_stone_turn() -> int:
 	if not is_timed_stone:
 		return 0
+	if timed_stone_permanent:
+		return 1
 	timed_stone_turns_remaining = maxi(timed_stone_turns_remaining - 1, 0)
 	_update_timed_label()
 	return timed_stone_turns_remaining
@@ -352,6 +357,16 @@ func _update_timed_label() -> void:
 	)
 	_timed_label.visible = (is_timed or is_timed_stone) and display_turns > 0
 	_timed_label.text = str(display_turns) if _timed_label.visible else ""
+
+
+func break_timed_stone() -> bool:
+	if not is_timed_stone:
+		return false
+	if level <= 2:
+		return true
+	set_jelly_mass(Config.data.jelly_mass_for_level(level - 1), Config.data)
+	set_timed_stone(0, true)
+	return false
 
 
 func _physics_process(delta: float) -> void:

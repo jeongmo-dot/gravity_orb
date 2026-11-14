@@ -6,6 +6,7 @@ const EXPECTED_H8_HASH: String = "790bb962860e741976447a88c3a0635b556ec4b47613ee
 const EXPECTED_K5_8_HASH: String = "3b814220f95318056b5665a591fdd9c4289a9bb5646cc818cab44efac208cb42"
 const EXPECTED_K5_4_HASH: String = "bc86d2571e89ed78fcb10d0fb69d03c33048f362ea8395d164605e3d7e21dab7"
 const EXPECTED_K5_4_STONE_HASH: String = "463995c4a2188c1639fcc7efaa9e0ce0c294a0b3633ae1c859d7b98eec0ff390"
+const EXPECTED_RANDOM_PERMANENT_HASH: String = "83e4f6c8de772cd3a0ff5c6d0853a0ca74996572b45019541c08be9eb1affb91"
 
 
 func test_h8_marker_countdown_success_and_failure_hash() -> void:
@@ -13,6 +14,8 @@ func test_h8_marker_countdown_success_and_failure_hash() -> void:
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.jelly_timed_enabled = true
 	Config.data.jelly_timed_turns = 8
+	Config.data.jelly_timed_turns_min = 0
+	Config.data.jelly_timed_fail_mode = 0
 	Config.data.jelly_timed_level = 3
 	Config.data.jelly_timed_burst_count = 6
 	Config.data.jelly_timed_stone_enabled = true
@@ -68,6 +71,8 @@ func test_k5_8_marker_countdown_success_and_failure_hash() -> void:
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.jelly_timed_enabled = true
 	Config.data.jelly_timed_turns = 8
+	Config.data.jelly_timed_turns_min = 0
+	Config.data.jelly_timed_fail_mode = 0
 	Config.data.jelly_timed_level = 5
 	Config.data.jelly_timed_burst_count = 10
 	Config.data.jelly_timed_stone_enabled = true
@@ -123,6 +128,8 @@ func test_k5_4_default_marker_countdown_success_and_failure_hash() -> void:
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.jelly_timed_enabled = true
 	Config.data.jelly_timed_turns = 4
+	Config.data.jelly_timed_turns_min = 0
+	Config.data.jelly_timed_fail_mode = 0
 	Config.data.jelly_timed_level = 5
 	Config.data.jelly_timed_burst_count = 10
 	Config.data.jelly_timed_stone_enabled = false
@@ -180,6 +187,8 @@ func test_k5_4_default_stone_hash() -> void:
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.jelly_timed_enabled = true
 	Config.data.jelly_timed_turns = 4
+	Config.data.jelly_timed_turns_min = 0
+	Config.data.jelly_timed_fail_mode = 0
 	Config.data.jelly_timed_level = 5
 	Config.data.jelly_timed_stone_enabled = true
 	var state: Dictionary = {
@@ -196,15 +205,60 @@ func test_k5_4_default_stone_hash() -> void:
 	_restore_config(snapshot)
 
 
+func test_random_timed_permanent_stone_default_hash() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var spawner: Spawner = Spawner.new()
+	spawner.init_rng(150510)
+	var scheduled: Array[Dictionary] = []
+	for turn_index: int in range(1, 57):
+		var batch: Array[Dictionary] = spawner._draw_batch(turn_index)
+		if bool((batch[0] as Dictionary).get("timed", false)):
+			scheduled.append({
+				"turn": turn_index,
+				"turns": int((batch[0] as Dictionary)["timed_turns"]),
+				"rng_row": _enabled_candidate_rng_row(batch[0] as Dictionary),
+			})
+	var state: Dictionary = {
+		"scheduled": scheduled,
+		"turns_min": Config.data.jelly_timed_turns_min,
+		"turns_max": Config.data.jelly_timed_turns_max,
+		"fail_mode": Config.data.jelly_timed_fail_mode,
+		"stone_level": Config.data.jelly_timed_level,
+		"stone_permanent": true,
+		"stone_label": false,
+		"breaks_to_remove": Config.data.jelly_timed_level - 1,
+		"score": 0,
+	}
+	var hash_value: String = JSON.stringify(state).sha256_text()
+	print("JELLY_RANDOM_PERMANENT_HASH hash=%s" % hash_value)
+	assert_eq(hash_value, EXPECTED_RANDOM_PERMANENT_HASH, "random permanent timed rule hash")
+	spawner.free()
+	_restore_config(snapshot)
+
+
 func test_timed_batches_preserve_rng_and_mark_only_scheduled_first_orb() -> void:
 	var snapshot: Dictionary = _snapshot_config()
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.jelly_timed_enabled = true
 	var enabled: Spawner = Spawner.new()
 	enabled.init_rng(14320)
+	var repeated: Spawner = Spawner.new()
+	repeated.init_rng(14320)
 	var enabled_rows: Array[Array] = []
 	for turn_index: int in range(1, 46):
 		enabled_rows.append(enabled._draw_batch(turn_index))
+		var repeated_batch: Array[Dictionary] = repeated._draw_batch(turn_index)
+		if bool((repeated_batch[0] as Dictionary).get("timed", false)):
+			assert_eq(
+				int((repeated_batch[0] as Dictionary)["timed_turns"]),
+				int((enabled_rows[-1][0] as Dictionary)["timed_turns"]),
+				"same seed reproduces the timed number"
+			)
+			assert_true(
+				int((repeated_batch[0] as Dictionary)["timed_turns"]) in range(5, 11),
+				"timed number is between five and ten"
+			)
 	Config.data.jelly_timed_enabled = false
 	var disabled: Spawner = Spawner.new()
 	disabled.init_rng(14320)
@@ -230,6 +284,7 @@ func test_timed_batches_preserve_rng_and_mark_only_scheduled_first_orb() -> void
 				"only first candidate is timed at turn %d" % turn_index
 			)
 	enabled.free()
+	repeated.free()
 	disabled.free()
 	_restore_config(snapshot)
 
@@ -245,7 +300,10 @@ func test_timed_preview_uses_configured_level_and_count_without_changing_budget(
 	var preview_batch: Array = spawner.peek_preview()[0] as Array
 	assert_true(bool((internal_batch[0] as Dictionary)["timed"]), "internal marker")
 	assert_eq(int((preview_batch[0] as Dictionary)["level"]), Config.data.jelly_timed_level, "preview level")
-	assert_eq(int((preview_batch[0] as Dictionary)["timed_turns"]), Config.data.jelly_timed_turns, "preview count")
+	assert_true(
+		int((preview_batch[0] as Dictionary)["timed_turns"]) in range(5, 11),
+		"preview uses the selected random count"
+	)
 	assert_eq(
 		spawner._batch_cost(internal_batch),
 		Config.data.spawn_count_for_turn(20),
@@ -283,6 +341,7 @@ func test_countdown_hardens_in_place_and_waits_an_extra_settle() -> void:
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.jelly_timed_enabled = true
 	Config.data.jelly_timed_turns = 1
+	Config.data.jelly_timed_fail_mode = 0
 	Config.data.jelly_timed_stone_enabled = true
 	Config.data.jelly_timed_stone_turns = 6
 	var fixture: Dictionary = await _create_fixture()
@@ -342,6 +401,7 @@ func test_countdown_hardens_in_place_and_waits_an_extra_settle() -> void:
 func test_first_placement_callout_is_queued_once() -> void:
 	var snapshot: Dictionary = _snapshot_config()
 	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_timed_fail_mode = 0
 	var main: Main = MAIN_SCENE.instantiate() as Main
 	main.launch_immediately(GameConfig.GameMode.JELLY)
 	tree.root.add_child(main)
@@ -364,6 +424,28 @@ func test_first_placement_callout_is_queued_once() -> void:
 		hud.timed_stone_callout_history()[0],
 		"굳은 젤리: 6턴 동안 합칠 수 없음",
 		"configured stone callout text"
+	)
+	hud._hide_callout_label()
+	hud._timed_stone_callout_seen = false
+	hud._timed_stone_callout_pending = false
+	hud._timed_stone_callout_history.clear()
+	Config.data.jelly_timed_fail_mode = 2
+	hud._on_timed_stone_created(0)
+	assert_eq(
+		hud.timed_stone_callout_history()[0],
+		"굳은 젤리: 폭발로만 깰 수 있음",
+		"mode two callout explains the permanent stone"
+	)
+	hud._hide_callout_label()
+	hud._timed_stone_callout_seen = false
+	hud._timed_stone_callout_pending = false
+	hud._timed_stone_callout_history.clear()
+	Config.data.jelly_timed_fail_mode = 1
+	hud._on_timed_stone_created(0)
+	assert_eq(
+		hud.timed_stone_callout_history()[0],
+		"회색 공: 폭발로만 깰 수 있음",
+		"mode one callout explains the scattered stones"
 	)
 	await _cleanup(main)
 	_restore_config(snapshot)
@@ -481,6 +563,7 @@ func test_timed_stone_expires_without_score_and_waits_for_settle() -> void:
 	var snapshot: Dictionary = _snapshot_config()
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.jelly_timed_enabled = true
+	Config.data.jelly_timed_fail_mode = 0
 	var fixture: Dictionary = await _create_fixture()
 	var board: Board3D = fixture["board"] as Board3D
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
@@ -523,6 +606,136 @@ func test_timed_stone_body_is_gray_with_face_and_label_preserved() -> void:
 	)
 	assert_eq(orb._face.material_override, face_material, "stone preserves face material")
 	assert_eq((orb.get_node("TimedLabel") as Label3D).text, "12", "stone label shows turns")
+	await _cleanup(fixture["root"] as Node)
+	_restore_config(snapshot)
+
+
+func test_fail_mode_two_creates_permanent_unlabelled_stone() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_timed_fail_mode = 2
+	var fixture: Dictionary = await _create_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	var source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 5, Vector2.ZERO)
+	source.set_timed(1, 20)
+	source.disable_physics()
+	assert_true(manager._advance_timed_jellies(), "timeout starts a transition")
+	assert_true(source.is_timed_stone, "mode two hardens in place")
+	assert_true(source.timed_stone_permanent, "mode two stone is permanent")
+	assert_eq(source.level, 5, "mode two preserves L5")
+	assert_eq(source.timed_stone_turns_remaining, 0, "permanent stone has no timer")
+	assert_true(not (source.get_node("TimedLabel") as Label3D).visible, "permanent stone has no number")
+	for _turn: int in range(30):
+		manager._advance_timed_jellies()
+	assert_true(board.get_orbs().has(source), "permanent stone remains after thirty turns")
+	assert_eq(source.level, 5, "time does not break a permanent stone")
+	await _cleanup(fixture["root"] as Node)
+	_restore_config(snapshot)
+
+
+func test_permanent_stones_break_once_per_explosion_and_only_in_range() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var fixture: Dictionary = await _create_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var inside: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, 5, Vector2.ZERO)
+	inside.set_timed_stone(0, true)
+	inside.disable_physics()
+	var outside: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.BLUE,
+		5,
+		Vector2(400.0, 400.0)
+	)
+	outside.set_timed_stone(0, true)
+	outside.disable_physics()
+	var tap_rows: Array[Dictionary] = board.apply_blast_with_radius_factor(
+		Vector2.ZERO,
+		0.3
+	)
+	assert_eq(
+		resolver._break_timed_stones_from_explosion(tap_rows, tap_rows),
+		1,
+		"duplicate target rows still break once"
+	)
+	assert_eq(inside.level, 4, "tap blast lowers an in-range L5 to L4")
+	assert_eq(outside.level, 5, "tap blast leaves an out-of-range stone unchanged")
+	var blast_rows: Array[Dictionary] = board.apply_blast(Vector2.ZERO, 8)
+	assert_eq(
+		resolver._break_timed_stones_from_explosion([], blast_rows),
+		2,
+		"full-board blast reaches both stones"
+	)
+	assert_eq(inside.level, 3, "large blast lowers the inside stone once")
+	assert_eq(outside.level, 4, "large blast lowers the distant stone once")
+	var jackpot_rows: Array[Dictionary] = board.apply_shockwave(
+		Vector2.ZERO,
+		Config.data.orb_max_level,
+		null,
+		true,
+		OrbTypes.OrbColor.RED
+	)
+	assert_eq(
+		resolver._break_timed_stones_from_explosion(jackpot_rows, []),
+		1,
+		"jackpot breaks only its shockwave targets"
+	)
+	assert_eq(inside.level, 2, "jackpot lowers the nearby stone")
+	assert_eq(outside.level, 4, "jackpot leaves a stone outside its range unchanged")
+	var removal_rows: Array[Dictionary] = board.apply_blast_with_radius_factor(
+		Vector2.ZERO,
+		0.3
+	)
+	assert_eq(
+		resolver._break_timed_stones_from_explosion([], removal_rows),
+		1,
+		"breaking L2 removes the L1 result"
+	)
+	assert_true(not board.get_orbs().has(inside), "broken-to-L1 stone leaves the board")
+	assert_eq(resolver._active_tap_clean_visuals.size(), 1, "existing clean visual is reused")
+	await _cleanup(fixture["root"] as Node)
+	_restore_config(snapshot)
+
+
+func test_fail_mode_one_scatters_five_deterministic_ghost_stones() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_timed_fail_mode = 1
+	Config.data.jelly_timed_scatter_count = 5
+	var fixture: Dictionary = await _create_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	var obstacle: Orb3D = board.spawn_orb(OrbTypes.OrbColor.BLUE, 4, Vector2.ZERO)
+	obstacle.disable_physics()
+	var source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 5, Vector2(80.0, 40.0))
+	source.set_timed(1, 20)
+	source.disable_physics()
+	manager._spawn_timed_scatter(source)
+	var stones: Array[Orb3D] = []
+	var occupied_positions: Dictionary = {}
+	for orb: Orb3D in board.get_orbs():
+		if not orb.is_timed_stone:
+			continue
+		stones.append(orb)
+		occupied_positions[str(orb.position)] = true
+		assert_eq(orb.level, 1, "scatter member is L1")
+		assert_true(orb.timed_stone_permanent, "scatter member is permanent")
+		assert_true(orb.is_ghost, "scatter member starts ghosted")
+		assert_true(not (orb.get_node("TimedLabel") as Label3D).visible, "scatter member has no number")
+	assert_eq(stones.size(), 5, "mode one creates five gray stones")
+	assert_eq(occupied_positions.size(), 5, "scatter positions are distinct")
+	assert_eq(manager.timed_jelly_failure_count, 1, "scatter records one failed timed jelly")
+	assert_eq(manager.timed_stone_created_count, 5, "scatter records all five stones")
+	var first: Orb3D = stones[0]
+	first.exit_ghost_state()
+	var rows: Array[Dictionary] = board.apply_blast_with_radius_factor(first.position, 0.05)
+	assert_true(
+		resolver._break_timed_stones_from_explosion([], rows) >= 1,
+		"an in-range explosion breaks a scattered L1"
+	)
+	assert_true(not board.get_orbs().has(first), "scattered L1 disappears in one explosion")
 	await _cleanup(fixture["root"] as Node)
 	_restore_config(snapshot)
 
@@ -688,9 +901,13 @@ func _snapshot_config() -> Dictionary:
 		"jelly_timed_interval_turns": Config.data.jelly_timed_interval_turns,
 		"jelly_timed_level": Config.data.jelly_timed_level,
 		"jelly_timed_turns": Config.data.jelly_timed_turns,
+		"jelly_timed_turns_min": Config.data.jelly_timed_turns_min,
+		"jelly_timed_turns_max": Config.data.jelly_timed_turns_max,
 		"jelly_timed_burst_count": Config.data.jelly_timed_burst_count,
 		"jelly_timed_stone_enabled": Config.data.jelly_timed_stone_enabled,
 		"jelly_timed_stone_turns": Config.data.jelly_timed_stone_turns,
+		"jelly_timed_fail_mode": Config.data.jelly_timed_fail_mode,
+		"jelly_timed_scatter_count": Config.data.jelly_timed_scatter_count,
 		"jelly_timed_bonus_levels": Config.data.jelly_timed_bonus_levels,
 	}
 
@@ -703,9 +920,13 @@ func _restore_config(snapshot: Dictionary) -> void:
 	Config.data.jelly_timed_interval_turns = int(snapshot["jelly_timed_interval_turns"])
 	Config.data.jelly_timed_level = int(snapshot["jelly_timed_level"])
 	Config.data.jelly_timed_turns = int(snapshot["jelly_timed_turns"])
+	Config.data.jelly_timed_turns_min = int(snapshot["jelly_timed_turns_min"])
+	Config.data.jelly_timed_turns_max = int(snapshot["jelly_timed_turns_max"])
 	Config.data.jelly_timed_burst_count = int(snapshot["jelly_timed_burst_count"])
 	Config.data.jelly_timed_stone_enabled = bool(snapshot["jelly_timed_stone_enabled"])
 	Config.data.jelly_timed_stone_turns = int(snapshot["jelly_timed_stone_turns"])
+	Config.data.jelly_timed_fail_mode = int(snapshot["jelly_timed_fail_mode"])
+	Config.data.jelly_timed_scatter_count = int(snapshot["jelly_timed_scatter_count"])
 	Config.data.jelly_timed_bonus_levels = int(snapshot["jelly_timed_bonus_levels"])
 
 
