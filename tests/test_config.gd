@@ -423,4 +423,4 @@ func test_m8_feedback_defaults() -> void:
 	assert_true(config.sfx_enabled, "SFX enabled")
 	assert_near(config.sfx_volume_db, 0.0, TOLERANCE, "SFX volume")
 	assert_eq(config.sfx_chain_semitones_max, 12, "chain pitch cap")
-	assert_near(config.sfx_pitch_jitter, 0.03, TOLERANCE, "pitch jitter")
+	assert_near(config.sfx_pitch_jitter, 0.0, TOLERANCE, "pitch jitter")
