@@ -5544,6 +5544,15 @@ G1 전략 봇 (시드 1~20, 600턴 상한, 턴 평균 / 총점 평균):
 - 회신 맨 앞에 적을 것: 해시 바뀜, 다른 소리의 합성·크기·시점이 바뀜, 굳을 때 한 턴에 소리가 두 번 이상, 효과음 끄기를 따르지 않음
 - 병합: Claude 검수 뒤. "맨 앞" 조건이 있으면 병합 전에 사용자에게 묻는다
 
+**#151 결과 — 병합** ([PR #151](https://github.com/jeongmo-dot/gravity_orb/pull/151) `0faf2b0`, 2026-11-14 사용자 "확인". 브랜치 끝 `3e1446a`, 병합 커밋 트리 = `3e1446a` 트리. 테스트는 Codex, 검수는 Claude — Claude 재실행 없음. 가벼운 모드 (주말) — 전체 회귀·캡처·Debug 빌드 없음. 빌드 없음 — #152)
+- 구현 (diff 대조):
+  - `SfxBank._synthesize_stone()`: 갈라짐 4번 (시작·세기·핑 주파수 상수 `STONE_CRACK_*`, 노이즈 `_high_pass_noise(index + 23011 + crack_index × 7919)`) + 0.072초 쿵 (125 → 62 Hz, 배음 1·0.45·0.22, × 0.75) → 최대 0.80로 맞춤. `res://assets/sfx/stone.*`가 있으면 그것. `play_stone()` (1.0, `sfx_volume_db` + 2)·`play_stone_break()` (`STONE_BREAK_PITCH` 1.259921, `sfx_volume_db` − 3), 둘 다 `sfx_enabled`를 본다
+  - `TurnManager`: 새 신호 `timed_stone_hardened` — `_harden_timed_jelly()`·`_spawn_timed_scatter()`가 bool을 돌려주고 `_advance_timed_jellies()`가 모아 **한 번** emit. `_spawn_timed_burst()`·`_remove_timed_stone()`은 신호 없음. `timed_stone_created` (첫 안내용)는 그대로
+  - `FeedbackDirector`: `bind()`에서 TurnManager일 때 연결 → `play_stone()`. `_play_reaction_sfx()`: GROW가 아니면 지금처럼 폭발 소리, 그 뒤 `timed_stone_break_count` > 0이면 `play_stone_break()` 한 번 (GROW에서도)
+- 검수용 `artifacts/sfx/stone.wav`: 44.1 kHz 16비트 모노 0.340초, 30,034바이트, 최대 진폭 0.800012 (Codex)
+- 테스트 `test_feedback.gd` 13/13·`test_timed_jelly.gd` 19/19 (새: 합성 길이·최대·결정성, 굳기 신호 → `stone` 한 번 1.0·+2 dB, BLAST·TAP_BLAST·MAX_CLEAR → `blast` 뒤 `stone_break` 한 번 1.26·−3 dB, GROW → `stone_break`만, 깨진 돌 0 → 없음, `sfx_enabled` false → 0, 2안 둘이 같은 턴 → 신호 한 번, 1안·방식 0 → 한 번, 18턴 돌 만료·#145 L1 터짐 → 없음). 해시 기본 `83e4f6c8…`·방식 0 `463995c4…`·K5-4 `bc86d257…`·H8·K5-8 그대로 (Codex). 맨 앞 경고 0건
+- 남은 것: 폭발 소리와 겹친 깨짐 소리가 들리는지, 굳을 때 소리가 어울리는지는 #152 빌드에서 손으로 (`manual_qa_pending.md`)
+
 ### 12-ONE.3 다음 (JELLY 개선)
 - CLASSIC 전용 분기 정리 (행성 그림·연출·규칙 — JELLY가 안 쓰는 것)
 - 결정 대기에서 이어지는 것: 효과음 (합성·녹음), 시작 화면 그림 (지금 행성 — JELLY에 맞게?)

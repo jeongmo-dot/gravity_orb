@@ -37,7 +37,7 @@
 ## 대기 중
 
 ### [2026-11-14 #152] Windows 빌드 0.16.11 — 0.16.10 뒤 JELLY 변경 (#143~#151)
-- 상태: 대기 (**#151 병합 뒤** — main 위에서. #151이 「처리 완료」로 옮겨진 뒤 시작)
+- 상태: 대기 (#151 병합됨 `0faf2b0` — main 위에서)
 - 근거: [technical_design.md](technical_design.md) **§10.5·§10.5.1** (빌드 절차·파일 이름·Release 보호)
 - 배경: 사용자 (2026-11-14) "빌드해줘" → 빌드 전에 효과음 추가 (#151). 0.16.10 (2026-11-09, #142) 뒤 병합된 변경을 직접 해 볼 빌드. 들어가는 것: 시한 젤리 (#143~#145), 0이 되면 회색 굳은 젤리 (#147), 숫자 선명도 (#148), 상한 뒤 합체 연장 (#149), 시한 숫자 5~10·영구 회색 돌 기본 (#150), 굳을 때·깨질 때 효과음 (#151). #146은 병합하지 않았다
 - 앵커: `project.godot` `application/config/version`, `tools/build_windows.ps1` (실행만)
@@ -56,8 +56,13 @@
   - [ ] `build/windows/` 목록 — 0.16.9·0.16.10 파일 (zip 포함) 이름·크기 그대로
 - 커밋: 항목 단위 브랜치 (`build-0.16.11`), **push·PR까지** (병합은 Claude 검수 뒤)
 
-### [2026-11-14 #151] 시한 젤리가 굳을 때·돌이 깨질 때 효과음
-- 상태: 대기 (#150 병합됨 `7b80999` — main 위에서)
+---
+
+## 처리 완료
+
+### [2026-11-14 #151] 시한 젤리가 굳을 때·돌이 깨질 때 효과음 — 완료
+- 상태: 완료 (2026-11-14 사용자 "확인" · [PR #151](https://github.com/jeongmo-dot/gravity_orb/pull/151) 병합 `0faf2b0`)
+- 검수: 코드 diff (합성 값이 명세와 같은지, 굳기 신호가 한 번만, 깨짐 소리가 GROW에서도), 테스트 diff, 회신의 `stone.wav` 수치. 테스트 13/13·19/19·해시는 Codex 관측 (Claude 재실행 없음). 가벼운 모드 — 전체 회귀·캡처·Debug 빌드 없음. 빌드 없음 (#152). 맨 앞 경고 0건. 결과: §12-ONE.42 "#151 결과"
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.42**
 - 배경: 사용자 (2026-11-14) 빌드 요청을 멈추고 "시한 젤리가 회색 젤리로 바뀔 때 효과음을 추가하고 싶어. 어떤게 좋을까" → Claude가 후보 A·B·C를 합성해 들려줌 → 사용자 "C 쩌적·쿵" (갈라지는 딱딱 소리 4번 뒤 낮은 쿵), 돌이 폭발에 깨질 때도 "깨질 때도"
 - 앵커: `scripts/fx/SfxBank.gd` (새 합성·재생 함수), `scripts/fx/FeedbackDirector.gd` `bind()`·`_play_reaction_sfx()`, `scripts/core/TurnManager.gd` `_advance_timed_jellies()`·`_harden_timed_jelly()`·`_spawn_timed_scatter()` (새 신호), `tests/test_feedback.gd`
@@ -77,10 +82,6 @@
   - [ ] `artifacts/sfx/stone.wav` — 길이·최대 진폭 보고
 - QA: §12-ONE.42 6번
 - 커밋: 항목 단위 브랜치 (`stone-sfx`), **push·PR까지** (병합은 Claude 검수 뒤)
-
----
-
-## 처리 완료
 
 ### [2026-11-14 #150] 시한 젤리 숫자 5~10·실패하면 회색 돌 (1안·2안) — 완료
 - 상태: 완료 (2026-11-14 사용자 "그대로 병합" · [PR #150](https://github.com/jeongmo-dot/gravity_orb/pull/150) 병합 `7b80999`)
