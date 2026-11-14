@@ -32,7 +32,28 @@
 
 ## 대기 중
 
-(없음)
+### [2026-11-14 #149] 상한 뒤에 닿은 합체도 그 턴 안에
+- 상태: 대기 (#148 병합됨 `ea253f5` — main 위에서)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.40**
+- 배경: 턴이 1.5초 상한 (`max_settle_time`)에 닿으면 `set_accepting_new_jelly_merges(false)`로 새 합체를 막아, 그 뒤 닿은 같은 색 쌍이 입력 대기 내내 붙은 채 있다가 다음 턴에 합쳐진다 (#127에서 남겨 둔 규칙). 사용자 (2026-11-14) "턴 타임 아웃 때문에 공이 안합쳐지는 경우가 있는데, 타임 아웃 추가 시간 줘서 그 턴 안에 합쳐지게 해줘"
+- 앵커: `scripts/core/TurnManager.gd` `_physics_process()`·`_begin_settle()`·`_on_settled()`, `scripts/core/CollisionResolver.gd` `set_accepting_new_jelly_merges()`·`sweep_resting_contacts()`·`flush()`, `scripts/ui/TurnInputIndicator.gd` `_classic_busy_progress()`, `config/GameConfig.gd`·`default_config.tres` 새 필드, `tests/spike/run_jolt_3d_measurement.gd`, `tests/tools/run_jelly_measurement.ps1`
+- 요구 (§12-ONE.40 1~7):
+  1. JELLY에서 상한에 닿아도 새 합체를 받는 **합체 연장** — 진행 중 합체 0이고 닿은 합체 가능 쌍 0이면 바로 턴 끝 (닿은 쌍이 없으면 지금과 같은 1.5초)
+  2. 연장 상한 `jelly_merge_extension_max` 1.5초 (턴 최대 3.0초) — 닿으면 지금처럼 새 합체를 막고 진행 중 합체 완성 뒤 턴 끝
+  3. 연장 중 합체는 그 턴 콤보·점수. 시작·터치 소폭발·시한 젤리 전환 정착에도 같은 규칙. JELLY 밖 모드 그대로
+  4. 진행 표시는 연장 중 1 그대로, 새 그림 없음
+  5. 새 필드 기본 1.5, 0 = 지금 그대로 (0 주입 해시 모두 그대로)
+  6. 측정 E0·E1.5 × 5봇 × 20판 (지금 기본 설정): 입력 대기 때 닿은 쌍 턴·미뤄진 합체·연장 쓴 턴·연장 시간·연장 상한 턴·평균 턴 시간·판 길이·점수 등
+  7. 테스트 (§12-ONE.40 5번)·전체 캡처 두 비율 (바뀐 장면 없음)
+- 수치 (Claude): 연장 상한 1.5초. 그 밖의 값은 그대로
+- 건드리지 말 것: `max_settle_time`·`stable_*`·`jelly_merge_duration`, 규칙·점수·수치 전부, 그림·연출, JELLY 밖 모드, 사용자 저장 파일, `project.godot` 버전·`build/windows/` Release 파일 (**빌드 없음**), `docs/` (회신 파일 제외)
+- **회신 맨 앞에**: E1.5에서 입력 대기 때 닿은 쌍이 남은 턴 0.5% 넘음, 평균 턴 시간 0.2초 이상 늚, 연장 상한에 닿은 턴 1% 넘음, 판 밖 이탈, 0 주입 해시 바뀜
+- Done-when:
+  - [ ] 테스트 통과, 0 주입 해시 모두 그대로, 기본 (1.5)에서 바뀐 JELLY 해시는 옛 값·새 값과 함께 고정
+  - [ ] 측정표 E0·E1.5
+  - [ ] 전체 캡처 두 비율
+- QA: §12-ONE.40 4·5·6번
+- 커밋: 항목 단위 브랜치 (`merge-extension`), **push·PR까지** (병합은 Claude 검수 뒤)
 
 ---
 
