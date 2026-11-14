@@ -41,7 +41,7 @@
 ### [2026-11-14] 대상 #151 — 시한 젤리가 굳을 때·돌이 깨질 때 효과음
 - 맨 앞 경고 조건 0건: 기본·mode 0 해시 모두 기존값 유지, 기존 합체/대폭발 합성 테스트 통과, 한 턴에 시한 젤리 2개가 굳어도 `stone` 호출 1회, `sfx_enabled=false`에서 `stone`·`stone_break` 호출 0회
 - 상태: 완료 — 합성음·굳기/깨짐 재생 경로·자동 테스트·검수용 WAV 완료. 주말 경량 규칙에 따라 전체 회귀·캡처·Debug 빌드는 실행하지 않음
-- 브랜치 / PR: `stone-sfx` / 생성 후 갱신
+- 브랜치 / PR: `stone-sfx` / https://github.com/jeongmo-dot/gravity_orb/pull/151
 - 변경 파일: `scripts/core/TurnManager.gd`, `scripts/fx/{FeedbackDirector.gd,SfxBank.gd}`, `tests/{test_feedback.gd,test_timed_jelly.gd}`, `artifacts/sfx/stone.wav`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] `stone.wav`·`.ogg` 우선 로드, 없으면 0.34초 결정적 합성. 4회 갈라짐과 125→62Hz 쿵을 명세 값으로 합산한 뒤 최대 진폭 0.80 정규화 — 길이·진폭·두 번 합성 바이트 자동 테스트
