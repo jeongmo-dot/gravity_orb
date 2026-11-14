@@ -18,6 +18,8 @@ const BLAST_DURATION: float = 0.460
 const CHIME_DURATION: float = 0.340
 const SWIPE_DURATION: float = 0.120
 const TURN_READY_DURATION: float = 0.050
+const STONE_DURATION: float = 0.340
+const STONE_BREAK_PITCH: float = 1.2599210498948732
 const VOICE_COUNT: int = 12
 const SFX_BUS: StringName = &"SFX"
 const POP_ASSET_PATHS: Array[String] = [
@@ -40,6 +42,13 @@ const TURN_READY_ASSET_PATHS: Array[String] = [
 	"res://assets/sfx/turn_ready.wav",
 	"res://assets/sfx/turn_ready.ogg",
 ]
+const STONE_ASSET_PATHS: Array[String] = [
+	"res://assets/sfx/stone.wav",
+	"res://assets/sfx/stone.ogg",
+]
+const STONE_CRACK_OFFSETS: Array[float] = [0.000, 0.021, 0.039, 0.064]
+const STONE_CRACK_GAINS: Array[float] = [1.00, 0.70, 0.85, 0.55]
+const STONE_CRACK_FREQUENCIES: Array[float] = [2900.0, 2300.0, 3300.0, 2600.0]
 const BLAST_POP_OFFSETS: Array[float] = [
 	0.000,
 	0.012,
@@ -67,6 +76,7 @@ var _blast_stream: AudioStream
 var _callout_stream: AudioStream
 var _swipe_stream: AudioStream
 var _turn_ready_stream: AudioStream
+var _stone_stream: AudioStream
 var _voices: Array[AudioStreamPlayer] = []
 var _next_voice: int = 0
 var _muted: bool = false
@@ -91,6 +101,9 @@ func _ready() -> void:
 	_turn_ready_stream = _load_first(TURN_READY_ASSET_PATHS)
 	if _turn_ready_stream == null:
 		_turn_ready_stream = _synthesize_turn_ready()
+	_stone_stream = _load_first(STONE_ASSET_PATHS)
+	if _stone_stream == null:
+		_stone_stream = _synthesize_stone()
 	for voice_index: int in range(VOICE_COUNT):
 		var voice: AudioStreamPlayer = AudioStreamPlayer.new()
 		voice.name = "Voice%d" % voice_index
@@ -114,6 +127,7 @@ func _exit_tree() -> void:
 	_callout_stream = null
 	_swipe_stream = null
 	_turn_ready_stream = null
+	_stone_stream = null
 
 
 func play_merge(
@@ -191,6 +205,38 @@ func play_turn_ready() -> void:
 	)
 
 
+func play_stone() -> void:
+	if not Config.data.sfx_enabled:
+		return
+	_play(
+		_stone_stream,
+		1.0,
+		Config.data.sfx_volume_db + 2.0,
+		"stone",
+		0,
+		-1,
+		-1
+	)
+
+
+func play_stone_break(
+	reaction_usec: int = 0,
+	reaction_physics_frame: int = -1,
+	reaction_process_frame: int = -1
+) -> void:
+	if not Config.data.sfx_enabled:
+		return
+	_play(
+		_stone_stream,
+		STONE_BREAK_PITCH,
+		Config.data.sfx_volume_db - 3.0,
+		"stone_break",
+		reaction_usec,
+		reaction_physics_frame,
+		reaction_process_frame
+	)
+
+
 func merge_pitch(result_level: int, chain: int, stable_spawn_id: int) -> float:
 	var maximum_level: int = maxi(Config.data.orb_max_level, 2)
 	var clamped_level: int = clampi(result_level, 2, maximum_level)
@@ -224,6 +270,10 @@ func blast_stream() -> AudioStream:
 
 func swipe_stream() -> AudioStream:
 	return _swipe_stream
+
+
+func stone_stream() -> AudioStream:
+	return _stone_stream
 
 
 func voice_count() -> int:
@@ -420,6 +470,59 @@ func _synthesize_turn_ready() -> AudioStreamWAV:
 			+ 0.30 * sin(TAU * 1770.0 * time)
 		) * envelope * 0.34
 		samples[index] = clampf(value, -1.0, 1.0)
+	return _make_wav(samples)
+
+
+func _synthesize_stone() -> AudioStreamWAV:
+	var sample_count: int = ceili(STONE_DURATION * float(SAMPLE_RATE))
+	var samples: PackedFloat32Array = PackedFloat32Array()
+	samples.resize(sample_count)
+	var thump_phase: float = 0.0
+	for index: int in range(sample_count):
+		var time: float = float(index) / float(SAMPLE_RATE)
+		var value: float = 0.0
+		for crack_index: int in range(STONE_CRACK_OFFSETS.size()):
+			var crack_time: float = time - STONE_CRACK_OFFSETS[crack_index]
+			if crack_time < 0.0:
+				continue
+			var crack_gain: float = STONE_CRACK_GAINS[crack_index]
+			if crack_time < 0.010:
+				value += (
+					_high_pass_noise(index + 23011 + crack_index * 7919)
+					* exp(-crack_time / 0.0016)
+					* 0.90
+					* crack_gain
+				)
+			if crack_time < 0.030:
+				value += (
+					sin(TAU * STONE_CRACK_FREQUENCIES[crack_index] * crack_time)
+					* exp(-crack_time / 0.006)
+					* 0.22
+					* crack_gain
+				)
+		var thump_time: float = time - 0.072
+		if thump_time >= 0.0 and thump_time < 0.260:
+			var pitch_progress: float = minf(thump_time / 0.120, 1.0)
+			var frequency: float = 125.0 * pow(62.0 / 125.0, pitch_progress)
+			thump_phase += TAU * frequency / float(SAMPLE_RATE)
+			var attack: float = minf(thump_time / 0.0015, 1.0)
+			var envelope: float = attack * exp(-thump_time / 0.070)
+			value += (
+				(
+					sin(thump_phase)
+					+ sin(thump_phase * 2.0) * 0.45
+					+ sin(thump_phase * 3.0) * 0.22
+				)
+				* envelope
+				* 0.75
+			)
+		samples[index] = value
+	var peak: float = 0.0
+	for sample: float in samples:
+		peak = maxf(peak, absf(sample))
+	var gain: float = 0.80 / peak if peak > 0.0 else 0.0
+	for index: int in range(samples.size()):
+		samples[index] = clampf(samples[index] * gain, -0.80, 0.80)
 	return _make_wav(samples)
 
 

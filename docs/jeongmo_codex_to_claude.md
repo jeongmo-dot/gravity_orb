@@ -38,6 +38,40 @@
 
 ## 미확인
 
+### [2026-11-14] 대상 #151 — 시한 젤리가 굳을 때·돌이 깨질 때 효과음
+- 맨 앞 경고 조건 0건: 기본·mode 0 해시 모두 기존값 유지, 기존 합체/대폭발 합성 테스트 통과, 한 턴에 시한 젤리 2개가 굳어도 `stone` 호출 1회, `sfx_enabled=false`에서 `stone`·`stone_break` 호출 0회
+- 상태: 완료 — 합성음·굳기/깨짐 재생 경로·자동 테스트·검수용 WAV 완료. 주말 경량 규칙에 따라 전체 회귀·캡처·Debug 빌드는 실행하지 않음
+- 브랜치 / PR: `stone-sfx` / 생성 후 갱신
+- 변경 파일: `scripts/core/TurnManager.gd`, `scripts/fx/{FeedbackDirector.gd,SfxBank.gd}`, `tests/{test_feedback.gd,test_timed_jelly.gd}`, `artifacts/sfx/stone.wav`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] `stone.wav`·`.ogg` 우선 로드, 없으면 0.34초 결정적 합성. 4회 갈라짐과 125→62Hz 쿵을 명세 값으로 합산한 뒤 최대 진폭 0.80 정규화 — 길이·진폭·두 번 합성 바이트 자동 테스트
+  - [x] mode 2·mode 1·mode 0의 18턴 돌 생성 때 새 `timed_stone_hardened` 신호. 한 `_advance_timed_jellies()`에서 여러 개가 굳어도 끝에서 1회만 emit — 세 방식·동시 2개 자동 테스트
+  - [x] mode 0 + 굳기 꺼짐의 기존 L1 터짐과 18턴 돌 만료 제거에는 신호 없음 — 자동 테스트
+  - [x] 굳기 `stone`: pitch 1.0, `sfx_volume_db+2`; 깨짐 `stone_break`: pitch `pow(2,4/12)=1.259921…`, `sfx_volume_db-3` — 실제 voice 속성 자동 테스트
+  - [x] BLAST·TAP_BLAST·MAX_CLEAR에서 `timed_stone_break_count>0`이면 반응당 `stone_break` 1회. count 0은 없음; 돌 2~4개도 1회 — `play_called` 순서/횟수 자동 테스트
+  - [x] 폭발음을 내지 않는 TAP_BLAST GROW도 돌이 깨지면 `stone_break` 1회, 기존 GROW 폭발음·진동 없음 유지 — 자동 테스트
+  - [x] `sfx_enabled=false`에서 굳기·깨짐 재생 0회. SFX 버스 음소거는 기존 공통 버스를 그대로 사용 — 자동 테스트·코드 경로 대조
+  - [x] 기본 해시 `83e4f6c8…`, mode 0 stone `463995c4…`, K5-4 burst `bc86d257…`, H8 `790bb962…`, K5-8 `3b814220…` 유지
+  - [x] 검수용 `artifacts/sfx/stone.wav` 생성. 게임 로드 경로 `assets/sfx/`와 분리
+- WAV 관측:
+  - 형식: 44,100Hz, 16비트, 모노, `0.340s`, 파일 `30,034 bytes`
+  - 최대 진폭: `0.800012` (목표 0.80), 최대 위치 `0.249ms`, 앞 10ms 에너지 비율 `0.051409`
+  - SHA-256: `9EC9F1BF16DB64D805B870E992C816239104B20625869F9DA9D225BF9D478E42`
+- QA 관측값:
+  - `test_feedback.gd` → `13/13` 통과, 종료 코드 0. 새 stone 테스트와 기존 합체/대폭발·VFX/진동 관련 테스트를 같은 파일에서 실행
+  - `test_timed_jelly.gd` → `19/19` 통과, 종료 코드 0. 굳기 신호 배치/제외 조건과 기존 시한 규칙·해시를 함께 실행
+  - 두 headless 실행 모두 `SCRIPT ERROR`·`Parse Error` 0건. 제한 환경의 `user://logs/godot.log` 쓰기 경고 1건씩은 있었으나 종료 코드 0
+  - 규칙 검색: 신규 `Input`·전역 난수 위반 0건. `git diff --check` 오류 0건
+  - 미실행(주말 경량): 전체 `tests/run_tests.ps1`, 캡처, 기본/BLITZ 장시간 스모크, Debug/Release 빌드. Release와 버전은 #152 대상이라 변경하지 않음
+- 수동 확인 절차:
+  1. JELLY에서 시한 젤리 하나 또는 여러 개가 같은 턴에 0이 되게 하기 → 갈라지는 딱딱 소리 4번 뒤 낮은 쿵이 한 번만 들림
+  2. 영구 회색 돌을 대폭발·터치 소폭발·잭팟으로 깨기 → 폭발음과 함께 4반음 높은 갈라짐/쿵이 반응당 한 번. 여러 돌이 동시에 깨져도 한 번
+  3. 초록 GROW 터치 소폭발로 돌 깨기 → 기존처럼 폭발음·새 진동은 없고 돌 깨짐 소리만 한 번
+  4. 효과음 설정 끄기 또는 SFX 버스 음소거 → 굳기·깨짐 소리 모두 들리지 않음
+  5. [stone.wav](../artifacts/sfx/stone.wav) 재생 → 0.34초의 `쩌적·쿵` 검수용 합성음
+- 결정 사항: 새 신호는 한 실패마다 직접 emit하지 않고 `_advance_timed_jellies()`가 그 턴의 굳기 성공 여부를 모아 `timed_stone_hardened`를 한 번 emit하도록 구성했다. 명세 수치 외 음색·음량·재생 시점은 추가하지 않음
+- 남은 것 · 질문: Claude 검수와 병합 뒤 #152 Windows 0.16.11 Release 빌드. 실제 폭발음과 겹친 청감은 #152 빌드 수동 QA에서 판단
+
 ### [2026-11-14] 대상 #150 — 시한 젤리 숫자 5~10·실패하면 회색 돌 (1안·2안)
 - 맨 앞 경고 조건: 같은 시드의 젤리 색·자리·레벨 순서 변경 `0`건(1~45턴 대조), mode 0 + min 0 회귀 해시 `463995c4a2188c1639fcc7efaa9e0ce0c294a0b3633ae1c859d7b98eec0ff390` 유지, 회색 돌의 합체·청소·터치 소폭발 원본 반응 `0`건. 표적 테스트·540×960 캡처에서 판 밖 배치 `0`건. 주말 경량 모드라 여러 판 물리 이탈 측정은 미실행
 - 상태: 완료 — 구현, 변경 테스트 2파일, 지정 540×960 장면 5개를 완료. 주말 작성 규칙에 따라 전체 회귀·봇 측정·두 번째 비율·Debug 빌드는 실행하지 않음

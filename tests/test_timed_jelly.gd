@@ -634,6 +634,61 @@ func test_fail_mode_two_creates_permanent_unlabelled_stone() -> void:
 	_restore_config(snapshot)
 
 
+func test_stone_hardening_signal_batches_and_excludes_burst_and_expiry() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_timed_enabled = true
+	var fixture: Dictionary = await _create_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	var hardening_calls: Array[int] = []
+	manager.timed_stone_hardened.connect(func() -> void: hardening_calls.append(1))
+
+	Config.data.jelly_timed_fail_mode = 2
+	for position: Vector2 in [Vector2(-80.0, 0.0), Vector2(80.0, 0.0)]:
+		var timed: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 5, position)
+		timed.set_timed(1, 20)
+		timed.disable_physics()
+	manager._advance_timed_jellies()
+	assert_eq(hardening_calls.size(), 1, "two mode-two failures in one turn emit once")
+
+	board.clear()
+	await tree.process_frame
+	Config.data.jelly_timed_fail_mode = 1
+	var scatter: Orb3D = board.spawn_orb(OrbTypes.OrbColor.BLUE, 5, Vector2.ZERO)
+	scatter.set_timed(1, 20)
+	scatter.disable_physics()
+	manager._advance_timed_jellies()
+	assert_eq(hardening_calls.size(), 2, "mode one emits one hardening event")
+	resolver.cancel_active_jelly_merges()
+	board.clear()
+	await tree.process_frame
+
+	Config.data.jelly_timed_fail_mode = 0
+	Config.data.jelly_timed_stone_enabled = true
+	var temporary: Orb3D = board.spawn_orb(OrbTypes.OrbColor.YELLOW, 5, Vector2.ZERO)
+	temporary.set_timed(1, 20)
+	temporary.disable_physics()
+	manager._advance_timed_jellies()
+	assert_eq(hardening_calls.size(), 3, "mode zero temporary stone emits once")
+	temporary.set_timed_stone(1)
+	manager._advance_timed_jellies()
+	assert_eq(hardening_calls.size(), 3, "temporary stone expiry is silent")
+	resolver.cancel_active_jelly_merges()
+	board.clear()
+	await tree.process_frame
+
+	Config.data.jelly_timed_stone_enabled = false
+	var burst: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, 5, Vector2.ZERO)
+	burst.set_timed(1, 20)
+	burst.disable_physics()
+	manager._advance_timed_jellies()
+	assert_eq(hardening_calls.size(), 3, "legacy L1 burst is silent")
+	await _cleanup(fixture["root"] as Node)
+	_restore_config(snapshot)
+
+
 func test_permanent_stones_break_once_per_explosion_and_only_in_range() -> void:
 	var snapshot: Dictionary = _snapshot_config()
 	Config.data.game_mode = GameConfig.GameMode.JELLY

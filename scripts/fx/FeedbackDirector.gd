@@ -100,6 +100,11 @@ func bind(game_manager: Variant, board: Variant) -> void:
 		and not game_manager.state_changed.is_connected(_on_turn_state_changed)
 	):
 		game_manager.state_changed.connect(_on_turn_state_changed)
+	if (
+		game_manager is TurnManager
+		and not game_manager.timed_stone_hardened.is_connected(_on_timed_stone_hardened)
+	):
+		game_manager.timed_stone_hardened.connect(_on_timed_stone_hardened)
 
 
 func _on_reaction_ready(reaction: Dictionary) -> void:
@@ -133,6 +138,10 @@ func _on_turn_state_changed(next_state: int) -> void:
 		return
 	_sfx_bank.play_turn_ready()
 	_haptics.play_turn_ready()
+
+
+func _on_timed_stone_hardened() -> void:
+	_sfx_bank.play_stone()
 
 
 func play_reaction_visuals(reaction: Dictionary) -> void:
@@ -218,24 +227,31 @@ func _play_reaction_sfx(reaction: Dictionary) -> void:
 		and reaction_type != ReactionRules.Type.MAX_CLEAR
 	):
 		return
-	if (
+	var grow_tap: bool = (
 		reaction_type == ReactionRules.Type.TAP_BLAST
 		and int(reaction.get("tap_effect", GameConfig.JellyTapEffect.PUSH))
 		== GameConfig.JellyTapEffect.GROW
-	):
+	)
+	if not grow_tap:
+		var finale: bool = bool(reaction.get("finale", false))
+		if finale:
+			_finale_sfx_index = int(reaction.get("finale_index", _finale_sfx_index + 1))
+		else:
+			_finale_sfx_index = 0
+		_sfx_bank.play_blast(
+			finale,
+			maxi(_finale_sfx_index, 1),
+			int(reaction.get("reaction_applied_usec", 0)),
+			int(reaction.get("reaction_physics_frame", -1)),
+			int(reaction.get("reaction_process_frame", -1)),
+			0.5 if reaction_type == ReactionRules.Type.TAP_BLAST else 1.0
+		)
+	if int(reaction.get("timed_stone_break_count", 0)) <= 0:
 		return
-	var finale: bool = bool(reaction.get("finale", false))
-	if finale:
-		_finale_sfx_index = int(reaction.get("finale_index", _finale_sfx_index + 1))
-	else:
-		_finale_sfx_index = 0
-	_sfx_bank.play_blast(
-		finale,
-		maxi(_finale_sfx_index, 1),
+	_sfx_bank.play_stone_break(
 		int(reaction.get("reaction_applied_usec", 0)),
 		int(reaction.get("reaction_physics_frame", -1)),
-		int(reaction.get("reaction_process_frame", -1)),
-		0.5 if reaction_type == ReactionRules.Type.TAP_BLAST else 1.0
+		int(reaction.get("reaction_process_frame", -1))
 	)
 
 
