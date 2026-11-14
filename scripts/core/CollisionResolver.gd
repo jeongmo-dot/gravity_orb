@@ -264,6 +264,12 @@ func flush(delta: float = 0.0) -> int:
 			)
 		elif reaction_type == ReactionRules.Type.BLAST:
 			blast_targets = _board.apply_blast(reaction_position, shock_level)
+		var timed_stone_break_count: int = 0
+		if reaction_type in [ReactionRules.Type.BLAST, ReactionRules.Type.MAX_CLEAR]:
+			timed_stone_break_count = _break_timed_stones_from_explosion(
+				shock_targets,
+				blast_targets
+			)
 
 		var reaction: Dictionary = {
 			"type": reaction_type,
@@ -287,6 +293,7 @@ func flush(delta: float = 0.0) -> int:
 			"shock_level": shock_level,
 			"shock_targets": shock_targets,
 			"blast_targets": blast_targets,
+			"timed_stone_break_count": timed_stone_break_count,
 			"contact_path": contact_path,
 			"reaction_applied_usec": Time.get_ticks_usec(),
 			"reaction_physics_frame": Engine.get_physics_frames(),
@@ -390,6 +397,10 @@ func apply_jelly_tap_blast(orb: Variant) -> bool:
 			Config.data.jelly_tap_magnet_time,
 			Config.data.blast_gravity_pause_time if common_push else 0.0
 		)
+	var timed_stone_break_count: int = _break_timed_stones_from_explosion(
+		shock_targets,
+		blast_targets
+	)
 	var reaction: Dictionary = {
 		"type": ReactionRules.Type.TAP_BLAST,
 		"chain": 1,
@@ -410,6 +421,7 @@ func apply_jelly_tap_blast(orb: Variant) -> bool:
 		"shock_level": level,
 		"shock_targets": shock_targets,
 		"blast_targets": blast_targets,
+		"timed_stone_break_count": timed_stone_break_count,
 		"contact_path": "tap_blast",
 		"tap_blast": true,
 		"tap_effect": tap_effect,
@@ -430,6 +442,36 @@ func remove_jelly_with_clean_visual(orb: Variant) -> void:
 	if not is_instance_valid(orb) or bool(orb.get("consumed")):
 		return
 	_start_tap_clean_visual(orb, orb.position)
+
+
+func _break_timed_stones_from_explosion(
+	shock_targets: Array[Dictionary],
+	blast_targets: Array[Dictionary]
+) -> int:
+	var broken_ids: Dictionary = {}
+	var broken_count: int = 0
+	var target_groups: Array = [shock_targets, blast_targets]
+	for target_group: Array in target_groups:
+		for row: Dictionary in target_group:
+			if row.has("in_range") and not bool(row["in_range"]):
+				continue
+			var orb: Variant = row.get("orb")
+			if (
+				not is_instance_valid(orb)
+				or bool(orb.get("consumed"))
+				or not bool(orb.get("is_timed_stone"))
+			):
+				continue
+			var stable_id: int = int(orb.get("stable_spawn_id"))
+			if broken_ids.has(stable_id):
+				continue
+			broken_ids[stable_id] = true
+			if bool(orb.break_timed_stone()):
+				remove_jelly_with_clean_visual(orb)
+			else:
+				orb.note_diagnostic_event("timed_stone_broken")
+			broken_count += 1
+	return broken_count
 
 
 func is_jelly_tap_blast_candidate(orb: Variant) -> bool:
@@ -820,7 +862,16 @@ func _complete_active_jelly_merge(entry: Dictionary) -> void:
 		int(reaction["result_color"]),
 		Callable(_spawner, "next_shake_direction") if _spawner != null else Callable()
 	)
+	var timed_stone_break_count: int = int(
+		reaction.get("timed_stone_break_count", 0)
+	)
+	if reaction["type"] == ReactionRules.Type.MAX_CLEAR:
+		timed_stone_break_count += _break_timed_stones_from_explosion(
+			shock_targets,
+			[]
+		)
 	reaction["shock_targets"] = shock_targets
+	reaction["timed_stone_break_count"] = timed_stone_break_count
 	reaction["reaction_applied_usec"] = Time.get_ticks_usec()
 	reaction["reaction_physics_frame"] = Engine.get_physics_frames()
 	reaction["reaction_process_frame"] = Engine.get_process_frames()

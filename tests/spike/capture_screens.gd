@@ -5,6 +5,7 @@ const DEFAULT_OUTPUT_DIRECTORY: String = "res://artifacts/screens"
 const DEFAULT_USER_SAVE: String = "user://save.cfg"
 const OUTPUT_PREFIX: String = "--capture-output-directory="
 const SAVE_PREFIX: String = "--capture-save-path="
+const TIMED_ONLY_ARGUMENT: String = "--capture-timed-only"
 const PILE_JITTER_SEED: int = 11620261030
 const SPAWN_RAMP_CAPTURE_SEED: int = 11920261031
 const CAPTURE_FILES: Array[String] = [
@@ -193,6 +194,15 @@ const CAPTURE_FILES: Array[String] = [
 	"208_jelly_timed_stone_broken_settled.png",
 	"209_jelly_timed_stone_first_callout.png",
 	"210_jelly_timed_stone_10.png",
+	"211_jelly_timed_stone_broken_l4.png",
+	"212_jelly_timed_scatter_five.png",
+]
+const TIMED_ONLY_FILES: Array[String] = [
+	"199_jelly_timed_board_initial.png",
+	"205_jelly_timed_stone_after_harden.png",
+	"209_jelly_timed_stone_first_callout.png",
+	"211_jelly_timed_stone_broken_l4.png",
+	"212_jelly_timed_scatter_five.png",
 ]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
@@ -200,6 +210,7 @@ var _temp_save_path: String = "res://artifacts/screens/capture_save.tmp.cfg"
 var _failed: bool = false
 var _user_save_existed: bool = false
 var _user_save_bytes: PackedByteArray = PackedByteArray()
+var _timed_only: bool = false
 
 
 func _ready() -> void:
@@ -218,15 +229,19 @@ func _run() -> void:
 	Config.data.sfx_enabled = false
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.rng_seed = 5050
-	await _capture_shell_scenes()
-	await _capture_gameplay_scenes()
+	if _timed_only:
+		await _capture_timed_only_scenes()
+	else:
+		await _capture_shell_scenes()
+		await _capture_gameplay_scenes()
 	Config.data.sfx_enabled = original_sfx_enabled
 	_verify_user_save_unchanged()
 	_remove_file(_temp_save_path)
-	for file_name: String in CAPTURE_FILES:
+	var expected_files: Array[String] = TIMED_ONLY_FILES if _timed_only else CAPTURE_FILES
+	for file_name: String in expected_files:
 		if not FileAccess.file_exists(_output_directory.path_join(file_name)):
 			_fail("Missing capture %s" % file_name)
-	print("SCREEN_CAPTURE_SUITE exit=%d files=%d" % [1 if _failed else 0, CAPTURE_FILES.size()])
+	print("SCREEN_CAPTURE_SUITE exit=%d files=%d" % [1 if _failed else 0, expected_files.size()])
 	get_tree().quit(1 if _failed else 0)
 
 
@@ -374,6 +389,17 @@ func _capture_gameplay_scenes() -> void:
 	await _capture_jelly_merge_process_scenes(board, resolver, manager)
 	await _capture_turn_hud_scene(main, manager, hud)
 	await _capture_level_ten_scenes(main, board)
+	await _destroy_main(main)
+
+
+func _capture_timed_only_scenes() -> void:
+	var main: Main = await _create_main(true)
+	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
+	manager.set_physics_process(false)
+	var board: Board3D = main.get_node("Board") as Board3D
+	var resolver: CollisionResolver = main.get_node("CollisionResolver") as CollisionResolver
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	await _capture_timed_fail_mode_scenes(main, manager, board, resolver, hud)
 	await _destroy_main(main)
 
 
@@ -588,26 +614,118 @@ func _capture_timed_jelly_scenes(
 	_report_callout_fit("206_jelly_timed_first_callout", hud)
 	await _capture("206_jelly_timed_first_callout.png")
 	hud._hide_callout_label()
+	await _capture_timed_fail_mode_scenes(main, manager, board, resolver, hud)
+
+
+func _capture_timed_fail_mode_scenes(
+	main: Main,
+	manager: TurnManager,
+	board: Board3D,
+	resolver: CollisionResolver,
+	hud: Hud
+) -> void:
+	var director: FeedbackDirector = main.get_node("FeedbackDirector") as FeedbackDirector
+	resolver.set_physics_process(false)
+	resolver.cancel_active_jelly_merges()
+	Config.data.jelly_timed_enabled = true
+	Config.data.fx_callouts_enabled = true
+	director.clear_effects()
+	board.clear()
+	_clear_capture_hud_residue(hud)
+	var preview_spawner: Spawner = Spawner.new()
+	preview_spawner.init_rng(150510)
+	var timed_batch: Array[Dictionary] = preview_spawner._draw_batch(
+		Config.data.jelly_timed_first_turn
+	)
+	var selected_turns: int = int((timed_batch[0] as Dictionary)["timed_turns"])
+	preview_spawner.free()
+	var timed: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.YELLOW,
+		Config.data.jelly_timed_level,
+		Vector2.ZERO
+	)
+	timed.set_timed(selected_turns, Config.data.jelly_timed_first_turn)
+	timed.disable_physics()
+	await _capture("199_jelly_timed_board_initial.png")
 
 	director.clear_effects()
 	board.clear()
 	_clear_capture_hud_residue(hud)
-	var callout_stone: Orb3D = board.spawn_orb(
-		OrbTypes.OrbColor.BLUE,
-		timed_level,
+	Config.data.jelly_timed_fail_mode = 2
+	var hardened: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.GREEN,
+		Config.data.jelly_timed_level,
 		Vector2.ZERO
 	)
-	callout_stone.set_timed_stone(Config.data.jelly_timed_stone_turns)
+	hardened.set_timed(1, Config.data.jelly_timed_first_turn)
+	hardened.disable_physics()
+	manager._timed_stone_callout_seen = true
+	manager._harden_timed_jelly(hardened, true)
+	await get_tree().process_frame
+	if not hardened.is_timed_stone or not hardened.timed_stone_permanent:
+		_fail("mode two capture expected a permanent stone")
+	if (hardened.get_node("TimedLabel") as Label3D).visible:
+		_fail("mode two capture stone must not show a number")
+	await _capture("205_jelly_timed_stone_after_harden.png")
+
+	var blast_rows: Array[Dictionary] = board.apply_blast_with_radius_factor(
+		Vector2(-80.0, 0.0),
+		Config.data.jelly_tap_push_radius_factor
+	)
+	if resolver._break_timed_stones_from_explosion([], blast_rows) != 1:
+		_fail("broken stone capture expected one affected stone")
+	if hardened.level != Config.data.jelly_timed_level - 1:
+		_fail("broken stone capture expected L4")
+	hardened.disable_physics()
+	await _capture("211_jelly_timed_stone_broken_l4.png")
+
+	director.clear_effects()
+	board.clear()
+	_clear_capture_hud_residue(hud)
+	Config.data.jelly_timed_fail_mode = 1
+	var scatter_source: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.BLUE,
+		Config.data.jelly_timed_level,
+		Vector2.ZERO
+	)
+	scatter_source.set_timed(1, Config.data.jelly_timed_first_turn)
+	scatter_source.disable_physics()
+	manager._timed_stone_callout_seen = true
+	manager._spawn_timed_scatter(scatter_source)
+	resolver._advance_tap_clean_visuals(Config.data.jelly_tap_clean_visual_time + 0.01)
+	await get_tree().process_frame
+	var scatter_count: int = 0
+	for orb: Orb3D in board.get_orbs():
+		if orb.is_timed_stone:
+			scatter_count += 1
+			orb.disable_physics()
+	if scatter_count != Config.data.jelly_timed_scatter_count:
+		_fail("scatter capture expected five stones")
+	await _capture("212_jelly_timed_scatter_five.png")
+
+	director.clear_effects()
+	resolver.cancel_active_jelly_merges()
+	board.clear()
+	await get_tree().process_frame
+	_clear_capture_hud_residue(hud)
+	Config.data.jelly_timed_fail_mode = 2
+	var callout_stone: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		Config.data.jelly_timed_level,
+		Vector2.ZERO
+	)
+	callout_stone.set_timed_stone(0, true)
 	callout_stone.disable_physics()
+	if (callout_stone.get_node("TimedLabel") as Label3D).visible:
+		_fail("mode two callout capture stone must not show a number")
 	hud._timed_stone_callout_seen = false
 	hud._timed_stone_callout_pending = false
-	hud._on_timed_stone_created(Config.data.jelly_timed_stone_turns)
+	hud._on_timed_stone_created(0)
 	if hud._callout_tween != null and hud._callout_tween.is_valid():
 		hud._callout_tween.kill()
 	_report_callout_fit("209_jelly_timed_stone_first_callout", hud)
 	await _capture("209_jelly_timed_stone_first_callout.png")
 	hud._hide_callout_label()
-
 
 func _capture_default_g1_scenes(
 	main: Main,
@@ -3023,6 +3141,8 @@ func _parse_arguments() -> void:
 			_output_directory = argument.trim_prefix(OUTPUT_PREFIX)
 		elif argument.begins_with(SAVE_PREFIX):
 			_temp_save_path = argument.trim_prefix(SAVE_PREFIX)
+		elif argument == TIMED_ONLY_ARGUMENT:
+			_timed_only = true
 
 
 func _snapshot_user_save() -> void:

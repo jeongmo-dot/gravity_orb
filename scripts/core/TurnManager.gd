@@ -225,7 +225,7 @@ func _physics_process(delta: float) -> void:
 			if not _timed_jelly_callout_seen:
 				_timed_jelly_callout_seen = true
 				timed_jelly_placed.emit(
-					Config.data.jelly_timed_turns,
+					int(orb.get("timed_turns_remaining")),
 					Config.data.jelly_timed_bonus_levels
 				)
 		var unlocked_color: int = Config.data.newly_unlocked_color_for_turn(turn_index)
@@ -470,6 +470,8 @@ func _advance_timed_jellies() -> bool:
 	for orb: Variant in _board.get_orbs():
 		if not bool(orb.get("is_timed_stone")):
 			continue
+		if bool(orb.get("timed_stone_permanent")):
+			continue
 		if int(orb.decrement_timed_stone_turn()) <= 0:
 			expired_stones.append(orb)
 	for orb: Variant in expired_stones:
@@ -482,25 +484,112 @@ func _advance_timed_jellies() -> bool:
 		if int(orb.decrement_timed_turn()) <= 0:
 			expired.append(orb)
 	for orb: Variant in expired:
-		if Config.data.jelly_timed_stone_enabled:
-			_harden_timed_jelly(orb)
-		else:
-			_spawn_timed_burst(orb)
+		match Config.data.jelly_timed_fail_mode:
+			1:
+				_spawn_timed_scatter(orb)
+			2:
+				_harden_timed_jelly(orb, true)
+			_:
+				if Config.data.jelly_timed_stone_enabled:
+					_harden_timed_jelly(orb)
+				else:
+					_spawn_timed_burst(orb)
 		transition_started = true
 	_update_timed_stone_maximum()
 	return transition_started
 
 
-func _harden_timed_jelly(source: Variant) -> void:
+func _harden_timed_jelly(source: Variant, permanent: bool = false) -> void:
 	if not is_instance_valid(source) or bool(source.get("consumed")):
 		return
-	source.set_timed_stone(maxi(Config.data.jelly_timed_stone_turns, 0))
+	var stone_turns: int = 0 if permanent else maxi(Config.data.jelly_timed_stone_turns, 0)
+	source.set_timed_stone(stone_turns, permanent)
 	source.note_diagnostic_event("timed_stone")
 	timed_jelly_failure_count += 1
 	timed_stone_created_count += 1
 	if not _timed_stone_callout_seen:
 		_timed_stone_callout_seen = true
-		timed_stone_created.emit(Config.data.jelly_timed_stone_turns)
+		timed_stone_created.emit(stone_turns)
+
+
+func _spawn_timed_scatter(source: Variant) -> void:
+	if not is_instance_valid(source) or bool(source.get("consumed")):
+		return
+	var color_index: int = int(source.color)
+	_collision_resolver.remove_jelly_with_clean_visual(source)
+	var count: int = maxi(Config.data.jelly_timed_scatter_count, 0)
+	var positions: Array[Vector2] = _timed_scatter_positions(count)
+	for position: Vector2 in positions:
+		var stone: Variant = _board.spawn_orb(
+			color_index,
+			1,
+			position,
+			Vector2.ZERO,
+			0
+		)
+		stone.set_timed_stone(0, true)
+		stone.enter_ghost_state(Config.data.ghost_alpha)
+		stone.note_diagnostic_event("timed_stone_scatter")
+	timed_jelly_failure_count += 1
+	timed_stone_created_count += positions.size()
+	if not _timed_stone_callout_seen:
+		_timed_stone_callout_seen = true
+		timed_stone_created.emit(0)
+
+
+func _timed_scatter_positions(count: int) -> Array[Vector2]:
+	var positions: Array[Vector2] = []
+	var safe_count: int = mini(maxi(count, 0), 25)
+	if safe_count <= 0:
+		return positions
+	var radius: float = Config.data.radius_for_level(1)
+	var center_limit: float = maxf(
+		Config.data.board_size * 0.5 - radius - Config.data.spawn_margin,
+		0.0
+	)
+	var candidates: Array[Vector2] = []
+	for row: int in range(5):
+		for column: int in range(5):
+			candidates.append(Vector2(
+				lerpf(-center_limit, center_limit, float(column) / 4.0),
+				lerpf(-center_limit, center_limit, float(row) / 4.0)
+			))
+	var existing: Array = _board.get_orbs()
+	while positions.size() < safe_count and not candidates.is_empty():
+		var best_index: int = 0
+		var best_score: float = -INF
+		for index: int in range(candidates.size()):
+			var score: float = _timed_scatter_clearance(
+				candidates[index],
+				radius,
+				existing,
+				positions
+			)
+			if score > best_score:
+				best_score = score
+				best_index = index
+		positions.append(candidates[best_index])
+		candidates.remove_at(best_index)
+	return positions
+
+
+func _timed_scatter_clearance(
+	candidate: Vector2,
+	radius: float,
+	existing: Array,
+	selected: Array[Vector2]
+) -> float:
+	var clearance: float = INF
+	for orb: Variant in existing:
+		if not is_instance_valid(orb) or bool(orb.get("consumed")):
+			continue
+		clearance = minf(
+			clearance,
+			candidate.distance_to(orb.position) - radius - float(orb.get_current_radius())
+		)
+	for position: Vector2 in selected:
+		clearance = minf(clearance, candidate.distance_to(position) - radius * 2.0)
+	return clearance
 
 
 func _remove_timed_stone(source: Variant) -> void:

@@ -7,6 +7,7 @@ signal orb_spawned(level: int)
 
 const EFFECT_SEED_SALT: int = 0x25C01A
 const BOT_SEED_SALT: int = 0x31B117
+const TIMED_SEED_SALT: int = 0x71A1ED
 const MAX_DISPLAY_SEED: int = 2147483647
 
 var seed_used: int = 0
@@ -14,6 +15,7 @@ var seed_used: int = 0
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _effect_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _bot_rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var _timed_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _preview_batches: Array[Array] = []
 
 
@@ -27,6 +29,7 @@ func init_rng(seed: int) -> int:
 	_rng.seed = seed_used
 	_effect_rng.seed = seed_used ^ EFFECT_SEED_SALT
 	_bot_rng.seed = seed_used ^ BOT_SEED_SALT
+	_timed_rng.seed = seed_used ^ TIMED_SEED_SALT
 	return seed_used
 
 
@@ -117,7 +120,7 @@ func try_spawn(board: Variant, gravity: Vector2i, turn_index: int = 1) -> Array:
 		else:
 			orb.enter_entrance_wait(preferred_position, gravity)
 		if timed:
-			orb.set_timed(Config.data.jelly_timed_turns, turn_index)
+			orb.set_timed(int(candidate["timed_turns"]), turn_index)
 		spawned.append(orb)
 		orb_spawned.emit(level)
 	_preview_batches.pop_front()
@@ -210,7 +213,15 @@ func _apply_timed_marker(batch: Array, turn_index: int) -> void:
 		return
 	var first: Dictionary = batch[0] as Dictionary
 	first["timed"] = true
-	first["timed_turns"] = Config.data.jelly_timed_turns
+	first["timed_turns"] = _draw_timed_turns()
+
+
+func _draw_timed_turns() -> int:
+	var minimum: int = Config.data.jelly_timed_turns_min
+	if minimum <= 0:
+		return Config.data.jelly_timed_turns
+	var maximum: int = maxi(Config.data.jelly_timed_turns_max, minimum)
+	return _timed_rng.randi_range(minimum, maximum)
 
 
 func _is_timed_turn(turn_index: int) -> bool:
