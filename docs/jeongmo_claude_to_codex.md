@@ -36,30 +36,8 @@
 
 ## 대기 중
 
-### [2026-11-14 #153] 합체 소리 — 합쳐진 크기마다 다른 음
-- 상태: 대기 (main `447a187` 뒤 이 명세 커밋 위에서)
-- 근거: [technical_design.md](technical_design.md) **§12-ONE.43**
-- 배경: 사용자 (2026-11-14, #152 빌드 전) "합칠 때 나오는 사운드는 합치는 크기에 따라서 소리가 달라지게 해줘" → Claude가 후보 A·B·C를 합성해 들려줌 → 사용자 "C 커질수록 높은 음" (지금 "똑" + 클수록 계단처럼 올라가는 음). ±3% 흔들림 on·off를 들려줌 → "끄기"
-- 앵커: `scripts/fx/SfxBank.gd` `_ready()`·`play_merge()`·`merge_pitch()`·`_synthesize_pop()`·`_pop_sample()`, `config/GameConfig.gd` `sfx_pitch_jitter` 선언 기본값, `tests/test_feedback.gd` (지금 합체 음 높이 테스트), `tests/test_config.gd` (기본 지터)
-- 요구 (§12-ONE.43 1~7):
-  1. 레벨별 합체 소리 9개 (L2~L10) — 0.30초, `clamp(pop × 0.70 + note_L × 0.55, −1, 1)`, f = 523.25·587.33·659.26·783.99·880.00·1046.50·1174.66·1318.51·1567.98 Hz (값·식은 §12-ONE.43 1번 그대로). `res://assets/sfx/merge_<L>.*`가 있으면 그것
-  2. `play_merge()`: clamp(L, 2, 10)의 소리, 음 높이 = 연쇄 상승 × (1 + 흔들림) — 레벨 계수 뺌, 크기 `sfx_volume_db` + 3 × (L − 2) / 8 dB
-  3. `sfx_pitch_jitter` 0.0 — `default_config.tres`는 Claude가 바꿨다. `GameConfig.gd` 선언 기본값 0.0, `test_config` 기대 0.0 (지금 main에서 이 한 줄이 틀린다)
-  4. 쓰지 않게 된 `_pop_stream`·`POP_ASSET_PATHS`·`pop_stream()` 정리 (다른 곳에서 쓰지 않으면). `_pop_sample()`은 그대로
-  5. 검수용 `artifacts/sfx/merge_levels.wav` (L2 → L10, 0.5초 간격 — 게임은 읽지 않음)
-  6. 테스트 (§12-ONE.43 6번), `SfxBank._ready()` 합성 시간 관측
-- 수치 (Claude): §12-ONE.43 1번 합성 값·음, 레벨 크기 +0~+3 dB, `sfx_pitch_jitter` 0.0
-- 건드리지 말 것: 연쇄 상승, 다른 소리 전부 (대폭발 안의 "뽁" 포함), 합체 그림·연출, 진동 (명세에 없는 것 금지, 고리 금지), 규칙·수치, 사용자 저장 파일, `project.godot` 버전·`build/windows/` Release 파일 (**빌드 없음** — #152), `docs/` (회신 파일 제외)
-- **가벼운 모드 (주말)**: 바뀐 테스트 파일과 해시 테스트만 돌린다. 전체 회귀·캡처·Debug 빌드 하지 않음
-- **회신 맨 앞에**: 해시 바뀜, 다른 소리의 합성·크기·시점이 바뀜, 합체 소리 횟수·시점이 바뀜, 효과음 끄기를 따르지 않음
-- Done-when:
-  - [ ] 테스트 통과 (`test_config` 지터 0.0 포함), 지금 기본 해시 그대로
-  - [ ] `artifacts/sfx/merge_levels.wav` — 길이·최대 진폭·SHA-256, `_ready()` 합성 시간
-- QA: §12-ONE.43 6번
-- 커밋: 항목 단위 브랜치 (`merge-sfx-levels`), **push·PR까지** (병합은 Claude 검수 뒤)
-
 ### [2026-11-14 #152] Windows 빌드 0.16.11 — 0.16.10 뒤 JELLY 변경 (#143~#151·#153)
-- 상태: 대기 (**#153 병합 뒤** — main 위에서. #153이 「처리 완료」로 옮겨진 뒤 시작)
+- 상태: 대기 (#153 병합됨 `816cd25` — main 위에서)
 - 근거: [technical_design.md](technical_design.md) **§10.5·§10.5.1** (빌드 절차·파일 이름·Release 보호)
 - 배경: 사용자 (2026-11-14) "빌드해줘" → 빌드 전에 효과음 추가 (#151). 0.16.10 (2026-11-09, #142) 뒤 병합된 변경을 직접 해 볼 빌드. 들어가는 것: 시한 젤리 (#143~#145), 0이 되면 회색 굳은 젤리 (#147), 숫자 선명도 (#148), 상한 뒤 합체 연장 (#149), 시한 숫자 5~10·영구 회색 돌 기본 (#150), 굳을 때·깨질 때 효과음 (#151), 합체 소리가 크기마다 다른 음 (#153). #146은 병합하지 않았다
 - 앵커: `project.godot` `application/config/version`, `tools/build_windows.ps1` (실행만)
@@ -81,6 +59,29 @@
 ---
 
 ## 처리 완료
+
+### [2026-11-14 #153] 합체 소리 — 합쳐진 크기마다 다른 음 — 완료
+- 상태: 완료 (2026-11-14 사용자 "확인" · [PR #152](https://github.com/jeongmo-dot/gravity_orb/pull/152) 병합 `816cd25` — GitHub PR 번호 152, 인박스 #152 빌드와 다름)
+- 검수: 코드 diff (합성 식·9개 음이 명세와 같은지, 레벨 계수 뺌, 크기 +3 × (L − 2) / 8, clamp, 반응당 한 번 그대로), 테스트 diff, 회신의 `merge_levels.wav`·합성 시간 수치. 테스트 14/14·16/16·19/19·해시는 Codex 관측 (Claude 재실행 없음). 가벼운 모드 — 전체 회귀·캡처·Debug 빌드 없음. 빌드 없음 (인박스 #152). 맨 앞 경고 0건. 결과: §12-ONE.43 "#153 결과"
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.43**
+- 배경: 사용자 (2026-11-14, #152 빌드 전) "합칠 때 나오는 사운드는 합치는 크기에 따라서 소리가 달라지게 해줘" → Claude가 후보 A·B·C를 합성해 들려줌 → 사용자 "C 커질수록 높은 음" (지금 "똑" + 클수록 계단처럼 올라가는 음). ±3% 흔들림 on·off를 들려줌 → "끄기"
+- 앵커: `scripts/fx/SfxBank.gd` `_ready()`·`play_merge()`·`merge_pitch()`·`_synthesize_pop()`·`_pop_sample()`, `config/GameConfig.gd` `sfx_pitch_jitter` 선언 기본값, `tests/test_feedback.gd` (지금 합체 음 높이 테스트), `tests/test_config.gd` (기본 지터)
+- 요구 (§12-ONE.43 1~7):
+  1. 레벨별 합체 소리 9개 (L2~L10) — 0.30초, `clamp(pop × 0.70 + note_L × 0.55, −1, 1)`, f = 523.25·587.33·659.26·783.99·880.00·1046.50·1174.66·1318.51·1567.98 Hz (값·식은 §12-ONE.43 1번 그대로). `res://assets/sfx/merge_<L>.*`가 있으면 그것
+  2. `play_merge()`: clamp(L, 2, 10)의 소리, 음 높이 = 연쇄 상승 × (1 + 흔들림) — 레벨 계수 뺌, 크기 `sfx_volume_db` + 3 × (L − 2) / 8 dB
+  3. `sfx_pitch_jitter` 0.0 — `default_config.tres`는 Claude가 바꿨다. `GameConfig.gd` 선언 기본값 0.0, `test_config` 기대 0.0 (지금 main에서 이 한 줄이 틀린다)
+  4. 쓰지 않게 된 `_pop_stream`·`POP_ASSET_PATHS`·`pop_stream()` 정리 (다른 곳에서 쓰지 않으면). `_pop_sample()`은 그대로
+  5. 검수용 `artifacts/sfx/merge_levels.wav` (L2 → L10, 0.5초 간격 — 게임은 읽지 않음)
+  6. 테스트 (§12-ONE.43 6번), `SfxBank._ready()` 합성 시간 관측
+- 수치 (Claude): §12-ONE.43 1번 합성 값·음, 레벨 크기 +0~+3 dB, `sfx_pitch_jitter` 0.0
+- 건드리지 말 것: 연쇄 상승, 다른 소리 전부 (대폭발 안의 "뽁" 포함), 합체 그림·연출, 진동 (명세에 없는 것 금지, 고리 금지), 규칙·수치, 사용자 저장 파일, `project.godot` 버전·`build/windows/` Release 파일 (**빌드 없음** — #152), `docs/` (회신 파일 제외)
+- **가벼운 모드 (주말)**: 바뀐 테스트 파일과 해시 테스트만 돌린다. 전체 회귀·캡처·Debug 빌드 하지 않음
+- **회신 맨 앞에**: 해시 바뀜, 다른 소리의 합성·크기·시점이 바뀜, 합체 소리 횟수·시점이 바뀜, 효과음 끄기를 따르지 않음
+- Done-when:
+  - [ ] 테스트 통과 (`test_config` 지터 0.0 포함), 지금 기본 해시 그대로
+  - [ ] `artifacts/sfx/merge_levels.wav` — 길이·최대 진폭·SHA-256, `_ready()` 합성 시간
+- QA: §12-ONE.43 6번
+- 커밋: 항목 단위 브랜치 (`merge-sfx-levels`), **push·PR까지** (병합은 Claude 검수 뒤)
 
 ### [2026-11-14 #151] 시한 젤리가 굳을 때·돌이 깨질 때 효과음 — 완료
 - 상태: 완료 (2026-11-14 사용자 "확인" · [PR #151](https://github.com/jeongmo-dot/gravity_orb/pull/151) 병합 `0faf2b0`)

@@ -5596,6 +5596,16 @@ G1 전략 봇 (시드 1~20, 600턴 상한, 턴 평균 / 총점 평균):
 - 회신 맨 앞에 적을 것: 해시 바뀜, 다른 소리의 합성·크기·시점이 바뀜, 합체 소리 횟수·시점이 바뀜, 효과음 끄기를 따르지 않음
 - 병합: Claude 검수 뒤. "맨 앞" 조건이 있으면 병합 전에 사용자에게 묻는다
 
+**#153 결과 — 병합** ([PR #152](https://github.com/jeongmo-dot/gravity_orb/pull/152) `816cd25` — GitHub PR 번호 152, 인박스 #152 빌드와 다름. 2026-11-14 사용자 "확인". 브랜치 끝 `20bde7c`, 병합 커밋 트리 = `20bde7c` 트리. 테스트는 Codex, 검수는 Claude — Claude 재실행 없음. 가벼운 모드 (주말) — 전체 회귀·캡처·Debug 빌드 없음. 빌드 없음 — 인박스 #152)
+- 구현 (diff 대조):
+  - `SfxBank`: `MERGE_FREQUENCIES` 9개 (명세 값), `_synthesize_merge(L)` = `clamp(_pop_sample(t, 1.0, i) × 0.82 × 0.70 + note × 0.55, −1, 1)` 0.30초 (note 식 명세 그대로). `_ready()`에서 L2~L10 (`res://assets/sfx/merge_<L>.wav`·`.ogg` 먼저)
+  - `play_merge()` → `merge_stream(clamp(L, 2, 10))`·`merge_volume_db()` (`sfx_volume_db` + 3 × (L − 2) / 8)·`merge_pitch()` (연쇄 × (1 + 흔들림) — 첫 인자는 쓰지 않고 시그니처만 유지). 반응당 한 번·호출 자리 그대로
+  - `_pop_stream`·`POP_ASSET_PATHS`·`pop_stream()`·`_synthesize_pop()` 삭제, `_pop_sample()` 그대로 (대폭발·새 합체). `GameConfig.gd` 선언 기본 `sfx_pitch_jitter` 0.0, `test_config` 기대 0.0
+- 검수용 `artifacts/sfx/merge_levels.wav`: 5.050초, 445,454바이트, 최대 진폭 1.000000 (첫 클릭이 ±1에 잘림 — 명세 1번 계산과 같다), SHA-256 `EBDE289C…` (Codex)
+- `_ready()` 합성 시간 (9개): headless 55.9·61.5 ms (Codex)
+- 테스트 `test_feedback.gd` 14/14·`test_config.gd` 16/16·`test_timed_jelly.gd` 19/19 (새: 9개 길이·결정성, Goertzel 0.05~0.20초 목표 음 > 이웃 레벨 음, 레벨별 스트림·음 높이 1.0·+0~+3 dB, L1 → L2·L11 → L10, 연쇄 2 → 2^(1/12)·13·30 → 2.0, 흔들림 0.03이면 같은 id 같은 음, 끄면 재생 0, 기본 지터 0.0). 해시 기본 `83e4f6c8…`·방식 0 `463995c4…`·K5-4 `bc86d257…`·H8 `790bb962…`·K5-8 `3b814220…` 그대로 (Codex). 맨 앞 경고 0건
+- 남은 것: 크기 차이가 들리는지, 합체가 몰릴 때 시끄러운지, 연쇄 중 음이 어긋나게 들리는지, 12보이스에서 폭발·돌 소리가 끊기는지는 인박스 #152 빌드에서 손으로 (`manual_qa_pending.md`)
+
 ### 12-ONE.3 다음 (JELLY 개선)
 - CLASSIC 전용 분기 정리 (행성 그림·연출·규칙 — JELLY가 안 쓰는 것)
 - 결정 대기에서 이어지는 것: 효과음 (합성·녹음), 시작 화면 그림 (지금 행성 — JELLY에 맞게?)
