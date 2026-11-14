@@ -38,6 +38,39 @@
 
 ## 미확인
 
+### [2026-11-14] 대상 #152 — Windows Release 0.16.11 빌드
+- 맨 앞 경고 조건 0건: 빌드 실패 0, `mode=Release` 불일치 0, `_BUILD.txt` 커밋과 최종 브랜치 끝 불일치 0, 버전 외 게임 파일 변경 0, 기존 버전 산출물 변경 0, `save.cfg` 변경 0, 스모크 오류 0
+- 상태: 완료 — 버전 한 줄 변경, Windows Release, 내보낸 실행 파일 스모크 2종, 저장·묶음·기존 산출물 검사 완료. 주말 가벼운 모드에 따라 전체 회귀·창 실행·캡처·Debug 빌드는 실행하지 않음
+- 브랜치 / PR: `build-0.16.11` / https://github.com/jeongmo-dot/gravity_orb/pull/153
+- 변경 파일: `project.godot`, `docs/jeongmo_codex_to_claude.md`; 빌드 산출물은 gitignore의 `build/windows/GravityOrb_v0.16.11*`
+- Done-when 대조:
+  - [x] `project.godot` `application/config/version`만 `0.16.10`→`0.16.11`로 변경하고 먼저 커밋
+  - [x] 깨끗한 작업 트리에서 Godot `4.8.dev3` 일반 빌드로 `build_windows.ps1` Release 실행. `-ReplaceSameVersion` 미사용
+  - [x] `GravityOrb_v0.16.11.exe`·`.console.exe`·`_BUILD.txt` 생성, sidecar `.pck` 없음
+  - [x] 내보낸 console exe 기본·`-- --mode=jelly` 스모크 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - [x] `%APPDATA%/Godot/app_userdata/Gravity Orb/save.cfg` 전후 2,101바이트·SHA-256 `2243b278dbf10afa50c73d54baeee316d4560658de75ac45658e620c6272db3a` 동일
+  - [x] 내보내기 로그 102개 항목과 exe 문자열 검사에서 `tests/`·`artifacts/`·`docs/` 포함 0건. `export_presets.cfg` 제외 필터도 유지
+  - [x] 0.16.9·0.16.10 산출물 7개 이름·크기·SHA-256 전후 동일
+- 빌드 관측:
+  - `WINDOWS_BUILD_RESULT version=0.16.11 mode=Release exit=0 bytes=111158768 preserved=7 exe=C:\Workspace\repos\game\gravity_orb\build\windows\GravityOrb_v0.16.11.exe wrapper=C:\Workspace\repos\game\gravity_orb\build\windows\GravityOrb_v0.16.11.console.exe build_info=C:\Workspace\repos\game\gravity_orb\build\windows\GravityOrb_v0.16.11_BUILD.txt`
+  - exe: `111,158,768 bytes`, SHA-256 `eb4ac934ec7f8957cb3af9bb2c670ed9951dabd80e8363f2e76ef0a6d2bd6de4`
+  - console: `50,176 bytes`, SHA-256 `3ffb0b7924b38ea075d290a4df2e35ff84c2c9ae9aeaa44be9c11898f0b7e742`
+  - `_BUILD.txt`: Version `0.16.11`, Mode `Release`, Engine `4.8.dev3.official.51105ccbe`, Commit = 최종 브랜치 끝
+  - 0.16.9: BUILD 159 / console 50,176 / exe 111,130,912 bytes; exe SHA-256 `fb44f13c…`
+  - 0.16.10: BUILD 160 / console 50,176 / exe 111,131,712 / zip 39,331,886 bytes; exe SHA-256 `019521f9…`, zip `fe3328f5…`
+- QA 관측값:
+  - Release 빌드 → 종료 코드 0, 보존 산출물 7개, export 오류 0건
+  - `GravityOrb_v0.16.11.console.exe --headless --quit-after 300` → 종료 코드 0, 오류 0건
+  - `GravityOrb_v0.16.11.console.exe --headless --quit-after 300 -- --mode=jelly` → 종료 코드 0, 오류 0건
+  - 금지 경로 문자열 검사 → `FORBIDDEN_PATH_MATCHES=0`
+  - 미실행(주말 가벼운 모드): 전체 `tests/run_tests.ps1`, 격리 창 실행, 화면 캡처, Debug 빌드
+- 수동 확인 절차:
+  1. [GravityOrb_v0.16.11.exe](../build/windows/GravityOrb_v0.16.11.exe) 실행 → 시작 화면이 뜨고 설정·랭킹의 기존 기록이 유지됨
+  2. JELLY 시작 → 시한 젤리 숫자 5~10, 실패 시 영구 회색 돌, 굳기·깨짐 효과음, 크기별 합체음 확인
+  3. 작업 관리자 또는 파일 속성에서 실행 파일 버전 `0.16.11`과 일반(non-.NET) Godot 실행 확인
+- 결정 사항: 최종 `_BUILD.txt`가 회신 문서까지 포함한 브랜치 끝을 가리키도록 PR 번호 확보·회신 커밋 뒤 0.16.11 산출물을 최종 생성했다. 명세대로 `-ReplaceSameVersion`은 사용하지 않음
+- 남은 것 · 질문: Claude의 실제 창·청감 검수와 병합. 빌드 파일은 gitignore 대상이라 로컬 `build/windows/`에만 존재
+
 ### [2026-11-14] 대상 #153 — 합체 소리: 합쳐진 크기마다 다른 음
 - 맨 앞 경고 조건 0건: 기존 해시 5개 변경 0건, 합체 외 소리의 합성·크기·시점 변경 0건, 합체 소리 횟수·재생 시점 변경 0건, `sfx_enabled=false`에서 합체 재생 0회
 - 상태: 완료 — L2~L10 합체음 9개·재생 라우팅·검수용 WAV·변경 대상 자동 테스트 완료. 주말 가벼운 모드에 따라 전체 회귀·캡처·Debug 빌드는 실행하지 않음
