@@ -36,7 +36,29 @@
 
 ## 대기 중
 
-(없음)
+### [2026-11-14 #150] 시한 젤리 숫자 5~10·실패하면 회색 돌 (1안·2안)
+- 상태: 대기 (#149 병합됨 `7876b8f` — main 위에서). **주말 — 가벼운 모드** (작성 규칙)
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.41**
+- 배경: 사용자 (2026-11-14) "하나도 재미없는 구조야. 벌칙도 아니고" — 숫자 4는 운으로 갈리고, 굳은 젤리는 18턴 뒤 그냥 사라진다. 사용자 안: 숫자 5~10, 실패하면 1안 (판 전체에 회색 공) 또는 2안 (그 자리에서 영구 회색 돌, 폭발로만 깨짐). Claude 질문 답: 매번 무작위·둘 다 만들어 비교 (기본 2안)·1안은 회색 L1 5개·깨지는 범위는 폭발이 미는 범위
+- 앵커: `scripts/core/Spawner.gd` (시한 표시·숫자), `scripts/core/TurnManager.gd` `_advance_timed_jellies()`·`_harden_timed_jelly()`·`_remove_timed_stone()`, `scripts/core/CollisionResolver.gd` `apply_jelly_tap_blast()`·BLAST·MAX_CLEAR 처리, `scripts/spike/Board3D.gd` `apply_blast()`·`apply_blast_with_radius_factor()`·`apply_shockwave()`, `scripts/core/Orb.gd`·`scripts/spike/Orb3D.gd` 굳은 젤리, `scripts/ui/Hud.gd` 안내 줄, `config/GameConfig.gd`·`default_config.tres` 새 필드, `tests/test_timed_jelly.gd`, `tests/spike/capture_screens.gd`
+- 요구 (§12-ONE.41 1~9):
+  1. 시작 숫자 5~10 무작위 (`jelly_timed_turns_min` 5·`_max` 10) — 별도 난수열, **같은 시드의 젤리 순서는 그대로**. NEXT·THEN·안내 한 줄에 그 숫자. min ≤ 0이면 `jelly_timed_turns` 고정
+  2. `jelly_timed_fail_mode` 0 (지금)·1 (1안)·**2 (2안, 기본)**
+  3. 회색 돌 공통: 반응 없음, 시간으로 안 풀림·숫자 없음, **폭발이 미는 범위 안이면 한 단계 깨짐** (대폭발·터치 소폭발·잭팟, 폭발 한 번에 한 단계), 깨진 결과가 L1 이하면 점수 없이 사라짐. 새 연출 없음
+  4. 2안: 0 → 그 자리 회색 돌 (L5)
+  5. 1안: 0 → 시한 젤리 사라짐 + 회색 L1 5개 (`jelly_timed_scatter_count`)를 판 전체에 골고루 (격자 후보 중 가장 먼 자리부터, 새 난수 없음), 유령 시작
+  6. 첫 실패 안내: 2안 `굳은 젤리: 폭발로만 깰 수 있음`, 1안 `회색 공: 폭발로만 깰 수 있음`
+  7. 캡처 540×960만: `199`·`205`·새 `211` (깨진 돌 L4)·새 `212` (1안 회색 L1 5개)·`209`
+  8. 테스트: §12-ONE.41 8번. 해시: mode 0 + min 0 주입 = `463995c4…`, 새 기본 고정, 시한 젤리를 끈 해시 그대로
+- 수치 (Claude): 숫자 5~10 (사용자), 회색 L1 5개, 격자 후보, 안내 문구. 그 밖의 값은 그대로
+- 건드리지 말 것: 시한 젤리 차례·L5·성공 +1, 지금 규칙·수치 전부, 그림·연출 (명세에 없는 것 금지, 고리·파편 금지), 사용자 저장 파일, `project.godot` 버전·`build/windows/` Release 파일 (**빌드 없음**), `docs/` (회신 파일 제외)
+- **가벼운 모드**: 바뀐 테스트 파일만 돌린다. 전체 회귀·봇 측정·전체 캡처·Debug 빌드 하지 않음
+- **회신 맨 앞에**: 같은 시드의 젤리 순서가 바뀜, 0 주입 해시 바뀜, 돌이 반응에 들어감, 판 밖 이탈
+- Done-when:
+  - [ ] 바뀐 테스트 통과, mode 0 + min 0 주입 해시 그대로, 새 기본 해시 고정
+  - [ ] 캡처 `199`·`205`·`209`·`211`·`212` (540×960)
+- QA: §12-ONE.41 7·8번
+- 커밋: 항목 단위 브랜치 (`timed-fail-modes`), **push·PR까지** (병합은 Claude 검수 뒤)
 
 ---
 
