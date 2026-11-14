@@ -15,6 +15,8 @@ param(
 	[int]$JellyMergeLevelGap = 1,
 	[ValidateRange(0, 10)]
 	[int]$JellyMergeWideGapMinLevel = 0,
+	[ValidateRange(0.0, 10.0)]
+	[double]$JellyMergeExtensionMax = 1.5,
 	[ValidateSet("On", "Off")]
 	[string]$JellyTimedEnabled = "On",
 	[ValidateRange(1, 100)]
@@ -134,6 +136,7 @@ if (-not $AggregateOnly) {
 					"--jelly-level-profile=$LevelProfile",
 					"--jelly-merge-level-gap=$JellyMergeLevelGap",
 					"--jelly-merge-wide-gap-min-level=$JellyMergeWideGapMinLevel",
+					"--jelly-merge-extension-max=$($JellyMergeExtensionMax.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--jelly-timed-enabled=$($JellyTimedEnabled.ToLower())",
 					"--jelly-timed-turns=$JellyTimedTurns",
 					"--jelly-timed-level=$JellyTimedLevel",
@@ -299,6 +302,12 @@ function Get-Summary($Rows) {
 		}
     }
 	$turnTotal = [double](($Rows | Measure-Object -Property completed_turns -Sum).Sum)
+	$turnFrameTotal = [double](($Rows | ForEach-Object { $_.turn_performance_samples } | Measure-Object -Property physics_frames -Sum).Sum)
+	$mergeExtensionTurns = [double](($Rows | Measure-Object -Property merge_extension_turn_count -Sum).Sum)
+	$mergeExtensionSeconds = [double](($Rows | Measure-Object -Property merge_extension_seconds_sum -Sum).Sum)
+	$inputWaitingTurns = [double](($Rows | Measure-Object -Property input_waiting_turn_count -Sum).Sum)
+	$inputWaitingTouchingTurns = [double](($Rows | Measure-Object -Property input_waiting_touching_merge_turn_count -Sum).Sum)
+	$inputWaitingTouchingPairs = [double](($Rows | Measure-Object -Property input_waiting_touching_merge_pair_count_sum -Sum).Sum)
 	$scoreTotal = [double](($Rows | Measure-Object -Property score -Sum).Sum)
 	$reactionScoreTotal = [double](($reactionScoreTotals.Values | Measure-Object -Sum).Sum)
 	$tapBlastTotal = [double](($Rows | Measure-Object -Property tap_blast_count -Sum).Sum)
@@ -396,6 +405,20 @@ function Get-Summary($Rows) {
 		timed_stone_remaining_per_game = Get-Ratio $timedStoneRemaining @($Rows).Count
 		timed_stone_reaction_count = [int]$timedStoneReactions
 		forced_settle_turns = [int](($Rows | Measure-Object -Property capped_turn_count -Sum).Sum)
+		forced_settle_ratio = Get-Ratio ([double](($Rows | Measure-Object -Property capped_turn_count -Sum).Sum)) $turnTotal
+		average_turn_seconds = Get-Ratio $turnFrameTotal ($turnTotal * 120.0)
+		input_waiting_turns = [int]$inputWaitingTurns
+		input_waiting_touching_merge_turns = [int]$inputWaitingTouchingTurns
+		input_waiting_touching_merge_turn_ratio = Get-Ratio $inputWaitingTouchingTurns $inputWaitingTurns
+		average_touching_merge_pairs_per_affected_turn = Get-Ratio $inputWaitingTouchingPairs $inputWaitingTouchingTurns
+		maximum_touching_merge_pairs_at_input_waiting = [int](($Rows | Measure-Object -Property input_waiting_touching_merge_pair_count_max -Maximum).Maximum)
+		deferred_jelly_merge_count = [int](($Rows | Measure-Object -Property deferred_jelly_merge_count -Sum).Sum)
+		merge_extension_turns = [int]$mergeExtensionTurns
+		merge_extension_turn_ratio = Get-Ratio $mergeExtensionTurns $turnTotal
+		average_merge_extension_seconds = Get-Ratio $mergeExtensionSeconds $mergeExtensionTurns
+		maximum_merge_extension_seconds = [double](($Rows | Measure-Object -Property merge_extension_seconds_max -Maximum).Maximum)
+		merge_extension_capped_turns = [int](($Rows | Measure-Object -Property merge_extension_capped_turn_count -Sum).Sum)
+		merge_extension_capped_turn_ratio = Get-Ratio ([double](($Rows | Measure-Object -Property merge_extension_capped_turn_count -Sum).Sum)) $turnTotal
 		same_level_blast_count_by_level = $sameLevelBlastCountByLevel
 		mixed_level_blast_count_by_level = $mixedLevelBlastCountByLevel
         preview_fatal_avoidance_turns = [int]$fatalAvoidance
@@ -460,6 +483,7 @@ $report = [ordered]@{
 	turn_color_unlock_turns = $TurnColorUnlockTurns.ToLower()
 	jelly_merge_level_gap = $JellyMergeLevelGap
 	jelly_merge_wide_gap_min_level = $JellyMergeWideGapMinLevel
+	jelly_merge_extension_max = $JellyMergeExtensionMax
 	jelly_timed_enabled = $JellyTimedEnabled -eq "On"
 	jelly_timed_turns = $JellyTimedTurns
 	jelly_timed_level = $JellyTimedLevel

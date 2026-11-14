@@ -38,6 +38,43 @@
 
 ## 미확인
 
+### [2026-11-14] 대상 #149 — 상한 뒤에 닿은 합체도 그 턴 안에
+- 맨 앞: E0/E1.5 다섯 봇 200판 비교는 **미완료**다. 사용자가 “풀테스트를 요청하기 전까지 대규모 시뮬레이션을 반복하지 말고 최소 테스트만”이라고 지시해 실행 중 계측을 중단했다. 따라서 입력 대기 접촉 쌍 0.5%, 평균 턴 시간 +0.2초, 연장 상한 1%, 이탈 조건의 판정값은 아직 없다
+- 상태: 부분완료 — 구현·핵심 단위 테스트·기존 전체 회귀·두 비율 캡처·Debug 빌드는 완료. 200판 균형 계측만 사용자 요청 전까지 보류
+- 브랜치 / PR: `merge-extension` / https://github.com/jeongmo-dot/gravity_orb/pull/149
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/{CollisionResolver.gd,TurnManager.gd}`, `tests/{run_jelly_physics_autoplay.ps1,test_config.gd,test_jolt_3d.gd,test_turn_input_indicator.gd}`, `tests/spike/run_jolt_3d_measurement.gd`, `tests/tools/{run_jelly_measurement.ps1,run_merge_extension_balance.ps1}`, `docs/jeongmo_codex_to_claude.md`
+- Done-when 대조:
+  - [x] JELLY가 1.5초 상한에 닿은 뒤에도 새 합체를 받고, 진행 중 합체와 닿은 합체 가능 쌍이 모두 0이면 즉시 종료 — `test_turn_manager_merge_extension_accepts_post_cap_pair_in_same_combo`
+  - [x] 상한 뒤 닿은 쌍의 `reaction_applied` 2건이 `turn_finished`보다 먼저 발생하고 같은 턴 콤보 2로 집계 — 같은 테스트의 신호 순서·콤보 관측
+  - [x] 닿은 쌍이 없으면 연장 없이 기존 상한 0.05초(축소 fixture)에서 종료 — `test_turn_manager_merge_extension_ends_immediately_without_pair_and_hard_caps`
+  - [x] 연장 상한에서 새 합체를 막고 진행 중 합체 1건을 마친 뒤 종료, 남은 쌍은 다음 턴에 보존 — 같은 테스트
+  - [x] `jelly_merge_extension_max=0`은 기존 상한 동작, JELLY 밖 모드는 기존 동작 — 기존 cap 테스트에 0 주입 + TURN 시간 상한 장기 테스트
+  - [x] 연장 중 진행 표시 1 유지 — `test_classic_orbit_progress_uses_settle_clock`에 2.25초 표본 추가
+  - [x] 시작 정착·터치 정착·시한 전환 정착도 공통 `_begin_settle()`/`_physics_process()` 경로를 사용 — 코드 경로 대조
+  - [x] E0/E1.5 다섯 봇 계측 필드와 실행 도구 구현 — 입력 대기 접촉 쌍, 미뤄진 합체, 연장 사용/시간/상한, 평균 턴 시간, 기존 상한, 판 길이·점수·합체·대폭발·시한 성공/굳음·이탈
+  - [ ] E0/E1.5 × 다섯 봇 × 20판 = 200판 결과 — 사용자 지시로 중단; 풀테스트 요청 시 `tests/tools/run_merge_extension_balance.ps1` 실행
+  - [x] 두 화면비 전체 캡처 생성, 대표 `04_jelly_gameplay.png` 직접 확인 — 정적 장면 변경 없음
+- 구현 관측:
+  - `CollisionResolver.touching_jelly_merge_pair_count()`는 기존 proximity와 같은 공간 버킷·접촉 허용 오차·`ReactionRules.classify()`를 사용하고 MERGE/MAX_CLEAR 쌍만 센다
+  - 연장 중에는 새 합체 수락을 유지한다. 활동 합체/닿은 합체 쌍이 없으면 즉시 정착을 끝내고, `max_settle_time + jelly_merge_extension_max`에서는 기존처럼 수락을 닫는다
+  - 새 공개 계측값: `merge_extension_turn_count`, `merge_extension_seconds_sum/max`, `merge_extension_capped_turn_count`. 정착 시작마다 내부 플래그를 초기화한다
+  - 새 기본값 `jelly_merge_extension_max=1.5`; `max_settle_time=1.5`, 합체 시간 0.3 등 기존 수치는 변경하지 않음
+- QA 관측값:
+  - 핵심 파일: `test_jolt_3d.gd` 39/39, `test_config.gd` 16/16, `test_turn_input_indicator.gd` 2/2, 각 종료 코드 0
+  - `tests/run_tests.ps1` → general 364/364, long 4/4, performance 5/5, 전체 종료 코드 0. 이후 사용자의 최소 테스트 지시에 따라 앞으로 명시 요청 없이 반복하지 않음
+  - 기존 해시 출력은 모두 기존값 유지: 새 기본 `463995c4…`, false K5-4 `bc86d257…`, G2 `3e688a78…`, Z1 `4be04897…`, T3 `7a20210c…`, C4E `4a0c467d…`, CLASSIC `52ae7da7…`, H8 `790bb962…`, K5-8 `3b814220…`. 단, E0 전체 자동 플레이 해시 비교는 위 200판 보류와 함께 미실행
+  - Standard `--import`, 기본/`--mode=blitz --quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR|Parse Error` 0건
+  - `tests/capture_screens.ps1` → 종료 코드 0, 540×960·540×1170 전체 430파일. 대표 게임 장면에서 배치·HUD 변화 없음
+  - `tools/build_windows.ps1 -Debug` → 종료 코드 0, `GravityOrb_v0.16.10.exe` 105,019,744 bytes. Release·버전 변경 없음
+  - PowerShell 파서 3파일 오류 0건, `git diff --check` 오류 0건
+- 수동 확인 절차:
+  1. JELLY에서 합체 가능한 젤리가 1.5초 직후 닿게 플레이 → 입력 대기로 넘어가기 전에 같은 턴 합체·점수·콤보가 발생
+  2. 상한 시점에 합체 가능 쌍이 없는 턴 → 진행 표시가 가득 찬 직후 기존처럼 약 1.5초에 입력 대기
+  3. 연쇄가 계속 생기게 두기 → 최대 약 3.0초에 새 합체 수락을 닫고 진행 중 합체만 끝낸 뒤 입력 대기
+  4. CLASSIC/BLITZ → 기존 1.5초 정착 동작이 유지됨
+- 결정 사항: 밸런스 수치·공개 신호 이름은 명세 그대로 사용했다. 사용자 지시를 우선해 미완료 대규모 계측값을 추정하거나 부분 표본으로 보고하지 않음
+- 남은 것 · 질문: 사용자가 풀테스트를 요청하면 200판 비교를 실행해 맨 앞 경고 네 조건을 채운다. 구현 검수는 현재 diff와 핵심 테스트 결과로 가능
+
 ### [2026-11-14] 대상 #148 — 시한 젤리·굳은 젤리 숫자를 또렷하게
 - 맨 앞 경고 조건 0건: 굳은 `18`·`10`·`1`, 시한 노랑 `4`·`1` 모두 읽힘 기준을 충족했다. 흰 획 `18~19px`, 눈과 외곽선 비겹침, 두 자리 숫자 윤곽 안 최소 `6px`(아래)·`19px`(가로), HUD·다른 글자 변경 없음, 모든 규칙 해시 불변을 관측했다
 - 상태: 완료 — 구현·단위/전체 테스트·두 비율 전체 캡처·픽셀 측정·Debug 빌드까지 완료. Release와 버전 변경은 하지 않음

@@ -726,10 +726,12 @@ func test_turn_manager_stable_sweep_waits_for_delayed_merge_completion() -> void
 func test_turn_manager_cap_finishes_active_merge_without_starting_a_new_one() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_duration: float = Config.data.jelly_merge_duration
+	var original_extension: float = Config.data.jelly_merge_extension_max
 	var original_stable_duration: float = Config.data.stable_duration
 	var original_max_settle_time: float = Config.data.max_settle_time
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.jelly_merge_duration = 0.3
+	Config.data.jelly_merge_extension_max = 0.0
 	Config.data.stable_duration = 10.0
 	Config.data.max_settle_time = 0.05
 	var fixture: Dictionary = await _create_turn_fixture()
@@ -772,6 +774,126 @@ func test_turn_manager_cap_finishes_active_merge_without_starting_a_new_one() ->
 	assert_eq(resolver.active_jelly_merge_count(), 0, "no post-cap process starts")
 	Config.data.game_mode = original_mode
 	Config.data.jelly_merge_duration = original_duration
+	Config.data.jelly_merge_extension_max = original_extension
+	Config.data.stable_duration = original_stable_duration
+	Config.data.max_settle_time = original_max_settle_time
+	await _cleanup(fixture["root"] as Node)
+
+
+func test_turn_manager_merge_extension_accepts_post_cap_pair_in_same_combo() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_duration: float = Config.data.jelly_merge_duration
+	var original_extension: float = Config.data.jelly_merge_extension_max
+	var original_stable_duration: float = Config.data.stable_duration
+	var original_max_settle_time: float = Config.data.max_settle_time
+	var original_chain_delay: float = Config.data.chain_reaction_delay
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_merge_duration = 0.3
+	Config.data.jelly_merge_extension_max = 0.5
+	Config.data.stable_duration = 10.0
+	Config.data.max_settle_time = 0.05
+	Config.data.chain_reaction_delay = 0.0
+	var fixture: Dictionary = await _create_turn_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	manager.set_physics_process(false)
+	resolver.proximity_reaction_scan_enabled = false
+	manager.state = TurnManager.State.SIMULATING
+	manager.turn_index = 1
+	manager._is_initial_settle = false
+	manager._begin_settle()
+	var order: Array[String] = []
+	resolver.reaction_applied.connect(
+		func(_reaction: Dictionary) -> void: order.append("reaction")
+	)
+	manager.turn_finished.connect(
+		func(_turn: int, _combo: int) -> void: order.append("finished")
+	)
+	var first: Orb3D = board.spawn_orb(2, 2, Vector2(-300.0, 0.0))
+	var second: Orb3D = board.spawn_orb(2, 2, Vector2(-230.0, 0.0))
+	resolver.report_contact(first, second, "pre_cap_active")
+	manager._physics_process(0.05)
+	assert_eq(manager.state, TurnManager.State.SIMULATING, "active merge enters extension")
+	assert_true(resolver._accepting_new_jelly_merges, "extension keeps accepting merges")
+	var post_cap_first: Orb3D = board.spawn_orb(3, 1, Vector2(230.0, 0.0))
+	var post_cap_second: Orb3D = board.spawn_orb(3, 1, Vector2(280.0, 0.0))
+	resolver.report_contact(post_cap_first, post_cap_second, "post_cap_touch")
+	for _frame: int in range(80):
+		if manager.state != TurnManager.State.SIMULATING:
+			break
+		manager._physics_process(0.01)
+	assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "extension ends after both merges")
+	assert_eq(order, ["reaction", "reaction", "finished"], "reactions precede settled turn")
+	assert_eq(manager.turn_combo, 2, "post-cap merge remains in the same turn combo")
+	assert_eq(manager.merge_extension_turn_count, 1, "one turn uses merge extension")
+	assert_true(manager.merge_extension_seconds_sum > 0.0, "extension time is measured")
+	assert_eq(resolver.deferred_jelly_merge_count, 0, "post-cap pair is not deferred")
+	Config.data.game_mode = original_mode
+	Config.data.jelly_merge_duration = original_duration
+	Config.data.jelly_merge_extension_max = original_extension
+	Config.data.stable_duration = original_stable_duration
+	Config.data.max_settle_time = original_max_settle_time
+	Config.data.chain_reaction_delay = original_chain_delay
+	await _cleanup(fixture["root"] as Node)
+
+
+func test_turn_manager_merge_extension_ends_immediately_without_pair_and_hard_caps() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_duration: float = Config.data.jelly_merge_duration
+	var original_extension: float = Config.data.jelly_merge_extension_max
+	var original_stable_duration: float = Config.data.stable_duration
+	var original_max_settle_time: float = Config.data.max_settle_time
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_merge_duration = 0.2
+	Config.data.jelly_merge_extension_max = 0.05
+	Config.data.stable_duration = 10.0
+	Config.data.max_settle_time = 0.05
+	var empty_fixture: Dictionary = await _create_turn_fixture()
+	var empty_manager: TurnManager = empty_fixture["manager"] as TurnManager
+	empty_manager.set_physics_process(false)
+	empty_manager.state = TurnManager.State.SIMULATING
+	empty_manager.turn_index = 1
+	empty_manager._is_initial_settle = false
+	empty_manager._begin_settle()
+	empty_manager._physics_process(0.05)
+	assert_eq(empty_manager.state, TurnManager.State.WAITING_INPUT, "no pair ends at normal cap")
+	assert_near(empty_manager.settle_elapsed, 0.05, 0.0001, "no-pair path uses no extension")
+	assert_eq(empty_manager.merge_extension_turn_count, 0, "no-pair turn records no extension")
+	await _cleanup(empty_fixture["root"] as Node)
+
+	var fixture: Dictionary = await _create_turn_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	manager.set_physics_process(false)
+	resolver.proximity_reaction_scan_enabled = false
+	manager.state = TurnManager.State.SIMULATING
+	manager.turn_index = 1
+	manager._is_initial_settle = false
+	manager._begin_settle()
+	var active_first: Orb3D = board.spawn_orb(2, 2, Vector2(-300.0, 0.0))
+	var active_second: Orb3D = board.spawn_orb(2, 2, Vector2(-230.0, 0.0))
+	resolver.report_contact(active_first, active_second, "extension_active")
+	manager._physics_process(0.05)
+	manager._physics_process(0.05)
+	assert_true(not resolver._accepting_new_jelly_merges, "hard cap blocks new merges")
+	var deferred_first: Orb3D = board.spawn_orb(1, 1, Vector2(230.0, 0.0))
+	var deferred_second: Orb3D = board.spawn_orb(1, 1, Vector2(280.0, 0.0))
+	resolver.report_contact(deferred_first, deferred_second, "after_extension_cap")
+	for _frame: int in range(80):
+		if manager.state != TurnManager.State.SIMULATING:
+			break
+		manager._physics_process(0.01)
+	assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "hard cap waits for active merge")
+	assert_true(is_instance_valid(deferred_first), "hard-cap pair remains for next turn")
+	assert_true(is_instance_valid(deferred_second), "hard-cap partner remains for next turn")
+	assert_eq(manager.turn_combo, 1, "only the pre-cap merge joins this turn")
+	assert_eq(manager.merge_extension_capped_turn_count, 1, "extension cap is measured")
+	assert_near(manager.merge_extension_seconds_max, 0.05, 0.0001, "extension metric clamps at cap")
+	Config.data.game_mode = original_mode
+	Config.data.jelly_merge_duration = original_duration
+	Config.data.jelly_merge_extension_max = original_extension
 	Config.data.stable_duration = original_stable_duration
 	Config.data.max_settle_time = original_max_settle_time
 	await _cleanup(fixture["root"] as Node)

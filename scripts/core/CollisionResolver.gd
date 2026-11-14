@@ -311,6 +311,12 @@ func active_jelly_merge_count() -> int:
 	return _active_jelly_merges.size()
 
 
+func touching_jelly_merge_pair_count() -> int:
+	if Config.data.game_mode != GameConfig.GameMode.JELLY:
+		return 0
+	return _scan_geometric_contacts(false, false)
+
+
 func apply_jelly_tap_blast(orb: Variant) -> bool:
 	if not is_jelly_tap_blast_candidate(orb):
 		return false
@@ -1117,7 +1123,7 @@ func _path_priority(path: String) -> int:
 	return 3
 
 
-func _scan_geometric_contacts(queue_reactions: bool, measure_contacts: bool) -> void:
+func _scan_geometric_contacts(queue_reactions: bool, measure_contacts: bool) -> int:
 	var orbs: Array = []
 	for orb: Variant in _board.get_orbs():
 		if not _is_valid_reaction_orb(orb):
@@ -1159,6 +1165,7 @@ func _scan_geometric_contacts(queue_reactions: bool, measure_contacts: bool) -> 
 		bucket.append(orb_index)
 	var contact_counts: Dictionary = {}
 	var current_contacts: Dictionary = {}
+	var merge_pair_count: int = 0
 	if measure_contacts:
 		for stable_id: int in stable_ids:
 			contact_counts[stable_id] = 0
@@ -1200,13 +1207,27 @@ func _scan_geometric_contacts(queue_reactions: bool, measure_contacts: bool) -> 
 						continue
 					var orb: Variant = orbs[orb_index]
 					var candidate: Variant = orbs[candidate_index]
+					var classified: Dictionary = ReactionRules.classify(
+						orb.color,
+						orb.level,
+						candidate.color,
+						candidate.level,
+						Config.data,
+						float(orb.get("jelly_mass")),
+						float(candidate.get("jelly_mass"))
+					)
+					var reaction_type: ReactionRules.Type = (
+						classified["type"] as ReactionRules.Type
+					)
+					if reaction_type in [ReactionRules.Type.MERGE, ReactionRules.Type.MAX_CLEAR]:
+						merge_pair_count += 1
 					if queue_reactions:
 						report_contact(orb, candidate, "proximity")
 					if measure_contacts:
 						var pair_key: String = _pair_key(orb, candidate)
 						current_contacts[pair_key] = [orb, candidate]
 	if not measure_contacts:
-		return
+		return merge_pair_count
 	for pair_key_value: Variant in current_contacts.keys():
 		var pair_key: String = str(pair_key_value)
 		if _measurement_active_contacts.has(pair_key):
@@ -1239,6 +1260,7 @@ func _scan_geometric_contacts(queue_reactions: bool, measure_contacts: bool) -> 
 		)
 		_record_missed_measurement(entry, outcome)
 		_measurement_active_contacts.erase(pair_key)
+	return merge_pair_count
 
 
 func _scan_reaction_proximity_groups(queue_contacts: bool) -> void:

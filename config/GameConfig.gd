@@ -118,6 +118,7 @@ enum GameMode {
 @export var green_shake_max_speed: float = 600.0
 @export var chain_reaction_delay: float = 0.2
 @export var jelly_merge_duration: float = 0.3
+@export var jelly_merge_extension_max: float = 1.5
 @export var jelly_merge_level_gap: int = 1
 @export var jelly_merge_wide_gap_min_level: int = 0
 @export var jelly_timed_enabled: bool = true

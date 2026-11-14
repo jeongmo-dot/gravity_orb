@@ -18,6 +18,7 @@ func test_classic_orbit_progress_uses_settle_clock() -> void:
 		PackedFloat32Array([0.0, 0.0]),
 		PackedFloat32Array([0.75, 0.5]),
 		PackedFloat32Array([1.5, 1.0]),
+		PackedFloat32Array([2.25, 1.0]),
 	]
 	for sample: PackedFloat32Array in samples:
 		manager.settle_elapsed = sample[0]

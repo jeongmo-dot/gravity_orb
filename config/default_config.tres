@@ -78,6 +78,7 @@ green_shake_speed = 150.0
 green_shake_max_speed = 600.0
 chain_reaction_delay = 0.2
 jelly_merge_duration = 0.3
+jelly_merge_extension_max = 1.5
 jelly_merge_level_gap = 1
 jelly_merge_wide_gap_min_level = 0
 jelly_timed_enabled = true

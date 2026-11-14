@@ -569,6 +569,10 @@ func _run_seed(
 		"merge_delayed_turn_count": manager.merge_delayed_turn_count,
 		"merge_delay_seconds_sum": manager.merge_delay_seconds_sum,
 		"merge_delay_seconds_max": manager.merge_delay_seconds_max,
+		"merge_extension_turn_count": manager.merge_extension_turn_count,
+		"merge_extension_seconds_sum": manager.merge_extension_seconds_sum,
+		"merge_extension_seconds_max": manager.merge_extension_seconds_max,
+		"merge_extension_capped_turn_count": manager.merge_extension_capped_turn_count,
 		"max_concurrent_jelly_merges": resolver.max_concurrent_jelly_merges,
 		"deferred_jelly_merge_count": resolver.deferred_jelly_merge_count,
 		"input_waiting_turn_count": input_waiting_turn_count,
@@ -1846,6 +1850,12 @@ func _copy_preview_state(
 	target_manager.turn_combo = source_manager.turn_combo
 	target_manager.max_combo = source_manager.max_combo
 	target_manager.capped_turn_count = source_manager.capped_turn_count
+	target_manager.merge_extension_turn_count = source_manager.merge_extension_turn_count
+	target_manager.merge_extension_seconds_sum = source_manager.merge_extension_seconds_sum
+	target_manager.merge_extension_seconds_max = source_manager.merge_extension_seconds_max
+	target_manager.merge_extension_capped_turn_count = (
+		source_manager.merge_extension_capped_turn_count
+	)
 	target_manager.blocked_directions.assign(source_manager.blocked_directions)
 	target_manager.game_over_details = source_manager.game_over_details.duplicate(true)
 	target_manager.final_move_pending = source_manager.final_move_pending
@@ -2378,6 +2388,11 @@ func _apply_arguments() -> void:
 		elif argument.begins_with("--jelly-merge-duration="):
 			Config.data.jelly_merge_duration = maxf(
 				argument.trim_prefix("--jelly-merge-duration=").to_float(),
+				0.0
+			)
+		elif argument.begins_with("--jelly-merge-extension-max="):
+			Config.data.jelly_merge_extension_max = maxf(
+				argument.trim_prefix("--jelly-merge-extension-max=").to_float(),
 				0.0
 			)
 		elif argument.begins_with("--jelly-merge-level-gap="):
