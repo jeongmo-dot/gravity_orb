@@ -41,7 +41,7 @@
 ### [2026-11-14] 대상 #153 — 합체 소리: 합쳐진 크기마다 다른 음
 - 맨 앞 경고 조건 0건: 기존 해시 5개 변경 0건, 합체 외 소리의 합성·크기·시점 변경 0건, 합체 소리 횟수·재생 시점 변경 0건, `sfx_enabled=false`에서 합체 재생 0회
 - 상태: 완료 — L2~L10 합체음 9개·재생 라우팅·검수용 WAV·변경 대상 자동 테스트 완료. 주말 가벼운 모드에 따라 전체 회귀·캡처·Debug 빌드는 실행하지 않음
-- 브랜치 / PR: `merge-sfx-levels` / PR 생성 예정
+- 브랜치 / PR: `merge-sfx-levels` / https://github.com/jeongmo-dot/gravity_orb/pull/152
 - 변경 파일: `config/GameConfig.gd`, `scripts/fx/SfxBank.gd`, `tests/{test_config.gd,test_feedback.gd}`, `artifacts/sfx/merge_levels.wav`, `docs/jeongmo_codex_to_claude.md`
 - Done-when 대조:
   - [x] L2~L10 각 0.30초·44.1kHz·16비트·모노 합체음을 명세의 `pop × 0.70 + note_L × 0.55` 식과 9개 주파수로 결정적 합성. `assets/sfx/merge_<L>.wav/.ogg` 우선 로드 — 길이·두 번 합성 바이트 자동 테스트
