@@ -38,6 +38,35 @@
 
 ## 미확인
 
+### [2026-11-16] 대상 #156 — 막힘 경고 표시 삭제
+- **맨 앞 경고:** 화살표 밖에도 막힘 경고가 한 곳 있었다 — 2D `Board.gd`의 `_draw()`가 `_warning_directions` 벽에 빨간 선을 그렸다. 이 선도 함께 제거했다. JELLY 해시 상수는 그대로이고, 막힘 계산·봇 판정·FINAL MOVE 규칙은 바꾸지 않았다.
+- 상태: 완료
+- 브랜치 / PR: `remove-blocked-warning` / 생성 예정
+- 변경 파일: `scripts/ui/TurnInputIndicator.gd`, `scripts/core/Board.gd`, `tests/test_turn_input_indicator.gd`, 이 회신 파일
+- Done-when 대조:
+  - [x] 막힌 방향도 `READY_COLOR`·같은 모양·크기·숨쉬기, 빨강·✕ 없음 — `BLOCKED_COLOR`, `BLOCKED_MARK_*`, `_blocked_directions`, 막힘 표시 함수·경계 함수, `warning_changed` 구독 제거
+  - [x] 현재 중력 방향 화살표는 계속 숨김, 움직이는 중 회색 거절 화살표 유지 — 전체 회귀 + 두 비율 캡처
+  - [x] 다른 화면 경고 제거 — 2D `Board._draw()`의 빨간 막힘 벽 선 제거. 3D `Board3D.set_warning_directions()`는 기존부터 금속 프레임을 유지해 추가 경고 그림 없음
+  - [x] 전체 회귀 + JELLY 해시 상수 그대로 — 일반 375/375, 장기 4/4, 성능 5/5
+  - [x] 실제 창 두 비율 — 현재 이름 `30_board_blocked`(명세의 예전 `18_board_blocked`) 540×960·540×1170 확인
+  - [x] 빌드 없음
+- QA 관측값:
+  - `--import`, 기본 `--quit-after 300`, `--mode=blitz --quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·`ERROR:` 0건
+  - `tests/run_tests.ps1` → 일반 **375/375**, 장기 **4/4**, 성능 **5/5**, 세 프로세스 종료 코드 0, 최종 종료 코드 0, 98.676초
+  - JELLY 고정 해시 출력 전체가 기존 상수와 일치. 규칙·설정 파일 변경 0개
+  - `tests/capture_screens.ps1` → 종료 코드 0, 비율 2개, 파일 430개. `30_board_blocked.png` 두 장을 직접 확인: 위·아래·왼쪽 세 화살표가 하늘색, 빨강·✕ 0개, 현재 중력 RIGHT 화살표는 숨김
+  - 화소 검사(각 화살표와 옛 ✕ 영역): 540×960 `UP 362 / LEFT 358 / DOWN 442` 하늘색 후보 픽셀, 빨강 0; 540×1170 `UP 362 / LEFT 358 / DOWN 362`, 빨강 0
+  - 규칙 검색: 새 `Input`·전역 난수 사용 0개. `blocked_spawn_directions()`·`warning_changed` 계산·`TurnManager.blocked_directions` 변경 0개
+- 바뀐 테스트 목록:
+  - `test_turn_input_indicator.gd::test_turn_input_cues_rejection_release_policy_and_ready_tick` — 막힌 LEFT도 `READY_COLOR`, `_draw_blocked_mark` 없음, 현재 DOWN은 계속 선택 불가
+  - 같은 파일의 화살표 경계 검사에서 삭제된 ✕ 경계 기대 제거
+  - `test_space_board_visuals.gd`와 `test_jolt_integration.gd`는 이미 3D 막힘 방향이 금속 프레임·경고 띠 없음이어야 한다고 검사해 기대 변경 없이 통과
+- 수동 확인 절차:
+  1. 입력 대기에서 한 방향의 다음 생성 입구를 막힘 상태로 만든다.
+  2. 현재 중력 방향을 제외한 세 화살표가 모두 같은 하늘색으로 숨쉬고, 빨간 화살표·✕·빨간 벽 선이 없는지 본다.
+  3. 막힌 방향으로 밀어 실제 생성이 막히면 기존 FINAL MOVE 안내가 그대로 나오는지 본다.
+- 결정 사항·알려진 문제: 화면 표시만 제거하기 위해 `set_warning_directions()` API와 내부 막힘 계산은 유지했다. 캡처 파일은 gitignore 로컬 산출물이며 커밋하지 않는다. 알려진 문제 없음.
+
 ### [2026-11-15] 대상 #154 — Claude 인박스 상태 최신화 요청
 - 상태: 완료 확인 — [PR #154](https://github.com/jeongmo-dot/gravity_orb/pull/154)는 2026-11-15 09:56 KST에 병합됐고, 최종 head `3b0ba46`의 트리와 `origin/main` 병합 커밋 `aab61d8`의 트리가 동일하다.
 - 현재 main: 초기 100턴 미만 10~15·이후 5~10, queued callout 실제 숫자·보너스 보존 후속 수정, 관련 테스트가 모두 반영됐다. `project.godot` 버전은 0.16.11 그대로다.

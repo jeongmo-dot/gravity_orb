@@ -89,15 +89,6 @@ func test_turn_input_cues_rejection_release_policy_and_ready_tick() -> void:
 			Rect2(Vector2.ZERO, indicator.size).encloses(bounds),
 			"%s chevron stays inside the HUD canvas" % OrbTypes.dir_name(direction)
 		)
-		var mark_bounds: Rect2 = indicator.blocked_mark_bounds(board_rect, direction)
-		assert_true(
-			_not_inside_board(mark_bounds, board_rect, direction),
-			"%s blocked X stays outside the board" % OrbTypes.dir_name(direction)
-		)
-		assert_true(
-			Rect2(Vector2.ZERO, indicator.size).encloses(mark_bounds),
-			"%s blocked X stays inside the HUD canvas" % OrbTypes.dir_name(direction)
-		)
 	assert_true(not indicator.orbit_visible(), "ready cue hides orbiting light")
 	assert_near(indicator.border_alpha(), 1.0, 0.001, "ready border is bright")
 	assert_eq(_turn_ready_sound_count, 1, "initial unlock plays one ready tick")
@@ -122,8 +113,8 @@ func test_turn_input_cues_rejection_release_policy_and_ready_tick() -> void:
 	manager.warning_changed.emit(blocked)
 	assert_eq(
 		indicator.arrow_color(Vector2i.LEFT),
-		TurnInputIndicator.BLOCKED_COLOR,
-		"blocked direction arrow is red"
+		TurnInputIndicator.READY_COLOR,
+		"blocked direction arrow stays sky blue"
 	)
 	assert_eq(
 		indicator.arrow_color(Vector2i.RIGHT),
@@ -131,8 +122,12 @@ func test_turn_input_cues_rejection_release_policy_and_ready_tick() -> void:
 		"available direction arrow stays sky blue"
 	)
 	assert_true(
+		not indicator.has_method("_draw_blocked_mark"),
+		"blocked direction does not draw an X mark"
+	)
+	assert_true(
 		not indicator.is_direction_selectable(Vector2i.DOWN),
-		"current direction hides its blocked mark with the arrow"
+		"current direction still hides its arrow"
 	)
 
 	manager.on_swipe(Vector2i.RIGHT)
