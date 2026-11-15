@@ -11,10 +11,20 @@ static func classify(
 	level_b: int,
 	cfg: GameConfig,
 	mass_a: float = -1.0,
-	mass_b: float = -1.0
+	mass_b: float = -1.0,
+	timed_pair: bool = false
 ) -> Dictionary:
 	if cfg.game_mode == GameConfig.GameMode.JELLY:
-		return _classify_jelly(color_a, level_a, color_b, level_b, cfg, mass_a, mass_b)
+		return _classify_jelly(
+			color_a,
+			level_a,
+			color_b,
+			level_b,
+			cfg,
+			mass_a,
+			mass_b,
+			timed_pair
+		)
 	if color_a == color_b and level_a == level_b:
 		if level_a == cfg.orb_max_level:
 			return _result(Type.MAX_CLEAR, 0, color_a)
@@ -48,20 +58,19 @@ static func can_react(
 	level_a: int,
 	color_b: int,
 	level_b: int,
-	cfg: GameConfig
+	cfg: GameConfig,
+	timed_pair: bool = false
 ) -> bool:
 	if cfg.game_mode == GameConfig.GameMode.JELLY:
-		var level_gap: int = absi(level_a - level_b)
-		var base_gap: int = maxi(cfg.jelly_merge_level_gap, 0)
-		var wide_gap_allowed: bool = (
-			cfg.jelly_merge_wide_gap_min_level > 0
-			and level_gap == base_gap + 1
-			and maxi(level_a, level_b) >= cfg.jelly_merge_wide_gap_min_level
-		)
 		return (
 			(
 				color_a == color_b
-				and (level_gap <= base_gap or wide_gap_allowed)
+				and _jelly_same_color_can_merge(
+					level_a,
+					level_b,
+					cfg,
+					timed_pair
+				)
 			)
 			or (
 				color_a != color_b
@@ -92,18 +101,12 @@ static func _classify_jelly(
 	level_b: int,
 	cfg: GameConfig,
 	mass_a: float,
-	mass_b: float
+	mass_b: float,
+	timed_pair: bool
 ) -> Dictionary:
-	var level_gap: int = absi(level_a - level_b)
-	var base_gap: int = maxi(cfg.jelly_merge_level_gap, 0)
-	var wide_gap_allowed: bool = (
-		cfg.jelly_merge_wide_gap_min_level > 0
-		and level_gap == base_gap + 1
-		and maxi(level_a, level_b) >= cfg.jelly_merge_wide_gap_min_level
-	)
 	if (
 		color_a == color_b
-		and (level_gap <= base_gap or wide_gap_allowed)
+		and _jelly_same_color_can_merge(level_a, level_b, cfg, timed_pair)
 	):
 		if level_a == cfg.orb_max_level and level_b == cfg.orb_max_level:
 			return _result(Type.MAX_CLEAR, 0, color_a)
@@ -136,6 +139,37 @@ static func _classify_jelly(
 	if color_a != color_b and cfg.jelly_blast_enabled_for_pair(level_a, level_b):
 		return _result(Type.BLAST, 0, color_a)
 	return _result(Type.NONE, 0, color_a)
+
+
+static func jelly_merge_level_gap(cfg: GameConfig, timed_pair: bool = false) -> int:
+	if timed_pair and cfg.jelly_timed_merge_level_gap >= 0:
+		return maxi(cfg.jelly_timed_merge_level_gap, 0)
+	return maxi(cfg.jelly_merge_level_gap, 0)
+
+
+static func jelly_merge_candidate_level_gap(cfg: GameConfig) -> int:
+	var normal_gap: int = jelly_merge_level_gap(cfg, false)
+	if cfg.jelly_merge_wide_gap_min_level > 0:
+		normal_gap += 1
+	return maxi(normal_gap, jelly_merge_level_gap(cfg, true))
+
+
+static func _jelly_same_color_can_merge(
+	level_a: int,
+	level_b: int,
+	cfg: GameConfig,
+	timed_pair: bool
+) -> bool:
+	var level_gap: int = absi(level_a - level_b)
+	var base_gap: int = jelly_merge_level_gap(cfg, timed_pair)
+	if level_gap <= base_gap:
+		return true
+	return (
+		not timed_pair
+		and cfg.jelly_merge_wide_gap_min_level > 0
+		and level_gap == base_gap + 1
+		and maxi(level_a, level_b) >= cfg.jelly_merge_wide_gap_min_level
+	)
 
 
 static func _result(

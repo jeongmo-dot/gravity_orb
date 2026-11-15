@@ -11,8 +11,8 @@ param(
 	[switch]$TapBlastBot,
 	[ValidateSet("None", "Save", "All")]
 	[string]$TapBlastBotMode = "None",
-	[ValidateRange(0, 10)]
-	[int]$JellyMergeLevelGap = 1,
+	[ValidateRange(-1, 10)]
+	[int]$JellyMergeLevelGap = -1,
 	[ValidateRange(0, 10)]
 	[int]$JellyMergeWideGapMinLevel = 0,
 	[ValidateRange(0.0, 10.0)]
@@ -74,6 +74,7 @@ param(
 	[int]$SpawnCountMax = 4,
 	[string]$Strategies = "r,g,l_merge",
 	[string]$MeasurementLabel = "",
+	[switch]$TurnProgress,
     [switch]$ReuseCompleted,
     [switch]$AggregateOnly
 )
@@ -99,7 +100,9 @@ if ([string]::IsNullOrWhiteSpace($GodotPath)) {
     if (-not [string]::IsNullOrWhiteSpace($env:GODOT)) {
         $GodotPath = $env:GODOT
     } else {
-        $GodotPath = "C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe"
+        # Track the real engine process. The console launcher can exit or become
+        # stale while its GUI-binary child is still running a long measurement.
+        $GodotPath = "C:\work\GodotStandard\Godot_v4.8-dev3_win64.exe"
     }
 }
 New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
@@ -133,8 +136,9 @@ if (-not $AggregateOnly) {
                     "res://tests/spike/JoltMeasurement.tscn", "--",
                     "--game-mode=jelly", "--jolt-ticks=120", "--jolt-seeds=$($shard.Csv)",
                     "--jolt-max-turns=$TurnCap", "--jolt-no-determinism", "--skill-strategy=$strategy",
+					$(if ($TurnProgress) { "--jolt-turn-progress" } else { "" }),
 					"--jelly-level-profile=$LevelProfile",
-					"--jelly-merge-level-gap=$JellyMergeLevelGap",
+					$(if ($JellyMergeLevelGap -ge 0) { "--jelly-merge-level-gap=$JellyMergeLevelGap" } else { "" }),
 					"--jelly-merge-wide-gap-min-level=$JellyMergeWideGapMinLevel",
 					"--jelly-merge-extension-max=$($JellyMergeExtensionMax.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--jelly-timed-enabled=$($JellyTimedEnabled.ToLower())",
@@ -184,27 +188,56 @@ if (-not $AggregateOnly) {
             $processArguments = @($task.Arguments | Where-Object { -not [string]::IsNullOrEmpty($_) })
             $process = Start-Process -FilePath $GodotPath -ArgumentList $processArguments -WindowStyle Hidden `
                 -PassThru -RedirectStandardOutput $task.Stdout -RedirectStandardError $task.Stderr
-            $running += [pscustomobject]@{ Task = $task; Process = $process }
+            $running += [pscustomobject]@{
+				Task = $task
+				Process = $process
+				StartedAt = Get-Date
+				PeakWorkingSet64 = [long]0
+				LastProgressLine = ""
+			}
             Write-Output "JELLY_MEASUREMENT_START name=$($task.Name) pid=$($process.Id)"
         }
         Start-Sleep -Milliseconds 500
         $stillRunning = @()
         foreach ($entry in $running) {
 			$entry.Process.Refresh()
-			if (-not $entry.Process.HasExited) {
+			try {
+				$entry.PeakWorkingSet64 = [Math]::Max(
+					[long]$entry.PeakWorkingSet64,
+					[long]$entry.Process.PeakWorkingSet64
+				)
+			} catch {
+				# The process can exit between Refresh() and reading memory counters.
+			}
+			if ($TurnProgress -and (Test-Path -LiteralPath $entry.Task.Stdout)) {
+				$progressLine = @(
+					Get-Content -LiteralPath $entry.Task.Stdout -Tail 8 -ErrorAction SilentlyContinue |
+						Where-Object { $_ -like "JOLT3D_PROGRESS*" }
+				) | Select-Object -Last 1
+				if (-not [string]::IsNullOrWhiteSpace($progressLine) -and $progressLine -ne $entry.LastProgressLine) {
+					$entry.LastProgressLine = $progressLine
+					Write-Output "$($entry.Task.Name) $progressLine"
+				}
+			}
+			$liveProcess = Get-Process -Id $entry.Process.Id -ErrorAction SilentlyContinue
+			if ($null -ne $liveProcess) {
 				$stillRunning += $entry
 				continue
 			}
-			$entry.Process.WaitForExit()
+			$null = $entry.Process.WaitForExit(1000)
 			$entry.Process.Refresh()
             $stdout = Get-Content -LiteralPath $entry.Task.Stdout -Raw -ErrorAction SilentlyContinue
             $stderr = Get-Content -LiteralPath $entry.Task.Stderr -Raw -ErrorAction SilentlyContinue
             $exitCode = if ($null -eq $entry.Process.ExitCode) { 0 } else { [int]$entry.Process.ExitCode }
+			$exitUnsigned = [BitConverter]::ToUInt32([BitConverter]::GetBytes([int]$exitCode), 0)
+			$exitHex = "0x{0:X8}" -f $exitUnsigned
+			$elapsedSeconds = [Math]::Round(((Get-Date) - $entry.StartedAt).TotalSeconds, 2)
+			$peakMemoryMb = [Math]::Round(([double]$entry.PeakWorkingSet64 / 1MB), 2)
             if ($exitCode -ne 0 -or ("$stdout`n$stderr" -match "SCRIPT ERROR|Parse Error|ERROR:")) {
-                throw "$($entry.Task.Name) failed exit=$exitCode`n$stdout`n$stderr"
+                throw "$($entry.Task.Name) failed exit=$exitCode exit_hex=$exitHex elapsed_s=$elapsedSeconds peak_mb=$peakMemoryMb`n$stdout`n$stderr"
             }
             if (-not (Test-Path -LiteralPath $entry.Task.Output)) { throw "Missing $($entry.Task.Output)" }
-            Write-Output "JELLY_MEASUREMENT_DONE name=$($entry.Task.Name) exit=0"
+            Write-Output "JELLY_MEASUREMENT_DONE name=$($entry.Task.Name) exit=0 exit_hex=$exitHex elapsed_s=$elapsedSeconds peak_mb=$peakMemoryMb"
         }
 		$running = $stillRunning
     }
@@ -428,12 +461,29 @@ function Get-Summary($Rows) {
 
 $rows = [ordered]@{}
 foreach ($strategy in $resolvedStrategies) { $rows[$strategy] = @() }
+$effectiveJellyMergeLevelGap = $null
+$effectiveJellyTimedMergeLevelGap = $null
 foreach ($strategy in @($rows.Keys)) {
     $shardSize = 1
     foreach ($shard in @(Get-SeedShards $SeedCount $shardSize)) {
         $filePath = Join-Path $outputDirectory "jelly_${measurementLabel}_${strategy}_part$($shard.Start)-$($shard.End).json"
         if (-not (Test-Path -LiteralPath $filePath)) { throw "Missing $filePath" }
-        $rows[$strategy] += @((Get-Content -LiteralPath $filePath -Raw | ConvertFrom-Json).ticks[0].seeds)
+		$rawReport = Get-Content -LiteralPath $filePath -Raw | ConvertFrom-Json
+		if ($null -eq $rawReport.PSObject.Properties['jelly_timed_merge_level_gap']) {
+			throw "$filePath is missing jelly_timed_merge_level_gap"
+		}
+		$reportedMergeLevelGap = [int]$rawReport.jelly_merge_level_gap
+		$reportedTimedMergeLevelGap = [int]$rawReport.jelly_timed_merge_level_gap
+		if ($null -eq $effectiveJellyMergeLevelGap) {
+			$effectiveJellyMergeLevelGap = $reportedMergeLevelGap
+			$effectiveJellyTimedMergeLevelGap = $reportedTimedMergeLevelGap
+		} elseif (
+			$effectiveJellyMergeLevelGap -ne $reportedMergeLevelGap -or
+			$effectiveJellyTimedMergeLevelGap -ne $reportedTimedMergeLevelGap
+		) {
+			throw "Inconsistent merge level gaps in $filePath"
+		}
+		$rows[$strategy] += @($rawReport.ticks[0].seeds)
     }
     $rows[$strategy] = @($rows[$strategy] | Sort-Object { [int]$_.seed })
     if ($rows[$strategy].Count -ne $SeedCount) { throw "$strategy expected $SeedCount rows, got $($rows[$strategy].Count)" }
@@ -481,7 +531,8 @@ $report = [ordered]@{
 	jelly_tap_effect_modes = $JellyTapEffectModes.ToLower()
 	turn_start_colors = $TurnStartColors
 	turn_color_unlock_turns = $TurnColorUnlockTurns.ToLower()
-	jelly_merge_level_gap = $JellyMergeLevelGap
+	jelly_merge_level_gap = $effectiveJellyMergeLevelGap
+	jelly_timed_merge_level_gap = $effectiveJellyTimedMergeLevelGap
 	jelly_merge_wide_gap_min_level = $JellyMergeWideGapMinLevel
 	jelly_merge_extension_max = $JellyMergeExtensionMax
 	jelly_timed_enabled = $JellyTimedEnabled -eq "On"

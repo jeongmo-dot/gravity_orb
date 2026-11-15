@@ -4,6 +4,8 @@ param(
     [string]$Label = "after",
     [ValidateRange(1, 16)]
     [int]$Parallelism = 4,
+	[ValidateRange(1, 20)]
+	[int]$SeedCount = 20,
     [double]$Friction = -1.0,
     [double]$AngularDamp = -1.0,
     [double]$GravityTurnDiagonalTime = -1.0,
@@ -62,8 +64,8 @@ param(
 	[double]$JellyMergeDuration = 0.3,
 	[ValidateRange(0.0, 10.0)]
 	[double]$JellyMergeExtensionMax = 1.5,
-	[ValidateRange(0, 10)]
-	[int]$JellyMergeLevelGap = 1,
+	[ValidateRange(-1, 10)]
+	[int]$JellyMergeLevelGap = -1,
 	[ValidateRange(0, 10)]
 	[int]$JellyMergeWideGapMinLevel = 0,
 	[ValidateSet("On", "Off")]
@@ -101,7 +103,9 @@ $resolvedTapBlastBotMode = if ($TapBlastBot -and $TapBlastBotMode -eq "None") { 
 $physicsArguments += "--jelly-tap-blast-bot=$($resolvedTapBlastBotMode.ToLower())"
 $physicsArguments += "--jelly-merge-duration=$($JellyMergeDuration.ToString($culture))"
 $physicsArguments += "--jelly-merge-extension-max=$($JellyMergeExtensionMax.ToString($culture))"
-$physicsArguments += "--jelly-merge-level-gap=$JellyMergeLevelGap"
+if ($JellyMergeLevelGap -ge 0) {
+	$physicsArguments += "--jelly-merge-level-gap=$JellyMergeLevelGap"
+}
 $physicsArguments += "--jelly-merge-wide-gap-min-level=$JellyMergeWideGapMinLevel"
 $physicsArguments += "--jelly-timed-enabled=$($JellyTimedEnabled.ToLower())"
 $physicsArguments += "--jelly-timed-turns=$JellyTimedTurns"
@@ -159,7 +163,8 @@ $outputDirectory = Join-Path $RepoPath "artifacts\jelly_physics_autoplay_$Label"
 New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
 
 $tasks = @()
-foreach ($seed in 101..120) {
+$seeds = @(101..(100 + $SeedCount))
+foreach ($seed in $seeds) {
     $name = "seed_$seed"
     $tasks += [pscustomobject]@{
         Seed = $seed
@@ -278,8 +283,31 @@ $timedStoneCreated = 0
 $timedStoneMaxConcurrent = 0
 $timedStoneRemaining = 0
 $timedStoneReactions = 0
+$effectiveJellyMergeLevelGap = $null
+$effectiveJellyTimedMergeLevelGap = $null
+$effectiveSpawnCountMax = $null
 foreach ($task in $tasks) {
     $report = Get-Content -LiteralPath $task.Output -Raw | ConvertFrom-Json
+	if ($null -eq $report.PSObject.Properties['jelly_timed_merge_level_gap']) {
+		throw "$($task.Output) is missing jelly_timed_merge_level_gap"
+	}
+	if ($null -eq $report.PSObject.Properties['spawn_count_max']) {
+		throw "$($task.Output) is missing spawn_count_max"
+	}
+	$reportedMergeLevelGap = [int]$report.jelly_merge_level_gap
+	$reportedTimedMergeLevelGap = [int]$report.jelly_timed_merge_level_gap
+	$reportedSpawnCountMax = [int]$report.spawn_count_max
+	if ($null -eq $effectiveJellyMergeLevelGap) {
+		$effectiveJellyMergeLevelGap = $reportedMergeLevelGap
+		$effectiveJellyTimedMergeLevelGap = $reportedTimedMergeLevelGap
+		$effectiveSpawnCountMax = $reportedSpawnCountMax
+	} elseif (
+		$effectiveJellyMergeLevelGap -ne $reportedMergeLevelGap -or
+		$effectiveJellyTimedMergeLevelGap -ne $reportedTimedMergeLevelGap -or
+		$effectiveSpawnCountMax -ne $reportedSpawnCountMax
+	) {
+		throw "Inconsistent effective settings in $($task.Output)"
+	}
     $tick = $report.ticks[0]
     $seedRow = $tick.seeds[0]
     $seedRows += $seedRow
@@ -474,7 +502,7 @@ foreach ($scoreKey in $reactionScoreTotals.Keys) {
 $summary = [ordered]@{
     label = $Label
     engine = "Godot 4.8-dev3 standard"
-    seeds = @(101..120)
+    seeds = $seeds
     fixed_fps = 120
     max_turns = $MaxTurns
 	level_profile = if ($LevelProfile -eq "Default") { "D" } else { $LevelProfile }
@@ -491,7 +519,8 @@ $summary = [ordered]@{
 	turn_color_unlock_turns = $TurnColorUnlockTurns.ToLower()
 	jelly_merge_duration = $JellyMergeDuration
 	jelly_merge_extension_max = $JellyMergeExtensionMax
-	jelly_merge_level_gap = $JellyMergeLevelGap
+	jelly_merge_level_gap = $effectiveJellyMergeLevelGap
+	jelly_timed_merge_level_gap = $effectiveJellyTimedMergeLevelGap
 	jelly_merge_wide_gap_min_level = $JellyMergeWideGapMinLevel
 	jelly_tap_blast_min_level = $JellyTapBlastMinLevel
 	jelly_blast_requires_same_level = $JellyBlastRequiresSameLevel -eq "On"
@@ -507,7 +536,7 @@ $summary = [ordered]@{
     angular_damp = if ($AngularDamp -ge 0.0) { $AngularDamp } else { $null }
     gravity_turn_diagonal_time = if ($GravityTurnDiagonalTime -ge 0.0) { $GravityTurnDiagonalTime } else { $null }
     jelly_blast_min_level = if ($JellyBlastMinLevel -ge 0) { $JellyBlastMinLevel } else { $null }
-    spawn_count_max = if ($SpawnCountMax -ge 0) { $SpawnCountMax } else { $null }
+    spawn_count_max = $effectiveSpawnCountMax
     spawn_level_costs = if ([string]::IsNullOrWhiteSpace($SpawnLevelCosts)) { $null } else { $SpawnLevelCosts }
     game_over_count = $completedGames.Count
     incomplete_count = $incompleteGames.Count
