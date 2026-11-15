@@ -285,21 +285,28 @@ $timedStoneRemaining = 0
 $timedStoneReactions = 0
 $effectiveJellyMergeLevelGap = $null
 $effectiveJellyTimedMergeLevelGap = $null
+$effectiveSpawnCountMax = $null
 foreach ($task in $tasks) {
     $report = Get-Content -LiteralPath $task.Output -Raw | ConvertFrom-Json
 	if ($null -eq $report.PSObject.Properties['jelly_timed_merge_level_gap']) {
 		throw "$($task.Output) is missing jelly_timed_merge_level_gap"
 	}
+	if ($null -eq $report.PSObject.Properties['spawn_count_max']) {
+		throw "$($task.Output) is missing spawn_count_max"
+	}
 	$reportedMergeLevelGap = [int]$report.jelly_merge_level_gap
 	$reportedTimedMergeLevelGap = [int]$report.jelly_timed_merge_level_gap
+	$reportedSpawnCountMax = [int]$report.spawn_count_max
 	if ($null -eq $effectiveJellyMergeLevelGap) {
 		$effectiveJellyMergeLevelGap = $reportedMergeLevelGap
 		$effectiveJellyTimedMergeLevelGap = $reportedTimedMergeLevelGap
+		$effectiveSpawnCountMax = $reportedSpawnCountMax
 	} elseif (
 		$effectiveJellyMergeLevelGap -ne $reportedMergeLevelGap -or
-		$effectiveJellyTimedMergeLevelGap -ne $reportedTimedMergeLevelGap
+		$effectiveJellyTimedMergeLevelGap -ne $reportedTimedMergeLevelGap -or
+		$effectiveSpawnCountMax -ne $reportedSpawnCountMax
 	) {
-		throw "Inconsistent merge level gaps in $($task.Output)"
+		throw "Inconsistent effective settings in $($task.Output)"
 	}
     $tick = $report.ticks[0]
     $seedRow = $tick.seeds[0]
@@ -529,7 +536,7 @@ $summary = [ordered]@{
     angular_damp = if ($AngularDamp -ge 0.0) { $AngularDamp } else { $null }
     gravity_turn_diagonal_time = if ($GravityTurnDiagonalTime -ge 0.0) { $GravityTurnDiagonalTime } else { $null }
     jelly_blast_min_level = if ($JellyBlastMinLevel -ge 0) { $JellyBlastMinLevel } else { $null }
-    spawn_count_max = if ($SpawnCountMax -ge 0) { $SpawnCountMax } else { $null }
+    spawn_count_max = $effectiveSpawnCountMax
     spawn_level_costs = if ([string]::IsNullOrWhiteSpace($SpawnLevelCosts)) { $null } else { $SpawnLevelCosts }
     game_over_count = $completedGames.Count
     incomplete_count = $incompleteGames.Count
