@@ -357,7 +357,7 @@ func test_jelly_merge_level_gap_controls_same_color_absorption_only() -> void:
 	assert_eq(different_gap["type"], ReactionRules.Type.NONE, "merge gap does not affect colors")
 
 
-func test_jelly_default_gap_two_and_timed_gap_one_rules() -> void:
+func test_jelly_default_gap_two_including_timed_pairs() -> void:
 	var cfg: GameConfig = GameConfig.new()
 	cfg.game_mode = GameConfig.GameMode.JELLY
 	var allowed_pairs: Array[Array] = [
@@ -391,26 +391,33 @@ func test_jelly_default_gap_two_and_timed_gap_one_rules() -> void:
 	assert_eq(ReactionRules.classify(0, 8, 1, 10, cfg)["type"], ReactionRules.Type.BLAST, "different L8/L10 still blasts")
 	assert_eq(ReactionRules.classify(0, 7, 1, 9, cfg)["type"], ReactionRules.Type.NONE, "different L7/L9 stays inert")
 
-	for adjacent_level: int in [4, 6]:
+	for timed_level: int in [3, 4, 6, 7]:
 		var timed_allowed: Dictionary = ReactionRules.classify(
 			2,
 			5,
 			2,
-			adjacent_level,
+			timed_level,
 			cfg,
 			-1.0,
 			-1.0,
 			true
 		)
-		assert_eq(timed_allowed["type"], ReactionRules.Type.MERGE, "timed L5 merges adjacent L%d" % adjacent_level)
-		assert_true(ReactionRules.can_react(2, 5, 2, adjacent_level, cfg, true), "timed predicate allows adjacent L%d" % adjacent_level)
+		assert_eq(timed_allowed["type"], ReactionRules.Type.MERGE, "default timed L5 merges L%d" % timed_level)
+		assert_true(ReactionRules.can_react(2, 5, 2, timed_level, cfg, true), "default timed predicate allows L%d" % timed_level)
+
+	cfg.jelly_timed_merge_level_gap = 1
+	for adjacent_level: int in [4, 6]:
+		assert_true(
+			ReactionRules.can_react(2, 5, 2, adjacent_level, cfg, true),
+			"explicit timed gap one allows adjacent L%d" % adjacent_level
+		)
 	for distant_level: int in [3, 7]:
 		assert_eq(
 			ReactionRules.classify(2, 5, 2, distant_level, cfg, -1.0, -1.0, true)["type"],
 			ReactionRules.Type.NONE,
-			"timed L5 rejects L%d" % distant_level
+			"explicit timed gap one rejects L%d" % distant_level
 		)
-		assert_true(not ReactionRules.can_react(2, distant_level, 2, 5, cfg, true), "timed predicate rejects reversed L%d/L5" % distant_level)
+		assert_true(not ReactionRules.can_react(2, distant_level, 2, 5, cfg, true), "explicit timed predicate rejects reversed L%d/L5" % distant_level)
 	cfg.jelly_merge_wide_gap_min_level = 5
 	assert_true(not ReactionRules.can_react(2, 5, 2, 3, cfg, true), "timed pair ignores H widening")
 	cfg.jelly_timed_merge_level_gap = -1

@@ -428,7 +428,7 @@ func test_timed_merge_gap_reaches_pair_flush_and_proximity_paths() -> void:
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.jelly_merge_duration = 0.0
 	Config.data.jelly_merge_level_gap = 2
-	Config.data.jelly_timed_merge_level_gap = 1
+	Config.data.jelly_timed_merge_level_gap = -1
 	var fixture: Dictionary = await _create_fixture()
 	var board: Board3D = fixture["board"] as Board3D
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
@@ -436,7 +436,15 @@ func test_timed_merge_gap_reaches_pair_flush_and_proximity_paths() -> void:
 	var pair: Array[Orb3D] = await _spawn_gap_pair(board, 5, false, 3, false)
 	assert_true(resolver._pair_can_react(pair[0], pair[1]), "normal L5/L3 pair reacts")
 	assert_eq(resolver._scan_geometric_contacts(false, false), 1, "proximity finds normal gap two")
+	pair = await _spawn_gap_pair(board, 5, true, 3, false)
+	assert_true(resolver._pair_can_react(pair[0], pair[1]), "default timed absorber follows gap two")
+	assert_eq(resolver._scan_geometric_contacts(false, false), 1, "proximity finds default timed gap two")
+	var default_lower: Dictionary = await _resolve_timed_pair(board, resolver, 5, true, 3, false)
+	assert_true(bool(default_lower["timed_success"]), "default timed L5/L3 gets success bonus")
+	var default_upper: Dictionary = await _resolve_timed_pair(board, resolver, 5, true, 7, false)
+	assert_true(bool(default_upper["timed_success"]), "default timed L5/L7 gets success bonus")
 
+	Config.data.jelly_timed_merge_level_gap = 1
 	pair = await _spawn_gap_pair(board, 5, true, 3, false)
 	assert_true(not resolver._pair_can_react(pair[0], pair[1]), "timed absorber rejects gap two")
 	assert_eq(resolver._scan_geometric_contacts(false, false), 0, "proximity rejects timed gap two")
