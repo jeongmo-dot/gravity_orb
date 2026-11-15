@@ -41,7 +41,7 @@
 ### [2026-11-15] 대상 #155 — 같은 색 합체 레벨 차 2, 시한 젤리는 1
 - 맨 앞 경고 조건 0건: 보존 대상 기존 해시 20개 변경 0건, 시한 젤리 상태 전달 누락 경로 0건, 런타임의 복제된 레벨 차 판정 0곳. 일반·시한·H 확장 선택은 `ReactionRules`로 중앙화했다.
 - 상태: 완료 — 일반 JELLY 기본 합체 차이를 2로 바꾸고, 활성 시한 젤리가 포함된 쌍은 별도 기본값 1을 사용하도록 구현했다. 시한 돌은 기존처럼 비반응이다.
-- 브랜치 / PR: `merge-gap-2` / PR 생성 후 링크 추가
+- 브랜치 / PR: `merge-gap-2` / https://github.com/jeongmo-dot/gravity_orb/pull/156
 - 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/{ReactionRules.gd,CollisionResolver.gd}`, `tests/spike/{run_jolt_3d_measurement.gd,capture_screens.gd}`, `tests/{test_config.gd,test_rules.gd,test_jelly_regression.gd,test_timed_jelly.gd,test_full_board_performance_equivalence.gd}`, 이 회신 파일
 - Done-when 대조:
   - [x] 일반 기본 `jelly_merge_level_gap=2`, 새 `jelly_timed_merge_level_gap=1`; 음수 시한 값은 일반 기본 차이를 따름 — config·rules 자동 테스트
