@@ -36,22 +36,25 @@
 
 ## 대기 중
 
-### [2026-11-15 #155] 같은 색 합체 레벨 차 2 다시 시도
-- 상태: 대기 (main 위에서 — 이 명세 커밋 뒤). 인박스 번호 #155는 GitHub PR #155 (#154 인박스 상태 요청)와 다르다
-- 근거: [technical_design.md](technical_design.md) **§12-ONE.45**, §4 `jelly_merge_level_gap` 행
-- 배경: 사용자 (2026-11-15) "지금은 1 레벨 차이만 병합하잖아. 2레벨 차이 병합 시도해보자"
-- 앵커: `config/GameConfig.gd` `jelly_merge_level_gap`, `config/default_config.tres`, `scripts/core/ReactionRules.gd` `can_react()`·`_classify_jelly()`, `scripts/core/CollisionResolver.gd` `_has_pending_jelly_reactions()`, `tests/test_config.gd`·`test_rules.gd`·`test_jelly_regression.gd`·`test_timed_jelly.gd`
-- 요구 (§12-ONE.45 1~4):
-  1. `jelly_merge_level_gap` 1 → **2** (`GameConfig.gd` 선언과 `default_config.tres` 둘 다). 값 말고 코드 변경 없음 예상 — 레벨 차를 따로 적은 곳이 있으면 회신에 목록
-  2. 지금 해시 상수 20종 그대로 (기본을 물려받는 묶음은 1 고정), 새 기본 해시 **GAP2** 고정
-  3. 테스트 — 기본값, 판정 (L3 + L1·L7 + L5·L5 + L3·L6 + L4·L10 + L8 흡수, L4 + L1·L8 + L5 없음, 다른 색 그대로), 시한 L5 두 단계 짝 보너스 +1, 돌 반응 없음, 대기 판정 L5·L3 true
-  4. 캡처 없음, 빌드 없음
-- 수치 (사용자·Claude): `jelly_merge_level_gap` 2
-- 건드리지 말 것: 다른 규칙·수치 (`spawn_count_max`·대폭발·소폭발·청소·시한 젤리·돌·점수·물리), 그림·소리·안내 (명세에 없는 것 금지, 고리 금지), 지금 해시 상수, 사용자 저장 파일, `project.godot` 버전·`build/windows/` (**빌드 없음**), `docs/` (회신 파일 제외)
-- **가벼운 모드 (주말)**: §12-ONE.45 3번의 파일과 고친 파일만. 전체 회귀·봇 측정·Debug 빌드 하지 않음. 기본 레벨 차 1에 기대는 테스트를 찾은 목록은 회신에
-- **회신 맨 앞에**: 지금 해시 상수가 바뀜, 값 말고 코드 변경이 필요했음, 레벨 차를 따로 적은 곳 발견
+### [2026-11-15 #155] 같은 색 합체 레벨 차 2 다시 시도 — 시한 젤리는 1
+- 상태: 대기 (main 위에서 — 이 명세 커밋 뒤). 인박스 번호 #155는 GitHub PR #155 (#154 인박스 상태 요청)와 다르다. 2026-11-15 명세 고침 (시한 젤리 1 추가) — 고친 뒤의 내용으로 한다
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.45**, §4 `jelly_merge_level_gap` 행·#155 `jelly_timed_merge_level_gap` 행
+- 배경: 사용자 (2026-11-15) "지금은 1 레벨 차이만 병합하잖아. 2레벨 차이 병합 시도해보자" → "시한 젤리는 그대로 1레벨 차이만 병합"
+- 앵커: `config/GameConfig.gd` `jelly_merge_level_gap`·새 필드, `config/default_config.tres`, `scripts/core/ReactionRules.gd` `can_react()`·`classify()`·`_classify_jelly()`, `scripts/core/CollisionResolver.gd` `_pair_can_react()`·`flush()`·근접 훑기 (약 1250행)·`_has_pending_jelly_reactions()`, `Orb3D`·`Orb` `is_timed`, `tests/spike/run_jolt_3d_measurement.gd`·`tests/spike/capture_screens.gd` 예측, `tests/test_config.gd`·`test_rules.gd`·`test_jelly_regression.gd`·`test_timed_jelly.gd`
+- 요구 (§12-ONE.45 1~6):
+  1. `jelly_merge_level_gap` 1 → **2** (`GameConfig.gd` 선언과 `default_config.tres` 둘 다)
+  2. 새 필드 `jelly_timed_merge_level_gap` **1** — 같은 색 쌍 중 하나가 숫자가 남은 시한 젤리면 이 상한 (H 넓히기 없음). −1이면 보통 상한을 따름
+  3. 상한 고르는 곳은 `ReactionRules` 하나 (선택 인자, 기본 false면 지금과 같음). 판정 경로 다섯 곳 (`_pair_can_react()`·`flush()`·근접 훑기·대기 판정 후보 범위·측정/캡처 예측) 모두 시한 여부를 넘김
+  4. 지금 해시 상수 20종 그대로 (기본을 물려받는 묶음은 보통 상한 1 고정), 새 기본 해시 **GAP2** 고정
+  5. 테스트 — 기본값 둘, 보통 판정 (L3 + L1·L7 + L5·L5 + L3·L6 + L4·L10 + L8 흡수, L4 + L1·L8 + L5 없음, 다른 색 그대로), 시한 판정 (L4·L6 합체·보너스, L3·L7 없음, −1이면 L3 합체), 돌 그대로, 경로 일치, 대기 판정 (보통 L5·L3 true, 시한 L5·L3 false, 시한 L5·L4 true)
+  6. 캡처 없음, 빌드 없음
+- 수치 (사용자): `jelly_merge_level_gap` 2, `jelly_timed_merge_level_gap` 1
+- 건드리지 말 것: 다른 규칙·수치 (`spawn_count_max`·대폭발·소폭발·청소·시한 젤리 차례·L5·숫자·보너스·돌·점수·물리), 그림·소리·안내 (명세에 없는 것 금지, 고리 금지), 지금 해시 상수, 사용자 저장 파일, `project.godot` 버전·`build/windows/` (**빌드 없음**), `docs/` (회신 파일 제외)
+- **가벼운 모드 (주말)**: §12-ONE.45 5번의 파일만. 전체 회귀·봇 측정·Debug 빌드 하지 않음. 기본 레벨 차 1에 기대던 테스트 목록은 회신에
+- **회신 맨 앞에**: 지금 해시 상수가 바뀜, 시한 여부를 넘기지 못한 판정 경로가 남음, 레벨 차를 따로 적은 곳 발견
 - Done-when:
   - [ ] 돌린 테스트 통과, 지금 해시 20종 그대로, GAP2 해시 값
+  - [ ] 판정 경로 다섯 곳이 시한 여부를 넘김 (회신에 경로별 한 줄)
   - [ ] 기본 레벨 차 1에 기대던 테스트 목록 (고친 곳·이유)
 - 커밋: 항목 단위 브랜치 (`merge-gap-2`), **push·PR까지** (병합은 Claude 검수 뒤)
 
