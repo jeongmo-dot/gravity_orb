@@ -535,7 +535,8 @@ func _capture_timed_jelly_scenes(
 		timed_level,
 		Config.data,
 		Config.data.jelly_mass_for_level(timed_level),
-		Config.data.jelly_mass_for_level(timed_level)
+		Config.data.jelly_mass_for_level(timed_level),
+		first.is_timed or second.is_timed
 	)
 	var expected_result_level: int = mini(
 		int(classified["result_level"]) + Config.data.jelly_timed_bonus_levels,

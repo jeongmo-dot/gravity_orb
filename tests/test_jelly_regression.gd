@@ -15,6 +15,7 @@ const EXPECTED_T3_DEFAULT_HASH: String = "7a20210c45a5e68cb8be6d4e2bc310eca31b3b
 const EXPECTED_C4E_DEFAULT_HASH: String = "4a0c467d83177f3e0fb6acd302529fea572083896cac45e5885f8e90160438f6"
 const EXPECTED_Z1_DEFAULT_HASH: String = "4be0489704ba1c8cebad7863cd487c9032236cfa4be00e808801609d74e25c2b"
 const EXPECTED_G2_DEFAULT_HASH: String = "3e688a78984fafee02bda4299de720de710337219c8bdf9af4ce2c295e0d6455"
+const EXPECTED_GAP2_DEFAULT_HASH: String = "89670fce918ad9b12af5bc1b6153829840ea747a01d1826e986f24bfcf1a4289"
 
 
 func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
@@ -29,6 +30,12 @@ func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
 	Config.data.sfx_enabled = false
 	Config.data.jelly_merge_duration = 0.3
 	Config.data.jelly_timed_enabled = false
+	Config.data.jelly_merge_level_gap = 2
+	Config.data.jelly_timed_merge_level_gap = 1
+	var gap_two_result: Dictionary = await _run_rule_path(false)
+	print("JELLY_GAP2_DEFAULT_HASH hash=%s" % str(gap_two_result["hash"]))
+	assert_eq(gap_two_result["hash"], EXPECTED_GAP2_DEFAULT_HASH, "GAP2 default hash")
+	Config.data.jelly_merge_level_gap = 1
 	var g2_visible_result: Dictionary = await _run_rule_path(true)
 	var g2_hidden_result: Dictionary = await _run_rule_path(false)
 	assert_eq(g2_visible_result["hash"], g2_hidden_result["hash"], "G2 hash ignores rendering")
@@ -479,6 +486,7 @@ func _snapshot_level_profile() -> Dictionary:
 		"max_merge_bonus_factor": Config.data.max_merge_bonus_factor,
 		"orb_friction_by_level": Config.data.orb_friction_by_level.duplicate(),
 		"jelly_merge_level_gap": Config.data.jelly_merge_level_gap,
+		"jelly_timed_merge_level_gap": Config.data.jelly_timed_merge_level_gap,
 		"jelly_merge_wide_gap_min_level": Config.data.jelly_merge_wide_gap_min_level,
 		"spawn_count_max": Config.data.spawn_count_max,
 		"turn_color_unlock_turns": Config.data.turn_color_unlock_turns.duplicate(),
@@ -517,6 +525,7 @@ func _restore_level_profile(snapshot: Dictionary) -> void:
 	Config.data.max_merge_bonus_factor = float(snapshot["max_merge_bonus_factor"])
 	Config.data.orb_friction_by_level = snapshot["orb_friction_by_level"] as PackedFloat32Array
 	Config.data.jelly_merge_level_gap = int(snapshot["jelly_merge_level_gap"])
+	Config.data.jelly_timed_merge_level_gap = int(snapshot["jelly_timed_merge_level_gap"])
 	Config.data.jelly_merge_wide_gap_min_level = int(snapshot["jelly_merge_wide_gap_min_level"])
 	Config.data.spawn_count_max = int(snapshot["spawn_count_max"])
 	Config.data.turn_color_unlock_turns.assign(snapshot["turn_color_unlock_turns"])

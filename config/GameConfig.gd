@@ -119,8 +119,9 @@ enum GameMode {
 @export var chain_reaction_delay: float = 0.2
 @export var jelly_merge_duration: float = 0.3
 @export var jelly_merge_extension_max: float = 1.5
-@export var jelly_merge_level_gap: int = 1
+@export var jelly_merge_level_gap: int = 2
 @export var jelly_merge_wide_gap_min_level: int = 0
+@export var jelly_timed_merge_level_gap: int = 1
 @export var jelly_timed_enabled: bool = true
 @export var jelly_timed_first_turn: int = 20
 @export var jelly_timed_interval_turns: int = 12

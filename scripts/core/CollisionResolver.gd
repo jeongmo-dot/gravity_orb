@@ -93,7 +93,8 @@ func flush(delta: float = 0.0) -> int:
 			b.level,
 			Config.data,
 			float(a.get("jelly_mass")),
-			float(b.get("jelly_mass"))
+			float(b.get("jelly_mass")),
+			_is_timed_pair(a, b)
 		)
 		var reaction_type: ReactionRules.Type = classified["type"] as ReactionRules.Type
 		if reaction_type == ReactionRules.Type.NONE:
@@ -922,10 +923,9 @@ func has_pending_reactions() -> bool:
 
 func _has_pending_jelly_reactions(active_orbs: Array) -> bool:
 	var level_stride: int = Config.data.orb_max_level + 1
-	var merge_level_gap: int = maxi(Config.data.jelly_merge_level_gap, 0)
-	var candidate_level_gap: int = merge_level_gap
-	if Config.data.jelly_merge_wide_gap_min_level > 0:
-		candidate_level_gap += 1
+	var candidate_level_gap: int = ReactionRules.jelly_merge_candidate_level_gap(
+		Config.data
+	)
 	var groups: Array = []
 	groups.resize(Config.data.color_display.size() * level_stride)
 	for candidate: Variant in active_orbs:
@@ -1114,7 +1114,15 @@ func _pair_can_react(a: Variant, b: Variant) -> bool:
 		a.level,
 		b.color,
 		b.level,
-		Config.data
+		Config.data,
+		_is_timed_pair(a, b)
+	)
+
+
+func _is_timed_pair(a: Variant, b: Variant) -> bool:
+	return (
+		(bool(a.get("is_timed")) and not bool(a.get("is_timed_stone")))
+		or (bool(b.get("is_timed")) and not bool(b.get("is_timed_stone")))
 	)
 
 
@@ -1187,6 +1195,7 @@ func _scan_geometric_contacts(queue_reactions: bool, measure_contacts: bool) -> 
 	var radii: PackedFloat32Array = PackedFloat32Array()
 	var colors: PackedInt32Array = PackedInt32Array()
 	var levels: PackedInt32Array = PackedInt32Array()
+	var timed: Array[bool] = []
 	var stable_ids: PackedInt64Array = PackedInt64Array()
 	var max_radius: float = 0.0
 	for orb: Variant in orbs:
@@ -1195,6 +1204,7 @@ func _scan_geometric_contacts(queue_reactions: bool, measure_contacts: bool) -> 
 		radii.append(radius)
 		colors.append(int(orb.color))
 		levels.append(int(orb.level))
+		timed.append(bool(orb.get("is_timed")) and not bool(orb.get("is_timed_stone")))
 		stable_ids.append(int(orb.stable_spawn_id))
 		max_radius = maxf(max_radius, radius)
 	var cell_size: float = maxf(
@@ -1253,7 +1263,8 @@ func _scan_geometric_contacts(queue_reactions: bool, measure_contacts: bool) -> 
 						levels[orb_index],
 						colors[candidate_index],
 						levels[candidate_index],
-						Config.data
+						Config.data,
+						timed[orb_index] or timed[candidate_index]
 					):
 						continue
 					var orb: Variant = orbs[orb_index]
@@ -1265,7 +1276,8 @@ func _scan_geometric_contacts(queue_reactions: bool, measure_contacts: bool) -> 
 						candidate.level,
 						Config.data,
 						float(orb.get("jelly_mass")),
-						float(candidate.get("jelly_mass"))
+						float(candidate.get("jelly_mass")),
+						timed[orb_index] or timed[candidate_index]
 					)
 					var reaction_type: ReactionRules.Type = (
 						classified["type"] as ReactionRules.Type

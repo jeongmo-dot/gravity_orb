@@ -1944,7 +1944,8 @@ func _count_skill_reaction_pairs(board: Board3D, direction: Vector2i) -> int:
 				second.level,
 				Config.data,
 				first.jelly_mass,
-				second.jelly_mass
+				second.jelly_mass,
+				first.is_timed or second.is_timed
 			)
 			var reaction_type: ReactionRules.Type = reaction["type"] as ReactionRules.Type
 			if (
@@ -1989,7 +1990,8 @@ func _count_touching_jelly_merge_pairs(board: Board3D) -> int:
 				second.level,
 				Config.data,
 				first.jelly_mass,
-				second.jelly_mass
+				second.jelly_mass,
+				first.is_timed or second.is_timed
 			)
 			var reaction_type: ReactionRules.Type = reaction["type"] as ReactionRules.Type
 			if reaction_type in [ReactionRules.Type.MERGE, ReactionRules.Type.MAX_CLEAR]:

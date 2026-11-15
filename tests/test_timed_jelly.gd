@@ -12,6 +12,7 @@ const EXPECTED_EARLY_DEFAULT_HASH: String = "8c6eb2f7c241b8d2e94f2f977083ebf0844
 
 func test_h8_marker_countdown_success_and_failure_hash() -> void:
 	var snapshot: Dictionary = _snapshot_config()
+	Config.data.jelly_merge_level_gap = 1
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.jelly_timed_enabled = true
 	Config.data.jelly_timed_turns = 8
@@ -69,6 +70,7 @@ func test_h8_marker_countdown_success_and_failure_hash() -> void:
 
 func test_k5_8_marker_countdown_success_and_failure_hash() -> void:
 	var snapshot: Dictionary = _snapshot_config()
+	Config.data.jelly_merge_level_gap = 1
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.jelly_timed_enabled = true
 	Config.data.jelly_timed_turns = 8
@@ -126,6 +128,7 @@ func test_k5_8_marker_countdown_success_and_failure_hash() -> void:
 
 func test_k5_4_default_marker_countdown_success_and_failure_hash() -> void:
 	var snapshot: Dictionary = _snapshot_config()
+	Config.data.jelly_merge_level_gap = 1
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.jelly_timed_enabled = true
 	Config.data.jelly_timed_turns = 4
@@ -184,6 +187,7 @@ func test_k5_4_default_marker_countdown_success_and_failure_hash() -> void:
 
 func test_k5_4_default_stone_hash() -> void:
 	var snapshot: Dictionary = _snapshot_config()
+	Config.data.jelly_merge_level_gap = 1
 	assert_true(Config.data.jelly_timed_stone_enabled, "timed stone defaults on")
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.jelly_timed_enabled = true
@@ -220,6 +224,7 @@ func _assert_random_timed_permanent_stone_hash(
 	expected_hash: String
 ) -> void:
 	var snapshot: Dictionary = _snapshot_config()
+	Config.data.jelly_merge_level_gap = 1
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.jelly_timed_early_turn_limit = early_limit
 	var spawner: Spawner = Spawner.new()
@@ -414,6 +419,46 @@ func test_timed_merge_bonus_applies_for_absorber_and_absorbed_sources() -> void:
 	assert_eq(int(second["result_level"]), 5, "timed absorbed source gets bonus")
 	assert_near(float(second["result_mass"]), Config.data.jelly_mass_for_level(5), 0.0001, "absorbed bonus mass")
 	assert_true(not bool((second["result_orb"] as Orb3D).is_timed), "absorber result is normal")
+	await _cleanup(fixture["root"] as Node)
+	_restore_config(snapshot)
+
+
+func test_timed_merge_gap_reaches_pair_flush_and_proximity_paths() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_merge_duration = 0.0
+	Config.data.jelly_merge_level_gap = 2
+	Config.data.jelly_timed_merge_level_gap = 1
+	var fixture: Dictionary = await _create_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+
+	var pair: Array[Orb3D] = await _spawn_gap_pair(board, 5, false, 3, false)
+	assert_true(resolver._pair_can_react(pair[0], pair[1]), "normal L5/L3 pair reacts")
+	assert_eq(resolver._scan_geometric_contacts(false, false), 1, "proximity finds normal gap two")
+
+	pair = await _spawn_gap_pair(board, 5, true, 3, false)
+	assert_true(not resolver._pair_can_react(pair[0], pair[1]), "timed absorber rejects gap two")
+	assert_eq(resolver._scan_geometric_contacts(false, false), 0, "proximity rejects timed gap two")
+	resolver.report_contact(pair[0], pair[1], "timed_gap_reject")
+	assert_eq(resolver.flush(), 0, "flush rejects timed gap two")
+
+	pair = await _spawn_gap_pair(board, 3, false, 5, true)
+	assert_true(not resolver._pair_can_react(pair[0], pair[1]), "timed absorbed source rejects gap two")
+
+	var adjacent_lower: Dictionary = await _resolve_timed_pair(board, resolver, 5, true, 4, false)
+	assert_true(bool(adjacent_lower["timed_success"]), "timed L5/L4 gets success bonus")
+	var adjacent_upper: Dictionary = await _resolve_timed_pair(board, resolver, 5, true, 6, false)
+	assert_true(bool(adjacent_upper["timed_success"]), "timed L5/L6 gets success bonus")
+
+	Config.data.jelly_timed_merge_level_gap = -1
+	var inherited: Dictionary = await _resolve_timed_pair(board, resolver, 5, true, 3, false)
+	assert_true(bool(inherited["timed_success"]), "negative timed gap follows normal gap and keeps bonus")
+
+	pair = await _spawn_gap_pair(board, 5, false, 4, false)
+	pair[0].set_timed_stone(0, true)
+	assert_true(not resolver._pair_can_react(pair[0], pair[1]), "timed stone remains nonreactive")
+
 	await _cleanup(fixture["root"] as Node)
 	_restore_config(snapshot)
 
@@ -1010,6 +1055,28 @@ func _resolve_timed_pair(
 	return captured[0]
 
 
+func _spawn_gap_pair(
+	board: Board3D,
+	first_level: int,
+	first_timed: bool,
+	second_level: int,
+	second_timed: bool
+) -> Array[Orb3D]:
+	board.clear()
+	await tree.process_frame
+	var first: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, first_level, Vector2(-10.0, 0.0))
+	var second: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, second_level, Vector2(10.0, 0.0))
+	first.exit_ghost_state()
+	second.exit_ghost_state()
+	if first_timed:
+		first.set_timed(8, 20)
+	if second_timed:
+		second.set_timed(8, 20)
+	first.disable_physics()
+	second.disable_physics()
+	return [first, second]
+
+
 func _create_fixture() -> Dictionary:
 	var root: Node3D = Node3D.new()
 	var board: Board3D = BOARD_SCENE.instantiate() as Board3D
@@ -1060,6 +1127,8 @@ func _snapshot_config() -> Dictionary:
 	return {
 		"game_mode": Config.data.game_mode,
 		"jelly_merge_duration": Config.data.jelly_merge_duration,
+		"jelly_merge_level_gap": Config.data.jelly_merge_level_gap,
+		"jelly_timed_merge_level_gap": Config.data.jelly_timed_merge_level_gap,
 		"jelly_timed_enabled": Config.data.jelly_timed_enabled,
 		"jelly_timed_first_turn": Config.data.jelly_timed_first_turn,
 		"jelly_timed_interval_turns": Config.data.jelly_timed_interval_turns,
@@ -1082,6 +1151,8 @@ func _snapshot_config() -> Dictionary:
 func _restore_config(snapshot: Dictionary) -> void:
 	Config.data.game_mode = int(snapshot["game_mode"]) as GameConfig.GameMode
 	Config.data.jelly_merge_duration = float(snapshot["jelly_merge_duration"])
+	Config.data.jelly_merge_level_gap = int(snapshot["jelly_merge_level_gap"])
+	Config.data.jelly_timed_merge_level_gap = int(snapshot["jelly_timed_merge_level_gap"])
 	Config.data.jelly_timed_enabled = bool(snapshot["jelly_timed_enabled"])
 	Config.data.jelly_timed_first_turn = int(snapshot["jelly_timed_first_turn"])
 	Config.data.jelly_timed_interval_turns = int(snapshot["jelly_timed_interval_turns"])

@@ -38,6 +38,39 @@
 
 ## 미확인
 
+### [2026-11-15] 대상 #155 — 같은 색 합체 레벨 차 2, 시한 젤리는 1
+- 맨 앞 경고 조건 0건: 보존 대상 기존 해시 20개 변경 0건, 시한 젤리 상태 전달 누락 경로 0건, 런타임의 복제된 레벨 차 판정 0곳. 일반·시한·H 확장 선택은 `ReactionRules`로 중앙화했다.
+- 상태: 완료 — 일반 JELLY 기본 합체 차이를 2로 바꾸고, 활성 시한 젤리가 포함된 쌍은 별도 기본값 1을 사용하도록 구현했다. 시한 돌은 기존처럼 비반응이다.
+- 브랜치 / PR: `merge-gap-2` / PR 생성 후 링크 추가
+- 변경 파일: `config/{GameConfig.gd,default_config.tres}`, `scripts/core/{ReactionRules.gd,CollisionResolver.gd}`, `tests/spike/{run_jolt_3d_measurement.gd,capture_screens.gd}`, `tests/{test_config.gd,test_rules.gd,test_jelly_regression.gd,test_timed_jelly.gd,test_full_board_performance_equivalence.gd}`, 이 회신 파일
+- Done-when 대조:
+  - [x] 일반 기본 `jelly_merge_level_gap=2`, 새 `jelly_timed_merge_level_gap=1`; 음수 시한 값은 일반 기본 차이를 따름 — config·rules 자동 테스트
+  - [x] `ReactionRules.classify/can_react`가 같은 색 일반 차이 2를 허용하고 차이 3은 거절. 활성 시한 쌍은 차이 1만 허용하고 H 넓은 차이 확장을 받지 않음 — rules 자동 테스트
+  - [x] `_pair_can_react`와 `flush` 분류에 absorber/absorbed 어느 쪽이든 활성 시한 상태 전달 — timed integration 자동 테스트
+  - [x] 근접 스캔의 병렬 배열·`can_react`·`classify`에 시한 상태 전달 — timed integration 자동 테스트
+  - [x] pending 후보 범위는 일반·시한·H 규칙의 최대 범위를 중앙 helper에서 구하고, 최종 쌍 판정은 실제 시한 상태 적용 — performance equivalence 자동 테스트
+  - [x] 측정·캡처 예측 분류에 시한 상태 전달 — 코드 경로 검사. 명세에 따라 캡처 자체는 미실행
+  - [x] 기존 GAP1 회귀는 해당 테스트 안에서 1을 명시하고 보존 대상 20개 해시 유지. 새 기본 GAP2 전체 규칙 경로 해시 1개 추가
+- QA 관측값:
+  - 엔진: Godot `4.8.dev3.official.51105ccbe` 일반 빌드
+  - `test_config.gd` → 16/16 통과, 실패 0, 종료 코드 0
+  - `test_rules.gd` → 21/21 통과, 실패 0, 종료 코드 0
+  - `test_jelly_regression.gd` → 1/1 통과, 실패 0, 종료 코드 0
+  - `test_timed_jelly.gd` → 24/24 통과, 실패 0, 종료 코드 0
+  - `test_full_board_performance_equivalence.gd` → 5/5 통과, 실패 0, 종료 코드 0
+  - 합계 67/67 통과, 실패 0. 각 파일은 별도 새 프로세스로 실행
+  - 새 `JELLY_GAP2_DEFAULT_HASH`: `89670fce918ad9b12af5bc1b6153829840ea747a01d1826e986f24bfcf1a4289`
+  - 기존 젤리 회귀 해시 14개와 시한 젤리 해시 6개는 기존 상수와 일치. 변경 0개
+  - `git diff --check` 오류 0건. 검색 결과 런타임에서 합체 차이를 직접 비교하는 곳은 `ReactionRules.gd`뿐이며 `CollisionResolver.gd`는 후보 범위 helper만 호출
+- GAP1 고정 목록: `test_rules.gd`의 추상 질량·명시적 GAP1 예제, `test_jelly_regression.gd`의 기존 기본 해시 경로, `test_timed_jelly.gd`의 H8·K5-8·K5-4·돌·early-default·limit0 해시 경로. 측정/캡처의 과거 명시 프로필 값은 의도된 고정 프로필이라 유지했다.
+- 수동 확인 절차:
+  1. JELLY에서 같은 색 L5와 L3을 접촉 → 일반 젤리는 L5(질량 10)로 흡수 합체한다.
+  2. L5 또는 L3 중 하나를 활성 시한 젤리로 만든 뒤 접촉 → 합체하지 않는다. L5 시한 젤리와 같은 색 L4 또는 L6은 합체하고 시한 성공 보너스를 받는다.
+  3. H 넓은 차이 옵션이 활성인 구성에서도 시한 L5/L3 접촉 → H 확장 없이 합체하지 않는다.
+- 미실행: 주말 가벼운 모드와 #155 명세에 따라 전체 `run_tests.ps1`, 봇/장시간 시뮬레이션, 캡처, Windows 빌드는 실행하지 않았다. 화면 변경 항목이 아니다.
+- 결정 사항·알려진 제한: 명세 밖 수치·공개 이름 변경 없음. 시한 판정은 `is_timed=true && is_timed_stone=false`인 활성 표식만 사용한다. 측정·캡처 코드는 예측 입력 전달만 수정했으며 산출물은 만들지 않았다.
+- 남은 것 · 질문: Claude 검수와 PR 병합 판단.
+
 ### [2026-11-15] 대상 #154 — Claude 인박스 상태 최신화 요청
 - 상태: 완료 확인 — [PR #154](https://github.com/jeongmo-dot/gravity_orb/pull/154)는 2026-11-15 09:56 KST에 병합됐고, 최종 head `3b0ba46`의 트리와 `origin/main` 병합 커밋 `aab61d8`의 트리가 동일하다.
 - 현재 main: 초기 100턴 미만 10~15·이후 5~10, queued callout 실제 숫자·보너스 보존 후속 수정, 관련 테스트가 모두 반영됐다. `project.godot` 버전은 0.16.11 그대로다.
