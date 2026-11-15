@@ -5701,6 +5701,24 @@ G1 전략 봇 (시드 1~20, 600턴 상한, 턴 평균 / 총점 평균):
 - 회신 맨 앞에 적을 것: 지금 해시 상수가 바뀜, 시한 여부를 넘기지 못한 판정 경로가 남음, 레벨 차를 따로 적은 곳 발견
 - 병합: Claude 검수 뒤. "맨 앞" 조건이 있으면 병합 전에 사용자에게 묻는다
 
+**#155 1차 검수 — 추가 요구 1** ([PR #156](https://github.com/jeongmo-dot/gravity_orb/pull/156) `0ecc064`, 2026-11-15 사용자 "확인" → Claude 지적 → **"고친 뒤 병합"**. 검수는 Claude — Claude 재실행 없음)
+- 구현은 명세대로다 (diff 대조):
+  - `ReactionRules.jelly_merge_level_gap(cfg, timed_pair)` — 시한 쌍이고 `jelly_timed_merge_level_gap` ≥ 0이면 그 값, 아니면 `jelly_merge_level_gap`. `_jelly_same_color_can_merge()` — H 넓히기는 시한 쌍이 아닐 때만. `can_react()`·`classify()` 선택 인자 `timed_pair` (기본 false)
+  - `jelly_merge_candidate_level_gap()` = max(보통 (H면 +1), 시한) — 대기 판정 후보 범위
+  - `CollisionResolver._is_timed_pair()` (`is_timed`이고 돌 아님, 둘 중 하나) → `_pair_can_react()`·`flush()` `classify()`·근접 훑기 (배열 `timed`). 측정 `_count_skill_reaction_pairs()`·`_count_touching_jelly_merge_pairs()`·캡처 예측도 넘긴다
+  - `GameConfig.gd` 선언·`.tres` `jelly_merge_level_gap` 2·`jelly_timed_merge_level_gap` 1
+- 테스트 (Codex): `test_config` 16/16·`test_rules` 21/21·`test_jelly_regression` 1/1·`test_timed_jelly` 24/24·`test_full_board_performance_equivalence` 5/5. 보통 판정 (L3 + L1·L7 + L5·L5 + L3·L6 + L4·L10 + L8 흡수, L4 + L1·L8 + L5 없음, 다른 색 그대로), 시한 판정 (L4·L6 합체, L3·L7 없음 — 순서 둘 다, H 무시, −1이면 L3 합체), 경로 (`_pair_can_react()`·근접 훑기·`flush()` 시한 먹는 쪽, 먹히는 쪽은 `_pair_can_react()`), 성공 보너스 (L4·L6, −1이면 L3), 돌 반응 없음, 대기 판정 (보통 L5·L3 true, 시한 L5·L3 false, 시한 L5·L4 true, 시한 L6·L4 H6 false). 같은 색 L8 + L10은 이제 흡수 (L10, 상한) — 다른 색은 대폭발 그대로
+- 해시: 지금 상수 20종 그대로 (기본을 물려받는 묶음은 보통 1 고정 — `test_jelly_regression` 기존 경로, `test_timed_jelly` H8·K5-8·K5-4·돌·early·limit 0). 새 **GAP2** `89670fce…` (Codex). GAP2는 그 테스트의 다른 묶음처럼 **시한 젤리를 끈** 전체 경로라 시한 상한은 해시에 들어가지 않는다 — 시한 판정은 위 통합 테스트가 맡는다
+- **Claude 지적 — 측정 래퍼의 레벨 차 기본값 1**: `tests/run_jelly_physics_autoplay.ps1` `[int]$JellyMergeLevelGap = 1`·`tests/tools/run_jelly_measurement.ps1` `[int]$JellyMergeLevelGap = 1`이 늘 `--jelly-merge-level-gap=1`을 넘긴다. 인자를 안 주고 봇을 돌리면 게임 기본 (2)이 아니라 1로 잰다. #135에서 그때 기본 (1)에 맞춰 둔 값이다. 회신의 "과거 명시 프로필"은 이름 붙은 묶음 (`run_four_color_balance`·`run_merge_extension_balance`·`run_tap_push_balance`·`run_timed_jelly_balance`·`run_spawn_merge_matrix`, `run_jolt_3d_measurement.gd` 약 2134·2148·2162행, `capture_screens.gd` 약 1538행)에는 맞지만 이 두 래퍼의 기본값은 아니다
+
+**추가 요구 1** (같은 브랜치 `merge-gap-2`):
+1. 두 래퍼의 `$JellyMergeLevelGap` 기본을 **−1 = 넘기지 않음**으로 바꾼다. 0 이상을 주면 지금처럼 `--jelly-merge-level-gap=<값>`을 넘긴다. 그래서 인자 없이 돌리면 `default_config.tres` 값을 따른다 (앞으로 기본이 바뀌어도 어긋나지 않게)
+2. 요약·결과 파일의 `jelly_merge_level_gap`은 래퍼 인자가 아니라 **실제 쓰인 값** (측정 쪽 `Config.data`가 찍는 값)을 적는다. `jelly_timed_merge_level_gap`도 같이 적는다 (새 인자는 만들지 않는다)
+3. 이름 붙은 묶음 (위 목록)은 그대로 1 — 예전 측정 재현용. 회신에 목록과 이유
+4. 확인 (가벼운 모드 — 측정 아님): 두 래퍼를 인자 없이 시드 1개·짧은 턴 상한 (예: 30턴)으로 한 번씩 돌려 요약에 레벨 차 2·시한 1이 찍히는지, `-JellyMergeLevelGap 1`을 주면 1이 찍히는지. 판 길이 등 수치는 보고하지 않아도 된다. 바뀐 테스트 파일이 있으면 그 파일만 다시 돌린다
+- 그대로: 게임 코드·설정·해시, 1차 구현 전부
+- 회신 맨 앞에 적을 것: 인자 없이 돌린 요약에 2가 아닌 값이 찍힘, 게임 코드나 해시가 바뀜
+
 ### 12-ONE.3 다음 (JELLY 개선)
 - CLASSIC 전용 분기 정리 (행성 그림·연출·규칙 — JELLY가 안 쓰는 것)
 - 결정 대기에서 이어지는 것: 효과음 (합성·녹음), 시작 화면 그림 (지금 행성 — JELLY에 맞게?)
