@@ -41,7 +41,7 @@
 ### [2026-11-16] 대상 #156 — 막힘 경고 표시 삭제
 - **맨 앞 경고:** 화살표 밖에도 막힘 경고가 한 곳 있었다 — 2D `Board.gd`의 `_draw()`가 `_warning_directions` 벽에 빨간 선을 그렸다. 이 선도 함께 제거했다. JELLY 해시 상수는 그대로이고, 막힘 계산·봇 판정·FINAL MOVE 규칙은 바꾸지 않았다.
 - 상태: 완료
-- 브랜치 / PR: `remove-blocked-warning` / 생성 예정
+- 브랜치 / PR: `remove-blocked-warning` / https://github.com/jeongmo-dot/gravity_orb/pull/157
 - 변경 파일: `scripts/ui/TurnInputIndicator.gd`, `scripts/core/Board.gd`, `tests/test_turn_input_indicator.gd`, 이 회신 파일
 - Done-when 대조:
   - [x] 막힌 방향도 `READY_COLOR`·같은 모양·크기·숨쉬기, 빨강·✕ 없음 — `BLOCKED_COLOR`, `BLOCKED_MARK_*`, `_blocked_directions`, 막힘 표시 함수·경계 함수, `warning_changed` 구독 제거
