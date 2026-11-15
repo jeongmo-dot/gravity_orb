@@ -36,7 +36,24 @@
 
 ## 대기 중
 
-(없음)
+### [2026-11-15 #155] 같은 색 합체 레벨 차 2 다시 시도
+- 상태: 대기 (main 위에서 — 이 명세 커밋 뒤). 인박스 번호 #155는 GitHub PR #155 (#154 인박스 상태 요청)와 다르다
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.45**, §4 `jelly_merge_level_gap` 행
+- 배경: 사용자 (2026-11-15) "지금은 1 레벨 차이만 병합하잖아. 2레벨 차이 병합 시도해보자"
+- 앵커: `config/GameConfig.gd` `jelly_merge_level_gap`, `config/default_config.tres`, `scripts/core/ReactionRules.gd` `can_react()`·`_classify_jelly()`, `scripts/core/CollisionResolver.gd` `_has_pending_jelly_reactions()`, `tests/test_config.gd`·`test_rules.gd`·`test_jelly_regression.gd`·`test_timed_jelly.gd`
+- 요구 (§12-ONE.45 1~4):
+  1. `jelly_merge_level_gap` 1 → **2** (`GameConfig.gd` 선언과 `default_config.tres` 둘 다). 값 말고 코드 변경 없음 예상 — 레벨 차를 따로 적은 곳이 있으면 회신에 목록
+  2. 지금 해시 상수 20종 그대로 (기본을 물려받는 묶음은 1 고정), 새 기본 해시 **GAP2** 고정
+  3. 테스트 — 기본값, 판정 (L3 + L1·L7 + L5·L5 + L3·L6 + L4·L10 + L8 흡수, L4 + L1·L8 + L5 없음, 다른 색 그대로), 시한 L5 두 단계 짝 보너스 +1, 돌 반응 없음, 대기 판정 L5·L3 true
+  4. 캡처 없음, 빌드 없음
+- 수치 (사용자·Claude): `jelly_merge_level_gap` 2
+- 건드리지 말 것: 다른 규칙·수치 (`spawn_count_max`·대폭발·소폭발·청소·시한 젤리·돌·점수·물리), 그림·소리·안내 (명세에 없는 것 금지, 고리 금지), 지금 해시 상수, 사용자 저장 파일, `project.godot` 버전·`build/windows/` (**빌드 없음**), `docs/` (회신 파일 제외)
+- **가벼운 모드 (주말)**: §12-ONE.45 3번의 파일과 고친 파일만. 전체 회귀·봇 측정·Debug 빌드 하지 않음. 기본 레벨 차 1에 기대는 테스트를 찾은 목록은 회신에
+- **회신 맨 앞에**: 지금 해시 상수가 바뀜, 값 말고 코드 변경이 필요했음, 레벨 차를 따로 적은 곳 발견
+- Done-when:
+  - [ ] 돌린 테스트 통과, 지금 해시 20종 그대로, GAP2 해시 값
+  - [ ] 기본 레벨 차 1에 기대던 테스트 목록 (고친 곳·이유)
+- 커밋: 항목 단위 브랜치 (`merge-gap-2`), **push·PR까지** (병합은 Claude 검수 뒤)
 
 ---
 
