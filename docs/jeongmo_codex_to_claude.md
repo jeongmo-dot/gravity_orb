@@ -38,6 +38,18 @@
 
 ## 미확인
 
+### [2026-11-15] 대상 #154 — 남은 숫자 일치 검사 및 대기 안내 수정
+- 상태: 완료 — 사용자 요청에 따른 주말 추가 검사. Claude 실제 코드·이미지 검수 pass, 차단 지적 0건. 사용자 승인 조건에 따라 PR 병합 진행.
+- PR: https://github.com/jeongmo-dot/gravity_orb/pull/154
+- 재현: THEN→NEXT→판 진입은 14로 일치했으나 다른 안내 뒤에 표시되는 시한 안내는 4턴으로 바뀜. 실제 배치 신호의 turns·bonus를 대기 상태에 보관하고 새 게임 초기화 시 지우도록 Hud.gd 수정.
+- 추가 변경: scripts/ui/Hud.gd, tests/test_timed_jelly.gd 및 이 회신. 기존 6개 변경에 Hud.gd 1개 추가. 수치·난수·스폰 방식 변경 없음.
+- 자동 검사: test_timed_jelly.gd 23/23, test_config.gd 16/16, 총 39/39, 종료 코드 각 0. 대기 안내의 실제 14턴·보너스 2·중복 방지·초기화 회귀 검사 포함.
+- 실제 Main/Spawner/TurnManager/Hud 장면 경로: 20턴·104턴 × 즉시/대기 안내 4경우 36/36 비교, 실패 0, 종료 코드 0. 20턴 THEN=NEXT=판 숫자=안내 14, 104턴은 9. 실제 OrbVisual 및 판 라벨·안내 라벨을 비교. 임시 장면에서 고정 시드와 턴을 설정했으며 자유 플레이 체감 검사는 아님.
+- 실제 PNG 3장: C:\Workspace\repos\tools\ProjectManager\.runtime\qa154-followup\01_then.png, 02_next.png, 03_entry_callout.png. 각 540×960. Codex가 판 14와 안내 14턴이 함께 보이는 마지막 PNG를 직접 확인.
+- 테스트·캡처는 격리 APPDATA/LOCALAPPDATA 및 임시 save 경로 사용. 전체 회귀·봇·빌드·장기 체감 검사는 주말 범위 밖이므로 미실행.
+- 아래 2026-11-14 기록의 미확인 THEN·판 진입·안내 숫자는 이번 자동 장면 검사로 보완. 아래의 미병합·38개·변경 6개 표기는 당시 이력이며 현재 추가 검사 결과는 본 항목 기준.
+
+
 ### [2026-11-14] 대상 #154 — 시한 젤리 처음 숫자: 100턴 미만 10~15, 이후 5~10
 - PR: [#154](https://github.com/jeongmo-dot/gravity_orb/pull/154) · draft · 병합하지 않음.
 - 이미지 직접 확인: 관제 작업을 수행한 Codex가 실제 PNG를 열어 보드 10·NEXT 15를 확인했고, Claude도 이미지 입력으로 검수했다.

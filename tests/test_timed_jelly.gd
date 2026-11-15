@@ -480,6 +480,33 @@ func test_countdown_hardens_in_place_and_waits_an_extra_settle() -> void:
 	_restore_config(snapshot)
 
 
+func test_queued_placement_callout_preserves_actual_values() -> void:
+	var snapshot: Dictionary = _snapshot_config()
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.fx_callouts_enabled = true
+	var main: Main = MAIN_SCENE.instantiate() as Main
+	main.launch_immediately(GameConfig.GameMode.JELLY)
+	tree.root.add_child(main)
+	await tree.process_frame
+	await tree.process_frame
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	hud._reset_callout_tracking()
+	hud._callout_label.visible = true
+	hud._on_timed_jelly_placed(14, 2)
+	hud._on_timed_jelly_placed(10, 1)
+	assert_eq(hud.timed_jelly_callout_history().size(), 0, "wait behind existing callout")
+	hud._complete_callout()
+	await tree.process_frame
+	await tree.process_frame
+	assert_eq(hud.timed_jelly_callout_history().size(), 1, "queued first placement once")
+	assert_eq(hud._callout_label.text, "시한 젤리: 14턴 안에 합치면 2단계 더", "queued actual turns and bonus")
+	hud._reset_callout_tracking()
+	assert_eq(hud._timed_jelly_callout_turns, -1, "reset queued turns")
+	assert_eq(hud._timed_jelly_callout_bonus, -1, "reset queued bonus")
+	await _cleanup(main)
+	_restore_config(snapshot)
+
+
 func test_first_placement_callout_is_queued_once() -> void:
 	var snapshot: Dictionary = _snapshot_config()
 	Config.data.game_mode = GameConfig.GameMode.JELLY
