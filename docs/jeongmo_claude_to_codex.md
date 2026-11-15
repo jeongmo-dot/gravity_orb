@@ -37,13 +37,15 @@
 ## 대기 중
 
 ### [2026-11-15 #155] 같은 색 합체 레벨 차 2 다시 시도 — 시한 젤리는 1
-- 상태: **진행중 — 추가 요구 1** (1차 [PR #156](https://github.com/jeongmo-dot/gravity_orb/pull/156) `0ecc064` 검수: 게임 코드는 명세대로, 측정 래퍼 기본값만 고친 뒤 병합 — 사용자 "고친 뒤 병합"). 인박스 번호 #155는 GitHub PR #155 (#154 인박스 상태 요청)와 다르다
-- **추가 요구 1** (§12-ONE.45 "추가 요구 1", 같은 브랜치 `merge-gap-2`·같은 PR):
-  1. `tests/run_jelly_physics_autoplay.ps1`·`tests/tools/run_jelly_measurement.ps1`의 `$JellyMergeLevelGap` 기본 1 → **−1 = 넘기지 않음** (0 이상이면 지금처럼 넘김) — 인자 없이 돌리면 `default_config.tres` (2)를 따른다
-  2. 요약·결과의 `jelly_merge_level_gap`은 실제 쓰인 값, `jelly_timed_merge_level_gap`도 기록 (새 인자 없음)
-  3. 이름 붙은 측정 묶음 (`run_four_color_balance`·`run_merge_extension_balance`·`run_tap_push_balance`·`run_timed_jelly_balance`·`run_spawn_merge_matrix`·`run_jolt_3d_measurement.gd` 프로필·`capture_screens.gd` 프로필)은 그대로 1 — 회신에 목록과 이유
-  4. 확인: 두 래퍼를 인자 없이 시드 1개·짧은 턴 상한으로 한 번씩 → 요약에 레벨 차 2·시한 1, `-JellyMergeLevelGap 1`이면 1. 수치 보고 불필요. 측정·전체 회귀 없음
-  - 그대로: 게임 코드·설정·해시. **회신 맨 앞에**: 인자 없이 돌린 요약에 2가 아닌 값, 게임 코드나 해시가 바뀜
+- 상태: **진행중 — 추가 요구 2** (추가 요구 1 `523bab0` 검수 통과. 측정 1 `cf9d5f9`: GAP2는 100판 중 94판 미완료 → 사용자 "GAP2 + 압박 측정"). 인박스 번호 #155는 GitHub PR #155 (#154 인박스 상태 요청)와 다르다
+- **추가 요구 2** (§12-ONE.45 "추가 요구 2", 같은 브랜치 `merge-gap-2`·같은 PR — **측정만**, 코드·설정·해시 변경 없음):
+  1. 새 이름 **GAP2-S5** (`-SpawnCountMax 5`)·**GAP2-S6** (`-SpawnCountMax 6`) — 레벨 차는 인자 없이 (기본 2), 시한 1
+  2. 측정 1과 같은 조건: 다섯 봇 × 20판, 시드 101~120 / 1~20, fixed 120fps, 600턴 상한. 이름당 100판
+  3. 표: 측정 1의 GAP1·GAP2 (S4)를 옆에 놓고 같은 항목 (평균 턴 / 미완료, 점수, 대폭발, 시한 성공률·돌/판, 판당 L8 이상, 이탈·최대 관통) + 요약의 실제 `spawn_count_max`·레벨 차·시한 상한
+  4. 판단 기준 (Claude): D-save 세 봇 (자동·R·L-합체) 모두 미완료 ≤ 1판, 자동 D-save 평균 142~264턴. D-all은 참고만
+  5. 기본값 그대로 (값은 표를 본 뒤 사용자와 정해 같은 PR에서 반영). 다른 테스트·캡처·빌드 없음
+  - **회신 맨 앞에**: 기준에 맞는 이름 없음, 판 밖 이탈 1건 이상, 최대 관통 30px 이상, 요약의 실제 값이 지정과 다름
+- 추가 요구 1 (완료 `523bab0`): 두 래퍼 `$JellyMergeLevelGap` 기본 −1 = 넘기지 않음, 요약에 실제 레벨 차·시한 상한, 이름 붙은 묶음은 1 그대로
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.45**, §4 `jelly_merge_level_gap` 행·#155 `jelly_timed_merge_level_gap` 행
 - 배경: 사용자 (2026-11-15) "지금은 1 레벨 차이만 병합하잖아. 2레벨 차이 병합 시도해보자" → "시한 젤리는 그대로 1레벨 차이만 병합"
 - 앵커: `config/GameConfig.gd` `jelly_merge_level_gap`·새 필드, `config/default_config.tres`, `scripts/core/ReactionRules.gd` `can_react()`·`classify()`·`_classify_jelly()`, `scripts/core/CollisionResolver.gd` `_pair_can_react()`·`flush()`·근접 훑기 (약 1250행)·`_has_pending_jelly_reactions()`, `Orb3D`·`Orb` `is_timed`, `tests/spike/run_jolt_3d_measurement.gd`·`tests/spike/capture_screens.gd` 예측, `tests/test_config.gd`·`test_rules.gd`·`test_jelly_regression.gd`·`test_timed_jelly.gd`
