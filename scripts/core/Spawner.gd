@@ -213,14 +213,21 @@ func _apply_timed_marker(batch: Array, turn_index: int) -> void:
 		return
 	var first: Dictionary = batch[0] as Dictionary
 	first["timed"] = true
-	first["timed_turns"] = _draw_timed_turns()
+	first["timed_turns"] = _draw_timed_turns(turn_index)
 
 
-func _draw_timed_turns() -> int:
+func _draw_timed_turns(turn_index: int) -> int:
 	var minimum: int = Config.data.jelly_timed_turns_min
 	if minimum <= 0:
 		return Config.data.jelly_timed_turns
 	var maximum: int = maxi(Config.data.jelly_timed_turns_max, minimum)
+	if (
+		Config.data.jelly_timed_early_turn_limit > 0
+		and turn_index < Config.data.jelly_timed_early_turn_limit
+		and Config.data.jelly_timed_early_turns_min > 0
+	):
+		minimum = Config.data.jelly_timed_early_turns_min
+		maximum = maxi(Config.data.jelly_timed_early_turns_max, minimum)
 	return _timed_rng.randi_range(minimum, maximum)
 
 

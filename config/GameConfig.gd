@@ -128,6 +128,9 @@ enum GameMode {
 @export var jelly_timed_turns: int = 4
 @export var jelly_timed_turns_min: int = 5
 @export var jelly_timed_turns_max: int = 10
+@export var jelly_timed_early_turn_limit: int = 100
+@export var jelly_timed_early_turns_min: int = 10
+@export var jelly_timed_early_turns_max: int = 15
 @export var jelly_timed_burst_count: int = 10
 @export var jelly_timed_stone_enabled: bool = true
 @export var jelly_timed_stone_turns: int = 18

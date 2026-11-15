@@ -121,6 +121,8 @@ var _current_multiplier: float = 1.0
 var _danger_multiplier: float = 1.0
 var _timed_jelly_callout_seen: bool = false
 var _timed_jelly_callout_pending: bool = false
+var _timed_jelly_callout_turns: int = -1
+var _timed_jelly_callout_bonus: int = -1
 var _timed_jelly_callout_history: Array[String] = []
 var _timed_stone_callout_seen: bool = false
 var _timed_stone_callout_pending: bool = false
@@ -1619,6 +1621,8 @@ func _on_timed_jelly_placed(turns: int, bonus_levels: int) -> void:
 	if not Config.data.fx_callouts_enabled:
 		return
 	_timed_jelly_callout_pending = true
+	_timed_jelly_callout_turns = turns
+	_timed_jelly_callout_bonus = bonus_levels
 	if not _callout_label.visible:
 		_show_next_timed_jelly_callout(turns, bonus_levels)
 
@@ -1635,9 +1639,11 @@ func _show_next_timed_jelly_callout(
 	):
 		return
 	_timed_jelly_callout_pending = false
-	var configured_turns: int = Config.data.jelly_timed_turns if turns < 0 else turns
+	var placed_turns: int = _timed_jelly_callout_turns if turns < 0 else turns
+	var placed_bonus: int = _timed_jelly_callout_bonus if bonus_levels < 0 else bonus_levels
+	var configured_turns: int = Config.data.jelly_timed_turns if placed_turns < 0 else placed_turns
 	var configured_bonus: int = (
-		Config.data.jelly_timed_bonus_levels if bonus_levels < 0 else bonus_levels
+		Config.data.jelly_timed_bonus_levels if placed_bonus < 0 else placed_bonus
 	)
 	var bonus_text: String = (
 		"한 단계 더" if configured_bonus == 1 else "%d단계 더" % configured_bonus
@@ -1729,6 +1735,8 @@ func _reset_callout_tracking() -> void:
 	_pending_jelly_tap_effects.clear()
 	_timed_jelly_callout_seen = false
 	_timed_jelly_callout_pending = false
+	_timed_jelly_callout_turns = -1
+	_timed_jelly_callout_bonus = -1
 	_timed_jelly_callout_history.clear()
 	_timed_stone_callout_seen = false
 	_timed_stone_callout_pending = false
