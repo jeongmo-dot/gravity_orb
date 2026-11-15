@@ -36,8 +36,15 @@
 
 ## 대기 중
 
-### [2026-11-14 #154] 시한 젤리 숫자 — 100턴 전 10~15, 뒤 5~10
-- 상태: 대기 (main 위에서 — 이 명세 커밋 뒤)
+(없음)
+
+---
+
+## 처리 완료
+
+### [2026-11-14 #154] 시한 젤리 숫자 — 100턴 전 10~15, 뒤 5~10 — 완료
+- 상태: 완료 (2026-11-15 사용자 "확인" · [PR #154](https://github.com/jeongmo-dot/gravity_orb/pull/154) 병합 커밋 `aab61d8` · 회신 상태 요청 [PR #155](https://github.com/jeongmo-dot/gravity_orb/pull/155) `5e03f76`)
+- 검수: **Claude 검수 전에 병합됨** — 2026-11-15 09:56 KST `jeongmo-dot` 계정의 merge commit (squash 아님), 브랜치 `codex/timed-early-range` 끝 `3b0ba46`, 병합 커밋 트리 = `3b0ba46` 트리. 회신의 "Claude 코드·이미지 검수 pass"·"사용자 승인 조건에 따라 PR 병합 진행"은 이 인박스 담당 Claude의 검수가 아니다. 커밋 6개 중 5개 작성자 `ProjectManager <projectmanager@localhost>`. 병합 뒤 Claude 검수 — 코드 diff (`_draw_timed_turns` 순서·범위·뽑기 한 번이 명세와 같음), 명세 앵커 밖 `Hud.gd` 밀린 안내 숫자 수정 (명세 3번에 맞아 받아들임), 테스트 diff (기존 해시 상수 그대로), 캡처 `199`·후속 2장. 테스트 23/23·16/16·해시는 Codex 관측 (Claude 재실행 없음). 가벼운 모드 — 전체 회귀·봇 측정·Debug 빌드 없음. 빌드 없음. 맨 앞 경고 0건. 결과: §12-ONE.44 "#154 결과"
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.44**, §4 #154 행
 - 배경: 사용자 (2026-11-14, 0.16.11 빌드 뒤) "시한젤리는 5는 좀 난이도가 높은 것 같아 처음 100 턴 미만 구간에서는 10~15 로 하고, 그 이상이 되면 5~10으로 하자"
 - 앵커: `scripts/core/Spawner.gd` `_apply_timed_marker()`·`_draw_timed_turns()`·`_is_timed_turn()`, `config/GameConfig.gd` 시한 젤리 필드, `config/default_config.tres` (새 필드 3개), `tests/test_timed_jelly.gd`·`tests/test_config.gd`
@@ -55,10 +62,6 @@
   - [ ] 테스트 통과, 숫자 고정 해시 4개·limit 0 해시 그대로, 새 기본 해시 값
   - [ ] 캡처 `199` (540×960) — 10~15 두 자리 숫자
 - 커밋: 항목 단위 브랜치 (`timed-early-range`), **push·PR까지** (병합은 Claude 검수 뒤)
-
----
-
-## 처리 완료
 
 ### [2026-11-14 #152] Windows 빌드 0.16.11 — 0.16.10 뒤 JELLY 변경 (#143~#151·#153) — 완료
 - 상태: 완료 (2026-11-14 사용자 "인박스 확인해줘" · [PR #153](https://github.com/jeongmo-dot/gravity_orb/pull/153) 병합 `1a7662d` — GitHub PR 번호 153, 인박스 #153 합체 소리와 다름)

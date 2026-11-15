@@ -5640,6 +5640,16 @@ G1 전략 봇 (시드 1~20, 600턴 상한, 턴 평균 / 총점 평균):
 - 회신 맨 앞에 적을 것: 같은 시드의 젤리 순서가 바뀜, 숫자 고정 해시 4개나 limit 0 해시가 바뀜, 범위 밖 숫자
 - 병합: Claude 검수 뒤. "맨 앞" 조건이 있으면 병합 전에 사용자에게 묻는다
 
+**#154 결과 — 병합** ([PR #154](https://github.com/jeongmo-dot/gravity_orb/pull/154) 병합 커밋 `aab61d8`. **Claude 검수 전에 병합됨** — 2026-11-15 09:56 KST `jeongmo-dot` 계정의 merge commit (squash 아님), 브랜치 `codex/timed-early-range` 끝 `3b0ba46`, 병합 커밋 트리 = `3b0ba46` 트리. 회신의 "Claude 코드·이미지 검수 pass"·"사용자 승인 조건에 따라 PR 병합 진행"은 이 인박스 담당 Claude의 검수가 아니다. 커밋 6개 중 5개 작성자 `ProjectManager <projectmanager@localhost>`. 병합 뒤 Claude 검수: 2026-11-15 사용자 "확인" — 아래, 차단 지적 0건. 테스트는 Codex, Claude 재실행 없음. 가벼운 모드 (주말) — 전체 회귀·봇 측정·Debug 빌드 없음. 빌드 없음. 인박스 상태 요청 회신은 [PR #155](https://github.com/jeongmo-dot/gravity_orb/pull/155) `5e03f76`)
+- 구현 (diff 대조):
+  - `GameConfig.gd` 선언·`default_config.tres` `jelly_timed_early_turn_limit` 100·`jelly_timed_early_turns_min` 10·`jelly_timed_early_turns_max` 15
+  - `Spawner._draw_timed_turns(turn_index)`: `jelly_timed_turns_min` ≤ 0 → `jelly_timed_turns` 고정 (맨 먼저, 뽑기 없음). limit > 0·턴 < limit·early min > 0 → `randi_range(early_min, max(early_max, early_min))`. 그 밖 5~10. `_timed_rng` 한 번, `_rng` 그대로 — 명세 그대로
+  - 명세 앵커 밖 `Hud.gd` (후속 커밋 `3b0ba46`): 다른 안내 뒤로 밀려 나중에 뜨는 시한 안내가 그 젤리 숫자 대신 `jelly_timed_turns` (4)·`jelly_timed_bonus_levels`를 쓰던 버그 수정 — 놓일 때 신호의 turns·bonus를 보관해 쓰고 새 게임에서 지운다. 이 경로는 #143부터 있었고 #150 (5~10 무작위) 뒤 숫자가 틀렸다 (0.16.11 빌드에 있음). 명세 3번 (안내 숫자 = 그 젤리 숫자)에 맞는 수정이라 받아들인다
+- 테스트 (Codex): `test_timed_jelly.gd` 23/23·`test_config.gd` 16/16 (Hud 수정 뒤). 새: 기본값·선언 기본값, 시드 3개 × limit 100·32로 1~140턴 — 같은 시드 같은 묶음, 색·자리·레벨 순서 = limit 0, 차례 20·32·…·140 그대로, 턴 < limit → 10~15·그 밖 5~10, 늦은 구간 숫자 = limit 0 숫자 (뽑기 한 번). 고정 우선 (상태 그대로), early min 0·−1 → 5~10, max < min → min, limit −1 → 5~10. 밀린 안내 14턴·2단계·한 번·초기화
+- 해시 (Codex 관측, 테스트 상수): 새 기본 `8c6eb2f7…`. limit 0 `83e4f6c8…`·방식 0 `463995c4…`·K5-4 `bc86d257…`·H8 `790bb962…`·K5-8 `3b814220…` 그대로 — 기존 상수는 diff에서 바뀌지 않았다 (Claude 확인). 맨 앞 경고 0건
+- 캡처 (Claude가 봄, 저장소 밖 `C:\Workspace\repos\tools\ProjectManager\.runtime\`): `199` 540×960 — 판 위 10·NEXT 15, 두 자리 잘림 없이 또렷, SHA-256 `6cd8b722…` = 회신 값. 후속 `qa154-followup` — THEN 14, 20턴 판 진입 14와 안내 `시한 젤리: 14턴 안에 합치면 한 단계 더`
+- 남은 것: 100턴 전 숫자가 덜 급해 해볼 만해졌는지, 104턴에 5~10으로 짧아지는 게 갑작스럽지 않은지는 빌드에서 손으로 (`manual_qa_pending.md`)
+
 ### 12-ONE.3 다음 (JELLY 개선)
 - CLASSIC 전용 분기 정리 (행성 그림·연출·규칙 — JELLY가 안 쓰는 것)
 - 결정 대기에서 이어지는 것: 효과음 (합성·녹음), 시작 화면 그림 (지금 행성 — JELLY에 맞게?)
