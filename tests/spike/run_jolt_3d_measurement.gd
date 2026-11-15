@@ -40,6 +40,7 @@ var _reaction_ghost_enabled: bool = false
 var _record_seed_hashes: bool = false
 var _scan_pairs_each_frame: bool = false
 var _skip_determinism: bool = false
+var _turn_progress_enabled: bool = false
 var _skill_strategy: String = ""
 var _tap_blast_bot_mode: String = "none"
 var _jelly_tap_effect_profile: String = "color"
@@ -163,6 +164,7 @@ func _run() -> void:
 		"jelly_level_masses": Array(Config.data.jelly_level_masses),
 		"orb_max_level": Config.data.orb_max_level,
 		"tap_blast_bot_mode": _tap_blast_bot_mode,
+		"turn_progress_enabled": _turn_progress_enabled,
 		"corrections": {
 			"reaction_ghost": _reaction_ghost_enabled,
 			"growth": _progressive_growth_enabled,
@@ -494,6 +496,7 @@ func _run_seed(
 			float(frame_metrics["max_wall_penetration_px"])
 		)
 		var turn_end_pair: Dictionary = _maximum_pair_penetration_details(board)
+		turn_rows[-1]["turn_end_pair"] = turn_end_pair
 		if (
 			float(turn_end_pair["penetration_px"])
 			> float(bin_values["max_pair_penetration_px"])
@@ -536,6 +539,23 @@ func _run_seed(
 			hashes.append(_state_hash(board))
 		if completed_turns % 10 == 0:
 			engine_count_samples.append(_engine_counts(completed_turns, board))
+		if _turn_progress_enabled:
+			var level_ten_count: int = 0
+			for progress_orb: Orb3D in board.get_orbs():
+				if progress_orb.level >= 10:
+					level_ten_count += 1
+			print(
+				"JOLT3D_PROGRESS strategy=%s seed=%d turn=%d orbs=%d l10=%d score=%d state=%d"
+				% [
+					_skill_strategy,
+					seed,
+					completed_turns,
+					active_orbs,
+					level_ten_count,
+					score_manager.score,
+					manager.state,
+				]
+			)
 		if bool(frame_metrics["aborted"]):
 			aborted = true
 			abort_reason = str(frame_metrics["abort_reason"])
@@ -2190,6 +2210,8 @@ func _apply_arguments() -> void:
 			_seeds = _parse_int_list(argument.trim_prefix("--jolt-seeds="))
 		elif argument.begins_with("--jolt-max-turns="):
 			_max_turns = maxi(argument.trim_prefix("--jolt-max-turns=").to_int(), 1)
+		elif argument == "--jolt-turn-progress":
+			_turn_progress_enabled = true
 		elif argument.begins_with("--jolt-determinism-turns="):
 			_determinism_turns = maxi(
 				argument.trim_prefix("--jolt-determinism-turns=").to_int(),
