@@ -146,6 +146,7 @@ func _run() -> void:
 		"blast_gravity_pause_time": Config.data.blast_gravity_pause_time,
 		"jelly_merge_duration": Config.data.jelly_merge_duration,
 		"jelly_merge_level_gap": Config.data.jelly_merge_level_gap,
+		"jelly_timed_merge_level_gap": Config.data.jelly_timed_merge_level_gap,
 		"jelly_merge_wide_gap_min_level": Config.data.jelly_merge_wide_gap_min_level,
 		"blast_push_radius_by_level": Array(Config.data.blast_push_radius_by_level),
 		"blast_speed": Config.data.blast_speed,

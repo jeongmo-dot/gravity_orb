@@ -11,8 +11,8 @@ param(
 	[switch]$TapBlastBot,
 	[ValidateSet("None", "Save", "All")]
 	[string]$TapBlastBotMode = "None",
-	[ValidateRange(0, 10)]
-	[int]$JellyMergeLevelGap = 1,
+	[ValidateRange(-1, 10)]
+	[int]$JellyMergeLevelGap = -1,
 	[ValidateRange(0, 10)]
 	[int]$JellyMergeWideGapMinLevel = 0,
 	[ValidateRange(0.0, 10.0)]
@@ -134,7 +134,7 @@ if (-not $AggregateOnly) {
                     "--game-mode=jelly", "--jolt-ticks=120", "--jolt-seeds=$($shard.Csv)",
                     "--jolt-max-turns=$TurnCap", "--jolt-no-determinism", "--skill-strategy=$strategy",
 					"--jelly-level-profile=$LevelProfile",
-					"--jelly-merge-level-gap=$JellyMergeLevelGap",
+					$(if ($JellyMergeLevelGap -ge 0) { "--jelly-merge-level-gap=$JellyMergeLevelGap" } else { "" }),
 					"--jelly-merge-wide-gap-min-level=$JellyMergeWideGapMinLevel",
 					"--jelly-merge-extension-max=$($JellyMergeExtensionMax.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--jelly-timed-enabled=$($JellyTimedEnabled.ToLower())",
@@ -428,12 +428,29 @@ function Get-Summary($Rows) {
 
 $rows = [ordered]@{}
 foreach ($strategy in $resolvedStrategies) { $rows[$strategy] = @() }
+$effectiveJellyMergeLevelGap = $null
+$effectiveJellyTimedMergeLevelGap = $null
 foreach ($strategy in @($rows.Keys)) {
     $shardSize = 1
     foreach ($shard in @(Get-SeedShards $SeedCount $shardSize)) {
         $filePath = Join-Path $outputDirectory "jelly_${measurementLabel}_${strategy}_part$($shard.Start)-$($shard.End).json"
         if (-not (Test-Path -LiteralPath $filePath)) { throw "Missing $filePath" }
-        $rows[$strategy] += @((Get-Content -LiteralPath $filePath -Raw | ConvertFrom-Json).ticks[0].seeds)
+		$rawReport = Get-Content -LiteralPath $filePath -Raw | ConvertFrom-Json
+		if ($null -eq $rawReport.PSObject.Properties['jelly_timed_merge_level_gap']) {
+			throw "$filePath is missing jelly_timed_merge_level_gap"
+		}
+		$reportedMergeLevelGap = [int]$rawReport.jelly_merge_level_gap
+		$reportedTimedMergeLevelGap = [int]$rawReport.jelly_timed_merge_level_gap
+		if ($null -eq $effectiveJellyMergeLevelGap) {
+			$effectiveJellyMergeLevelGap = $reportedMergeLevelGap
+			$effectiveJellyTimedMergeLevelGap = $reportedTimedMergeLevelGap
+		} elseif (
+			$effectiveJellyMergeLevelGap -ne $reportedMergeLevelGap -or
+			$effectiveJellyTimedMergeLevelGap -ne $reportedTimedMergeLevelGap
+		) {
+			throw "Inconsistent merge level gaps in $filePath"
+		}
+		$rows[$strategy] += @($rawReport.ticks[0].seeds)
     }
     $rows[$strategy] = @($rows[$strategy] | Sort-Object { [int]$_.seed })
     if ($rows[$strategy].Count -ne $SeedCount) { throw "$strategy expected $SeedCount rows, got $($rows[$strategy].Count)" }
@@ -481,7 +498,8 @@ $report = [ordered]@{
 	jelly_tap_effect_modes = $JellyTapEffectModes.ToLower()
 	turn_start_colors = $TurnStartColors
 	turn_color_unlock_turns = $TurnColorUnlockTurns.ToLower()
-	jelly_merge_level_gap = $JellyMergeLevelGap
+	jelly_merge_level_gap = $effectiveJellyMergeLevelGap
+	jelly_timed_merge_level_gap = $effectiveJellyTimedMergeLevelGap
 	jelly_merge_wide_gap_min_level = $JellyMergeWideGapMinLevel
 	jelly_merge_extension_max = $JellyMergeExtensionMax
 	jelly_timed_enabled = $JellyTimedEnabled -eq "On"

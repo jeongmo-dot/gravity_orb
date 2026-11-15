@@ -38,6 +38,29 @@
 
 ## 미확인
 
+### [2026-11-15] 대상 #155 추가 요구 1 — 측정 래퍼가 기본 합체 차이를 따름
+- 맨 앞 경고 조건 0건: 인자 없이 실행한 두 요약의 `jelly_merge_level_gap`은 모두 2, 게임 코드·설정·해시 변경 파일 0개.
+- 상태: 완료 — 최신 `origin/main`의 추가 요구를 `merge-gap-2`에 병합하고, 두 범용 래퍼가 기본 설정을 강제로 1로 덮지 않도록 수정했다.
+- 브랜치 / PR: `merge-gap-2` / https://github.com/jeongmo-dot/gravity_orb/pull/156
+- 변경 파일: `tests/run_jelly_physics_autoplay.ps1`, `tests/tools/run_jelly_measurement.ps1`, `tests/spike/run_jolt_3d_measurement.gd`, 이 회신 파일
+- Done-when 대조:
+  - [x] 두 래퍼의 `$JellyMergeLevelGap` 기본값을 `-1`로 변경. 0 이상일 때만 `--jelly-merge-level-gap=<값>` 전달
+  - [x] 원시 측정 결과가 `Config.data`의 실제 `jelly_merge_level_gap`·`jelly_timed_merge_level_gap`을 모두 기록
+  - [x] 두 래퍼의 최종 요약은 첫 결과의 실제 두 값을 사용하고, 여러 결과 사이 값이 다르면 오류로 중단
+  - [x] 자동 재현은 기존 20시드가 기본인 autoplay에 `-SeedCount` 선택값을 추가해 1시드로 실행. 기본값 20은 유지
+- QA 관측값:
+  - 엔진: Godot `4.8.dev3.official.51105ccbe` 일반 빌드
+  - autoplay, 인자 없음, 시드 1개·30턴 → 종료 코드 0; 원시/요약 모두 일반 2·시한 1
+  - measurement `r`, 인자 없음, 시드 1개·30턴 → 종료 코드 0; 원시/요약 모두 일반 2·시한 1
+  - autoplay, `-JellyMergeLevelGap 1`, 시드 1개·30턴 → 종료 코드 0; 원시/요약 모두 일반 1·시한 1
+  - measurement `r`, `-JellyMergeLevelGap 1`, 시드 1개·1턴 재확인 → 종료 코드 0; 원시/요약 모두 일반 1·시한 1
+  - PowerShell 파서: 두 래퍼 오류 0건. `git diff --check` 오류 0건
+  - 참고 관측: 명시값 measurement의 첫 30턴 실행은 Godot 종료 0·최종 REPORT 출력·JSON 생성 뒤 부모 도구 세션만 남아 수동 중단했다. 남은 Godot 프로세스 0개를 확인하고 위 1턴 재실행에서 전체 종료 코드 0을 관측했다.
+- 이름 붙은 GAP1 묶음 유지: `run_four_color_balance`, `run_merge_extension_balance`, `run_tap_push_balance`, `run_timed_jelly_balance`, `run_spawn_merge_matrix`, `run_jolt_3d_measurement.gd`의 D-save/D-all 계열 프로필, `capture_screens.gd`의 과거 GAP1 장면 프로필. 예전 측정·캡처와 같은 조건을 재현하는 명시값이므로 변경하지 않았다.
+- 미실행: 추가 요구가 측정값 자체는 요구하지 않고 주말 가벼운 모드이므로 전체 회귀, 여러 판 봇 측정, 캡처, 빌드는 실행하지 않았다. 게임 규칙·해시 테스트도 코드가 바뀌지 않아 반복하지 않았다.
+- 결정 사항: 요구한 1시드 확인을 실제 래퍼로 수행할 수 있도록 autoplay에 `-SeedCount`만 추가했다. 산출물은 gitignore의 `artifacts/` 아래에 있으며 커밋 대상이 아니다.
+- 남은 것 · 질문: Claude의 후속 diff 검수와 PR 병합 판단.
+
 ### [2026-11-15] 대상 #155 — 같은 색 합체 레벨 차 2, 시한 젤리는 1
 - 맨 앞 경고 조건 0건: 보존 대상 기존 해시 20개 변경 0건, 시한 젤리 상태 전달 누락 경로 0건, 런타임의 복제된 레벨 차 판정 0곳. 일반·시한·H 확장 선택은 `ReactionRules`로 중앙화했다.
 - 상태: 완료 — 일반 JELLY 기본 합체 차이를 2로 바꾸고, 활성 시한 젤리가 포함된 쌍은 별도 기본값 1을 사용하도록 구현했다. 시한 돌은 기존처럼 비반응이다.
