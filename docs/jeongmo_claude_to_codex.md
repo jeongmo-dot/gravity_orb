@@ -36,24 +36,6 @@
 
 ## 대기 중
 
-### [2026-11-16 #156] 막힘 경고 표시 삭제 — 화살표의 빨강·✕
-- 상태: 대기 — **#155보다 먼저** (#155는 사용자 값 결정 대기라 할 일이 없다). 인박스 번호 #156은 GitHub PR #156 (#155 작업)과 다르다
-- 근거: [technical_design.md](technical_design.md) **§12-ONE.46**
-- 앵커: `scripts/ui/TurnInputIndicator.gd` `arrow_color()`·`_draw()`·`_draw_blocked_mark()`·`blocked_mark_bounds()`·`_on_warning_changed()`
-- 배경: 사용자 (2026-11-16) "그리고 지금 게임 UI에서 4방향 화살표 중에서 입력이 안되는 방향 표시가 잘못되어 있어. 아래로 내려갈 수 없을 때 (이미 아래쪽 중력이라) 위 방향이 금지로 나오고 있어" → Claude 설명 (빨강 ✕ = 그 방향으로 기울이면 입구가 막힌다는 경고) → "위험 표시 하지말라고 그 뒤에 했었는데, 남아있네." — #125에서 Claude가 글자 판만 지우고 화살표 빨강·✕를 남긴 것을 마저 지운다
-- 요구:
-  1. 막힌 방향 화살표도 다른 방향과 같은 `READY_COLOR`·모양·크기·숨쉬기, ✕ 없음. 쓰는 곳이 없어지는 `BLOCKED_COLOR`·`_draw_blocked_mark()`·`blocked_mark_bounds()`·`BLOCKED_MARK_*`·`_blocked_directions`·`warning_changed` 구독은 지운다
-  2. 지금 중력 방향 화살표는 지금처럼 그리지 않는다 (#124). 움직이는 중 회색 화살표 그대로
-  3. 화면 다른 곳에 막힘 경고가 남아 있으면 (예: `Board3D.set_warning_directions()`를 쓰는 판 그림) 같이 지우고 목록을 회신에
-- 건드리지 말 것: `blocked_spawn_directions()`·`warning_changed` 계산·`TurnManager.blocked_directions` (봇·측정이 쓴다), FINAL MOVE 안내, DANGER 글자·점유율 위험 빛, 규칙·물리·생성
-- Done-when:
-  - [ ] `test_turn_input_indicator.gd`: 막힌 방향이 있어도 화살표가 `READY_COLOR`, ✕ 없음, 지금 중력 방향 화살표 없음. 막힘 표시에 기대던 다른 테스트를 새 기대로 (목록 회신)
-  - [ ] 전체 회귀 + JELLY 해시 상수 그대로 (평일)
-  - [ ] 실제 창 캡처 두 비율: `18_board_blocked`를 새 기대로 (세 화살표 같은 색, 빨강·✕ 없음) + 화소 검사
-  - [ ] 빌드 없음
-- 브랜치: main에서 새 브랜치 → PR (#155 `merge-gap-2`와 따로)
-- **회신 맨 앞에**: 해시 상수가 바뀜, 화살표 밖에도 막힘 경고가 있었음, 규칙·봇 판정까지 바꿔야 했음
-
 ### [2026-11-15 #155] 같은 색 합체 레벨 차 2 다시 시도 — 시한 젤리는 1
 - 상태: **사용자 값 결정 대기 — Codex 할 일 없음** (추가 요구 6 `18513eb` 검수 통과: B10 100판이 기준 통과, 대신 대폭발 판당 6.6 → 0.8. 값은 사용자가 정한다 — 정해지면 추가 요구 7). 인박스 번호 #155는 GitHub PR #155 (#154 인박스 상태 요청)와 다르다
 - 병합: 사용자 값 결정 → 추가 요구 7 반영 → Claude 검수 뒤 한 번에 병합
@@ -86,6 +68,25 @@
 ---
 
 ## 처리 완료
+
+### [2026-11-16 #156] 막힘 경고 표시 삭제 — 화살표의 빨강·✕ — 완료
+- 상태: 완료 (2026-11-16 사용자 "확인" → "병합해줘" · [PR #157](https://github.com/jeongmo-dot/gravity_orb/pull/157) squash `45dbdd3`)
+- 검수: 코드 diff (`TurnInputIndicator.gd` 빨강·✕ 전부 삭제, `arrow_color()` 늘 `READY_COLOR`), 맨 앞 경고 1건 — 2D `Board.gd` 빨간 벽 선도 삭제 (실제 게임은 `Main3D`·`Board3D`라 플레이 화면에는 보이지 않던 선 → 받아들임). 전체 회귀 375/375·4/4·5/5·해시 그대로는 Codex 관측 (Claude 재실행 없음). 캡처 `30_board_blocked` 두 비율 Claude 직접 확인, 빨강 화소 0. 빌드 없음. 결과: §12-ONE.46 "#156 결과"
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.46**
+- 앵커: `scripts/ui/TurnInputIndicator.gd` `arrow_color()`·`_draw()`·`_draw_blocked_mark()`·`blocked_mark_bounds()`·`_on_warning_changed()`
+- 배경: 사용자 (2026-11-16) "그리고 지금 게임 UI에서 4방향 화살표 중에서 입력이 안되는 방향 표시가 잘못되어 있어. 아래로 내려갈 수 없을 때 (이미 아래쪽 중력이라) 위 방향이 금지로 나오고 있어" → Claude 설명 (빨강 ✕ = 그 방향으로 기울이면 입구가 막힌다는 경고) → "위험 표시 하지말라고 그 뒤에 했었는데, 남아있네." — #125에서 Claude가 글자 판만 지우고 화살표 빨강·✕를 남긴 것을 마저 지운다
+- 요구:
+  1. 막힌 방향 화살표도 다른 방향과 같은 `READY_COLOR`·모양·크기·숨쉬기, ✕ 없음. 쓰는 곳이 없어지는 `BLOCKED_COLOR`·`_draw_blocked_mark()`·`blocked_mark_bounds()`·`BLOCKED_MARK_*`·`_blocked_directions`·`warning_changed` 구독은 지운다
+  2. 지금 중력 방향 화살표는 지금처럼 그리지 않는다 (#124). 움직이는 중 회색 화살표 그대로
+  3. 화면 다른 곳에 막힘 경고가 남아 있으면 (예: `Board3D.set_warning_directions()`를 쓰는 판 그림) 같이 지우고 목록을 회신에
+- 건드리지 말 것: `blocked_spawn_directions()`·`warning_changed` 계산·`TurnManager.blocked_directions` (봇·측정이 쓴다), FINAL MOVE 안내, DANGER 글자·점유율 위험 빛, 규칙·물리·생성
+- Done-when:
+  - [ ] `test_turn_input_indicator.gd`: 막힌 방향이 있어도 화살표가 `READY_COLOR`, ✕ 없음, 지금 중력 방향 화살표 없음. 막힘 표시에 기대던 다른 테스트를 새 기대로 (목록 회신)
+  - [ ] 전체 회귀 + JELLY 해시 상수 그대로 (평일)
+  - [ ] 실제 창 캡처 두 비율: `18_board_blocked`를 새 기대로 (세 화살표 같은 색, 빨강·✕ 없음) + 화소 검사
+  - [ ] 빌드 없음
+- 브랜치: main에서 새 브랜치 → PR (#155 `merge-gap-2`와 따로)
+- **회신 맨 앞에**: 해시 상수가 바뀜, 화살표 밖에도 막힘 경고가 있었음, 규칙·봇 판정까지 바꿔야 했음
 
 ### [2026-11-14 #154] 시한 젤리 숫자 — 100턴 전 10~15, 뒤 5~10 — 완료
 - 상태: 완료 (2026-11-15 사용자 "확인" · [PR #154](https://github.com/jeongmo-dot/gravity_orb/pull/154) 병합 커밋 `aab61d8` · 회신 상태 요청 [PR #155](https://github.com/jeongmo-dot/gravity_orb/pull/155) `5e03f76`)

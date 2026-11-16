@@ -5914,6 +5914,16 @@ G1 전략 봇 (시드 1~20, 600턴 상한, 턴 평균 / 총점 평균):
 - 브랜치: main에서 새 브랜치 (#155의 `merge-gap-2`와 따로) → PR
 - 회신 맨 앞에 적을 것: 해시 상수가 바뀜, 화살표 밖의 다른 곳에도 막힘 경고가 있었음 (지운 곳), 막힘 표시를 지우려면 규칙·봇 판정까지 바꿔야 했음
 
+**#156 결과 — 병합** ([PR #157](https://github.com/jeongmo-dot/gravity_orb/pull/157) squash `45dbdd3`, 브랜치 `remove-blocked-warning` 끝 `d514b87`, 2026-11-16 사용자 "확인" → "병합해줘". 검수는 Claude — Claude 재실행 없음)
+- 코드: `TurnInputIndicator.gd` — `BLOCKED_COLOR`·`BLOCKED_MARK_*`·`_blocked_directions`·`warning_changed` 구독·`_on_warning_changed()`·`_draw_blocked_mark()`·`blocked_mark_bounds()`·`_blocked_mark_center()` 삭제. `arrow_color()`는 늘 `READY_COLOR`. 지금 중력 방향 숨김 (`is_direction_selectable()`)·움직이는 중 회색 거절 화살표는 그대로
+- 맨 앞 경고 "화살표 밖에도 막힘 경고가 있었음": 2D `Board.gd`의 `_draw()`가 `_warning_directions` 벽에 빨간 선 (`WARNING_FRAME_COLOR` `#FF3B30`, 12px)을 그렸다 → 함께 삭제. Claude 확인: 실제 게임은 `run/main_scene` = `Main3D.tscn` (`Board3D`)이고, 2D `Main.tscn`·`Board.tscn`은 테스트·2D 비교용이라 플레이 화면에는 보이지 않던 선이다 → 받아들임 (사용자 "병합해줘")
+  - `Board3D._update_warning_visuals()`는 막힘 방향과 상관없이 벽을 `METAL_FRAME_COLOR`로 칠한다 (#77). `Board3D`에 남은 `WARNING_FRAME_COLOR`는 `_danger_color()` (점유율 위험 빛, 배수 4 이상)뿐 — 범위 밖
+- 그대로 (diff 확인): `blocked_spawn_directions()`·`warning_changed` 계산·`TurnManager.blocked_directions`, `set_warning_directions()` (값만 보관), FINAL MOVE, 규칙·설정
+- 테스트 (Codex 관측): 일반 375/375·장기 4/4·성능 5/5, 종료 코드 0, JELLY 해시 상수 그대로. `test_turn_input_indicator.gd` — 막힌 LEFT도 `READY_COLOR`, ✕ 그리기 함수 없음, ✕ 경계 단언 삭제. `test_space_board_visuals.gd`·`test_jolt_integration.gd`는 기대 변경 없이 통과
+- 캡처: 지금 이름은 `30_board_blocked` (명세의 `18_`은 예전 번호). 아래 막힘·오른쪽 중력. Claude가 두 장 (540×960·540×1170)을 직접 봄 — 위·왼쪽·아래 화살표가 같은 하늘색, 오른쪽 숨김, ✕·빨간 선 없음. Claude 화소 세기 (R > 200·G < 110·B < 110): 두 장 모두 0
+- 빌드 없음. 평일 검사. 기획서 0.16.36
+- 남은 것: DANGER 글자·점유율 위험 빛도 지울지 사용자에게 물음 (답 대기, 이번 범위 밖)
+
 
 ### 12-ONE.3 다음 (JELLY 개선)
 - CLASSIC 전용 분기 정리 (행성 그림·연출·규칙 — JELLY가 안 쓰는 것)
