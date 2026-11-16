@@ -5,8 +5,6 @@ signal orb_contact(a: Orb, b: Orb)
 
 const ORB_SCENE: PackedScene = preload("res://scenes/Orb.tscn")
 const FRAME_WIDTH: float = 4.0
-const WARNING_FRAME_WIDTH: float = 12.0
-const WARNING_FRAME_COLOR: Color = Color("#FF3B30")
 const BLAST_FLASH_DURATION: float = 0.18
 const BLAST_SHAKE_DISTANCE: float = 6.0
 
@@ -898,16 +896,3 @@ func _configure_frame() -> void:
 	_frame_border.width = FRAME_WIDTH
 	_frame_border.default_color = Color.WHITE
 	_frame_border.closed = true
-
-
-func _draw() -> void:
-	var half: float = half_size()
-	for direction: Vector2i in _warning_directions:
-		var wall_center: Vector2 = -Vector2(direction) * half
-		var wall_axis: Vector2 = Vector2(OrbTypes.perpendicular(direction))
-		draw_line(
-			wall_center - wall_axis * half,
-			wall_center + wall_axis * half,
-			WARNING_FRAME_COLOR,
-			WARNING_FRAME_WIDTH
-		)

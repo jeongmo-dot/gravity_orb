@@ -2,7 +2,6 @@ class_name TurnInputIndicator
 extends Control
 
 const READY_COLOR: Color = Color("#BFE9FF")
-const BLOCKED_COLOR: Color = Color("#FF3B30")
 const REJECTED_COLOR: Color = Color("#8EA3C8")
 const READY_FADE_DURATION: float = 0.20
 const BUSY_FADE_DURATION: float = 0.10
@@ -18,9 +17,6 @@ const ARROW_DEPTH: float = 18.0
 const ARROW_STROKE_WIDTH: float = 8.0
 const ARROW_HORIZONTAL_OFFSET: float = 13.0
 const ARROW_VERTICAL_OFFSET: float = 34.0
-const BLOCKED_MARK_SIZE: float = 12.0
-const BLOCKED_MARK_SIDE_OFFSET: float = 34.0
-const BLOCKED_MARK_VERTICAL_OFFSET: float = 24.0
 const ORBIT_DIAMETER: float = 20.0
 const ORBIT_RADIUS: float = ORBIT_DIAMETER * 0.5
 const ORBIT_OUTSIDE_GAP: float = 4.0
@@ -37,7 +33,6 @@ var _orbit_progress: float = 0.0
 var _rejected_remaining: float = 0.0
 var _rejected_direction: Vector2i = Vector2i.ZERO
 var _rejection_flash_count: int = 0
-var _blocked_directions: Array[Vector2i] = []
 
 
 func _ready() -> void:
@@ -57,13 +52,10 @@ func bind(manager: Variant, board: Variant) -> void:
 	set_process(true)
 	if not _manager.state_changed.is_connected(_on_state_changed):
 		_manager.state_changed.connect(_on_state_changed)
-	if not _manager.warning_changed.is_connected(_on_warning_changed):
-		_manager.warning_changed.connect(_on_warning_changed)
 	if not _manager.game_over.is_connected(_on_game_over):
 		_manager.game_over.connect(_on_game_over)
 	if not InputRouter.swipe_rejected.is_connected(_on_swipe_rejected):
 		InputRouter.swipe_rejected.connect(_on_swipe_rejected)
-	_on_warning_changed(_manager.blocked_directions)
 	_on_state_changed(int(_manager.state))
 
 
@@ -114,8 +106,6 @@ func _draw() -> void:
 			continue
 		color.a *= alpha
 		_draw_arrow(board_rect, direction, color, scale_value)
-		if direction in _blocked_directions and _ready_state:
-			_draw_blocked_mark(board_rect, direction, color, scale_value)
 	if not _ready_state:
 		_draw_orbit_light(board_rect)
 
@@ -143,12 +133,6 @@ func _on_game_over() -> void:
 	_on_state_changed(int(TurnManager.State.GAME_OVER))
 
 
-func _on_warning_changed(directions: Array[Vector2i]) -> void:
-	_blocked_directions.clear()
-	_blocked_directions.append_array(directions)
-	queue_redraw()
-
-
 func _on_swipe_rejected(direction: Vector2i) -> void:
 	if not _cues_visible or _ready_state or direction == Vector2i.ZERO:
 		return
@@ -158,8 +142,8 @@ func _on_swipe_rejected(direction: Vector2i) -> void:
 	queue_redraw()
 
 
-func arrow_color(direction: Vector2i) -> Color:
-	return BLOCKED_COLOR if direction in _blocked_directions else READY_COLOR
+func arrow_color(_direction: Vector2i) -> Color:
+	return READY_COLOR
 
 
 func is_direction_selectable(direction: Vector2i) -> bool:
@@ -296,12 +280,6 @@ func orbit_path_rect(board_rect: Rect2) -> Rect2:
 	return board_rect.grow(ORBIT_RADIUS + ORBIT_OUTSIDE_GAP)
 
 
-func blocked_mark_bounds(board_rect: Rect2, direction: Vector2i) -> Rect2:
-	var center: Vector2 = _blocked_mark_center(board_rect, direction)
-	var half_extent: float = BLOCKED_MARK_SIZE * 0.5 + 1.5
-	return Rect2(center - Vector2.ONE * half_extent, Vector2.ONE * half_extent * 2.0)
-
-
 func _draw_arrow(
 	board_rect: Rect2,
 	direction: Vector2i,
@@ -325,31 +303,6 @@ func _draw_arrow(
 	)
 
 
-func _draw_blocked_mark(
-	board_rect: Rect2,
-	direction: Vector2i,
-	color: Color,
-	scale_value: float
-) -> void:
-	var center: Vector2 = _blocked_mark_center(board_rect, direction)
-	var half_size: float = BLOCKED_MARK_SIZE * 0.5 * scale_value
-	var stroke_width: float = 3.0 * scale_value
-	draw_line(
-		center - Vector2(half_size, half_size),
-		center + Vector2(half_size, half_size),
-		color,
-		stroke_width,
-		true
-	)
-	draw_line(
-		center + Vector2(-half_size, half_size),
-		center + Vector2(half_size, -half_size),
-		color,
-		stroke_width,
-		true
-	)
-
-
 func _arrow_center(board_rect: Rect2, direction: Vector2i) -> Vector2:
 	var center: Vector2 = board_rect.get_center()
 	if direction.x < 0:
@@ -361,15 +314,6 @@ func _arrow_center(board_rect: Rect2, direction: Vector2i) -> Vector2:
 	else:
 		center.y = board_rect.end.y + ARROW_VERTICAL_OFFSET
 	return center
-
-
-func _blocked_mark_center(board_rect: Rect2, direction: Vector2i) -> Vector2:
-	var offset: float = (
-		BLOCKED_MARK_SIDE_OFFSET
-		if direction.x != 0
-		else BLOCKED_MARK_VERTICAL_OFFSET
-	)
-	return _arrow_center(board_rect, direction) + Vector2.UP * offset
 
 
 func _draw_orbit_light(board_rect: Rect2) -> void:
