@@ -38,6 +38,26 @@
 
 ## 미확인
 
+### [2026-11-20] 대상 #156 후속 — 전체 코드 리뷰 지적 3건 개선
+- 상태: 완료
+- 브랜치 / PR: `review-fixes-save-warning-cleanup` / 미생성
+- 변경 파일: `scripts/core/SaveStore.gd`, `scripts/core/TurnManager.gd`, `tests/test_rankings.gd`, `tests/scenarios/test_turn_manager.gd`, `tests/scenarios/test_game_over_measurement.gd`, `tests/spike/run_jolt_3d_measurement.gd`, 이 회신 파일
+- Done-when 대조:
+  - [x] 기존 `save.cfg` 로드 실패 시 같은 경로에 덮어쓰지 않음 — `_save_rankings_and_best()`와 `_save_value()`가 `ConfigFile.load()` 오류를 즉시 반환
+  - [x] 랭킹 저장 실패를 새 기록으로 표시하지 않음 — `add_ranking()`이 저장 오류 시 기존 실패 결과 `{rank: 0, record: {}}` 반환
+  - [x] 일반 플레이의 막힘 방향 네 방향 스캔 제거 — 기본 `blocked_direction_tracking_enabled = false`; 봇·측정 픽스처만 true
+  - [x] 공개 함수 시그니처·밸런스 수치·게임 규칙 변경 없음
+- QA 관측값:
+  - 관련 테스트 5개 파일을 각각 새 Godot 프로세스로 실행: `test_rankings.gd` 3/3, `test_turn_manager.gd` 13/13, `test_score_flow.gd` 11/11, `test_game_over.gd` 7/7, `test_frontend.gd` 3/3 — 합계 **37/37**, 실패 0, 각 종료 코드 0
+  - 기본·`--mode=jelly` `--headless --quit-after 300` → 각각 종료 코드 0, `ERROR:`·`SCRIPT ERROR`·`Parse Error` 0건
+  - `git diff --check` → 오류 0
+  - 일반 전체·장기·성능 묶음, 빌드, 화면 캡처 → 미실행. 사용자의 반복 시뮬레이션 최소화 지시에 따라 저장·턴·결과·게임오버 관련 회귀만 실행했고 화면 변경은 없음
+- 수동 확인 절차:
+  1. 정상 저장 경로에서 게임오버 → 새 기록 배지가 표시되고 재실행 뒤 랭킹이 유지되는지 확인한다.
+  2. 저장 경로를 쓸 수 없는 환경에서 게임오버 → 새 기록 배지가 표시되지 않는지 확인한다.
+- 결정 사항: `add_ranking()`의 Dictionary 모양과 공개 함수 시그니처는 유지했다. 저장 실패 원인은 UI에 새 문구로 노출하지 않고 거짓 성공 표시만 막았다. 막힘 방향 자료가 필요한 측정 도구는 명시적으로 추적을 켠다.
+- 남은 것 · 질문: 없음
+
 ### [2026-11-16] 대상 #156 — 막힘 경고 표시 삭제
 - **맨 앞 경고:** 화살표 밖에도 막힘 경고가 한 곳 있었다 — 2D `Board.gd`의 `_draw()`가 `_warning_directions` 벽에 빨간 선을 그렸다. 이 선도 함께 제거했다. JELLY 해시 상수는 그대로이고, 막힘 계산·봇 판정·FINAL MOVE 규칙은 바꾸지 않았다.
 - 상태: 완료
