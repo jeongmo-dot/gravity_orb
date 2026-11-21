@@ -5913,6 +5913,14 @@ G1 전략 봇 (시드 1~20, 600턴 상한, 턴 평균 / 총점 평균):
 - 그 뒤: 사용자가 에디터에서 해 보고 정한다 — B10 채택 → 추가 요구 8 (기본값 테스트·GAP2-B10 해시 상수·대폭발 8에 기대던 테스트, 평일이면 전체 회귀) → Claude 검수 → 병합 (§4 `jelly_blast_min_level` 행·기획서는 그때). 다른 값·GAP1이면 사용자와 다시 정한다. 공유 트리를 main으로 돌리는 것은 그때 지시
 - 사용자에게 알릴 것 (Claude): 이 브랜치에서 낸 점수도 같은 `save.cfg` 랭킹·최고점수에 들어간다
 
+**#155 추가 요구 7 결과 — 사용자 플레이 대기** ([PR #156](https://github.com/jeongmo-dot/gravity_orb/pull/156) `3a6dd34`, 2026-11-22 사용자 "코덱스 내용 확인". 검수는 Claude — Claude 재실행 없음)
+- main 병합 `441d45f` (부모 `18513eb`·`d30a346`). Claude diff 대조: 브랜치와 main의 차이는 #155 파일 14개뿐이고, #156·#156 후속 파일 (`TurnInputIndicator.gd`·`Board.gd`·`SaveStore.gd`·`TurnManager.gd`, 테스트 4개)은 main과 같다. `run_jolt_3d_measurement.gd`에 `blocked_direction_tracking_enabled = true` 두 곳 (`_create_fixture()`·`_create_preview_fixture_shell()`)·`--jolt-turn-progress`·턴별 `turn_end_pair`가 다 있다. `docs/`는 회신 파일만 main과 다르다
+- 값 커밋 `3a6dd34`: `GameConfig.gd`·`default_config.tres`의 `jelly_blast_min_level` 8 → 10 두 줄 + 회신. 다른 값 그대로 (레벨 차 2·시한 −1·터치 8·공 4·같은 레벨만 false)
+- 테스트 (Codex 관측, 고치지 않음): `test_turn_input_indicator` 2/2·`test_rankings` 3/3·`test_turn_manager` 13/13·`test_timed_jelly` 24/24, `test_rules` 19/21 — 실패 2개 (`test_jelly_blast_default_l8_threshold_and_gap_two_absorption_precedence`·`test_jelly_explicit_gap_one_rule_examples`)는 기본 L8·L9 대폭발 기대. headless 스모크 (`--quit-after 300 -- --mode=jelly`) 종료 코드 0·`SCRIPT ERROR` 0
+- 추가 요구 8에서 고칠 목록 (Codex 코드 읽기): `test_config.gd` L8 기본값, `test_rules.gd` 위 두 테스트, `test_jelly_regression.gd` `EXPECTED_GAP2_DEFAULT_HASH`. `test_jelly_visuals.gd`·`test_jolt_3d.gd`의 L8 그림 테스트는 8을 직접 넣어 기본값과 무관
+- 대폭발 레벨을 숫자로 적은 화면 글 0건 (Codex 검색 — Claude 검색과 같다). 공유 트리 = `merge-gap-2` `3a6dd34`, 깨끗함 (Claude 확인). 맨 앞 경고 0건
+- 다음: 사용자가 에디터에서 해 보고 정한다 — B10 채택 → 추가 요구 8 / 다른 값·GAP1 → 다시 정함
+
 ### 12-ONE.46 막힘 경고 표시 삭제 — 화살표의 빨강·✕ (#156)
 사용자 (2026-11-16, 에디터에서 플레이 중 — 아래 중력, 위 화살표가 빨강 + ✕인 스크린샷): **"그리고 지금 게임 UI에서 4방향 화살표 중에서 입력이 안되는 방향 표시가 잘못되어 있어. 아래로 내려갈 수 없을 때 (이미 아래쪽 중력이라) 위 방향이 금지로 나오고 있어"** → Claude가 지금 설계를 설명 (빨강 ✕ = 그 방향으로 기울이면 새 공이 들어올 입구가 막혀 FINAL MOVE가 된다는 경고, 지금 중력 방향은 화살표를 그리지 않음) → 사용자 **"위험 표시 하지말라고 그 뒤에 했었는데, 남아있네."**
 
