@@ -41,6 +41,7 @@ var merge_extension_seconds_sum: float = 0.0
 var merge_extension_seconds_max: float = 0.0
 var merge_extension_capped_turn_count: int = 0
 var blocked_directions: Array[Vector2i] = []
+var blocked_direction_tracking_enabled: bool = false
 var game_over_details: Dictionary = {}
 var final_move_pending: bool = false
 var final_move_active: bool = false
@@ -741,6 +742,8 @@ func _build_game_over_details(blocked_spawns: Array) -> Dictionary:
 
 
 func _update_warnings() -> void:
+	if not blocked_direction_tracking_enabled:
+		return
 	var next_blocked: Array[Vector2i] = _board.blocked_spawn_directions(
 		_spawner.peek_next()
 	)
