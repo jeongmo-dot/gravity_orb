@@ -38,6 +38,33 @@
 
 ## 미확인
 
+### [2026-11-22] 대상 #155 추가 요구 7 — GAP2-B10 직접 플레이 기본값
+- 상태: **완료** — `merge-gap-2`에 최신 `origin/main` `d30a346`을 병합한 뒤 JELLY 자동 대폭발 최소 레벨만 8에서 10으로 변경했다. 테스트 기대값·해시·게임 코드·아트·사운드·도움말은 수정하지 않았다.
+- 브랜치 / PR: `merge-gap-2` / https://github.com/jeongmo-dot/gravity_orb/pull/156
+- 커밋 순서: main 병합 `441d45f` → B10 값·회신 커밋(이 항목과 같은 커밋)
+- 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, 이 회신 파일
+- Done-when 대조:
+  - [x] 브랜치에 최신 main 병합 — 회신 문서 충돌은 양쪽 기록을 모두 보존. 자동 병합된 Jolt 측정 도구에서 `blocked_direction_tracking_enabled = true` 두 곳, `--jolt-turn-progress`, 턴별 `turn_end_pair` 기록을 모두 확인
+  - [x] `jelly_blast_min_level=10` — 선언과 기본 리소스 두 곳만 변경
+  - [x] 기존 선택값 보존 — 일반 합체 차이 2, 시한 합체 차이 −1, 탭 대폭발 문턱 8, `spawn_count_max=4`, `jelly_blast_requires_same_level=false`
+  - [x] 테스트·해시 기대값 무수정 및 영향 목록 작성
+  - [x] 지정된 다섯 파일만 각각 새 Godot 프로세스로 실행, JELLY 헤드리스 스모크 1회
+- QA 관측값 (Godot `4.8.dev3.official.51105ccbe` 일반 빌드):
+  - `test_turn_input_indicator.gd` 2/2, `test_rankings.gd` 3/3, `test_turn_manager.gd` 13/13, `test_timed_jelly.gd` 24/24 — 합계 **42/42**, 실패 0, 각 종료 코드 0
+  - `test_rules.gd` — **19/21 통과, 2개 테스트 실패, 종료 코드 1**. `test_jelly_blast_default_l8_threshold_and_gap_two_absorption_precedence`와 `test_jelly_explicit_gap_one_rule_examples`의 기존 기본 L8/L9 대폭발 기대가 B10 기본값과 달라 발생했으며, 명세의 예상 실패 조건과 일치한다. 테스트는 수정하지 않았다.
+  - 지정 다섯 파일 전체: **61/63 통과, 예상 실패 2, 그 밖의 실패 0**
+  - `--headless --path . --quit-after 300 -- --mode=jelly` 1회 → 종료 코드 0, 출력 `SCRIPT ERROR`·`Parse Error` 0건
+  - 기본값/현재 GAP2 해시 영향 파일(소스 읽기): `test_config.gd`의 L8 기본값 기대, `test_rules.gd`의 위 두 테스트, `test_jelly_regression.gd`의 `EXPECTED_GAP2_DEFAULT_HASH`. 명세대로 이 기대값·해시는 바꾸지 않았고 앞의 두 미지정 파일은 실행하지 않았다. `test_jelly_visuals.gd`와 `test_jolt_3d.gd`의 L8 시각 테스트는 테스트 안에서 8을 명시하므로 기본값 의존이 아니다.
+  - 사용자 노출 문구 검색: “대폭발은 L8”처럼 자동 대폭발 문턱 8을 고정 안내하는 코드·장면·설정 문구 0건
+  - 미실행: 봇/장시간 시뮬레이션, 전체 회귀, 캡처, Windows 빌드. 추가 요구의 주말 경량 검증 범위를 따랐다.
+- 수동 확인 절차:
+  1. Godot 4.8 일반 빌드로 `merge-gap-2`를 열어 JELLY를 플레이한다.
+  2. 서로 다른 색 L8/L8, L8/L9, L9/L10을 접촉시켜 자동 대폭발이 나지 않고 L8·L9가 대폭발 준비 얼굴/깜빡임을 쓰지 않는지 본다.
+  3. 서로 다른 색 L10/L10을 접촉시켜 기존 대폭발 동작이 나는지 본다. L10 MAX 얼굴은 기존 표현을 유지해야 한다.
+  4. L8 공을 직접 탭해 탭 대폭발 문턱 8이 그대로 동작하는지 본다.
+- 결정 사항·알려진 문제: 새 수치나 API를 임의로 정하지 않았다. 이 브랜치에서 플레이해 기록되는 점수는 다른 브랜치/기존 게임과 **같은 `save.cfg`의 JELLY 랭킹·최고 점수**를 사용하므로 시험 점수가 기존 기록에 섞일 수 있다.
+- 남은 것 · 질문: Claude의 수동 플레이 결과 판정과 PR #156 병합 여부 결정.
+
 ### [2026-11-16] 대상 #155 추가 요구 6 — B10 중단 진단·100판 완료
 - **맨 앞 경고:** B10 L-합체 D-save 시드 8의 턴 끝 쌍 관통이 **36.42px**로 30px를 넘었다. 100판의 판 밖 이탈은 0건, 지정 실제 값 불일치는 0건이다. 이전 프로세스를 끊은 외부 주체 자체는 기록에 남지 않아 특정하지 못했지만, 같은 두 판을 실제 엔진 프로세스로 다시 실행하면 600턴·종료 코드 0·JSON 생성까지 정상 완료됐고 Windows Application 로그에도 Godot 충돌 기록이 없으므로 게임 코드 비정상 종료나 JSON 누락 경로가 아니라 **콘솔 런처/외부 실행 감시 경계의 중단**으로 분류했다. 게임 코드·설정·해시 상수는 바꾸지 않았다. B10 D-save 관측치는 미완료 `0 / 0 / 1`, 자동 평균 159.25턴으로 기존 Claude 기준 범위 안에 남았다.
 - 상태: **완료** — 누락 21판을 보충해 B10 100/100판을 집계했다. 측정 도구만 보완했고 게임 코드는 수정하지 않았다.
