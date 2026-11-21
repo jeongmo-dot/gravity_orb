@@ -15,6 +15,31 @@ var _turn_starts: Array[Dictionary] = []
 var _turn_finishes: Array[Dictionary] = []
 
 
+func test_blocked_direction_scan_runs_only_for_measurements() -> void:
+	var snapshot: Dictionary = _snapshot_m3_config()
+	var fixture: Dictionary = await _create_fixture(FIXTURE_SEED)
+	var board: Board = fixture["board"] as Board
+	var spawner: Spawner = fixture["spawner"] as Spawner
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	var sentinel: Array[Vector2i] = [Vector2i.UP]
+	manager.blocked_directions.assign(sentinel)
+
+	manager._update_warnings()
+	assert_eq(
+		manager.blocked_directions,
+		sentinel,
+		"normal gameplay skips the blocked-direction scan"
+	)
+	manager.blocked_direction_tracking_enabled = true
+	manager._update_warnings()
+	assert_eq(
+		manager.blocked_directions,
+		board.blocked_spawn_directions(spawner.peek_next()),
+		"measurement mode refreshes blocked directions"
+	)
+	await _cleanup_fixture(fixture, snapshot)
+
+
 func test_t1_start_game_settles_without_starting_turn() -> void:
 	var snapshot: Dictionary = _snapshot_m3_config()
 	var fixture: Dictionary = await _create_fixture(FIXTURE_SEED + 1)

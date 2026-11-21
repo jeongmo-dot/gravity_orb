@@ -352,6 +352,54 @@
 - 미실행: 주말 가벼운 모드와 #155 명세에 따라 전체 `run_tests.ps1`, 봇/장시간 시뮬레이션, 캡처, Windows 빌드는 실행하지 않았다. 화면 변경 항목이 아니다.
 - 결정 사항·알려진 제한: 명세 밖 수치·공개 이름 변경 없음. 시한 판정은 `is_timed=true && is_timed_stone=false`인 활성 표식만 사용한다. 측정·캡처 코드는 예측 입력 전달만 수정했으며 산출물은 만들지 않았다.
 - 남은 것 · 질문: Claude 검수와 PR 병합 판단.
+### [2026-11-20] 대상 #156 후속 — 전체 코드 리뷰 지적 3건 개선
+- 상태: 완료
+- 브랜치 / PR: `review-fixes-save-warning-cleanup` / 미생성
+- 변경 파일: `scripts/core/SaveStore.gd`, `scripts/core/TurnManager.gd`, `tests/test_rankings.gd`, `tests/scenarios/test_turn_manager.gd`, `tests/scenarios/test_game_over_measurement.gd`, `tests/spike/run_jolt_3d_measurement.gd`, 이 회신 파일
+- Done-when 대조:
+  - [x] 기존 `save.cfg` 로드 실패 시 같은 경로에 덮어쓰지 않음 — `_save_rankings_and_best()`와 `_save_value()`가 `ConfigFile.load()` 오류를 즉시 반환
+  - [x] 랭킹 저장 실패를 새 기록으로 표시하지 않음 — `add_ranking()`이 저장 오류 시 기존 실패 결과 `{rank: 0, record: {}}` 반환
+  - [x] 일반 플레이의 막힘 방향 네 방향 스캔 제거 — 기본 `blocked_direction_tracking_enabled = false`; 봇·측정 픽스처만 true
+  - [x] 공개 함수 시그니처·밸런스 수치·게임 규칙 변경 없음
+- QA 관측값:
+  - 관련 테스트 5개 파일을 각각 새 Godot 프로세스로 실행: `test_rankings.gd` 3/3, `test_turn_manager.gd` 13/13, `test_score_flow.gd` 11/11, `test_game_over.gd` 7/7, `test_frontend.gd` 3/3 — 합계 **37/37**, 실패 0, 각 종료 코드 0
+  - 기본·`--mode=jelly` `--headless --quit-after 300` → 각각 종료 코드 0, `ERROR:`·`SCRIPT ERROR`·`Parse Error` 0건
+  - `git diff --check` → 오류 0
+  - 일반 전체·장기·성능 묶음, 빌드, 화면 캡처 → 미실행. 사용자의 반복 시뮬레이션 최소화 지시에 따라 저장·턴·결과·게임오버 관련 회귀만 실행했고 화면 변경은 없음
+- 수동 확인 절차:
+  1. 정상 저장 경로에서 게임오버 → 새 기록 배지가 표시되고 재실행 뒤 랭킹이 유지되는지 확인한다.
+  2. 저장 경로를 쓸 수 없는 환경에서 게임오버 → 새 기록 배지가 표시되지 않는지 확인한다.
+- 결정 사항: `add_ranking()`의 Dictionary 모양과 공개 함수 시그니처는 유지했다. 저장 실패 원인은 UI에 새 문구로 노출하지 않고 거짓 성공 표시만 막았다. 막힘 방향 자료가 필요한 측정 도구는 명시적으로 추적을 켠다.
+- 남은 것 · 질문: 없음
+
+### [2026-11-16] 대상 #156 — 막힘 경고 표시 삭제
+- **맨 앞 경고:** 화살표 밖에도 막힘 경고가 한 곳 있었다 — 2D `Board.gd`의 `_draw()`가 `_warning_directions` 벽에 빨간 선을 그렸다. 이 선도 함께 제거했다. JELLY 해시 상수는 그대로이고, 막힘 계산·봇 판정·FINAL MOVE 규칙은 바꾸지 않았다.
+- 상태: 완료
+- 브랜치 / PR: `remove-blocked-warning` / https://github.com/jeongmo-dot/gravity_orb/pull/157
+- 변경 파일: `scripts/ui/TurnInputIndicator.gd`, `scripts/core/Board.gd`, `tests/test_turn_input_indicator.gd`, 이 회신 파일
+- Done-when 대조:
+  - [x] 막힌 방향도 `READY_COLOR`·같은 모양·크기·숨쉬기, 빨강·✕ 없음 — `BLOCKED_COLOR`, `BLOCKED_MARK_*`, `_blocked_directions`, 막힘 표시 함수·경계 함수, `warning_changed` 구독 제거
+  - [x] 현재 중력 방향 화살표는 계속 숨김, 움직이는 중 회색 거절 화살표 유지 — 전체 회귀 + 두 비율 캡처
+  - [x] 다른 화면 경고 제거 — 2D `Board._draw()`의 빨간 막힘 벽 선 제거. 3D `Board3D.set_warning_directions()`는 기존부터 금속 프레임을 유지해 추가 경고 그림 없음
+  - [x] 전체 회귀 + JELLY 해시 상수 그대로 — 일반 375/375, 장기 4/4, 성능 5/5
+  - [x] 실제 창 두 비율 — 현재 이름 `30_board_blocked`(명세의 예전 `18_board_blocked`) 540×960·540×1170 확인
+  - [x] 빌드 없음
+- QA 관측값:
+  - `--import`, 기본 `--quit-after 300`, `--mode=blitz --quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error`·`ERROR:` 0건
+  - `tests/run_tests.ps1` → 일반 **375/375**, 장기 **4/4**, 성능 **5/5**, 세 프로세스 종료 코드 0, 최종 종료 코드 0, 98.676초
+  - JELLY 고정 해시 출력 전체가 기존 상수와 일치. 규칙·설정 파일 변경 0개
+  - `tests/capture_screens.ps1` → 종료 코드 0, 비율 2개, 파일 430개. `30_board_blocked.png` 두 장을 직접 확인: 위·아래·왼쪽 세 화살표가 하늘색, 빨강·✕ 0개, 현재 중력 RIGHT 화살표는 숨김
+  - 화소 검사(각 화살표와 옛 ✕ 영역): 540×960 `UP 362 / LEFT 358 / DOWN 442` 하늘색 후보 픽셀, 빨강 0; 540×1170 `UP 362 / LEFT 358 / DOWN 362`, 빨강 0
+  - 규칙 검색: 새 `Input`·전역 난수 사용 0개. `blocked_spawn_directions()`·`warning_changed` 계산·`TurnManager.blocked_directions` 변경 0개
+- 바뀐 테스트 목록:
+  - `test_turn_input_indicator.gd::test_turn_input_cues_rejection_release_policy_and_ready_tick` — 막힌 LEFT도 `READY_COLOR`, `_draw_blocked_mark` 없음, 현재 DOWN은 계속 선택 불가
+  - 같은 파일의 화살표 경계 검사에서 삭제된 ✕ 경계 기대 제거
+  - `test_space_board_visuals.gd`와 `test_jolt_integration.gd`는 이미 3D 막힘 방향이 금속 프레임·경고 띠 없음이어야 한다고 검사해 기대 변경 없이 통과
+- 수동 확인 절차:
+  1. 입력 대기에서 한 방향의 다음 생성 입구를 막힘 상태로 만든다.
+  2. 현재 중력 방향을 제외한 세 화살표가 모두 같은 하늘색으로 숨쉬고, 빨간 화살표·✕·빨간 벽 선이 없는지 본다.
+  3. 막힌 방향으로 밀어 실제 생성이 막히면 기존 FINAL MOVE 안내가 그대로 나오는지 본다.
+- 결정 사항·알려진 문제: 화면 표시만 제거하기 위해 `set_warning_directions()` API와 내부 막힘 계산은 유지했다. 캡처 파일은 gitignore 로컬 산출물이며 커밋하지 않는다. 알려진 문제 없음.
 
 ### [2026-11-15] 대상 #154 — Claude 인박스 상태 최신화 요청
 - 상태: 완료 확인 — [PR #154](https://github.com/jeongmo-dot/gravity_orb/pull/154)는 2026-11-15 09:56 KST에 병합됐고, 최종 head `3b0ba46`의 트리와 `origin/main` 병합 커밋 `aab61d8`의 트리가 동일하다.

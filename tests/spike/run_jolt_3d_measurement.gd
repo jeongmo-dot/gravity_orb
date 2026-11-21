@@ -719,6 +719,7 @@ func _create_fixture(seed: int) -> Dictionary:
 	spawner.owner = fixture_root
 	var manager: TurnManager = TURN_MANAGER_SCRIPT.new() as TurnManager
 	manager.name = "TurnManager"
+	manager.blocked_direction_tracking_enabled = true
 	fixture_root.add_child(manager)
 	manager.owner = fixture_root
 	var score_manager: ScoreManager = SCORE_MANAGER_SCRIPT.new() as ScoreManager
@@ -1798,6 +1799,7 @@ func _create_preview_fixture_shell() -> Dictionary:
 	spawner.owner = fixture_root
 	var manager: TurnManager = TURN_MANAGER_SCRIPT.new() as TurnManager
 	manager.name = "TurnManager"
+	manager.blocked_direction_tracking_enabled = true
 	fixture_root.add_child(manager)
 	manager.owner = fixture_root
 	var score_manager: ScoreManager = SCORE_MANAGER_SCRIPT.new() as ScoreManager

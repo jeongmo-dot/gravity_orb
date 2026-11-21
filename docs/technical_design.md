@@ -5876,6 +5876,83 @@ G1 전략 봇 (시드 1~20, 600턴 상한, 턴 평균 / 총점 평균):
 - 회신 맨 앞에 적을 것: 원인을 못 찾음, 게임 코드 문제로 확인됨 (main 설정에서도 닿으면 특히), 해시 상수가 바뀜, B10이 기준 밖으로 바뀜, 판 밖 이탈 1건 이상, 최대 관통 30px 이상, 요약의 실제 값이 지정과 다름
 - 병합: 추가 요구 6 → 사용자 값 결정 → 추가 요구 7 반영 → Claude 검수 뒤 한 번에 병합
 
+**#155 추가 요구 6 결과 — 추가 요구 7 (직접 해보기)** ([PR #156](https://github.com/jeongmo-dot/gravity_orb/pull/156) `18513eb`, 2026-11-16 사용자 "확인". 검수는 Claude — Claude 재실행 없음)
+- 진단 (Codex): 결과 없이 끝났던 두 판 (L-합체 D-save 시드 17, L-합체 D-all 시드 1)을 일반 엔진 exe (`Godot_v4.8-dev3_win64.exe`)로 단독·시간 제한 없이 실행 → 둘 다 600턴·종료 코드 0·JSON 생성 (373.94초·283.58MB / 209.15초·266.63MB). Windows 응용 프로그램 로그의 Godot 충돌 기록 0건. 분류: 게임 비정상 종료나 JSON 누락 경로가 아니라 콘솔 런처 (`_console.exe`)를 거친 실행이 바깥에서 끊긴 것 — 끊은 주체는 특정하지 못했다
+- 측정 도구 (diff 대조): `run_jolt_3d_measurement.gd` `--jolt-turn-progress` (기본 꺼짐, 턴마다 한 줄)·턴별 `turn_end_pair` 기록 (늘 켜짐 — 원시 JSON이 커진다). `run_jelly_measurement.ps1` 기본 실행 파일을 일반 exe로, 실제 PID 생존 확인·종료 코드 10/16진·경과 시간·최대 메모리 기록, `-TurnProgress`. 게임 코드·설정·해시 그대로. 받아들인다
+- **B10 100판** (Codex. 레벨 차 2·시한 −1·공 4·터치 8·대폭발 10):
+
+| 봇 | GAP1-B8 (측정 1) 평균 턴 / 미완료 | GAP2-B10 |
+|---|---:|---:|
+| 자동 D-save | 203.05 / 0 | **159.25 / 0** |
+| R D-save | 160.90 / 0 | **160.10 / 0** |
+| L-합체 D-save | 402.90 / 5 | **221.75 / 1** (끝난 판 201.84) |
+| 자동 D-all / L-합체 D-all | 560.35 / 17 · 582.90 / 18 | 600 / 20 · 600 / 20 |
+
+  - 자동 D-save: 대폭발 132 → 16 (판당 6.60 → 0.80), L10 나온 판 3 → 19 / 20, 터치/판 1.95 → 3.20, 시한 성공률 66.14% → 80.08%·돌/판 4.60 → 1.55, 평균 점수 277,833 → 134,831
+  - L-합체 / R D-save 평균 턴 비 2.50 → 1.29 (Codex 1.28618)
+  - 턴 끝 쌍 관통 30px 넘는 턴은 100판에 1턴 (L-합체 D-save 시드 8 턴 127, L4·L2 36.42px — 다음 턴 최대 4.42px). 판 밖 이탈 0. 요약의 실제 값은 지정과 같다
+- 판단 (Claude): **B10은 미리 정한 기준을 처음 통과했다** (D-save 세 봇 미완료 0 / 0 / 1, 자동 D-save 159.25턴). 대신 대폭발이 판당 6.6 → 0.8로 거의 사라지고, L10이 거의 매 판 나오고, 실력 차 (L-합체/R)가 2.50 → 1.29로 줄어든다. 봇이 잴 수 없는 느낌의 변화라 사용자가 정한다
+- 2026-11-16: Claude가 선택지 (직접 해보고 결정 (Claude 추천)·B10 채택·GAP1로 되돌리기)를 물었으나 사용자가 질문 창을 닫았다 — **값 결정 대기**. 그동안 Codex 할 일 없음
+- 2026-11-22: 사용자 "#155 내용 다시 설명" → Claude가 처음부터 다시 설명 (요청·판이 끝나지 않는 문제·판단 기준·시도 네 가지·B10의 대가·선택지) → 사용자 **"1번으로 해줘"** = 직접 해보고 결정 (Claude 추천). B10 값을 브랜치에 넣어 사용자가 에디터에서 해 본다 → 추가 요구 7
+
+**추가 요구 7 — B10 직접 해보기 (시험 커밋)** (같은 브랜치 `merge-gap-2`·같은 PR, 브랜치 끝 `18513eb`에서. 2026-11-22 일요일 — 가벼운 모드):
+1. **main 병합 먼저**: `origin/main` (지금 `554ce89`)을 `merge-gap-2`에 병합한다. 지금 브랜치 (마지막 main 병합 `2503781`, 2026-11-16)에는 #156 (막힘 화살표 빨강·✕ 삭제, PR #157 `45dbdd3`)·#156 후속 (PR #158 `41a2bf3`)이 없다 — 그대로 해 보면 사용자가 지운 빨강·✕가 다시 보인다
+   - 충돌은 main 쪽 동작을 지키며 푼다. `run_jolt_3d_measurement.gd`는 두 쪽이 다 고쳤다 (브랜치: `--jolt-turn-progress`·턴별 `turn_end_pair`, main: `_create_fixture()`·`_create_preview_fixture_shell()`의 `blocked_direction_tracking_enabled = true`) — 병합 뒤에도 둘 다 있어야 한다 (D-save 봇은 막힘 방향을 읽는다)
+2. **값**: `jelly_blast_min_level` 8 → **10** — `GameConfig.gd` 선언 기본값과 `default_config.tres` 둘 다. 다른 값은 이 브랜치 그대로 (레벨 차 2·시한 −1·터치 문턱 8·공 상한 4·`jelly_blast_requires_same_level` false) — 추가 요구 5·6에서 잰 GAP2-B10과 같은 설정
+3. **코드·그림·소리·안내는 바꾸지 않는다.** 문턱을 읽는 곳은 값을 저절로 따른다 (Claude 코드 읽기, main 기준 행): 판정 `ReactionRules.gd` 40·84행 (`active_blast_min_level()`), 근접 훑기 `CollisionResolver.gd` 1347행, NEXT 예고 깜빡임 `Hud.gd` 717행, 판 위 깜빡임 `Orb.set_blast_armed()` (`blast_enabled_for_level()`), `><` 얼굴 `JellyOrbArt.gd` 230행 (`blast_ready and level < orb_max_level`)
+   - 그래서 화면에서: L8·L9의 `><` 얼굴·대폭발 깜빡임이 없어진다. L10은 지금처럼 MAX 얼굴. 다른 색 L8·L9끼리는 부딪히기만 한다. 터치 소폭발·색 효과 안내는 `jelly_tap_blast_min_level` 8을 읽어 그대로
+   - 화면 글에 대폭발 레벨을 숫자로 적은 곳은 Claude 검색 (`scripts/`·`scenes/`·`config/`)에서 없었다. 찾으면 고치지 말고 회신에
+4. **테스트는 고치지 않는다** — 값이 정해지면 추가 요구 8에서 한다. 대신:
+   - 기본 대폭발 8·지금 GAP2 기본 해시에 기대는 테스트 목록 (파일·테스트 이름·이유)을 코드 읽기로 회신에 (돌려서 찾지 않아도 된다)
+   - main 병합 확인: `test_turn_input_indicator.gd`·`test_rankings.gd`·`test_turn_manager.gd` (#156·#156 후속)와 `test_rules.gd`·`test_timed_jelly.gd` (#155 판정)를 돌린다. 실패는 위 목록 안 (대폭발 8·GAP2 해시 기대)인지만 본다
+   - headless 스모크 한 번: 메인 씬을 짧게 띄워 종료 코드 0·`SCRIPT ERROR` 0
+5. 커밋 (main 병합 커밋 → 값 커밋) → push (`merge-gap-2`, PR #156). **공유 작업 트리를 `merge-gap-2`에 둔 채 끝낸다** (커밋되지 않은 변경 없음) — 사용자가 에디터에서 바로 해 본다. 다른 브랜치로 옮겨야 할 일이 생기면 회신에 적는다
+6. 봇 측정·전체 회귀·캡처·빌드 없음 (주말, B10은 100판을 이미 쟀다)
+- 건드리지 말 것: 다른 값·규칙, 그림·소리·안내 (명세에 없는 것 금지, 고리 금지), 해시 상수·테스트 기대 (추가 요구 8), 사용자 저장 파일, `project.godot` 버전·`build/windows/` (빌드 없음), `docs/` (회신 파일 제외)
+- 회신 맨 앞에 적을 것: main 병합 충돌을 main 쪽 동작대로 풀지 못한 곳, 병합 뒤 측정 픽스처에 `blocked_direction_tracking_enabled = true`가 빠짐, 돌린 테스트 가운데 목록 밖 실패, 스모크 에러, 공유 트리를 `merge-gap-2`에 두지 못함, 대폭발 레벨을 숫자로 적은 화면 글
+- 그 뒤: 사용자가 에디터에서 해 보고 정한다 — B10 채택 → 추가 요구 8 (기본값 테스트·GAP2-B10 해시 상수·대폭발 8에 기대던 테스트, 평일이면 전체 회귀) → Claude 검수 → 병합 (§4 `jelly_blast_min_level` 행·기획서는 그때). 다른 값·GAP1이면 사용자와 다시 정한다. 공유 트리를 main으로 돌리는 것은 그때 지시
+- 사용자에게 알릴 것 (Claude): 이 브랜치에서 낸 점수도 같은 `save.cfg` 랭킹·최고점수에 들어간다
+
+### 12-ONE.46 막힘 경고 표시 삭제 — 화살표의 빨강·✕ (#156)
+사용자 (2026-11-16, 에디터에서 플레이 중 — 아래 중력, 위 화살표가 빨강 + ✕인 스크린샷): **"그리고 지금 게임 UI에서 4방향 화살표 중에서 입력이 안되는 방향 표시가 잘못되어 있어. 아래로 내려갈 수 없을 때 (이미 아래쪽 중력이라) 위 방향이 금지로 나오고 있어"** → Claude가 지금 설계를 설명 (빨강 ✕ = 그 방향으로 기울이면 새 공이 들어올 입구가 막혀 FINAL MOVE가 된다는 경고, 지금 중력 방향은 화살표를 그리지 않음) → 사용자 **"위험 표시 하지말라고 그 뒤에 했었는데, 남아있네."**
+
+- 경위 (Claude): #125 (§12-ONE.18)에서 사용자는 미리보기 칸 위 "↑ ← → 막힘" 글자 스크린샷과 함께 "그리고 이 막힘 표시는 없애줘"라고 했다. Claude는 글자 판만 지우고 판 둘레의 빨간 화살표·✕는 "그대로"로 명세했다 — 사용자 뜻보다 좁게 읽었다. 이번에 남은 막힘 경고를 화면에서 모두 지운다
+- 지금 (`TurnInputIndicator.gd`, main 기준):
+  - 입력 대기 중 고를 수 있는 세 방향 화살표를 그린다. 지금 중력 방향은 그리지 않는다 (`is_direction_selectable()` — #124)
+  - `blocked_directions`에 든 방향은 빨강 `BLOCKED_COLOR` `#FF3B30` 화살표 + 작은 ✕ (`arrow_color()`·`_draw_blocked_mark()` — #77). 막힘 = 그 방향으로 기울이면 다음 묶음이 들어올 자리가 없음 (`Board3D.blocked_spawn_directions()`). 그 방향으로 미는 것은 막지 않는다 — 밀면 FINAL MOVE ("막혔어요 · 한 번의 이동으로 입구를 비우세요")
+- **바꿀 것**:
+  1. 막힌 방향 화살표도 다른 방향과 같은 색·모양·크기·숨쉬기 (`READY_COLOR`). ✕를 그리지 않는다. 쓰는 곳이 없어지는 `BLOCKED_COLOR`·`_draw_blocked_mark()`·`blocked_mark_bounds()`·`BLOCKED_MARK_*` 상수·`_blocked_directions`·`warning_changed` 구독은 지운다
+  2. 지금 중력 방향 화살표는 지금처럼 그리지 않는다 (#124 그대로). 움직이는 중 스와이프의 회색 화살표 0.3초도 그대로
+  3. 화면의 다른 곳에 막힘 경고가 남아 있으면 같이 지운다 — 예: `Board3D.set_warning_directions()`가 판 그림 (벽 색·빛)에 쓰이는 곳 (#77에서 테두리 빨강은 지웠다). 지운 곳을 회신에 적는다
+- 그대로: `blocked_spawn_directions()`·`warning_changed` 계산과 `TurnManager.blocked_directions` (봇 D-save·측정이 쓴다), FINAL MOVE 안내 (실제로 막힌 뒤의 안내), DANGER 글자·점유율 위험 빛 (막힘 경고가 아님 — 이번 범위 밖), 규칙·물리·생성
+- 확인 (평일 — 풀테스트에 가깝게):
+  1. 테스트: `test_turn_input_indicator.gd` — 막힌 방향이 있어도 화살표 색이 `READY_COLOR`이고 ✕가 없다 (빨강·✕를 기대하던 단언을 새 기대로). 지금 중력 방향 화살표는 여전히 없다. 막힘 표시에 기대던 다른 테스트 (`test_space_board_visuals.gd`·`test_jolt_integration.gd` 등)는 새 기대에 맞추고 목록을 회신에 적는다
+  2. 전체 회귀 + JELLY 해시 상수 그대로 (그림만 바뀜)
+  3. 실제 창 캡처, 두 비율: `18_board_blocked` (막힌 방향이 있는 입력 대기)를 새 기대로 — 세 화살표가 모두 같은 색, 빨강·✕ 없음, 지금 중력 방향 화살표 없음. 화소 검사도 새 기대로
+  4. 빌드 없음
+- 브랜치: main에서 새 브랜치 (#155의 `merge-gap-2`와 따로) → PR
+- 회신 맨 앞에 적을 것: 해시 상수가 바뀜, 화살표 밖의 다른 곳에도 막힘 경고가 있었음 (지운 곳), 막힘 표시를 지우려면 규칙·봇 판정까지 바꿔야 했음
+
+**#156 결과 — 병합** ([PR #157](https://github.com/jeongmo-dot/gravity_orb/pull/157) squash `45dbdd3`, 브랜치 `remove-blocked-warning` 끝 `d514b87`, 2026-11-16 사용자 "확인" → "병합해줘". 검수는 Claude — Claude 재실행 없음)
+- 코드: `TurnInputIndicator.gd` — `BLOCKED_COLOR`·`BLOCKED_MARK_*`·`_blocked_directions`·`warning_changed` 구독·`_on_warning_changed()`·`_draw_blocked_mark()`·`blocked_mark_bounds()`·`_blocked_mark_center()` 삭제. `arrow_color()`는 늘 `READY_COLOR`. 지금 중력 방향 숨김 (`is_direction_selectable()`)·움직이는 중 회색 거절 화살표는 그대로
+- 맨 앞 경고 "화살표 밖에도 막힘 경고가 있었음": 2D `Board.gd`의 `_draw()`가 `_warning_directions` 벽에 빨간 선 (`WARNING_FRAME_COLOR` `#FF3B30`, 12px)을 그렸다 → 함께 삭제. Claude 확인: 실제 게임은 `run/main_scene` = `Main3D.tscn` (`Board3D`)이고, 2D `Main.tscn`·`Board.tscn`은 테스트·2D 비교용이라 플레이 화면에는 보이지 않던 선이다 → 받아들임 (사용자 "병합해줘")
+  - `Board3D._update_warning_visuals()`는 막힘 방향과 상관없이 벽을 `METAL_FRAME_COLOR`로 칠한다 (#77). `Board3D`에 남은 `WARNING_FRAME_COLOR`는 `_danger_color()` (점유율 위험 빛, 배수 4 이상)뿐 — 범위 밖
+- 그대로 (diff 확인): `blocked_spawn_directions()`·`warning_changed` 계산·`TurnManager.blocked_directions`, `set_warning_directions()` (값만 보관), FINAL MOVE, 규칙·설정
+- 테스트 (Codex 관측): 일반 375/375·장기 4/4·성능 5/5, 종료 코드 0, JELLY 해시 상수 그대로. `test_turn_input_indicator.gd` — 막힌 LEFT도 `READY_COLOR`, ✕ 그리기 함수 없음, ✕ 경계 단언 삭제. `test_space_board_visuals.gd`·`test_jolt_integration.gd`는 기대 변경 없이 통과
+- 캡처: 지금 이름은 `30_board_blocked` (명세의 `18_`은 예전 번호). 아래 막힘·오른쪽 중력. Claude가 두 장 (540×960·540×1170)을 직접 봄 — 위·왼쪽·아래 화살표가 같은 하늘색, 오른쪽 숨김, ✕·빨간 선 없음. Claude 화소 세기 (R > 200·G < 110·B < 110): 두 장 모두 0
+- 빌드 없음. 평일 검사. 기획서 0.16.36
+- 남은 것: DANGER 글자·점유율 위험 빛도 지울지 사용자에게 물음 (답 대기, 이번 범위 밖)
+
+**#156 후속 — 저장 실패·막힘 계산 (Codex 직접 작업, 병합)** ([PR #158](https://github.com/jeongmo-dot/gravity_orb/pull/158) squash `41a2bf3`, 커밋 `7dbb61f`, 2026-11-21 사용자 "코덱스 내용 확인" → "병합해줘". 이 인박스의 지시 없이 Codex가 전체 코드 리뷰 지적 3건을 고친 것. 검수는 Claude — Claude 재실행 없음)
+- `SaveStore.gd`: 기존 `save.cfg`의 `ConfigFile.load()`가 실패하면 그 경로에 덮어쓰지 않고 오류를 돌려준다 (`_save_rankings_and_best()`·`_save_value()`). `add_ranking()`은 저장이 실패하면 `{rank: 0, record: {}}` — 새 기록 배지를 띄우지 않는다
+  - 결과: 저장 파일이 깨지면 그 뒤 기록·설정이 조용히 저장되지 않는다 (안내 문구 없음). 기존 기록을 지키는 쪽을 고른 것
+- `TurnManager.blocked_direction_tracking_enabled` (기본 false): 일반 플레이에서는 `_update_warnings()`의 네 방향 막힘 계산을 하지 않는다 — `blocked_directions`는 비어 있고 `warning_changed`도 나오지 않는다. #156 뒤로 화면에서 이 값을 쓰는 곳이 없다
+  - **앞으로 측정·봇 명세에서**: 막힘 방향을 읽는 봇 (D-save)은 TurnManager에 이 값을 true로 켜야 한다. 지금은 `run_jolt_3d_measurement.gd`의 `_create_fixture()`·`_create_preview_fixture_shell()`, `test_game_over_measurement.gd`가 켠다
+  - Claude 확인: FINAL MOVE·게임오버는 `entrance_waiting_orbs()`로 판정해 막힘 계산과 무관. `blocked_spawn_directions()`·`Spawner.peek_next()`는 난수를 쓰지 않고 상태를 바꾸지 않아 진행 순서·해시가 같다
+- 테스트 (Codex 관측): 관련 5개 파일 37/37 (`test_rankings` 3/3·`test_turn_manager` 13/13·`test_score_flow` 11/11·`test_game_over` 7/7·`test_frontend` 3/3), headless 실행 오류 0건. 주말 — 전체 회귀·캡처 없음 (화면 변경 없음). 빌드 없음
+- 남은 점: 새 테스트는 저장 폴더가 없는 경우만 본다. 깨진 파일을 읽지 못할 때 덮어쓰지 않는 경로는 직접 테스트하지 않는다
+
+
 ### 12-ONE.3 다음 (JELLY 개선)
 - CLASSIC 전용 분기 정리 (행성 그림·연출·규칙 — JELLY가 안 쓰는 것)
 - 결정 대기에서 이어지는 것: 효과음 (합성·녹음), 시작 화면 그림 (지금 행성 — JELLY에 맞게?)

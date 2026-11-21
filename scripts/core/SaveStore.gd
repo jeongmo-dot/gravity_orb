@@ -104,7 +104,9 @@ static func add_ranking(
 	if rankings.size() > RANKING_LIMIT:
 		rankings.resize(RANKING_LIMIT)
 	var ranked: bool = insertion_index < RANKING_LIMIT
-	_save_rankings_and_best(path, mode, rankings, stats)
+	var save_error: Error = _save_rankings_and_best(path, mode, rankings, stats)
+	if save_error != OK:
+		return result
 	result["rank"] = insertion_index + 1 if ranked else 0
 	result["record"] = entry.duplicate(true) if ranked else {}
 	return result
@@ -366,7 +368,9 @@ static func _save_rankings_and_best(
 		return ERR_INVALID_PARAMETER
 	var save_file: ConfigFile = ConfigFile.new()
 	if FileAccess.file_exists(path):
-		save_file.load(path)
+		var load_error: Error = save_file.load(path)
+		if load_error != OK:
+			return load_error
 	save_file.set_value(RANKINGS_SECTION, ranking_key_for_mode(mode), rankings)
 	var best_score: int = int(rankings[0]["score"]) if not rankings.is_empty() else 0
 	save_file.set_value(RECORDS_SECTION, record_key_for_mode(mode), best_score)
@@ -433,7 +437,9 @@ static func _save_value(
 		return ERR_INVALID_PARAMETER
 	var save_file: ConfigFile = ConfigFile.new()
 	if FileAccess.file_exists(path):
-		save_file.load(path)
+		var load_error: Error = save_file.load(path)
+		if load_error != OK:
+			return load_error
 	save_file.set_value(section, key, value)
 	return save_file.save(path)
 

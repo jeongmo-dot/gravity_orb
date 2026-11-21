@@ -2,6 +2,7 @@ extends TestCase
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
 const SAVE_PATH: String = "res://tests/test_rankings.tmp.cfg"
+const MISSING_PARENT_SAVE_PATH: String = "res://tests/missing_save_parent/save.cfg"
 
 
 func test_jelly_rankings_sort_cap_and_keep_legacy_keys() -> void:
@@ -68,6 +69,25 @@ func test_ranking_panel_is_jelly_only_without_tabs() -> void:
 	_remove_save()
 
 
+func test_unwritable_ranking_path_does_not_report_a_new_record() -> void:
+	var result: Dictionary = SaveStore.add_ranking(
+		MISSING_PARENT_SAVE_PATH,
+		GameConfig.GameMode.JELLY,
+		9999,
+		{"max_combo": 9, "turns": 99, "max_level": 9, "final_moves": 2},
+		"2026-11-20 10:00"
+	)
+	assert_eq(int(result["rank"]), 0, "unwritable ranking path does not report a rank")
+	assert_true((result["record"] as Dictionary).is_empty(), "unwritable path has no record")
+	assert_true(not FileAccess.file_exists(MISSING_PARENT_SAVE_PATH), "no save file is created")
+	var setting_error: Error = SaveStore.save_sfx_muted(MISSING_PARENT_SAVE_PATH, true)
+	assert_true(setting_error != OK, "unwritable setting path returns its save error")
+
+
 func _remove_save() -> void:
-	if FileAccess.file_exists(SAVE_PATH):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
+	_remove_file(SAVE_PATH)
+
+
+func _remove_file(path: String) -> void:
+	if FileAccess.file_exists(path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
