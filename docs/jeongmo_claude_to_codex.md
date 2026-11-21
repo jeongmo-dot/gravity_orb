@@ -69,6 +69,12 @@
 
 ## 처리 완료
 
+### [2026-11-20 #156 후속] 저장 실패 및 막힘 계산 개선 (Codex 직접 작업) — 완료
+- 상태: 완료 (2026-11-21 사용자 "코덱스 내용 확인" → "병합해줘" · [PR #158](https://github.com/jeongmo-dot/gravity_orb/pull/158) squash `41a2bf3`). 이 인박스의 지시가 아니라 Codex가 전체 코드 리뷰 지적 3건을 직접 고친 것 — 회신 "[2026-11-20] 대상 #156 후속"
+- 검수: 코드 diff (`SaveStore.gd` 읽기 실패 시 덮어쓰지 않음·저장 실패 시 새 기록 아님, `TurnManager.blocked_direction_tracking_enabled` 기본 false·측정 픽스처 3곳 true). FINAL MOVE와 무관·난수 없음·해시 그대로 확인. 테스트 37/37은 Codex 관측 (Claude 재실행 없음). 맨 앞 경고 0건. 결과: §12-ONE.46 "#156 후속"
+- 앞으로: 막힘 방향을 읽는 봇·측정은 TurnManager의 `blocked_direction_tracking_enabled`를 true로 켠다
+- 남은 점 (지시 아님): 깨진 `save.cfg`를 읽지 못할 때 덮어쓰지 않는 경로의 직접 테스트가 없다
+
 ### [2026-11-16 #156] 막힘 경고 표시 삭제 — 화살표의 빨강·✕ — 완료
 - 상태: 완료 (2026-11-16 사용자 "확인" → "병합해줘" · [PR #157](https://github.com/jeongmo-dot/gravity_orb/pull/157) squash `45dbdd3`)
 - 검수: 코드 diff (`TurnInputIndicator.gd` 빨강·✕ 전부 삭제, `arrow_color()` 늘 `READY_COLOR`), 맨 앞 경고 1건 — 2D `Board.gd` 빨간 벽 선도 삭제 (실제 게임은 `Main3D`·`Board3D`라 플레이 화면에는 보이지 않던 선 → 받아들임). 전체 회귀 375/375·4/4·5/5·해시 그대로는 Codex 관측 (Claude 재실행 없음). 캡처 `30_board_blocked` 두 비율 Claude 직접 확인, 빨강 화소 0. 빌드 없음. 결과: §12-ONE.46 "#156 결과"

@@ -5924,6 +5924,15 @@ G1 전략 봇 (시드 1~20, 600턴 상한, 턴 평균 / 총점 평균):
 - 빌드 없음. 평일 검사. 기획서 0.16.36
 - 남은 것: DANGER 글자·점유율 위험 빛도 지울지 사용자에게 물음 (답 대기, 이번 범위 밖)
 
+**#156 후속 — 저장 실패·막힘 계산 (Codex 직접 작업, 병합)** ([PR #158](https://github.com/jeongmo-dot/gravity_orb/pull/158) squash `41a2bf3`, 커밋 `7dbb61f`, 2026-11-21 사용자 "코덱스 내용 확인" → "병합해줘". 이 인박스의 지시 없이 Codex가 전체 코드 리뷰 지적 3건을 고친 것. 검수는 Claude — Claude 재실행 없음)
+- `SaveStore.gd`: 기존 `save.cfg`의 `ConfigFile.load()`가 실패하면 그 경로에 덮어쓰지 않고 오류를 돌려준다 (`_save_rankings_and_best()`·`_save_value()`). `add_ranking()`은 저장이 실패하면 `{rank: 0, record: {}}` — 새 기록 배지를 띄우지 않는다
+  - 결과: 저장 파일이 깨지면 그 뒤 기록·설정이 조용히 저장되지 않는다 (안내 문구 없음). 기존 기록을 지키는 쪽을 고른 것
+- `TurnManager.blocked_direction_tracking_enabled` (기본 false): 일반 플레이에서는 `_update_warnings()`의 네 방향 막힘 계산을 하지 않는다 — `blocked_directions`는 비어 있고 `warning_changed`도 나오지 않는다. #156 뒤로 화면에서 이 값을 쓰는 곳이 없다
+  - **앞으로 측정·봇 명세에서**: 막힘 방향을 읽는 봇 (D-save)은 TurnManager에 이 값을 true로 켜야 한다. 지금은 `run_jolt_3d_measurement.gd`의 `_create_fixture()`·`_create_preview_fixture_shell()`, `test_game_over_measurement.gd`가 켠다
+  - Claude 확인: FINAL MOVE·게임오버는 `entrance_waiting_orbs()`로 판정해 막힘 계산과 무관. `blocked_spawn_directions()`·`Spawner.peek_next()`는 난수를 쓰지 않고 상태를 바꾸지 않아 진행 순서·해시가 같다
+- 테스트 (Codex 관측): 관련 5개 파일 37/37 (`test_rankings` 3/3·`test_turn_manager` 13/13·`test_score_flow` 11/11·`test_game_over` 7/7·`test_frontend` 3/3), headless 실행 오류 0건. 주말 — 전체 회귀·캡처 없음 (화면 변경 없음). 빌드 없음
+- 남은 점: 새 테스트는 저장 폴더가 없는 경우만 본다. 깨진 파일을 읽지 못할 때 덮어쓰지 않는 경로는 직접 테스트하지 않는다
+
 
 ### 12-ONE.3 다음 (JELLY 개선)
 - CLASSIC 전용 분기 정리 (행성 그림·연출·규칙 — JELLY가 안 쓰는 것)
