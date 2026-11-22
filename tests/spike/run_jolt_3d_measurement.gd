@@ -60,6 +60,7 @@ var _current_measurement_turn: int = 0
 var _turn_reaction_count: int = 0
 var _turn_merge_count: int = 0
 var _turn_blast_count: int = 0
+var _turn_tap_blast_count: int = 0
 var _preview_fixture_serial: int = 0
 var _seed_seen_colors: Dictionary = {}
 var _seed_merge_count: int = 0
@@ -385,6 +386,7 @@ func _run_seed(
 		_turn_reaction_count = 0
 		_turn_merge_count = 0
 		_turn_blast_count = 0
+		_turn_tap_blast_count = 0
 		var score_before: int = score_manager.score
 		var spawned_before: int = _seed_spawn_count
 		var tap_turn_orb: Orb3D = null
@@ -486,6 +488,7 @@ func _run_seed(
 			"combo": manager.turn_combo,
 			"score_gain": score_manager.score - score_before,
 			"blast_count": _turn_blast_count,
+			"tap_blast_count": _turn_tap_blast_count,
 			"entrance_waiting_count": entrance_waiting_count,
 			"input_waiting_touching_merge_pairs": input_waiting_touching_merge_pairs,
 		})
@@ -1139,6 +1142,7 @@ func _record_shock_event(reaction: Dictionary) -> void:
 			"blasts": 0,
 		})
 		_seed_tap_blast_count += 1
+		_turn_tap_blast_count += 1
 		var tap_levels: Array = reaction.get("levels", []) as Array
 		var tap_level: int = int(tap_levels[0]) if not tap_levels.is_empty() else 0
 		var tap_key: String = "L%d" % tap_level

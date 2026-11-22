@@ -241,6 +241,7 @@ if (-not $AggregateOnly) {
             }
             if (-not (Test-Path -LiteralPath $entry.Task.Output)) { throw "Missing $($entry.Task.Output)" }
             Write-Output "JELLY_MEASUREMENT_DONE name=$($entry.Task.Name) exit=0 exit_hex=$exitHex elapsed_s=$elapsedSeconds peak_mb=$peakMemoryMb"
+			$entry.Process.Dispose()
         }
 		$running = $stillRunning
     }
@@ -256,6 +257,43 @@ function Get-Median($Values) {
 function Get-Ratio([double]$Numerator, [double]$Denominator) {
     if ($Denominator -eq 0.0) { return 0.0 }
     return $Numerator / $Denominator
+}
+function Get-TapBlastFlowSummary($Rows) {
+	$firstTurns = @()
+	$intervals = @()
+	$longestEmptyRuns = @()
+	foreach ($seedRow in @($Rows)) {
+		$eventTurns = @()
+		$currentEmptyRun = 0
+		$longestEmptyRun = 0
+		foreach ($turnRow in @($seedRow.turn_rows | Sort-Object -Property turn)) {
+			$property = $turnRow.PSObject.Properties["tap_blast_count"]
+			$count = if ($null -eq $property) { 0 } else { [int]$property.Value }
+			if ($count -le 0) {
+				$currentEmptyRun += 1
+				continue
+			}
+			$longestEmptyRun = [Math]::Max($longestEmptyRun, $currentEmptyRun)
+			$currentEmptyRun = 0
+			for ($eventIndex = 0; $eventIndex -lt $count; $eventIndex++) {
+				$eventTurns += [int]$turnRow.turn
+			}
+		}
+		$longestEmptyRuns += [Math]::Max($longestEmptyRun, $currentEmptyRun)
+		if ($eventTurns.Count -gt 0) {
+			$firstTurns += $eventTurns[0]
+		}
+		for ($eventIndex = 1; $eventIndex -lt $eventTurns.Count; $eventIndex++) {
+			$intervals += [int]$eventTurns[$eventIndex] - [int]$eventTurns[$eventIndex - 1]
+		}
+	}
+	return [ordered]@{
+		first_turn_median = if ($firstTurns.Count -gt 0) { Get-Median $firstTurns } else { $null }
+		interval_turns_median = if ($intervals.Count -gt 0) { Get-Median $intervals } else { $null }
+		longest_empty_run_turns_average = if ($longestEmptyRuns.Count -gt 0) {
+			($longestEmptyRuns | Measure-Object -Average).Average
+		} else { 0.0 }
+	}
 }
 function Get-SameSeedWinRate($Better, $Baseline, [string]$Field) {
     $lookup = @{}
@@ -398,6 +436,7 @@ function Get-Summary($Rows) {
 			Where-Object { [int]$_.turn -le 200 } |
 			Measure-Object -Property blast_count -Sum).Sum
 	)
+	$tapBlastFlow = Get-TapBlastFlowSummary $Rows
 	$completedRows = @($Rows | Where-Object { $_.game_over })
 	$maximumActiveRow = @($Rows | Sort-Object -Property max_active_orbs -Descending | Select-Object -First 1)
     return [ordered]@{
@@ -439,6 +478,10 @@ function Get-Summary($Rows) {
 		blast_count_through_turn_200 = $blastCountThroughTurn200
 		average_blasts_through_turn_200_per_game = Get-Ratio $blastCountThroughTurn200 @($Rows).Count
 		tap_blasts = [int](($Rows | Measure-Object -Property tap_blast_count -Sum).Sum)
+		tap_blasts_per_100_turns = (Get-Ratio $tapBlastTotal $turnTotal) * 100.0
+		first_tap_blast_turn_median = $tapBlastFlow.first_turn_median
+		tap_blast_interval_turns_median = $tapBlastFlow.interval_turns_median
+		longest_tap_blast_empty_run_turns_average = $tapBlastFlow.longest_empty_run_turns_average
 		blast_count_by_level = $blastCountByLevel
 		blast_count_by_pair_levels = $blastCountByPairLevels
 		tap_blast_count_by_level = $tapBlastCountByLevel

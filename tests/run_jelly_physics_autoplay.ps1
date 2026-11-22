@@ -503,6 +503,43 @@ function Get-Median($Values) {
     if ($items.Count % 2 -eq 1) { return [double]$items[$middle] }
     return ([double]$items[$middle - 1] + [double]$items[$middle]) / 2.0
 }
+function Get-TapBlastFlowSummary($Rows) {
+	$firstTurns = @()
+	$intervals = @()
+	$longestEmptyRuns = @()
+	foreach ($seedRow in @($Rows)) {
+		$eventTurns = @()
+		$currentEmptyRun = 0
+		$longestEmptyRun = 0
+		foreach ($turnRow in @($seedRow.turn_rows | Sort-Object -Property turn)) {
+			$property = $turnRow.PSObject.Properties["tap_blast_count"]
+			$count = if ($null -eq $property) { 0 } else { [int]$property.Value }
+			if ($count -le 0) {
+				$currentEmptyRun += 1
+				continue
+			}
+			$longestEmptyRun = [Math]::Max($longestEmptyRun, $currentEmptyRun)
+			$currentEmptyRun = 0
+			for ($eventIndex = 0; $eventIndex -lt $count; $eventIndex++) {
+				$eventTurns += [int]$turnRow.turn
+			}
+		}
+		$longestEmptyRuns += [Math]::Max($longestEmptyRun, $currentEmptyRun)
+		if ($eventTurns.Count -gt 0) {
+			$firstTurns += $eventTurns[0]
+		}
+		for ($eventIndex = 1; $eventIndex -lt $eventTurns.Count; $eventIndex++) {
+			$intervals += [int]$eventTurns[$eventIndex] - [int]$eventTurns[$eventIndex - 1]
+		}
+	}
+	return [ordered]@{
+		first_turn_median = if ($firstTurns.Count -gt 0) { Get-Median $firstTurns } else { $null }
+		interval_turns_median = if ($intervals.Count -gt 0) { Get-Median $intervals } else { $null }
+		longest_empty_run_turns_average = if ($longestEmptyRuns.Count -gt 0) {
+			($longestEmptyRuns | Measure-Object -Average).Average
+		} else { 0.0 }
+	}
+}
 $reactionScoreTotal = [double](($reactionScoreTotals.Values | Measure-Object -Sum).Sum)
 $firstBlastTurns = @(
 	$seedRows |
@@ -515,6 +552,7 @@ $blastCountThroughTurn200 = [int](
 		Where-Object { [int]$_.turn -le 200 } |
 		Measure-Object -Property blast_count -Sum).Sum
 )
+$tapBlastFlow = Get-TapBlastFlowSummary $seedRows
 $averageCleanCountPerTapByColor = [ordered]@{}
 $zeroCleanTapRatioByColor = [ordered]@{}
 foreach ($color in @($tapBlastCountByColor.Keys | Sort-Object)) {
@@ -653,6 +691,10 @@ $summary = [ordered]@{
 	blast_count_through_turn_200 = $blastCountThroughTurn200
 	average_blasts_through_turn_200_per_game = [double]$blastCountThroughTurn200 / $seedRows.Count
 	tap_blast_count = $totalTapBlastCount
+	tap_blasts_per_100_turns = if ($totalTurns -gt 0) { [double]$totalTapBlastCount * 100.0 / $totalTurns } else { 0.0 }
+	first_tap_blast_turn_median = $tapBlastFlow.first_turn_median
+	tap_blast_interval_turns_median = $tapBlastFlow.interval_turns_median
+	longest_tap_blast_empty_run_turns_average = $tapBlastFlow.longest_empty_run_turns_average
 	tap_blast_count_by_level = $tapBlastCountByLevel
 	tap_blast_count_by_color = $tapBlastCountByColor
 	tap_clean_count_by_color = $tapCleanCountByColor

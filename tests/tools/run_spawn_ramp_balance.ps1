@@ -2,7 +2,7 @@ param(
     [string]$GodotPath = "",
     [ValidateRange(1, 8)]
     [int]$Parallelism = 4,
-    [ValidatePattern('^(4|8|10|0)(,(4|8|10|0))*$')]
+    [ValidatePattern('^(4|5|6|8|10|0)(,(4|5|6|8|10|0))*$')]
     [string]$CandidateCaps = "4,8,10,0",
     [ValidateRange(-1, 10)]
     [int]$JellyBlastPairTopMinLevel = -1,
@@ -88,6 +88,12 @@ function Get-LevelCount($Counts, [string]$Level) {
     return [int]$property.Value
 }
 
+function Get-OptionalDouble($Object, [string]$Name, [double]$Fallback = 0.0) {
+    $property = $Object.PSObject.Properties[$Name]
+    if ($null -eq $property -or $null -eq $property.Value) { return $Fallback }
+    return [double]$property.Value
+}
+
 function Get-SettingMismatch($Summary, [int]$Cap) {
     $mismatches = @()
     $expectedPairTop = if ($JellyBlastPairTopMinLevel -ge 0) { $JellyBlastPairTopMinLevel } else { 0 }
@@ -111,6 +117,10 @@ function Get-AutoRow($Summary, [string]$Bot) {
         blasts_per_game = [double]$Summary.average_blasts_per_game
         tap_blasts_l9_per_game = [double](Get-LevelCount $Summary.tap_blast_count_by_level "L9") / $games
         tap_blasts_l10_per_game = [double](Get-LevelCount $Summary.tap_blast_count_by_level "L10") / $games
+        tap_blasts_per_100_turns = Get-OptionalDouble $Summary "tap_blasts_per_100_turns"
+        first_tap_blast_turn_median = $Summary.first_tap_blast_turn_median
+        tap_blast_interval_turns_median = $Summary.tap_blast_interval_turns_median
+        longest_tap_blast_empty_run_turns_average = Get-OptionalDouble $Summary "longest_tap_blast_empty_run_turns_average"
         first_blast_turn_median = $Summary.first_blast_turn_median
         zero_blast_games = [int]$Summary.zero_blast_game_count
         blasts_through_turn_200_per_game = [double]$Summary.average_blasts_through_turn_200_per_game
@@ -142,6 +152,10 @@ function Get-StrategyRow($Summary, [string]$Bot) {
         blasts_per_game = [double]$Summary.average_blasts_per_game
         tap_blasts_l9_per_game = [double](Get-LevelCount $Summary.tap_blast_count_by_level "L9") / $games
         tap_blasts_l10_per_game = [double](Get-LevelCount $Summary.tap_blast_count_by_level "L10") / $games
+        tap_blasts_per_100_turns = Get-OptionalDouble $Summary "tap_blasts_per_100_turns"
+        first_tap_blast_turn_median = $Summary.first_tap_blast_turn_median
+        tap_blast_interval_turns_median = $Summary.tap_blast_interval_turns_median
+        longest_tap_blast_empty_run_turns_average = Get-OptionalDouble $Summary "longest_tap_blast_empty_run_turns_average"
         first_blast_turn_median = $Summary.first_blast_turn_median
         zero_blast_games = [int]$Summary.zero_blast_game_count
         blasts_through_turn_200_per_game = [double]$Summary.average_blasts_through_turn_200_per_game
@@ -193,6 +207,11 @@ foreach ($cap in $caps) {
     $safetyObserved = @($rows.Values | Where-Object {
         $_.departures -gt 0 -or $_.maximum_penetration_px -ge 30.0
     }).Count -gt 0
+    $blastExpectationEligible = $rows.l_merge_d_save.zero_blast_games -le 5
+    $dAllTapBlastRate = (
+        [double]$rows.auto_d_all.tap_blasts_per_100_turns +
+        [double]$rows.l_merge_d_all.tap_blasts_per_100_turns
+    ) / 2.0
     $candidates += [pscustomobject][ordered]@{
         name = "GAP2-P$Cap"
         spawn_count_max = $cap
@@ -205,20 +224,39 @@ foreach ($cap in $caps) {
         }
         rows = $rows
         d_save_eligible = $dSaveEligible
+        blast_expectation_eligible = $blastExpectationEligible
+        d_all_tap_blasts_per_100_turns_average = $dAllTapBlastRate
         safety_warning = $safetyObserved
     }
 }
 
-$eligible = @($candidates | Where-Object { $_.d_save_eligible })
-$topCandidate = @($eligible | Sort-Object { [double]$_.rows.auto_d_save.blasts_per_game } -Descending | Select-Object -First 1)
-$topBlastRate = if ($topCandidate.Count -gt 0) {
-    [double]$topCandidate[0].rows.auto_d_save.blasts_per_game
+$eligible = @($candidates | Where-Object {
+    $_.d_save_eligible -and $_.blast_expectation_eligible -and -not $_.safety_warning
+})
+$topCandidate = @($eligible | Sort-Object -Property d_all_tap_blasts_per_100_turns_average -Descending | Select-Object -First 1)
+$topFlowRate = if ($topCandidate.Count -gt 0) {
+    [double]$topCandidate[0].d_all_tap_blasts_per_100_turns_average
 } else { $null }
-$leaders = if ($null -ne $topBlastRate) {
+$leaders = if ($null -ne $topFlowRate) {
     @($eligible | Where-Object {
-        [Math]::Abs([double]$_.rows.auto_d_save.blasts_per_game - $topBlastRate) -lt 0.000001
+        [Math]::Abs([double]$_.d_all_tap_blasts_per_100_turns_average - $topFlowRate) -lt 0.000001
     })
 } else { @() }
+$previousPairReportPath = Join-Path $measurementDirectory "spawn_ramp_pair_balance.json"
+$pairReferences = [ordered]@{}
+if (Test-Path -LiteralPath $previousPairReportPath) {
+    $previousPairReport = Get-Content -LiteralPath $previousPairReportPath -Raw | ConvertFrom-Json
+    foreach ($candidate in @($previousPairReport.candidates)) {
+        if ($candidate.name -notin @("GAP2-P4", "GAP2-P8", "GAP2-P10", "GAP2-P0")) { continue }
+        foreach ($row in @($candidate.rows.PSObject.Properties | ForEach-Object { $_.Value })) {
+            $turns = [double]$row.turns_average
+            $tapBlastsPerGame = [double]$row.tap_blasts_l9_per_game + [double]$row.tap_blasts_l10_per_game
+            $rate = if ($turns -gt 0.0) { $tapBlastsPerGame * 100.0 / $turns } else { 0.0 }
+            $row | Add-Member -NotePropertyName tap_blasts_per_100_turns -NotePropertyValue $rate -Force
+        }
+        $pairReferences[$candidate.name] = $candidate
+    }
+}
 $references = [ordered]@{}
 foreach ($reference in @(
     [pscustomobject]@{ Name = "GAP2-A4"; Slug = "155_gap2_a4"; Blast = 10; Tap = 9 },
@@ -260,11 +298,12 @@ $report = [ordered]@{
     engine = "Godot 4.8-dev3 standard"
     conditions = "GAP2; timed gap -1; blast min L9 with pair top L$(if ($JellyBlastPairTopMinLevel -ge 0) { $JellyBlastPairTopMinLevel } else { 0 }); tap L9; five bots x 20 games; 600 turns; fixed 120 fps"
     candidates = $candidates
+    pair_references = $pairReferences
     references = $references
     eligible_names = @($eligible | ForEach-Object { $_.name })
     criterion_leader = if ($leaders.Count -eq 1) { $leaders[0].name } else { $null }
     criterion_leaders = @($leaders | ForEach-Object { $_.name })
 }
-$outputPath = Join-Path $measurementDirectory "spawn_ramp_pair_balance.json"
+$outputPath = Join-Path $measurementDirectory "spawn_ramp_pair_flow_balance.json"
 $report | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $outputPath -Encoding utf8
 Write-Output "SPAWN_RAMP_BALANCE_REPORT $outputPath"
