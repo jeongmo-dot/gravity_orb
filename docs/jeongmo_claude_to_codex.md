@@ -50,8 +50,8 @@
 - 커밋: 항목 단위 브랜치 (`ui-b-board`, main에서), **push·PR까지** (병합은 Claude 검수 뒤)
 
 ### [2026-11-22 #157] UI B안 1 — 게임 중 화면·결과 창·화면 바탕, 방향 화살표 삭제
-- 상태: **대기 — 2026-11-23 (월)부터 시작** (#155 추가 요구 8 측정은 이 항목 PR을 올린 뒤. main에서 브랜치). 캡처가 많아 평일 풀테스트 — 주말에는 시작하지 않는다. 인박스 번호 #157은 GitHub PR #157 (#156)과 다르다
-- 근거: [technical_design.md](technical_design.md) **§12-ONE.47** — B 색 토큰·부품 1~9·주아 글꼴·"#157 요구" 1~10. 목업 원본 [mockups/ui_b/](mockups/ui_b/) (540 폭 기준 — 논리 좌표는 ×2)
+- 상태: **대기 — 추가 요구 1** (2026-11-23 Claude 검수: [PR #159](https://github.com/jeongmo-dot/gravity_orb/pull/159) 병합 전에 고칠 것 6건 — 그중 그림자는 명세 잘못). 명세: §12-ONE.47 "#157 검수"·"#157 추가 요구 1". #155 추가 요구 8 측정이 공유 트리에서 돌고 있으면 끊지 말고 끝난 뒤에 하거나 따로 작업 트리에서. 인박스 번호 #157은 GitHub PR #157 (#156)과 다르다
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.47** — B 색 토큰·부품 1~9·주아 글꼴·"#157 요구" 1~10. 목업 원본 [mockups/ui_b/](mockups/ui_b/) — 저장소 경로 `docs/mockups/ui_b/` (540 폭 기준 — 논리 좌표는 ×2)
 - 배경: 사용자 (2026-11-22) "다른 모바일 퍼즐게임 UI야 이걸 참고해서 우리게임 UI를 개선하고 싶어" → Claude 목업 A·B·C → "B가 좋아보이는데 저 게임 프레임 옆에 삼각형은 제발 없애줘" → "응 명세부터 써줘"
 - 앵커: `assets/ui/gravity_orb_theme.tres` (새 형식 추가), `assets/fonts/` (주아·`SOURCE.md`·`OFL.txt`), `scenes/UI.tscn` `Hud` 아래 노드, `scripts/ui/Hud.gd` (`CALLOUT_COLORS`·`HUD_*_COLOR`·`_fit_numeric_label()` 크기), `scripts/ui/GameOverPanel.gd`, `scripts/ui/ScorePopup.gd`, `scripts/ui/JellyFinalMoveBanner.gd`, `scripts/ui/CosmicSparkle.gd` (색만), `scripts/ui/TurnInputIndicator.gd` (삭제), `scripts/fx/SpaceBackdrop.gd` 셰이더, `tests/test_turn_input_indicator.gd` (삭제)·`tests/spike/capture_screens.gd`
 - 요구 요약: 크림 카드 (테두리 8 #F39AB4·모서리 36·흐림 없는 아래 두께 10 #D9718F), 분홍 소리 버튼, 민트 다시 하기, 리본 제목, 2×2 숫자 칸, NEXT/THEN 꼬리표·칸, 호령·점수 팝업 테두리 글, FINAL MOVE·DANGER 카드 모양, 글꼴 주아 (없는 글자는 Noto), 화면 바탕 크림 + 점, **방향 화살표 삭제 (입력 규칙 그대로)**. 배치 (`hud_layout()`)·움직임·문구 그대로
@@ -60,8 +60,10 @@
   - [ ] 주아 파일·출처·라이선스, 폴백 글자 목록
   - [ ] `test_turn_input_indicator.gd` 삭제·화살표에 기대던 테스트 정리 (목록), 전체 회귀 통과, 해시 상수 그대로 (평일)
   - [ ] 캡처 두 비율 6종 (§12-ONE.47 "#157" 캡처 목록) + 확대
-- **회신 맨 앞에**: §12-ONE.47 "#157" 목록
-- 커밋: 항목 단위 브랜치 (`ui-b-hud`, main에서), **push·PR까지** (병합은 Claude 검수 뒤)
+  - 1차 (완료 `4344f63`, PR #159): 위 세 줄 — 폴백 글자 목록은 틀림 (×·· 빠짐)
+  - [ ] **추가 요구 1**: 호령 그림자 `글 크기 × 0.13`·외곽선 `× 0.05`, 점수 팝업 그림자 없음·외곽선 `× 0.08`, 식 글 흰 외곽선, 배경 점 지름 10·간격 68 (화면에서), FINAL MOVE 테마 주아·안쪽 여백 24·띠 폭 맞춤, 폴백 글자 ×·· 목록, 테스트·전체 회귀·캡처 12장 + 화소 측정값
+- **회신 맨 앞에**: §12-ONE.47 "#157" 목록 (추가 요구 1은 그 항목의 목록)
+- 커밋: 항목 단위 브랜치 (`ui-b-hud`, main에서), **push·PR까지** (병합은 Claude 검수 뒤). 추가 요구 1도 같은 브랜치·같은 PR
 
 ### [2026-11-15 #155] 같은 색 합체 레벨 차 2 다시 시도 — 시한 젤리는 1
 - 상태: **대기 — #157 PR을 올린 뒤 시작** (추가 요구 8: 공 계속 늘리기 측정. 2026-11-22 사용자 "A로 하고 터치도 L9로 바꿔줘" → "L9 터치는 일반 폭발이고 L10 끼리만 다른 색 닿으면 대폭발 하도록"·"L10도 터치 됨" — 레벨 차 2·대폭발 10·터치 9, 얼굴 L9 `><`·L10 MAX. 일반 폭발·대폭발 횟수는 측정표에만 나눠 적음). [PR #156](https://github.com/jeongmo-dot/gravity_orb/pull/156) 열림. 명세: §12-ONE.45 "추가 요구 8 — 들어오는 공 계속 늘리기 측정 (A)". 인박스 번호 #155는 GitHub PR #155 (#154 인박스 상태 요청)와 다르다
