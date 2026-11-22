@@ -273,6 +273,7 @@ func test_jelly_explicit_gap_one_rule_examples() -> void:
 	var cfg: GameConfig = GameConfig.new()
 	cfg.game_mode = GameConfig.GameMode.JELLY
 	cfg.jelly_merge_level_gap = 1
+	cfg.jelly_blast_min_level = 8
 	var l1_l2: Dictionary = ReactionRules.classify(2, 1, 2, 2, cfg, 1.0, 2.0)
 	var l5_l4: Dictionary = ReactionRules.classify(2, 5, 2, 4, cfg, 7.0, 5.0)
 	var l10_l9: Dictionary = ReactionRules.classify(2, 10, 2, 9, cfg, 64.0, 42.0)
@@ -482,6 +483,7 @@ func test_jelly_blast_default_l8_threshold_and_gap_two_absorption_precedence() -
 	var cfg: GameConfig = GameConfig.new()
 	cfg.game_mode = GameConfig.GameMode.JELLY
 	cfg.blast_enabled = true
+	cfg.jelly_blast_min_level = 8
 	cfg.opposite_pairs = [Vector2i(0, 1)]
 	var level_seven_default: Dictionary = ReactionRules.classify(0, 7, 1, 7, cfg, 17.0, 17.0)
 	var level_eight_default: Dictionary = ReactionRules.classify(0, 8, 1, 8, cfg, 27.0, 27.0)
@@ -537,6 +539,26 @@ func test_jelly_blast_default_l8_threshold_and_gap_two_absorption_precedence() -
 	assert_eq(same_color_gap["type"], ReactionRules.Type.MERGE, "default same-color gap two merges before BLAST")
 	var same_color_gap_three: Dictionary = ReactionRules.classify(0, 7, 0, 4, cfg, 64.0, 8.0)
 	assert_eq(same_color_gap_three["type"], ReactionRules.Type.NONE, "same-color gap three does not BLAST")
+
+
+func test_jelly_blast_pair_top_minimum_requires_one_l10() -> void:
+	var cfg: GameConfig = GameConfig.new()
+	cfg.game_mode = GameConfig.GameMode.JELLY
+	cfg.blast_enabled = true
+	cfg.jelly_blast_min_level = 9
+	cfg.jelly_blast_pair_top_min_level = 10
+	cfg.jelly_blast_requires_same_level = false
+	assert_true(not cfg.jelly_blast_enabled_for_pair(9, 9), "L9+L9 misses pair top minimum")
+	assert_true(cfg.jelly_blast_enabled_for_pair(9, 10), "L9+L10 satisfies pair top minimum")
+	assert_true(cfg.jelly_blast_enabled_for_pair(10, 9), "pair top minimum is order independent")
+	assert_true(cfg.jelly_blast_enabled_for_pair(10, 10), "L10+L10 satisfies pair top minimum")
+	assert_true(not cfg.jelly_blast_enabled_for_pair(8, 10), "both levels must pass blast minimum")
+	cfg.jelly_blast_pair_top_min_level = 0
+	assert_true(cfg.jelly_blast_enabled_for_pair(9, 9), "zero disables pair top condition")
+	cfg.jelly_blast_pair_top_min_level = 10
+	cfg.jelly_blast_requires_same_level = true
+	assert_true(not cfg.jelly_blast_enabled_for_pair(9, 10), "same-level toggle still takes precedence")
+	assert_true(cfg.jelly_blast_enabled_for_pair(10, 10), "same L10 remains enabled")
 
 
 func _enable_red_blue(cfg: GameConfig) -> void:

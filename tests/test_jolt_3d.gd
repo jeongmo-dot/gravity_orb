@@ -360,8 +360,10 @@ func test_jolt_reaction_uses_shared_rules_and_spawns_3d_result() -> void:
 
 func test_jelly_mixed_level_blast_uses_larger_level_for_effect() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_minimum: int = Config.data.jelly_blast_min_level
 	var original_requires_same: bool = Config.data.jelly_blast_requires_same_level
 	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_blast_min_level = 8
 	Config.data.jelly_blast_requires_same_level = false
 	var fixture: Dictionary = await _create_turn_fixture()
 	var board: Board3D = fixture["board"] as Board3D
@@ -381,7 +383,60 @@ func test_jelly_mixed_level_blast_uses_larger_level_for_effect() -> void:
 		assert_eq(reactions[0]["levels"], [8, 9], "reaction keeps both source levels")
 		assert_eq(reactions[0]["shock_level"], 9, "larger source level drives effect")
 	await _cleanup(fixture["root"] as Node)
+	Config.data.jelly_blast_min_level = original_minimum
 	Config.data.jelly_blast_requires_same_level = original_requires_same
+	Config.data.game_mode = original_mode
+
+
+func test_jelly_blast_pair_top_minimum_resolves_only_l9_l10() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_minimum: int = Config.data.jelly_blast_min_level
+	var original_pair_top: int = Config.data.jelly_blast_pair_top_min_level
+	var original_requires_same: bool = Config.data.jelly_blast_requires_same_level
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_blast_min_level = 9
+	Config.data.jelly_blast_pair_top_min_level = 10
+	Config.data.jelly_blast_requires_same_level = false
+
+	var no_blast_fixture: Dictionary = await _create_turn_fixture()
+	var no_blast_board: Board3D = no_blast_fixture["board"] as Board3D
+	var no_blast_resolver: CollisionResolver = no_blast_fixture["resolver"] as CollisionResolver
+	no_blast_resolver.proximity_reaction_scan_enabled = false
+	var first_l9: Orb3D = no_blast_board.spawn_orb(0, 9, Vector2(-100.0, 0.0))
+	var second_l9: Orb3D = no_blast_board.spawn_orb(1, 9, Vector2(100.0, 0.0))
+	first_l9.disable_physics()
+	second_l9.disable_physics()
+	var no_blast_reactions: Array[Dictionary] = []
+	no_blast_resolver.reaction_applied.connect(
+		func(reaction: Dictionary) -> void: no_blast_reactions.append(reaction)
+	)
+	no_blast_resolver.report_contact(first_l9, second_l9, "pair_top_l9_l9")
+	assert_eq(no_blast_resolver.flush(), 0, "L9+L9 does not resolve")
+	assert_eq(no_blast_reactions.size(), 0, "L9+L9 emits no reaction")
+	await _cleanup(no_blast_fixture["root"] as Node)
+
+	var blast_fixture: Dictionary = await _create_turn_fixture()
+	var blast_board: Board3D = blast_fixture["board"] as Board3D
+	var blast_resolver: CollisionResolver = blast_fixture["resolver"] as CollisionResolver
+	blast_resolver.proximity_reaction_scan_enabled = false
+	var blast_l9: Orb3D = blast_board.spawn_orb(0, 9, Vector2(-100.0, 0.0))
+	var blast_l10: Orb3D = blast_board.spawn_orb(1, 10, Vector2(100.0, 0.0))
+	blast_l9.disable_physics()
+	blast_l10.disable_physics()
+	var blast_reactions: Array[Dictionary] = []
+	blast_resolver.reaction_applied.connect(
+		func(reaction: Dictionary) -> void: blast_reactions.append(reaction)
+	)
+	blast_resolver.report_contact(blast_l9, blast_l10, "pair_top_l9_l10")
+	assert_eq(blast_resolver.flush(), 1, "L9+L10 resolves once")
+	assert_eq(blast_reactions.size(), 1, "L9+L10 emits one reaction")
+	if blast_reactions.size() == 1:
+		assert_eq(blast_reactions[0]["type"], ReactionRules.Type.BLAST, "L9+L10 is BLAST")
+	await _cleanup(blast_fixture["root"] as Node)
+
+	Config.data.jelly_blast_requires_same_level = original_requires_same
+	Config.data.jelly_blast_pair_top_min_level = original_pair_top
+	Config.data.jelly_blast_min_level = original_minimum
 	Config.data.game_mode = original_mode
 
 

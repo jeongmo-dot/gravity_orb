@@ -31,6 +31,8 @@ param(
 	[int]$JellyTimedStoneTurns = 6,
 	[ValidateRange(0, 10)]
 	[int]$JellyBlastMinLevel = 8,
+	[ValidateRange(-1, 10)]
+	[int]$JellyBlastPairTopMinLevel = -1,
 	[ValidateRange(0, 10)]
 	[int]$JellyTapBlastMinLevel = 8,
 	[ValidateRange(0.0, 100.0)]
@@ -148,6 +150,7 @@ if (-not $AggregateOnly) {
 					"--jelly-timed-stone-enabled=$($JellyTimedStoneEnabled.ToLower())",
 					"--jelly-timed-stone-turns=$JellyTimedStoneTurns",
 					"--jelly-blast-min-level=$JellyBlastMinLevel",
+					$(if ($JellyBlastPairTopMinLevel -ge 0) { "--jelly-blast-pair-top-min-level=$JellyBlastPairTopMinLevel" } else { "" }),
 					"--jelly-tap-blast-min-level=$JellyTapBlastMinLevel",
 					"--blast-score-factor=$($BlastScoreFactor.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--jelly-tap-blast-score-factor=$($JellyTapBlastScoreFactor.ToString([Globalization.CultureInfo]::InvariantCulture))",
@@ -278,6 +281,7 @@ function Get-Summary($Rows) {
     $unarmedOutlineFrames = [double](($Rows | Measure-Object -Property jelly_unarmed_outline_visible_frames -Sum).Sum)
     $outlineMaxAlpha = [double](($Rows | Measure-Object -Property jelly_outline_max_alpha -Maximum).Maximum)
     $blastCountByLevel = [ordered]@{}
+	$blastCountByPairLevels = [ordered]@{}
 	$levelCreationCounts = [ordered]@{}
 	$tapBlastCountByLevel = [ordered]@{}
 	$tapBlastCountByColor = [ordered]@{}
@@ -300,6 +304,11 @@ function Get-Summary($Rows) {
             }
             $blastCountByLevel[$levelKey] += [int]$levelProperty.Value
         }
+		foreach ($pairProperty in $row.blast_count_by_pair_levels.PSObject.Properties) {
+			$pairKey = [string]$pairProperty.Name
+			if (-not $blastCountByPairLevels.Contains($pairKey)) { $blastCountByPairLevels[$pairKey] = 0 }
+			$blastCountByPairLevels[$pairKey] += [int]$pairProperty.Value
+		}
 		foreach ($levelProperty in $row.level_creation_count_by_level.PSObject.Properties) {
 			$levelKey = [string]$levelProperty.Name
 			if (-not $levelCreationCounts.Contains($levelKey)) { $levelCreationCounts[$levelKey] = 0 }
@@ -431,6 +440,7 @@ function Get-Summary($Rows) {
 		average_blasts_through_turn_200_per_game = Get-Ratio $blastCountThroughTurn200 @($Rows).Count
 		tap_blasts = [int](($Rows | Measure-Object -Property tap_blast_count -Sum).Sum)
 		blast_count_by_level = $blastCountByLevel
+		blast_count_by_pair_levels = $blastCountByPairLevels
 		tap_blast_count_by_level = $tapBlastCountByLevel
 		tap_blast_count_by_color = $tapBlastCountByColor
 		tap_clean_count_by_color = $tapCleanCountByColor
@@ -497,6 +507,7 @@ $rows = [ordered]@{}
 foreach ($strategy in $resolvedStrategies) { $rows[$strategy] = @() }
 $effectiveJellyMergeLevelGap = $null
 $effectiveJellyTimedMergeLevelGap = $null
+$effectiveJellyBlastPairTopMinLevel = $null
 foreach ($strategy in @($rows.Keys)) {
     $shardSize = 1
     foreach ($shard in @(Get-SeedShards $SeedCount $shardSize)) {
@@ -506,14 +517,20 @@ foreach ($strategy in @($rows.Keys)) {
 		if ($null -eq $rawReport.PSObject.Properties['jelly_timed_merge_level_gap']) {
 			throw "$filePath is missing jelly_timed_merge_level_gap"
 		}
+		if ($null -eq $rawReport.PSObject.Properties['jelly_blast_pair_top_min_level']) {
+			throw "$filePath is missing jelly_blast_pair_top_min_level"
+		}
 		$reportedMergeLevelGap = [int]$rawReport.jelly_merge_level_gap
 		$reportedTimedMergeLevelGap = [int]$rawReport.jelly_timed_merge_level_gap
+		$reportedJellyBlastPairTopMinLevel = [int]$rawReport.jelly_blast_pair_top_min_level
 		if ($null -eq $effectiveJellyMergeLevelGap) {
 			$effectiveJellyMergeLevelGap = $reportedMergeLevelGap
 			$effectiveJellyTimedMergeLevelGap = $reportedTimedMergeLevelGap
+			$effectiveJellyBlastPairTopMinLevel = $reportedJellyBlastPairTopMinLevel
 		} elseif (
 			$effectiveJellyMergeLevelGap -ne $reportedMergeLevelGap -or
-			$effectiveJellyTimedMergeLevelGap -ne $reportedTimedMergeLevelGap
+			$effectiveJellyTimedMergeLevelGap -ne $reportedTimedMergeLevelGap -or
+			$effectiveJellyBlastPairTopMinLevel -ne $reportedJellyBlastPairTopMinLevel
 		) {
 			throw "Inconsistent merge level gaps in $filePath"
 		}
@@ -575,6 +592,7 @@ $report = [ordered]@{
 	jelly_timed_stone_enabled = $JellyTimedStoneEnabled -eq "On"
 	jelly_timed_stone_turns = $JellyTimedStoneTurns
 	jelly_blast_min_level = $JellyBlastMinLevel
+	jelly_blast_pair_top_min_level = $effectiveJellyBlastPairTopMinLevel
 	jelly_tap_blast_min_level = $JellyTapBlastMinLevel
 	jelly_blast_requires_same_level = $JellyBlastRequiresSameLevel -eq "On"
 	jelly_tap_common_push = $JellyTapCommonPush -eq "On"

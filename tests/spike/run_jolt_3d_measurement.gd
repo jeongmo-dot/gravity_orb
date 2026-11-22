@@ -51,6 +51,7 @@ var _seed_reactions_by_color: Dictionary = {}
 var _seed_max_clear_count: int = 0
 var _seed_blast_count: int = 0
 var _seed_blast_count_by_level: Dictionary = {}
+var _seed_blast_count_by_pair_levels: Dictionary = {}
 var _seed_same_level_blast_count_by_level: Dictionary = {}
 var _seed_mixed_level_blast_count_by_level: Dictionary = {}
 var _seed_blast_moved_ratio_sum_by_level: Dictionary = {}
@@ -128,6 +129,7 @@ func _run() -> void:
 		"blast_min_level": Config.data.blast_min_level,
 		"jelly_blast_min_level": Config.data.jelly_blast_min_level,
 		"jelly_blast_requires_same_level": Config.data.jelly_blast_requires_same_level,
+		"jelly_blast_pair_top_min_level": Config.data.jelly_blast_pair_top_min_level,
 		"jelly_tap_blast_min_level": Config.data.jelly_tap_blast_min_level,
 		"jelly_tap_blast_score_factor": Config.data.jelly_tap_blast_score_factor,
 		"jelly_tap_blast_uses_turn": Config.data.jelly_tap_blast_uses_turn,
@@ -303,6 +305,7 @@ func _run_seed(
 	_seed_max_clear_count = 0
 	_seed_blast_count = 0
 	_seed_blast_count_by_level.clear()
+	_seed_blast_count_by_pair_levels.clear()
 	_seed_same_level_blast_count_by_level.clear()
 	_seed_mixed_level_blast_count_by_level.clear()
 	_seed_blast_moved_ratio_sum_by_level.clear()
@@ -642,6 +645,7 @@ func _run_seed(
 		),
 		"blast_count": _seed_blast_count,
 		"blast_count_by_level": _seed_blast_count_by_level.duplicate(true),
+		"blast_count_by_pair_levels": _seed_blast_count_by_pair_levels.duplicate(true),
 		"blast_moved_orb_ratio_by_level": _blast_moved_ratio_by_level(),
 		"first_blast_turn": _seed_first_blast_turn,
 		"entrance_blocked_turns": entrance_blocked_turns,
@@ -1196,6 +1200,13 @@ func _record_shock_event(reaction: Dictionary) -> void:
 		_seed_blast_count_by_level[blast_key] = int(
 			_seed_blast_count_by_level.get(blast_key, 0)
 		) + 1
+		if levels.size() >= 2:
+			var lower_level: int = mini(int(levels[0]), int(levels[1]))
+			var upper_level: int = maxi(int(levels[0]), int(levels[1]))
+			var pair_key: String = "L%d+L%d" % [lower_level, upper_level]
+			_seed_blast_count_by_pair_levels[pair_key] = int(
+				_seed_blast_count_by_pair_levels.get(pair_key, 0)
+			) + 1
 		var pair_bucket: Dictionary = (
 			_seed_same_level_blast_count_by_level
 			if levels.size() >= 2 and int(levels[0]) == int(levels[1])
@@ -2349,6 +2360,12 @@ func _apply_arguments() -> void:
 		elif argument.begins_with("--jelly-blast-min-level="):
 			Config.data.jelly_blast_min_level = clampi(
 				argument.trim_prefix("--jelly-blast-min-level=").to_int(),
+				0,
+				Config.data.orb_max_level
+			)
+		elif argument.begins_with("--jelly-blast-pair-top-min-level="):
+			Config.data.jelly_blast_pair_top_min_level = clampi(
+				argument.trim_prefix("--jelly-blast-pair-top-min-level=").to_int(),
 				0,
 				Config.data.orb_max_level
 			)

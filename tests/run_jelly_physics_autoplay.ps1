@@ -11,6 +11,8 @@ param(
     [double]$GravityTurnDiagonalTime = -1.0,
     [ValidateRange(-1, 10)]
     [int]$JellyBlastMinLevel = 8,
+	[ValidateRange(-1, 10)]
+	[int]$JellyBlastPairTopMinLevel = -1,
 	[ValidateSet("Default", "D", "M", "A", "B")]
 	[string]$LevelProfile = "Default",
 	[switch]$TapBlastBot,
@@ -150,6 +152,9 @@ if ($GravityTurnDiagonalTime -ge 0.0) {
 if ($JellyBlastMinLevel -ge 0) {
     $physicsArguments += "--jelly-blast-min-level=$JellyBlastMinLevel"
 }
+if ($JellyBlastPairTopMinLevel -ge 0) {
+	$physicsArguments += "--jelly-blast-pair-top-min-level=$JellyBlastPairTopMinLevel"
+}
 if ($SpawnCountMax -ge 0) {
     $physicsArguments += "--spawn-count-max=$SpawnCountMax"
 }
@@ -223,6 +228,7 @@ $totalTurns = 0
 $totalMerges = 0
 $totalBlasts = 0
 $blastCountByLevel = @{}
+$blastCountByPairLevels = @{}
 $sameLevelBlastCountByLevel = @{}
 $mixedLevelBlastCountByLevel = @{}
 $totalJackpots = 0
@@ -286,6 +292,7 @@ $timedStoneReactions = 0
 $effectiveJellyMergeLevelGap = $null
 $effectiveJellyTimedMergeLevelGap = $null
 $effectiveSpawnCountMax = $null
+$effectiveJellyBlastPairTopMinLevel = $null
 foreach ($task in $tasks) {
     $report = Get-Content -LiteralPath $task.Output -Raw | ConvertFrom-Json
 	if ($null -eq $report.PSObject.Properties['jelly_timed_merge_level_gap']) {
@@ -294,17 +301,23 @@ foreach ($task in $tasks) {
 	if ($null -eq $report.PSObject.Properties['spawn_count_max']) {
 		throw "$($task.Output) is missing spawn_count_max"
 	}
+	if ($null -eq $report.PSObject.Properties['jelly_blast_pair_top_min_level']) {
+		throw "$($task.Output) is missing jelly_blast_pair_top_min_level"
+	}
 	$reportedMergeLevelGap = [int]$report.jelly_merge_level_gap
 	$reportedTimedMergeLevelGap = [int]$report.jelly_timed_merge_level_gap
 	$reportedSpawnCountMax = [int]$report.spawn_count_max
+	$reportedJellyBlastPairTopMinLevel = [int]$report.jelly_blast_pair_top_min_level
 	if ($null -eq $effectiveJellyMergeLevelGap) {
 		$effectiveJellyMergeLevelGap = $reportedMergeLevelGap
 		$effectiveJellyTimedMergeLevelGap = $reportedTimedMergeLevelGap
 		$effectiveSpawnCountMax = $reportedSpawnCountMax
+		$effectiveJellyBlastPairTopMinLevel = $reportedJellyBlastPairTopMinLevel
 	} elseif (
 		$effectiveJellyMergeLevelGap -ne $reportedMergeLevelGap -or
 		$effectiveJellyTimedMergeLevelGap -ne $reportedTimedMergeLevelGap -or
-		$effectiveSpawnCountMax -ne $reportedSpawnCountMax
+		$effectiveSpawnCountMax -ne $reportedSpawnCountMax -or
+		$effectiveJellyBlastPairTopMinLevel -ne $reportedJellyBlastPairTopMinLevel
 	) {
 		throw "Inconsistent effective settings in $($task.Output)"
 	}
@@ -389,6 +402,11 @@ foreach ($task in $tasks) {
 		$level = $levelProperty.Name
 		if (-not $mixedLevelBlastCountByLevel.ContainsKey($level)) { $mixedLevelBlastCountByLevel[$level] = 0 }
 		$mixedLevelBlastCountByLevel[$level] += [int]$levelProperty.Value
+	}
+	foreach ($pairProperty in $seedRow.blast_count_by_pair_levels.PSObject.Properties) {
+		$pairKey = $pairProperty.Name
+		if (-not $blastCountByPairLevels.ContainsKey($pairKey)) { $blastCountByPairLevels[$pairKey] = 0 }
+		$blastCountByPairLevels[$pairKey] += [int]$pairProperty.Value
 	}
 	$maximumLevelKey = "L$([int]$seedRow.max_level_reached)"
 	if (-not $maximumLevelDistribution.ContainsKey($maximumLevelKey)) {
@@ -535,6 +553,7 @@ $summary = [ordered]@{
 	jelly_merge_wide_gap_min_level = $JellyMergeWideGapMinLevel
 	jelly_tap_blast_min_level = $JellyTapBlastMinLevel
 	jelly_blast_requires_same_level = $JellyBlastRequiresSameLevel -eq "On"
+	jelly_blast_pair_top_min_level = $effectiveJellyBlastPairTopMinLevel
 	jelly_tap_common_push = $JellyTapCommonPush -eq "On"
 	jelly_tap_lift_speed = $JellyTapLiftSpeed
 	jelly_tap_push_radius_factor = $JellyTapPushRadiusFactor
@@ -649,6 +668,7 @@ $summary = [ordered]@{
 		tap = [ordered]@{ windows = $tapReactionWindows; merges = $tapReactionMerges; blasts = $tapReactionBlasts }
 	}
     blast_count_by_level = $blastCountByLevel
+	blast_count_by_pair_levels = $blastCountByPairLevels
 	same_level_blast_count_by_level = $sameLevelBlastCountByLevel
 	mixed_level_blast_count_by_level = $mixedLevelBlastCountByLevel
     jackpot_count = $totalJackpots

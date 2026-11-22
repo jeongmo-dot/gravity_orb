@@ -327,8 +327,9 @@ func test_m9_blast_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	assert_true(config.blast_enabled, "blast enabled")
 	assert_eq(config.blast_min_level, 4, "shared blast minimum level")
-	assert_eq(config.jelly_blast_min_level, 8, "JELLY blast starts at L8 by default")
+	assert_eq(config.jelly_blast_min_level, 10, "JELLY blast starts at L10 in this candidate")
 	assert_true(not config.jelly_blast_requires_same_level, "JELLY blast allows mixed levels")
+	assert_eq(config.jelly_blast_pair_top_min_level, 0, "JELLY blast pair top minimum defaults off")
 	assert_eq(config.jelly_merge_level_gap, 2, "JELLY merge level gap defaults to two")
 	assert_eq(config.jelly_merge_wide_gap_min_level, 0, "JELLY wide merge gap defaults off")
 	assert_eq(config.jelly_timed_merge_level_gap, -1, "timed JELLY merge gap follows normal gap")

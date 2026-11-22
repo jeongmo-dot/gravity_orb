@@ -123,8 +123,12 @@ func test_pending_jelly_reactions_follow_merge_gap_and_blast_rule() -> void:
 	var original_gap: int = Config.data.jelly_merge_level_gap
 	var original_timed_gap: int = Config.data.jelly_timed_merge_level_gap
 	var original_wide_gap_min_level: int = Config.data.jelly_merge_wide_gap_min_level
+	var original_blast_min_level: int = Config.data.jelly_blast_min_level
+	var original_blast_pair_top: int = Config.data.jelly_blast_pair_top_min_level
 	var original_requires_same: bool = Config.data.jelly_blast_requires_same_level
 	Config.data.jelly_merge_duration = 0.0
+	Config.data.jelly_blast_min_level = 8
+	Config.data.jelly_blast_pair_top_min_level = 0
 	Config.data.jelly_blast_requires_same_level = false
 	var fixture: Dictionary = await _create_fixture()
 	var board: Board3D = fixture["board"] as Board3D
@@ -184,6 +188,8 @@ func test_pending_jelly_reactions_follow_merge_gap_and_blast_rule() -> void:
 	Config.data.jelly_merge_level_gap = original_gap
 	Config.data.jelly_timed_merge_level_gap = original_timed_gap
 	Config.data.jelly_merge_wide_gap_min_level = original_wide_gap_min_level
+	Config.data.jelly_blast_pair_top_min_level = original_blast_pair_top
+	Config.data.jelly_blast_min_level = original_blast_min_level
 	Config.data.jelly_blast_requires_same_level = original_requires_same
 
 

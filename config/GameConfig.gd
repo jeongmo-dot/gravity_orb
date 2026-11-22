@@ -142,6 +142,7 @@ enum GameMode {
 @export var blast_min_level: int = 4
 @export var jelly_blast_min_level: int = 10
 @export var jelly_blast_requires_same_level: bool = false
+@export var jelly_blast_pair_top_min_level: int = 0
 @export var blast_push_radius_by_level: PackedFloat32Array = PackedFloat32Array(
 	[0.0, 0.0, 0.0, 0.3, 0.55, 1.0, 1.0, 1.0, 1.0, 1.0]
 )
@@ -289,7 +290,12 @@ func blast_enabled_for_level(level: int) -> bool:
 func jelly_blast_enabled_for_pair(level_a: int, level_b: int) -> bool:
 	if jelly_blast_requires_same_level and level_a != level_b:
 		return false
-	return blast_enabled_for_level(level_a) and blast_enabled_for_level(level_b)
+	if not blast_enabled_for_level(level_a) or not blast_enabled_for_level(level_b):
+		return false
+	return (
+		jelly_blast_pair_top_min_level <= 0
+		or maxi(level_a, level_b) >= jelly_blast_pair_top_min_level
+	)
 
 
 func jelly_tap_blast_enabled_for_level(level: int) -> bool:
