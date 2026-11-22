@@ -6,6 +6,7 @@ const DEFAULT_USER_SAVE: String = "user://save.cfg"
 const OUTPUT_PREFIX: String = "--capture-output-directory="
 const SAVE_PREFIX: String = "--capture-save-path="
 const TIMED_ONLY_ARGUMENT: String = "--capture-timed-only"
+const UI_B_ONLY_ARGUMENT: String = "--capture-ui-b"
 const PILE_JITTER_SEED: int = 11620261030
 const SPAWN_RAMP_CAPTURE_SEED: int = 11920261031
 const CAPTURE_FILES: Array[String] = [
@@ -38,10 +39,6 @@ const CAPTURE_FILES: Array[String] = [
 	"27_start_no_record.png",
 	"28_gravity_switch.png",
 	"29_board_danger.png",
-	"30_board_blocked.png",
-	"31_turn_input_ready.png",
-	"32_turn_input_busy.png",
-	"33_turn_input_rejected.png",
 	"34_callout_great.png",
 	"35_callout_incredible.png",
 	"36_popup_merge.png",
@@ -204,6 +201,14 @@ const TIMED_ONLY_FILES: Array[String] = [
 	"211_jelly_timed_stone_broken_l4.png",
 	"212_jelly_timed_scatter_five.png",
 ]
+const UI_B_ONLY_FILES: Array[String] = [
+	"213_ui_b_gameplay_combo_popup.png",
+	"214_ui_b_result_record.png",
+	"215_ui_b_final_move.png",
+	"216_ui_b_danger.png",
+	"217_ui_b_timed_callout.png",
+	"218_ui_b_gold_popup.png",
+]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
 var _temp_save_path: String = "res://artifacts/screens/capture_save.tmp.cfg"
@@ -211,6 +216,7 @@ var _failed: bool = false
 var _user_save_existed: bool = false
 var _user_save_bytes: PackedByteArray = PackedByteArray()
 var _timed_only: bool = false
+var _ui_b_only: bool = false
 
 
 func _ready() -> void:
@@ -229,7 +235,9 @@ func _run() -> void:
 	Config.data.sfx_enabled = false
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.rng_seed = 5050
-	if _timed_only:
+	if _ui_b_only:
+		await _capture_ui_b_scenes()
+	elif _timed_only:
 		await _capture_timed_only_scenes()
 	else:
 		await _capture_shell_scenes()
@@ -237,7 +245,9 @@ func _run() -> void:
 	Config.data.sfx_enabled = original_sfx_enabled
 	_verify_user_save_unchanged()
 	_remove_file(_temp_save_path)
-	var expected_files: Array[String] = TIMED_ONLY_FILES if _timed_only else CAPTURE_FILES
+	var expected_files: Array[String] = (
+		UI_B_ONLY_FILES if _ui_b_only else (TIMED_ONLY_FILES if _timed_only else CAPTURE_FILES)
+	)
 	for file_name: String in expected_files:
 		if not FileAccess.file_exists(_output_directory.path_join(file_name)):
 			_fail("Missing capture %s" % file_name)
@@ -253,7 +263,98 @@ func _capture_shell_scenes() -> void:
 	await get_tree().create_timer(0.30).timeout
 	await _capture("26_settings.png")
 	await _destroy_main(main)
+	await _capture_shell_scenes_rest()
 
+
+func _capture_ui_b_scenes() -> void:
+	var main: Main = await _create_main(true)
+	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
+	manager.set_physics_process(false)
+	var board: Board3D = main.get_node("Board") as Board3D
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	board.clear()
+	_spawn_featured(board)
+	var timed: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.YELLOW,
+		Config.data.jelly_timed_level,
+		Vector2(-250.0, 120.0)
+	)
+	timed.set_timed(8, 120)
+	timed.disable_physics()
+	hud._on_preview_changed([
+		[{"color": OrbTypes.OrbColor.RED, "level": 2}],
+		[{"color": OrbTypes.OrbColor.BLUE, "level": 1}],
+	])
+	hud._on_combo_changed(8, 4.0, 8)
+	hud._show_callout("GREAT!", 1)
+	hud._on_reaction_scored({
+		"type": ReactionRules.Type.MERGE,
+		"result_color": OrbTypes.OrbColor.RED,
+		"result_level": 5,
+		"position": Vector2(160.0, 40.0),
+		"points": 960,
+		"base_points": 240,
+		"combo_multiplier": 4.0,
+		"occupancy": 0.0,
+	})
+	await get_tree().create_timer(0.10).timeout
+	await _capture("213_ui_b_gameplay_combo_popup.png")
+
+	_clear_capture_hud_residue(hud)
+	hud._on_final_move_changed(true, TurnManager.FINAL_MOVE_MESSAGE)
+	await _capture("215_ui_b_final_move.png")
+	hud._on_final_move_changed(false, "")
+	hud.set_process(false)
+	hud._set_danger_badge(0.70, 4.0)
+	board.set_danger_state(0.70, 4.0)
+	await get_tree().create_timer(0.12).timeout
+	await _capture("216_ui_b_danger.png")
+	hud._set_danger_badge(0.0, 1.0)
+	board.set_danger_state(0.0, 1.0)
+	hud.set_process(true)
+
+	hud._on_timed_jelly_placed(8, Config.data.jelly_timed_bonus_levels)
+	if hud._callout_tween != null and hud._callout_tween.is_valid():
+		hud._callout_tween.kill()
+	await _capture("217_ui_b_timed_callout.png")
+	hud._hide_callout_label()
+	hud._on_reaction_scored({
+		"type": ReactionRules.Type.BLAST,
+		"position": Vector2(80.0, -20.0),
+		"points": 48600,
+		"base_points": 6075,
+		"combo_multiplier": 8.0,
+		"occupancy": 0.0,
+	})
+	await get_tree().create_timer(0.08).timeout
+	await _capture("218_ui_b_gold_popup.png")
+	await _destroy_main(main)
+
+	main = await _create_main(true)
+	manager = main.get_node("TurnManager") as TurnManager
+	var score: ScoreManager = main.get_node("ScoreManager") as ScoreManager
+	manager.set_physics_process(false)
+	manager.turn_index = 73
+	manager.max_combo = 11
+	manager.final_move_count = 5
+	manager.final_move_success_count = 4
+	score.score = 187750
+	score.best_score = 176400
+	score.max_level_reached = 9
+	manager.game_over_details = {
+		"direction": Vector2i.RIGHT,
+		"final_moves": 5,
+		"final_move_successes": 4,
+		"ranking": {"rank": 1, "record": {}},
+	}
+	manager.game_over.emit()
+	await get_tree().create_timer(0.85).timeout
+	await _capture("214_ui_b_result_record.png")
+	await _destroy_main(main)
+
+
+func _capture_shell_scenes_rest() -> void:
+	var main: Main
 	SaveStore.add_ranking(
 		_temp_save_path,
 		GameConfig.GameMode.JELLY,
@@ -1848,34 +1949,6 @@ func _capture_recovered_hud_scenes(
 	hud._set_danger_badge(0.0, 1.0)
 	board.set_danger_state(0.0, 1.0)
 
-	manager.blocked_directions.assign([Vector2i.DOWN])
-	manager.warning_changed.emit(manager.blocked_directions)
-	board.set_warning_directions(manager.blocked_directions)
-	manager._set_state(TurnManager.State.WAITING_INPUT)
-	InputRouter.set_locked(false)
-	await get_tree().create_timer(TurnInputIndicator.READY_FADE_DURATION + 0.02).timeout
-	if hud.get_node_or_null("BlockedPanel") != null or hud.get_node_or_null("BlockedLabel") != null:
-		_fail("blocked text panel still exists in the warning capture")
-	await _capture("30_board_blocked.png")
-	await _capture("31_turn_input_ready.png")
-	var indicator: TurnInputIndicator = main.get_node(
-		"UI/Hud/TurnInputIndicator"
-	) as TurnInputIndicator
-	if indicator.is_direction_selectable(Vector2i.RIGHT):
-		_fail("current RIGHT gravity arrow is still selectable in the ready capture")
-	print("SCREEN_CAPTURE_CHECK scene=input_ready current=RIGHT visible=UP,DOWN,LEFT hidden=RIGHT")
-
-	manager._set_state(TurnManager.State.SIMULATING)
-	manager.settle_elapsed = 0.5
-	await get_tree().create_timer(TurnInputIndicator.BUSY_FADE_DURATION + 0.02).timeout
-	await _capture("32_turn_input_busy.png")
-	InputRouter.swipe_rejected.emit(Vector2i.LEFT)
-	await get_tree().create_timer(0.04).timeout
-	await _capture("33_turn_input_rejected.png")
-	manager.blocked_directions.clear()
-	var no_blocked_directions: Array[Vector2i] = []
-	manager.warning_changed.emit(no_blocked_directions)
-	board.set_warning_directions(no_blocked_directions)
 	manager._set_state(TurnManager.State.WAITING_INPUT)
 	InputRouter.set_locked(false)
 
@@ -1914,7 +1987,7 @@ func _capture_recovered_hud_scenes(
 	})
 	await get_tree().create_timer(0.10).timeout
 	var big_popup: ScorePopup = hud.active_score_popups()[0]
-	if big_popup.score_text() != "+48,600" or big_popup.formula_text() != "6,075 ×8":
+	if big_popup.score_text() != "+48,600" or big_popup.formula_text() != "6,075 x8":
 		_fail("restored JELLY big popup comma/formula mismatch")
 	await _capture("37_popup_blast_big.png")
 	for popup: ScorePopup in hud.active_score_popups():
@@ -3143,6 +3216,8 @@ func _parse_arguments() -> void:
 			_temp_save_path = argument.trim_prefix(SAVE_PREFIX)
 		elif argument == TIMED_ONLY_ARGUMENT:
 			_timed_only = true
+		elif argument == UI_B_ONLY_ARGUMENT:
+			_ui_b_only = true
 
 
 func _snapshot_user_save() -> void:

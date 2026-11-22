@@ -222,7 +222,7 @@ func test_main_scene_binds_score_hud_and_restart() -> void:
 		_reaction(ReactionRules.Type.MERGE, 0, [1, 1], 2, 0.50)
 	)
 	_assert_combo_labels(main, 3, 3, "x4")
-	assert_eq(danger_label.text, "DANGER ×2", "danger multiplier text")
+	assert_eq(danger_label.text, "DANGER x2", "danger multiplier text")
 	assert_true(danger_label.visible, "danger visible at threshold")
 	await tree.create_timer(0.3, true, false, true).timeout
 	assert_eq(score_label.text, "44", "score HUD numeric text")
@@ -346,7 +346,7 @@ func test_game_over_panel_shows_scores_direction_and_restart_button() -> void:
 	var panel_style: StyleBoxFlat = panel.get_theme_stylebox("panel") as StyleBoxFlat
 	assert_true(panel.visible, "game-over panel visible")
 	assert_true(dimmer.visible, "game-over dims the whole screen")
-	assert_near(dimmer.color.a, 0.6, 0.001, "game-over dim alpha")
+	assert_near(dimmer.color.a, 0.45, 0.001, "game-over dim alpha")
 	assert_true(panel_style != null, "game-over panel has a flat opaque style")
 	if panel_style != null:
 		assert_true(panel_style.bg_color.a >= 0.92, "game-over panel opacity")
@@ -364,8 +364,8 @@ func test_game_over_panel_shows_scores_direction_and_restart_button() -> void:
 		"result values are about 1.6x their labels"
 	)
 	assert_true(
-		turn_value.get_theme_color("font_color").is_equal_approx(Color("#E8EEFF")),
-		"JELLY turn count uses the neutral result color"
+		turn_value.get_theme_color("font_color").is_equal_approx(Color("#5B2A3C")),
+		"JELLY turn count uses the warm result text color"
 	)
 	assert_eq(panel.mouse_filter, Control.MOUSE_FILTER_IGNORE, "panel ignores pointer")
 	assert_eq(restart_button.mouse_filter, Control.MOUSE_FILTER_STOP, "restart consumes pointer")
@@ -516,7 +516,7 @@ func _assert_combo_labels(
 		)
 		assert_eq(
 			multiplier_label.text,
-			"×%s" % expected_multiplier.trim_prefix("x"),
+			"x%s" % expected_multiplier.trim_prefix("x"),
 			"current multiplier HUD text"
 		)
 	assert_eq(max_combo_label.text, "MAX COMBO %d" % max_combo, "maximum combo HUD text")

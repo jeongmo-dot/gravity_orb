@@ -6,6 +6,8 @@ signal finished(popup: ScorePopup)
 const BASE_FONT_SIZE: float = 34.0
 const TEXT_SCALE: float = 0.70
 const FORMULA_FONT_SIZE: int = 15
+const SCORE_OUTLINE_RATIO: float = 0.08
+const FORMULA_OUTLINE_SIZE: int = 2
 const POP_DURATION: float = 0.7
 const LARGE_SCORE_EXTRA_DURATION: float = 0.2
 const FADE_DURATION: float = 0.25
@@ -13,9 +15,8 @@ const RISE_DISTANCE: float = 60.0
 const POP_IN_DURATION: float = 0.12
 const POP_IN_PEAK_TIME: float = 0.07
 const POPUP_SIZE: Vector2 = Vector2(308.0, 126.0)
-const GOLD_COLOR: Color = Color("#FFD54A")
-const FORMULA_COLOR: Color = Color("#AFC5D8")
-const COSMIC_GLOW_ALPHA: float = 0.28
+const GOLD_COLOR: Color = Color("#FFC233")
+const FORMULA_COLOR: Color = Color("#5B2A3C")
 const HUD_THEME: Theme = preload("res://assets/ui/gravity_orb_theme.tres")
 
 var started_process_frame: int = -1
@@ -46,7 +47,7 @@ func _ready() -> void:
 	_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_score_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_score_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_score_label.theme_type_variation = &"HudDisplayBold"
+	_score_label.theme_type_variation = &"WarmText"
 	add_child(_score_label)
 	_formula_label = Label.new()
 	_formula_label.name = "Formula"
@@ -56,9 +57,15 @@ func _ready() -> void:
 	_formula_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_formula_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_formula_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_formula_label.theme_type_variation = &"HudDisplayMedium"
+	_formula_label.theme_type_variation = &"WarmText"
 	_formula_label.add_theme_font_size_override("font_size", FORMULA_FONT_SIZE)
 	_formula_label.add_theme_color_override("font_color", FORMULA_COLOR)
+	_formula_label.add_theme_color_override("font_outline_color", Color.WHITE)
+	_formula_label.add_theme_constant_override("outline_size", FORMULA_OUTLINE_SIZE)
+	_formula_label.add_theme_color_override("font_shadow_color", Color.TRANSPARENT)
+	_formula_label.add_theme_constant_override("shadow_offset_x", 0)
+	_formula_label.add_theme_constant_override("shadow_offset_y", 0)
+	_formula_label.add_theme_constant_override("shadow_outline_size", 0)
 	add_child(_formula_label)
 	for index: int in range(2):
 		var sparkle: CosmicSparkle = CosmicSparkle.new()
@@ -91,10 +98,13 @@ func activate(
 	scale = Vector2.ONE * 0.6
 	position = anchor_position - POPUP_SIZE * 0.5
 	_score_label.text = "+%s" % format_number(points)
-	_score_label.add_theme_font_size_override("font_size", popup_font_size(points))
+	var score_font_size: int = popup_font_size(points)
+	_score_label.add_theme_font_size_override("font_size", score_font_size)
 	_score_label.add_theme_color_override("font_color", font_color)
 	_score_label.add_theme_color_override("font_outline_color", outline_color)
-	_score_label.add_theme_constant_override("outline_size", outline_size)
+	_score_label.add_theme_constant_override(
+		"outline_size", popup_outline_size(points) if outline_size < 0 else outline_size
+	)
 	_configure_cosmic_style()
 	_formula_label.text = formula
 	_formula_label.visible = not formula.is_empty()
@@ -106,6 +116,7 @@ func merge_score(additional_points: int) -> void:
 	_duration = POP_DURATION + (LARGE_SCORE_EXTRA_DURATION if points >= 1000 else 0.0)
 	_score_label.text = "+%s" % format_number(points)
 	_score_label.add_theme_font_size_override("font_size", popup_font_size(points))
+	_score_label.add_theme_constant_override("outline_size", popup_outline_size(points))
 	_formula_label.text = ""
 	_formula_label.visible = false
 
@@ -138,7 +149,7 @@ func content_local_rect_for(p_points: int, formula: String) -> Rect2:
 		-1.0,
 		score_font_size
 	)
-	var outline_margin: float = 6.0
+	var outline_margin: float = float(popup_outline_size(p_points))
 	var score_rect: Rect2 = Rect2(
 		Vector2(
 			(POPUP_SIZE.x - score_size.x) * 0.5 - outline_margin,
@@ -213,6 +224,18 @@ func glow_alpha() -> float:
 	return _score_label.get_theme_color("font_shadow_color").a
 
 
+func score_outline_size() -> int:
+	return _score_label.get_theme_constant("outline_size")
+
+
+func score_shadow_offset_y() -> int:
+	return _score_label.get_theme_constant("shadow_offset_y")
+
+
+func formula_outline_size() -> int:
+	return _formula_label.get_theme_constant("outline_size")
+
+
 static func format_number(value: int) -> String:
 	var negative: bool = value < 0
 	var digits: String = str(absi(value))
@@ -228,6 +251,10 @@ static func popup_font_size(score: int) -> int:
 	var ratio: float = maxf(float(score) / 10.0, 0.0001)
 	var factor: float = clampf(1.0 + 0.25 * log(ratio) / log(10.0), 1.0, 2.4)
 	return roundi(BASE_FONT_SIZE * TEXT_SCALE * factor)
+
+
+static func popup_outline_size(score: int) -> int:
+	return maxi(2, roundi(float(popup_font_size(score)) * SCORE_OUTLINE_RATIO))
 
 
 func _process(delta: float) -> void:
@@ -256,13 +283,10 @@ func _process(delta: float) -> void:
 
 
 func _configure_cosmic_style() -> void:
-	var shadow_color: Color = GOLD_COLOR
-	shadow_color.a = COSMIC_GLOW_ALPHA if _cosmic_score else 0.0
-	_score_label.add_theme_color_override("font_shadow_color", shadow_color)
-	_score_label.add_theme_constant_override(
-		"shadow_outline_size",
-		16 if _cosmic_score else 0
-	)
+	_score_label.add_theme_color_override("font_shadow_color", Color.TRANSPARENT)
+	_score_label.add_theme_constant_override("shadow_offset_x", 0)
+	_score_label.add_theme_constant_override("shadow_offset_y", 0)
+	_score_label.add_theme_constant_override("shadow_outline_size", 0)
 	for sparkle: CosmicSparkle in _sparkles:
 		sparkle.stop()
 	if not _cosmic_score:
@@ -272,7 +296,7 @@ func _configure_cosmic_style() -> void:
 	for index: int in range(sparkle_count):
 		_sparkles[index].play(
 			POPUP_SIZE * 0.5,
-			GOLD_COLOR,
+			[Color("#FFD75E"), Color("#FF8FB0"), Color.WHITE][index % 3],
 			_duration,
 			offsets[index],
 			offsets[index] * 1.18,

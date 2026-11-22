@@ -3,7 +3,8 @@ param(
     [ValidateRange(1, [int]::MaxValue)]
     [int]$FixedFps = 120,
     [switch]$HudScenesOnly,
-    [switch]$TimedOnly
+    [switch]$TimedOnly,
+    [switch]$UiBOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -43,10 +44,6 @@ $expectedFiles = @(
     "27_start_no_record.png",
     "28_gravity_switch.png",
     "29_board_danger.png",
-    "30_board_blocked.png",
-    "31_turn_input_ready.png",
-    "32_turn_input_busy.png",
-    "33_turn_input_rejected.png",
     "34_callout_great.png",
     "35_callout_incredible.png",
     "36_popup_merge.png",
@@ -247,6 +244,18 @@ if ($TimedOnly) {
     $expectedZoomFiles = @()
 }
 
+if ($UiBOnly) {
+    $expectedFiles = @(
+        "213_ui_b_gameplay_combo_popup.png",
+        "214_ui_b_result_record.png",
+        "215_ui_b_final_move.png",
+        "216_ui_b_danger.png",
+        "217_ui_b_timed_callout.png",
+        "218_ui_b_gold_popup.png"
+    )
+    $expectedZoomFiles = @()
+}
+
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {
     if (-not [string]::IsNullOrWhiteSpace($env:GODOT)) {
         $GodotPath = $env:GODOT
@@ -275,6 +284,9 @@ foreach ($captureSpec in $captureSpecs) {
     if ($TimedOnly) {
         $arguments += "--capture-timed-only"
     }
+    if ($UiBOnly) {
+        $arguments += "--capture-ui-b"
+    }
     & $GodotPath @arguments
     if ($LASTEXITCODE -ne 0) {
         throw "Screenshot capture $($captureSpec.Name) failed with exit code $LASTEXITCODE"
@@ -295,7 +307,7 @@ foreach ($captureSpec in $captureSpecs) {
         Write-Output ("SCREEN_CAPTURE_ZOOM_RESULT ratio={0} file={1}" -f $captureSpec.Name, $filePath)
         $capturedFileCount += 1
     }
-    if (-not $TimedOnly) {
+    if (-not $TimedOnly -and -not $UiBOnly) {
         $landingFiles = @(1..10 | ForEach-Object {
             Join-Path $outputPath ("{0:D2}_jelly_motion_land_{1:D2}.png" -f (43 + $_), $_)
         })
