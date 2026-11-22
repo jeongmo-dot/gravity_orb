@@ -41,7 +41,7 @@
 ### [2026-11-22] 대상 #157 — UI B안 1: 따뜻한 젤리 HUD·결과 창·화면 바탕
 - **맨 앞 확인 목록:** JELLY 해시 상수 변경 없음. 주아 폴백 글자 없음. 540×960·540×1170 캡처 12장에서 글 잘림·겹침 없음. 화살표 삭제에 따른 입력 동작 변경 없음. 시작·랭킹·설정 모습 변경 없음. 명세에 없는 움직임·연출 추가 없음.
 - 상태: 완료
-- 브랜치 / PR: `ui-b-hud` / 생성 예정
+- 브랜치 / PR: `ui-b-hud` / https://github.com/jeongmo-dot/gravity_orb/pull/159
 - 변경 파일: `assets/fonts/Jua-Regular.ttf`, `assets/fonts/SOURCE.md`, `assets/fonts/OFL.txt`, `assets/ui/gravity_orb_theme.tres`, `scenes/UI.tscn`, `scripts/fx/SpaceBackdrop.gd`, `scripts/ui/GameOverPanel.gd`, `scripts/ui/Hud.gd`, `scripts/ui/JellyFinalMoveBanner.gd`, `scripts/ui/ScorePopup.gd`, `scripts/ui/WarmRibbon.gd`, `scripts/ui/TurnInputIndicator.gd`(삭제), `tests/capture_screens.ps1`, `tests/spike/capture_screens.gd`, `tests/test_callouts.gd`, `tests/test_score_popups.gd`, `tests/test_screen_layout.gd`, `tests/test_space_board_visuals.gd`, `tests/test_turn_input_indicator.gd`(삭제), 이 회신 파일
 - Done-when 대조:
   - [x] 주아 원본·출처·라이선스 — Google Fonts `ofl/jua/Jua-Regular.ttf`, 원본 커밋 `06bfe0d62a98375cb09c942fa18e68bd32cff057`, SHA-256 `769677aef240bfc3b9965f2b50748075bff885e6c6992fc591a3fb268279f898`, SIL OFL 1.1. 현재 #157 표시 문자열의 폴백 글자 0개
