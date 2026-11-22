@@ -62,35 +62,89 @@ func test_space_parallax_moves_toward_gravity_and_returns_in_point_three_seconds
 	await tree.process_frame
 
 
-func test_board_uses_glass_gravity_field_and_layered_metal_frame() -> void:
+func test_board_uses_opaque_ten_by_ten_checkerboard_and_warm_layered_frame() -> void:
 	var board: Board3D = await _create_board()
 	var backing: MeshInstance3D = board.get_node("VisualTilt/Backing") as MeshInstance3D
 	var backing_material: ShaderMaterial = backing.material_override as ShaderMaterial
-	assert_true(backing_material != null, "board backing uses a glass shader")
+	assert_true(backing_material != null, "board backing uses a checker shader")
 	assert_true(
-		backing_material.shader.code.contains("ALPHA = mix(0.65, 0.78"),
-		"glass reveals thirty to forty percent of the background"
+		backing_material.shader.code.contains("floor(UV * cell_count)"),
+		"checker shader divides the floor into regular cells"
 	)
-	var gravity_field: MeshInstance3D = board.get_node(
-		"VisualTilt/GravityField"
-	) as MeshInstance3D
-	var field_material: ShaderMaterial = gravity_field.material_override as ShaderMaterial
-	assert_true(field_material != null, "board has a gravity field layer")
+	assert_eq(
+		int(backing_material.get_shader_parameter("cell_count")),
+		Board3D.BOARD_CHECKER_CELLS,
+		"checker has ten cells per side"
+	)
+	assert_eq(
+		backing_material.get_shader_parameter("checker_dark") as Vector3,
+		Vector3(
+			Board3D.BOARD_CHECKER_DARK_COLOR.r,
+			Board3D.BOARD_CHECKER_DARK_COLOR.g,
+			Board3D.BOARD_CHECKER_DARK_COLOR.b
+		),
+		"checker dark square uses the B palette"
+	)
+	assert_eq(
+		backing_material.get_shader_parameter("checker_light") as Vector3,
+		Vector3(
+			Board3D.BOARD_CHECKER_LIGHT_COLOR.r,
+			Board3D.BOARD_CHECKER_LIGHT_COLOR.g,
+			Board3D.BOARD_CHECKER_LIGHT_COLOR.b
+		),
+		"checker light square uses the B palette"
+	)
 	assert_true(
-		float(field_material.get_shader_parameter("maximum_alpha")) <= 0.12,
-		"gravity field opacity stays at or below 0.12"
+		not backing_material.shader.code.contains("ALPHA")
+		and not backing_material.shader.code.contains("gravity"),
+		"checker is opaque and has no gravity warp"
+	)
+	assert_near(
+		float(backing_material.get_shader_parameter("corner_radius")),
+		Board3D.BOARD_CORNER_RADIUS_M / (Config.data.board_size / Board3D.PIXELS_PER_METER),
+		0.0001,
+		"floor corner radius is thirty-two logical pixels"
+	)
+	var expected_band_size: float = (
+		Config.data.board_size / Board3D.PIXELS_PER_METER
+		+ Board3D.VISUAL_WALL_WIDTH_M * 2.0
+	)
+	var expected_outer_size: float = expected_band_size + Board3D.FRAME_OUTLINE_WIDTH_M * 2.0
+	var frame_band: MeshInstance3D = board.get_node("VisualTilt/FrameBand") as MeshInstance3D
+	var frame_outline: MeshInstance3D = board.get_node("VisualTilt/FrameOutline") as MeshInstance3D
+	var frame_depth: MeshInstance3D = board.get_node("VisualTilt/FrameDepth") as MeshInstance3D
+	assert_near((frame_band.mesh as QuadMesh).size.x, expected_band_size, 0.0001, "white band is 16px")
+	assert_near((frame_outline.mesh as QuadMesh).size.x, expected_outer_size, 0.0001, "pink line is 8px")
+	assert_near((frame_depth.mesh as QuadMesh).size.x, expected_outer_size, 0.0001, "depth matches frame")
+	assert_near(
+		frame_depth.position.y,
+		-Board3D.FRAME_DEPTH_OFFSET_M,
+		0.0001,
+		"world-space depth projects 28px below the board"
+	)
+	assert_eq(
+		(frame_outline.material_override as ShaderMaterial).get_shader_parameter("fill_color") as Vector3,
+		Vector3(Board3D.FRAME_OUTLINE_COLOR.r, Board3D.FRAME_OUTLINE_COLOR.g, Board3D.FRAME_OUTLINE_COLOR.b),
+		"outer line uses b_line"
+	)
+	assert_eq(
+		(frame_depth.material_override as ShaderMaterial).get_shader_parameter("fill_color") as Vector3,
+		Vector3(Board3D.FRAME_DEPTH_COLOR.r, Board3D.FRAME_DEPTH_COLOR.g, Board3D.FRAME_DEPTH_COLOR.b),
+		"lower thickness uses b_depth"
 	)
 	for wall_name: String in ["VisualTop", "VisualBottom", "VisualLeft", "VisualRight"]:
 		var wall: MeshInstance3D = board.get_node("VisualTilt/%s" % wall_name) as MeshInstance3D
 		var material: StandardMaterial3D = wall.material_override as StandardMaterial3D
-		assert_true(material.metallic >= 0.75, "%s uses a metallic frame" % wall_name)
-		assert_true(wall.has_node("InnerGlow"), "%s has inner glass light" % wall_name)
+		assert_eq(material.albedo_color, Board3D.METAL_FRAME_COLOR, "%s uses a white band" % wall_name)
+		assert_near(material.metallic, 0.0, 0.0001, "%s is no longer metallic" % wall_name)
+		assert_true(wall.has_node("InnerGlow"), "%s has gravity light" % wall_name)
 		assert_true(wall.has_node("OuterGlow"), "%s has outer state glow" % wall_name)
-	assert_true(board.has_node("VisualTilt/BeveledCorners"), "frame corners are beveled")
+	assert_true(not board.has_node("VisualTilt/GravityField"), "curved gravity grid is removed")
+	assert_true(not board.has_node("VisualTilt/BeveledCorners"), "metal corner caps are removed")
 	await _cleanup(board)
 
 
-func test_gravity_wall_light_and_field_move_to_the_new_direction() -> void:
+func test_pink_gravity_wall_light_moves_to_the_new_direction() -> void:
 	var board: Board3D = await _create_board()
 	var wall_by_direction: Dictionary = {
 		Vector2i.UP: "VisualTop",
@@ -109,6 +163,15 @@ func test_gravity_wall_light_and_field_move_to_the_new_direction() -> void:
 			var material: ShaderMaterial = glow.material_override as ShaderMaterial
 			var strength: float = float(material.get_shader_parameter("strength"))
 			if checked_direction == direction:
+				assert_eq(
+					material.get_shader_parameter("glow_color") as Vector3,
+					Vector3(
+						Board3D.GRAVITY_GLOW_COLOR.r,
+						Board3D.GRAVITY_GLOW_COLOR.g,
+						Board3D.GRAVITY_GLOW_COLOR.b
+					),
+					"%s gravity wall uses the pink light" % wall_name
+				)
 				assert_true(strength >= 0.85, "%s gravity wall is fully lit" % wall_name)
 				assert_near(
 					float(material.get_shader_parameter("highlight_center")),
@@ -143,23 +206,6 @@ func test_gravity_wall_light_and_field_move_to_the_new_direction() -> void:
 			"gravity light reaches the shared bottom-right corner"
 		)
 
-	board.set_gravity(Vector2i.LEFT)
-	board._process(Board3D.GRAVITY_FIELD_DURATION)
-	var gravity_field: MeshInstance3D = board.get_node(
-		"VisualTilt/GravityField"
-	) as MeshInstance3D
-	var field_material: ShaderMaterial = gravity_field.material_override as ShaderMaterial
-	assert_eq(
-		field_material.get_shader_parameter("gravity_to") as Vector2,
-		Vector2.LEFT,
-		"field targets the new gravity direction"
-	)
-	assert_near(
-		float(field_material.get_shader_parameter("gravity_mix")),
-		1.0,
-		0.0001,
-		"field finishes bending in 0.3 seconds"
-	)
 	await _cleanup(board)
 
 
@@ -172,7 +218,7 @@ func test_blocked_and_danger_keep_distinct_frame_states() -> void:
 	assert_eq(
 		top_material.albedo_color,
 		Board3D.METAL_FRAME_COLOR,
-		"blocked direction leaves the frame at its normal metal color"
+		"blocked direction leaves the frame white"
 	)
 	var blocked_outer: MeshInstance3D = board.get_node(
 		"VisualTilt/VisualTop/OuterGlow"

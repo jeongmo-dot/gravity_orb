@@ -7,6 +7,7 @@ const OUTPUT_PREFIX: String = "--capture-output-directory="
 const SAVE_PREFIX: String = "--capture-save-path="
 const TIMED_ONLY_ARGUMENT: String = "--capture-timed-only"
 const UI_B_ONLY_ARGUMENT: String = "--capture-ui-b"
+const UI_B_BOARD_ONLY_ARGUMENT: String = "--capture-ui-b-board"
 const PILE_JITTER_SEED: int = 11620261030
 const SPAWN_RAMP_CAPTURE_SEED: int = 11920261031
 const CAPTURE_FILES: Array[String] = [
@@ -209,6 +210,15 @@ const UI_B_ONLY_FILES: Array[String] = [
 	"217_ui_b_timed_callout.png",
 	"218_ui_b_gold_popup.png",
 ]
+const UI_B_BOARD_ONLY_FILES: Array[String] = [
+	"219_ui_b_board_first.png",
+	"220_ui_b_board_full.png",
+	"221_ui_b_board_gravity_light.png",
+	"222_ui_b_board_blast.png",
+	"223_ui_b_board_timed_number.png",
+	"224_ui_b_board_stone.png",
+	"225_ui_b_board_final_move.png",
+]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
 var _temp_save_path: String = "res://artifacts/screens/capture_save.tmp.cfg"
@@ -217,6 +227,7 @@ var _user_save_existed: bool = false
 var _user_save_bytes: PackedByteArray = PackedByteArray()
 var _timed_only: bool = false
 var _ui_b_only: bool = false
+var _ui_b_board_only: bool = false
 
 
 func _ready() -> void:
@@ -235,7 +246,9 @@ func _run() -> void:
 	Config.data.sfx_enabled = false
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.rng_seed = 5050
-	if _ui_b_only:
+	if _ui_b_board_only:
+		await _capture_ui_b_board_scenes()
+	elif _ui_b_only:
 		await _capture_ui_b_scenes()
 	elif _timed_only:
 		await _capture_timed_only_scenes()
@@ -245,9 +258,13 @@ func _run() -> void:
 	Config.data.sfx_enabled = original_sfx_enabled
 	_verify_user_save_unchanged()
 	_remove_file(_temp_save_path)
-	var expected_files: Array[String] = (
-		UI_B_ONLY_FILES if _ui_b_only else (TIMED_ONLY_FILES if _timed_only else CAPTURE_FILES)
-	)
+	var expected_files: Array[String] = CAPTURE_FILES
+	if _ui_b_board_only:
+		expected_files = UI_B_BOARD_ONLY_FILES
+	elif _ui_b_only:
+		expected_files = UI_B_ONLY_FILES
+	elif _timed_only:
+		expected_files = TIMED_ONLY_FILES
 	for file_name: String in expected_files:
 		if not FileAccess.file_exists(_output_directory.path_join(file_name)):
 			_fail("Missing capture %s" % file_name)
@@ -350,6 +367,100 @@ func _capture_ui_b_scenes() -> void:
 	manager.game_over.emit()
 	await get_tree().create_timer(0.85).timeout
 	await _capture("214_ui_b_result_record.png")
+	await _destroy_main(main)
+
+
+func _capture_ui_b_board_scenes() -> void:
+	var main: Main = await _create_main(true)
+	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
+	manager.set_physics_process(false)
+	var board: Board3D = main.get_node("Board") as Board3D
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	var director: FeedbackDirector = main.get_node("FeedbackDirector") as FeedbackDirector
+
+	board.clear()
+	var first_specs: Array[Dictionary] = [
+		{"color": OrbTypes.OrbColor.RED, "position": Vector2(-240.0, 270.0)},
+		{"color": OrbTypes.OrbColor.BLUE, "position": Vector2(-80.0, 270.0)},
+		{"color": OrbTypes.OrbColor.GREEN, "position": Vector2(80.0, 270.0)},
+		{"color": OrbTypes.OrbColor.YELLOW, "position": Vector2(240.0, 270.0)},
+	]
+	for spec: Dictionary in first_specs:
+		var first_orb: Orb3D = board.spawn_orb(
+			int(spec["color"]),
+			1,
+			spec["position"] as Vector2
+		)
+		first_orb.disable_physics()
+	await _capture("219_ui_b_board_first.png")
+
+	board.clear()
+	for row: int in range(6):
+		for column: int in range(6):
+			var full_orb: Orb3D = board.spawn_orb(
+				(row + column) % 4,
+				1 + (row * 2 + column) % 4,
+				Vector2(-350.0 + float(column) * 140.0, -350.0 + float(row) * 140.0)
+			)
+			full_orb.disable_physics()
+	await _capture("220_ui_b_board_full.png")
+
+	board.set_process(false)
+	board.set_gravity(Vector2i.DOWN)
+	board._process(Board3D.GRAVITY_LIGHT_DURATION)
+	board.set_gravity(Vector2i.RIGHT)
+	board._process(Board3D.GRAVITY_LIGHT_DURATION * 0.5)
+	await _capture("221_ui_b_board_gravity_light.png")
+	board.set_process(true)
+
+	board.clear()
+	director.clear_effects()
+	var blast_left: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.RED,
+		Config.data.orb_max_level,
+		Vector2(-120.0, 0.0)
+	)
+	var blast_right: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.BLUE,
+		Config.data.orb_max_level,
+		Vector2(120.0, 0.0)
+	)
+	blast_left.disable_physics()
+	blast_right.disable_physics()
+	director.play_reaction_visuals({
+		"type": ReactionRules.Type.BLAST,
+		"levels": [Config.data.orb_max_level, Config.data.orb_max_level],
+		"colors": [OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE],
+		"position": Vector2.ZERO,
+	})
+	await get_tree().create_timer(0.06).timeout
+	await _capture("222_ui_b_board_blast.png")
+
+	board.clear()
+	director.clear_effects()
+	var yellow_l1: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.YELLOW,
+		1,
+		Vector2(-170.0, 120.0)
+	)
+	yellow_l1.disable_physics()
+	var timed: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.YELLOW,
+		Config.data.jelly_timed_level,
+		Vector2(100.0, 80.0)
+	)
+	timed.set_timed(8, Config.data.jelly_timed_first_turn)
+	timed.disable_physics()
+	await _capture("223_ui_b_board_timed_number.png")
+
+	timed.set_timed_stone(0, true)
+	await _capture("224_ui_b_board_stone.png")
+
+	board.clear()
+	_spawn_featured(board)
+	hud._on_final_move_changed(true, TurnManager.FINAL_MOVE_MESSAGE)
+	await _capture("225_ui_b_board_final_move.png")
+	hud._on_final_move_changed(false, "")
 	await _destroy_main(main)
 
 
@@ -3218,6 +3329,8 @@ func _parse_arguments() -> void:
 			_timed_only = true
 		elif argument == UI_B_ONLY_ARGUMENT:
 			_ui_b_only = true
+		elif argument == UI_B_BOARD_ONLY_ARGUMENT:
+			_ui_b_board_only = true
 
 
 func _snapshot_user_save() -> void:
