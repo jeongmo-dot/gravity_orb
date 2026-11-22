@@ -50,7 +50,7 @@
 - 커밋: 항목 단위 브랜치 (`ui-b-board`, main에서), **push·PR까지** (병합은 Claude 검수 뒤)
 
 ### [2026-11-22 #157] UI B안 1 — 게임 중 화면·결과 창·화면 바탕, 방향 화살표 삭제
-- 상태: **대기 — 추가 요구 1** (2026-11-23 Claude 검수: [PR #159](https://github.com/jeongmo-dot/gravity_orb/pull/159) 병합 전에 고칠 것 6건 — 그중 그림자는 명세 잘못). 명세: §12-ONE.47 "#157 검수"·"#157 추가 요구 1". #155 추가 요구 8 측정이 공유 트리에서 돌고 있으면 끊지 말고 끝난 뒤에 하거나 따로 작업 트리에서. 인박스 번호 #157은 GitHub PR #157 (#156)과 다르다
+- 상태: **대기 — 추가 요구 1** (2026-11-23 Claude 검수: [PR #159](https://github.com/jeongmo-dot/gravity_orb/pull/159) 병합 전에 고칠 것 6건 — 그중 그림자는 명세 잘못. 사용자 "3번이 좋네. 그렇게 수정하게 해주고 나머지도 수정안 진행시켜" — × → 주아 `x` 포함 전부 진행). 명세: §12-ONE.47 "#157 검수"·"#157 추가 요구 1". #155 추가 요구 8 측정이 공유 트리에서 돌고 있으면 끊지 말고 끝난 뒤에 하거나 따로 작업 트리에서. 인박스 번호 #157은 GitHub PR #157 (#156)과 다르다
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.47** — B 색 토큰·부품 1~9·주아 글꼴·"#157 요구" 1~10. 목업 원본 [mockups/ui_b/](mockups/ui_b/) — 저장소 경로 `docs/mockups/ui_b/` (540 폭 기준 — 논리 좌표는 ×2)
 - 배경: 사용자 (2026-11-22) "다른 모바일 퍼즐게임 UI야 이걸 참고해서 우리게임 UI를 개선하고 싶어" → Claude 목업 A·B·C → "B가 좋아보이는데 저 게임 프레임 옆에 삼각형은 제발 없애줘" → "응 명세부터 써줘"
 - 앵커: `assets/ui/gravity_orb_theme.tres` (새 형식 추가), `assets/fonts/` (주아·`SOURCE.md`·`OFL.txt`), `scenes/UI.tscn` `Hud` 아래 노드, `scripts/ui/Hud.gd` (`CALLOUT_COLORS`·`HUD_*_COLOR`·`_fit_numeric_label()` 크기), `scripts/ui/GameOverPanel.gd`, `scripts/ui/ScorePopup.gd`, `scripts/ui/JellyFinalMoveBanner.gd`, `scripts/ui/CosmicSparkle.gd` (색만), `scripts/ui/TurnInputIndicator.gd` (삭제), `scripts/fx/SpaceBackdrop.gd` 셰이더, `tests/test_turn_input_indicator.gd` (삭제)·`tests/spike/capture_screens.gd`
@@ -61,7 +61,7 @@
   - [ ] `test_turn_input_indicator.gd` 삭제·화살표에 기대던 테스트 정리 (목록), 전체 회귀 통과, 해시 상수 그대로 (평일)
   - [ ] 캡처 두 비율 6종 (§12-ONE.47 "#157" 캡처 목록) + 확대
   - 1차 (완료 `4344f63`, PR #159): 위 세 줄 — 폴백 글자 목록은 틀림 (×·· 빠짐)
-  - [ ] **추가 요구 1**: 호령 그림자 `글 크기 × 0.13`·외곽선 `× 0.05`, 점수 팝업 그림자 없음·외곽선 `× 0.08`, 식 글 흰 외곽선, 배경 점 지름 10·간격 68 (화면에서), FINAL MOVE 테마 주아·안쪽 여백 24·띠 폭 맞춤, 폴백 글자 ×·· 목록, 테스트·전체 회귀·캡처 12장 + 화소 측정값
+  - [ ] **추가 요구 1**: 호령 그림자 `글 크기 × 0.13`·외곽선 `× 0.05`, 점수 팝업 그림자 없음·외곽선 `× 0.08`, 식 글 흰 외곽선, 배경 점 지름 10·간격 68 (화면에서), FINAL MOVE 테마 주아·안쪽 여백 24·띠 폭 맞춤, **× → 주아 `x`** (배수·NEXT/THEN 개수·DANGER·점수 식, 사용자 결정)·남은 폴백 글자 (·) 목록, 테스트·전체 회귀·캡처 12장 + 화소 측정값
 - **회신 맨 앞에**: §12-ONE.47 "#157" 목록 (추가 요구 1은 그 항목의 목록)
 - 커밋: 항목 단위 브랜치 (`ui-b-hud`, main에서), **push·PR까지** (병합은 Claude 검수 뒤). 추가 요구 1도 같은 브랜치·같은 PR
 
