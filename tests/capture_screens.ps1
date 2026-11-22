@@ -4,7 +4,8 @@ param(
     [int]$FixedFps = 120,
     [switch]$HudScenesOnly,
     [switch]$TimedOnly,
-    [switch]$UiBOnly
+    [switch]$UiBOnly,
+    [switch]$UiBBoardOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -256,6 +257,21 @@ if ($UiBOnly) {
     $expectedZoomFiles = @()
 }
 
+if ($UiBBoardOnly) {
+    $expectedFiles = @(
+        "219_ui_b_board_first.png",
+        "220_ui_b_board_full.png",
+        "221_ui_b_board_gravity_light.png",
+        "222_ui_b_board_blast.png",
+        "223_ui_b_board_timed_number.png",
+        "224_ui_b_board_stone.png",
+        "225_ui_b_board_final_move.png",
+        "226_ui_b_board_danger_amber.png",
+        "227_ui_b_board_danger_red.png"
+    )
+    $expectedZoomFiles = @()
+}
+
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {
     if (-not [string]::IsNullOrWhiteSpace($env:GODOT)) {
         $GodotPath = $env:GODOT
@@ -287,6 +303,9 @@ foreach ($captureSpec in $captureSpecs) {
     if ($UiBOnly) {
         $arguments += "--capture-ui-b"
     }
+    if ($UiBBoardOnly) {
+        $arguments += "--capture-ui-b-board"
+    }
     & $GodotPath @arguments
     if ($LASTEXITCODE -ne 0) {
         throw "Screenshot capture $($captureSpec.Name) failed with exit code $LASTEXITCODE"
@@ -307,7 +326,7 @@ foreach ($captureSpec in $captureSpecs) {
         Write-Output ("SCREEN_CAPTURE_ZOOM_RESULT ratio={0} file={1}" -f $captureSpec.Name, $filePath)
         $capturedFileCount += 1
     }
-    if (-not $TimedOnly -and -not $UiBOnly) {
+    if (-not $TimedOnly -and -not $UiBOnly -and -not $UiBBoardOnly) {
         $landingFiles = @(1..10 | ForEach-Object {
             Join-Path $outputPath ("{0:D2}_jelly_motion_land_{1:D2}.png" -f (43 + $_), $_)
         })
