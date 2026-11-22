@@ -41,7 +41,7 @@
 ### [2026-11-23] 대상 #158 — UI B안 2: 판 바닥·판 틀 (3D)
 - **맨 앞 확인 목록:** JELLY 해시 상수 변경 없음. 물리 벽 위치·판 크기 변경 없음. 밝은 바닥에서 노랑 L1·흰 시한 숫자·회색 돌·대폭발 그림을 모두 식별했고, 흰 대폭발 반짝이는 밝은 칸 위에서 대비가 낮아지지만 형태는 보였다. 명세에 없는 움직임·연출 추가 없음.
 - 상태: 완료
-- 브랜치 / PR: `ui-b-board-3d` / 생성 전
+- 브랜치 / PR: `ui-b-board-3d` / https://github.com/jeongmo-dot/gravity_orb/pull/160
 - 변경 파일: `scripts/spike/Board3D.gd`, `tests/test_space_board_visuals.gd`, `tests/spike/capture_screens.gd`, `tests/capture_screens.ps1`, 이 회신 파일
 - Done-when 대조:
   - [x] 판 바닥을 불투명 10×10 바둑판으로 교체 — #F3E6FB·#FDF8FF, 32논리 px 둥근 모서리, 중력 휘어짐·우주 격자 제거. 자동 셰이더 검사 + 실제 창 캡처
