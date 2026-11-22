@@ -486,6 +486,17 @@ function Get-Median($Values) {
     return ([double]$items[$middle - 1] + [double]$items[$middle]) / 2.0
 }
 $reactionScoreTotal = [double](($reactionScoreTotals.Values | Measure-Object -Sum).Sum)
+$firstBlastTurns = @(
+	$seedRows |
+		Where-Object { [int]$_.first_blast_turn -ge 0 } |
+		ForEach-Object { [double]$_.first_blast_turn }
+)
+$blastCountThroughTurn200 = [int](
+	($seedRows |
+		ForEach-Object { $_.turn_rows } |
+		Where-Object { [int]$_.turn -le 200 } |
+		Measure-Object -Property blast_count -Sum).Sum
+)
 $averageCleanCountPerTapByColor = [ordered]@{}
 $zeroCleanTapRatioByColor = [ordered]@{}
 foreach ($color in @($tapBlastCountByColor.Keys | Sort-Object)) {
@@ -617,6 +628,11 @@ $summary = [ordered]@{
 	maximum_level_distribution = $maximumLevelDistribution
 	level_ten_game_count = $levelTenGameCount
     blast_count = $totalBlasts
+	average_blasts_per_game = [double]$totalBlasts / $seedRows.Count
+	first_blast_turn_median = if ($firstBlastTurns.Count -gt 0) { Get-Median $firstBlastTurns } else { $null }
+	zero_blast_game_count = @($seedRows | Where-Object { [int]$_.blast_count -eq 0 }).Count
+	blast_count_through_turn_200 = $blastCountThroughTurn200
+	average_blasts_through_turn_200_per_game = [double]$blastCountThroughTurn200 / $seedRows.Count
 	tap_blast_count = $totalTapBlastCount
 	tap_blast_count_by_level = $tapBlastCountByLevel
 	tap_blast_count_by_color = $tapBlastCountByColor

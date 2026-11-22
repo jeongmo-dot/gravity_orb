@@ -70,7 +70,7 @@ param(
 	[ValidateRange(0.0, 1.0)]
 	[double]$BlastFarFactor = 0.5,
 	[string]$OrbFrictionByLevel = "0.3,0.3,0.3,0.4,0.4,0.4,0.4,0.5,0.5,0.5",
-	[ValidateRange(1, 100)]
+	[ValidateRange(0, 100)]
 	[int]$SpawnCountMax = 4,
 	[string]$Strategies = "r,g,l_merge",
 	[string]$MeasurementLabel = "",
@@ -278,6 +278,7 @@ function Get-Summary($Rows) {
     $unarmedOutlineFrames = [double](($Rows | Measure-Object -Property jelly_unarmed_outline_visible_frames -Sum).Sum)
     $outlineMaxAlpha = [double](($Rows | Measure-Object -Property jelly_outline_max_alpha -Maximum).Maximum)
     $blastCountByLevel = [ordered]@{}
+	$levelCreationCounts = [ordered]@{}
 	$tapBlastCountByLevel = [ordered]@{}
 	$tapBlastCountByColor = [ordered]@{}
 	$tapCleanCountByColor = [ordered]@{}
@@ -299,6 +300,11 @@ function Get-Summary($Rows) {
             }
             $blastCountByLevel[$levelKey] += [int]$levelProperty.Value
         }
+		foreach ($levelProperty in $row.level_creation_count_by_level.PSObject.Properties) {
+			$levelKey = [string]$levelProperty.Name
+			if (-not $levelCreationCounts.Contains($levelKey)) { $levelCreationCounts[$levelKey] = 0 }
+			$levelCreationCounts[$levelKey] += [int]$levelProperty.Value
+		}
 		foreach ($levelProperty in $row.tap_blast_count_by_level.PSObject.Properties) {
 			$levelKey = [string]$levelProperty.Name
 			if (-not $tapBlastCountByLevel.Contains($levelKey)) { $tapBlastCountByLevel[$levelKey] = 0 }
@@ -372,6 +378,19 @@ function Get-Summary($Rows) {
 	foreach ($scoreKey in $reactionScoreTotals.Keys) {
 		$reactionScoreShares[$scoreKey] = Get-Ratio ([double]$reactionScoreTotals[$scoreKey]) $reactionScoreTotal
 	}
+	$firstBlastTurns = @(
+		$Rows |
+			Where-Object { [int]$_.first_blast_turn -ge 0 } |
+			ForEach-Object { [double]$_.first_blast_turn }
+	)
+	$blastCountThroughTurn200 = [int](
+		($Rows |
+			ForEach-Object { $_.turn_rows } |
+			Where-Object { [int]$_.turn -le 200 } |
+			Measure-Object -Property blast_count -Sum).Sum
+	)
+	$completedRows = @($Rows | Where-Object { $_.game_over })
+	$maximumActiveRow = @($Rows | Sort-Object -Property max_active_orbs -Descending | Select-Object -First 1)
     return [ordered]@{
         games = @($Rows).Count
 		game_over_count = @($Rows | Where-Object { $_.game_over }).Count
@@ -380,6 +399,7 @@ function Get-Summary($Rows) {
 		turns_minimum = ($Rows | Measure-Object -Property completed_turns -Minimum).Minimum
 		turns_maximum = ($Rows | Measure-Object -Property completed_turns -Maximum).Maximum
         turns_median = Get-Median @($Rows | ForEach-Object { $_.completed_turns })
+		completed_turns_average = if ($completedRows.Count -gt 0) { ($completedRows | Measure-Object -Property completed_turns -Average).Average } else { $null }
 		score_average = ($Rows | Measure-Object -Property score -Average).Average
         score_median = Get-Median @($Rows | ForEach-Object { $_.score })
 		score_per_turn = Get-Ratio $scoreTotal $turnTotal
@@ -398,11 +418,17 @@ function Get-Summary($Rows) {
         blast_outline_max_alpha = $outlineMaxAlpha
 		level_seven_game_rate = Get-Ratio @($Rows | Where-Object { $_.reached_level_seven }).Count @($Rows).Count
 		level_eight_plus_game_count = @($Rows | Where-Object { $_.reached_level_eight_plus }).Count
+		level_creation_count_by_level = $levelCreationCounts
 		level_eight_plus_creation_count = [int](($Rows | Measure-Object -Property level_eight_plus_creation_count -Sum).Sum)
 		average_level_eight_plus_creations_per_game = Get-Ratio ([double](($Rows | Measure-Object -Property level_eight_plus_creation_count -Sum).Sum)) @($Rows).Count
 		level_ten_game_count = @($Rows | Where-Object { [int]$_.max_level_reached -ge 10 }).Count
         jackpots = [int](($Rows | Measure-Object -Property max_clear_count -Sum).Sum)
 		blasts = [int](($Rows | Measure-Object -Property blast_count -Sum).Sum)
+		average_blasts_per_game = Get-Ratio ([double](($Rows | Measure-Object -Property blast_count -Sum).Sum)) @($Rows).Count
+		first_blast_turn_median = if ($firstBlastTurns.Count -gt 0) { Get-Median $firstBlastTurns } else { $null }
+		zero_blast_game_count = @($Rows | Where-Object { [int]$_.blast_count -eq 0 }).Count
+		blast_count_through_turn_200 = $blastCountThroughTurn200
+		average_blasts_through_turn_200_per_game = Get-Ratio $blastCountThroughTurn200 @($Rows).Count
 		tap_blasts = [int](($Rows | Measure-Object -Property tap_blast_count -Sum).Sum)
 		blast_count_by_level = $blastCountByLevel
 		tap_blast_count_by_level = $tapBlastCountByLevel
@@ -421,6 +447,14 @@ function Get-Summary($Rows) {
 		}
 		maximum_pair_penetration_px = ($Rows | ForEach-Object { [double]$_.max_turn_end_pair.penetration_px } | Measure-Object -Maximum).Maximum
 		departures = [int](($Rows | Measure-Object -Property departures -Sum).Sum)
+		average_game_over_spawn_count = if ($completedRows.Count -gt 0) { ($completedRows | Measure-Object -Property game_over_spawn_count -Average).Average } else { $null }
+		maximum_active_sample = if ($maximumActiveRow.Count -gt 0) { [ordered]@{
+			seed = [int]$maximumActiveRow[0].seed
+			turn = [int]$maximumActiveRow[0].max_active_orbs_turn
+			active_orbs = [int]$maximumActiveRow[0].max_active_orbs
+			physics_ms_max = [double]$maximumActiveRow[0].max_active_physics_ms_max
+		} } else { $null }
+		maximum_peak_active_physics_ms = ($Rows | Measure-Object -Property max_active_physics_ms_max -Maximum).Maximum
 		timed_jelly_placed_count = [int]$timedPlaced
 		timed_jelly_per_game = Get-Ratio $timedPlaced @($Rows).Count
 		timed_jelly_success_count = [int]$timedSuccess
