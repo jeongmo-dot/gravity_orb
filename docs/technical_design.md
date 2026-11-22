@@ -239,7 +239,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | #23 | `chain_reaction_delay` | float | 0.2 (가안, 플레이 체감으로 조정) | 합체 결과의 반응 잠금 시간 (초, §7.5) |
 | #127 | `jelly_merge_duration` | float | (새 필드) **0.3** (#127, 2026-10-31 사용자 "합쳐지는 과정이 눈에 보였으면" — 사용자가 해 보고 조정, §12-ONE.20) | JELLY 합체 과정 길이 (초). 닿는 순간 규칙을 정하고, T 동안 먹히는 쪽 그림이 결과로 끌려가며 작아지고 결과가 커진 뒤 완성 (점수·연출·충격파). 0이면 닿는 순간 결과 (#126까지) |
 | #128 | `jelly_level_masses` | PackedFloat32Array | (새 필드) **[1, 2, 3, 5, 7, 11, 17, 27, 42, 64]** (#128 B — L10 = 예전 L7 양, §12-ONE.21) | JELLY 레벨별 질량 (인덱스 0 = L1). 질량 → 레벨은 표 값 ≤ m인 가장 큰 레벨, 배 속 = (m − 질량[L]) ÷ (질량[L+1] − 질량[L]). 길이가 `orb_max_level`과 다르면 2^(L−1) |
-| #128 | `jelly_merge_level_gap` | int | (새 필드) **2** (#155, 2026-11-15 사용자 "지금은 1 레벨 차이만 병합하잖아. 2레벨 차이 병합 시도해보자" — §12-ONE.45. #135~#154는 1 (사용자 "1레벨 차이만 합치게" — §12-ONE.26), #128 추가 요구 2 C8부터 #134까지 2) | JELLY 같은 색 흡수·합체 레벨 차 상한. 2 = 같은 레벨·한 단계·두 단계 차이까지. 예전 해시 묶음은 각자 값을 고정한다 (F2 = 2, #155 전 기본을 물려받던 묶음 = 1) |
+| #128 | `jelly_merge_level_gap` | int | (새 필드) **1** (#155에서 2를 다시 시도 — 2026-11-15 사용자 "지금은 1 레벨 차이만 병합하잖아. 2레벨 차이 병합 시도해보자" — 했으나 판이 끝나지 않아 대폭발 L10 (B10)까지 잰 뒤 2026-11-22 사용자 "지금 그대로 유지"로 병합 안 함, §12-ONE.45. #135부터 1 (사용자 "1레벨 차이만 합치게" — §12-ONE.26), #128 추가 요구 2 C8부터 #134까지 2) | JELLY 같은 색 흡수·합체 레벨 차 상한. 2 = 같은 레벨·한 단계·두 단계 차이까지. 예전 해시 묶음은 각자 값을 고정한다 (F2 = 2, #155 전 기본을 물려받던 묶음 = 1) |
 | #128 | `jelly_tap_blast_radius_factor` / `jelly_tap_blast_score_factor` / `jelly_tap_blast_touch_margin` | float | (새 필드) **0.3 / 0.5 / 16** (#128, 2026-11-01 사용자 "L10 이 되면 해당 젤리를 터치해서 소폭발" — 값은 Claude, §12-ONE.21. 점수 배율 1.0 → **0.5**는 #130 — 측정을 본 뒤 사용자 "ST ×15 그대로", §12-ONE.23) | 터치 소폭발 (#129부터 `jelly_tap_blast_min_level` 이상): 밀어내는 반경 (`board_size` 비율) / 점수 = `score_for_level(터진 레벨)` × 값 / 터치 판정 여백 (판 좌표 px, 반지름 + 값) |
 | #129 | `jelly_tap_blast_min_level` | int | (새 필드) **8** (#129, 2026-11-01 사용자 "L8~L10 싱글 폭발 가능. 소폭발." — 측정을 본 뒤 "그대로 병합", §12-ONE.22) | 터치 소폭발 최저 레벨. 입력 대기 중 이 레벨 이상 젤리를 터치로 터뜨린다 (색 상관없음). 반응의 레벨·점수·연출 레벨은 터진 레벨. 0이면 끈다. 10 = #128 (L10만) |
 | #129 | `jelly_blast_requires_same_level` | bool | (새 필드) **false** (#129, 사용자 "L8~L10 서로 다른 색깔과 충돌시 대폭발" — "레벨 상관없이", §12-ONE.22) | false: 다른 색 둘 다 `jelly_blast_min_level` 이상이면 레벨이 달라도 대폭발 (범위·연출은 큰 레벨, 점수 `(sA + sB) × blast_score_factor`). true: 같은 레벨만 (#128까지). 같은 색은 흡수가 먼저 |
@@ -264,7 +264,7 @@ enum AnnihilationRule { A_BOTH, B_SAME_LEVEL, C_REMAINDER }   # M6
 | #150 | `jelly_timed_turns_min` / `jelly_timed_turns_max` / `jelly_timed_fail_mode` / `jelly_timed_scatter_count` | int × 4 | (새 필드) **5 / 10 / 2 / 5** (#150, 2026-11-14 사용자 "시한 젤리 들어올 때 숫자 5 ~ 10 사이"·1안·2안 → Claude 질문 답 "매번 5~10 무작위"·"둘 다 만들어 비교" (기본 2안)·"회색 L1 5개"·"폭발이 미는 범위 안", §12-ONE.41. 측정 없음 — 주말 가벼운 모드) | 시한 젤리 처음 숫자 = `Spawner._timed_rng` (판 시드 ^ `TIMED_SEED_SALT`)에서 min~max 고르게 (min ≤ 0이면 `jelly_timed_turns` 고정). 실패 방식: 0 = #147 (위 행), 1 = 시한 젤리 사라짐 + 회색 L1 `scatter_count`개를 5 × 5 격자 후보 중 가장 먼 자리부터 (유령 시작), **2 = 그 자리에서 영구 회색 돌**. 1·2의 회색 돌: 반응 없음, 시간으로 안 풀림, 폭발이 미는 범위 (대폭발 `apply_blast()`, 터치 소폭발 미는 범위·파랑 지진은 판 전체, 잭팟 `apply_shockwave()`) 안이면 폭발 한 번에 한 단계, L2 이하에서 맞으면 점수 없이 사라짐 |
 | #153 | `sfx_pitch_jitter` | float | 0.03 (#35, §12-F) → **0.0** (#153, 2026-11-14 사용자 "합칠 때 나오는 사운드는 합치는 크기에 따라서 소리가 달라지게 해줘" → "C 커질수록 높은 음" → 흔들림 on·off를 들어 보고 "끄기" — §12-ONE.43) | 합체 소리 음 높이 흔들림 (± 비율, `stable_spawn_id` 해시로 정함). #153부터 합체 소리가 레벨마다 정해진 음이라 0.03이면 음이 최대 반음 절반 어긋난다. 0이면 연쇄 상승만. 코드는 남아 있어 값을 넣으면 되살아난다 |
 | #154 | `jelly_timed_early_turn_limit` / `jelly_timed_early_turns_min` / `jelly_timed_early_turns_max` | int × 3 | (새 필드) **100 / 10 / 15** (#154, 2026-11-14 사용자 "시한젤리는 5는 좀 난이도가 높은 것 같아 처음 100 턴 미만 구간에서는 10~15 로 하고, 그 이상이 되면 5~10으로 하자" — §12-ONE.44) | 시한 젤리가 판에 들어오는 턴이 limit **미만**이면 처음 숫자를 early min~max에서 고르게 (`_timed_rng` 한 번), limit 이상이면 `jelly_timed_turns_min`~`max` (5~10). limit ≤ 0 또는 early min ≤ 0이면 끔 (#150 그대로). `jelly_timed_turns_min` ≤ 0이면 셋 다 무시하고 `jelly_timed_turns` 고정. 기본 차례로는 20~92턴 (7개)이 10~15, 104턴부터 5~10 |
-| #155 | `jelly_timed_merge_level_gap` | int | (새 필드) **−1** = 보통 젤리 상한을 따름 (#155 추가 요구 2, 2026-11-15 사용자 "일반 젤리와 시한 젤리 모두 합치는 것은 2 레벨 차이까지. 어렵게 하는 방법은 더 생각해보자" — §12-ONE.45. 처음 명세는 1 (사용자 "시한 젤리는 그대로 1레벨 차이만 병합")) | 0 이상이면 같은 색 쌍 중 하나가 숫자가 남은 시한 젤리 (`is_timed`, 돌 아님)일 때 레벨 차 상한을 `jelly_merge_level_gap` 대신 이 값으로 (H 규칙 넓히기 없음). 음수면 `jelly_merge_level_gap`을 따른다 (H 넓히기는 시한 쌍에 쓰지 않는 것은 같다). 다른 색 쌍·돌은 그대로 |
+| #155 | `jelly_timed_merge_level_gap` | int | **main에 없음** — #155 브랜치 `merge-gap-2`에만 있고 병합하지 않았다 (2026-11-22, §12-ONE.45). 브랜치 값: **−1** = 보통 젤리 상한을 따름 (#155 추가 요구 2, 2026-11-15 사용자 "일반 젤리와 시한 젤리 모두 합치는 것은 2 레벨 차이까지. 어렵게 하는 방법은 더 생각해보자" — §12-ONE.45. 처음 명세는 1 (사용자 "시한 젤리는 그대로 1레벨 차이만 병합")) | 0 이상이면 같은 색 쌍 중 하나가 숫자가 남은 시한 젤리 (`is_timed`, 돌 아님)일 때 레벨 차 상한을 `jelly_merge_level_gap` 대신 이 값으로 (H 규칙 넓히기 없음). 음수면 `jelly_merge_level_gap`을 따른다 (H 넓히기는 시한 쌍에 쓰지 않는 것은 같다). 다른 색 쌍·돌은 그대로 |
 | #21 | `combo_multiplier_base` | float | 2.0 | 콤보 배수 밑 (§8.2) |
 | #62 | `combo_multiplier_max` | float | **128.0** | 턴제 콤보 배수 상한 — `min(base^(combo − 1), max)`, 콤보 8부터 ×128 고정 (§8.2, 2026-10-11 사용자). BLITZ 체인 배수(최대 ×5)와 무관 |
 | #21 | `danger_start` / `danger_doubling` | float | 0.30 / 0.20 | 위험 배수 시작 점유율 / 2배가 되는 점유율 간격 (§8.2) |
@@ -5913,13 +5913,20 @@ G1 전략 봇 (시드 1~20, 600턴 상한, 턴 평균 / 총점 평균):
 - 그 뒤: 사용자가 에디터에서 해 보고 정한다 — B10 채택 → 추가 요구 8 (기본값 테스트·GAP2-B10 해시 상수·대폭발 8에 기대던 테스트, 평일이면 전체 회귀) → Claude 검수 → 병합 (§4 `jelly_blast_min_level` 행·기획서는 그때). 다른 값·GAP1이면 사용자와 다시 정한다. 공유 트리를 main으로 돌리는 것은 그때 지시
 - 사용자에게 알릴 것 (Claude): 이 브랜치에서 낸 점수도 같은 `save.cfg` 랭킹·최고점수에 들어간다
 
-**#155 추가 요구 7 결과 — 사용자 플레이 대기** ([PR #156](https://github.com/jeongmo-dot/gravity_orb/pull/156) `3a6dd34`, 2026-11-22 사용자 "코덱스 내용 확인". 검수는 Claude — Claude 재실행 없음)
+**#155 추가 요구 7 결과 — GAP1 유지로 끝남** ([PR #156](https://github.com/jeongmo-dot/gravity_orb/pull/156) `3a6dd34`, 2026-11-22 사용자 "코덱스 내용 확인". 검수는 Claude — Claude 재실행 없음)
 - main 병합 `441d45f` (부모 `18513eb`·`d30a346`). Claude diff 대조: 브랜치와 main의 차이는 #155 파일 14개뿐이고, #156·#156 후속 파일 (`TurnInputIndicator.gd`·`Board.gd`·`SaveStore.gd`·`TurnManager.gd`, 테스트 4개)은 main과 같다. `run_jolt_3d_measurement.gd`에 `blocked_direction_tracking_enabled = true` 두 곳 (`_create_fixture()`·`_create_preview_fixture_shell()`)·`--jolt-turn-progress`·턴별 `turn_end_pair`가 다 있다. `docs/`는 회신 파일만 main과 다르다
 - 값 커밋 `3a6dd34`: `GameConfig.gd`·`default_config.tres`의 `jelly_blast_min_level` 8 → 10 두 줄 + 회신. 다른 값 그대로 (레벨 차 2·시한 −1·터치 8·공 4·같은 레벨만 false)
 - 테스트 (Codex 관측, 고치지 않음): `test_turn_input_indicator` 2/2·`test_rankings` 3/3·`test_turn_manager` 13/13·`test_timed_jelly` 24/24, `test_rules` 19/21 — 실패 2개 (`test_jelly_blast_default_l8_threshold_and_gap_two_absorption_precedence`·`test_jelly_explicit_gap_one_rule_examples`)는 기본 L8·L9 대폭발 기대. headless 스모크 (`--quit-after 300 -- --mode=jelly`) 종료 코드 0·`SCRIPT ERROR` 0
 - 추가 요구 8에서 고칠 목록 (Codex 코드 읽기): `test_config.gd` L8 기본값, `test_rules.gd` 위 두 테스트, `test_jelly_regression.gd` `EXPECTED_GAP2_DEFAULT_HASH`. `test_jelly_visuals.gd`·`test_jolt_3d.gd`의 L8 그림 테스트는 8을 직접 넣어 기본값과 무관
 - 대폭발 레벨을 숫자로 적은 화면 글 0건 (Codex 검색 — Claude 검색과 같다). 공유 트리 = `merge-gap-2` `3a6dd34`, 깨끗함 (Claude 확인). 맨 앞 경고 0건
 - 다음: 사용자가 에디터에서 해 보고 정한다 — B10 채택 → 추가 요구 8 / 다른 값·GAP1 → 다시 정함
+
+**#155 결정 — 지금 그대로 (GAP1), 병합 안 함** (2026-11-22)
+- 사용자 "b10이 뭐였지?" → Claude가 다시 설명 (GAP2는 판이 끝나지 않아 다른 색 대폭발을 L10끼리만 — 지금과 비교 표: 판 길이 203 → 159턴, 대폭발 판당 6.6 → 0.8, 점수 약 28만 → 13만, 실력 차 2.5 → 1.3배. 선택지 채택 / 다른 값 / 지금 (GAP1)으로 되돌리기) → 사용자 **"지금 그대로 유지"** = GAP1
+- [PR #156](https://github.com/jeongmo-dot/gravity_orb/pull/156) 병합하지 않고 닫음 (Claude). 브랜치 `merge-gap-2` (끝 `3a6dd34`)는 지우지 않는다 — 측정 도구 보강 (`run_jelly_measurement.ps1` 실제 PID·종료 코드·최대 메모리, `--jolt-turn-progress`, 턴별 `turn_end_pair`)과 시한 쌍 레벨 차 상한 코드 (`jelly_timed_merge_level_gap`)가 거기에만 있다. 필요하면 따로 항목으로 가져온다
+- main 그대로: `jelly_merge_level_gap` 1, `jelly_blast_min_level` 8, 새 필드 없음. 공유 트리는 main으로 돌림 (Claude, `git status` 깨끗 확인 뒤)
+- §4: `jelly_merge_level_gap` 행을 1로 되돌리고, `jelly_timed_merge_level_gap` 행은 main에 없는 필드로 표시
+- 측정 결과 (GAP2 B8·T9·T10·S5·S6·B9·B10)는 위 기록 그대로 — 다음에 합체 규칙을 바꿀 때 참고
 
 ### 12-ONE.46 막힘 경고 표시 삭제 — 화살표의 빨강·✕ (#156)
 사용자 (2026-11-16, 에디터에서 플레이 중 — 아래 중력, 위 화살표가 빨강 + ✕인 스크린샷): **"그리고 지금 게임 UI에서 4방향 화살표 중에서 입력이 안되는 방향 표시가 잘못되어 있어. 아래로 내려갈 수 없을 때 (이미 아래쪽 중력이라) 위 방향이 금지로 나오고 있어"** → Claude가 지금 설계를 설명 (빨강 ✕ = 그 방향으로 기울이면 새 공이 들어올 입구가 막혀 FINAL MOVE가 된다는 경고, 지금 중력 방향은 화살표를 그리지 않음) → 사용자 **"위험 표시 하지말라고 그 뒤에 했었는데, 남아있네."**
@@ -5968,7 +5975,7 @@ G1 전략 봇 (시드 1~20, 600턴 상한, 턴 평균 / 총점 평균):
 - 가져오지 않는 것: 상점·하트·재화·출석·지도·부스터·레벨 별 — 게임에 없는 기능 (명세에 없는 기능 금지)
 - 목업 원본: [mockups/ui_b/B_game.dc.html](mockups/ui_b/B_game.dc.html)·[B_result.dc.html](mockups/ui_b/B_result.dc.html) — Design 캔버스 형식이라 런타임 없이는 열리지 않는다. 수치 확인용 (인라인 style). 목업은 540 폭 화면 기준이고 **게임 논리 좌표 (1080 폭, `display/window/size/viewport_width`)에서는 ×2**. 아래 수치는 모두 논리 px. 목업의 젤리·판은 그림 설명용 — 실제 3D 젤리는 그대로
 - 나누기: **#157** 2D 화면 (HUD·결과 창·화살표 삭제·글꼴) + 화면 바탕 / **#158** 판 바닥·판 틀 (3D) / **#159** 시작 화면·랭킹·설정 — Claude가 B 목업을 먼저 그려 사용자에게 보인 뒤 명세
-- 시작 조건: #155 값 결정 뒤 (지금 공유 트리는 사용자가 B10을 해 보도록 `merge-gap-2`에 있다). 캡처가 많은 일이라 평일 풀테스트
+- 시작 조건: #155는 2026-11-22 "지금 그대로 유지" (GAP1)로 끝났다 — #157은 **2026-11-23 (월)부터**. 캡처가 많은 일이라 평일 풀테스트 (주말에는 시작하지 않는다)
 
 **B 색 (토큰)**
 

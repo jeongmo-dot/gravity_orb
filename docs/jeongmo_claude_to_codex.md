@@ -50,7 +50,7 @@
 - 커밋: 항목 단위 브랜치 (`ui-b-board`, main에서), **push·PR까지** (병합은 Claude 검수 뒤)
 
 ### [2026-11-22 #157] UI B안 1 — 게임 중 화면·결과 창·화면 바탕, 방향 화살표 삭제
-- 상태: **보류 — 시작하지 말 것**. #155 값 결정 뒤 Claude가 "대기"로 바꾼다 (그 전까지 공유 트리는 사용자가 B10을 해 보도록 `merge-gap-2`에 둔다). 캡처가 많아 평일 풀테스트. 인박스 번호 #157은 GitHub PR #157 (#156)과 다르다
+- 상태: **대기 — 2026-11-23 (월)부터 시작** (#155는 2026-11-22 "지금 그대로 유지"로 GAP1 유지·PR #156 닫음, 공유 트리 main). 캡처가 많아 평일 풀테스트 — 주말에는 시작하지 않는다. 인박스 번호 #157은 GitHub PR #157 (#156)과 다르다
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.47** — B 색 토큰·부품 1~9·주아 글꼴·"#157 요구" 1~10. 목업 원본 [mockups/ui_b/](mockups/ui_b/) (540 폭 기준 — 논리 좌표는 ×2)
 - 배경: 사용자 (2026-11-22) "다른 모바일 퍼즐게임 UI야 이걸 참고해서 우리게임 UI를 개선하고 싶어" → Claude 목업 A·B·C → "B가 좋아보이는데 저 게임 프레임 옆에 삼각형은 제발 없애줘" → "응 명세부터 써줘"
 - 앵커: `assets/ui/gravity_orb_theme.tres` (새 형식 추가), `assets/fonts/` (주아·`SOURCE.md`·`OFL.txt`), `scenes/UI.tscn` `Hud` 아래 노드, `scripts/ui/Hud.gd` (`CALLOUT_COLORS`·`HUD_*_COLOR`·`_fit_numeric_label()` 크기), `scripts/ui/GameOverPanel.gd`, `scripts/ui/ScorePopup.gd`, `scripts/ui/JellyFinalMoveBanner.gd`, `scripts/ui/CosmicSparkle.gd` (색만), `scripts/ui/TurnInputIndicator.gd` (삭제), `scripts/fx/SpaceBackdrop.gd` 셰이더, `tests/test_turn_input_indicator.gd` (삭제)·`tests/spike/capture_screens.gd`
@@ -63,8 +63,12 @@
 - **회신 맨 앞에**: §12-ONE.47 "#157" 목록
 - 커밋: 항목 단위 브랜치 (`ui-b-hud`, main에서), **push·PR까지** (병합은 Claude 검수 뒤)
 
-### [2026-11-15 #155] 같은 색 합체 레벨 차 2 다시 시도 — 시한 젤리는 1
-- 상태: **사용자 플레이 대기 — Codex 할 일 없음** (추가 요구 7 `3a6dd34` 검수 통과, 공유 트리 = `merge-gap-2`). 2026-11-22 사용자 "1번으로 해줘" = 직접 해보고 결정 (추가 요구 6 `18513eb`: B10 100판이 기준 통과, 대신 대폭발 판당 6.6 → 0.8). 인박스 번호 #155는 GitHub PR #155 (#154 인박스 상태 요청)와 다르다
+---
+
+## 처리 완료
+
+### [2026-11-15 #155] 같은 색 합체 레벨 차 2 다시 시도 — 시한 젤리는 1 — 완료 (병합 안 함)
+- 상태: 완료 — **병합 안 함, GAP1 유지** (2026-11-22 사용자 "b10이 뭐였지?" → Claude 설명 → "지금 그대로 유지"). [PR #156](https://github.com/jeongmo-dot/gravity_orb/pull/156) 닫음, 브랜치 `merge-gap-2` (끝 `3a6dd34`)는 측정 도구 보강·시한 쌍 상한 코드 참고용으로 남김. 공유 트리 main. 결과: §12-ONE.45 "#155 결정". 인박스 번호 #155는 GitHub PR #155 (#154 인박스 상태 요청)와 다르다
 - 병합: 추가 요구 7 (시험 커밋) → 사용자가 에디터에서 해 보고 값 결정 → 채택이면 추가 요구 8 (테스트·해시) → Claude 검수 뒤 한 번에 병합
 - 추가 요구 7 (완료 `3a6dd34`, 2026-11-22 "코덱스 내용 확인"): main 병합 `441d45f`·대폭발 문턱 10. 테스트 42/42 + `test_rules` 19/21 (실패 2개는 대폭발 8 기대 — 추가 요구 8에서). 스모크 오류 0. 결과: §12-ONE.45 "추가 요구 7 결과". 명세: [§12-ONE.45 "추가 요구 7"](technical_design.md) — ① `origin/main` (`554ce89`, #156·#156 후속 포함)을 `merge-gap-2`에 병합 (측정 픽스처의 `blocked_direction_tracking_enabled = true` 유지) ② `jelly_blast_min_level` 8 → **10** (`GameConfig.gd`·`default_config.tres`) ③ 코드·그림·안내·**테스트는 고치지 않음** (대폭발 8·GAP2 해시에 기대는 테스트는 목록만) ④ 테스트 5개 파일·headless 스모크 ⑤ push 뒤 **공유 트리를 `merge-gap-2`에 둔 채** 끝냄 (사용자가 에디터에서 해 본다). 주말 가벼운 모드 — 봇 측정·전체 회귀·캡처·빌드 없음
 - 추가 요구 6 (완료 `18513eb`): 결과 없이 끝난 판은 일반 exe 단독 실행에서 600턴·종료 코드 0 — 게임 문제 아님. 측정 도구 보강 (진행 출력·PID·종료 코드·메모리) 받아들임. B10 100판 D-save 미완료 0 / 0 / 1, 자동 D-save 159.25턴
@@ -92,10 +96,6 @@
   - [ ] 판정 경로 다섯 곳이 시한 여부를 넘김 (회신에 경로별 한 줄)
   - [ ] 기본 레벨 차 1에 기대던 테스트 목록 (고친 곳·이유)
 - 커밋: 항목 단위 브랜치 (`merge-gap-2`), **push·PR까지** (병합은 Claude 검수 뒤)
-
----
-
-## 처리 완료
 
 ### [2026-11-20 #156 후속] 저장 실패 및 막힘 계산 개선 (Codex 직접 작업) — 완료
 - 상태: 완료 (2026-11-21 사용자 "코덱스 내용 확인" → "병합해줘" · [PR #158](https://github.com/jeongmo-dot/gravity_orb/pull/158) squash `41a2bf3`). 이 인박스의 지시가 아니라 Codex가 전체 코드 리뷰 지적 3건을 직접 고친 것 — 회신 "[2026-11-20] 대상 #156 후속"
