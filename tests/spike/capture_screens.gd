@@ -1987,7 +1987,7 @@ func _capture_recovered_hud_scenes(
 	})
 	await get_tree().create_timer(0.10).timeout
 	var big_popup: ScorePopup = hud.active_score_popups()[0]
-	if big_popup.score_text() != "+48,600" or big_popup.formula_text() != "6,075 ×8":
+	if big_popup.score_text() != "+48,600" or big_popup.formula_text() != "6,075 x8":
 		_fail("restored JELLY big popup comma/formula mismatch")
 	await _capture("37_popup_blast_big.png")
 	for popup: ScorePopup in hud.active_score_popups():

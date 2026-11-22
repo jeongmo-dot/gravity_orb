@@ -336,7 +336,7 @@ theme_override_colors/font_outline_color = Color(1, 1, 1, 1)
 theme_override_constants/outline_size = 6
 theme_override_font_sizes/font_size = 52
 theme_type_variation = &"WarmText"
-text = "×1"
+text = "x1"
 horizontal_alignment = 1
 
 [node name="ComboLabel" type="Label" parent="Hud"]
@@ -368,7 +368,7 @@ pivot_offset = Vector2(116, 25)
 mouse_filter = 2
 theme_override_font_sizes/font_size = 24
 theme_type_variation = &"WarmDangerText"
-text = "DANGER ×1"
+text = "DANGER x1"
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -450,7 +450,7 @@ offset_bottom = 1820.0
 mouse_filter = 2
 theme_override_font_sizes/font_size = 30
 theme_type_variation = &"WarmLabel"
-text = "×8"
+text = "x8"
 horizontal_alignment = 1
 
 [node name="ThenLabel" type="Label" parent="Hud"]
@@ -502,7 +502,7 @@ offset_bottom = 1812.0
 mouse_filter = 2
 theme_override_font_sizes/font_size = 24
 theme_type_variation = &"WarmLabel"
-text = "×8"
+text = "x8"
 horizontal_alignment = 1
 
 [node name="HudSoundButton" type="Button" parent="Hud"]

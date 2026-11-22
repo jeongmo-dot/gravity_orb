@@ -16,20 +16,20 @@ func test_each_scored_reaction_shows_matching_popup_and_conditional_formula() ->
 	assert_eq(hud.active_score_popup_count(), 1, "one popup for one scored reaction")
 	var combo_popup: ScorePopup = hud.active_score_popups()[0]
 	assert_eq(combo_popup.score_text(), "+136", "popup uses awarded points")
-	assert_eq(combo_popup.formula_text(), "34 ×4", "combo ×4 shows calculation")
+	assert_eq(combo_popup.formula_text(), "34 x4", "combo x4 shows calculation")
 	var danger_reaction: Dictionary = _reaction(Vector2(100.0, 0.0), 1.0, 0.50)
 	score.on_reaction(danger_reaction)
 	assert_eq(hud.active_score_popup_count(), 2, "separate reaction position gets popup")
 	var danger_popup: ScorePopup = hud.active_score_popups()[1]
 	assert_eq(danger_popup.score_text(), "+68", "danger popup uses awarded points")
-	assert_eq(danger_popup.formula_text(), "34 ×2", "danger ×2 shows calculation")
+	assert_eq(danger_popup.formula_text(), "34 x2", "danger x2 shows calculation")
 	var capped_reaction: Dictionary = _reaction(Vector2(0.0, 200.0), 1.0, 0.20)
 	capped_reaction.erase("combo_multiplier")
 	capped_reaction["combo"] = 20
 	score.on_reaction(capped_reaction)
 	var capped_popup: ScorePopup = hud.active_score_popups()[2]
 	assert_eq(capped_popup.score_text(), "+4,352", "large popup uses comma separators")
-	assert_eq(capped_popup.formula_text(), "34 ×128", "popup shows actual capped multiplier")
+	assert_eq(capped_popup.formula_text(), "34 x128", "popup shows actual capped multiplier")
 	assert_eq(ScorePopup.popup_font_size(10), 24, "popup text is seventy percent size")
 	assert_eq(ScorePopup.POPUP_SIZE, Vector2(308.0, 126.0), "popup bounds scale to seventy percent")
 	assert_true(
@@ -66,7 +66,7 @@ func test_popup_capacity_evicts_oldest_and_same_frame_nearby_scores_merge() -> v
 	hud._on_reaction_scored(formula_reaction)
 	assert_eq(
 		hud.active_score_popups()[0].formula_text(),
-		"25 ×4",
+		"25 x4",
 		"single popup keeps its calculation"
 	)
 	var merged_reaction: Dictionary = _display_reaction(Vector2(30.0, 0.0), 60)
@@ -101,10 +101,17 @@ func test_popup_colors_follow_warm_normal_gold_and_finale_rules() -> void:
 	})
 	assert_eq(merge["color"], Hud.B_CALLOUT_COLOR, "ordinary score uses warm callout pink")
 	assert_eq(merge["outline_color"], Color.WHITE, "ordinary score uses white outline")
-	var blast: Dictionary = hud._popup_appearance({"type": ReactionRules.Type.BLAST})
+	var blast: Dictionary = hud._popup_appearance({
+		"type": ReactionRules.Type.BLAST,
+		"points": 48600,
+	})
 	assert_eq(blast["color"], Hud.GOLD_COLOR, "blast uses gold text")
 	assert_true(bool(blast["cosmic"]), "blast uses cosmic treatment")
-	assert_eq(int(blast["outline_size"]), 6, "blast uses a visible six-pixel outline")
+	assert_eq(
+		int(blast["outline_size"]),
+		ScorePopup.popup_outline_size(48600),
+		"blast outline follows eight percent of the popup font size"
+	)
 	assert_eq(blast["outline_color"], Hud.B_GOLD_OUTLINE_COLOR, "blast uses warm gold outline")
 	var finale: Dictionary = hud._popup_appearance({
 		"type": ReactionRules.Type.BLAST,
@@ -127,10 +134,17 @@ func test_large_popup_formats_formula_without_horizontal_shake_and_caps_sparkles
 	})
 	var popup: ScorePopup = hud.active_score_popups()[0]
 	assert_eq(popup.score_text(), "+48,600", "big score has comma separators")
-	assert_eq(popup.formula_text(), "6,075 ×8", "formula base has comma separators")
+	assert_eq(popup.formula_text(), "6,075 x8", "formula base has comma separators")
 	assert_true(popup.is_cosmic_score(), "blast is a cosmic popup")
 	assert_eq(popup.active_sparkle_count(), 2, "large cosmic popup has two stars")
-	assert_near(popup.glow_alpha(), 1.0, TOLERANCE, "gold score uses an opaque crisp shadow")
+	assert_near(popup.glow_alpha(), 0.0, TOLERANCE, "gold score popup has no shadow")
+	assert_eq(popup.score_shadow_offset_y(), 0, "score popup shadow offset is zero")
+	assert_eq(
+		popup.score_outline_size(),
+		ScorePopup.popup_outline_size(48600),
+		"large score outline follows its final font size"
+	)
+	assert_eq(popup.formula_outline_size(), 2, "formula uses a two-pixel white outline")
 	var initial_x: float = popup.position.x
 	popup._process(0.2)
 	assert_near(popup.position.x, initial_x, TOLERANCE, "large popup has no horizontal shake")
@@ -200,7 +214,7 @@ func test_danger_refreshes_from_board_without_reaction() -> void:
 		)
 	hud._process(0.25)
 	assert_true(danger_label.visible, "30 percent occupancy shows DANGER without reaction")
-	assert_true(danger_label.text.begins_with("DANGER ×"), "danger badge shows multiplier")
+	assert_true(danger_label.text.begins_with("DANGER x"), "danger badge shows multiplier")
 	await _destroy_main(main)
 
 

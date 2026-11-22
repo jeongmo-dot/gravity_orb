@@ -38,6 +38,45 @@
 
 ## 미확인
 
+### [2026-11-23] 대상 #157 추가 요구 1 — UI B 검수 6건 보완
+- **맨 앞 확인 목록:** JELLY 해시 상수 변경 없음. 남은 주아 폴백 글자는 `·` 한 글자이며 FINAL MOVE 안내·`새 기록 · %d위`·색 효과 안내 호령에서 Noto 폴백으로 그린다. 최종 540×960·540×1170 캡처 12장에서 글 잘림·겹침 0건. 명세에 없는 움직임·연출 추가 없음.
+- 상태: 완료
+- 브랜치 / PR: `ui-b-hud` / https://github.com/jeongmo-dot/gravity_orb/pull/159
+- 변경 파일: `scenes/UI.tscn`, `scripts/fx/SpaceBackdrop.gd`, `scripts/ui/Hud.gd`, `scripts/ui/JellyFinalMoveBanner.gd`, `scripts/ui/ScorePopup.gd`, `tests/scenarios/test_score_flow.gd`, `tests/spike/capture_screens.gd`, `tests/test_callouts.gd`, `tests/test_score_popups.gd`, `tests/test_screen_layout.gd`, `tests/test_space_board_visuals.gd`, 이 회신 파일
+- Done-when 대조:
+  - [x] 호령 그림자·외곽선을 최종 글 크기 비율로 계산 — 그림자 `round(font_size × 0.13)`, 외곽선 `max(2, round(font_size × 0.05))`; 64px와 28px 및 실제 Label 적용 자동 검사
+  - [x] 보통·금색 점수 팝업 그림자 제거, 외곽선 `max(2, round(font_size × 0.08))`; 식 글 흰 외곽선 논리 2·그림자 없음 — 자동 검사 + 캡처
+  - [x] 배경 점을 Quad UV가 아닌 `SCREEN_UV × viewport_size` 화면 좌표로 계산 — 두 비율에서 같은 지름·가로/세로 간격 관측
+  - [x] FINAL MOVE는 테마 `WarmText`의 `FontVariation` 사용, 좌우 내부 여백 24 이상, 문구 폭에 따라 띠 폭 확대·24→18 글자 축소 — 현재 문구와 긴 시험 문구 2개 자동 검사
+  - [x] `×`를 주아 소문자 `x`로 교체 — 배수, NEXT/THEN 개수, DANGER, 점수 식, `UI.tscn` 초기 문자열 및 기대 문자열 수정
+  - [x] #157 표시 코드의 `Jua-Regular.ttf`/`FontFile` 직접 사용 0개. 남은 폴백 `·`만 자동 열거
+  - [x] 전체 회귀·고정 해시·스모크·12장 실제 창 캡처. 빌드 없음
+- 바뀐 테스트·캡처 기대 목록:
+  - `test_score_flow.gd`, `test_score_popups.gd`, `test_screen_layout.gd`, `capture_screens.gd`의 표시 기대를 `x`로 변경
+  - `test_callouts.gd`: 최대·최소 호령 글 크기의 그림자·외곽선 비율
+  - `test_score_popups.gd`: 점수 그림자 0, 동적 외곽선, 식 글 외곽선 2
+  - `test_screen_layout.gd`: FINAL MOVE 현재 문구+긴 문구 2개, 테마 FontVariation, 폴백 `·`
+  - `test_space_board_visuals.gd`: 화면 좌표 점 격자·활성 viewport 크기
+- QA 관측값:
+  - 엔진: `C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe`, Godot `4.8.dev3.official.51105ccbe` 일반 빌드
+  - `--headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건
+  - 관련 5개 파일 집중 검사 → **50/50** (14+11+9+5+11), 실패 0; 마지막 FINAL MOVE 보정 뒤 `test_screen_layout.gd` **9/9** 재통과
+  - `tests/run_tests.ps1` → 일반 **379/379**, 장기 **4/4**, 성능 **5/5**, 최종 종료 코드 0, 100.655초. JELLY 고정 해시 출력은 기존 상수와 일치
+  - 기본·`--mode=blitz` `--headless --quit-after 300` → 각각 종료 코드 0, 오류 출력 0건
+  - `tests/capture_screens.ps1 -UiBOnly` → 종료 코드 0, `213`~`218`, 540×960 6장 + 540×1170 6장. 최종 코드로 재생성 후 12장 직접 확인
+  - 배경 점 (두 비율 동일): 화면상 유효 지름 **5px** (완전 채움 4px, 안티앨리어싱 포함 외곽 6px), 중심 간격 가로 **34px**·세로 **34px**. 셰이더 논리값 지름 10·간격 68
+  - `GREAT!`: 설정 그림자 8논리 px = 화면 4px, 실제 같은 글리프 색 경계는 아래 4~5px; 흰 외곽선 화면 1~2px. `outline_size=3`이 0.5배 캡처에서 이 범위로 보임
+  - `+960`: 그림자 0px, 흰 외곽선 화면 1~2px. 금색 `+48,600`: 그림자 0px, 갈색 외곽선 화면 2px. 식 글: 흰 외곽선 화면 1px가 어두운 판 위에서 보임
+  - FINAL MOVE (두 비율 동일): 띠 테두리 안쪽에서 안내 글의 어두운 글리프 끝까지 좌·우 각각 **15화면 px = 30논리 px**. 최소 24논리 px보다 6px 큼
+  - 규칙 검색: `Input`은 기존 `InputRouter.gd`·`Haptics.gd`만, 전역 `randf/randi/shuffle/pick_random` 추가 0개. `git diff --check` 오류 0
+- 수동 확인 절차:
+  1. JELLY에서 콤보를 만들어 `GREAT!`, 보통 점수와 금색 큰 점수를 본다 → 호령 그림자는 한 겹으로 붙고, 두 점수 팝업은 그림자 없이 외곽선만 보이며 식 글도 판에서 읽힌다.
+  2. 6개 초과 미리보기·DANGER·콤보 배수를 표시한다 → 네 곳이 `×`가 아닌 주아 `x`로 보인다.
+  3. 입구를 막아 FINAL MOVE를 띄운다 → 안내 문구가 띠 안에 있고 테두리 안쪽 좌우 여백이 유지된다.
+  4. 540×960·540×1170 창에서 크림 배경 점을 본다 → 두 비율 모두 원형 점의 가로·세로 간격이 같다.
+- 결정 사항·알려진 문제: FINAL MOVE 글꼴 폭 API가 글리프 안티앨리어싱 가장자리를 포함하지 않으므로 명세의 내부 여백 24에 4논리 px 안전 여유를 더해 실제 캡처에서도 24 이상을 확보했다. 점 지름은 0.5배 캡처의 서브픽셀 래스터화 때문에 완전 채움 4px·안티앨리어싱 외곽 6px이며 색 중심 기준 유효 지름은 5px이다. 캡처는 gitignore 로컬 산출물이다.
+- 남은 것 · 질문: 없음
+
 ### [2026-11-22] 대상 #157 — UI B안 1: 따뜻한 젤리 HUD·결과 창·화면 바탕
 - **맨 앞 확인 목록:** JELLY 해시 상수 변경 없음. 주아 폴백 글자 없음. 540×960·540×1170 캡처 12장에서 글 잘림·겹침 없음. 화살표 삭제에 따른 입력 동작 변경 없음. 시작·랭킹·설정 모습 변경 없음. 명세에 없는 움직임·연출 추가 없음.
 - 상태: 완료

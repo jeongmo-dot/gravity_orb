@@ -259,6 +259,33 @@ func test_jelly_callout_sits_between_combo_and_board() -> void:
 	Config.data.sfx_enabled = original_sfx_enabled
 
 
+func test_callout_edge_metrics_follow_maximum_and_minimum_font_sizes() -> void:
+	assert_eq(Hud.callout_shadow_offset(Hud.CALLOUT_FONT_MAX), 8, "64px callout shadow is 13 percent")
+	assert_eq(Hud.callout_outline_size(Hud.CALLOUT_FONT_MAX), 3, "64px callout outline is 5 percent")
+	assert_eq(Hud.callout_shadow_offset(Hud.CALLOUT_FONT_MIN), 4, "28px callout shadow rounds to four")
+	assert_eq(Hud.callout_outline_size(Hud.CALLOUT_FONT_MIN), 2, "callout outline keeps the logical minimum")
+	var original_sfx_enabled: bool = Config.data.sfx_enabled
+	Config.data.sfx_enabled = false
+	var main: Main = await _create_main()
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	var callout: Label = main.get_node("UI/Hud/CalloutLabel") as Label
+	for font_size: int in [Hud.CALLOUT_FONT_MAX, Hud.CALLOUT_FONT_MIN]:
+		callout.add_theme_font_size_override("font_size", font_size)
+		hud._apply_callout_edge_metrics()
+		assert_eq(
+			callout.get_theme_constant("shadow_offset_y"),
+			Hud.callout_shadow_offset(font_size),
+			"active callout shadow follows its final font size"
+		)
+		assert_eq(
+			callout.get_theme_constant("outline_size"),
+			Hud.callout_outline_size(font_size),
+			"active callout outline follows its final font size"
+		)
+	await _destroy_main(main)
+	Config.data.sfx_enabled = original_sfx_enabled
+
+
 func test_callout_font_shrinks_only_for_overflow_and_resets() -> void:
 	var original_sfx_enabled: bool = Config.data.sfx_enabled
 	var original_tap_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()

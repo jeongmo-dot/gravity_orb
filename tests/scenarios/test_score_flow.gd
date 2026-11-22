@@ -222,7 +222,7 @@ func test_main_scene_binds_score_hud_and_restart() -> void:
 		_reaction(ReactionRules.Type.MERGE, 0, [1, 1], 2, 0.50)
 	)
 	_assert_combo_labels(main, 3, 3, "x4")
-	assert_eq(danger_label.text, "DANGER ×2", "danger multiplier text")
+	assert_eq(danger_label.text, "DANGER x2", "danger multiplier text")
 	assert_true(danger_label.visible, "danger visible at threshold")
 	await tree.create_timer(0.3, true, false, true).timeout
 	assert_eq(score_label.text, "44", "score HUD numeric text")
@@ -516,7 +516,7 @@ func _assert_combo_labels(
 		)
 		assert_eq(
 			multiplier_label.text,
-			"×%s" % expected_multiplier.trim_prefix("x"),
+			"x%s" % expected_multiplier.trim_prefix("x"),
 			"current multiplier HUD text"
 		)
 	assert_eq(max_combo_label.text, "MAX COMBO %d" % max_combo, "maximum combo HUD text")

@@ -65,8 +65,8 @@ func test_preview_orbs_match_board_scale_and_count_uses_actual_jelly_items() -> 
 		var rendered_count: int = mini(count, Hud.MAX_PREVIEW_COUNT)
 		assert_eq(hud._next_preview.get_child_count(), rendered_count, "NEXT rendered item count")
 		assert_eq(hud._then_preview.get_child_count(), rendered_count, "THEN rendered item count")
-		assert_eq(hud._next_count_label.text, "×%d" % count, "NEXT actual jelly count")
-		assert_eq(hud._then_count_label.text, "×%d" % count, "THEN actual jelly count")
+		assert_eq(hud._next_count_label.text, "x%d" % count, "NEXT actual jelly count")
+		assert_eq(hud._then_count_label.text, "x%d" % count, "THEN actual jelly count")
 		assert_eq(hud._next_count_label.visible, count > Hud.MAX_PREVIEW_COUNT, "NEXT count visibility")
 		assert_eq(hud._then_count_label.visible, count > Hud.MAX_PREVIEW_COUNT, "THEN count visibility")
 		for preview_root: Node2D in [hud._next_preview, hud._then_preview]:
@@ -193,11 +193,48 @@ func test_warm_hud_theme_is_scoped_to_gameplay_and_result_controls() -> void:
 	Config.data.game_mode = GameConfig.GameMode.TURN
 
 
+func test_final_move_banner_uses_theme_font_and_keeps_messages_inside_padding() -> void:
+	var banner: JellyFinalMoveBanner = JellyFinalMoveBanner.new()
+	tree.root.add_child(banner)
+	banner.size = Vector2(1080.0, 1920.0)
+	await tree.process_frame
+	assert_true(banner.uses_theme_font_variation(), "FINAL MOVE uses the theme FontVariation")
+	var messages: Array[String] = [
+		"막혔어요 · 한 번의 이동으로 입구를 비우세요",
+		"막혔어요 · 이번 한 번의 이동으로 막힌 입구를 비우세요",
+		"마지막 기회예요 · 다른 방향으로 움직여 입구를 완전히 비우세요",
+	]
+	for message: String in messages:
+		var layout: Dictionary = banner.layout_for_message(message)
+		var band_rect: Rect2 = layout["band_rect"] as Rect2
+		var text_rect: Rect2 = layout["text_rect"] as Rect2
+		assert_true(band_rect.encloses(text_rect), "message drawing area stays inside the band")
+		assert_true(
+			text_rect.position.x - band_rect.position.x >= 30.0,
+			"message keeps border plus 24 logical pixels on the left"
+		)
+		assert_true(
+			band_rect.end.x - text_rect.end.x >= 30.0,
+			"message keeps border plus 24 logical pixels on the right"
+		)
+		assert_true(
+			float(layout["message_width"]) + JellyFinalMoveBanner.GLYPH_EDGE_SAFETY * 2.0
+			<= text_rect.size.x + 0.001,
+			"message width fits the padded band with glyph-edge safety"
+		)
+		assert_true(
+			int(layout["message_font_size"]) >= JellyFinalMoveBanner.MESSAGE_FONT_MIN,
+			"message font never shrinks below 18"
+		)
+	banner.queue_free()
+	await tree.process_frame
+
+
 func test_jua_font_uses_noto_fallback_for_missing_ui_characters() -> void:
 	var ui_text: String = (
 		"TURN SCORE BEST MAX COMBO DANGER NEXT THEN GAME OVER "
 		+ "FINAL MOVE 최고 기록 새 기록 위 다시 하기 랭킹 처음 화면 "
-		+ "턴 수 최대 콤보 최고 젤리 번 버팀 시한 굳은 폭발 청소"
+		+ "턴 수 최대 콤보 최고 젤리 번 버팀 시한 굳은 폭발 청소 x ·"
 	)
 	var missing: String = ""
 	for index: int in range(ui_text.length()):
@@ -206,4 +243,6 @@ func test_jua_font_uses_noto_fallback_for_missing_ui_characters() -> void:
 			missing += character
 	var warm_font: Font = HUD_THEME.get_font(&"font", &"WarmText")
 	assert_true(not warm_font.fallbacks.is_empty(), "WarmText configures a Noto fallback")
+	assert_true(warm_font is FontVariation, "WarmText routes UI B text through a FontVariation")
+	assert_eq(missing, "·", "only the middle dot needs the Noto fallback in UI B text")
 	print("JUA_FALLBACK_CHARACTERS=%s" % ("none" if missing.is_empty() else missing))

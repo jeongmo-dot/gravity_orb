@@ -11,8 +11,17 @@ func test_space_backdrop_uses_warm_cream_dots_and_danger_tint() -> void:
 	var shader_code: String = material.shader.code
 	assert_true(shader_code.contains("background_color"), "backdrop has a cream base")
 	assert_true(shader_code.contains("dot_grid"), "backdrop has a regular dot grid")
-	assert_true(shader_code.contains("1080.0 / 68.0"), "dot spacing is 68 logical pixels")
-	assert_true(shader_code.contains("5.0 / 68.0"), "dot radius is five logical pixels")
+	assert_true(
+		shader_code.contains("SCREEN_UV * viewport_size"),
+		"dot placement uses screen pixels instead of the oversized quad UV"
+	)
+	assert_true(shader_code.contains("shifted_pixels / 68.0"), "dot spacing is 68 logical pixels")
+	assert_true(shader_code.contains("smoothstep(5.0, 6.0"), "dot radius is five logical pixels")
+	assert_eq(
+		material.get_shader_parameter("viewport_size"),
+		backdrop.get_viewport().get_visible_rect().size,
+		"shader receives the active logical viewport size"
+	)
 	assert_eq(SpaceBackdrop.FAR_PARALLAX_PIXELS, 2.0, "far parallax is two pixels")
 	assert_eq(SpaceBackdrop.NEAR_PARALLAX_PIXELS, 8.0, "near parallax is eight pixels")
 	assert_true(

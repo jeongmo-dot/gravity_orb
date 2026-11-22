@@ -26,6 +26,8 @@ const CALLOUT_SIDE_MARGIN: float = 40.0
 const CALLOUT_GAP_PADDING: float = 12.0
 const CALLOUT_FONT_MAX: int = 64
 const CALLOUT_FONT_MIN: int = 28
+const CALLOUT_OUTLINE_RATIO: float = 0.05
+const CALLOUT_SHADOW_RATIO: float = 0.13
 const POPUP_ORB_GAP: float = 12.0
 const JELLY_FACE_RADIUS_RATIO: float = 0.45
 const TURN_CALLOUT_STEPS: Array[int] = [3, 5, 8, 12]
@@ -397,7 +399,7 @@ func _callout_text_width(font_size: int = -1) -> float:
 		else font_size
 	)
 	var font: Font = _callout_label.get_theme_font("font")
-	var outline_size: int = _callout_label.get_theme_constant("outline_size")
+	var outline_size: int = callout_outline_size(resolved_font_size)
 	return font.get_string_size(
 		_callout_label.text,
 		HORIZONTAL_ALIGNMENT_LEFT,
@@ -420,6 +422,7 @@ func _fit_callout_font_to_rect(callout_rect: Rect2) -> void:
 		):
 			fitted_size -= 1
 		_callout_label.add_theme_font_size_override("font_size", fitted_size)
+	_apply_callout_edge_metrics()
 	# Assigning a long string can expand a Label to its new minimum size. Restore the
 	# responsive rect after fitting so its center and animation path remain unchanged.
 	_set_control_rect(_callout_label, callout_rect)
@@ -431,6 +434,22 @@ func _fit_callout_font_to_layout() -> void:
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
 	var layout: Dictionary = hud_layout(viewport_size, _logical_safe_area(viewport_size))
 	_fit_callout_font_to_rect(_callout_layout_rect(viewport_size, layout))
+
+
+static func callout_outline_size(font_size: int) -> int:
+	return maxi(2, roundi(float(font_size) * CALLOUT_OUTLINE_RATIO))
+
+
+static func callout_shadow_offset(font_size: int) -> int:
+	return roundi(float(font_size) * CALLOUT_SHADOW_RATIO)
+
+
+func _apply_callout_edge_metrics() -> void:
+	var font_size: int = _callout_label.get_theme_font_size("font_size")
+	_callout_label.add_theme_constant_override("outline_size", callout_outline_size(font_size))
+	_callout_label.add_theme_constant_override("shadow_offset_x", 0)
+	_callout_label.add_theme_constant_override("shadow_offset_y", callout_shadow_offset(font_size))
+	_callout_label.add_theme_constant_override("shadow_outline_size", 0)
 
 
 func _projected_board_rect() -> Rect2:
@@ -608,14 +627,14 @@ func _render_preview_batches(batches: Array) -> void:
 	var next_batch: Array = batches[0] if not batches.is_empty() else []
 	_render_preview(_next_preview, next_batch)
 	_next_count_label.visible = next_batch.size() > MAX_PREVIEW_COUNT
-	_next_count_label.text = "×%d" % next_batch.size()
+	_next_count_label.text = "x%d" % next_batch.size()
 	var has_then: bool = batches.size() > 1
 	_then_label.visible = has_then
 	_then_preview.visible = has_then
 	var then_batch: Array = batches[1] if has_then else []
 	_render_preview(_then_preview, then_batch)
 	_then_count_label.visible = has_then and then_batch.size() > MAX_PREVIEW_COUNT
-	_then_count_label.text = "×%d" % then_batch.size()
+	_then_count_label.text = "x%d" % then_batch.size()
 
 
 func _track_preview_unlocks(batches: Array) -> void:
@@ -892,7 +911,7 @@ func _on_combo_changed(combo: int, multiplier: float, max_combo: int) -> void:
 		_multiplier_label.scale = Vector2.ONE
 		_combo_label.scale = Vector2.ONE
 		return
-	_multiplier_label.text = "×%s" % _format_multiplier(multiplier)
+	_multiplier_label.text = "x%s" % _format_multiplier(multiplier)
 	if multiplier > previous_multiplier and Config.data.fx_score_popups_enabled:
 		_punch_multiplier_badge()
 
@@ -981,9 +1000,9 @@ func _popup_formula(reaction: Dictionary) -> String:
 		ScorePopup.format_number(int(reaction.get("base_points", 0)))
 	]
 	if combo_multiplier > 1.0:
-		factors.append("×%s" % _format_multiplier(combo_multiplier))
+		factors.append("x%s" % _format_multiplier(combo_multiplier))
 	if danger_multiplier > 1.0:
-		factors.append("×%s" % _format_multiplier(danger_multiplier))
+		factors.append("x%s" % _format_multiplier(danger_multiplier))
 	return " ".join(factors)
 
 
@@ -1004,13 +1023,13 @@ func _popup_appearance(reaction: Dictionary) -> Dictionary:
 		return {
 			"color": GOLD_COLOR,
 			"outline_color": B_GOLD_OUTLINE_COLOR,
-			"outline_size": 6,
+			"outline_size": ScorePopup.popup_outline_size(int(reaction.get("points", 0))),
 			"cosmic": true,
 		}
 	return {
 		"color": B_CALLOUT_COLOR,
 		"outline_color": Color.WHITE,
-		"outline_size": 6,
+		"outline_size": ScorePopup.popup_outline_size(int(reaction.get("points", 0))),
 		"cosmic": false,
 	}
 
@@ -1200,7 +1219,7 @@ func _set_danger_badge(occupancy: float, multiplier: float) -> void:
 	_danger_label.visible = occupancy >= Config.data.danger_start
 	_danger_panel.visible = _danger_label.visible
 	if _danger_label.visible:
-		_danger_label.text = "DANGER ×%s" % _format_multiplier(multiplier)
+		_danger_label.text = "DANGER x%s" % _format_multiplier(multiplier)
 		_danger_label.add_theme_color_override("font_color", Color("#C2334A"))
 		_apply_danger_panel_color(B_DANGER_COLOR)
 	if _board != null and _board.has_method("set_danger_state"):
@@ -1342,13 +1361,10 @@ func _show_callout(text: String, stage_index: int = 0, informational: bool = fal
 		"font_outline_color",
 		B_GOLD_OUTLINE_COLOR if cosmic else Color.WHITE
 	)
-	_callout_label.add_theme_constant_override("outline_size", 6)
 	_callout_label.add_theme_color_override(
 		"font_shadow_color", B_GOLD_SHADOW_COLOR if cosmic else B_DEPTH_COLOR
 	)
-	_callout_label.add_theme_constant_override("shadow_offset_x", 0)
-	_callout_label.add_theme_constant_override("shadow_offset_y", 16)
-	_callout_label.add_theme_constant_override("shadow_outline_size", 0)
+	_apply_callout_edge_metrics()
 	_callout_label.visible = true
 	_callout_label.modulate = Color.WHITE
 	_callout_label.position = _callout_base_position
@@ -1416,11 +1432,8 @@ func _show_planet_unlock(color_index: int) -> void:
 	_callout_label.add_theme_color_override(
 		"font_outline_color", Color.WHITE
 	)
-	_callout_label.add_theme_constant_override("outline_size", 6)
 	_callout_label.add_theme_color_override("font_shadow_color", B_DEPTH_COLOR)
-	_callout_label.add_theme_constant_override("shadow_offset_x", 0)
-	_callout_label.add_theme_constant_override("shadow_offset_y", 16)
-	_callout_label.add_theme_constant_override("shadow_outline_size", 0)
+	_apply_callout_edge_metrics()
 	_callout_label.visible = true
 	_callout_label.modulate = Color.WHITE
 	_callout_label.position = _callout_base_position
@@ -1560,11 +1573,8 @@ func _show_jelly_tap_effect(color_index: int) -> void:
 	_callout_label.add_theme_color_override(
 		"font_outline_color", Color.WHITE
 	)
-	_callout_label.add_theme_constant_override("outline_size", 6)
 	_callout_label.add_theme_color_override("font_shadow_color", B_DEPTH_COLOR)
-	_callout_label.add_theme_constant_override("shadow_offset_x", 0)
-	_callout_label.add_theme_constant_override("shadow_offset_y", 16)
-	_callout_label.add_theme_constant_override("shadow_outline_size", 0)
+	_apply_callout_edge_metrics()
 	_callout_label.visible = true
 	_callout_label.modulate = Color.WHITE
 	_callout_label.position = _callout_base_position

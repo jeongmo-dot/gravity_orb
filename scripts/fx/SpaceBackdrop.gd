@@ -26,11 +26,14 @@ func _ready() -> void:
 	backdrop_shader.code = _shader_code()
 	_material.shader = backdrop_shader
 	_material.set_shader_parameter("parallax_uv", Vector2.ZERO)
+	_material.set_shader_parameter("parallax_pixels", Vector2.ZERO)
 	_material.set_shader_parameter(
 		"far_parallax_ratio",
 		FAR_PARALLAX_PIXELS / NEAR_PARALLAX_PIXELS
 	)
 	_material.set_shader_parameter("danger_tint", 0.0)
+	_update_viewport_size()
+	get_viewport().size_changed.connect(_update_viewport_size)
 	material_override = _material
 	set_process(true)
 
@@ -45,6 +48,7 @@ func _process(delta: float) -> void:
 		pixel_offset.y / REFERENCE_VIEWPORT_SIZE.y
 	)
 	_material.set_shader_parameter("parallax_uv", parallax_uv)
+	_material.set_shader_parameter("parallax_pixels", pixel_offset)
 	var pulse: float = 1.0
 	if _danger_pulsing:
 		_danger_pulse_elapsed += delta
@@ -74,20 +78,29 @@ func current_parallax_uv() -> Vector2:
 	return _material.get_shader_parameter("parallax_uv") as Vector2
 
 
+func _update_viewport_size() -> void:
+	if _material == null:
+		return
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	_material.set_shader_parameter("viewport_size", viewport_size.max(Vector2.ONE))
+
+
 func _shader_code() -> String:
 	return """
 shader_type spatial;
 render_mode unshaded, cull_disabled, depth_draw_never;
 
 uniform vec2 parallax_uv = vec2(0.0);
+uniform vec2 parallax_pixels = vec2(0.0);
+uniform vec2 viewport_size = vec2(1080.0, 1920.0);
 uniform float far_parallax_ratio = 0.25;
 uniform float danger_tint : hint_range(0.0, 1.0) = 0.0;
 
 void fragment() {
-	vec2 shifted_uv = UV + parallax_uv;
-	vec2 dot_grid = shifted_uv * vec2(1080.0 / 68.0, 1920.0 / 68.0);
-	vec2 dot_local = fract(dot_grid) - vec2(0.5);
-	float dot_mask = 1.0 - smoothstep(5.0 / 68.0, 6.0 / 68.0, length(dot_local));
+	vec2 shifted_pixels = SCREEN_UV * viewport_size + parallax_pixels;
+	vec2 dot_grid = shifted_pixels / 68.0;
+	vec2 dot_local = (fract(dot_grid) - vec2(0.5)) * 68.0;
+	float dot_mask = 1.0 - smoothstep(5.0, 6.0, length(dot_local));
 	vec3 background_color = vec3(1.0, 0.941176, 0.890196);
 	vec3 dot_color = vec3(1.0, 0.850980, 0.768627);
 	vec3 danger_color = vec3(1.0, 0.352941, 0.431373);
