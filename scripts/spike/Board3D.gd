@@ -7,20 +7,27 @@ signal danger_visual_changed(intensity: float, pulsing: bool)
 
 const ORB_SCENE: PackedScene = preload("res://scenes/Orb3D.tscn")
 const PIXELS_PER_METER: float = 100.0
-const VISUAL_WALL_WIDTH_M: float = 0.12
+const VISUAL_WALL_WIDTH_M: float = 0.16
 const VISUAL_TILT_DEGREES: float = 6.0
 const VISUAL_TILT_DURATION: float = 0.3
 const WARNING_FRAME_COLOR: Color = Color("#FF3B30")
 const NORMAL_FRAME_COLOR: Color = Color("#8ec5ff")
-const METAL_FRAME_COLOR: Color = Color("#26384E")
-const GRAVITY_GLOW_COLOR: Color = Color("#D7EEFF")
+const METAL_FRAME_COLOR: Color = Color("#FFFFFF")
+const FRAME_OUTLINE_COLOR: Color = Color("#F39AB4")
+const FRAME_DEPTH_COLOR: Color = Color("#D9718F")
+const BOARD_CHECKER_DARK_COLOR: Color = Color("#F3E6FB")
+const BOARD_CHECKER_LIGHT_COLOR: Color = Color("#FDF8FF")
+const GRAVITY_GLOW_COLOR: Color = Color("#FF8FB0")
 const DANGER_AMBER_COLOR: Color = Color("#FFB020")
 const GRAVITY_LIGHT_DURATION: float = 0.25
-const GRAVITY_FIELD_DURATION: float = 0.30
-const GRAVITY_FIELD_MAX_ALPHA: float = 0.10
 const OUTER_GLOW_WIDTH_M: float = 0.36
 const INNER_GLOW_WIDTH_M: float = 0.09
 const PERIMETER_LENGTH: float = 4.0
+const BOARD_CHECKER_CELLS: int = 10
+const BOARD_CORNER_RADIUS_M: float = 0.32
+const FRAME_OUTLINE_WIDTH_M: float = 0.08
+const FRAME_DEPTH_OFFSET_M: float = 0.28
+const FRAME_LIGHT_Z: float = -0.31
 
 static var _active_board_count: int = 0
 
@@ -44,10 +51,9 @@ var _wall_materials: Dictionary = {}
 var _wall_inner_glows: Dictionary = {}
 var _wall_outer_glows: Dictionary = {}
 var _tilt_tween: Tween
-var _gravity_field_material: ShaderMaterial
 var _gravity_visual_from: Vector2i = Vector2i.DOWN
 var _gravity_visual_to: Vector2i = Vector2i.DOWN
-var _gravity_visual_elapsed: float = GRAVITY_FIELD_DURATION
+var _gravity_visual_elapsed: float = GRAVITY_LIGHT_DURATION
 var _gravity_light_from_position: float = 2.0
 var _gravity_light_delta: float = 0.0
 var _danger_active: bool = false
@@ -94,9 +100,8 @@ func _process(delta: float) -> void:
 		_danger_pulse_elapsed += delta
 	_gravity_visual_elapsed = minf(
 		_gravity_visual_elapsed + delta,
-		GRAVITY_FIELD_DURATION
+		GRAVITY_LIGHT_DURATION
 	)
-	_update_gravity_field_transition()
 	_update_warning_visuals()
 
 
@@ -132,7 +137,6 @@ func set_gravity(direction: Vector2i) -> void:
 	_apply_actual_gravity_to_orbs()
 	if previous_direction != direction:
 		visual_gravity_changed.emit(direction)
-	_update_gravity_field_transition()
 	_update_warning_visuals()
 
 
@@ -983,6 +987,29 @@ func _configure_wall(
 func _configure_visuals() -> void:
 	var board_size_m: float = Config.data.board_size / PIXELS_PER_METER
 	var half: float = half_size()
+	var frame_band_size_m: float = board_size_m + VISUAL_WALL_WIDTH_M * 2.0
+	var frame_outer_size_m: float = frame_band_size_m + FRAME_OUTLINE_WIDTH_M * 2.0
+	_add_frame_layer(
+		"FrameDepth",
+		frame_outer_size_m,
+		Vector3(0.0, -FRAME_DEPTH_OFFSET_M, -0.40),
+		FRAME_DEPTH_COLOR,
+		BOARD_CORNER_RADIUS_M + VISUAL_WALL_WIDTH_M + FRAME_OUTLINE_WIDTH_M
+	)
+	_add_frame_layer(
+		"FrameOutline",
+		frame_outer_size_m,
+		Vector3(0.0, 0.0, -0.39),
+		FRAME_OUTLINE_COLOR,
+		BOARD_CORNER_RADIUS_M + VISUAL_WALL_WIDTH_M + FRAME_OUTLINE_WIDTH_M
+	)
+	_add_frame_layer(
+		"FrameBand",
+		frame_band_size_m,
+		Vector3(0.0, 0.0, -0.38),
+		METAL_FRAME_COLOR,
+		BOARD_CORNER_RADIUS_M + VISUAL_WALL_WIDTH_M
+	)
 	var backing: MeshInstance3D = MeshInstance3D.new()
 	backing.name = "Backing"
 	backing.position = Vector3(0.0, 0.0, -0.34)
@@ -990,18 +1017,8 @@ func _configure_visuals() -> void:
 	backing_mesh.size = Vector2(board_size_m, board_size_m)
 	backing.mesh = backing_mesh
 	backing.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	backing.material_override = _glass_backing_material()
+	backing.material_override = _checkerboard_material(board_size_m)
 	_visual_tilt.add_child(backing)
-	var gravity_field: MeshInstance3D = MeshInstance3D.new()
-	gravity_field.name = "GravityField"
-	gravity_field.position = Vector3(0.0, 0.0, -0.31)
-	var field_mesh: QuadMesh = QuadMesh.new()
-	field_mesh.size = Vector2(board_size_m, board_size_m)
-	gravity_field.mesh = field_mesh
-	gravity_field.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_gravity_field_material = _gravity_field_shader_material()
-	gravity_field.material_override = _gravity_field_material
-	_visual_tilt.add_child(gravity_field)
 	_add_visual_wall(
 		"VisualTop",
 		Orb3D.plane_position_to_world(Vector2(0.0, -half)),
@@ -1022,18 +1039,40 @@ func _configure_visuals() -> void:
 		Orb3D.plane_position_to_world(Vector2(half, 0.0)),
 		Vector3(VISUAL_WALL_WIDTH_M, board_size_m, 0.28)
 	)
-	_add_beveled_corners(board_size_m * 0.5)
+
+
+func _add_frame_layer(
+	layer_name: String,
+	size_m: float,
+	position_value: Vector3,
+	color_value: Color,
+	corner_radius_m: float
+) -> void:
+	var layer: MeshInstance3D = MeshInstance3D.new()
+	layer.name = layer_name
+	layer.position = position_value
+	var layer_mesh: QuadMesh = QuadMesh.new()
+	layer_mesh.size = Vector2(size_m, size_m)
+	layer.mesh = layer_mesh
+	layer.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	layer.material_override = _rounded_fill_material(
+		color_value,
+		corner_radius_m / size_m
+	)
+	_visual_tilt.add_child(layer)
 
 
 func _add_visual_wall(wall_name: String, wall_position: Vector3, size: Vector3) -> void:
 	var wall_mesh_instance: MeshInstance3D = MeshInstance3D.new()
 	wall_mesh_instance.name = wall_name
+	if size.x > size.y:
+		wall_position.y += signf(wall_position.y) * VISUAL_WALL_WIDTH_M * 0.5
+	else:
+		wall_position.x += signf(wall_position.x) * VISUAL_WALL_WIDTH_M * 0.5
 	wall_mesh_instance.position = wall_position
-	var wall_mesh: BoxMesh = BoxMesh.new()
-	wall_mesh.size = size
-	wall_mesh_instance.mesh = wall_mesh
 	var wall_material: StandardMaterial3D = _visual_material(METAL_FRAME_COLOR, 0.22, 0.08)
-	wall_material.metallic = 0.78
+	wall_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	wall_material.metallic = 0.0
 	wall_mesh_instance.material_override = wall_material
 	_visual_tilt.add_child(wall_mesh_instance)
 	_visual_walls[wall_name] = wall_mesh_instance
@@ -1055,7 +1094,7 @@ func _add_visual_wall(wall_name: String, wall_position: Vector3, size: Vector3) 
 
 	var inner_glow: MeshInstance3D = MeshInstance3D.new()
 	inner_glow.name = "InnerGlow"
-	inner_glow.position.z = 0.17
+	inner_glow.position.z = FRAME_LIGHT_Z
 	var inner_mesh: QuadMesh = QuadMesh.new()
 	inner_mesh.size = Vector2(
 		size.x if size.x > size.y else INNER_GLOW_WIDTH_M,
@@ -1133,52 +1172,6 @@ func _visual_material(color_value: Color, roughness: float, emission_energy: flo
 		material.emission_enabled = true
 		material.emission = color_value * emission_energy
 	return material
-
-
-func _add_beveled_corners(half_size_m: float) -> void:
-	var corners: Node3D = Node3D.new()
-	corners.name = "BeveledCorners"
-	_visual_tilt.add_child(corners)
-	for corner_index: int in range(4):
-		var x_sign: float = -1.0 if corner_index % 2 == 0 else 1.0
-		var y_sign: float = -1.0 if corner_index < 2 else 1.0
-		var corner: MeshInstance3D = MeshInstance3D.new()
-		corner.name = "Corner%d" % corner_index
-		corner.position = Vector3(x_sign * half_size_m, y_sign * half_size_m, 0.03)
-		corner.rotation.z = deg_to_rad(45.0 * x_sign * y_sign)
-		var corner_mesh: BoxMesh = BoxMesh.new()
-		corner_mesh.size = Vector3(0.22, 0.10, 0.31)
-		corner.mesh = corner_mesh
-		var corner_material: StandardMaterial3D = _visual_material(
-			METAL_FRAME_COLOR.lerp(NORMAL_FRAME_COLOR, 0.16),
-			0.20,
-			0.10
-		)
-		corner_material.metallic = 0.84
-		corner.material_override = corner_material
-		corners.add_child(corner)
-
-
-func _update_gravity_field_transition() -> void:
-	if _gravity_field_material == null:
-		return
-	_gravity_field_material.set_shader_parameter(
-		"gravity_from",
-		Vector2(_gravity_visual_from)
-	)
-	_gravity_field_material.set_shader_parameter(
-		"gravity_to",
-		Vector2(_gravity_visual_to)
-	)
-	_gravity_field_material.set_shader_parameter("gravity_mix", _gravity_field_mix())
-
-
-func _gravity_field_mix() -> float:
-	return clampf(
-		_gravity_visual_elapsed / GRAVITY_FIELD_DURATION,
-		0.0,
-		1.0
-	)
 
 
 func _gravity_light_mix() -> float:
@@ -1316,60 +1309,63 @@ func _set_gravity_glow_material(
 	material.set_shader_parameter("highlight_center", clampf(highlight_center, 0.0, 1.0))
 
 
-func _glass_backing_material() -> ShaderMaterial:
+func _checkerboard_material(board_size_m: float) -> ShaderMaterial:
 	var material: ShaderMaterial = ShaderMaterial.new()
-	var glass_shader: Shader = Shader.new()
-	glass_shader.code = """
+	var checker_shader: Shader = Shader.new()
+	checker_shader.code = """
 shader_type spatial;
-render_mode unshaded, blend_mix, cull_disabled, depth_draw_opaque;
+render_mode unshaded, cull_disabled, depth_draw_opaque;
+
+uniform vec3 checker_dark = vec3(0.953, 0.902, 0.984);
+uniform vec3 checker_light = vec3(0.992, 0.973, 1.0);
+uniform float cell_count = 10.0;
+uniform float corner_radius = 0.033333;
 
 void fragment() {
-	vec2 centered = abs(UV * 2.0 - 1.0);
-	float edge = smoothstep(0.58, 1.0, max(centered.x, centered.y));
-	float center_glow = 1.0 - smoothstep(0.0, 0.92, length((UV - vec2(0.5)) * vec2(0.88, 1.0)));
-	vec3 glass = mix(vec3(0.012, 0.021, 0.046), vec3(0.025, 0.045, 0.082), center_glow * 0.55);
-	glass *= 1.0 - edge * 0.30;
-	ALBEDO = glass;
-	ALPHA = mix(0.65, 0.78, edge);
-	ROUGHNESS = 0.34;
+	vec2 centered = abs(UV - vec2(0.5));
+	vec2 corner_delta = max(centered - vec2(0.5 - corner_radius), vec2(0.0));
+	if (length(corner_delta) > corner_radius) {
+		discard;
+	}
+	vec2 cell = floor(UV * cell_count);
+	float alternate = mod(cell.x + cell.y, 2.0);
+	ALBEDO = mix(checker_dark, checker_light, alternate);
 }
 """
-	material.shader = glass_shader
+	material.shader = checker_shader
+	material.set_shader_parameter(
+		"checker_dark",
+		Vector3(BOARD_CHECKER_DARK_COLOR.r, BOARD_CHECKER_DARK_COLOR.g, BOARD_CHECKER_DARK_COLOR.b)
+	)
+	material.set_shader_parameter(
+		"checker_light",
+		Vector3(BOARD_CHECKER_LIGHT_COLOR.r, BOARD_CHECKER_LIGHT_COLOR.g, BOARD_CHECKER_LIGHT_COLOR.b)
+	)
+	material.set_shader_parameter("cell_count", float(BOARD_CHECKER_CELLS))
+	material.set_shader_parameter("corner_radius", BOARD_CORNER_RADIUS_M / board_size_m)
 	return material
 
 
-func _gravity_field_shader_material() -> ShaderMaterial:
+func _rounded_fill_material(color_value: Color, corner_radius: float) -> ShaderMaterial:
 	var material: ShaderMaterial = ShaderMaterial.new()
-	var field_shader: Shader = Shader.new()
-	field_shader.code = """
+	var fill_shader: Shader = Shader.new()
+	fill_shader.code = """
 shader_type spatial;
-render_mode unshaded, blend_add, cull_disabled, depth_draw_never;
+render_mode unshaded, cull_disabled, depth_draw_opaque;
 
-uniform vec2 gravity_from = vec2(0.0, 1.0);
-uniform vec2 gravity_to = vec2(0.0, 1.0);
-uniform float gravity_mix : hint_range(0.0, 1.0) = 1.0;
-uniform float maximum_alpha : hint_range(0.0, 0.12) = 0.10;
+uniform vec3 fill_color = vec3(1.0);
+uniform float corner_radius = 0.05;
 
 void fragment() {
-	vec2 point = UV * 2.0 - 1.0;
-	float from_angle = atan(gravity_from.y, gravity_from.x);
-	float to_angle = atan(gravity_to.y, gravity_to.x);
-	float angle_delta = mod(to_angle - from_angle + 3.14159265, 6.28318531) - 3.14159265;
-	float gravity_angle = from_angle + angle_delta * gravity_mix;
-	vec2 gravity = vec2(cos(gravity_angle), sin(gravity_angle));
-	vec2 tangent = vec2(-gravity.y, gravity.x);
-	float along = dot(point, gravity);
-	float across = dot(point, tangent);
-	float well = (along + 1.0) * 0.5;
-	vec2 warped = point - gravity * across * across * (0.15 + 0.18 * well);
-	float line_x = 1.0 - smoothstep(0.025, 0.070, abs(fract(warped.x * 5.0 + 0.5) - 0.5));
-	float line_y = 1.0 - smoothstep(0.025, 0.070, abs(fract(warped.y * 5.0 + 0.5) - 0.5));
-	float edge_fade = smoothstep(1.0, 0.80, max(abs(point.x), abs(point.y)));
-	float alpha = max(line_x, line_y) * edge_fade * maximum_alpha;
-	ALBEDO = vec3(0.48, 0.70, 0.88);
-	ALPHA = min(alpha, 0.12);
+	vec2 centered = abs(UV - vec2(0.5));
+	vec2 corner_delta = max(centered - vec2(0.5 - corner_radius), vec2(0.0));
+	if (length(corner_delta) > corner_radius) {
+		discard;
+	}
+	ALBEDO = fill_color;
 }
 """
-	material.shader = field_shader
-	material.set_shader_parameter("maximum_alpha", GRAVITY_FIELD_MAX_ALPHA)
+	material.shader = fill_shader
+	material.set_shader_parameter("fill_color", Vector3(color_value.r, color_value.g, color_value.b))
+	material.set_shader_parameter("corner_radius", corner_radius)
 	return material
