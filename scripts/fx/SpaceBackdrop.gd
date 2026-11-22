@@ -26,11 +26,14 @@ func _ready() -> void:
 	backdrop_shader.code = _shader_code()
 	_material.shader = backdrop_shader
 	_material.set_shader_parameter("parallax_uv", Vector2.ZERO)
+	_material.set_shader_parameter("parallax_pixels", Vector2.ZERO)
 	_material.set_shader_parameter(
 		"far_parallax_ratio",
 		FAR_PARALLAX_PIXELS / NEAR_PARALLAX_PIXELS
 	)
 	_material.set_shader_parameter("danger_tint", 0.0)
+	_update_viewport_size()
+	get_viewport().size_changed.connect(_update_viewport_size)
 	material_override = _material
 	set_process(true)
 
@@ -45,6 +48,7 @@ func _process(delta: float) -> void:
 		pixel_offset.y / REFERENCE_VIEWPORT_SIZE.y
 	)
 	_material.set_shader_parameter("parallax_uv", parallax_uv)
+	_material.set_shader_parameter("parallax_pixels", pixel_offset)
 	var pulse: float = 1.0
 	if _danger_pulsing:
 		_danger_pulse_elapsed += delta
@@ -74,75 +78,35 @@ func current_parallax_uv() -> Vector2:
 	return _material.get_shader_parameter("parallax_uv") as Vector2
 
 
+func _update_viewport_size() -> void:
+	if _material == null:
+		return
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	_material.set_shader_parameter("viewport_size", viewport_size.max(Vector2.ONE))
+
+
 func _shader_code() -> String:
 	return """
 shader_type spatial;
 render_mode unshaded, cull_disabled, depth_draw_never;
 
 uniform vec2 parallax_uv = vec2(0.0);
+uniform vec2 parallax_pixels = vec2(0.0);
+uniform vec2 viewport_size = vec2(1080.0, 1920.0);
 uniform float far_parallax_ratio = 0.25;
 uniform float danger_tint : hint_range(0.0, 1.0) = 0.0;
 
-float hash21(vec2 value) {
-	value = fract(value * vec2(123.34, 456.21));
-	value += dot(value, value + 45.32);
-	return fract(value.x * value.y);
-}
-
-vec2 hash22(vec2 value) {
-	float first = hash21(value);
-	return vec2(first, hash21(value + first + 19.19));
-}
-
-float value_noise(vec2 value) {
-	vec2 cell = floor(value);
-	vec2 local = fract(value);
-	vec2 blend = local * local * (3.0 - 2.0 * local);
-	float a = hash21(cell);
-	float b = hash21(cell + vec2(1.0, 0.0));
-	float c = hash21(cell + vec2(0.0, 1.0));
-	float d = hash21(cell + vec2(1.0, 1.0));
-	return mix(mix(a, b, blend.x), mix(c, d, blend.x), blend.y);
-}
-
-float cloud_noise(vec2 value) {
-	return value_noise(value) * 0.64 + value_noise(value * 2.03 + 7.1) * 0.36;
-}
-
-float star_layer(vec2 uv, float scale, float threshold, float radius, float phase) {
-	vec2 cell = floor(uv * scale);
-	vec2 local = fract(uv * scale);
-	float identity = hash21(cell + phase);
-	vec2 point = 0.16 + hash22(cell + phase + 3.7) * 0.68;
-	float distance_to_star = length(local - point);
-	float star = smoothstep(radius, 0.0, distance_to_star) * step(threshold, identity);
-	float twinkle = 0.68 + 0.32 * sin(TIME * (0.55 + identity * 0.65) + identity * 31.0);
-	return star * twinkle;
-}
-
 void fragment() {
-	vec2 uv = UV;
-	float vignette = 1.0 - smoothstep(0.18, 0.78, length((uv - vec2(0.5)) * vec2(0.75, 1.0)));
-	vec3 color = mix(vec3(0.006, 0.011, 0.034), vec3(0.030, 0.012, 0.060), uv.y);
-	color += vec3(0.018, 0.022, 0.050) * vignette;
-
-	float slow_time = TIME / 96.0;
-	float violet = smoothstep(0.50, 0.84, cloud_noise(uv * vec2(2.2, 3.1) + vec2(slow_time, -slow_time * 0.35)));
-	float teal = smoothstep(0.54, 0.86, cloud_noise(uv * vec2(3.1, 2.4) + vec2(-slow_time * 0.42, slow_time * 0.26) + 13.0));
-	float magenta = smoothstep(0.58, 0.88, cloud_noise(uv * vec2(1.7, 3.6) + vec2(slow_time * 0.18, slow_time * 0.51) + 31.0));
-	color += vec3(0.075, 0.025, 0.105) * violet;
-	color += vec3(0.018, 0.074, 0.080) * teal;
-	color += vec3(0.080, 0.018, 0.058) * magenta;
-
-	float far_stars = star_layer(uv + parallax_uv * far_parallax_ratio, 86.0, 0.963, 0.105, 1.0);
-	float middle_stars = star_layer(uv + parallax_uv * 0.58, 47.0, 0.982, 0.090, 8.0);
-	float near_stars = star_layer(uv + parallax_uv, 25.0, 0.991, 0.075, 17.0);
-	color += vec3(0.34, 0.40, 0.54) * far_stars;
-	color += vec3(0.43, 0.50, 0.60) * middle_stars;
-	color += vec3(0.54, 0.56, 0.58) * near_stars;
-
-	color += vec3(0.120, 0.0, 0.0) * danger_tint;
-	ALBEDO = clamp(color, vec3(0.0), vec3(0.58));
+	vec2 shifted_pixels = SCREEN_UV * viewport_size + parallax_pixels;
+	vec2 dot_grid = shifted_pixels / 68.0;
+	vec2 dot_local = (fract(dot_grid) - vec2(0.5)) * 68.0;
+	float dot_mask = 1.0 - smoothstep(5.0, 6.0, length(dot_local));
+	vec3 background_color = vec3(1.0, 0.941176, 0.890196);
+	vec3 dot_color = vec3(1.0, 0.850980, 0.768627);
+	vec3 danger_color = vec3(1.0, 0.352941, 0.431373);
+	vec3 color = mix(background_color, dot_color, dot_mask);
+	color = mix(color, danger_color, danger_tint * 0.34);
+	ALBEDO = color;
 	ROUGHNESS = 1.0;
 }
 """

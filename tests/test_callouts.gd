@@ -259,6 +259,33 @@ func test_jelly_callout_sits_between_combo_and_board() -> void:
 	Config.data.sfx_enabled = original_sfx_enabled
 
 
+func test_callout_edge_metrics_follow_maximum_and_minimum_font_sizes() -> void:
+	assert_eq(Hud.callout_shadow_offset(Hud.CALLOUT_FONT_MAX), 8, "64px callout shadow is 13 percent")
+	assert_eq(Hud.callout_outline_size(Hud.CALLOUT_FONT_MAX), 3, "64px callout outline is 5 percent")
+	assert_eq(Hud.callout_shadow_offset(Hud.CALLOUT_FONT_MIN), 4, "28px callout shadow rounds to four")
+	assert_eq(Hud.callout_outline_size(Hud.CALLOUT_FONT_MIN), 2, "callout outline keeps the logical minimum")
+	var original_sfx_enabled: bool = Config.data.sfx_enabled
+	Config.data.sfx_enabled = false
+	var main: Main = await _create_main()
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	var callout: Label = main.get_node("UI/Hud/CalloutLabel") as Label
+	for font_size: int in [Hud.CALLOUT_FONT_MAX, Hud.CALLOUT_FONT_MIN]:
+		callout.add_theme_font_size_override("font_size", font_size)
+		hud._apply_callout_edge_metrics()
+		assert_eq(
+			callout.get_theme_constant("shadow_offset_y"),
+			Hud.callout_shadow_offset(font_size),
+			"active callout shadow follows its final font size"
+		)
+		assert_eq(
+			callout.get_theme_constant("outline_size"),
+			Hud.callout_outline_size(font_size),
+			"active callout outline follows its final font size"
+		)
+	await _destroy_main(main)
+	Config.data.sfx_enabled = original_sfx_enabled
+
+
 func test_callout_font_shrinks_only_for_overflow_and_resets() -> void:
 	var original_sfx_enabled: bool = Config.data.sfx_enabled
 	var original_tap_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
@@ -290,11 +317,13 @@ func test_callout_font_shrinks_only_for_overflow_and_resets() -> void:
 		)
 		callout.add_theme_font_size_override("font_size", base_font_size)
 		callout.text = hud._jelly_tap_effect_callout_text(OrbTypes.OrbColor.GREEN)
+		var overflows_at_base: bool = hud._callout_text_width() > callout_rect.size.x
 		hud._fit_callout_font_to_rect(callout_rect)
 		var fitted_font_size: int = callout.get_theme_font_size("font_size")
-		assert_true(
+		assert_eq(
 			fitted_font_size < base_font_size,
-			"green REST hint shrinks at the 540-wide window ratio"
+			overflows_at_base,
+			"callout shrinks exactly when the active font overflows"
 		)
 		assert_true(
 			hud._callout_text_width() <= callout_rect.size.x,
@@ -330,15 +359,7 @@ func test_callout_font_shrinks_only_for_overflow_and_resets() -> void:
 		Hud.CALLOUT_FONT_MIN,
 		Hud.CALLOUT_FONT_MAX
 	)
-	var reset_layout: Dictionary = Hud.hud_layout(simulated_viewports[0])
-	var reset_rect: Rect2 = hud._callout_layout_rect(simulated_viewports[0], reset_layout)
-	callout.add_theme_font_size_override("font_size", Hud.CALLOUT_FONT_MAX)
-	callout.text = hud._jelly_tap_effect_callout_text(OrbTypes.OrbColor.GREEN)
-	hud._fit_callout_font_to_rect(reset_rect)
-	assert_true(
-		callout.get_theme_font_size("font_size") < Hud.CALLOUT_FONT_MAX,
-		"long green hint establishes a reduced font before the reset check"
-	)
+	callout.add_theme_font_size_override("font_size", Hud.CALLOUT_FONT_MIN)
 	hud._show_jelly_tap_effect(OrbTypes.OrbColor.RED)
 	assert_eq(
 		callout.get_theme_font_size("font_size"),
@@ -391,8 +412,8 @@ func test_six_jelly_tap_effect_callouts_show_once_without_art_or_sound() -> void
 		assert_eq(callout.text, expected[color_index], "effect callout text at input wait")
 		assert_eq(
 			callout.get_theme_color("font_color"),
-			JellyOrbArt.color_for(color_index, 8),
-			"effect callout uses jelly color"
+			Hud.B_TEXT_COLOR,
+			"effect callout uses warm informational text"
 		)
 		assert_true(not unlock_visual.visible, "effect callout has no orb art")
 		if hud._callout_tween != null and hud._callout_tween.is_valid():

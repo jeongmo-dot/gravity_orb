@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>B 따뜻한 젤리 · 결과 창</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#a8405f}a:hover{color:#7a2a44}
+</style>
+</helmet>
+<div style="position: relative; width: 540px; height: 1170px; overflow: hidden; background-color: #fff0e3; background-image: radial-gradient(#ffd9c4 2.5px, transparent 3px); background-size: 34px 34px; font-family: Jua, sans-serif; color: #5b2a3c">
+
+  <div style="position: absolute; left: 35px; top: 340px; width: 470px; height: 470px; border-radius: 16px; background: repeating-conic-gradient(#f3e6fb 0 25%, #fdf8ff 0 50%) 0 0 / 47px 47px; box-shadow: 0 0 0 8px #ffffff, 0 0 0 12px #f39ab4, 0 14px 0 12px #d9718f"></div>
+  <div style="position: absolute; left: 70px; right: 70px; top: 880px; height: 150px; box-sizing: border-box; border-radius: 22px; border: 4px solid #f39ab4; background: #fffaf3; box-shadow: 0 6px 0 #d9718f"></div>
+  <div style="position: absolute; inset: 0; background: rgba(90,40,60,0.45)"></div>
+
+  <div style="position: absolute; left: 50px; width: 440px; top: 262px; box-sizing: border-box; padding: 58px 28px 32px; border-radius: 28px; border: 5px solid #f39ab4; background: #fffaf3; box-shadow: 0 10px 0 #d9718f; display: flex; flex-direction: column; align-items: center; gap: 16px">
+    <div style="position: absolute; left: 50px; top: -30px; width: 340px; height: 62px">
+      <div style="position: absolute; left: 0; top: 6px; width: 340px; height: 62px; background: #b8325c; clip-path: polygon(0 0, 100% 0, 94% 50%, 100% 100%, 0 100%, 6% 50%)"></div>
+      <div style="position: absolute; left: 0; top: 0; width: 340px; height: 62px; background: #f2557f; clip-path: polygon(0 0, 100% 0, 94% 50%, 100% 100%, 0 100%, 6% 50%); display: flex; align-items: center; justify-content: center; color: #ffffff; font-size: 36px; text-shadow: 0 3px 0 #b8325c">GAME OVER</div>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center">
+      <div style="font-size: 16px; color: #a8405f">SCORE</div>
+      <div style="font-size: 62px; line-height: 1.05">187,750</div>
+    </div>
+    <div style="padding: 6px 24px; border-radius: 14px; border: 3px solid #e8a92e; background: #ffd75e; box-shadow: 0 4px 0 #c98a14; color: #5a3a00; font-size: 20px">최고 기록!</div>
+    <div style="width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+      <div style="border-radius: 16px; background: #ffeef3; padding: 12px 0; display: flex; flex-direction: column; align-items: center; gap: 2px">
+        <div style="font-size: 15px; color: #a8405f">턴 수</div>
+        <div style="font-size: 30px">73</div>
+      </div>
+      <div style="border-radius: 16px; background: #ffeef3; padding: 12px 0; display: flex; flex-direction: column; align-items: center; gap: 2px">
+        <div style="font-size: 15px; color: #a8405f">최대 콤보</div>
+        <div style="font-size: 30px">11</div>
+      </div>
+      <div style="border-radius: 16px; background: #ffeef3; padding: 12px 0; display: flex; flex-direction: column; align-items: center; gap: 2px">
+        <div style="font-size: 15px; color: #a8405f">최고 젤리</div>
+        <div style="font-size: 30px">L7</div>
+      </div>
+      <div style="border-radius: 16px; background: #ffeef3; padding: 12px 0; display: flex; flex-direction: column; align-items: center; gap: 2px">
+        <div style="font-size: 15px; color: #a8405f">FINAL MOVE</div>
+        <div style="font-size: 28px">4번 버팀</div>
+      </div>
+    </div>
+    <button style="width: 100%; height: 66px; margin-top: 4px; border: none; border-radius: 18px; background: #6fdc9f; box-shadow: 0 6px 0 #2f9e65; color: #0f3d26; font-family: Jua, sans-serif; font-size: 26px; cursor: pointer">다시 하기</button>
+    <div style="width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+      <button style="height: 58px; border-radius: 18px; border: 4px solid #f39ab4; background: #fffaf3; box-shadow: 0 5px 0 #d9718f; color: #a8405f; font-family: Jua, sans-serif; font-size: 21px; cursor: pointer">랭킹</button>
+      <button style="height: 58px; border-radius: 18px; border: 4px solid #f39ab4; background: #fffaf3; box-shadow: 0 5px 0 #d9718f; color: #a8405f; font-family: Jua, sans-serif; font-size: 21px; cursor: pointer">처음 화면</button>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":540,"height":1170}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

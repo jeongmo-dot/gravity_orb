@@ -101,7 +101,7 @@ func _set_stat_text() -> void:
 	)
 	_survived_time_label.text = "턴 수"
 	_survived_time_value.text = str(_game_manager.turn_index)
-	_survived_time_value.add_theme_color_override("font_color", Color("#E8EEFF"))
+	_survived_time_value.add_theme_color_override("font_color", Color("#5B2A3C"))
 	_max_combo_label.text = "최대 콤보"
 	_max_combo_value.text = str(_game_manager.max_combo)
 	_blocked_label.text = "최고 젤리"
