@@ -3,27 +3,25 @@ extends TestCase
 const BOARD_SCENE: PackedScene = preload("res://scenes/Board3D.tscn")
 
 
-func test_space_backdrop_has_three_star_depths_nebula_and_no_meteor() -> void:
+func test_space_backdrop_uses_warm_cream_dots_and_danger_tint() -> void:
 	var backdrop: SpaceBackdrop = SpaceBackdrop.new()
 	tree.root.add_child(backdrop)
 	await tree.process_frame
 	var material: ShaderMaterial = backdrop.shader_material()
 	var shader_code: String = material.shader.code
-	assert_true(shader_code.contains("far_stars"), "space has a far star layer")
-	assert_true(shader_code.contains("middle_stars"), "space has a middle star layer")
-	assert_true(shader_code.contains("near_stars"), "space has a near star layer")
-	assert_true(shader_code.contains("violet"), "space has a violet nebula layer")
-	assert_true(shader_code.contains("teal"), "space has a teal nebula layer")
-	assert_true(shader_code.contains("magenta"), "space has a magenta nebula layer")
+	assert_true(shader_code.contains("background_color"), "backdrop has a cream base")
+	assert_true(shader_code.contains("dot_grid"), "backdrop has a regular dot grid")
+	assert_true(shader_code.contains("1080.0 / 68.0"), "dot spacing is 68 logical pixels")
+	assert_true(shader_code.contains("5.0 / 68.0"), "dot radius is five logical pixels")
 	assert_eq(SpaceBackdrop.FAR_PARALLAX_PIXELS, 2.0, "far parallax is two pixels")
 	assert_eq(SpaceBackdrop.NEAR_PARALLAX_PIXELS, 8.0, "near parallax is eight pixels")
 	assert_true(
-		not shader_code.to_lower().contains("meteor"),
-		"space backdrop removes the meteor shader code"
+		not shader_code.contains("star_layer") and not shader_code.contains("cloud_noise"),
+		"warm backdrop removes stars and nebulae"
 	)
 	assert_true(
-		shader_code.contains("vec3(0.120, 0.0, 0.0) * danger_tint"),
-		"danger state adds a visible red nebula tint"
+		shader_code.contains("danger_color") and shader_code.contains("danger_tint * 0.34"),
+		"danger state mixes the specified warm red tint"
 	)
 	backdrop.set_danger_state(1.0, true)
 	backdrop._process(0.625)

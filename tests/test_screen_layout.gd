@@ -1,6 +1,8 @@
 extends TestCase
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
+const JUA_FONT: FontFile = preload("res://assets/fonts/Jua-Regular.ttf")
+const HUD_THEME: Theme = preload("res://assets/ui/gravity_orb_theme.tres")
 
 
 func test_single_jelly_start_layout_fits_both_supported_ratios() -> void:
@@ -140,7 +142,68 @@ func test_scene_has_only_jelly_frontend_controls() -> void:
 	assert_true(hud.get_node_or_null("TurnLabel") != null, "TURN value exists")
 	assert_true(hud.get_node_or_null("BlockedPanel") == null, "blocked text panel removed")
 	assert_true(hud.get_node_or_null("BlockedLabel") == null, "blocked text label removed")
+	assert_true(hud.get_node_or_null("TurnInputIndicator") == null, "direction arrows are removed")
 	main.queue_free()
 	await tree.process_frame
 	InputRouter.set_locked(false)
 	Config.data.game_mode = GameConfig.GameMode.TURN
+
+
+func test_warm_hud_theme_is_scoped_to_gameplay_and_result_controls() -> void:
+	var main: Main = MAIN_SCENE.instantiate() as Main
+	main.launch_immediately(GameConfig.GameMode.JELLY)
+	tree.root.add_child(main)
+	await tree.process_frame
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	assert_eq(
+		(hud.get_node("TurnPanel") as PanelContainer).theme_type_variation,
+		&"WarmCard",
+		"TURN uses the warm card without changing shared HudPanel"
+	)
+	assert_eq(
+		(hud.get_node("HudSoundButton") as Button).theme_type_variation,
+		&"WarmSoundButton",
+		"sound uses the warm pink button"
+	)
+	assert_eq(
+		(hud.get_node("NextPreviewWell") as Panel).size,
+		Vector2(200.0, 200.0),
+		"NEXT well is 200 square"
+	)
+	assert_eq(
+		(hud.get_node("ThenPreviewWell") as Panel).size,
+		Vector2(152.0, 152.0),
+		"THEN well is 152 square"
+	)
+	var result: GameOverPanel = hud.get_node("GameOverPanel") as GameOverPanel
+	assert_eq(result.theme_type_variation, &"WarmResultPanel", "result uses warm card")
+	assert_near(result.size.x, 880.0, 0.001, "result width is 880")
+	assert_true(result.get_node_or_null("Margin/Content/StatWellTurn") != null, "turn well exists")
+	assert_true(result.get_node_or_null("Margin/Content/StatWellFinal") != null, "final move well exists")
+	var start: StartScreen = main.get_node("UI/StartScreen") as StartScreen
+	assert_true(
+		(start.get_node("Content/JellyButton") as Button).theme_type_variation != &"WarmPrimaryButton",
+		"start screen keeps its pre-159 theme"
+	)
+	assert_true(FileAccess.file_exists("res://assets/fonts/Jua-Regular.ttf"), "Jua font is bundled")
+	assert_true(not FileAccess.file_exists("res://scripts/ui/TurnInputIndicator.gd"), "arrow script is deleted")
+	main.queue_free()
+	await tree.process_frame
+	InputRouter.set_locked(false)
+	Config.data.game_mode = GameConfig.GameMode.TURN
+
+
+func test_jua_font_uses_noto_fallback_for_missing_ui_characters() -> void:
+	var ui_text: String = (
+		"TURN SCORE BEST MAX COMBO DANGER NEXT THEN GAME OVER "
+		+ "FINAL MOVE 최고 기록 새 기록 위 다시 하기 랭킹 처음 화면 "
+		+ "턴 수 최대 콤보 최고 젤리 번 버팀 시한 굳은 폭발 청소"
+	)
+	var missing: String = ""
+	for index: int in range(ui_text.length()):
+		var character: String = ui_text[index]
+		if not JUA_FONT.has_char(character.unicode_at(0)) and not missing.contains(character):
+			missing += character
+	var warm_font: Font = HUD_THEME.get_font(&"font", &"WarmText")
+	assert_true(not warm_font.fallbacks.is_empty(), "WarmText configures a Noto fallback")
+	print("JUA_FALLBACK_CHARACTERS=%s" % ("none" if missing.is_empty() else missing))

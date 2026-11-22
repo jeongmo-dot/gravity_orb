@@ -14,8 +14,8 @@
 [ext_resource type="Texture2D" path="res://assets/ui/hourglass.svg" id="12_hourglass"]
 [ext_resource type="Texture2D" path="res://assets/ui/trophy.svg" id="13_trophy"]
 [ext_resource type="Texture2D" path="res://assets/ui/settings.svg" id="14_settings"]
-[ext_resource type="Script" path="res://scripts/ui/TurnInputIndicator.gd" id="16_turn_input_indicator"]
 [ext_resource type="Script" path="res://scripts/ui/JellyCardIcon.gd" id="18_jelly_card_icon"]
+[ext_resource type="Script" path="res://scripts/ui/WarmRibbon.gd" id="19_warm_ribbon"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_result_panel"]
 bg_color = Color(0.025, 0.05, 0.105, 0.97)
@@ -174,17 +174,6 @@ mouse_filter = 2
 theme = ExtResource("6_hud_theme")
 script = ExtResource("2_hud")
 
-[node name="TurnInputIndicator" type="Control" parent="Hud"]
-unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-script = ExtResource("16_turn_input_indicator")
-
 [node name="TurnPanel" type="PanelContainer" parent="Hud"]
 unique_name_in_owner = true
 layout_mode = 0
@@ -193,7 +182,7 @@ offset_top = 24.0
 offset_right = 288.0
 offset_bottom = 174.0
 mouse_filter = 2
-theme_type_variation = &"HudPanel"
+theme_type_variation = &"WarmCard"
 
 [node name="ScorePanel" type="PanelContainer" parent="Hud"]
 unique_name_in_owner = true
@@ -203,7 +192,7 @@ offset_top = 24.0
 offset_right = 780.0
 offset_bottom = 174.0
 mouse_filter = 2
-theme_type_variation = &"HudPanel"
+theme_type_variation = &"WarmCard"
 
 [node name="BestPanel" type="PanelContainer" parent="Hud"]
 unique_name_in_owner = true
@@ -213,7 +202,7 @@ offset_top = 24.0
 offset_right = 1056.0
 offset_bottom = 174.0
 mouse_filter = 2
-theme_type_variation = &"HudPanel"
+theme_type_variation = &"WarmCard"
 
 [node name="DangerPanel" type="PanelContainer" parent="Hud"]
 unique_name_in_owner = true
@@ -224,7 +213,7 @@ offset_top = 190.0
 offset_right = 280.0
 offset_bottom = 252.0
 mouse_filter = 2
-theme_type_variation = &"HudDangerPanel"
+theme_type_variation = &"WarmDangerCard"
 
 [node name="PreviewShelf" type="PanelContainer" parent="Hud"]
 unique_name_in_owner = true
@@ -234,7 +223,7 @@ offset_top = 1540.0
 offset_right = 1040.0
 offset_bottom = 1880.0
 mouse_filter = 2
-theme_type_variation = &"HudPanel"
+theme_type_variation = &"WarmCard"
 
 [node name="TurnTitleLabel" type="Label" parent="Hud"]
 unique_name_in_owner = true
@@ -244,10 +233,8 @@ offset_top = 36.0
 offset_right = 276.0
 offset_bottom = 66.0
 mouse_filter = 2
-theme_override_colors/font_outline_color = Color(0, 0, 0, 0.85)
-theme_override_constants/outline_size = 3
-theme_override_font_sizes/font_size = 22
-theme_type_variation = &"HudDisplaySecondary"
+theme_override_font_sizes/font_size = 30
+theme_type_variation = &"WarmLabel"
 text = "TURN"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -260,10 +247,8 @@ offset_top = 66.0
 offset_right = 276.0
 offset_bottom = 160.0
 mouse_filter = 2
-theme_override_colors/font_outline_color = Color(0, 0, 0, 0.85)
-theme_override_constants/outline_size = 4
-theme_override_font_sizes/font_size = 40
-theme_type_variation = &"HudDisplayBold"
+theme_override_font_sizes/font_size = 60
+theme_type_variation = &"WarmText"
 text = "1"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -276,10 +261,8 @@ offset_top = 36.0
 offset_right = 764.0
 offset_bottom = 66.0
 mouse_filter = 2
-theme_override_colors/font_outline_color = Color(0, 0, 0, 0.85)
-theme_override_constants/outline_size = 3
-theme_override_font_sizes/font_size = 22
-theme_type_variation = &"HudDisplaySecondary"
+theme_override_font_sizes/font_size = 30
+theme_type_variation = &"WarmLabel"
 text = "SCORE"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -292,10 +275,8 @@ offset_top = 66.0
 offset_right = 764.0
 offset_bottom = 162.0
 mouse_filter = 2
-theme_override_colors/font_outline_color = Color(0, 0, 0, 0.85)
-theme_override_constants/outline_size = 5
-theme_override_font_sizes/font_size = 54
-theme_type_variation = &"HudDisplayBold"
+theme_override_font_sizes/font_size = 68
+theme_type_variation = &"WarmText"
 text = "0"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -308,10 +289,8 @@ offset_top = 36.0
 offset_right = 1044.0
 offset_bottom = 66.0
 mouse_filter = 2
-theme_override_colors/font_outline_color = Color(0, 0, 0, 0.85)
-theme_override_constants/outline_size = 3
-theme_override_font_sizes/font_size = 22
-theme_type_variation = &"HudDisplaySecondary"
+theme_override_font_sizes/font_size = 30
+theme_type_variation = &"WarmLabel"
 text = "BEST"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -324,10 +303,8 @@ offset_top = 66.0
 offset_right = 1044.0
 offset_bottom = 162.0
 mouse_filter = 2
-theme_override_colors/font_outline_color = Color(0, 0, 0, 0.85)
-theme_override_constants/outline_size = 4
-theme_override_font_sizes/font_size = 40
-theme_type_variation = &"HudDisplayBold"
+theme_override_font_sizes/font_size = 52
+theme_type_variation = &"WarmGoldText"
 text = "0"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -340,10 +317,8 @@ offset_top = 186.0
 offset_right = 1056.0
 offset_bottom = 232.0
 mouse_filter = 2
-theme_override_colors/font_outline_color = Color(0, 0, 0, 0.85)
-theme_override_constants/outline_size = 4
-theme_override_font_sizes/font_size = 22
-theme_type_variation = &"HudDisplaySecondary"
+theme_override_font_sizes/font_size = 32
+theme_type_variation = &"WarmLabel"
 text = "MAX COMBO 0"
 horizontal_alignment = 1
 
@@ -357,10 +332,10 @@ offset_right = 760.0
 offset_bottom = 250.0
 pivot_offset = Vector2(220, 33)
 mouse_filter = 2
-theme_override_colors/font_outline_color = Color(0, 0, 0, 0.8)
+theme_override_colors/font_outline_color = Color(1, 1, 1, 1)
 theme_override_constants/outline_size = 6
 theme_override_font_sizes/font_size = 52
-theme_type_variation = &"HudDisplayBold"
+theme_type_variation = &"WarmText"
 text = "×1"
 horizontal_alignment = 1
 
@@ -374,10 +349,10 @@ offset_right = 760.0
 offset_bottom = 296.0
 pivot_offset = Vector2(220, 23)
 mouse_filter = 2
-theme_override_colors/font_outline_color = Color(0, 0, 0, 0.8)
+theme_override_colors/font_outline_color = Color(1, 1, 1, 1)
 theme_override_constants/outline_size = 4
 theme_override_font_sizes/font_size = 25
-theme_type_variation = &"HudDisplayMedium"
+theme_type_variation = &"WarmText"
 text = "COMBO 1"
 horizontal_alignment = 1
 
@@ -391,10 +366,8 @@ offset_right = 268.0
 offset_bottom = 246.0
 pivot_offset = Vector2(116, 25)
 mouse_filter = 2
-theme_override_colors/font_outline_color = Color(0, 0, 0, 0.8)
-theme_override_constants/outline_size = 5
 theme_override_font_sizes/font_size = 24
-theme_type_variation = &"HudDangerLabel"
+theme_type_variation = &"WarmDangerText"
 text = "DANGER ×1"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -420,11 +393,11 @@ offset_right = 1040.0
 offset_bottom = 1040.0
 pivot_offset = Vector2(500, 100)
 mouse_filter = 2
-theme_override_colors/font_color = Color(1, 0.835294, 0.227451, 1)
-theme_override_colors/font_outline_color = Color(0.02, 0.035, 0.07, 0.92)
-theme_override_constants/outline_size = 4
+theme_override_colors/font_color = Color(1, 0.364706, 0.560784, 1)
+theme_override_colors/font_outline_color = Color(1, 1, 1, 1)
+theme_override_constants/outline_size = 6
 theme_override_font_sizes/font_size = 96
-theme_type_variation = &"HudDisplayBold"
+theme_type_variation = &"WarmText"
 text = "AMAZING!"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -437,12 +410,21 @@ offset_top = 1572.0
 offset_right = 610.0
 offset_bottom = 1622.0
 mouse_filter = 2
-theme_override_colors/font_outline_color = Color(0, 0, 0, 0.85)
-theme_override_constants/outline_size = 4
-theme_override_font_sizes/font_size = 30
-theme_type_variation = &"HudDisplayBold"
+theme_override_font_sizes/font_size = 34
+theme_type_variation = &"WarmTagNext"
 text = "NEXT"
 horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="NextPreviewWell" type="Panel" parent="Hud"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 240.0
+offset_top = 1650.0
+offset_right = 440.0
+offset_bottom = 1850.0
+mouse_filter = 2
+theme_type_variation = &"WarmWell"
 
 [node name="NextPreviewRegion" type="Control" parent="Hud"]
 unique_name_in_owner = true
@@ -466,10 +448,8 @@ offset_top = 1770.0
 offset_right = 610.0
 offset_bottom = 1820.0
 mouse_filter = 2
-theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
-theme_override_constants/outline_size = 6
 theme_override_font_sizes/font_size = 30
-theme_type_variation = &"HudDisplayBold"
+theme_type_variation = &"WarmLabel"
 text = "×8"
 horizontal_alignment = 1
 
@@ -481,12 +461,21 @@ offset_top = 1590.0
 offset_right = 1000.0
 offset_bottom = 1632.0
 mouse_filter = 2
-theme_override_colors/font_outline_color = Color(0, 0, 0, 0.85)
-theme_override_constants/outline_size = 3
-theme_override_font_sizes/font_size = 24
-theme_type_variation = &"HudDisplaySecondary"
+theme_override_font_sizes/font_size = 30
+theme_type_variation = &"WarmTagThen"
 text = "THEN"
 horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ThenPreviewWell" type="Panel" parent="Hud"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 744.0
+offset_top = 1674.0
+offset_right = 896.0
+offset_bottom = 1826.0
+mouse_filter = 2
+theme_type_variation = &"WarmWell"
 
 [node name="ThenPreviewRegion" type="Control" parent="Hud"]
 unique_name_in_owner = true
@@ -511,10 +500,8 @@ offset_top = 1770.0
 offset_right = 1000.0
 offset_bottom = 1812.0
 mouse_filter = 2
-theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
-theme_override_constants/outline_size = 5
 theme_override_font_sizes/font_size = 24
-theme_type_variation = &"HudDisplayMedium"
+theme_type_variation = &"WarmLabel"
 text = "×8"
 horizontal_alignment = 1
 
@@ -527,7 +514,7 @@ offset_top = 32.0
 offset_right = 144.0
 offset_bottom = 152.0
 mouse_filter = 0
-theme_type_variation = &"HudIconButton"
+theme_type_variation = &"WarmSoundButton"
 icon = ExtResource("7_speaker_on")
 icon_alignment = 1
 expand_icon = true
@@ -542,55 +529,66 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0, 0, 0, 0.6)
+color = Color(0.352941, 0.156863, 0.235294, 0.45)
 
 [node name="GameOverPanel" type="PanelContainer" parent="Hud"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 0
-offset_left = 146.0
-offset_top = 430.0
-offset_right = 934.0
-offset_bottom = 1470.0
+offset_left = 100.0
+offset_top = 340.0
+offset_right = 980.0
+offset_bottom = 1466.0
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_result_panel")
+theme_type_variation = &"WarmResultPanel"
 script = ExtResource("3_game_over")
 
 [node name="Margin" type="MarginContainer" parent="Hud/GameOverPanel"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_constants/margin_left = 48
-theme_override_constants/margin_top = 44
-theme_override_constants/margin_right = 48
-theme_override_constants/margin_bottom = 44
+theme_override_constants/margin_left = 56
+theme_override_constants/margin_top = 116
+theme_override_constants/margin_right = 56
+theme_override_constants/margin_bottom = 64
 
 [node name="Content" type="Control" parent="Hud/GameOverPanel/Margin"]
-custom_minimum_size = Vector2(692, 952)
+custom_minimum_size = Vector2(748, 946)
 layout_mode = 2
 mouse_filter = 2
+
+[node name="ResultRibbon" type="Control" parent="Hud/GameOverPanel/Margin/Content"]
+layout_mode = 0
+offset_left = 34.0
+offset_top = -176.0
+offset_right = 714.0
+offset_bottom = -40.0
+mouse_filter = 2
+script = ExtResource("19_warm_ribbon")
 
 [node name="ResultTitle" type="Label" parent="Hud/GameOverPanel/Margin/Content"]
 unique_name_in_owner = true
 layout_mode = 0
-offset_right = 692.0
-offset_bottom = 88.0
+offset_left = 34.0
+offset_top = -176.0
+offset_right = 714.0
+offset_bottom = -52.0
 mouse_filter = 2
-theme_override_colors/font_color = Color(1, 0.231373, 0.188235, 1)
-theme_override_font_sizes/font_size = 64
-theme_type_variation = &"HudDisplayBold"
+theme_override_font_sizes/font_size = 72
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0.721569, 0.196078, 0.360784, 1)
+theme_override_constants/shadow_offset_y = 6
+theme_type_variation = &"WarmText"
 text = "GAME OVER"
 horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="GameOverScoreTitle" type="Label" parent="Hud/GameOverPanel/Margin/Content"]
 layout_mode = 0
-offset_top = 94.0
-offset_right = 692.0
-offset_bottom = 132.0
+offset_right = 748.0
+offset_bottom = 44.0
 mouse_filter = 2
-theme_override_colors/font_color = Color(0.557, 0.639, 0.784, 1)
-theme_override_font_sizes/font_size = 24
-theme_type_variation = &"HudDisplaySecondary"
+theme_override_font_sizes/font_size = 32
+theme_type_variation = &"WarmLabel"
 text = "SCORE"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -598,12 +596,12 @@ vertical_alignment = 1
 [node name="GameOverScore" type="Label" parent="Hud/GameOverPanel/Margin/Content"]
 unique_name_in_owner = true
 layout_mode = 0
-offset_top = 126.0
-offset_right = 692.0
-offset_bottom = 230.0
+offset_top = 40.0
+offset_right = 748.0
+offset_bottom = 184.0
 mouse_filter = 2
-theme_override_font_sizes/font_size = 76
-theme_type_variation = &"HudDisplayBold"
+theme_override_font_sizes/font_size = 124
+theme_type_variation = &"WarmText"
 text = "0"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -611,28 +609,59 @@ vertical_alignment = 1
 [node name="GameOverBest" type="Label" parent="Hud/GameOverPanel/Margin/Content"]
 unique_name_in_owner = true
 layout_mode = 0
-offset_top = 236.0
-offset_right = 692.0
-offset_bottom = 286.0
+offset_top = 186.0
+offset_right = 748.0
+offset_bottom = 238.0
 mouse_filter = 2
-theme_override_colors/font_color = Color(0.557, 0.639, 0.784, 1)
-theme_override_font_sizes/font_size = 28
-theme_type_variation = &"HudDisplaySecondary"
+theme_override_font_sizes/font_size = 40
+theme_type_variation = &"WarmGoldText"
 text = "BEST 0"
 horizontal_alignment = 1
 vertical_alignment = 1
 
+[node name="StatWellTurn" type="Panel" parent="Hud/GameOverPanel/Margin/Content"]
+layout_mode = 0
+offset_top = 270.0
+offset_right = 364.0
+offset_bottom = 430.0
+mouse_filter = 2
+theme_type_variation = &"WarmWell"
+
+[node name="StatWellCombo" type="Panel" parent="Hud/GameOverPanel/Margin/Content"]
+layout_mode = 0
+offset_left = 384.0
+offset_top = 270.0
+offset_right = 748.0
+offset_bottom = 430.0
+mouse_filter = 2
+theme_type_variation = &"WarmWell"
+
+[node name="StatWellJelly" type="Panel" parent="Hud/GameOverPanel/Margin/Content"]
+layout_mode = 0
+offset_top = 450.0
+offset_right = 364.0
+offset_bottom = 610.0
+mouse_filter = 2
+theme_type_variation = &"WarmWell"
+
+[node name="StatWellFinal" type="Panel" parent="Hud/GameOverPanel/Margin/Content"]
+layout_mode = 0
+offset_left = 384.0
+offset_top = 450.0
+offset_right = 748.0
+offset_bottom = 610.0
+mouse_filter = 2
+theme_type_variation = &"WarmWell"
+
 [node name="SurvivedTimeLabel" type="Label" parent="Hud/GameOverPanel/Margin/Content"]
 unique_name_in_owner = true
 layout_mode = 0
-offset_left = 12.0
-offset_top = 320.0
-offset_right = 334.0
-offset_bottom = 364.0
+offset_top = 286.0
+offset_right = 364.0
+offset_bottom = 326.0
 mouse_filter = 2
-theme_override_colors/font_color = Color(0.557, 0.639, 0.784, 1)
-theme_override_font_sizes/font_size = 26
-theme_type_variation = &"HudBody"
+theme_override_font_sizes/font_size = 30
+theme_type_variation = &"WarmLabel"
 text = "버틴 시간"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -640,13 +669,12 @@ vertical_alignment = 1
 [node name="SurvivedTimeValue" type="Label" parent="Hud/GameOverPanel/Margin/Content"]
 unique_name_in_owner = true
 layout_mode = 0
-offset_left = 12.0
-offset_top = 364.0
-offset_right = 334.0
-offset_bottom = 430.0
+offset_top = 326.0
+offset_right = 364.0
+offset_bottom = 414.0
 mouse_filter = 2
-theme_override_font_sizes/font_size = 44
-theme_type_variation = &"HudDisplayBold"
+theme_override_font_sizes/font_size = 60
+theme_type_variation = &"WarmText"
 text = "0:30"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -654,14 +682,13 @@ vertical_alignment = 1
 [node name="GameOverMaxCombo" type="Label" parent="Hud/GameOverPanel/Margin/Content"]
 unique_name_in_owner = true
 layout_mode = 0
-offset_left = 358.0
-offset_top = 320.0
-offset_right = 680.0
-offset_bottom = 364.0
+offset_left = 384.0
+offset_top = 286.0
+offset_right = 748.0
+offset_bottom = 326.0
 mouse_filter = 2
-theme_override_colors/font_color = Color(0.557, 0.639, 0.784, 1)
-theme_override_font_sizes/font_size = 26
-theme_type_variation = &"HudBody"
+theme_override_font_sizes/font_size = 30
+theme_type_variation = &"WarmLabel"
 text = "최대 콤보"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -669,13 +696,13 @@ vertical_alignment = 1
 [node name="GameOverMaxComboValue" type="Label" parent="Hud/GameOverPanel/Margin/Content"]
 unique_name_in_owner = true
 layout_mode = 0
-offset_left = 358.0
-offset_top = 364.0
-offset_right = 680.0
-offset_bottom = 430.0
+offset_left = 384.0
+offset_top = 326.0
+offset_right = 748.0
+offset_bottom = 414.0
 mouse_filter = 2
-theme_override_font_sizes/font_size = 44
-theme_type_variation = &"HudDisplayBold"
+theme_override_font_sizes/font_size = 60
+theme_type_variation = &"WarmText"
 text = "0"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -683,14 +710,12 @@ vertical_alignment = 1
 [node name="GameOverBlocked" type="Label" parent="Hud/GameOverPanel/Margin/Content"]
 unique_name_in_owner = true
 layout_mode = 0
-offset_left = 12.0
-offset_top = 440.0
-offset_right = 334.0
-offset_bottom = 484.0
+offset_top = 466.0
+offset_right = 364.0
+offset_bottom = 506.0
 mouse_filter = 2
-theme_override_colors/font_color = Color(0.557, 0.639, 0.784, 1)
-theme_override_font_sizes/font_size = 26
-theme_type_variation = &"HudBody"
+theme_override_font_sizes/font_size = 30
+theme_type_variation = &"WarmLabel"
 text = "최고 천체"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -698,13 +723,12 @@ vertical_alignment = 1
 [node name="GameOverBlockedValue" type="Label" parent="Hud/GameOverPanel/Margin/Content"]
 unique_name_in_owner = true
 layout_mode = 0
-offset_left = 12.0
-offset_top = 484.0
-offset_right = 334.0
-offset_bottom = 550.0
+offset_top = 506.0
+offset_right = 364.0
+offset_bottom = 594.0
 mouse_filter = 2
-theme_override_font_sizes/font_size = 42
-theme_type_variation = &"HudDisplayBold"
+theme_override_font_sizes/font_size = 60
+theme_type_variation = &"WarmText"
 text = "L0"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -712,14 +736,13 @@ vertical_alignment = 1
 [node name="ResultExtraLabel" type="Label" parent="Hud/GameOverPanel/Margin/Content"]
 unique_name_in_owner = true
 layout_mode = 0
-offset_left = 358.0
-offset_top = 440.0
-offset_right = 680.0
-offset_bottom = 484.0
+offset_left = 384.0
+offset_top = 466.0
+offset_right = 748.0
+offset_bottom = 506.0
 mouse_filter = 2
-theme_override_colors/font_color = Color(0.557, 0.639, 0.784, 1)
-theme_override_font_sizes/font_size = 26
-theme_type_variation = &"HudBody"
+theme_override_font_sizes/font_size = 30
+theme_type_variation = &"WarmLabel"
 text = "막힌 방향"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -727,13 +750,13 @@ vertical_alignment = 1
 [node name="ResultExtraValue" type="Label" parent="Hud/GameOverPanel/Margin/Content"]
 unique_name_in_owner = true
 layout_mode = 0
-offset_left = 358.0
-offset_top = 484.0
-offset_right = 680.0
-offset_bottom = 550.0
+offset_left = 384.0
+offset_top = 506.0
+offset_right = 748.0
+offset_bottom = 594.0
 mouse_filter = 2
-theme_override_font_sizes/font_size = 44
-theme_type_variation = &"HudDisplayBold"
+theme_override_font_sizes/font_size = 56
+theme_type_variation = &"WarmText"
 text = "UNKNOWN"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -742,22 +765,20 @@ vertical_alignment = 1
 unique_name_in_owner = true
 visible = false
 layout_mode = 0
-offset_left = 126.0
-offset_top = 238.0
-offset_right = 566.0
-offset_bottom = 296.0
+offset_left = 154.0
+offset_top = 188.0
+offset_right = 594.0
+offset_bottom = 252.0
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_record_badge")
+theme_type_variation = &"WarmBadge"
 
 [node name="RankingResultLabel" type="Label" parent="Hud/GameOverPanel/Margin/Content/RankingResultBadge"]
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
-theme_override_colors/font_color = Color(1, 0.690196, 0.12549, 1)
-theme_override_colors/font_outline_color = Color(0, 0, 0, 0.85)
-theme_override_constants/outline_size = 4
-theme_override_font_sizes/font_size = 34
-theme_type_variation = &"HudBodyMedium"
+theme_override_colors/font_color = Color(0.352941, 0.227451, 0, 1)
+theme_override_font_sizes/font_size = 40
+theme_type_variation = &"WarmText"
 text = "최고 기록!"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -765,44 +786,35 @@ vertical_alignment = 1
 [node name="RestartButton" type="Button" parent="Hud/GameOverPanel/Margin/Content"]
 unique_name_in_owner = true
 layout_mode = 0
-offset_left = 12.0
-offset_top = 610.0
-offset_right = 680.0
-offset_bottom = 750.0
+offset_top = 650.0
+offset_right = 748.0
+offset_bottom = 782.0
 mouse_filter = 0
-theme_override_colors/font_color = Color(0.015, 0.05, 0.09, 1)
-theme_override_font_sizes/font_size = 36
-theme_override_styles/normal = SubResource("StyleBoxFlat_primary_cyan")
-theme_override_styles/hover = SubResource("StyleBoxFlat_primary_cyan")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_primary_cyan")
+theme_override_font_sizes/font_size = 52
+theme_type_variation = &"WarmPrimaryButton"
 text = "다시 하기"
 
 [node name="ResultRankingButton" type="Button" parent="Hud/GameOverPanel/Margin/Content"]
 unique_name_in_owner = true
 layout_mode = 0
-offset_left = 12.0
-offset_top = 780.0
-offset_right = 334.0
-offset_bottom = 908.0
+offset_top = 830.0
+offset_right = 362.0
+offset_bottom = 946.0
 mouse_filter = 0
-theme_override_font_sizes/font_size = 36
-theme_override_styles/normal = SubResource("StyleBoxFlat_outline_cyan")
-theme_override_styles/hover = SubResource("StyleBoxFlat_outline_cyan")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_outline_cyan")
+theme_override_font_sizes/font_size = 42
+theme_type_variation = &"WarmSecondaryButton"
 text = "랭킹"
 
 [node name="ModeSelectButton" type="Button" parent="Hud/GameOverPanel/Margin/Content"]
 unique_name_in_owner = true
 layout_mode = 0
-offset_left = 358.0
-offset_top = 780.0
-offset_right = 680.0
-offset_bottom = 908.0
+offset_left = 386.0
+offset_top = 830.0
+offset_right = 748.0
+offset_bottom = 946.0
 mouse_filter = 0
-theme_override_font_sizes/font_size = 36
-theme_override_styles/normal = SubResource("StyleBoxFlat_outline_cyan")
-theme_override_styles/hover = SubResource("StyleBoxFlat_outline_cyan")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_outline_cyan")
+theme_override_font_sizes/font_size = 42
+theme_type_variation = &"WarmSecondaryButton"
 text = "처음 화면"
 
 [node name="StartScreen" type="Control" parent="."]

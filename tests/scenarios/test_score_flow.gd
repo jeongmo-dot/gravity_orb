@@ -346,7 +346,7 @@ func test_game_over_panel_shows_scores_direction_and_restart_button() -> void:
 	var panel_style: StyleBoxFlat = panel.get_theme_stylebox("panel") as StyleBoxFlat
 	assert_true(panel.visible, "game-over panel visible")
 	assert_true(dimmer.visible, "game-over dims the whole screen")
-	assert_near(dimmer.color.a, 0.6, 0.001, "game-over dim alpha")
+	assert_near(dimmer.color.a, 0.45, 0.001, "game-over dim alpha")
 	assert_true(panel_style != null, "game-over panel has a flat opaque style")
 	if panel_style != null:
 		assert_true(panel_style.bg_color.a >= 0.92, "game-over panel opacity")
@@ -364,8 +364,8 @@ func test_game_over_panel_shows_scores_direction_and_restart_button() -> void:
 		"result values are about 1.6x their labels"
 	)
 	assert_true(
-		turn_value.get_theme_color("font_color").is_equal_approx(Color("#E8EEFF")),
-		"JELLY turn count uses the neutral result color"
+		turn_value.get_theme_color("font_color").is_equal_approx(Color("#5B2A3C")),
+		"JELLY turn count uses the warm result text color"
 	)
 	assert_eq(panel.mouse_filter, Control.MOUSE_FILTER_IGNORE, "panel ignores pointer")
 	assert_eq(restart_button.mouse_filter, Control.MOUSE_FILTER_STOP, "restart consumes pointer")

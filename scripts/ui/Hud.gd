@@ -8,7 +8,14 @@ const SCORE_ROLL_DURATION: float = 0.30
 const BADGE_PUNCH_DURATION: float = 0.15
 const BEST_FLASH_DURATION: float = 0.42
 const POPUP_MERGE_DISTANCE: float = 40.0
-const GOLD_COLOR: Color = Color("#FFD54A")
+const GOLD_COLOR: Color = Color("#FFC233")
+const B_TEXT_COLOR: Color = Color("#5B2A3C")
+const B_LABEL_COLOR: Color = Color("#A8405F")
+const B_CALLOUT_COLOR: Color = Color("#FF5D8F")
+const B_DEPTH_COLOR: Color = Color("#D9718F")
+const B_GOLD_OUTLINE_COLOR: Color = Color("#A86200")
+const B_GOLD_SHADOW_COLOR: Color = Color("#7A4500")
+const B_DANGER_COLOR: Color = Color("#FF5A6E")
 const CALLOUT_TOTAL_DURATION: float = 0.80
 const CALLOUT_COSMIC_DURATION: float = 1.00
 const PLANET_UNLOCK_CALLOUT_DURATION: float = 1.20
@@ -26,11 +33,11 @@ const CALLOUT_WORDS: Array[String] = [
 	"NICE!", "GREAT!", "AMAZING!", "INCREDIBLE!", "UNSTOPPABLE!"
 ]
 const CALLOUT_COLORS: Array[Color] = [
-	Color("#BFE9FF"),
-	Color("#E8EEFF"),
-	Color("#FFB020"),
-	Color("#FFD54A"),
-	Color("#FFD54A"),
+	Color("#FF7AA2"),
+	Color("#FF5D8F"),
+	Color("#F2557F"),
+	Color("#FFC233"),
+	Color("#FFC233"),
 ]
 const PLANET_NAMES: Dictionary = {
 	OrbTypes.OrbColor.PURPLE: "해왕성",
@@ -53,13 +60,13 @@ const JELLY_TAP_EFFECT_NAMES: Dictionary = {
 	GameConfig.JellyTapEffect.MAGNET: "자석",
 	GameConfig.JellyTapEffect.REST: "휴식",
 }
-const HUD_ACCENT_COLOR: Color = Color("#BFE9FF")
-const HUD_AMBER_COLOR: Color = Color("#FFB020")
-const HUD_PANEL_COLOR: Color = Color(0.0431373, 0.0941176, 0.2, 0.60)
-const SCORE_FONT_MAX: int = 54
-const SCORE_FONT_MIN: int = 32
-const BEST_FONT_MAX: int = 40
-const BEST_FONT_MIN: int = 18
+const HUD_ACCENT_COLOR: Color = Color("#FFD75E")
+const SCORE_FONT_MAX: int = 68
+const SCORE_FONT_MIN: int = 40
+const BEST_FONT_MAX: int = 52
+const BEST_FONT_MIN: int = 24
+const TURN_FONT_MAX: int = 60
+const TURN_FONT_MIN: int = 40
 const NUMERIC_SIDE_PADDING: float = 8.0
 const HUD_MARGIN: float = 24.0
 const PREVIEW_SHELF_HEIGHT: float = 340.0
@@ -94,7 +101,8 @@ const SPEAKER_OFF_ICON: Texture2D = preload("res://assets/ui/speaker_off.svg")
 @onready var _best_panel: PanelContainer = %BestPanel
 @onready var _danger_panel: PanelContainer = %DangerPanel
 @onready var _preview_shelf: PanelContainer = %PreviewShelf
-@onready var _turn_input_indicator: TurnInputIndicator = %TurnInputIndicator
+@onready var _next_preview_well: Panel = %NextPreviewWell
+@onready var _then_preview_well: Panel = %ThenPreviewWell
 
 var _spawner: Spawner
 var _score_manager: ScoreManager
@@ -245,9 +253,11 @@ func _apply_responsive_layout() -> void:
 	_set_control_rect(_max_combo_label, layout["max_combo"] as Rect2)
 	_set_control_rect(_preview_shelf, layout["preview_shelf"] as Rect2)
 	_set_control_rect(_next_label, layout["next_label"] as Rect2)
+	_set_control_rect(_next_preview_well, layout["next"] as Rect2)
 	_set_control_rect(_next_preview_region, layout["next"] as Rect2)
 	_set_control_rect(_next_count_label, layout["next_count"] as Rect2)
 	_set_control_rect(_then_label, layout["then_label"] as Rect2)
+	_set_control_rect(_then_preview_well, layout["then"] as Rect2)
 	_set_control_rect(_then_preview_region, layout["then"] as Rect2)
 	_set_control_rect(_then_count_label, layout["then_count"] as Rect2)
 	_next_preview.position = (layout["next"] as Rect2).get_center() + Vector2(0.0, 8.0)
@@ -315,9 +325,14 @@ static func hud_layout(viewport_size: Vector2, safe_area: Rect2 = Rect2()) -> Di
 		maxf(safe.size.x - 80.0, 1.0),
 		PREVIEW_SHELF_HEIGHT
 	)
-	var next_width: float = shelf.size.x * 0.55
-	var then_x: float = shelf.position.x + shelf.size.x * 0.60
-	var then_width: float = shelf.end.x - 30.0 - then_x
+	var next_rect: Rect2 = Rect2(
+		Vector2(shelf.position.x + shelf.size.x * 0.30 - 100.0, shelf_top + 110.0),
+		Vector2(200.0, 200.0)
+	)
+	var then_rect: Rect2 = Rect2(
+		Vector2(shelf.position.x + shelf.size.x * 0.78 - 76.0, shelf_top + 134.0),
+		Vector2(152.0, 152.0)
+	)
 	var score_panel: Rect2 = Rect2(center_x - 240.0, top, 480.0, 150.0)
 	var sound_rect: Rect2 = Rect2(safe.position.x + HUD_MARGIN, top + 8.0, 120.0, 120.0)
 	var turn_left: float = sound_rect.end.x + 12.0
@@ -341,17 +356,17 @@ static func hud_layout(viewport_size: Vector2, safe_area: Rect2 = Rect2()) -> Di
 		"combo": Rect2(center_x - 220.0, top + 226.0, 440.0, 46.0),
 		"max_combo": Rect2(safe.end.x - HUD_MARGIN - 236.0, top + 162.0, 236.0, 46.0),
 		"preview_shelf": shelf,
-		"next_label": Rect2(shelf.position.x + 30.0, shelf_top + 76.0, next_width, 40.0),
-		"next": Rect2(shelf.position.x + 30.0, shelf_top + 116.0, next_width, 194.0),
+		"next_label": Rect2(next_rect.position.x + 20.0, shelf_top + 62.0, 160.0, 48.0),
+		"next": next_rect,
 		"next_count": Rect2(
-			shelf.position.x + next_width - 50.0,
-			shelf_top + 72.0,
+			next_rect.end.x - 50.0,
+			shelf_top + 68.0,
 			80.0,
 			40.0
 		),
-		"then_label": Rect2(then_x, shelf_top + 84.0, then_width, 40.0),
-		"then": Rect2(then_x, shelf_top + 124.0, then_width, 176.0),
-		"then_count": Rect2(shelf.end.x - 110.0, shelf_top + 80.0, 80.0, 40.0),
+		"then_label": Rect2(then_rect.position.x + 6.0, shelf_top + 86.0, 140.0, 42.0),
+		"then": then_rect,
+		"then_count": Rect2(then_rect.end.x - 50.0, shelf_top + 88.0, 80.0, 40.0),
 	}
 
 
@@ -515,7 +530,6 @@ func bind_game_state(
 	_turn_manager = game_manager as TurnManager
 	_apply_responsive_layout()
 	_reset_callout_tracking()
-	_turn_input_indicator.bind(game_manager, board)
 	var turn_manager: TurnManager = _turn_manager
 	if not turn_manager.state_changed.is_connected(_on_turn_state_changed):
 		turn_manager.state_changed.connect(_on_turn_state_changed)
@@ -564,7 +578,7 @@ func _refresh_turn_number() -> void:
 		int(_turn_manager.state)
 	)
 	_turn_label.text = str(value)
-	_fit_numeric_label(_turn_label, value, BEST_FONT_MAX, BEST_FONT_MIN)
+	_fit_numeric_label(_turn_label, value, TURN_FONT_MAX, TURN_FONT_MIN)
 
 
 static func turn_number_for_state(turn_index: int, state: int) -> int:
@@ -879,8 +893,6 @@ func _on_combo_changed(combo: int, multiplier: float, max_combo: int) -> void:
 		_combo_label.scale = Vector2.ONE
 		return
 	_multiplier_label.text = "×%s" % _format_multiplier(multiplier)
-	_multiplier_label.add_theme_color_override("font_color", multiplier_stage_color(multiplier))
-	_combo_label.add_theme_color_override("font_color", multiplier_stage_color(multiplier))
 	if multiplier > previous_multiplier and Config.data.fx_score_popups_enabled:
 		_punch_multiplier_badge()
 
@@ -991,30 +1003,14 @@ func _popup_appearance(reaction: Dictionary) -> Dictionary:
 	if cosmic:
 		return {
 			"color": GOLD_COLOR,
-			"outline_color": Color(0.05, 0.025, 0.0, 0.92),
-			"outline_size": 3,
+			"outline_color": B_GOLD_OUTLINE_COLOR,
+			"outline_size": 6,
 			"cosmic": true,
 		}
-	if reaction_type == ReactionRules.Type.MERGE:
-		var color_index: int = clampi(
-			int(reaction.get("result_color", OrbTypes.OrbColor.RED)),
-			0,
-			Config.data.color_display.size() - 1
-		)
-		var base_color: Color = Config.data.color_display[color_index]
-		var bright_color: Color = Color.from_hsv(
-			base_color.h, base_color.s, 1.0, base_color.a
-		)
-		return {
-			"color": bright_color,
-			"outline_color": Color(0.02, 0.03, 0.06, 0.92),
-			"outline_size": 3,
-			"cosmic": false,
-		}
 	return {
-		"color": Color.WHITE,
-		"outline_color": Color(0.02, 0.03, 0.06, 0.92),
-		"outline_size": 3,
+		"color": B_CALLOUT_COLOR,
+		"outline_color": Color.WHITE,
+		"outline_size": 6,
 		"cosmic": false,
 	}
 
@@ -1205,21 +1201,21 @@ func _set_danger_badge(occupancy: float, multiplier: float) -> void:
 	_danger_panel.visible = _danger_label.visible
 	if _danger_label.visible:
 		_danger_label.text = "DANGER ×%s" % _format_multiplier(multiplier)
-		var danger_color: Color = (
-			Color("#FF3B30") if multiplier >= 4.0 else HUD_AMBER_COLOR
-		)
-		_danger_label.add_theme_color_override("font_color", danger_color)
-		_apply_danger_panel_color(danger_color)
+		_danger_label.add_theme_color_override("font_color", Color("#C2334A"))
+		_apply_danger_panel_color(B_DANGER_COLOR)
 	if _board != null and _board.has_method("set_danger_state"):
 		_board.call("set_danger_state", occupancy, multiplier)
 
 
 func _apply_danger_panel_color(border_color: Color) -> void:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = HUD_PANEL_COLOR
+	style.bg_color = Color("#FFF1F1")
 	style.border_color = border_color
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(12)
+	style.set_border_width_all(8)
+	style.set_corner_radius_all(31)
+	style.shadow_color = Color("#C2334A")
+	style.shadow_size = 1
+	style.shadow_offset = Vector2(0.0, 10.0)
 	_danger_panel.add_theme_stylebox_override("panel", style)
 
 
@@ -1327,7 +1323,7 @@ func _update_callout(combo: int) -> void:
 		_sfx_bank.play_callout_chime(stage_index)
 
 
-func _show_callout(text: String, stage_index: int = 0) -> void:
+func _show_callout(text: String, stage_index: int = 0, informational: bool = false) -> void:
 	_apply_responsive_layout()
 	_showing_jelly_tap_effect = false
 	if _callout_tween != null and _callout_tween.is_valid():
@@ -1335,20 +1331,24 @@ func _show_callout(text: String, stage_index: int = 0) -> void:
 	_stop_sparkles(_callout_sparkles)
 	_planet_callout_visual.visible = false
 	var clamped_stage: int = clampi(stage_index, 0, CALLOUT_WORDS.size() - 1)
-	var cosmic: bool = clamped_stage >= 3
+	var cosmic: bool = clamped_stage >= 3 and not informational
 	var duration: float = CALLOUT_COSMIC_DURATION if cosmic else CALLOUT_TOTAL_DURATION
 	_callout_label.text = text
 	_fit_callout_font_to_layout()
-	_callout_label.add_theme_color_override("font_color", CALLOUT_COLORS[clamped_stage])
+	_callout_label.add_theme_color_override(
+		"font_color", B_TEXT_COLOR if informational else CALLOUT_COLORS[clamped_stage]
+	)
 	_callout_label.add_theme_color_override(
 		"font_outline_color",
-		Color(0.02, 0.035, 0.07, 0.92)
+		B_GOLD_OUTLINE_COLOR if cosmic else Color.WHITE
 	)
-	_callout_label.add_theme_constant_override("outline_size", 4)
-	var glow_color: Color = GOLD_COLOR
-	glow_color.a = 0.30 if cosmic else 0.0
-	_callout_label.add_theme_color_override("font_shadow_color", glow_color)
-	_callout_label.add_theme_constant_override("shadow_outline_size", 20 if cosmic else 0)
+	_callout_label.add_theme_constant_override("outline_size", 6)
+	_callout_label.add_theme_color_override(
+		"font_shadow_color", B_GOLD_SHADOW_COLOR if cosmic else B_DEPTH_COLOR
+	)
+	_callout_label.add_theme_constant_override("shadow_offset_x", 0)
+	_callout_label.add_theme_constant_override("shadow_offset_y", 16)
+	_callout_label.add_theme_constant_override("shadow_outline_size", 0)
 	_callout_label.visible = true
 	_callout_label.modulate = Color.WHITE
 	_callout_label.position = _callout_base_position
@@ -1412,12 +1412,14 @@ func _show_planet_unlock(color_index: int) -> void:
 	)
 	_callout_label.text = text
 	_fit_callout_font_to_layout()
-	_callout_label.add_theme_color_override("font_color", display_color)
+	_callout_label.add_theme_color_override("font_color", B_TEXT_COLOR)
 	_callout_label.add_theme_color_override(
-		"font_outline_color", Color(0.02, 0.035, 0.07, 0.92)
+		"font_outline_color", Color.WHITE
 	)
-	_callout_label.add_theme_constant_override("outline_size", 4)
-	_callout_label.add_theme_color_override("font_shadow_color", Color.TRANSPARENT)
+	_callout_label.add_theme_constant_override("outline_size", 6)
+	_callout_label.add_theme_color_override("font_shadow_color", B_DEPTH_COLOR)
+	_callout_label.add_theme_constant_override("shadow_offset_x", 0)
+	_callout_label.add_theme_constant_override("shadow_offset_y", 16)
 	_callout_label.add_theme_constant_override("shadow_outline_size", 0)
 	_callout_label.visible = true
 	_callout_label.modulate = Color.WHITE
@@ -1553,14 +1555,15 @@ func _show_jelly_tap_effect(color_index: int) -> void:
 	_callout_label.text = callout_text
 	_fit_callout_font_to_layout()
 	_callout_label.add_theme_color_override(
-		"font_color",
-		JellyOrbArt.color_for(color_index, Config.data.jelly_tap_blast_min_level)
+		"font_color", B_TEXT_COLOR
 	)
 	_callout_label.add_theme_color_override(
-		"font_outline_color", Color(0.02, 0.035, 0.07, 0.92)
+		"font_outline_color", Color.WHITE
 	)
-	_callout_label.add_theme_constant_override("outline_size", 4)
-	_callout_label.add_theme_color_override("font_shadow_color", Color.TRANSPARENT)
+	_callout_label.add_theme_constant_override("outline_size", 6)
+	_callout_label.add_theme_color_override("font_shadow_color", B_DEPTH_COLOR)
+	_callout_label.add_theme_constant_override("shadow_offset_x", 0)
+	_callout_label.add_theme_constant_override("shadow_offset_y", 16)
 	_callout_label.add_theme_constant_override("shadow_outline_size", 0)
 	_callout_label.visible = true
 	_callout_label.modulate = Color.WHITE
@@ -1653,7 +1656,7 @@ func _show_next_timed_jelly_callout(
 		bonus_text,
 	]
 	_timed_jelly_callout_history.append(text)
-	_show_callout(text, 0)
+	_show_callout(text, 0, true)
 
 
 func _on_timed_stone_created(turns: int) -> void:
@@ -1689,7 +1692,7 @@ func _show_next_timed_stone_callout(turns: int = -1) -> void:
 			)
 			text = "굳은 젤리: %d턴 동안 합칠 수 없음" % configured_turns
 	_timed_stone_callout_history.append(text)
-	_show_callout(text, 0)
+	_show_callout(text, 0, true)
 
 
 func _show_callout_sparkles(stage_index: int, duration: float) -> void:
@@ -1711,7 +1714,7 @@ func _show_callout_sparkles(stage_index: int, duration: float) -> void:
 		end_offset.y = clampf(end_offset.y, -vertical_span, vertical_span)
 		_callout_sparkles[index].play(
 			center,
-			GOLD_COLOR,
+			[Color("#FFD75E"), Color("#FF8FB0"), Color.WHITE][index % 3],
 			duration,
 			offsets[index],
 			end_offset,

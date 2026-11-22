@@ -38,6 +38,34 @@
 
 ## 미확인
 
+### [2026-11-22] 대상 #157 — UI B안 1: 따뜻한 젤리 HUD·결과 창·화면 바탕
+- **맨 앞 확인 목록:** JELLY 해시 상수 변경 없음. 주아 폴백 글자 없음. 540×960·540×1170 캡처 12장에서 글 잘림·겹침 없음. 화살표 삭제에 따른 입력 동작 변경 없음. 시작·랭킹·설정 모습 변경 없음. 명세에 없는 움직임·연출 추가 없음.
+- 상태: 완료
+- 브랜치 / PR: `ui-b-hud` / 생성 예정
+- 변경 파일: `assets/fonts/Jua-Regular.ttf`, `assets/fonts/SOURCE.md`, `assets/fonts/OFL.txt`, `assets/ui/gravity_orb_theme.tres`, `scenes/UI.tscn`, `scripts/fx/SpaceBackdrop.gd`, `scripts/ui/GameOverPanel.gd`, `scripts/ui/Hud.gd`, `scripts/ui/JellyFinalMoveBanner.gd`, `scripts/ui/ScorePopup.gd`, `scripts/ui/WarmRibbon.gd`, `scripts/ui/TurnInputIndicator.gd`(삭제), `tests/capture_screens.ps1`, `tests/spike/capture_screens.gd`, `tests/test_callouts.gd`, `tests/test_score_popups.gd`, `tests/test_screen_layout.gd`, `tests/test_space_board_visuals.gd`, `tests/test_turn_input_indicator.gd`(삭제), 이 회신 파일
+- Done-when 대조:
+  - [x] 주아 원본·출처·라이선스 — Google Fonts `ofl/jua/Jua-Regular.ttf`, 원본 커밋 `06bfe0d62a98375cb09c942fa18e68bd32cff057`, SHA-256 `769677aef240bfc3b9965f2b50748075bff885e6c6992fc591a3fb268279f898`, SIL OFL 1.1. 현재 #157 표시 문자열의 폴백 글자 0개
+  - [x] 시작·랭킹·설정의 공용 테마를 건드리지 않고 `Warm*` 테마 형식만 추가 — 자동 (`test_screen_layout.gd`)
+  - [x] 위 카드·소리 버튼·호령·점수 팝업·FINAL MOVE·NEXT/THEN·결과 창·크림 점 배경을 B 토큰으로 변경 — 자동 + 실제 창 캡처
+  - [x] `TurnInputIndicator` 노드·스크립트·전용 테스트 삭제 — 입력 규칙을 담당하는 `TurnManager`는 변경하지 않음
+  - [x] 화살표 기대 정리 — 삭제: `test_turn_input_indicator.gd`; 캡처 목록에서 `30_board_blocked`, `31_arrow_ready`, `32_arrow_rejected`, `33_arrow_locked` 제거; `test_screen_layout.gd`에 노드·리소스 부재 검사 추가
+  - [x] 전체 회귀·규칙 해시 — 일반 **377/377**, 장기 **4/4**, 성능 **5/5**, JELLY 고정 해시 출력 전부 기존 상수와 일치
+  - [x] 두 비율 6종 실제 창 — 각 ①게임 중 GREAT+COMBO+팝업+시한 젤리 ②최고 기록 결과 ③FINAL MOVE ④DANGER ⑤시한 안내 ⑥금색 큰 점수, 합계 12장 직접 확인
+  - [x] 빌드 없음
+- QA 관측값:
+  - 엔진: Godot `4.8.dev3.official.51105ccbe` 일반 빌드
+  - `--headless --path . --import` → 스크립트·애셋 가져오기 완료, `SCRIPT ERROR`·`Parse Error` 0건
+  - `tests/run_tests.ps1` → 일반 **377/377**, 장기 **4/4**, 성능 **5/5**, 각 종료 코드 0, 최종 종료 코드 0, 103.244초
+  - 관련 단위·장면 테스트 별도 실행 → `test_screen_layout` 8/8, `test_callouts` 13/13, `test_score_popups` 11/11, `test_score_flow` 11/11, `test_space_board_visuals` 5/5, 합계 **48/48**
+  - 기본·`--mode=blitz` `--headless --quit-after 300` → 각각 종료 코드 0, 오류 출력 0건
+  - `tests/capture_screens.ps1 -UiBOnly` → 종료 코드 0, 540×960 6장 + 540×1170 6장. 장면 번호 `213`~`218`; 캡처는 gitignore 로컬 산출물
+  - 규칙 검색 → 새 `Input` 사용 0개, 새 전역 난수 사용 0개. `git diff --check` 오류 0
+- 수동 확인 절차:
+  1. JELLY 게임을 시작해 상단 카드·NEXT/THEN·호령·점수 팝업·크림 점 배경과 방향 화살표 부재를 확인한다.
+  2. 현재 중력 방향과 이동 중 방향 입력을 시도해 기존 무시·처리 규칙이 유지되는지 확인한다.
+  3. 게임오버를 발생시켜 리본·2×2 통계 칸·최고 기록 배지·세 버튼을 보고, 버튼 세 개가 기존 화면으로 이동하는지 확인한다.
+- 결정 사항·알려진 문제: 결과 리본의 접힌 끝을 표현하기 위해 명세 수치만 사용하는 `WarmRibbon` 그리기 노드를 추가했다. 현재 체크아웃에는 인박스 링크의 `mockups/ui_b/` 원본이 없어 §12-ONE.47의 수치·색·부품 명세를 기준으로 구현하고 실제 캡처로 검증했다. #158 전이므로 판 내부·틀·중력 빛은 기존 어두운 우주 모습이고, #159 전이므로 시작·랭킹·설정은 기존 모습이다.
+
 ### [2026-11-20] 대상 #156 후속 — 전체 코드 리뷰 지적 3건 개선
 - 상태: 완료
 - 브랜치 / PR: `review-fixes-save-warning-cleanup` / 미생성

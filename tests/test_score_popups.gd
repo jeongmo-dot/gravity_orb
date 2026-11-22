@@ -92,23 +92,20 @@ func test_multiplier_has_four_color_stages() -> void:
 	assert_eq(Hud.multiplier_stage_color(8.0), Color.RED, "×8 red")
 
 
-func test_popup_colors_follow_merge_blast_and_finale_rules() -> void:
+func test_popup_colors_follow_warm_normal_gold_and_finale_rules() -> void:
 	var main: Main = await _create_main(GameConfig.GameMode.TURN)
 	var hud: Hud = main.get_node("UI/Hud") as Hud
 	var merge: Dictionary = hud._popup_appearance({
 		"type": ReactionRules.Type.MERGE,
 		"result_color": OrbTypes.OrbColor.BLUE,
 	})
-	var source_color: Color = Config.data.color_display[OrbTypes.OrbColor.BLUE]
-	var expected_merge: Color = Color.from_hsv(
-		source_color.h, source_color.s, 1.0, source_color.a
-	)
-	assert_eq(merge["color"], expected_merge, "merge uses bright result-orb color")
+	assert_eq(merge["color"], Hud.B_CALLOUT_COLOR, "ordinary score uses warm callout pink")
+	assert_eq(merge["outline_color"], Color.WHITE, "ordinary score uses white outline")
 	var blast: Dictionary = hud._popup_appearance({"type": ReactionRules.Type.BLAST})
 	assert_eq(blast["color"], Hud.GOLD_COLOR, "blast uses gold text")
 	assert_true(bool(blast["cosmic"]), "blast uses cosmic treatment")
-	assert_eq(int(blast["outline_size"]), 3, "blast uses a thin dark outline")
-	assert_true((blast["outline_color"] as Color).get_luminance() < 0.1, "blast outline is dark")
+	assert_eq(int(blast["outline_size"]), 6, "blast uses a visible six-pixel outline")
+	assert_eq(blast["outline_color"], Hud.B_GOLD_OUTLINE_COLOR, "blast uses warm gold outline")
 	var finale: Dictionary = hud._popup_appearance({
 		"type": ReactionRules.Type.BLAST,
 		"finale": true,
@@ -133,7 +130,7 @@ func test_large_popup_formats_formula_without_horizontal_shake_and_caps_sparkles
 	assert_eq(popup.formula_text(), "6,075 ×8", "formula base has comma separators")
 	assert_true(popup.is_cosmic_score(), "blast is a cosmic popup")
 	assert_eq(popup.active_sparkle_count(), 2, "large cosmic popup has two stars")
-	assert_true(popup.glow_alpha() <= 0.30 + TOLERANCE, "gold glow respects alpha cap")
+	assert_near(popup.glow_alpha(), 1.0, TOLERANCE, "gold score uses an opaque crisp shadow")
 	var initial_x: float = popup.position.x
 	popup._process(0.2)
 	assert_near(popup.position.x, initial_x, TOLERANCE, "large popup has no horizontal shake")

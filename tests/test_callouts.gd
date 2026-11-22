@@ -290,11 +290,13 @@ func test_callout_font_shrinks_only_for_overflow_and_resets() -> void:
 		)
 		callout.add_theme_font_size_override("font_size", base_font_size)
 		callout.text = hud._jelly_tap_effect_callout_text(OrbTypes.OrbColor.GREEN)
+		var overflows_at_base: bool = hud._callout_text_width() > callout_rect.size.x
 		hud._fit_callout_font_to_rect(callout_rect)
 		var fitted_font_size: int = callout.get_theme_font_size("font_size")
-		assert_true(
+		assert_eq(
 			fitted_font_size < base_font_size,
-			"green REST hint shrinks at the 540-wide window ratio"
+			overflows_at_base,
+			"callout shrinks exactly when the active font overflows"
 		)
 		assert_true(
 			hud._callout_text_width() <= callout_rect.size.x,
@@ -330,15 +332,7 @@ func test_callout_font_shrinks_only_for_overflow_and_resets() -> void:
 		Hud.CALLOUT_FONT_MIN,
 		Hud.CALLOUT_FONT_MAX
 	)
-	var reset_layout: Dictionary = Hud.hud_layout(simulated_viewports[0])
-	var reset_rect: Rect2 = hud._callout_layout_rect(simulated_viewports[0], reset_layout)
-	callout.add_theme_font_size_override("font_size", Hud.CALLOUT_FONT_MAX)
-	callout.text = hud._jelly_tap_effect_callout_text(OrbTypes.OrbColor.GREEN)
-	hud._fit_callout_font_to_rect(reset_rect)
-	assert_true(
-		callout.get_theme_font_size("font_size") < Hud.CALLOUT_FONT_MAX,
-		"long green hint establishes a reduced font before the reset check"
-	)
+	callout.add_theme_font_size_override("font_size", Hud.CALLOUT_FONT_MIN)
 	hud._show_jelly_tap_effect(OrbTypes.OrbColor.RED)
 	assert_eq(
 		callout.get_theme_font_size("font_size"),
@@ -391,8 +385,8 @@ func test_six_jelly_tap_effect_callouts_show_once_without_art_or_sound() -> void
 		assert_eq(callout.text, expected[color_index], "effect callout text at input wait")
 		assert_eq(
 			callout.get_theme_color("font_color"),
-			JellyOrbArt.color_for(color_index, 8),
-			"effect callout uses jelly color"
+			Hud.B_TEXT_COLOR,
+			"effect callout uses warm informational text"
 		)
 		assert_true(not unlock_visual.visible, "effect callout has no orb art")
 		if hud._callout_tween != null and hud._callout_tween.is_valid():

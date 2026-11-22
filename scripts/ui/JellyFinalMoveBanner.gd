@@ -1,16 +1,24 @@
 class_name JellyFinalMoveBanner
 extends Control
 
-const ORBITRON: FontFile = preload("res://assets/fonts/Orbitron[wght].ttf")
-const KOREAN_FONT: FontFile = preload("res://assets/fonts/NotoSansKR-Medium-KSX1001.ttf")
-const WARNING_COLOR: Color = Color("#FFCF66")
-const BACKGROUND_COLOR: Color = Color(0.08, 0.05, 0.10, 0.82)
+const JUA: FontFile = preload("res://assets/fonts/Jua-Regular.ttf")
+const TITLE_COLOR: Color = Color("#C2334A")
+const TEXT_COLOR: Color = Color("#5B2A3C")
 
 var message: String = ""
+var _panel_style: StyleBoxFlat
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_panel_style = StyleBoxFlat.new()
+	_panel_style.bg_color = Color("#FFFAF3")
+	_panel_style.border_color = Color("#FF5A6E")
+	_panel_style.set_border_width_all(6)
+	_panel_style.set_corner_radius_all(30)
+	_panel_style.shadow_color = Color("#C2334A")
+	_panel_style.shadow_size = 1
+	_panel_style.shadow_offset = Vector2(0.0, 8.0)
 	set_process(false)
 	visible = false
 
@@ -18,17 +26,11 @@ func _ready() -> void:
 func show_final_move(next_message: String) -> void:
 	message = next_message
 	visible = true
-	set_process(true)
 	queue_redraw()
 
 
 func hide_final_move() -> void:
 	visible = false
-	set_process(false)
-
-
-func _process(_delta: float) -> void:
-	queue_redraw()
 
 
 func _draw() -> void:
@@ -39,26 +41,24 @@ func _draw() -> void:
 		(size.x - band_width) * 0.5,
 		maxf(size.y * 0.5 - 360.0, 174.0),
 		band_width,
-		68.0
+		122.0
 	)
-	var pulse: float = 0.82 + sin(float(Time.get_ticks_msec()) * 0.008) * 0.18
-	draw_rect(band_rect, BACKGROUND_COLOR, true)
-	draw_rect(band_rect, Color(WARNING_COLOR, pulse), false, 3.0)
+	draw_style_box(_panel_style, band_rect)
 	draw_string(
-		ORBITRON,
+		JUA,
 		band_rect.position + Vector2(0.0, 44.0),
 		"FINAL MOVE",
 		HORIZONTAL_ALIGNMENT_CENTER,
 		band_rect.size.x,
-		28,
-		WARNING_COLOR
+		32,
+		TITLE_COLOR
 	)
 	draw_string(
-		KOREAN_FONT,
-		band_rect.position + Vector2(-40.0, 100.0),
+		JUA,
+		band_rect.position + Vector2(-40.0, 91.0),
 		message,
 		HORIZONTAL_ALIGNMENT_CENTER,
 		band_rect.size.x + 80.0,
-		18,
-		Color("#DFE8FF")
+		24,
+		TEXT_COLOR
 	)

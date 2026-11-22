@@ -13,9 +13,10 @@ const RISE_DISTANCE: float = 60.0
 const POP_IN_DURATION: float = 0.12
 const POP_IN_PEAK_TIME: float = 0.07
 const POPUP_SIZE: Vector2 = Vector2(308.0, 126.0)
-const GOLD_COLOR: Color = Color("#FFD54A")
-const FORMULA_COLOR: Color = Color("#AFC5D8")
-const COSMIC_GLOW_ALPHA: float = 0.28
+const GOLD_COLOR: Color = Color("#FFC233")
+const GOLD_SHADOW_COLOR: Color = Color("#7A4500")
+const CALLOUT_SHADOW_COLOR: Color = Color("#D9718F")
+const FORMULA_COLOR: Color = Color("#5B2A3C")
 const HUD_THEME: Theme = preload("res://assets/ui/gravity_orb_theme.tres")
 
 var started_process_frame: int = -1
@@ -46,7 +47,7 @@ func _ready() -> void:
 	_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_score_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_score_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_score_label.theme_type_variation = &"HudDisplayBold"
+	_score_label.theme_type_variation = &"WarmText"
 	add_child(_score_label)
 	_formula_label = Label.new()
 	_formula_label.name = "Formula"
@@ -56,7 +57,7 @@ func _ready() -> void:
 	_formula_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_formula_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_formula_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_formula_label.theme_type_variation = &"HudDisplayMedium"
+	_formula_label.theme_type_variation = &"WarmText"
 	_formula_label.add_theme_font_size_override("font_size", FORMULA_FONT_SIZE)
 	_formula_label.add_theme_color_override("font_color", FORMULA_COLOR)
 	add_child(_formula_label)
@@ -256,13 +257,12 @@ func _process(delta: float) -> void:
 
 
 func _configure_cosmic_style() -> void:
-	var shadow_color: Color = GOLD_COLOR
-	shadow_color.a = COSMIC_GLOW_ALPHA if _cosmic_score else 0.0
-	_score_label.add_theme_color_override("font_shadow_color", shadow_color)
-	_score_label.add_theme_constant_override(
-		"shadow_outline_size",
-		16 if _cosmic_score else 0
+	_score_label.add_theme_color_override(
+		"font_shadow_color", GOLD_SHADOW_COLOR if _cosmic_score else CALLOUT_SHADOW_COLOR
 	)
+	_score_label.add_theme_constant_override("shadow_offset_x", 0)
+	_score_label.add_theme_constant_override("shadow_offset_y", 16)
+	_score_label.add_theme_constant_override("shadow_outline_size", 0)
 	for sparkle: CosmicSparkle in _sparkles:
 		sparkle.stop()
 	if not _cosmic_score:
@@ -272,7 +272,7 @@ func _configure_cosmic_style() -> void:
 	for index: int in range(sparkle_count):
 		_sparkles[index].play(
 			POPUP_SIZE * 0.5,
-			GOLD_COLOR,
+			[Color("#FFD75E"), Color("#FF8FB0"), Color.WHITE][index % 3],
 			_duration,
 			offsets[index],
 			offsets[index] * 1.18,
