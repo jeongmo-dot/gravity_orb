@@ -116,6 +116,9 @@ func test_board_uses_opaque_ten_by_ten_checkerboard_and_warm_layered_frame() -> 
 	assert_near((frame_band.mesh as QuadMesh).size.x, expected_band_size, 0.0001, "white band is 16px")
 	assert_near((frame_outline.mesh as QuadMesh).size.x, expected_outer_size, 0.0001, "pink line is 8px")
 	assert_near((frame_depth.mesh as QuadMesh).size.x, expected_outer_size, 0.0001, "depth matches frame")
+	assert_true(frame_depth.position.z < frame_outline.position.z, "depth renders behind outline")
+	assert_true(frame_outline.position.z < frame_band.position.z, "outline renders behind white band")
+	assert_true(frame_band.position.z < backing.position.z, "white band renders behind checker floor")
 	assert_near(
 		frame_depth.position.y,
 		-Board3D.FRAME_DEPTH_OFFSET_M,
@@ -135,9 +138,16 @@ func test_board_uses_opaque_ten_by_ten_checkerboard_and_warm_layered_frame() -> 
 	for wall_name: String in ["VisualTop", "VisualBottom", "VisualLeft", "VisualRight"]:
 		var wall: MeshInstance3D = board.get_node("VisualTilt/%s" % wall_name) as MeshInstance3D
 		var material: StandardMaterial3D = wall.material_override as StandardMaterial3D
+		assert_true(wall.mesh == null, "%s keeps light anchors without a square box" % wall_name)
 		assert_eq(material.albedo_color, Board3D.METAL_FRAME_COLOR, "%s uses a white band" % wall_name)
 		assert_near(material.metallic, 0.0, 0.0001, "%s is no longer metallic" % wall_name)
 		assert_true(wall.has_node("InnerGlow"), "%s has gravity light" % wall_name)
+		assert_near(
+			(wall.get_node("InnerGlow") as MeshInstance3D).position.z,
+			Board3D.FRAME_LIGHT_Z,
+			0.0001,
+			"%s gravity light stays flat enough not to cover the outline" % wall_name
+		)
 		assert_true(wall.has_node("OuterGlow"), "%s has outer state glow" % wall_name)
 	assert_true(not board.has_node("VisualTilt/GravityField"), "curved gravity grid is removed")
 	assert_true(not board.has_node("VisualTilt/BeveledCorners"), "metal corner caps are removed")

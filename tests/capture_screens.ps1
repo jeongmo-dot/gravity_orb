@@ -265,7 +265,9 @@ if ($UiBBoardOnly) {
         "222_ui_b_board_blast.png",
         "223_ui_b_board_timed_number.png",
         "224_ui_b_board_stone.png",
-        "225_ui_b_board_final_move.png"
+        "225_ui_b_board_final_move.png",
+        "226_ui_b_board_danger_amber.png",
+        "227_ui_b_board_danger_red.png"
     )
     $expectedZoomFiles = @()
 }

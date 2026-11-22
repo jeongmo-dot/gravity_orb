@@ -27,6 +27,7 @@ const BOARD_CHECKER_CELLS: int = 10
 const BOARD_CORNER_RADIUS_M: float = 0.32
 const FRAME_OUTLINE_WIDTH_M: float = 0.08
 const FRAME_DEPTH_OFFSET_M: float = 0.28
+const FRAME_LIGHT_Z: float = -0.31
 
 static var _active_board_count: int = 0
 
@@ -1069,9 +1070,6 @@ func _add_visual_wall(wall_name: String, wall_position: Vector3, size: Vector3) 
 	else:
 		wall_position.x += signf(wall_position.x) * VISUAL_WALL_WIDTH_M * 0.5
 	wall_mesh_instance.position = wall_position
-	var wall_mesh: BoxMesh = BoxMesh.new()
-	wall_mesh.size = size
-	wall_mesh_instance.mesh = wall_mesh
 	var wall_material: StandardMaterial3D = _visual_material(METAL_FRAME_COLOR, 0.22, 0.08)
 	wall_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	wall_material.metallic = 0.0
@@ -1096,7 +1094,7 @@ func _add_visual_wall(wall_name: String, wall_position: Vector3, size: Vector3) 
 
 	var inner_glow: MeshInstance3D = MeshInstance3D.new()
 	inner_glow.name = "InnerGlow"
-	inner_glow.position.z = 0.17
+	inner_glow.position.z = FRAME_LIGHT_Z
 	var inner_mesh: QuadMesh = QuadMesh.new()
 	inner_mesh.size = Vector2(
 		size.x if size.x > size.y else INNER_GLOW_WIDTH_M,

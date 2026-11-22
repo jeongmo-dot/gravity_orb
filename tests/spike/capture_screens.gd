@@ -218,6 +218,8 @@ const UI_B_BOARD_ONLY_FILES: Array[String] = [
 	"223_ui_b_board_timed_number.png",
 	"224_ui_b_board_stone.png",
 	"225_ui_b_board_final_move.png",
+	"226_ui_b_board_danger_amber.png",
+	"227_ui_b_board_danger_red.png",
 ]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
@@ -404,6 +406,16 @@ func _capture_ui_b_board_scenes() -> void:
 			)
 			full_orb.disable_physics()
 	await _capture("220_ui_b_board_full.png")
+	board.set_process(false)
+	board.set_danger_state(0.70, 1.5)
+	board._process(0.1)
+	await _capture("226_ui_b_board_danger_amber.png")
+	board.set_danger_state(0.70, 4.0)
+	board._process(0.625)
+	await _capture("227_ui_b_board_danger_red.png")
+	board.set_danger_state(0.0, 1.0)
+	board._process(0.1)
+	board.set_process(true)
 
 	board.set_process(false)
 	board.set_gravity(Vector2i.DOWN)
@@ -454,7 +466,12 @@ func _capture_ui_b_board_scenes() -> void:
 	await _capture("223_ui_b_board_timed_number.png")
 
 	timed.set_timed_stone(0, true)
+	board.play_visual_tilt(Vector2i.RIGHT)
+	await get_tree().create_timer(Config.data.fx_tilt_duration * 0.43).timeout
 	await _capture("224_ui_b_board_stone.png")
+	if board._tilt_tween != null and board._tilt_tween.is_valid():
+		board._tilt_tween.kill()
+	board._visual_tilt.rotation_degrees = Vector3.ZERO
 
 	board.clear()
 	_spawn_featured(board)
