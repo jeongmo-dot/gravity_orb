@@ -36,6 +36,33 @@
 
 ## 대기 중
 
+### [2026-11-22 #158] UI B안 2 — 판 바닥·판 틀 (3D)
+- 상태: **보류 — 시작하지 말 것**. #157 병합 뒤 Claude가 "대기"로 바꾼다. 인박스 번호 #158은 GitHub PR #158 (#156 후속)과 다르다
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.47** "#158 요구" 1~6
+- 배경: 사용자 (2026-11-22) "B가 좋아보이는데 저 게임 프레임 옆에 삼각형은 제발 없애줘" → "응 명세부터 써줘"
+- 앵커: `scripts/spike/Board3D.gd` 바닥 셰이더 (휘는 격자, 약 1363행)·`METAL_FRAME_COLOR`·`GRAVITY_GLOW_COLOR`·벽 그림, `tests/test_space_board_visuals.gd`
+- 요구 요약: 바닥 우주 격자 → 바둑판 (#F3E6FB·#FDF8FF, 한 변 10칸, 휘어짐 없음), 판 틀 흰 띠 16 + 바깥 선 8 #F39AB4 + 아래 두께 28 #D9718F, 중력 빛 #FF8FB0. 그림만 — 물리 벽·판 크기·기울기·입구 그대로
+- 건드리지 말 것: 규칙·물리·수치, 젤리 그림·빛, 위험 빛·대폭발·청소 그림, 2D 화면 (#157), 시작·랭킹·설정 (#159), 사용자 저장 파일, `project.godot` 버전·`build/windows/` (**빌드 없음**), `docs/` (회신 파일 제외), 고리 모양, 명세에 없는 연출
+- Done-when:
+  - [ ] 판 그림 테스트 새 기대, 해시 상수 그대로, 전체 회귀 (평일)
+  - [ ] 캡처 두 비율 (§12-ONE.47 "#158 요구" 캡처 목록) — 노랑 L1·시한 숫자·회색 돌·중력 빛이 밝은 판에서 보이는지 회신에
+- **회신 맨 앞에**: §12-ONE.47 "#158" 목록
+- 커밋: 항목 단위 브랜치 (`ui-b-board`, main에서), **push·PR까지** (병합은 Claude 검수 뒤)
+
+### [2026-11-22 #157] UI B안 1 — 게임 중 화면·결과 창·화면 바탕, 방향 화살표 삭제
+- 상태: **보류 — 시작하지 말 것**. #155 값 결정 뒤 Claude가 "대기"로 바꾼다 (그 전까지 공유 트리는 사용자가 B10을 해 보도록 `merge-gap-2`에 둔다). 캡처가 많아 평일 풀테스트. 인박스 번호 #157은 GitHub PR #157 (#156)과 다르다
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.47** — B 색 토큰·부품 1~9·주아 글꼴·"#157 요구" 1~10. 목업 원본 [mockups/ui_b/](mockups/ui_b/) (540 폭 기준 — 논리 좌표는 ×2)
+- 배경: 사용자 (2026-11-22) "다른 모바일 퍼즐게임 UI야 이걸 참고해서 우리게임 UI를 개선하고 싶어" → Claude 목업 A·B·C → "B가 좋아보이는데 저 게임 프레임 옆에 삼각형은 제발 없애줘" → "응 명세부터 써줘"
+- 앵커: `assets/ui/gravity_orb_theme.tres` (새 형식 추가), `assets/fonts/` (주아·`SOURCE.md`·`OFL.txt`), `scenes/UI.tscn` `Hud` 아래 노드, `scripts/ui/Hud.gd` (`CALLOUT_COLORS`·`HUD_*_COLOR`·`_fit_numeric_label()` 크기), `scripts/ui/GameOverPanel.gd`, `scripts/ui/ScorePopup.gd`, `scripts/ui/JellyFinalMoveBanner.gd`, `scripts/ui/CosmicSparkle.gd` (색만), `scripts/ui/TurnInputIndicator.gd` (삭제), `scripts/fx/SpaceBackdrop.gd` 셰이더, `tests/test_turn_input_indicator.gd` (삭제)·`tests/spike/capture_screens.gd`
+- 요구 요약: 크림 카드 (테두리 8 #F39AB4·모서리 36·흐림 없는 아래 두께 10 #D9718F), 분홍 소리 버튼, 민트 다시 하기, 리본 제목, 2×2 숫자 칸, NEXT/THEN 꼬리표·칸, 호령·점수 팝업 테두리 글, FINAL MOVE·DANGER 카드 모양, 글꼴 주아 (없는 글자는 Noto), 화면 바탕 크림 + 점, **방향 화살표 삭제 (입력 규칙 그대로)**. 배치 (`hud_layout()`)·움직임·문구 그대로
+- 건드리지 말 것: 규칙·물리·수치·소리, 판 바닥·판 틀·중력 빛 (#158), 시작 화면·랭킹·설정 (#159 — 같이 쓰는 지금 테마 형식도 바꾸지 않음), 3D 젤리, DANGER 켜짐 조건, 사용자 저장 파일, `project.godot` 버전·`build/windows/` (**빌드 없음**), `docs/` (회신 파일 제외), 고리 모양, 명세에 없는 연출·움직임
+- Done-when:
+  - [ ] 주아 파일·출처·라이선스, 폴백 글자 목록
+  - [ ] `test_turn_input_indicator.gd` 삭제·화살표에 기대던 테스트 정리 (목록), 전체 회귀 통과, 해시 상수 그대로 (평일)
+  - [ ] 캡처 두 비율 6종 (§12-ONE.47 "#157" 캡처 목록) + 확대
+- **회신 맨 앞에**: §12-ONE.47 "#157" 목록
+- 커밋: 항목 단위 브랜치 (`ui-b-hud`, main에서), **push·PR까지** (병합은 Claude 검수 뒤)
+
 ### [2026-11-15 #155] 같은 색 합체 레벨 차 2 다시 시도 — 시한 젤리는 1
 - 상태: **사용자 플레이 대기 — Codex 할 일 없음** (추가 요구 7 `3a6dd34` 검수 통과, 공유 트리 = `merge-gap-2`). 2026-11-22 사용자 "1번으로 해줘" = 직접 해보고 결정 (추가 요구 6 `18513eb`: B10 100판이 기준 통과, 대신 대폭발 판당 6.6 → 0.8). 인박스 번호 #155는 GitHub PR #155 (#154 인박스 상태 요청)와 다르다
 - 병합: 추가 요구 7 (시험 커밋) → 사용자가 에디터에서 해 보고 값 결정 → 채택이면 추가 요구 8 (테스트·해시) → Claude 검수 뒤 한 번에 병합

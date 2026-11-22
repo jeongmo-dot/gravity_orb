@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>B 따뜻한 젤리 · 게임 중</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#a8405f}a:hover{color:#7a2a44}
+</style>
+</helmet>
+<div style="position: relative; width: 540px; height: 1170px; overflow: hidden; background-color: #fff0e3; background-image: radial-gradient(#ffd9c4 2.5px, transparent 3px); background-size: 34px 34px; font-family: Jua, sans-serif; color: #5b2a3c">
+
+  <div style="position: absolute; left: 16px; right: 16px; top: 20px; height: 76px; display: flex; gap: 10px">
+    <button aria-label="소리 켜기·끄기" style="width: 64px; flex-shrink: 0; padding: 0; border: none; border-radius: 18px; background: #f2557f; box-shadow: 0 5px 0 #b8325c; color: #ffffff; display: flex; align-items: center; justify-content: center; cursor: pointer">
+      <svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h4l5-4v14l-5-4H3z" fill="currentColor"></path><path d="M15.5 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round"></path><path d="M18 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round"></path></svg>
+    </button>
+    <div style="width: 84px; flex-shrink: 0; box-sizing: border-box; border-radius: 18px; border: 4px solid #f39ab4; background: #fffaf3; box-shadow: 0 5px 0 #d9718f; display: flex; flex-direction: column; align-items: center; justify-content: center">
+      <div style="font-size: 15px; color: #a8405f">TURN</div>
+      <div style="font-size: 30px; line-height: 1.1">30</div>
+    </div>
+    <div style="flex: 1; box-sizing: border-box; border-radius: 18px; border: 4px solid #f39ab4; background: #fffaf3; box-shadow: 0 5px 0 #d9718f; display: flex; flex-direction: column; align-items: center; justify-content: center">
+      <div style="font-size: 15px; color: #a8405f">SCORE</div>
+      <div style="font-size: 34px; line-height: 1.1">364,145</div>
+    </div>
+    <div style="width: 132px; flex-shrink: 0; box-sizing: border-box; border-radius: 18px; border: 4px solid #f39ab4; background: #fffaf3; box-shadow: 0 5px 0 #d9718f; display: flex; flex-direction: column; align-items: center; justify-content: center">
+      <div style="font-size: 15px; color: #a8405f">BEST</div>
+      <div style="font-size: 26px; line-height: 1.1; color: #a86200">412,980</div>
+    </div>
+  </div>
+  <div style="position: absolute; right: 18px; top: 110px; font-size: 16px; color: #a8405f">MAX COMBO 3</div>
+
+  <div style="position: absolute; left: 0; right: 0; top: 158px; display: flex; flex-direction: column; align-items: center; gap: 2px">
+    <div style="font-size: 62px; color: #ff5d8f; text-shadow: -3px 0 #ffffff, 3px 0 #ffffff, 0 -3px #ffffff, 0 3px #ffffff, -2px -2px #ffffff, 2px 2px #ffffff, -2px 2px #ffffff, 2px -2px #ffffff, 0 8px 0 #d9718f">GREAT!</div>
+    <div style="font-size: 30px; color: #5b2a3c; text-shadow: -2px 0 #ffffff, 2px 0 #ffffff, 0 -2px #ffffff, 0 2px #ffffff, 0 5px 0 #f3c2cf">COMBO 3</div>
+  </div>
+
+  <div style="position: absolute; left: 35px; top: 340px; width: 470px; height: 470px; border-radius: 16px; overflow: hidden; background: repeating-conic-gradient(#f3e6fb 0 25%, #fdf8ff 0 50%) 0 0 / 47px 47px; box-shadow: 0 0 0 8px #ffffff, 0 0 0 12px #f39ab4, 0 14px 0 12px #d9718f">
+    <sc-for list="{{ pile }}" as="j" hint-placeholder-count="16">
+      <div style="{{ j.style }}">
+        <div style="{{ j.eyeL }}"></div>
+        <div style="{{ j.eyeR }}"></div>
+        <sc-if value="{{ j.timed }}" hint-placeholder-val="{{ false }}">
+          <div style="{{ j.numStyle }}">{{ j.num }}</div>
+        </sc-if>
+      </div>
+    </sc-for>
+    <div style="position: absolute; left: 300px; top: 322px; font-size: 24px; color: #ff5d8f; text-shadow: -2px 0 #ffffff, 2px 0 #ffffff, 0 -2px #ffffff, 0 2px #ffffff">+240</div>
+  </div>
+
+  <div style="position: absolute; left: 70px; right: 70px; top: 880px; height: 150px; box-sizing: border-box; border-radius: 22px; border: 4px solid #f39ab4; background: #fffaf3; box-shadow: 0 6px 0 #d9718f; display: flex; justify-content: center; align-items: center; gap: 48px">
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 8px">
+      <div style="padding: 2px 16px; border-radius: 10px; background: #f2557f; color: #ffffff; font-size: 17px">NEXT</div>
+      <div style="position: relative; width: 100px; height: 100px; border-radius: 18px; background: #ffeef3">
+        <sc-for list="{{ next }}" as="j" hint-placeholder-count="1">
+          <div style="{{ j.style }}">
+            <div style="{{ j.eyeL }}"></div>
+            <div style="{{ j.eyeR }}"></div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 8px">
+      <div style="padding: 2px 14px; border-radius: 10px; background: #ffd1de; color: #a8405f; font-size: 15px">THEN</div>
+      <div style="position: relative; width: 76px; height: 76px; border-radius: 16px; background: #ffeef3">
+        <sc-for list="{{ then }}" as="j" hint-placeholder-count="1">
+          <div style="{{ j.style }}">
+            <div style="{{ j.eyeL }}"></div>
+            <div style="{{ j.eyeR }}"></div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":540,"height":1170}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const P = {
+      p: ['#ffc2d4', '#ff6f98', '#c23b66'],
+      b: ['#b5d8ff', '#5a9cff', '#2a5cc2'],
+      g: ['#b3f0c8', '#4fcf7f', '#237f47'],
+      y: ['#fff2b0', '#ffcf45', '#c98f14']
+    };
+    const D = [0, 26, 32, 38, 44, 50, 56, 62, 68, 74, 80];
+    const jelly = (c, lv, cx, cy, timed) => {
+      const d = D[lv];
+      const k = P[c];
+      const ew = Math.max(3, Math.round(d * 0.09));
+      const eh = Math.round(d * 0.17);
+      const eye = (fx) => 'position: absolute; left: ' + Math.round(d * fx - ew / 2) + 'px; top: ' + Math.round(d * 0.36) + 'px; width: ' + ew + 'px; height: ' + eh + 'px; border-radius: ' + ew + 'px; background: #2a1a2e';
+      return {
+        style: 'position: absolute; left: ' + (cx - d / 2) + 'px; top: ' + (cy - d / 2) + 'px; width: ' + d + 'px; height: ' + d + 'px; border-radius: 50%; background: radial-gradient(circle at 34% 28%, #ffffff 0 7%, ' + k[0] + ' 17%, ' + k[1] + ' 58%, ' + k[2] + ' 100%); box-shadow: 0 4px 6px rgba(150,70,100,0.30)',
+        eyeL: eye(0.37),
+        eyeR: eye(0.63),
+        timed: !!timed,
+        num: timed ? String(timed) : '',
+        numStyle: 'position: absolute; left: 0; right: 0; top: ' + Math.round(d * 0.54) + 'px; text-align: center; font-family: Jua, sans-serif; font-size: ' + Math.round(d * 0.42) + 'px; line-height: 1; color: #ffffff; text-shadow: 0 0 3px #5b2a3c, 0 2px 0 #5b2a3c'
+      };
+    };
+    const pile = [
+      ['p', 6, 30, 442], ['b', 4, 80, 448], ['y', 8, 136, 436], ['g', 3, 189, 451], ['p', 9, 245, 433],
+      ['b', 7, 313, 439], ['g', 5, 369, 445], ['y', 2, 410, 454], ['b', 1, 439, 457],
+      ['g', 2, 55, 405], ['p', 3, 106, 398], ['b', 5, 188, 400, 7], ['y', 4, 282, 383], ['p', 1, 342, 400],
+      ['g', 6, 405, 392], ['y', 3, 235, 352]
+    ].map((a) => jelly(a[0], a[1], a[2], a[3], a[4]));
+    return { pile: pile, next: [jelly('p', 5, 50, 50)], then: [jelly('b', 2, 38, 38)] };
+  }
+}
+</script>
+</body>
+</html>
