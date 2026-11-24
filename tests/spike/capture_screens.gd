@@ -8,6 +8,7 @@ const SAVE_PREFIX: String = "--capture-save-path="
 const TIMED_ONLY_ARGUMENT: String = "--capture-timed-only"
 const UI_B_ONLY_ARGUMENT: String = "--capture-ui-b"
 const UI_B_BOARD_ONLY_ARGUMENT: String = "--capture-ui-b-board"
+const GAP2_DEFAULTS_ONLY_ARGUMENT: String = "--capture-gap2-defaults"
 const PILE_JITTER_SEED: int = 11620261030
 const SPAWN_RAMP_CAPTURE_SEED: int = 11920261031
 const CAPTURE_FILES: Array[String] = [
@@ -221,6 +222,10 @@ const UI_B_BOARD_ONLY_FILES: Array[String] = [
 	"226_ui_b_board_danger_amber.png",
 	"227_ui_b_board_danger_red.png",
 ]
+const GAP2_DEFAULTS_ONLY_FILES: Array[String] = [
+	"228_jelly_gap2_l8_l9_l10.png",
+	"229_jelly_gap2_l8_l9_l10_zoom.png",
+]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
 var _temp_save_path: String = "res://artifacts/screens/capture_save.tmp.cfg"
@@ -230,6 +235,7 @@ var _user_save_bytes: PackedByteArray = PackedByteArray()
 var _timed_only: bool = false
 var _ui_b_only: bool = false
 var _ui_b_board_only: bool = false
+var _gap2_defaults_only: bool = false
 
 
 func _ready() -> void:
@@ -248,7 +254,9 @@ func _run() -> void:
 	Config.data.sfx_enabled = false
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.rng_seed = 5050
-	if _ui_b_board_only:
+	if _gap2_defaults_only:
+		await _capture_gap2_default_scenes()
+	elif _ui_b_board_only:
 		await _capture_ui_b_board_scenes()
 	elif _ui_b_only:
 		await _capture_ui_b_scenes()
@@ -261,7 +269,9 @@ func _run() -> void:
 	_verify_user_save_unchanged()
 	_remove_file(_temp_save_path)
 	var expected_files: Array[String] = CAPTURE_FILES
-	if _ui_b_board_only:
+	if _gap2_defaults_only:
+		expected_files = GAP2_DEFAULTS_ONLY_FILES
+	elif _ui_b_board_only:
 		expected_files = UI_B_BOARD_ONLY_FILES
 	elif _ui_b_only:
 		expected_files = UI_B_ONLY_FILES
@@ -369,6 +379,45 @@ func _capture_ui_b_scenes() -> void:
 	manager.game_over.emit()
 	await get_tree().create_timer(0.85).timeout
 	await _capture("214_ui_b_result_record.png")
+	await _destroy_main(main)
+
+
+func _capture_gap2_default_scenes() -> void:
+	var main: Main = await _create_main(true)
+	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
+	var board: Board3D = main.get_node("Board") as Board3D
+	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
+	manager.set_physics_process(false)
+	manager._set_state(TurnManager.State.WAITING_INPUT)
+	board.clear()
+	board.set_gravity(Vector2i.DOWN)
+	var level_eight: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.YELLOW, 8, Vector2(-280.0, 20.0)
+	)
+	var level_nine: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.PURPLE, 9, Vector2.ZERO
+	)
+	var level_ten: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.BLUE, 10, Vector2(280.0, 20.0)
+	)
+	for orb: Orb3D in [level_eight, level_nine, level_ten]:
+		orb.disable_physics()
+	var level_eight_material: ShaderMaterial = level_eight._face.material_override as ShaderMaterial
+	var level_nine_material: ShaderMaterial = level_nine._face.material_override as ShaderMaterial
+	var level_ten_material: ShaderMaterial = level_ten._face.material_override as ShaderMaterial
+	if bool(level_eight_material.get_shader_parameter("is_blast_ready")):
+		_fail("GAP2 default capture L8 must keep the normal face")
+	if not bool(level_nine_material.get_shader_parameter("is_blast_ready")):
+		_fail("GAP2 default capture L9 must use the blast-ready face")
+	if not bool(level_ten_material.get_shader_parameter("is_max")):
+		_fail("GAP2 default capture L10 must use the MAX face")
+	await get_tree().create_timer(0.10).timeout
+	await _capture("228_jelly_gap2_l8_l9_l10.png")
+	await _capture_zoom(
+		"229_jelly_gap2_l8_l9_l10_zoom.png",
+		camera.unproject_position(level_nine._mesh.global_position),
+		190
+	)
 	await _destroy_main(main)
 
 
@@ -3349,6 +3398,8 @@ func _parse_arguments() -> void:
 			_ui_b_only = true
 		elif argument == UI_B_BOARD_ONLY_ARGUMENT:
 			_ui_b_board_only = true
+		elif argument == GAP2_DEFAULTS_ONLY_ARGUMENT:
+			_gap2_defaults_only = true
 
 
 func _snapshot_user_save() -> void:

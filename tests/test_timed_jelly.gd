@@ -2,12 +2,12 @@ extends TestCase
 
 const BOARD_SCENE: PackedScene = preload("res://scenes/Board3D.tscn")
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
-const EXPECTED_H8_HASH: String = "790bb962860e741976447a88c3a0635b556ec4b47613ee84ea3743fa8d1f0fd0"
-const EXPECTED_K5_8_HASH: String = "3b814220f95318056b5665a591fdd9c4289a9bb5646cc818cab44efac208cb42"
-const EXPECTED_K5_4_HASH: String = "bc86d2571e89ed78fcb10d0fb69d03c33048f362ea8395d164605e3d7e21dab7"
+const EXPECTED_H8_HASH: String = "3328ad8089ad0d0a2ef923237827e7ef7de4868507a9f9addccb7bd28fa0f092"
+const EXPECTED_K5_8_HASH: String = "7ebadcfa2ced4ce1799ccd9a1b0de8e85cd6ef6d91c083acda09d16a5a479f4f"
+const EXPECTED_K5_4_HASH: String = "54b1ed39806d4535b22aff25f7cafc88519edc0ac7893bb14f37c2143a89a41c"
 const EXPECTED_K5_4_STONE_HASH: String = "463995c4a2188c1639fcc7efaa9e0ce0c294a0b3633ae1c859d7b98eec0ff390"
-const EXPECTED_RANDOM_PERMANENT_HASH: String = "83e4f6c8de772cd3a0ff5c6d0853a0ca74996572b45019541c08be9eb1affb91"
-const EXPECTED_EARLY_DEFAULT_HASH: String = "8c6eb2f7c241b8d2e94f2f977083ebf084428e91ce4bdc0920e898ae2484921a"
+const EXPECTED_RANDOM_PERMANENT_HASH: String = "d8ae40980e5e5af82da835b5ed46ecf7dc77b904a8549544c004b6488f3ea162"
+const EXPECTED_EARLY_DEFAULT_HASH: String = "83d3310089f8a60b17b6e2136db70045159a688bd951469af4403a0429a45b50"
 
 
 func test_h8_marker_countdown_success_and_failure_hash() -> void:

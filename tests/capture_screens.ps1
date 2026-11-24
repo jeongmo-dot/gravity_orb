@@ -5,7 +5,8 @@ param(
     [switch]$HudScenesOnly,
     [switch]$TimedOnly,
     [switch]$UiBOnly,
-    [switch]$UiBBoardOnly
+    [switch]$UiBBoardOnly,
+    [switch]$Gap2DefaultsOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -272,6 +273,14 @@ if ($UiBBoardOnly) {
     $expectedZoomFiles = @()
 }
 
+if ($Gap2DefaultsOnly) {
+    $expectedFiles = @(
+        "228_jelly_gap2_l8_l9_l10.png",
+        "229_jelly_gap2_l8_l9_l10_zoom.png"
+    )
+    $expectedZoomFiles = @()
+}
+
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {
     if (-not [string]::IsNullOrWhiteSpace($env:GODOT)) {
         $GodotPath = $env:GODOT
@@ -306,6 +315,9 @@ foreach ($captureSpec in $captureSpecs) {
     if ($UiBBoardOnly) {
         $arguments += "--capture-ui-b-board"
     }
+    if ($Gap2DefaultsOnly) {
+        $arguments += "--capture-gap2-defaults"
+    }
     & $GodotPath @arguments
     if ($LASTEXITCODE -ne 0) {
         throw "Screenshot capture $($captureSpec.Name) failed with exit code $LASTEXITCODE"
@@ -326,7 +338,7 @@ foreach ($captureSpec in $captureSpecs) {
         Write-Output ("SCREEN_CAPTURE_ZOOM_RESULT ratio={0} file={1}" -f $captureSpec.Name, $filePath)
         $capturedFileCount += 1
     }
-    if (-not $TimedOnly -and -not $UiBOnly -and -not $UiBBoardOnly) {
+    if (-not $TimedOnly -and -not $UiBOnly -and -not $UiBBoardOnly -and -not $Gap2DefaultsOnly) {
         $landingFiles = @(1..10 | ForEach-Object {
             Join-Path $outputPath ("{0:D2}_jelly_motion_land_{1:D2}.png" -f (43 + $_), $_)
         })

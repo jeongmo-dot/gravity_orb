@@ -15,7 +15,7 @@ const EXPECTED_T3_DEFAULT_HASH: String = "61d3c0665a90979f61c3deedf9cd2f3a7ba299
 const EXPECTED_C4E_DEFAULT_HASH: String = "680e412abc510c4bba01a73adfe95dc04bad60b917bdc082c90dbcb050d6cd82"
 const EXPECTED_Z1_DEFAULT_HASH: String = "e2c2c9c04771fb32bbe596983bddce3a0294a05aabe2521d4ef7efe0fad1387c"
 const EXPECTED_G2_DEFAULT_HASH: String = "31ad483a55f00990d0abd102c849d81bcd09557fe953e1558974b2e37f74bd67"
-const EXPECTED_GAP2_DEFAULT_HASH: String = "db9dc64b299b49d84d6bbd03cc7508266ea9f585142cc600f5334493ab1ea74b"
+const EXPECTED_GAP2_DEFAULT_HASH: String = "d49a9d7bea39adceeb8b9cc8ca7de34d79097bf99aa779aa7752d8383616c6c7"
 
 
 func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
@@ -35,6 +35,7 @@ func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
 	var gap_two_result: Dictionary = await _run_rule_path(false)
 	print("JELLY_GAP2_DEFAULT_HASH hash=%s" % str(gap_two_result["hash"]))
 	assert_eq(gap_two_result["hash"], EXPECTED_GAP2_DEFAULT_HASH, "GAP2 default hash")
+	_apply_pre_gap2_defaults()
 	Config.data.jelly_merge_level_gap = 1
 	var g2_visible_result: Dictionary = await _run_rule_path(true)
 	var g2_hidden_result: Dictionary = await _run_rule_path(false)
@@ -257,6 +258,12 @@ func _run_rule_path(visuals_enabled: bool) -> Dictionary:
 	var below_top_mass: float = Config.data.jelly_mass_for_level(below_top_level)
 	var blast_level: int = Config.data.jelly_blast_min_level
 	var blast_mass: float = Config.data.jelly_mass_for_level(blast_level)
+	var blast_pair_level: int = (
+		Config.data.jelly_blast_pair_top_min_level
+		if Config.data.jelly_blast_pair_top_min_level > blast_level
+		else blast_level
+	)
+	var blast_pair_mass: float = Config.data.jelly_mass_for_level(blast_pair_level)
 
 	var result: Dictionary = await _apply_pair(
 		board, resolver, OrbTypes.OrbColor.GREEN, 3, first_large_mass, OrbTypes.OrbColor.GREEN, 2, first_small_mass
@@ -274,9 +281,16 @@ func _run_rule_path(visuals_enabled: bool) -> Dictionary:
 	events["absorption_level_up"] = int(events["absorption_level_up"]) + 1
 
 	result = await _apply_pair(
-		board, resolver, OrbTypes.OrbColor.RED, blast_level, blast_mass, OrbTypes.OrbColor.BLUE, blast_level, blast_mass
+		board,
+		resolver,
+		OrbTypes.OrbColor.RED,
+		blast_level,
+		blast_mass,
+		OrbTypes.OrbColor.BLUE,
+		blast_pair_level,
+		blast_pair_mass
 	)
-	assert_eq(int(result["type"]), int(ReactionRules.Type.BLAST), "different L6 colors blast")
+	assert_eq(int(result["type"]), int(ReactionRules.Type.BLAST), "configured different-color pair blasts")
 	events["blast"] = int(events["blast"]) + 1
 	if not Config.data.jelly_blast_requires_same_level:
 		result = await _apply_pair(
@@ -470,6 +484,7 @@ func _snapshot_level_profile() -> Dictionary:
 		"level_radii": Config.data.level_radii.duplicate(),
 		"level_scores": Config.data.level_scores.duplicate(),
 		"jelly_blast_min_level": Config.data.jelly_blast_min_level,
+		"jelly_blast_pair_top_min_level": Config.data.jelly_blast_pair_top_min_level,
 		"jelly_blast_requires_same_level": Config.data.jelly_blast_requires_same_level,
 		"jelly_tap_blast_min_level": Config.data.jelly_tap_blast_min_level,
 		"blast_score_factor": Config.data.blast_score_factor,
@@ -509,6 +524,7 @@ func _restore_level_profile(snapshot: Dictionary) -> void:
 	Config.data.level_radii = snapshot["level_radii"] as PackedFloat32Array
 	Config.data.level_scores = snapshot["level_scores"] as PackedInt32Array
 	Config.data.jelly_blast_min_level = int(snapshot["jelly_blast_min_level"])
+	Config.data.jelly_blast_pair_top_min_level = int(snapshot["jelly_blast_pair_top_min_level"])
 	Config.data.jelly_blast_requires_same_level = bool(snapshot["jelly_blast_requires_same_level"])
 	Config.data.jelly_tap_blast_min_level = int(snapshot["jelly_tap_blast_min_level"])
 	Config.data.blast_score_factor = float(snapshot["blast_score_factor"])
@@ -640,8 +656,19 @@ func _apply_legacy_blast_push_profile() -> void:
 func _apply_legacy_color_profile() -> void:
 	Config.data.turn_color_unlock_turns.assign([30, 60])
 	Config.data.jelly_tap_effect_modes = PackedInt32Array([2, 3, 4, 5, 6, 7])
+	Config.data.jelly_blast_min_level = 10
+	Config.data.jelly_blast_pair_top_min_level = 0
+	Config.data.jelly_tap_blast_min_level = 8
+	Config.data.spawn_count_max = 4
 	Config.data.jelly_tap_clean_max_level = 2
 	Config.data.jelly_tap_clean_zone_rule = false
+
+
+func _apply_pre_gap2_defaults() -> void:
+	Config.data.jelly_blast_min_level = 10
+	Config.data.jelly_blast_pair_top_min_level = 0
+	Config.data.jelly_tap_blast_min_level = 8
+	Config.data.spawn_count_max = 4
 
 
 func _apply_c4e_profile() -> void:

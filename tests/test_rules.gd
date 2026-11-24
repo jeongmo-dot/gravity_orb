@@ -274,6 +274,7 @@ func test_jelly_explicit_gap_one_rule_examples() -> void:
 	cfg.game_mode = GameConfig.GameMode.JELLY
 	cfg.jelly_merge_level_gap = 1
 	cfg.jelly_blast_min_level = 8
+	cfg.jelly_blast_pair_top_min_level = 0
 	var l1_l2: Dictionary = ReactionRules.classify(2, 1, 2, 2, cfg, 1.0, 2.0)
 	var l5_l4: Dictionary = ReactionRules.classify(2, 5, 2, 4, cfg, 7.0, 5.0)
 	var l10_l9: Dictionary = ReactionRules.classify(2, 10, 2, 9, cfg, 64.0, 42.0)
@@ -352,6 +353,7 @@ func test_jelly_merge_level_gap_controls_same_color_absorption_only() -> void:
 	assert_true(ReactionRules.can_react(2, 7, 2, 5, cfg), "can_react follows gap two")
 
 	cfg.jelly_blast_min_level = 8
+	cfg.jelly_blast_pair_top_min_level = 0
 	var different_l8: Dictionary = ReactionRules.classify(0, 8, 1, 8, cfg, 27.0, 27.0)
 	var different_gap: Dictionary = ReactionRules.classify(0, 8, 1, 6, cfg, 27.0, 11.0)
 	assert_eq(different_l8["type"], ReactionRules.Type.BLAST, "different-color same L8 blasts")
@@ -388,9 +390,8 @@ func test_jelly_default_gap_two_including_timed_pairs() -> void:
 			ReactionRules.Type.NONE,
 			"default rejects gap three L%d/L%d" % rejected_pair
 		)
-	cfg.jelly_blast_min_level = 8
-	assert_eq(ReactionRules.classify(0, 8, 1, 10, cfg)["type"], ReactionRules.Type.BLAST, "different L8/L10 still blasts")
-	assert_eq(ReactionRules.classify(0, 7, 1, 9, cfg)["type"], ReactionRules.Type.NONE, "different L7/L9 stays inert")
+	assert_eq(ReactionRules.classify(0, 9, 1, 9, cfg)["type"], ReactionRules.Type.NONE, "default different L9/L9 stays inert")
+	assert_eq(ReactionRules.classify(0, 9, 1, 10, cfg)["type"], ReactionRules.Type.BLAST, "default different L9/L10 blasts")
 
 	for timed_level: int in [3, 4, 6, 7]:
 		var timed_allowed: Dictionary = ReactionRules.classify(
@@ -479,11 +480,12 @@ func test_jelly_wide_gap_allows_only_large_same_color_absorbers() -> void:
 	)
 
 
-func test_jelly_blast_default_l8_threshold_and_gap_two_absorption_precedence() -> void:
+func test_jelly_explicit_l8_blast_threshold_and_gap_two_absorption_precedence() -> void:
 	var cfg: GameConfig = GameConfig.new()
 	cfg.game_mode = GameConfig.GameMode.JELLY
 	cfg.blast_enabled = true
 	cfg.jelly_blast_min_level = 8
+	cfg.jelly_blast_pair_top_min_level = 0
 	cfg.opposite_pairs = [Vector2i(0, 1)]
 	var level_seven_default: Dictionary = ReactionRules.classify(0, 7, 1, 7, cfg, 17.0, 17.0)
 	var level_eight_default: Dictionary = ReactionRules.classify(0, 8, 1, 8, cfg, 27.0, 27.0)
@@ -541,18 +543,18 @@ func test_jelly_blast_default_l8_threshold_and_gap_two_absorption_precedence() -
 	assert_eq(same_color_gap_three["type"], ReactionRules.Type.NONE, "same-color gap three does not BLAST")
 
 
-func test_jelly_blast_pair_top_minimum_requires_one_l10() -> void:
+func test_jelly_default_blast_and_tap_thresholds() -> void:
 	var cfg: GameConfig = GameConfig.new()
 	cfg.game_mode = GameConfig.GameMode.JELLY
-	cfg.blast_enabled = true
-	cfg.jelly_blast_min_level = 9
-	cfg.jelly_blast_pair_top_min_level = 10
-	cfg.jelly_blast_requires_same_level = false
+	assert_eq(cfg.jelly_blast_min_level, 9, "default pair minimum starts at L9")
+	assert_eq(cfg.jelly_blast_pair_top_min_level, 10, "default pair requires one L10")
 	assert_true(not cfg.jelly_blast_enabled_for_pair(9, 9), "L9+L9 misses pair top minimum")
 	assert_true(cfg.jelly_blast_enabled_for_pair(9, 10), "L9+L10 satisfies pair top minimum")
 	assert_true(cfg.jelly_blast_enabled_for_pair(10, 9), "pair top minimum is order independent")
 	assert_true(cfg.jelly_blast_enabled_for_pair(10, 10), "L10+L10 satisfies pair top minimum")
 	assert_true(not cfg.jelly_blast_enabled_for_pair(8, 10), "both levels must pass blast minimum")
+	assert_true(cfg.jelly_tap_blast_enabled_for_level(9), "default L9 tap blasts")
+	assert_true(not cfg.jelly_tap_blast_enabled_for_level(8), "default L8 tap does nothing")
 	cfg.jelly_blast_pair_top_min_level = 0
 	assert_true(cfg.jelly_blast_enabled_for_pair(9, 9), "zero disables pair top condition")
 	cfg.jelly_blast_pair_top_min_level = 10

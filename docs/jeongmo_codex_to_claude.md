@@ -38,6 +38,43 @@
 
 ## 미확인
 
+### [2026-11-24] 대상 #155 추가 요구 9 — GAP2-P6 기본값 반영
+- **맨 앞 경고:** GAP2 밖 해시 **6개**가 기본값 변화에 따라 바뀜 — `test_spawner.gd` CLASSIC 진행 해시 1개와 `test_timed_jelly.gd` 시한 해시 5개. 예상 목록 밖 테스트 파일은 `test_callouts.gd`, `test_jolt_3d.gd`, `test_spawner.gd`, `test_timed_jelly.gd`. 화면 글의 하드코딩 레벨 숫자는 검색 결과 **0곳**. 측정 스모크 실제 설정 불일치 **0건**, main 병합 충돌 **0건**, 판 밖 이탈 **0건**, 최대 관통 **4.346px**(30px 미만).
+- 상태: 완료 — 사용자 선택 P6을 기본 설정에 반영하고 같은 `merge-gap-2` 브랜치·PR #156에 구현·검증했다.
+- 브랜치 / PR: `merge-gap-2` / https://github.com/jeongmo-dot/gravity_orb/pull/156
+- 선행 동기화: `origin/main` `e87d86b`를 병합한 로컬 merge commit `776432d`. 충돌 없음.
+- 변경 파일: `config/GameConfig.gd`, `config/default_config.tres`, 두 측정 래퍼와 과거 측정 호출 스크립트 9개, 캡처 도구 2개, 관련 테스트 8개, 이 회신 파일.
+- Done-when 대조:
+  - [x] 기본값: 대폭발 최소 **9**, 짝 상단 최소 **10**, 터치 최소 **9**, 공 상한 **6**. 합체 차이 2·시한 차이 −1·턴당 1·램프 10·같은 레벨 필수 false는 유지.
+  - [x] 기본 규칙 자동 검증: 다른 색 L9+L9 `NONE`, L9+L10 `BLAST`, L9 터치 가능, L8 터치 불가. L8 보통 얼굴·L9 `><`·L10 MAX도 단위 테스트와 실제 캡처로 확인.
+  - [x] 측정 래퍼의 대폭발·터치·공 상한 기본을 `-1`(인자 생략)로 바꾸고, 요약은 원시 보고서의 실제 설정을 기록한다.
+  - [x] 자동 플레이 스모크 1판(시드 101, 30턴 상한), 세 인자 생략 → 실제 `blast=9`, `pair_top=10`, `tap=9`, `spawn_max=6`, `merge_gap=2`, `timed_gap=-1`; 종료 코드 0.
+  - [x] 실제 창 두 비율에서 입력 대기 전체 장면과 확대 장면을 각각 캡처·직접 확인. 그림·소리·안내·런타임 로직 변경 없음.
+- 테스트 기대 변경:
+  - `test_config.gd`: 기본 `blast 10→9`, `pair top 0→10`, `tap 8→9`, `spawn max 4→6`; 램프 턴 41/100/500 기대 `4/4/4→5/6/6`.
+  - `test_rules.gd`: 기본 L8 대폭발 기대를 `L9+L9 없음 / L9+L10 대폭발`로 교체하고 L9/L8 터치 경계를 추가. 옛 L8 후보 전용 테스트에는 pair-top 0을 명시.
+  - `test_jelly_visuals.gd`: L8 `armed→unarmed`·보통 얼굴, L9부터 `armed`·`><`.
+  - `test_jelly_regression.gd`: GAP2 해시 `db9dc64b…→d49a9d7b…`; 기본 대폭발 쌍을 L9+L10으로 변경. 기존 G2/Z1/T3/C4E/S4/K4/M/D/ST/JACKPOT/F2/G1 해시는 옛 프로필 값을 명시해 그대로 유지.
+  - `test_callouts.gd`: 기본 안내 레벨 글 `L8→L9` (명시적으로 L8 후보를 검사하는 테스트는 유지).
+  - `test_jolt_3d.gd`: 기본 얼굴·접촉·터치 경계를 L8/L9/L10 새 규칙으로 갱신하고, 터치 효과 테스트 소스는 `jelly_tap_blast_min_level`을 사용.
+  - `test_spawner.gd`: 기본 진행 해시 `52ae7da7…→e9fa5d7f…`.
+  - `test_timed_jelly.gd`: H8 `790bb962…→3328ad80…`, K5-8 `3b814220…→7ebadcfa…`, K5-4 `bc86d257…→54b1ed39…`, early default `8c6eb2f7…→83d33100…`, random permanent `83e4f6c8…→d8ae4098…`; K5-4 stone 해시는 유지.
+- 과거 측정 재현용 명시값 추가: `run_gravity_turn_candidates.ps1`, `run_jelly_friction_sweep.ps1`, `run_jelly_rolling_candidates.ps1`, `run_spawn_budget_autoplay.ps1`, `run_four_color_balance.ps1`, `run_merge_extension_balance.ps1`, `run_spawn_merge_matrix.ps1`, `run_tap_push_balance.ps1`, `run_timed_jelly_balance.ps1`에 옛 대폭발/터치 8을 직접 넘김. `run_spawn_ramp_balance.ps1`은 이미 9/9를 명시해 변경 없음.
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` 일반 빌드. `tests/run_tests.ps1` → 일반 **383/383**, 장기 **4/4**, 성능 **5/5**, 합계 **392/392**, 종료 코드 0.
+  - `--import`, 기본 `--quit-after 300`, `--mode=blitz --quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 각 0건.
+  - 측정 스모크 → 이탈 0, 최대 턴 종료 쌍 관통 4.346px.
+  - 장기 회귀 → 이탈 0, 최대 벽 관통 17.313px, 최대 쌍 관통 20.986px.
+  - PowerShell 변경 파일 11개 구문 오류 0, `git diff --check` 오류 0. Input 검색은 `InputRouter.gd`·`Haptics.gd`만, 런타임 난수 검색의 기존 예외는 `Spawner.gd`와 연출용 `ColorEffectVisual.gd`만 관측.
+  - 캡처: `228_jelly_gap2_l8_l9_l10.png`, `229_jelly_gap2_l8_l9_l10_zoom.png` × 540×960·540×1170 = **4장**, 캡처 종료 코드 0. L8·L9·L10 모두 잘림 없음.
+  - 빌드: 명세대로 미실행.
+- 수동 확인 절차:
+  1. JELLY를 시작해 L8·L9·L10을 만든다 → L8 보통 얼굴, L9 `><`, L10 MAX를 확인한다.
+  2. 입력 대기에서 L8을 누른다 → 반응 없음. L9를 누른다 → 일반 폭발과 함께 턴을 쓴다.
+  3. 다른 색 L9+L9를 닿게 한다 → 반응 없음. 다른 색 L9+L10을 닿게 한다 → 대폭발.
+- 결정 사항·알려진 문제: 게임 코드·그림·소리·안내는 바꾸지 않았다. 전체 회귀에서 기본 공 상한을 해시에 포함하는 비-GAP2 테스트 6개도 실제 상태에 맞춰 갱신했으며 이 항목 맨 앞에 표시했다. 사용자 저장 파일은 건드리지 않았다.
+- 남은 것 · 질문: Claude 검수와 사용자 병합 승인. 빌드는 사용자 요청 때만 한다.
+
 ### [2026-11-23] 대상 #155 추가 요구 8-3 — 공 상한 5·6 일반 폭발 흐름 200판
 - **맨 앞 경고:** D-all 미완료 6판 이상 — P5 자동 **19/20**·L-합체 **20/20**, P6 자동 **14/20**·L-합체 **20/20**. P5 최대 관통 **33.030px**로 30px 이상. 판 밖 이탈 0, 실제 설정 불일치 0, 결과 없이 끝난 판 0. P6 최대 관통은 29.495px.
 - 상태: 완료 — 게임 코드·기본 밸런스 값은 바꾸지 않고 측정 도구와 집계만 보강한 뒤 **P5·P6 × 다섯 봇 × 20판 = 200/200판**을 측정했다. 기준상 선두는 **GAP2-P6**이며 고르는 것은 사용자다.

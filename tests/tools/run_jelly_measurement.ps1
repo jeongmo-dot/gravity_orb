@@ -29,12 +29,12 @@ param(
 	[string]$JellyTimedStoneEnabled = "On",
 	[ValidateRange(1, 100)]
 	[int]$JellyTimedStoneTurns = 6,
-	[ValidateRange(0, 10)]
-	[int]$JellyBlastMinLevel = 8,
+	[ValidateRange(-1, 10)]
+	[int]$JellyBlastMinLevel = -1,
 	[ValidateRange(-1, 10)]
 	[int]$JellyBlastPairTopMinLevel = -1,
-	[ValidateRange(0, 10)]
-	[int]$JellyTapBlastMinLevel = 8,
+	[ValidateRange(-1, 10)]
+	[int]$JellyTapBlastMinLevel = -1,
 	[ValidateRange(0.0, 100.0)]
 	[double]$BlastScoreFactor = 15.0,
 	[ValidateRange(0.0, 100.0)]
@@ -72,8 +72,8 @@ param(
 	[ValidateRange(0.0, 1.0)]
 	[double]$BlastFarFactor = 0.5,
 	[string]$OrbFrictionByLevel = "0.3,0.3,0.3,0.4,0.4,0.4,0.4,0.5,0.5,0.5",
-	[ValidateRange(0, 100)]
-	[int]$SpawnCountMax = 4,
+	[ValidateRange(-1, 100)]
+	[int]$SpawnCountMax = -1,
 	[string]$Strategies = "r,g,l_merge",
 	[string]$MeasurementLabel = "",
 	[switch]$TurnProgress,
@@ -149,9 +149,9 @@ if (-not $AggregateOnly) {
 					"--jelly-timed-burst-count=$JellyTimedBurstCount",
 					"--jelly-timed-stone-enabled=$($JellyTimedStoneEnabled.ToLower())",
 					"--jelly-timed-stone-turns=$JellyTimedStoneTurns",
-					"--jelly-blast-min-level=$JellyBlastMinLevel",
+					$(if ($JellyBlastMinLevel -ge 0) { "--jelly-blast-min-level=$JellyBlastMinLevel" } else { "" }),
 					$(if ($JellyBlastPairTopMinLevel -ge 0) { "--jelly-blast-pair-top-min-level=$JellyBlastPairTopMinLevel" } else { "" }),
-					"--jelly-tap-blast-min-level=$JellyTapBlastMinLevel",
+					$(if ($JellyTapBlastMinLevel -ge 0) { "--jelly-tap-blast-min-level=$JellyTapBlastMinLevel" } else { "" }),
 					"--blast-score-factor=$($BlastScoreFactor.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--jelly-tap-blast-score-factor=$($JellyTapBlastScoreFactor.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--jelly-tap-blast-uses-turn=$($JellyTapBlastUsesTurn.ToLower())",
@@ -171,7 +171,7 @@ if (-not $AggregateOnly) {
 					"--blast-speed=$($BlastSpeed.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--blast-far-factor=$($BlastFarFactor.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--orb-friction-by-level=$OrbFrictionByLevel",
-					"--spawn-count-max=$SpawnCountMax",
+					$(if ($SpawnCountMax -ge 0) { "--spawn-count-max=$SpawnCountMax" } else { "" }),
 					"--jelly-tap-blast-bot=$($resolvedTapBlastBotMode.ToLower())",
                     "--jolt-output=res://artifacts/measurements/$name.json"
                 )
@@ -550,7 +550,10 @@ $rows = [ordered]@{}
 foreach ($strategy in $resolvedStrategies) { $rows[$strategy] = @() }
 $effectiveJellyMergeLevelGap = $null
 $effectiveJellyTimedMergeLevelGap = $null
+$effectiveJellyBlastMinLevel = $null
 $effectiveJellyBlastPairTopMinLevel = $null
+$effectiveJellyTapBlastMinLevel = $null
+$effectiveSpawnCountMax = $null
 foreach ($strategy in @($rows.Keys)) {
     $shardSize = 1
     foreach ($shard in @(Get-SeedShards $SeedCount $shardSize)) {
@@ -563,17 +566,31 @@ foreach ($strategy in @($rows.Keys)) {
 		if ($null -eq $rawReport.PSObject.Properties['jelly_blast_pair_top_min_level']) {
 			throw "$filePath is missing jelly_blast_pair_top_min_level"
 		}
+		foreach ($propertyName in @('jelly_blast_min_level', 'jelly_tap_blast_min_level', 'spawn_count_max')) {
+			if ($null -eq $rawReport.PSObject.Properties[$propertyName]) {
+				throw "$filePath is missing $propertyName"
+			}
+		}
 		$reportedMergeLevelGap = [int]$rawReport.jelly_merge_level_gap
 		$reportedTimedMergeLevelGap = [int]$rawReport.jelly_timed_merge_level_gap
+		$reportedJellyBlastMinLevel = [int]$rawReport.jelly_blast_min_level
 		$reportedJellyBlastPairTopMinLevel = [int]$rawReport.jelly_blast_pair_top_min_level
+		$reportedJellyTapBlastMinLevel = [int]$rawReport.jelly_tap_blast_min_level
+		$reportedSpawnCountMax = [int]$rawReport.spawn_count_max
 		if ($null -eq $effectiveJellyMergeLevelGap) {
 			$effectiveJellyMergeLevelGap = $reportedMergeLevelGap
 			$effectiveJellyTimedMergeLevelGap = $reportedTimedMergeLevelGap
+			$effectiveJellyBlastMinLevel = $reportedJellyBlastMinLevel
 			$effectiveJellyBlastPairTopMinLevel = $reportedJellyBlastPairTopMinLevel
+			$effectiveJellyTapBlastMinLevel = $reportedJellyTapBlastMinLevel
+			$effectiveSpawnCountMax = $reportedSpawnCountMax
 		} elseif (
 			$effectiveJellyMergeLevelGap -ne $reportedMergeLevelGap -or
 			$effectiveJellyTimedMergeLevelGap -ne $reportedTimedMergeLevelGap -or
-			$effectiveJellyBlastPairTopMinLevel -ne $reportedJellyBlastPairTopMinLevel
+			$effectiveJellyBlastMinLevel -ne $reportedJellyBlastMinLevel -or
+			$effectiveJellyBlastPairTopMinLevel -ne $reportedJellyBlastPairTopMinLevel -or
+			$effectiveJellyTapBlastMinLevel -ne $reportedJellyTapBlastMinLevel -or
+			$effectiveSpawnCountMax -ne $reportedSpawnCountMax
 		) {
 			throw "Inconsistent merge level gaps in $filePath"
 		}
@@ -634,9 +651,9 @@ $report = [ordered]@{
 	jelly_timed_level = $JellyTimedLevel
 	jelly_timed_stone_enabled = $JellyTimedStoneEnabled -eq "On"
 	jelly_timed_stone_turns = $JellyTimedStoneTurns
-	jelly_blast_min_level = $JellyBlastMinLevel
+	jelly_blast_min_level = $effectiveJellyBlastMinLevel
 	jelly_blast_pair_top_min_level = $effectiveJellyBlastPairTopMinLevel
-	jelly_tap_blast_min_level = $JellyTapBlastMinLevel
+	jelly_tap_blast_min_level = $effectiveJellyTapBlastMinLevel
 	jelly_blast_requires_same_level = $JellyBlastRequiresSameLevel -eq "On"
 	jelly_tap_common_push = $JellyTapCommonPush -eq "On"
 	jelly_tap_lift_speed = $JellyTapLiftSpeed
@@ -644,7 +661,7 @@ $report = [ordered]@{
 	blast_speed = $BlastSpeed
 	blast_far_factor = $BlastFarFactor
 	orb_friction_by_level = $OrbFrictionByLevel
-	spawn_count_max = $SpawnCountMax
+	spawn_count_max = $effectiveSpawnCountMax
 	strategies_requested = $resolvedStrategies
 	strategies = $strategySummaries
     skill_length_ratio_l_merge_over_r = $lengthRatio

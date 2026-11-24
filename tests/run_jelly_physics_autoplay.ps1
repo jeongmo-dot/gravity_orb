@@ -10,7 +10,7 @@ param(
     [double]$AngularDamp = -1.0,
     [double]$GravityTurnDiagonalTime = -1.0,
     [ValidateRange(-1, 10)]
-    [int]$JellyBlastMinLevel = 8,
+    [int]$JellyBlastMinLevel = -1,
 	[ValidateRange(-1, 10)]
 	[int]$JellyBlastPairTopMinLevel = -1,
 	[ValidateSet("Default", "D", "M", "A", "B")]
@@ -18,8 +18,8 @@ param(
 	[switch]$TapBlastBot,
 	[ValidateSet("None", "Save", "All")]
 	[string]$TapBlastBotMode = "None",
-	[ValidateRange(0, 10)]
-	[int]$JellyTapBlastMinLevel = 8,
+	[ValidateRange(-1, 10)]
+	[int]$JellyTapBlastMinLevel = -1,
 	[ValidateRange(0.0, 100.0)]
 	[double]$BlastScoreFactor = 15.0,
 	[ValidateRange(0.0, 100.0)]
@@ -115,7 +115,9 @@ $physicsArguments += "--jelly-timed-level=$JellyTimedLevel"
 $physicsArguments += "--jelly-timed-burst-count=$JellyTimedBurstCount"
 $physicsArguments += "--jelly-timed-stone-enabled=$($JellyTimedStoneEnabled.ToLower())"
 $physicsArguments += "--jelly-timed-stone-turns=$JellyTimedStoneTurns"
-$physicsArguments += "--jelly-tap-blast-min-level=$JellyTapBlastMinLevel"
+if ($JellyTapBlastMinLevel -ge 0) {
+	$physicsArguments += "--jelly-tap-blast-min-level=$JellyTapBlastMinLevel"
+}
 $physicsArguments += "--blast-score-factor=$($BlastScoreFactor.ToString($culture))"
 $physicsArguments += "--jelly-tap-blast-score-factor=$($JellyTapBlastScoreFactor.ToString($culture))"
 $physicsArguments += "--jelly-tap-blast-uses-turn=$($JellyTapBlastUsesTurn.ToLower())"
@@ -292,7 +294,9 @@ $timedStoneReactions = 0
 $effectiveJellyMergeLevelGap = $null
 $effectiveJellyTimedMergeLevelGap = $null
 $effectiveSpawnCountMax = $null
+$effectiveJellyBlastMinLevel = $null
 $effectiveJellyBlastPairTopMinLevel = $null
+$effectiveJellyTapBlastMinLevel = $null
 foreach ($task in $tasks) {
     $report = Get-Content -LiteralPath $task.Output -Raw | ConvertFrom-Json
 	if ($null -eq $report.PSObject.Properties['jelly_timed_merge_level_gap']) {
@@ -304,20 +308,32 @@ foreach ($task in $tasks) {
 	if ($null -eq $report.PSObject.Properties['jelly_blast_pair_top_min_level']) {
 		throw "$($task.Output) is missing jelly_blast_pair_top_min_level"
 	}
+	if ($null -eq $report.PSObject.Properties['jelly_blast_min_level']) {
+		throw "$($task.Output) is missing jelly_blast_min_level"
+	}
+	if ($null -eq $report.PSObject.Properties['jelly_tap_blast_min_level']) {
+		throw "$($task.Output) is missing jelly_tap_blast_min_level"
+	}
 	$reportedMergeLevelGap = [int]$report.jelly_merge_level_gap
 	$reportedTimedMergeLevelGap = [int]$report.jelly_timed_merge_level_gap
 	$reportedSpawnCountMax = [int]$report.spawn_count_max
+	$reportedJellyBlastMinLevel = [int]$report.jelly_blast_min_level
 	$reportedJellyBlastPairTopMinLevel = [int]$report.jelly_blast_pair_top_min_level
+	$reportedJellyTapBlastMinLevel = [int]$report.jelly_tap_blast_min_level
 	if ($null -eq $effectiveJellyMergeLevelGap) {
 		$effectiveJellyMergeLevelGap = $reportedMergeLevelGap
 		$effectiveJellyTimedMergeLevelGap = $reportedTimedMergeLevelGap
 		$effectiveSpawnCountMax = $reportedSpawnCountMax
+		$effectiveJellyBlastMinLevel = $reportedJellyBlastMinLevel
 		$effectiveJellyBlastPairTopMinLevel = $reportedJellyBlastPairTopMinLevel
+		$effectiveJellyTapBlastMinLevel = $reportedJellyTapBlastMinLevel
 	} elseif (
 		$effectiveJellyMergeLevelGap -ne $reportedMergeLevelGap -or
 		$effectiveJellyTimedMergeLevelGap -ne $reportedTimedMergeLevelGap -or
 		$effectiveSpawnCountMax -ne $reportedSpawnCountMax -or
-		$effectiveJellyBlastPairTopMinLevel -ne $reportedJellyBlastPairTopMinLevel
+		$effectiveJellyBlastMinLevel -ne $reportedJellyBlastMinLevel -or
+		$effectiveJellyBlastPairTopMinLevel -ne $reportedJellyBlastPairTopMinLevel -or
+		$effectiveJellyTapBlastMinLevel -ne $reportedJellyTapBlastMinLevel
 	) {
 		throw "Inconsistent effective settings in $($task.Output)"
 	}
@@ -589,7 +605,7 @@ $summary = [ordered]@{
 	jelly_merge_level_gap = $effectiveJellyMergeLevelGap
 	jelly_timed_merge_level_gap = $effectiveJellyTimedMergeLevelGap
 	jelly_merge_wide_gap_min_level = $JellyMergeWideGapMinLevel
-	jelly_tap_blast_min_level = $JellyTapBlastMinLevel
+	jelly_tap_blast_min_level = $effectiveJellyTapBlastMinLevel
 	jelly_blast_requires_same_level = $JellyBlastRequiresSameLevel -eq "On"
 	jelly_blast_pair_top_min_level = $effectiveJellyBlastPairTopMinLevel
 	jelly_tap_common_push = $JellyTapCommonPush -eq "On"
@@ -603,7 +619,7 @@ $summary = [ordered]@{
     friction = if ($Friction -gt 0.0) { $Friction } else { $null }
     angular_damp = if ($AngularDamp -ge 0.0) { $AngularDamp } else { $null }
     gravity_turn_diagonal_time = if ($GravityTurnDiagonalTime -ge 0.0) { $GravityTurnDiagonalTime } else { $null }
-    jelly_blast_min_level = if ($JellyBlastMinLevel -ge 0) { $JellyBlastMinLevel } else { $null }
+    jelly_blast_min_level = $effectiveJellyBlastMinLevel
     spawn_count_max = $effectiveSpawnCountMax
     spawn_level_costs = if ([string]::IsNullOrWhiteSpace($SpawnLevelCosts)) { $null } else { $SpawnLevelCosts }
     game_over_count = $completedGames.Count

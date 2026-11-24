@@ -334,7 +334,7 @@ func test_default_classic_progression_hash() -> void:
 	print("STAGED_DIFFICULTY_HASH classic=%s" % hash_value)
 	assert_eq(
 		hash_value,
-		"52ae7da72853f167058f6134a01a06d35b8eab222cb48a2534831e2ace5ebe35",
+		"e9fa5d7fd401779fd2f791c986bd4c6584408eef1d0d00e7aa36743fe480f23a",
 		"CLASSIC staged progression hash"
 	)
 	spawner.free()

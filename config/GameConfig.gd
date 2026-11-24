@@ -62,7 +62,7 @@ enum GameMode {
 @export var spawn_count_per_turn: int = 1
 @export var preview_turns: int = 2
 @export var spawn_count_ramp_turns: int = 10
-@export var spawn_count_max: int = 4
+@export var spawn_count_max: int = 6
 @export var turn_start_colors: int = 4
 @export var turn_color_unlock_turns: Array[int] = []
 @export var spawn_position_mode: SpawnPositionMode = SpawnPositionMode.RANDOM
@@ -140,13 +140,13 @@ enum GameMode {
 @export var jelly_timed_bonus_levels: int = 1
 @export var blast_enabled: bool = true
 @export var blast_min_level: int = 4
-@export var jelly_blast_min_level: int = 10
+@export var jelly_blast_min_level: int = 9
 @export var jelly_blast_requires_same_level: bool = false
-@export var jelly_blast_pair_top_min_level: int = 0
+@export var jelly_blast_pair_top_min_level: int = 10
 @export var blast_push_radius_by_level: PackedFloat32Array = PackedFloat32Array(
 	[0.0, 0.0, 0.0, 0.3, 0.55, 1.0, 1.0, 1.0, 1.0, 1.0]
 )
-@export var jelly_tap_blast_min_level: int = 8
+@export var jelly_tap_blast_min_level: int = 9
 @export var jelly_tap_blast_radius_factor: float = 0.3
 @export var jelly_tap_blast_score_factor: float = 0.5
 @export var jelly_tap_blast_uses_turn: bool = true

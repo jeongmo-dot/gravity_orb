@@ -17,6 +17,8 @@ foreach ($angularDamp in @(5.0, 15.0, 30.0)) {
         -Label "rolling_damp_$tag" `
         -Friction 0.3 `
         -AngularDamp $angularDamp `
+		-JellyBlastMinLevel 8 `
+		-JellyTapBlastMinLevel 8 `
         -Parallelism $Parallelism
 }
 

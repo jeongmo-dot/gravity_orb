@@ -114,11 +114,11 @@ func test_jelly_max_face_uses_body_radius_while_regular_faces_keep_original_scal
 	Config.data.game_mode = original_mode
 
 
-func test_jelly_default_l8_l9_use_blast_face_and_l10_keeps_max_face() -> void:
+func test_jelly_default_l8_normal_l9_blast_face_and_l10_max_face() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_jelly_minimum: int = Config.data.jelly_blast_min_level
 	Config.data.game_mode = GameConfig.GameMode.JELLY
-	Config.data.jelly_blast_min_level = 8
+	Config.data.jelly_blast_min_level = 9
 	var board: Board3D = await _create_board()
 	var level_seven: Orb3D = board.spawn_orb(0, 7, Vector2(-300.0, 0.0))
 	var level_eight: Orb3D = board.spawn_orb(3, 8, Vector2(-100.0, 0.0))
@@ -130,22 +130,22 @@ func test_jelly_default_l8_l9_use_blast_face_and_l10_keeps_max_face() -> void:
 	var max_material: ShaderMaterial = level_ten._face.material_override as ShaderMaterial
 
 	assert_true(not bool(level_seven_material.get_shader_parameter("is_blast_ready")), "L7 keeps normal face")
-	assert_true(bool(level_eight_material.get_shader_parameter("is_blast_ready")), "L8 uses blast-ready face")
+	assert_true(not bool(level_eight_material.get_shader_parameter("is_blast_ready")), "L8 keeps normal face")
 	assert_true(bool(level_nine_material.get_shader_parameter("is_blast_ready")), "L9 uses blast-ready face")
 	assert_true(not bool(max_material.get_shader_parameter("is_blast_ready")), "L10 keeps MAX face")
 	assert_true(bool(max_material.get_shader_parameter("is_max")), "L10 remains MAX")
 	assert_true(not level_seven.is_blast_armed(), "L7 unarmed")
-	assert_true(level_eight.is_blast_armed(), "L8 armed")
+	assert_true(not level_eight.is_blast_armed(), "L8 unarmed")
 	assert_true(level_nine.is_blast_armed(), "L9 armed")
 	assert_true(level_ten.is_blast_armed(), "L10 armed by rule")
-	for orb: Orb3D in [level_seven]:
+	for orb: Orb3D in [level_seven, level_eight]:
 		assert_near(
 			orb._face.scale.x / (orb.get_current_radius() / Orb3D.PIXELS_PER_METER),
 			0.62,
 			0.001,
 			"L%d keeps regular face scale" % orb.level
 		)
-	for orb: Orb3D in [level_eight, level_nine, level_ten]:
+	for orb: Orb3D in [level_nine, level_ten]:
 		assert_near(
 			orb._face.scale.x / (orb.get_current_radius() / Orb3D.PIXELS_PER_METER),
 			1.0,
