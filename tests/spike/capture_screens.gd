@@ -405,18 +405,21 @@ func _capture_gap2_default_scenes() -> void:
 	var level_eight_material: ShaderMaterial = level_eight._face.material_override as ShaderMaterial
 	var level_nine_material: ShaderMaterial = level_nine._face.material_override as ShaderMaterial
 	var level_ten_material: ShaderMaterial = level_ten._face.material_override as ShaderMaterial
-	if bool(level_eight_material.get_shader_parameter("is_blast_ready")):
+	if (
+		bool(level_eight_material.get_shader_parameter("is_sparkle_face"))
+		or bool(level_eight_material.get_shader_parameter("is_squeezed_face"))
+	):
 		_fail("GAP2 default capture L8 must keep the normal face")
-	if not bool(level_nine_material.get_shader_parameter("is_blast_ready")):
-		_fail("GAP2 default capture L9 must use the blast-ready face")
-	if not bool(level_ten_material.get_shader_parameter("is_max")):
-		_fail("GAP2 default capture L10 must use the MAX face")
+	if not bool(level_nine_material.get_shader_parameter("is_sparkle_face")):
+		_fail("GAP2 default capture L9 must use the sparkle face")
+	if not bool(level_ten_material.get_shader_parameter("is_squeezed_face")):
+		_fail("GAP2 default capture L10 must use the squeezed face")
 	await get_tree().create_timer(0.10).timeout
 	await _capture("228_jelly_gap2_l8_l9_l10.png")
 	await _capture_zoom(
 		"229_jelly_gap2_l8_l9_l10_zoom.png",
 		camera.unproject_position(level_nine._mesh.global_position),
-		190
+		260
 	)
 	await _destroy_main(main)
 

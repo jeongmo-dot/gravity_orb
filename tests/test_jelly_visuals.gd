@@ -114,7 +114,7 @@ func test_jelly_max_face_uses_body_radius_while_regular_faces_keep_original_scal
 	Config.data.game_mode = original_mode
 
 
-func test_jelly_default_l8_normal_l9_blast_face_and_l10_max_face() -> void:
+func test_jelly_default_l8_normal_l9_sparkle_face_and_l10_squeezed_face() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_jelly_minimum: int = Config.data.jelly_blast_min_level
 	Config.data.game_mode = GameConfig.GameMode.JELLY
@@ -127,13 +127,33 @@ func test_jelly_default_l8_normal_l9_blast_face_and_l10_max_face() -> void:
 	var level_seven_material: ShaderMaterial = level_seven._face.material_override as ShaderMaterial
 	var level_eight_material: ShaderMaterial = level_eight._face.material_override as ShaderMaterial
 	var level_nine_material: ShaderMaterial = level_nine._face.material_override as ShaderMaterial
-	var max_material: ShaderMaterial = level_ten._face.material_override as ShaderMaterial
+	var level_ten_material: ShaderMaterial = level_ten._face.material_override as ShaderMaterial
 
-	assert_true(not bool(level_seven_material.get_shader_parameter("is_blast_ready")), "L7 keeps normal face")
-	assert_true(not bool(level_eight_material.get_shader_parameter("is_blast_ready")), "L8 keeps normal face")
-	assert_true(bool(level_nine_material.get_shader_parameter("is_blast_ready")), "L9 uses blast-ready face")
-	assert_true(not bool(max_material.get_shader_parameter("is_blast_ready")), "L10 keeps MAX face")
-	assert_true(bool(max_material.get_shader_parameter("is_max")), "L10 remains MAX")
+	for normal_material: ShaderMaterial in [level_seven_material, level_eight_material]:
+		assert_true(
+			not bool(normal_material.get_shader_parameter("is_sparkle_face")),
+			"L7 and L8 do not use the sparkle face"
+		)
+		assert_true(
+			not bool(normal_material.get_shader_parameter("is_squeezed_face")),
+			"L7 and L8 keep the normal face"
+		)
+	assert_true(
+		bool(level_nine_material.get_shader_parameter("is_sparkle_face")),
+		"L9 uses the sparkle face"
+	)
+	assert_true(
+		not bool(level_nine_material.get_shader_parameter("is_squeezed_face")),
+		"L9 does not use the squeezed face"
+	)
+	assert_true(
+		not bool(level_ten_material.get_shader_parameter("is_sparkle_face")),
+		"L10 does not keep the sparkle face"
+	)
+	assert_true(
+		bool(level_ten_material.get_shader_parameter("is_squeezed_face")),
+		"L10 uses the squeezed face"
+	)
 	assert_true(not level_seven.is_blast_armed(), "L7 unarmed")
 	assert_true(not level_eight.is_blast_armed(), "L8 unarmed")
 	assert_true(level_nine.is_blast_armed(), "L9 armed")
@@ -154,22 +174,31 @@ func test_jelly_default_l8_normal_l9_blast_face_and_l10_max_face() -> void:
 		)
 	for orb: Orb3D in [level_seven, level_eight, level_nine, level_ten]:
 		assert_eq(_forbidden_geometry_count(orb), 0, "JELLY L%d has no outline geometry" % orb.level)
-	var blast_material: ShaderMaterial = JellyOrbArt.face_material_for(4, 9, true)
-	assert_eq(blast_material.get_shader_parameter("blast_eye_outer_top"), Vector2(0.32, -0.16), "blast eye outer top")
-	assert_eq(blast_material.get_shader_parameter("blast_eye_inner"), Vector2(0.16, -0.04), "blast eye inner corner")
-	assert_eq(blast_material.get_shader_parameter("blast_eye_outer_bottom"), Vector2(0.32, 0.08), "blast eye outer bottom")
-	assert_near(float(blast_material.get_shader_parameter("blast_eye_stroke_width")), 0.064, 0.0001, "blast eye stroke")
-	assert_eq(blast_material.get_shader_parameter("blast_mouth_center"), Vector2(0.0, 0.22), "blast mouth center")
-	assert_eq(blast_material.get_shader_parameter("blast_mouth_radii"), Vector2(0.064, 0.076), "blast mouth radii")
-	assert_eq(blast_material.get_shader_parameter("blast_mouth_color"), Color("3a1530"), "blast mouth color")
-	assert_eq(blast_material.get_shader_parameter("blast_blush_center"), Vector2(0.48, 0.18), "blast blush center")
-	assert_eq(blast_material.get_shader_parameter("blast_blush_radii"), Vector2(0.16, 0.10), "blast blush radii")
-	assert_near(float(blast_material.get_shader_parameter("blast_blush_alpha")), 0.60, 0.0001, "blast blush alpha")
+	var squeezed_material: ShaderMaterial = JellyOrbArt.face_material_for(4, 10, true)
+	assert_eq(squeezed_material.get_shader_parameter("blast_eye_outer_top"), Vector2(0.32, -0.16), "squeezed eye outer top")
+	assert_eq(squeezed_material.get_shader_parameter("blast_eye_inner"), Vector2(0.16, -0.04), "squeezed eye inner corner")
+	assert_eq(squeezed_material.get_shader_parameter("blast_eye_outer_bottom"), Vector2(0.32, 0.08), "squeezed eye outer bottom")
+	assert_near(float(squeezed_material.get_shader_parameter("blast_eye_stroke_width")), 0.064, 0.0001, "squeezed eye stroke")
+	assert_eq(squeezed_material.get_shader_parameter("blast_mouth_center"), Vector2(0.0, 0.22), "squeezed mouth center")
+	assert_eq(squeezed_material.get_shader_parameter("blast_mouth_radii"), Vector2(0.064, 0.076), "squeezed mouth radii")
+	assert_eq(squeezed_material.get_shader_parameter("blast_mouth_color"), Color("3a1530"), "squeezed mouth color")
+	assert_eq(squeezed_material.get_shader_parameter("blast_blush_center"), Vector2(0.48, 0.18), "squeezed blush center")
+	assert_eq(squeezed_material.get_shader_parameter("blast_blush_radii"), Vector2(0.16, 0.10), "squeezed blush radii")
+	assert_near(float(squeezed_material.get_shader_parameter("blast_blush_alpha")), 0.60, 0.0001, "squeezed blush alpha")
 	assert_true(
-		blast_material.shader.code.contains(
+		squeezed_material.shader.code.contains(
 			"face_color = mix(face_color, max_blush_color.rgb, blush_color_mask);"
 		),
-		"blast and MAX blush keep the source pink and use alpha only"
+		"sparkle and squeezed blush keep the source pink and use alpha only"
+	)
+	var legacy_level_eight_material: ShaderMaterial = JellyOrbArt.face_material_for(3, 8, true)
+	assert_true(
+		bool(legacy_level_eight_material.get_shader_parameter("is_sparkle_face")),
+		"an old L8 blast threshold uses the sparkle face below maximum"
+	)
+	assert_true(
+		not bool(legacy_level_eight_material.get_shader_parameter("is_squeezed_face")),
+		"an old L8 blast threshold does not use the maximum-level squeezed face"
 	)
 	await _cleanup(board)
 	Config.data.jelly_blast_min_level = original_jelly_minimum

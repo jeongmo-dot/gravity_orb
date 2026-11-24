@@ -237,7 +237,7 @@ func test_classic_3d_blast_readiness_starts_at_level_four() -> void:
 	Config.data.game_mode = original_mode
 
 
-func test_jelly_default_l8_normal_l9_blast_readiness_follows_mass_without_outline_geometry() -> void:
+func test_jelly_default_l8_normal_l9_sparkle_face_follows_mass_without_outline_geometry() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_jelly_minimum: int = Config.data.jelly_blast_min_level
 	Config.data.game_mode = GameConfig.GameMode.JELLY
@@ -251,23 +251,23 @@ func test_jelly_default_l8_normal_l9_blast_readiness_follows_mass_without_outlin
 	assert_true(level_nine.is_blast_armed(), "L9 arms BLAST")
 	assert_true(level_ten.is_blast_armed(), "L10 arms BLAST")
 	assert_true(
-		not bool((level_eight._face.material_override as ShaderMaterial).get_shader_parameter("is_blast_ready")),
+		not bool((level_eight._face.material_override as ShaderMaterial).get_shader_parameter("is_sparkle_face")),
 		"L8 uses the normal face"
 	)
 	assert_true(
-		bool((level_nine._face.material_override as ShaderMaterial).get_shader_parameter("is_blast_ready")),
-		"L9 uses the blast-ready face"
+		bool((level_nine._face.material_override as ShaderMaterial).get_shader_parameter("is_sparkle_face")),
+		"L9 uses the sparkle face"
 	)
 	level_nine.set_jelly_mass(64.0, Config.data)
 	assert_eq(level_nine.level, 10, "mass update reaches displayed L10")
 	assert_true(level_nine.is_blast_armed(), "mass-updated displayed L10 arms BLAST")
 	assert_true(
-		bool((level_nine._face.material_override as ShaderMaterial).get_shader_parameter("is_max")),
-		"mass-updated L10 keeps the MAX face"
+		bool((level_nine._face.material_override as ShaderMaterial).get_shader_parameter("is_squeezed_face")),
+		"mass-updated L10 switches to the squeezed face"
 	)
 	assert_true(
-		not bool((level_nine._face.material_override as ShaderMaterial).get_shader_parameter("is_blast_ready")),
-		"mass-updated L10 does not replace MAX with blast-ready face"
+		not bool((level_nine._face.material_override as ShaderMaterial).get_shader_parameter("is_sparkle_face")),
+		"mass-updated L10 no longer uses the sparkle face"
 	)
 	_cleanup(board)
 	Config.data.jelly_blast_min_level = original_jelly_minimum
