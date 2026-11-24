@@ -16,6 +16,43 @@ $captureSpecs = @(
     [ordered]@{ Name = "540x960"; Resolution = "540x960" },
     [ordered]@{ Name = "540x1170"; Resolution = "540x1170" }
 )
+
+function Get-PngDimensions {
+    param([Parameter(Mandatory = $true)][string]$LiteralPath)
+
+    $bytes = [System.IO.File]::ReadAllBytes($LiteralPath)
+    if (
+        $bytes.Length -lt 24 -or
+        $bytes[0] -ne 0x89 -or
+        $bytes[1] -ne 0x50 -or
+        $bytes[2] -ne 0x4E -or
+        $bytes[3] -ne 0x47
+    ) {
+        throw "Capture is not a valid PNG: $LiteralPath"
+    }
+    $width = (
+        ([int]$bytes[16] -shl 24) -bor
+        ([int]$bytes[17] -shl 16) -bor
+        ([int]$bytes[18] -shl 8) -bor
+        [int]$bytes[19]
+    )
+    $height = (
+        ([int]$bytes[20] -shl 24) -bor
+        ([int]$bytes[21] -shl 16) -bor
+        ([int]$bytes[22] -shl 8) -bor
+        [int]$bytes[23]
+    )
+    return [pscustomobject]@{ Width = $width; Height = $height }
+}
+
+function Get-ResolutionDimensions {
+    param([Parameter(Mandatory = $true)][string]$Resolution)
+
+    if ($Resolution -notmatch '^(\d+)x(\d+)$') {
+        throw "Invalid capture resolution: $Resolution"
+    }
+    return [pscustomobject]@{ Width = [int]$Matches[1]; Height = [int]$Matches[2] }
+}
 $expectedFiles = @(
     "01_jelly_start.png",
     "02_jelly_ranking.png",
@@ -225,11 +262,11 @@ $expectedFiles = @(
     "210_jelly_timed_stone_10.png"
 )
 $expectedZoomFiles = @(
-    "199_jelly_timed_4_5x.png",
-    "200_jelly_timed_1_5x.png",
-    "205_jelly_timed_stone_18_5x.png",
-    "207_jelly_timed_stone_1_5x.png",
-    "210_jelly_timed_stone_10_5x.png"
+    "zoom\199_jelly_timed_4_5x.png",
+    "zoom\200_jelly_timed_1_5x.png",
+    "zoom\205_jelly_timed_stone_18_5x.png",
+    "zoom\207_jelly_timed_stone_1_5x.png",
+    "zoom\210_jelly_timed_stone_10_5x.png"
 )
 
 if ($TimedOnly) {
@@ -275,10 +312,11 @@ if ($UiBBoardOnly) {
 
 if ($Gap2DefaultsOnly) {
     $expectedFiles = @(
-        "228_jelly_gap2_l8_l9_l10.png",
+        "228_jelly_gap2_l8_l9_l10.png"
+    )
+    $expectedZoomFiles = @(
         "229_jelly_gap2_l8_l9_l10_zoom.png"
     )
-    $expectedZoomFiles = @()
 }
 
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {
@@ -295,16 +333,27 @@ $capturedFileCount = 0
 foreach ($captureSpec in $captureSpecs) {
     $outputPath = Join-Path $outputRoot $captureSpec.Name
     New-Item -ItemType Directory -Path $outputPath -Force | Out-Null
+    $resolutionSize = Get-ResolutionDimensions -Resolution $captureSpec.Resolution
+    foreach ($relativePath in @($expectedFiles) + @($expectedZoomFiles)) {
+        $stalePath = Join-Path $outputPath $relativePath
+        if (Test-Path -LiteralPath $stalePath) {
+            Remove-Item -LiteralPath $stalePath -Force
+        }
+    }
     $arguments = @(
         "--path", $repoPath,
         "--windowed",
+        "--borderless",
+        "--position", "0,0",
         "--resolution", $captureSpec.Resolution,
         "--audio-driver", "Dummy",
         "--fixed-fps", $FixedFps.ToString(),
         "res://tests/spike/CaptureScreens.tscn",
         "--",
         "--capture-output-directory=res://artifacts/screens/$($captureSpec.Name)",
-        "--capture-save-path=res://artifacts/screens/$($captureSpec.Name)/capture_save.tmp.cfg"
+        "--capture-save-path=res://artifacts/screens/$($captureSpec.Name)/capture_save.tmp.cfg",
+        "--capture-window-size=$($captureSpec.Resolution)",
+        "--capture-expected-size=$($captureSpec.Resolution)"
     )
     if ($TimedOnly) {
         $arguments += "--capture-timed-only"
@@ -327,15 +376,50 @@ foreach ($captureSpec in $captureSpecs) {
         if (-not (Test-Path -LiteralPath $filePath)) {
             throw "Screenshot capture did not create $filePath"
         }
-        Write-Output ("SCREEN_CAPTURE_RESULT ratio={0} file={1}" -f $captureSpec.Name, $filePath)
+        $actualSize = Get-PngDimensions -LiteralPath $filePath
+        if (
+            $actualSize.Width -ne $resolutionSize.Width -or
+            $actualSize.Height -ne $resolutionSize.Height
+        ) {
+            throw (
+                "Capture size mismatch file={0} expected={1}x{2} actual={3}x{4}" -f `
+                    $filePath,
+                    $resolutionSize.Width,
+                    $resolutionSize.Height,
+                    $actualSize.Width,
+                    $actualSize.Height
+            )
+        }
+        Write-Output (
+            "SCREEN_CAPTURE_RESULT ratio={0} size={1}x{2} file={3}" -f `
+                $captureSpec.Name,
+                $actualSize.Width,
+                $actualSize.Height,
+                $filePath
+        )
         $capturedFileCount += 1
     }
     foreach ($fileName in $expectedZoomFiles) {
-        $filePath = Join-Path (Join-Path $outputPath "zoom") $fileName
+        $filePath = Join-Path $outputPath $fileName
         if (-not (Test-Path -LiteralPath $filePath)) {
             throw "Screenshot capture did not create $filePath"
         }
-        Write-Output ("SCREEN_CAPTURE_ZOOM_RESULT ratio={0} file={1}" -f $captureSpec.Name, $filePath)
+        $actualSize = Get-PngDimensions -LiteralPath $filePath
+        if ($actualSize.Width -ne 480 -or $actualSize.Height -ne 480) {
+            throw (
+                "Capture zoom size mismatch file={0} expected=480x480 actual={1}x{2}" -f `
+                    $filePath,
+                    $actualSize.Width,
+                    $actualSize.Height
+            )
+        }
+        Write-Output (
+            "SCREEN_CAPTURE_ZOOM_RESULT ratio={0} size={1}x{2} file={3}" -f `
+                $captureSpec.Name,
+                $actualSize.Width,
+                $actualSize.Height,
+                $filePath
+        )
         $capturedFileCount += 1
     }
     if (-not $TimedOnly -and -not $UiBOnly -and -not $UiBBoardOnly -and -not $Gap2DefaultsOnly) {

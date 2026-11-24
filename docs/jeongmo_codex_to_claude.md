@@ -38,6 +38,36 @@
 
 ## 미확인
 
+### [2026-11-24] 대상 #160 — 캡처 크기 검사
+- **맨 앞 경고:** 이 PC에서 실제 창 캡처 **540×960·540×1170 모두 생성 가능**. 기존 전체 화면 PNG 중 폴더 비율과 다른 파일 **0개**(이번에 다시 찍은 `228` 포함). 게임 코드·`project.godot` 변경 **0개**, 회귀 해시 변경 **0개**.
+- 상태: 완료 — 요청 창 크기·기대 PNG 크기를 캡처 도구에 넘기고, GDScript 저장 전 검사와 PowerShell PNG IHDR 검사·오래된 파일 제거를 추가했다.
+- 브랜치 / PR: `capture-size-validation` / PR 생성 예정
+- 변경 파일: `tests/capture_screens.ps1`, `tests/spike/capture_screens.gd`, 이 회신 파일.
+- 원인 관측:
+  - Windows 화면 1024×768, 작업 영역 1024×720, 배율 100%. 장식된 `--windowed --resolution 540x960` 창은 OS 제한 뒤 실제 클라이언트가 **540×749**가 됐다.
+  - 캡처 래퍼에서만 borderless 실제 창을 사용하고, GDScript가 `--capture-window-size`로 창을 다시 540×960·540×1170으로 맞추자 `DisplayServer.window_get_size()`와 PNG가 두 요청 크기와 일치했다. 별도 `SubViewport`나 렌더 경로는 쓰지 않았다.
+- Done-when 대조:
+  - [x] GDScript는 `--capture-expected-size`가 있을 때 `_capture()`·`_capture_zoom()`·`_capture_timed_number_zoom()`의 원본 뷰포트 그림을 저장 전에 검사한다. 인자가 없으면 크기·대기 동작을 추가하지 않는다.
+  - [x] 불일치 시 `CAPTURE_SIZE_MISMATCH file=… expected=… actual=… usable=… scale=… window=…`를 출력하고 저장하지 않은 채 종료 코드 1로 끝난다.
+  - [x] PowerShell은 매 비율 실행 전에 그 실행의 기대 파일만 지워 오래된 파일을 성공으로 오인하지 않는다. 실행 뒤 PNG IHDR로 전체 화면은 비율 크기, 확대는 480×480인지 검사하고 결과 줄에 실제 크기를 쓴다.
+  - [x] `-Gap2DefaultsOnly` 정상 실행: `228`은 540×960·540×1170, `229`는 양쪽 480×480. 두 `228` MD5 `37C298ED…`·`53225875…`, 서로 다름.
+  - [x] 기존 `artifacts/screens/540x960`·`540x1170`의 루트 PNG에서 `_zoom`·`_5x` 확대 파일과 `zoom/`을 제외해 검사 → 불일치 **0개**. 다른 캡처는 다시 찍거나 수정하지 않았다.
+- 실패 경로 관측:
+  - 크기 다름: 실제 창 540×960, 기대 540×961 → `CAPTURE_SIZE_MISMATCH … actual=540x960`, Godot 종료 코드 **1**, `228`·`229` 저장 **0개**.
+  - PowerShell 독립 검사: 테스트용 프로세스가 종료 코드 0으로 480×480 PNG를 `228`에 쓴 경우 → `expected=540x960 actual=480x480`, 래퍼 종료 코드 **1**. 임시 프로세스 파일은 검사 직후 삭제하고 정상 캡처를 다시 생성했다.
+  - 예전 파일: 정상 `228`을 미리 둔 뒤 캡처 프로세스를 강제 종료 코드 1로 실행 → 래퍼 종료 코드 **1**, 오래된 `228` 잔존 **false**. 실패한 실행이 이전 파일로 통과하지 않았다.
+- QA 관측값:
+  - Godot `4.8.dev3.official.51105ccbe` 일반 빌드. `tests/run_tests.ps1` → 일반 **383/383**, 장기 **4/4**, 성능 **5/5**, 합계 **392/392**, 종료 코드 0.
+  - GAP2 `d49a9d7b…`, 시각 상태 `70dde5ab…` 등 출력된 기존 해시 유지. 장기 회귀 이탈 0, 최대 벽 관통 17.313px, 최대 쌍 관통 20.986px.
+  - `godot --headless --path . --import` → 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건. 샌드박스 AppData 편집기 safe-save 권한 경고 1건은 있었으나 import와 테스트는 계속됐다.
+  - 기본·`--mode=blitz` `--quit-after 300` → 각각 종료 코드 0, `SCRIPT ERROR`·`Parse Error` 0건.
+  - PowerShell 구문 오류 0, `git diff --check` 오류 0. 새 입력·난수 코드 없음. 빌드는 명세대로 미실행.
+- 수동 확인 절차:
+  1. `tests/capture_screens.ps1 -Gap2DefaultsOnly` 실행 → 두 `CAPTURE_DISPLAY_INFO`의 window와 두 `SCREEN_CAPTURE_RESULT`의 size가 각각 540×960·540×1170이고 종료 코드 0인지 본다.
+  2. `--capture-window-size=540x960 --capture-expected-size=540x961`로 캡처 씬을 직접 실행 → `CAPTURE_SIZE_MISMATCH`, 종료 코드 1, 해당 PNG 미생성을 확인한다.
+- 결정 사항·알려진 문제: 기대 파일의 수정 시각 비교 대신 실행 전 해당 기대 파일만 삭제하는 방식을 선택했다. `artifacts/`의 해당 실행 산출물만 대상이며 저장소 파일·다른 장면 캡처에는 영향이 없다. 1170px 창은 720px 작업 영역보다 커서 화면 아래가 물리 모니터 밖에 있지만, Godot의 실제 window viewport 자체는 540×1170이고 그 실제 창 그림을 저장한다.
+- 남은 것 · 질문: Claude 검수와 PR 병합. Windows 빌드는 사용자 요청 때만 한다.
+
 ### [2026-11-24] 대상 #155 추가 요구 10 — L9·L10 얼굴 맞바꾸기
 - **맨 앞 경고:** 회귀 해시 변경 **0건**, 예상 목록 밖 테스트 수정 **0개**, 2D에서 L9·L10을 그리는 화면 **0곳**. 셰이더 불리언 유니폼은 모양 기준으로 `is_max` → `is_sparkle_face`, `is_blast_ready` → `is_squeezed_face`로 바꿨다. 수치 상수 이름은 2D `OrbVisual`과 모양 값을 공유하므로 바꾸지 않았다.
 - 상태: 완료 — 기본 L8은 보통 얼굴, L9는 기존 L10의 반짝 얼굴, L10은 기존 L9의 `><` 얼굴로 맞바꿨다. 규칙·값·`is_blast_armed()`·얼굴 크기·깜빡임 주기·소리·안내는 변경하지 않았다.
