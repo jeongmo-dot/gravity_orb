@@ -41,7 +41,7 @@
 ### [2026-11-24] 대상 #160 — 캡처 크기 검사
 - **맨 앞 경고:** 이 PC에서 실제 창 캡처 **540×960·540×1170 모두 생성 가능**. 기존 전체 화면 PNG 중 폴더 비율과 다른 파일 **0개**(이번에 다시 찍은 `228` 포함). 게임 코드·`project.godot` 변경 **0개**, 회귀 해시 변경 **0개**.
 - 상태: 완료 — 요청 창 크기·기대 PNG 크기를 캡처 도구에 넘기고, GDScript 저장 전 검사와 PowerShell PNG IHDR 검사·오래된 파일 제거를 추가했다.
-- 브랜치 / PR: `capture-size-validation` / PR 생성 예정
+- 브랜치 / PR: `capture-size-validation` / https://github.com/jeongmo-dot/gravity_orb/pull/161
 - 변경 파일: `tests/capture_screens.ps1`, `tests/spike/capture_screens.gd`, 이 회신 파일.
 - 원인 관측:
   - Windows 화면 1024×768, 작업 영역 1024×720, 배율 100%. 장식된 `--windowed --resolution 540x960` 창은 OS 제한 뒤 실제 클라이언트가 **540×749**가 됐다.
