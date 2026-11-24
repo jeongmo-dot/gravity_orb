@@ -34,6 +34,7 @@ foreach ($profile in $profiles) {
                 GodotPath = $GodotPath; RepoPath = $repoPath; Label = $autoLabel
                 Parallelism = $Parallelism; MaxTurns = 600; LevelProfile = "D"
                 TapBlastBotMode = $tapMode; SpawnCountMax = 4
+				JellyBlastMinLevel = 8; JellyTapBlastMinLevel = 8
                 JellyMergeLevelGap = 1; JellyMergeWideGapMinLevel = 0
                 JellyTapEffectModes = "Four"; TurnStartColors = 4; TurnColorUnlockTurns = "None"
                 JellyTapCleanMaxLevel = 1; JellyTapCleanZoneRule = "On"; JellyTapRestCleanCount = 2
@@ -50,6 +51,7 @@ foreach ($profile in $profiles) {
             GodotPath = $GodotPath; SeedCount = 20; Parallelism = $Parallelism
             TurnCap = 600; LevelProfile = "D"; TapBlastBotMode = $tapMode
             SpawnCountMax = 4; JellyMergeLevelGap = 1; JellyMergeWideGapMinLevel = 0
+			JellyBlastMinLevel = 8; JellyTapBlastMinLevel = 8
             JellyTapEffectModes = "Four"; TurnStartColors = 4; TurnColorUnlockTurns = "None"
             JellyTapCleanMaxLevel = 1; JellyTapCleanZoneRule = "On"; JellyTapRestCleanCount = 2
             JellyTimedEnabled = "On"; JellyTimedTurns = 4; JellyTimedLevel = 5

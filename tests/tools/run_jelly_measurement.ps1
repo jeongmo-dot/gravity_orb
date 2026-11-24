@@ -11,8 +11,8 @@ param(
 	[switch]$TapBlastBot,
 	[ValidateSet("None", "Save", "All")]
 	[string]$TapBlastBotMode = "None",
-	[ValidateRange(0, 10)]
-	[int]$JellyMergeLevelGap = 1,
+	[ValidateRange(-1, 10)]
+	[int]$JellyMergeLevelGap = -1,
 	[ValidateRange(0, 10)]
 	[int]$JellyMergeWideGapMinLevel = 0,
 	[ValidateRange(0.0, 10.0)]
@@ -29,10 +29,12 @@ param(
 	[string]$JellyTimedStoneEnabled = "On",
 	[ValidateRange(1, 100)]
 	[int]$JellyTimedStoneTurns = 6,
-	[ValidateRange(0, 10)]
-	[int]$JellyBlastMinLevel = 8,
-	[ValidateRange(0, 10)]
-	[int]$JellyTapBlastMinLevel = 8,
+	[ValidateRange(-1, 10)]
+	[int]$JellyBlastMinLevel = -1,
+	[ValidateRange(-1, 10)]
+	[int]$JellyBlastPairTopMinLevel = -1,
+	[ValidateRange(-1, 10)]
+	[int]$JellyTapBlastMinLevel = -1,
 	[ValidateRange(0.0, 100.0)]
 	[double]$BlastScoreFactor = 15.0,
 	[ValidateRange(0.0, 100.0)]
@@ -70,10 +72,11 @@ param(
 	[ValidateRange(0.0, 1.0)]
 	[double]$BlastFarFactor = 0.5,
 	[string]$OrbFrictionByLevel = "0.3,0.3,0.3,0.4,0.4,0.4,0.4,0.5,0.5,0.5",
-	[ValidateRange(1, 100)]
-	[int]$SpawnCountMax = 4,
+	[ValidateRange(-1, 100)]
+	[int]$SpawnCountMax = -1,
 	[string]$Strategies = "r,g,l_merge",
 	[string]$MeasurementLabel = "",
+	[switch]$TurnProgress,
     [switch]$ReuseCompleted,
     [switch]$AggregateOnly
 )
@@ -99,7 +102,9 @@ if ([string]::IsNullOrWhiteSpace($GodotPath)) {
     if (-not [string]::IsNullOrWhiteSpace($env:GODOT)) {
         $GodotPath = $env:GODOT
     } else {
-        $GodotPath = "C:\work\GodotStandard\Godot_v4.8-dev3_win64_console.exe"
+        # Track the real engine process. The console launcher can exit or become
+        # stale while its GUI-binary child is still running a long measurement.
+        $GodotPath = "C:\work\GodotStandard\Godot_v4.8-dev3_win64.exe"
     }
 }
 New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
@@ -133,8 +138,9 @@ if (-not $AggregateOnly) {
                     "res://tests/spike/JoltMeasurement.tscn", "--",
                     "--game-mode=jelly", "--jolt-ticks=120", "--jolt-seeds=$($shard.Csv)",
                     "--jolt-max-turns=$TurnCap", "--jolt-no-determinism", "--skill-strategy=$strategy",
+					$(if ($TurnProgress) { "--jolt-turn-progress" } else { "" }),
 					"--jelly-level-profile=$LevelProfile",
-					"--jelly-merge-level-gap=$JellyMergeLevelGap",
+					$(if ($JellyMergeLevelGap -ge 0) { "--jelly-merge-level-gap=$JellyMergeLevelGap" } else { "" }),
 					"--jelly-merge-wide-gap-min-level=$JellyMergeWideGapMinLevel",
 					"--jelly-merge-extension-max=$($JellyMergeExtensionMax.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--jelly-timed-enabled=$($JellyTimedEnabled.ToLower())",
@@ -143,8 +149,9 @@ if (-not $AggregateOnly) {
 					"--jelly-timed-burst-count=$JellyTimedBurstCount",
 					"--jelly-timed-stone-enabled=$($JellyTimedStoneEnabled.ToLower())",
 					"--jelly-timed-stone-turns=$JellyTimedStoneTurns",
-					"--jelly-blast-min-level=$JellyBlastMinLevel",
-					"--jelly-tap-blast-min-level=$JellyTapBlastMinLevel",
+					$(if ($JellyBlastMinLevel -ge 0) { "--jelly-blast-min-level=$JellyBlastMinLevel" } else { "" }),
+					$(if ($JellyBlastPairTopMinLevel -ge 0) { "--jelly-blast-pair-top-min-level=$JellyBlastPairTopMinLevel" } else { "" }),
+					$(if ($JellyTapBlastMinLevel -ge 0) { "--jelly-tap-blast-min-level=$JellyTapBlastMinLevel" } else { "" }),
 					"--blast-score-factor=$($BlastScoreFactor.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--jelly-tap-blast-score-factor=$($JellyTapBlastScoreFactor.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--jelly-tap-blast-uses-turn=$($JellyTapBlastUsesTurn.ToLower())",
@@ -164,7 +171,7 @@ if (-not $AggregateOnly) {
 					"--blast-speed=$($BlastSpeed.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--blast-far-factor=$($BlastFarFactor.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--orb-friction-by-level=$OrbFrictionByLevel",
-					"--spawn-count-max=$SpawnCountMax",
+					$(if ($SpawnCountMax -ge 0) { "--spawn-count-max=$SpawnCountMax" } else { "" }),
 					"--jelly-tap-blast-bot=$($resolvedTapBlastBotMode.ToLower())",
                     "--jolt-output=res://artifacts/measurements/$name.json"
                 )
@@ -184,27 +191,57 @@ if (-not $AggregateOnly) {
             $processArguments = @($task.Arguments | Where-Object { -not [string]::IsNullOrEmpty($_) })
             $process = Start-Process -FilePath $GodotPath -ArgumentList $processArguments -WindowStyle Hidden `
                 -PassThru -RedirectStandardOutput $task.Stdout -RedirectStandardError $task.Stderr
-            $running += [pscustomobject]@{ Task = $task; Process = $process }
+            $running += [pscustomobject]@{
+				Task = $task
+				Process = $process
+				StartedAt = Get-Date
+				PeakWorkingSet64 = [long]0
+				LastProgressLine = ""
+			}
             Write-Output "JELLY_MEASUREMENT_START name=$($task.Name) pid=$($process.Id)"
         }
         Start-Sleep -Milliseconds 500
         $stillRunning = @()
         foreach ($entry in $running) {
 			$entry.Process.Refresh()
-			if (-not $entry.Process.HasExited) {
+			try {
+				$entry.PeakWorkingSet64 = [Math]::Max(
+					[long]$entry.PeakWorkingSet64,
+					[long]$entry.Process.PeakWorkingSet64
+				)
+			} catch {
+				# The process can exit between Refresh() and reading memory counters.
+			}
+			if ($TurnProgress -and (Test-Path -LiteralPath $entry.Task.Stdout)) {
+				$progressLine = @(
+					Get-Content -LiteralPath $entry.Task.Stdout -Tail 8 -ErrorAction SilentlyContinue |
+						Where-Object { $_ -like "JOLT3D_PROGRESS*" }
+				) | Select-Object -Last 1
+				if (-not [string]::IsNullOrWhiteSpace($progressLine) -and $progressLine -ne $entry.LastProgressLine) {
+					$entry.LastProgressLine = $progressLine
+					Write-Output "$($entry.Task.Name) $progressLine"
+				}
+			}
+			$liveProcess = Get-Process -Id $entry.Process.Id -ErrorAction SilentlyContinue
+			if ($null -ne $liveProcess) {
 				$stillRunning += $entry
 				continue
 			}
-			$entry.Process.WaitForExit()
+			$null = $entry.Process.WaitForExit(1000)
 			$entry.Process.Refresh()
             $stdout = Get-Content -LiteralPath $entry.Task.Stdout -Raw -ErrorAction SilentlyContinue
             $stderr = Get-Content -LiteralPath $entry.Task.Stderr -Raw -ErrorAction SilentlyContinue
             $exitCode = if ($null -eq $entry.Process.ExitCode) { 0 } else { [int]$entry.Process.ExitCode }
+			$exitUnsigned = [BitConverter]::ToUInt32([BitConverter]::GetBytes([int]$exitCode), 0)
+			$exitHex = "0x{0:X8}" -f $exitUnsigned
+			$elapsedSeconds = [Math]::Round(((Get-Date) - $entry.StartedAt).TotalSeconds, 2)
+			$peakMemoryMb = [Math]::Round(([double]$entry.PeakWorkingSet64 / 1MB), 2)
             if ($exitCode -ne 0 -or ("$stdout`n$stderr" -match "SCRIPT ERROR|Parse Error|ERROR:")) {
-                throw "$($entry.Task.Name) failed exit=$exitCode`n$stdout`n$stderr"
+                throw "$($entry.Task.Name) failed exit=$exitCode exit_hex=$exitHex elapsed_s=$elapsedSeconds peak_mb=$peakMemoryMb`n$stdout`n$stderr"
             }
             if (-not (Test-Path -LiteralPath $entry.Task.Output)) { throw "Missing $($entry.Task.Output)" }
-            Write-Output "JELLY_MEASUREMENT_DONE name=$($entry.Task.Name) exit=0"
+            Write-Output "JELLY_MEASUREMENT_DONE name=$($entry.Task.Name) exit=0 exit_hex=$exitHex elapsed_s=$elapsedSeconds peak_mb=$peakMemoryMb"
+			$entry.Process.Dispose()
         }
 		$running = $stillRunning
     }
@@ -220,6 +257,43 @@ function Get-Median($Values) {
 function Get-Ratio([double]$Numerator, [double]$Denominator) {
     if ($Denominator -eq 0.0) { return 0.0 }
     return $Numerator / $Denominator
+}
+function Get-TapBlastFlowSummary($Rows) {
+	$firstTurns = @()
+	$intervals = @()
+	$longestEmptyRuns = @()
+	foreach ($seedRow in @($Rows)) {
+		$eventTurns = @()
+		$currentEmptyRun = 0
+		$longestEmptyRun = 0
+		foreach ($turnRow in @($seedRow.turn_rows | Sort-Object -Property turn)) {
+			$property = $turnRow.PSObject.Properties["tap_blast_count"]
+			$count = if ($null -eq $property) { 0 } else { [int]$property.Value }
+			if ($count -le 0) {
+				$currentEmptyRun += 1
+				continue
+			}
+			$longestEmptyRun = [Math]::Max($longestEmptyRun, $currentEmptyRun)
+			$currentEmptyRun = 0
+			for ($eventIndex = 0; $eventIndex -lt $count; $eventIndex++) {
+				$eventTurns += [int]$turnRow.turn
+			}
+		}
+		$longestEmptyRuns += [Math]::Max($longestEmptyRun, $currentEmptyRun)
+		if ($eventTurns.Count -gt 0) {
+			$firstTurns += $eventTurns[0]
+		}
+		for ($eventIndex = 1; $eventIndex -lt $eventTurns.Count; $eventIndex++) {
+			$intervals += [int]$eventTurns[$eventIndex] - [int]$eventTurns[$eventIndex - 1]
+		}
+	}
+	return [ordered]@{
+		first_turn_median = if ($firstTurns.Count -gt 0) { Get-Median $firstTurns } else { $null }
+		interval_turns_median = if ($intervals.Count -gt 0) { Get-Median $intervals } else { $null }
+		longest_empty_run_turns_average = if ($longestEmptyRuns.Count -gt 0) {
+			($longestEmptyRuns | Measure-Object -Average).Average
+		} else { 0.0 }
+	}
 }
 function Get-SameSeedWinRate($Better, $Baseline, [string]$Field) {
     $lookup = @{}
@@ -245,6 +319,8 @@ function Get-Summary($Rows) {
     $unarmedOutlineFrames = [double](($Rows | Measure-Object -Property jelly_unarmed_outline_visible_frames -Sum).Sum)
     $outlineMaxAlpha = [double](($Rows | Measure-Object -Property jelly_outline_max_alpha -Maximum).Maximum)
     $blastCountByLevel = [ordered]@{}
+	$blastCountByPairLevels = [ordered]@{}
+	$levelCreationCounts = [ordered]@{}
 	$tapBlastCountByLevel = [ordered]@{}
 	$tapBlastCountByColor = [ordered]@{}
 	$tapCleanCountByColor = [ordered]@{}
@@ -266,6 +342,16 @@ function Get-Summary($Rows) {
             }
             $blastCountByLevel[$levelKey] += [int]$levelProperty.Value
         }
+		foreach ($pairProperty in $row.blast_count_by_pair_levels.PSObject.Properties) {
+			$pairKey = [string]$pairProperty.Name
+			if (-not $blastCountByPairLevels.Contains($pairKey)) { $blastCountByPairLevels[$pairKey] = 0 }
+			$blastCountByPairLevels[$pairKey] += [int]$pairProperty.Value
+		}
+		foreach ($levelProperty in $row.level_creation_count_by_level.PSObject.Properties) {
+			$levelKey = [string]$levelProperty.Name
+			if (-not $levelCreationCounts.Contains($levelKey)) { $levelCreationCounts[$levelKey] = 0 }
+			$levelCreationCounts[$levelKey] += [int]$levelProperty.Value
+		}
 		foreach ($levelProperty in $row.tap_blast_count_by_level.PSObject.Properties) {
 			$levelKey = [string]$levelProperty.Name
 			if (-not $tapBlastCountByLevel.Contains($levelKey)) { $tapBlastCountByLevel[$levelKey] = 0 }
@@ -339,6 +425,20 @@ function Get-Summary($Rows) {
 	foreach ($scoreKey in $reactionScoreTotals.Keys) {
 		$reactionScoreShares[$scoreKey] = Get-Ratio ([double]$reactionScoreTotals[$scoreKey]) $reactionScoreTotal
 	}
+	$firstBlastTurns = @(
+		$Rows |
+			Where-Object { [int]$_.first_blast_turn -ge 0 } |
+			ForEach-Object { [double]$_.first_blast_turn }
+	)
+	$blastCountThroughTurn200 = [int](
+		($Rows |
+			ForEach-Object { $_.turn_rows } |
+			Where-Object { [int]$_.turn -le 200 } |
+			Measure-Object -Property blast_count -Sum).Sum
+	)
+	$tapBlastFlow = Get-TapBlastFlowSummary $Rows
+	$completedRows = @($Rows | Where-Object { $_.game_over })
+	$maximumActiveRow = @($Rows | Sort-Object -Property max_active_orbs -Descending | Select-Object -First 1)
     return [ordered]@{
         games = @($Rows).Count
 		game_over_count = @($Rows | Where-Object { $_.game_over }).Count
@@ -347,6 +447,7 @@ function Get-Summary($Rows) {
 		turns_minimum = ($Rows | Measure-Object -Property completed_turns -Minimum).Minimum
 		turns_maximum = ($Rows | Measure-Object -Property completed_turns -Maximum).Maximum
         turns_median = Get-Median @($Rows | ForEach-Object { $_.completed_turns })
+		completed_turns_average = if ($completedRows.Count -gt 0) { ($completedRows | Measure-Object -Property completed_turns -Average).Average } else { $null }
 		score_average = ($Rows | Measure-Object -Property score -Average).Average
         score_median = Get-Median @($Rows | ForEach-Object { $_.score })
 		score_per_turn = Get-Ratio $scoreTotal $turnTotal
@@ -365,13 +466,24 @@ function Get-Summary($Rows) {
         blast_outline_max_alpha = $outlineMaxAlpha
 		level_seven_game_rate = Get-Ratio @($Rows | Where-Object { $_.reached_level_seven }).Count @($Rows).Count
 		level_eight_plus_game_count = @($Rows | Where-Object { $_.reached_level_eight_plus }).Count
+		level_creation_count_by_level = $levelCreationCounts
 		level_eight_plus_creation_count = [int](($Rows | Measure-Object -Property level_eight_plus_creation_count -Sum).Sum)
 		average_level_eight_plus_creations_per_game = Get-Ratio ([double](($Rows | Measure-Object -Property level_eight_plus_creation_count -Sum).Sum)) @($Rows).Count
 		level_ten_game_count = @($Rows | Where-Object { [int]$_.max_level_reached -ge 10 }).Count
         jackpots = [int](($Rows | Measure-Object -Property max_clear_count -Sum).Sum)
 		blasts = [int](($Rows | Measure-Object -Property blast_count -Sum).Sum)
+		average_blasts_per_game = Get-Ratio ([double](($Rows | Measure-Object -Property blast_count -Sum).Sum)) @($Rows).Count
+		first_blast_turn_median = if ($firstBlastTurns.Count -gt 0) { Get-Median $firstBlastTurns } else { $null }
+		zero_blast_game_count = @($Rows | Where-Object { [int]$_.blast_count -eq 0 }).Count
+		blast_count_through_turn_200 = $blastCountThroughTurn200
+		average_blasts_through_turn_200_per_game = Get-Ratio $blastCountThroughTurn200 @($Rows).Count
 		tap_blasts = [int](($Rows | Measure-Object -Property tap_blast_count -Sum).Sum)
+		tap_blasts_per_100_turns = (Get-Ratio $tapBlastTotal $turnTotal) * 100.0
+		first_tap_blast_turn_median = $tapBlastFlow.first_turn_median
+		tap_blast_interval_turns_median = $tapBlastFlow.interval_turns_median
+		longest_tap_blast_empty_run_turns_average = $tapBlastFlow.longest_empty_run_turns_average
 		blast_count_by_level = $blastCountByLevel
+		blast_count_by_pair_levels = $blastCountByPairLevels
 		tap_blast_count_by_level = $tapBlastCountByLevel
 		tap_blast_count_by_color = $tapBlastCountByColor
 		tap_clean_count_by_color = $tapCleanCountByColor
@@ -388,6 +500,14 @@ function Get-Summary($Rows) {
 		}
 		maximum_pair_penetration_px = ($Rows | ForEach-Object { [double]$_.max_turn_end_pair.penetration_px } | Measure-Object -Maximum).Maximum
 		departures = [int](($Rows | Measure-Object -Property departures -Sum).Sum)
+		average_game_over_spawn_count = if ($completedRows.Count -gt 0) { ($completedRows | Measure-Object -Property game_over_spawn_count -Average).Average } else { $null }
+		maximum_active_sample = if ($maximumActiveRow.Count -gt 0) { [ordered]@{
+			seed = [int]$maximumActiveRow[0].seed
+			turn = [int]$maximumActiveRow[0].max_active_orbs_turn
+			active_orbs = [int]$maximumActiveRow[0].max_active_orbs
+			physics_ms_max = [double]$maximumActiveRow[0].max_active_physics_ms_max
+		} } else { $null }
+		maximum_peak_active_physics_ms = ($Rows | Measure-Object -Property max_active_physics_ms_max -Maximum).Maximum
 		timed_jelly_placed_count = [int]$timedPlaced
 		timed_jelly_per_game = Get-Ratio $timedPlaced @($Rows).Count
 		timed_jelly_success_count = [int]$timedSuccess
@@ -428,12 +548,53 @@ function Get-Summary($Rows) {
 
 $rows = [ordered]@{}
 foreach ($strategy in $resolvedStrategies) { $rows[$strategy] = @() }
+$effectiveJellyMergeLevelGap = $null
+$effectiveJellyTimedMergeLevelGap = $null
+$effectiveJellyBlastMinLevel = $null
+$effectiveJellyBlastPairTopMinLevel = $null
+$effectiveJellyTapBlastMinLevel = $null
+$effectiveSpawnCountMax = $null
 foreach ($strategy in @($rows.Keys)) {
     $shardSize = 1
     foreach ($shard in @(Get-SeedShards $SeedCount $shardSize)) {
         $filePath = Join-Path $outputDirectory "jelly_${measurementLabel}_${strategy}_part$($shard.Start)-$($shard.End).json"
         if (-not (Test-Path -LiteralPath $filePath)) { throw "Missing $filePath" }
-        $rows[$strategy] += @((Get-Content -LiteralPath $filePath -Raw | ConvertFrom-Json).ticks[0].seeds)
+		$rawReport = Get-Content -LiteralPath $filePath -Raw | ConvertFrom-Json
+		if ($null -eq $rawReport.PSObject.Properties['jelly_timed_merge_level_gap']) {
+			throw "$filePath is missing jelly_timed_merge_level_gap"
+		}
+		if ($null -eq $rawReport.PSObject.Properties['jelly_blast_pair_top_min_level']) {
+			throw "$filePath is missing jelly_blast_pair_top_min_level"
+		}
+		foreach ($propertyName in @('jelly_blast_min_level', 'jelly_tap_blast_min_level', 'spawn_count_max')) {
+			if ($null -eq $rawReport.PSObject.Properties[$propertyName]) {
+				throw "$filePath is missing $propertyName"
+			}
+		}
+		$reportedMergeLevelGap = [int]$rawReport.jelly_merge_level_gap
+		$reportedTimedMergeLevelGap = [int]$rawReport.jelly_timed_merge_level_gap
+		$reportedJellyBlastMinLevel = [int]$rawReport.jelly_blast_min_level
+		$reportedJellyBlastPairTopMinLevel = [int]$rawReport.jelly_blast_pair_top_min_level
+		$reportedJellyTapBlastMinLevel = [int]$rawReport.jelly_tap_blast_min_level
+		$reportedSpawnCountMax = [int]$rawReport.spawn_count_max
+		if ($null -eq $effectiveJellyMergeLevelGap) {
+			$effectiveJellyMergeLevelGap = $reportedMergeLevelGap
+			$effectiveJellyTimedMergeLevelGap = $reportedTimedMergeLevelGap
+			$effectiveJellyBlastMinLevel = $reportedJellyBlastMinLevel
+			$effectiveJellyBlastPairTopMinLevel = $reportedJellyBlastPairTopMinLevel
+			$effectiveJellyTapBlastMinLevel = $reportedJellyTapBlastMinLevel
+			$effectiveSpawnCountMax = $reportedSpawnCountMax
+		} elseif (
+			$effectiveJellyMergeLevelGap -ne $reportedMergeLevelGap -or
+			$effectiveJellyTimedMergeLevelGap -ne $reportedTimedMergeLevelGap -or
+			$effectiveJellyBlastMinLevel -ne $reportedJellyBlastMinLevel -or
+			$effectiveJellyBlastPairTopMinLevel -ne $reportedJellyBlastPairTopMinLevel -or
+			$effectiveJellyTapBlastMinLevel -ne $reportedJellyTapBlastMinLevel -or
+			$effectiveSpawnCountMax -ne $reportedSpawnCountMax
+		) {
+			throw "Inconsistent merge level gaps in $filePath"
+		}
+		$rows[$strategy] += @($rawReport.ticks[0].seeds)
     }
     $rows[$strategy] = @($rows[$strategy] | Sort-Object { [int]$_.seed })
     if ($rows[$strategy].Count -ne $SeedCount) { throw "$strategy expected $SeedCount rows, got $($rows[$strategy].Count)" }
@@ -481,7 +642,8 @@ $report = [ordered]@{
 	jelly_tap_effect_modes = $JellyTapEffectModes.ToLower()
 	turn_start_colors = $TurnStartColors
 	turn_color_unlock_turns = $TurnColorUnlockTurns.ToLower()
-	jelly_merge_level_gap = $JellyMergeLevelGap
+	jelly_merge_level_gap = $effectiveJellyMergeLevelGap
+	jelly_timed_merge_level_gap = $effectiveJellyTimedMergeLevelGap
 	jelly_merge_wide_gap_min_level = $JellyMergeWideGapMinLevel
 	jelly_merge_extension_max = $JellyMergeExtensionMax
 	jelly_timed_enabled = $JellyTimedEnabled -eq "On"
@@ -489,8 +651,9 @@ $report = [ordered]@{
 	jelly_timed_level = $JellyTimedLevel
 	jelly_timed_stone_enabled = $JellyTimedStoneEnabled -eq "On"
 	jelly_timed_stone_turns = $JellyTimedStoneTurns
-	jelly_blast_min_level = $JellyBlastMinLevel
-	jelly_tap_blast_min_level = $JellyTapBlastMinLevel
+	jelly_blast_min_level = $effectiveJellyBlastMinLevel
+	jelly_blast_pair_top_min_level = $effectiveJellyBlastPairTopMinLevel
+	jelly_tap_blast_min_level = $effectiveJellyTapBlastMinLevel
 	jelly_blast_requires_same_level = $JellyBlastRequiresSameLevel -eq "On"
 	jelly_tap_common_push = $JellyTapCommonPush -eq "On"
 	jelly_tap_lift_speed = $JellyTapLiftSpeed
@@ -498,7 +661,7 @@ $report = [ordered]@{
 	blast_speed = $BlastSpeed
 	blast_far_factor = $BlastFarFactor
 	orb_friction_by_level = $OrbFrictionByLevel
-	spawn_count_max = $SpawnCountMax
+	spawn_count_max = $effectiveSpawnCountMax
 	strategies_requested = $resolvedStrategies
 	strategies = $strategySummaries
     skill_length_ratio_l_merge_over_r = $lengthRatio

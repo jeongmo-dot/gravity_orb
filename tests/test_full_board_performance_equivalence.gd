@@ -121,17 +121,31 @@ func test_pending_reaction_fast_path_matches_classification() -> void:
 func test_pending_jelly_reactions_follow_merge_gap_and_blast_rule() -> void:
 	var original_duration: float = Config.data.jelly_merge_duration
 	var original_gap: int = Config.data.jelly_merge_level_gap
+	var original_timed_gap: int = Config.data.jelly_timed_merge_level_gap
 	var original_wide_gap_min_level: int = Config.data.jelly_merge_wide_gap_min_level
+	var original_blast_min_level: int = Config.data.jelly_blast_min_level
+	var original_blast_pair_top: int = Config.data.jelly_blast_pair_top_min_level
 	var original_requires_same: bool = Config.data.jelly_blast_requires_same_level
 	Config.data.jelly_merge_duration = 0.0
+	Config.data.jelly_blast_min_level = 8
+	Config.data.jelly_blast_pair_top_min_level = 0
 	Config.data.jelly_blast_requires_same_level = false
 	var fixture: Dictionary = await _create_fixture()
 	var board: Board3D = fixture["board"] as Board3D
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
 	Config.data.jelly_merge_level_gap = 2
+	Config.data.jelly_timed_merge_level_gap = 1
 	assert_true(
 		_pending_for_pair(board, resolver, 2, 5, 2, 3),
 		"gap two keeps touching same-color L5/L3 pending"
+	)
+	assert_true(
+		not _pending_for_pair(board, resolver, 2, 5, 2, 3, true),
+		"timed L5/L3 does not stay pending at timed gap one"
+	)
+	assert_true(
+		_pending_for_pair(board, resolver, 2, 5, 2, 4, true),
+		"timed L5/L4 stays pending at timed gap one"
 	)
 	Config.data.jelly_merge_level_gap = 1
 	assert_true(
@@ -142,6 +156,10 @@ func test_pending_jelly_reactions_follow_merge_gap_and_blast_rule() -> void:
 	assert_true(
 		_pending_for_pair(board, resolver, 2, 6, 2, 4),
 		"H6 keeps touching locked same-color L6/L4 pending"
+	)
+	assert_true(
+		not _pending_for_pair(board, resolver, 2, 6, 2, 4, true),
+		"timed pair ignores H6 widening"
 	)
 	assert_true(
 		not _pending_for_pair(board, resolver, 2, 5, 2, 3),
@@ -168,7 +186,10 @@ func test_pending_jelly_reactions_follow_merge_gap_and_blast_rule() -> void:
 	await _cleanup_fixture(fixture)
 	Config.data.jelly_merge_duration = original_duration
 	Config.data.jelly_merge_level_gap = original_gap
+	Config.data.jelly_timed_merge_level_gap = original_timed_gap
 	Config.data.jelly_merge_wide_gap_min_level = original_wide_gap_min_level
+	Config.data.jelly_blast_pair_top_min_level = original_blast_pair_top
+	Config.data.jelly_blast_min_level = original_blast_min_level
 	Config.data.jelly_blast_requires_same_level = original_requires_same
 
 
@@ -334,12 +355,18 @@ func _pending_for_pair(
 	color_a: int,
 	level_a: int,
 	color_b: int,
-	level_b: int
+	level_b: int,
+	first_timed: bool = false,
+	second_timed: bool = false
 ) -> bool:
 	board.clear()
 	resolver.cancel_active_jelly_merges()
 	var first: Orb3D = _spawn_normal(board, color_a, level_a, Vector2.ZERO)
-	_spawn_normal(board, color_b, level_b, Vector2.ZERO)
+	var second: Orb3D = _spawn_normal(board, color_b, level_b, Vector2.ZERO)
+	if first_timed:
+		first.set_timed(8, 20)
+	if second_timed:
+		second.set_timed(8, 20)
 	resolver._lock_reaction_result(first)
 	return resolver.has_pending_reactions()
 

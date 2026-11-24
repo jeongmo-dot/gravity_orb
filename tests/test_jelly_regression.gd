@@ -4,17 +4,18 @@ const MAIN_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
 const EXPECTED_M_DELAYED_HASH: String = "ee67b19ca82ddb2e35ea7a5ed605e83eedbae4d0c044106ec5b86622a21ac45d"
 const EXPECTED_B_DELAYED_HASH: String = "5a525e46718f3befc3c4101e5a4fe1c3b392fc1c172f7166ed0b0517f6d74dc7"
 const EXPECTED_C8_LEGACY_HASH: String = "8c1a02e9dfa345a31828276e917dad0f8dda35282a34cb5a0ced15a670752184"
-const EXPECTED_D_DEFAULT_HASH: String = "2cdf79475d340e34252a3d295ccc23e092c719038e2362f5df6ac80dc8e5979f"
-const EXPECTED_ST_DEFAULT_HASH: String = "f3ff93474eb3765cdc611ae941c89ec96052a20f16fff75efe8ad6a6c8fb816c"
-const EXPECTED_JACKPOT_DEFAULT_HASH: String = "3254c77f2bcf478239f023f08af2bae5f48bc68aee56aa246894908d0b9ab5e7"
-const EXPECTED_F2_DEFAULT_HASH: String = "4c4ab4aa9cf014d4d266a6fdfd75a03bbd4f40c5e9a540bd6f682da3c0835974"
-const EXPECTED_G1_DEFAULT_HASH: String = "d5175565a24fa4d0e00e1eb3ccbd5529a0c489852c00437fed58197bd20e4c7d"
-const EXPECTED_K4_DEFAULT_HASH: String = "3e929d90b33f6617322e96a2f53e0e790a32c9c5c11f045e9d7fa05c3a88c42f"
-const EXPECTED_S4_G1_LIFT_DEFAULT_HASH: String = "bc5951c060d635cb6e43d72f4854afbf38ef6a48bea693e224e118677ca736b2"
-const EXPECTED_T3_DEFAULT_HASH: String = "7a20210c45a5e68cb8be6d4e2bc310eca31b3b450d20d0a9bf37a38f892b9c63"
-const EXPECTED_C4E_DEFAULT_HASH: String = "4a0c467d83177f3e0fb6acd302529fea572083896cac45e5885f8e90160438f6"
-const EXPECTED_Z1_DEFAULT_HASH: String = "4be0489704ba1c8cebad7863cd487c9032236cfa4be00e808801609d74e25c2b"
-const EXPECTED_G2_DEFAULT_HASH: String = "3e688a78984fafee02bda4299de720de710337219c8bdf9af4ce2c295e0d6455"
+const EXPECTED_D_DEFAULT_HASH: String = "0330ed12c817a64f9c1c59b4267e801f4074d5a93ce892e1a484e54993917227"
+const EXPECTED_ST_DEFAULT_HASH: String = "c6204654c77b92664feaec32d9293f6cc55ff2278c5e8e537b49052637f89ab9"
+const EXPECTED_JACKPOT_DEFAULT_HASH: String = "009ebcfcc3b1fe7c4cdd58347ad37cb1712e6c5693489477dc32799b7fa0c149"
+const EXPECTED_F2_DEFAULT_HASH: String = "28f9d8f565512ddb4e341255197af711fd52f045ec878c88cecdcd7ad6403172"
+const EXPECTED_G1_DEFAULT_HASH: String = "cbe239c36f5b66a58975cf8729fa3992e30ee70d8c4cfc3ac61b58cbbe1cb8be"
+const EXPECTED_K4_DEFAULT_HASH: String = "9f71853c11318aba659442c257f901b5bad2e0eb25395d6be0a940ac49ce44e5"
+const EXPECTED_S4_G1_LIFT_DEFAULT_HASH: String = "fd5dfb3932ada3ccfc75fa0922f34271f395627521a9e17ae3f717be0be2ccbf"
+const EXPECTED_T3_DEFAULT_HASH: String = "61d3c0665a90979f61c3deedf9cd2f3a7ba299e879bdf179178a7fa5b2cd95c6"
+const EXPECTED_C4E_DEFAULT_HASH: String = "680e412abc510c4bba01a73adfe95dc04bad60b917bdc082c90dbcb050d6cd82"
+const EXPECTED_Z1_DEFAULT_HASH: String = "e2c2c9c04771fb32bbe596983bddce3a0294a05aabe2521d4ef7efe0fad1387c"
+const EXPECTED_G2_DEFAULT_HASH: String = "31ad483a55f00990d0abd102c849d81bcd09557fe953e1558974b2e37f74bd67"
+const EXPECTED_GAP2_DEFAULT_HASH: String = "d49a9d7bea39adceeb8b9cc8ca7de34d79097bf99aa779aa7752d8383616c6c7"
 
 
 func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
@@ -29,6 +30,13 @@ func test_jelly_full_rule_path_has_stable_render_independent_hash() -> void:
 	Config.data.sfx_enabled = false
 	Config.data.jelly_merge_duration = 0.3
 	Config.data.jelly_timed_enabled = false
+	Config.data.jelly_merge_level_gap = 2
+	Config.data.jelly_timed_merge_level_gap = 1
+	var gap_two_result: Dictionary = await _run_rule_path(false)
+	print("JELLY_GAP2_DEFAULT_HASH hash=%s" % str(gap_two_result["hash"]))
+	assert_eq(gap_two_result["hash"], EXPECTED_GAP2_DEFAULT_HASH, "GAP2 default hash")
+	_apply_pre_gap2_defaults()
+	Config.data.jelly_merge_level_gap = 1
 	var g2_visible_result: Dictionary = await _run_rule_path(true)
 	var g2_hidden_result: Dictionary = await _run_rule_path(false)
 	assert_eq(g2_visible_result["hash"], g2_hidden_result["hash"], "G2 hash ignores rendering")
@@ -250,6 +258,12 @@ func _run_rule_path(visuals_enabled: bool) -> Dictionary:
 	var below_top_mass: float = Config.data.jelly_mass_for_level(below_top_level)
 	var blast_level: int = Config.data.jelly_blast_min_level
 	var blast_mass: float = Config.data.jelly_mass_for_level(blast_level)
+	var blast_pair_level: int = (
+		Config.data.jelly_blast_pair_top_min_level
+		if Config.data.jelly_blast_pair_top_min_level > blast_level
+		else blast_level
+	)
+	var blast_pair_mass: float = Config.data.jelly_mass_for_level(blast_pair_level)
 
 	var result: Dictionary = await _apply_pair(
 		board, resolver, OrbTypes.OrbColor.GREEN, 3, first_large_mass, OrbTypes.OrbColor.GREEN, 2, first_small_mass
@@ -267,9 +281,16 @@ func _run_rule_path(visuals_enabled: bool) -> Dictionary:
 	events["absorption_level_up"] = int(events["absorption_level_up"]) + 1
 
 	result = await _apply_pair(
-		board, resolver, OrbTypes.OrbColor.RED, blast_level, blast_mass, OrbTypes.OrbColor.BLUE, blast_level, blast_mass
+		board,
+		resolver,
+		OrbTypes.OrbColor.RED,
+		blast_level,
+		blast_mass,
+		OrbTypes.OrbColor.BLUE,
+		blast_pair_level,
+		blast_pair_mass
 	)
-	assert_eq(int(result["type"]), int(ReactionRules.Type.BLAST), "different L6 colors blast")
+	assert_eq(int(result["type"]), int(ReactionRules.Type.BLAST), "configured different-color pair blasts")
 	events["blast"] = int(events["blast"]) + 1
 	if not Config.data.jelly_blast_requires_same_level:
 		result = await _apply_pair(
@@ -463,6 +484,7 @@ func _snapshot_level_profile() -> Dictionary:
 		"level_radii": Config.data.level_radii.duplicate(),
 		"level_scores": Config.data.level_scores.duplicate(),
 		"jelly_blast_min_level": Config.data.jelly_blast_min_level,
+		"jelly_blast_pair_top_min_level": Config.data.jelly_blast_pair_top_min_level,
 		"jelly_blast_requires_same_level": Config.data.jelly_blast_requires_same_level,
 		"jelly_tap_blast_min_level": Config.data.jelly_tap_blast_min_level,
 		"blast_score_factor": Config.data.blast_score_factor,
@@ -479,6 +501,7 @@ func _snapshot_level_profile() -> Dictionary:
 		"max_merge_bonus_factor": Config.data.max_merge_bonus_factor,
 		"orb_friction_by_level": Config.data.orb_friction_by_level.duplicate(),
 		"jelly_merge_level_gap": Config.data.jelly_merge_level_gap,
+		"jelly_timed_merge_level_gap": Config.data.jelly_timed_merge_level_gap,
 		"jelly_merge_wide_gap_min_level": Config.data.jelly_merge_wide_gap_min_level,
 		"spawn_count_max": Config.data.spawn_count_max,
 		"turn_color_unlock_turns": Config.data.turn_color_unlock_turns.duplicate(),
@@ -501,6 +524,7 @@ func _restore_level_profile(snapshot: Dictionary) -> void:
 	Config.data.level_radii = snapshot["level_radii"] as PackedFloat32Array
 	Config.data.level_scores = snapshot["level_scores"] as PackedInt32Array
 	Config.data.jelly_blast_min_level = int(snapshot["jelly_blast_min_level"])
+	Config.data.jelly_blast_pair_top_min_level = int(snapshot["jelly_blast_pair_top_min_level"])
 	Config.data.jelly_blast_requires_same_level = bool(snapshot["jelly_blast_requires_same_level"])
 	Config.data.jelly_tap_blast_min_level = int(snapshot["jelly_tap_blast_min_level"])
 	Config.data.blast_score_factor = float(snapshot["blast_score_factor"])
@@ -517,6 +541,7 @@ func _restore_level_profile(snapshot: Dictionary) -> void:
 	Config.data.max_merge_bonus_factor = float(snapshot["max_merge_bonus_factor"])
 	Config.data.orb_friction_by_level = snapshot["orb_friction_by_level"] as PackedFloat32Array
 	Config.data.jelly_merge_level_gap = int(snapshot["jelly_merge_level_gap"])
+	Config.data.jelly_timed_merge_level_gap = int(snapshot["jelly_timed_merge_level_gap"])
 	Config.data.jelly_merge_wide_gap_min_level = int(snapshot["jelly_merge_wide_gap_min_level"])
 	Config.data.spawn_count_max = int(snapshot["spawn_count_max"])
 	Config.data.turn_color_unlock_turns.assign(snapshot["turn_color_unlock_turns"])
@@ -631,8 +656,19 @@ func _apply_legacy_blast_push_profile() -> void:
 func _apply_legacy_color_profile() -> void:
 	Config.data.turn_color_unlock_turns.assign([30, 60])
 	Config.data.jelly_tap_effect_modes = PackedInt32Array([2, 3, 4, 5, 6, 7])
+	Config.data.jelly_blast_min_level = 10
+	Config.data.jelly_blast_pair_top_min_level = 0
+	Config.data.jelly_tap_blast_min_level = 8
+	Config.data.spawn_count_max = 4
 	Config.data.jelly_tap_clean_max_level = 2
 	Config.data.jelly_tap_clean_zone_rule = false
+
+
+func _apply_pre_gap2_defaults() -> void:
+	Config.data.jelly_blast_min_level = 10
+	Config.data.jelly_blast_pair_top_min_level = 0
+	Config.data.jelly_tap_blast_min_level = 8
+	Config.data.spawn_count_max = 4
 
 
 func _apply_c4e_profile() -> void:

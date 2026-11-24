@@ -46,6 +46,8 @@ foreach ($profile in $profiles) {
                 MaxTurns = 600
                 LevelProfile = "D"
                 TapBlastBotMode = $tapMode
+				JellyBlastMinLevel = 8
+				JellyTapBlastMinLevel = 8
                 SpawnCountMax = $profile.SpawnMax
                 JellyMergeLevelGap = $profile.Gap
                 JellyMergeWideGapMinLevel = $profile.Wide
@@ -67,6 +69,8 @@ foreach ($profile in $profiles) {
             TurnCap = 600
             LevelProfile = "D"
             TapBlastBotMode = $tapMode
+			JellyBlastMinLevel = 8
+			JellyTapBlastMinLevel = 8
             SpawnCountMax = $profile.SpawnMax
             JellyMergeLevelGap = $profile.Gap
             JellyMergeWideGapMinLevel = $profile.Wide

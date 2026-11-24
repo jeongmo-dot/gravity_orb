@@ -40,6 +40,7 @@ var _reaction_ghost_enabled: bool = false
 var _record_seed_hashes: bool = false
 var _scan_pairs_each_frame: bool = false
 var _skip_determinism: bool = false
+var _turn_progress_enabled: bool = false
 var _skill_strategy: String = ""
 var _tap_blast_bot_mode: String = "none"
 var _jelly_tap_effect_profile: String = "color"
@@ -50,6 +51,7 @@ var _seed_reactions_by_color: Dictionary = {}
 var _seed_max_clear_count: int = 0
 var _seed_blast_count: int = 0
 var _seed_blast_count_by_level: Dictionary = {}
+var _seed_blast_count_by_pair_levels: Dictionary = {}
 var _seed_same_level_blast_count_by_level: Dictionary = {}
 var _seed_mixed_level_blast_count_by_level: Dictionary = {}
 var _seed_blast_moved_ratio_sum_by_level: Dictionary = {}
@@ -58,6 +60,7 @@ var _current_measurement_turn: int = 0
 var _turn_reaction_count: int = 0
 var _turn_merge_count: int = 0
 var _turn_blast_count: int = 0
+var _turn_tap_blast_count: int = 0
 var _preview_fixture_serial: int = 0
 var _seed_seen_colors: Dictionary = {}
 var _seed_merge_count: int = 0
@@ -127,6 +130,7 @@ func _run() -> void:
 		"blast_min_level": Config.data.blast_min_level,
 		"jelly_blast_min_level": Config.data.jelly_blast_min_level,
 		"jelly_blast_requires_same_level": Config.data.jelly_blast_requires_same_level,
+		"jelly_blast_pair_top_min_level": Config.data.jelly_blast_pair_top_min_level,
 		"jelly_tap_blast_min_level": Config.data.jelly_tap_blast_min_level,
 		"jelly_tap_blast_score_factor": Config.data.jelly_tap_blast_score_factor,
 		"jelly_tap_blast_uses_turn": Config.data.jelly_tap_blast_uses_turn,
@@ -146,6 +150,7 @@ func _run() -> void:
 		"blast_gravity_pause_time": Config.data.blast_gravity_pause_time,
 		"jelly_merge_duration": Config.data.jelly_merge_duration,
 		"jelly_merge_level_gap": Config.data.jelly_merge_level_gap,
+		"jelly_timed_merge_level_gap": Config.data.jelly_timed_merge_level_gap,
 		"jelly_merge_wide_gap_min_level": Config.data.jelly_merge_wide_gap_min_level,
 		"blast_push_radius_by_level": Array(Config.data.blast_push_radius_by_level),
 		"blast_speed": Config.data.blast_speed,
@@ -162,6 +167,7 @@ func _run() -> void:
 		"jelly_level_masses": Array(Config.data.jelly_level_masses),
 		"orb_max_level": Config.data.orb_max_level,
 		"tap_blast_bot_mode": _tap_blast_bot_mode,
+		"turn_progress_enabled": _turn_progress_enabled,
 		"corrections": {
 			"reaction_ghost": _reaction_ghost_enabled,
 			"growth": _progressive_growth_enabled,
@@ -300,6 +306,7 @@ func _run_seed(
 	_seed_max_clear_count = 0
 	_seed_blast_count = 0
 	_seed_blast_count_by_level.clear()
+	_seed_blast_count_by_pair_levels.clear()
 	_seed_same_level_blast_count_by_level.clear()
 	_seed_mixed_level_blast_count_by_level.clear()
 	_seed_blast_moved_ratio_sum_by_level.clear()
@@ -379,6 +386,7 @@ func _run_seed(
 		_turn_reaction_count = 0
 		_turn_merge_count = 0
 		_turn_blast_count = 0
+		_turn_tap_blast_count = 0
 		var score_before: int = score_manager.score
 		var spawned_before: int = _seed_spawn_count
 		var tap_turn_orb: Orb3D = null
@@ -480,6 +488,7 @@ func _run_seed(
 			"combo": manager.turn_combo,
 			"score_gain": score_manager.score - score_before,
 			"blast_count": _turn_blast_count,
+			"tap_blast_count": _turn_tap_blast_count,
 			"entrance_waiting_count": entrance_waiting_count,
 			"input_waiting_touching_merge_pairs": input_waiting_touching_merge_pairs,
 		})
@@ -493,6 +502,7 @@ func _run_seed(
 			float(frame_metrics["max_wall_penetration_px"])
 		)
 		var turn_end_pair: Dictionary = _maximum_pair_penetration_details(board)
+		turn_rows[-1]["turn_end_pair"] = turn_end_pair
 		if (
 			float(turn_end_pair["penetration_px"])
 			> float(bin_values["max_pair_penetration_px"])
@@ -535,6 +545,23 @@ func _run_seed(
 			hashes.append(_state_hash(board))
 		if completed_turns % 10 == 0:
 			engine_count_samples.append(_engine_counts(completed_turns, board))
+		if _turn_progress_enabled:
+			var level_ten_count: int = 0
+			for progress_orb: Orb3D in board.get_orbs():
+				if progress_orb.level >= 10:
+					level_ten_count += 1
+			print(
+				"JOLT3D_PROGRESS strategy=%s seed=%d turn=%d orbs=%d l10=%d score=%d state=%d"
+				% [
+					_skill_strategy,
+					seed,
+					completed_turns,
+					active_orbs,
+					level_ten_count,
+					score_manager.score,
+					manager.state,
+				]
+			)
 		if bool(frame_metrics["aborted"]):
 			aborted = true
 			abort_reason = str(frame_metrics["abort_reason"])
@@ -621,6 +648,7 @@ func _run_seed(
 		),
 		"blast_count": _seed_blast_count,
 		"blast_count_by_level": _seed_blast_count_by_level.duplicate(true),
+		"blast_count_by_pair_levels": _seed_blast_count_by_pair_levels.duplicate(true),
 		"blast_moved_orb_ratio_by_level": _blast_moved_ratio_by_level(),
 		"first_blast_turn": _seed_first_blast_turn,
 		"entrance_blocked_turns": entrance_blocked_turns,
@@ -1114,6 +1142,7 @@ func _record_shock_event(reaction: Dictionary) -> void:
 			"blasts": 0,
 		})
 		_seed_tap_blast_count += 1
+		_turn_tap_blast_count += 1
 		var tap_levels: Array = reaction.get("levels", []) as Array
 		var tap_level: int = int(tap_levels[0]) if not tap_levels.is_empty() else 0
 		var tap_key: String = "L%d" % tap_level
@@ -1175,6 +1204,13 @@ func _record_shock_event(reaction: Dictionary) -> void:
 		_seed_blast_count_by_level[blast_key] = int(
 			_seed_blast_count_by_level.get(blast_key, 0)
 		) + 1
+		if levels.size() >= 2:
+			var lower_level: int = mini(int(levels[0]), int(levels[1]))
+			var upper_level: int = maxi(int(levels[0]), int(levels[1]))
+			var pair_key: String = "L%d+L%d" % [lower_level, upper_level]
+			_seed_blast_count_by_pair_levels[pair_key] = int(
+				_seed_blast_count_by_pair_levels.get(pair_key, 0)
+			) + 1
 		var pair_bucket: Dictionary = (
 			_seed_same_level_blast_count_by_level
 			if levels.size() >= 2 and int(levels[0]) == int(levels[1])
@@ -1946,7 +1982,8 @@ func _count_skill_reaction_pairs(board: Board3D, direction: Vector2i) -> int:
 				second.level,
 				Config.data,
 				first.jelly_mass,
-				second.jelly_mass
+				second.jelly_mass,
+				first.is_timed or second.is_timed
 			)
 			var reaction_type: ReactionRules.Type = reaction["type"] as ReactionRules.Type
 			if (
@@ -1991,7 +2028,8 @@ func _count_touching_jelly_merge_pairs(board: Board3D) -> int:
 				second.level,
 				Config.data,
 				first.jelly_mass,
-				second.jelly_mass
+				second.jelly_mass,
+				first.is_timed or second.is_timed
 			)
 			var reaction_type: ReactionRules.Type = reaction["type"] as ReactionRules.Type
 			if reaction_type in [ReactionRules.Type.MERGE, ReactionRules.Type.MAX_CLEAR]:
@@ -2189,6 +2227,8 @@ func _apply_arguments() -> void:
 			_seeds = _parse_int_list(argument.trim_prefix("--jolt-seeds="))
 		elif argument.begins_with("--jolt-max-turns="):
 			_max_turns = maxi(argument.trim_prefix("--jolt-max-turns=").to_int(), 1)
+		elif argument == "--jolt-turn-progress":
+			_turn_progress_enabled = true
 		elif argument.begins_with("--jolt-determinism-turns="):
 			_determinism_turns = maxi(
 				argument.trim_prefix("--jolt-determinism-turns=").to_int(),
@@ -2324,6 +2364,12 @@ func _apply_arguments() -> void:
 		elif argument.begins_with("--jelly-blast-min-level="):
 			Config.data.jelly_blast_min_level = clampi(
 				argument.trim_prefix("--jelly-blast-min-level=").to_int(),
+				0,
+				Config.data.orb_max_level
+			)
+		elif argument.begins_with("--jelly-blast-pair-top-min-level="):
+			Config.data.jelly_blast_pair_top_min_level = clampi(
+				argument.trim_prefix("--jelly-blast-pair-top-min-level=").to_int(),
 				0,
 				Config.data.orb_max_level
 			)

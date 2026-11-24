@@ -33,6 +33,8 @@ foreach ($mode in @("save", "all")) {
             MaxTurns = 600
             LevelProfile = "D"
             TapBlastBotMode = $tapMode
+			JellyBlastMinLevel = 8
+			JellyTapBlastMinLevel = 8
             SpawnCountMax = 4
             JellyMergeLevelGap = 1
             JellyMergeWideGapMinLevel = 0
@@ -52,6 +54,8 @@ foreach ($mode in @("save", "all")) {
         TurnCap = 600
         LevelProfile = "D"
         TapBlastBotMode = $tapMode
+		JellyBlastMinLevel = 8
+		JellyTapBlastMinLevel = 8
         SpawnCountMax = 4
         JellyMergeLevelGap = 1
         JellyMergeWideGapMinLevel = 0

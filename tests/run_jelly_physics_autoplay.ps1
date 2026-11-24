@@ -4,18 +4,22 @@ param(
     [string]$Label = "after",
     [ValidateRange(1, 16)]
     [int]$Parallelism = 4,
+	[ValidateRange(1, 20)]
+	[int]$SeedCount = 20,
     [double]$Friction = -1.0,
     [double]$AngularDamp = -1.0,
     [double]$GravityTurnDiagonalTime = -1.0,
     [ValidateRange(-1, 10)]
-    [int]$JellyBlastMinLevel = 8,
+    [int]$JellyBlastMinLevel = -1,
+	[ValidateRange(-1, 10)]
+	[int]$JellyBlastPairTopMinLevel = -1,
 	[ValidateSet("Default", "D", "M", "A", "B")]
 	[string]$LevelProfile = "Default",
 	[switch]$TapBlastBot,
 	[ValidateSet("None", "Save", "All")]
 	[string]$TapBlastBotMode = "None",
-	[ValidateRange(0, 10)]
-	[int]$JellyTapBlastMinLevel = 8,
+	[ValidateRange(-1, 10)]
+	[int]$JellyTapBlastMinLevel = -1,
 	[ValidateRange(0.0, 100.0)]
 	[double]$BlastScoreFactor = 15.0,
 	[ValidateRange(0.0, 100.0)]
@@ -62,8 +66,8 @@ param(
 	[double]$JellyMergeDuration = 0.3,
 	[ValidateRange(0.0, 10.0)]
 	[double]$JellyMergeExtensionMax = 1.5,
-	[ValidateRange(0, 10)]
-	[int]$JellyMergeLevelGap = 1,
+	[ValidateRange(-1, 10)]
+	[int]$JellyMergeLevelGap = -1,
 	[ValidateRange(0, 10)]
 	[int]$JellyMergeWideGapMinLevel = 0,
 	[ValidateSet("On", "Off")]
@@ -101,7 +105,9 @@ $resolvedTapBlastBotMode = if ($TapBlastBot -and $TapBlastBotMode -eq "None") { 
 $physicsArguments += "--jelly-tap-blast-bot=$($resolvedTapBlastBotMode.ToLower())"
 $physicsArguments += "--jelly-merge-duration=$($JellyMergeDuration.ToString($culture))"
 $physicsArguments += "--jelly-merge-extension-max=$($JellyMergeExtensionMax.ToString($culture))"
-$physicsArguments += "--jelly-merge-level-gap=$JellyMergeLevelGap"
+if ($JellyMergeLevelGap -ge 0) {
+	$physicsArguments += "--jelly-merge-level-gap=$JellyMergeLevelGap"
+}
 $physicsArguments += "--jelly-merge-wide-gap-min-level=$JellyMergeWideGapMinLevel"
 $physicsArguments += "--jelly-timed-enabled=$($JellyTimedEnabled.ToLower())"
 $physicsArguments += "--jelly-timed-turns=$JellyTimedTurns"
@@ -109,7 +115,9 @@ $physicsArguments += "--jelly-timed-level=$JellyTimedLevel"
 $physicsArguments += "--jelly-timed-burst-count=$JellyTimedBurstCount"
 $physicsArguments += "--jelly-timed-stone-enabled=$($JellyTimedStoneEnabled.ToLower())"
 $physicsArguments += "--jelly-timed-stone-turns=$JellyTimedStoneTurns"
-$physicsArguments += "--jelly-tap-blast-min-level=$JellyTapBlastMinLevel"
+if ($JellyTapBlastMinLevel -ge 0) {
+	$physicsArguments += "--jelly-tap-blast-min-level=$JellyTapBlastMinLevel"
+}
 $physicsArguments += "--blast-score-factor=$($BlastScoreFactor.ToString($culture))"
 $physicsArguments += "--jelly-tap-blast-score-factor=$($JellyTapBlastScoreFactor.ToString($culture))"
 $physicsArguments += "--jelly-tap-blast-uses-turn=$($JellyTapBlastUsesTurn.ToLower())"
@@ -146,6 +154,9 @@ if ($GravityTurnDiagonalTime -ge 0.0) {
 if ($JellyBlastMinLevel -ge 0) {
     $physicsArguments += "--jelly-blast-min-level=$JellyBlastMinLevel"
 }
+if ($JellyBlastPairTopMinLevel -ge 0) {
+	$physicsArguments += "--jelly-blast-pair-top-min-level=$JellyBlastPairTopMinLevel"
+}
 if ($SpawnCountMax -ge 0) {
     $physicsArguments += "--spawn-count-max=$SpawnCountMax"
 }
@@ -159,7 +170,8 @@ $outputDirectory = Join-Path $RepoPath "artifacts\jelly_physics_autoplay_$Label"
 New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
 
 $tasks = @()
-foreach ($seed in 101..120) {
+$seeds = @(101..(100 + $SeedCount))
+foreach ($seed in $seeds) {
     $name = "seed_$seed"
     $tasks += [pscustomobject]@{
         Seed = $seed
@@ -218,6 +230,7 @@ $totalTurns = 0
 $totalMerges = 0
 $totalBlasts = 0
 $blastCountByLevel = @{}
+$blastCountByPairLevels = @{}
 $sameLevelBlastCountByLevel = @{}
 $mixedLevelBlastCountByLevel = @{}
 $totalJackpots = 0
@@ -278,8 +291,52 @@ $timedStoneCreated = 0
 $timedStoneMaxConcurrent = 0
 $timedStoneRemaining = 0
 $timedStoneReactions = 0
+$effectiveJellyMergeLevelGap = $null
+$effectiveJellyTimedMergeLevelGap = $null
+$effectiveSpawnCountMax = $null
+$effectiveJellyBlastMinLevel = $null
+$effectiveJellyBlastPairTopMinLevel = $null
+$effectiveJellyTapBlastMinLevel = $null
 foreach ($task in $tasks) {
     $report = Get-Content -LiteralPath $task.Output -Raw | ConvertFrom-Json
+	if ($null -eq $report.PSObject.Properties['jelly_timed_merge_level_gap']) {
+		throw "$($task.Output) is missing jelly_timed_merge_level_gap"
+	}
+	if ($null -eq $report.PSObject.Properties['spawn_count_max']) {
+		throw "$($task.Output) is missing spawn_count_max"
+	}
+	if ($null -eq $report.PSObject.Properties['jelly_blast_pair_top_min_level']) {
+		throw "$($task.Output) is missing jelly_blast_pair_top_min_level"
+	}
+	if ($null -eq $report.PSObject.Properties['jelly_blast_min_level']) {
+		throw "$($task.Output) is missing jelly_blast_min_level"
+	}
+	if ($null -eq $report.PSObject.Properties['jelly_tap_blast_min_level']) {
+		throw "$($task.Output) is missing jelly_tap_blast_min_level"
+	}
+	$reportedMergeLevelGap = [int]$report.jelly_merge_level_gap
+	$reportedTimedMergeLevelGap = [int]$report.jelly_timed_merge_level_gap
+	$reportedSpawnCountMax = [int]$report.spawn_count_max
+	$reportedJellyBlastMinLevel = [int]$report.jelly_blast_min_level
+	$reportedJellyBlastPairTopMinLevel = [int]$report.jelly_blast_pair_top_min_level
+	$reportedJellyTapBlastMinLevel = [int]$report.jelly_tap_blast_min_level
+	if ($null -eq $effectiveJellyMergeLevelGap) {
+		$effectiveJellyMergeLevelGap = $reportedMergeLevelGap
+		$effectiveJellyTimedMergeLevelGap = $reportedTimedMergeLevelGap
+		$effectiveSpawnCountMax = $reportedSpawnCountMax
+		$effectiveJellyBlastMinLevel = $reportedJellyBlastMinLevel
+		$effectiveJellyBlastPairTopMinLevel = $reportedJellyBlastPairTopMinLevel
+		$effectiveJellyTapBlastMinLevel = $reportedJellyTapBlastMinLevel
+	} elseif (
+		$effectiveJellyMergeLevelGap -ne $reportedMergeLevelGap -or
+		$effectiveJellyTimedMergeLevelGap -ne $reportedTimedMergeLevelGap -or
+		$effectiveSpawnCountMax -ne $reportedSpawnCountMax -or
+		$effectiveJellyBlastMinLevel -ne $reportedJellyBlastMinLevel -or
+		$effectiveJellyBlastPairTopMinLevel -ne $reportedJellyBlastPairTopMinLevel -or
+		$effectiveJellyTapBlastMinLevel -ne $reportedJellyTapBlastMinLevel
+	) {
+		throw "Inconsistent effective settings in $($task.Output)"
+	}
     $tick = $report.ticks[0]
     $seedRow = $tick.seeds[0]
     $seedRows += $seedRow
@@ -361,6 +418,11 @@ foreach ($task in $tasks) {
 		$level = $levelProperty.Name
 		if (-not $mixedLevelBlastCountByLevel.ContainsKey($level)) { $mixedLevelBlastCountByLevel[$level] = 0 }
 		$mixedLevelBlastCountByLevel[$level] += [int]$levelProperty.Value
+	}
+	foreach ($pairProperty in $seedRow.blast_count_by_pair_levels.PSObject.Properties) {
+		$pairKey = $pairProperty.Name
+		if (-not $blastCountByPairLevels.ContainsKey($pairKey)) { $blastCountByPairLevels[$pairKey] = 0 }
+		$blastCountByPairLevels[$pairKey] += [int]$pairProperty.Value
 	}
 	$maximumLevelKey = "L$([int]$seedRow.max_level_reached)"
 	if (-not $maximumLevelDistribution.ContainsKey($maximumLevelKey)) {
@@ -457,7 +519,56 @@ function Get-Median($Values) {
     if ($items.Count % 2 -eq 1) { return [double]$items[$middle] }
     return ([double]$items[$middle - 1] + [double]$items[$middle]) / 2.0
 }
+function Get-TapBlastFlowSummary($Rows) {
+	$firstTurns = @()
+	$intervals = @()
+	$longestEmptyRuns = @()
+	foreach ($seedRow in @($Rows)) {
+		$eventTurns = @()
+		$currentEmptyRun = 0
+		$longestEmptyRun = 0
+		foreach ($turnRow in @($seedRow.turn_rows | Sort-Object -Property turn)) {
+			$property = $turnRow.PSObject.Properties["tap_blast_count"]
+			$count = if ($null -eq $property) { 0 } else { [int]$property.Value }
+			if ($count -le 0) {
+				$currentEmptyRun += 1
+				continue
+			}
+			$longestEmptyRun = [Math]::Max($longestEmptyRun, $currentEmptyRun)
+			$currentEmptyRun = 0
+			for ($eventIndex = 0; $eventIndex -lt $count; $eventIndex++) {
+				$eventTurns += [int]$turnRow.turn
+			}
+		}
+		$longestEmptyRuns += [Math]::Max($longestEmptyRun, $currentEmptyRun)
+		if ($eventTurns.Count -gt 0) {
+			$firstTurns += $eventTurns[0]
+		}
+		for ($eventIndex = 1; $eventIndex -lt $eventTurns.Count; $eventIndex++) {
+			$intervals += [int]$eventTurns[$eventIndex] - [int]$eventTurns[$eventIndex - 1]
+		}
+	}
+	return [ordered]@{
+		first_turn_median = if ($firstTurns.Count -gt 0) { Get-Median $firstTurns } else { $null }
+		interval_turns_median = if ($intervals.Count -gt 0) { Get-Median $intervals } else { $null }
+		longest_empty_run_turns_average = if ($longestEmptyRuns.Count -gt 0) {
+			($longestEmptyRuns | Measure-Object -Average).Average
+		} else { 0.0 }
+	}
+}
 $reactionScoreTotal = [double](($reactionScoreTotals.Values | Measure-Object -Sum).Sum)
+$firstBlastTurns = @(
+	$seedRows |
+		Where-Object { [int]$_.first_blast_turn -ge 0 } |
+		ForEach-Object { [double]$_.first_blast_turn }
+)
+$blastCountThroughTurn200 = [int](
+	($seedRows |
+		ForEach-Object { $_.turn_rows } |
+		Where-Object { [int]$_.turn -le 200 } |
+		Measure-Object -Property blast_count -Sum).Sum
+)
+$tapBlastFlow = Get-TapBlastFlowSummary $seedRows
 $averageCleanCountPerTapByColor = [ordered]@{}
 $zeroCleanTapRatioByColor = [ordered]@{}
 foreach ($color in @($tapBlastCountByColor.Keys | Sort-Object)) {
@@ -474,7 +585,7 @@ foreach ($scoreKey in $reactionScoreTotals.Keys) {
 $summary = [ordered]@{
     label = $Label
     engine = "Godot 4.8-dev3 standard"
-    seeds = @(101..120)
+    seeds = $seeds
     fixed_fps = 120
     max_turns = $MaxTurns
 	level_profile = if ($LevelProfile -eq "Default") { "D" } else { $LevelProfile }
@@ -491,10 +602,12 @@ $summary = [ordered]@{
 	turn_color_unlock_turns = $TurnColorUnlockTurns.ToLower()
 	jelly_merge_duration = $JellyMergeDuration
 	jelly_merge_extension_max = $JellyMergeExtensionMax
-	jelly_merge_level_gap = $JellyMergeLevelGap
+	jelly_merge_level_gap = $effectiveJellyMergeLevelGap
+	jelly_timed_merge_level_gap = $effectiveJellyTimedMergeLevelGap
 	jelly_merge_wide_gap_min_level = $JellyMergeWideGapMinLevel
-	jelly_tap_blast_min_level = $JellyTapBlastMinLevel
+	jelly_tap_blast_min_level = $effectiveJellyTapBlastMinLevel
 	jelly_blast_requires_same_level = $JellyBlastRequiresSameLevel -eq "On"
+	jelly_blast_pair_top_min_level = $effectiveJellyBlastPairTopMinLevel
 	jelly_tap_common_push = $JellyTapCommonPush -eq "On"
 	jelly_tap_lift_speed = $JellyTapLiftSpeed
 	jelly_tap_push_radius_factor = $JellyTapPushRadiusFactor
@@ -506,8 +619,8 @@ $summary = [ordered]@{
     friction = if ($Friction -gt 0.0) { $Friction } else { $null }
     angular_damp = if ($AngularDamp -ge 0.0) { $AngularDamp } else { $null }
     gravity_turn_diagonal_time = if ($GravityTurnDiagonalTime -ge 0.0) { $GravityTurnDiagonalTime } else { $null }
-    jelly_blast_min_level = if ($JellyBlastMinLevel -ge 0) { $JellyBlastMinLevel } else { $null }
-    spawn_count_max = if ($SpawnCountMax -ge 0) { $SpawnCountMax } else { $null }
+    jelly_blast_min_level = $effectiveJellyBlastMinLevel
+    spawn_count_max = $effectiveSpawnCountMax
     spawn_level_costs = if ([string]::IsNullOrWhiteSpace($SpawnLevelCosts)) { $null } else { $SpawnLevelCosts }
     game_over_count = $completedGames.Count
     incomplete_count = $incompleteGames.Count
@@ -588,7 +701,16 @@ $summary = [ordered]@{
 	maximum_level_distribution = $maximumLevelDistribution
 	level_ten_game_count = $levelTenGameCount
     blast_count = $totalBlasts
+	average_blasts_per_game = [double]$totalBlasts / $seedRows.Count
+	first_blast_turn_median = if ($firstBlastTurns.Count -gt 0) { Get-Median $firstBlastTurns } else { $null }
+	zero_blast_game_count = @($seedRows | Where-Object { [int]$_.blast_count -eq 0 }).Count
+	blast_count_through_turn_200 = $blastCountThroughTurn200
+	average_blasts_through_turn_200_per_game = [double]$blastCountThroughTurn200 / $seedRows.Count
 	tap_blast_count = $totalTapBlastCount
+	tap_blasts_per_100_turns = if ($totalTurns -gt 0) { [double]$totalTapBlastCount * 100.0 / $totalTurns } else { 0.0 }
+	first_tap_blast_turn_median = $tapBlastFlow.first_turn_median
+	tap_blast_interval_turns_median = $tapBlastFlow.interval_turns_median
+	longest_tap_blast_empty_run_turns_average = $tapBlastFlow.longest_empty_run_turns_average
 	tap_blast_count_by_level = $tapBlastCountByLevel
 	tap_blast_count_by_color = $tapBlastCountByColor
 	tap_clean_count_by_color = $tapCleanCountByColor
@@ -604,6 +726,7 @@ $summary = [ordered]@{
 		tap = [ordered]@{ windows = $tapReactionWindows; merges = $tapReactionMerges; blasts = $tapReactionBlasts }
 	}
     blast_count_by_level = $blastCountByLevel
+	blast_count_by_pair_levels = $blastCountByPairLevels
 	same_level_blast_count_by_level = $sameLevelBlastCountByLevel
 	mixed_level_blast_count_by_level = $mixedLevelBlastCountByLevel
     jackpot_count = $totalJackpots

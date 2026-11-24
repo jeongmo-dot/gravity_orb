@@ -156,7 +156,7 @@ func test_m4_spawn_defaults() -> void:
 	assert_eq(config.spawn_count_per_turn, 1, "spawn count per turn")
 	assert_eq(config.preview_turns, 2, "preview turns")
 	assert_eq(config.spawn_count_ramp_turns, 10, "spawn count ramp interval")
-	assert_eq(config.spawn_count_max, 4, "spawn count maximum")
+	assert_eq(config.spawn_count_max, 6, "spawn count maximum")
 	assert_eq(config.turn_start_colors, 4, "turn mode starts with four colors")
 	assert_eq(config.turn_color_unlock_turns, [], "turn colors stay at the starting four")
 	assert_eq(config.spawn_position_mode, GameConfig.SpawnPositionMode.RANDOM, "position mode")
@@ -170,9 +170,9 @@ func test_spawn_count_ramp_turn_boundaries() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	var expected: Dictionary = {
 		40: 4,
-		41: 4,
-		100: 4,
-		500: 4,
+		41: 5,
+		100: 6,
+		500: 6,
 	}
 	for turn_value: Variant in expected:
 		var turn_index: int = int(turn_value)
@@ -327,10 +327,12 @@ func test_m9_blast_defaults() -> void:
 	var config: GameConfig = CONFIG_RESOURCE.duplicate(true) as GameConfig
 	assert_true(config.blast_enabled, "blast enabled")
 	assert_eq(config.blast_min_level, 4, "shared blast minimum level")
-	assert_eq(config.jelly_blast_min_level, 8, "JELLY blast starts at L8 by default")
+	assert_eq(config.jelly_blast_min_level, 9, "JELLY blast starts at L9")
 	assert_true(not config.jelly_blast_requires_same_level, "JELLY blast allows mixed levels")
-	assert_eq(config.jelly_merge_level_gap, 1, "JELLY merge level gap defaults to one")
+	assert_eq(config.jelly_blast_pair_top_min_level, 10, "JELLY blast pair requires one L10")
+	assert_eq(config.jelly_merge_level_gap, 2, "JELLY merge level gap defaults to two")
 	assert_eq(config.jelly_merge_wide_gap_min_level, 0, "JELLY wide merge gap defaults off")
+	assert_eq(config.jelly_timed_merge_level_gap, -1, "timed JELLY merge gap follows normal gap")
 	assert_true(config.jelly_timed_enabled, "timed jelly enabled")
 	assert_eq(config.jelly_timed_first_turn, 20, "timed jelly first turn")
 	assert_eq(config.jelly_timed_interval_turns, 12, "timed jelly interval")
@@ -342,6 +344,8 @@ func test_m9_blast_defaults() -> void:
 	assert_eq(config.jelly_timed_early_turns_min, 10, "timed jelly early minimum")
 	assert_eq(config.jelly_timed_early_turns_max, 15, "timed jelly early maximum")
 	var declaration_defaults: GameConfig = GameConfig.new()
+	assert_eq(declaration_defaults.jelly_merge_level_gap, 2, "declared merge gap")
+	assert_eq(declaration_defaults.jelly_timed_merge_level_gap, -1, "declared timed merge gap")
 	assert_eq(declaration_defaults.jelly_timed_early_turn_limit, 100, "declared early turn limit")
 	assert_eq(declaration_defaults.jelly_timed_early_turns_min, 10, "declared early minimum")
 	assert_eq(declaration_defaults.jelly_timed_early_turns_max, 15, "declared early maximum")
@@ -360,7 +364,7 @@ func test_m9_blast_defaults() -> void:
 	assert_near(config.blast_far_factor, 0.5, TOLERANCE, "blast far factor")
 	assert_near(config.blast_score_factor, 15.0, TOLERANCE, "blast score factor")
 	assert_near(config.blast_blink_period, 0.8, TOLERANCE, "blast blink period")
-	assert_eq(config.jelly_tap_blast_min_level, 8, "tap blast starts at L8")
+	assert_eq(config.jelly_tap_blast_min_level, 9, "tap blast starts at L9")
 	assert_near(config.jelly_tap_blast_radius_factor, 0.3, TOLERANCE, "tap radius")
 	assert_near(config.jelly_tap_blast_score_factor, 0.5, TOLERANCE, "tap score")
 	assert_true(config.jelly_tap_blast_uses_turn, "tap blast consumes a turn")

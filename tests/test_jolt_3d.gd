@@ -237,38 +237,37 @@ func test_classic_3d_blast_readiness_starts_at_level_four() -> void:
 	Config.data.game_mode = original_mode
 
 
-func test_jelly_default_l8_blast_readiness_follows_mass_without_outline_geometry() -> void:
+func test_jelly_default_l8_normal_l9_sparkle_face_follows_mass_without_outline_geometry() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_jelly_minimum: int = Config.data.jelly_blast_min_level
 	Config.data.game_mode = GameConfig.GameMode.JELLY
-	Config.data.jelly_blast_min_level = 8
 	var board: Board3D = await _create_board()
 	var level_seven: Orb3D = board.spawn_orb(0, 7, Vector2(-300.0, 0.0))
 	var level_eight: Orb3D = board.spawn_orb(1, 8, Vector2(-100.0, 0.0))
 	var level_nine: Orb3D = board.spawn_orb(2, 9, Vector2(100.0, 0.0))
 	var level_ten: Orb3D = board.spawn_orb(3, 10, Vector2(300.0, 0.0))
 	assert_true(not level_seven.is_blast_armed(), "L7 remains unarmed")
-	assert_true(level_eight.is_blast_armed(), "L8 arms BLAST")
+	assert_true(not level_eight.is_blast_armed(), "L8 remains unarmed")
 	assert_true(level_nine.is_blast_armed(), "L9 arms BLAST")
 	assert_true(level_ten.is_blast_armed(), "L10 arms BLAST")
 	assert_true(
-		bool((level_eight._face.material_override as ShaderMaterial).get_shader_parameter("is_blast_ready")),
-		"L8 uses the blast-ready face"
+		not bool((level_eight._face.material_override as ShaderMaterial).get_shader_parameter("is_sparkle_face")),
+		"L8 uses the normal face"
 	)
 	assert_true(
-		bool((level_nine._face.material_override as ShaderMaterial).get_shader_parameter("is_blast_ready")),
-		"L9 uses the blast-ready face"
+		bool((level_nine._face.material_override as ShaderMaterial).get_shader_parameter("is_sparkle_face")),
+		"L9 uses the sparkle face"
 	)
 	level_nine.set_jelly_mass(64.0, Config.data)
 	assert_eq(level_nine.level, 10, "mass update reaches displayed L10")
 	assert_true(level_nine.is_blast_armed(), "mass-updated displayed L10 arms BLAST")
 	assert_true(
-		bool((level_nine._face.material_override as ShaderMaterial).get_shader_parameter("is_max")),
-		"mass-updated L10 keeps the MAX face"
+		bool((level_nine._face.material_override as ShaderMaterial).get_shader_parameter("is_squeezed_face")),
+		"mass-updated L10 switches to the squeezed face"
 	)
 	assert_true(
-		not bool((level_nine._face.material_override as ShaderMaterial).get_shader_parameter("is_blast_ready")),
-		"mass-updated L10 does not replace MAX with blast-ready face"
+		not bool((level_nine._face.material_override as ShaderMaterial).get_shader_parameter("is_sparkle_face")),
+		"mass-updated L10 no longer uses the sparkle face"
 	)
 	_cleanup(board)
 	Config.data.jelly_blast_min_level = original_jelly_minimum
@@ -358,8 +357,9 @@ func test_jolt_reaction_uses_shared_rules_and_spawns_3d_result() -> void:
 	_cleanup(fixture_root)
 
 
-func test_jelly_mixed_level_blast_uses_larger_level_for_effect() -> void:
+func test_jelly_default_l9_l10_blast_uses_larger_level_for_effect() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_minimum: int = Config.data.jelly_blast_min_level
 	var original_requires_same: bool = Config.data.jelly_blast_requires_same_level
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.jelly_blast_requires_same_level = false
@@ -367,21 +367,74 @@ func test_jelly_mixed_level_blast_uses_larger_level_for_effect() -> void:
 	var board: Board3D = fixture["board"] as Board3D
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
 	resolver.proximity_reaction_scan_enabled = false
-	var level_eight: Orb3D = board.spawn_orb(0, 8, Vector2(-100.0, 0.0))
-	var level_nine: Orb3D = board.spawn_orb(1, 9, Vector2(100.0, 0.0))
-	level_eight.disable_physics()
+	var level_nine: Orb3D = board.spawn_orb(0, 9, Vector2(-100.0, 0.0))
+	var level_ten: Orb3D = board.spawn_orb(1, 10, Vector2(100.0, 0.0))
 	level_nine.disable_physics()
+	level_ten.disable_physics()
 	var reactions: Array[Dictionary] = []
 	resolver.reaction_applied.connect(func(reaction: Dictionary) -> void: reactions.append(reaction))
-	resolver.report_contact(level_eight, level_nine, "mixed_level_test")
-	assert_eq(resolver.flush(), 1, "mixed L8+L9 resolves once")
+	resolver.report_contact(level_nine, level_ten, "mixed_level_test")
+	assert_eq(resolver.flush(), 1, "mixed L9+L10 resolves once")
 	assert_eq(reactions.size(), 1, "mixed blast emits one reaction")
 	if reactions.size() == 1:
 		assert_eq(reactions[0]["type"], ReactionRules.Type.BLAST, "mixed pair is BLAST")
-		assert_eq(reactions[0]["levels"], [8, 9], "reaction keeps both source levels")
-		assert_eq(reactions[0]["shock_level"], 9, "larger source level drives effect")
+		assert_eq(reactions[0]["levels"], [9, 10], "reaction keeps both source levels")
+		assert_eq(reactions[0]["shock_level"], 10, "larger source level drives effect")
 	await _cleanup(fixture["root"] as Node)
+	Config.data.jelly_blast_min_level = original_minimum
 	Config.data.jelly_blast_requires_same_level = original_requires_same
+	Config.data.game_mode = original_mode
+
+
+func test_jelly_blast_pair_top_minimum_resolves_only_l9_l10() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_minimum: int = Config.data.jelly_blast_min_level
+	var original_pair_top: int = Config.data.jelly_blast_pair_top_min_level
+	var original_requires_same: bool = Config.data.jelly_blast_requires_same_level
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.jelly_blast_min_level = 9
+	Config.data.jelly_blast_pair_top_min_level = 10
+	Config.data.jelly_blast_requires_same_level = false
+
+	var no_blast_fixture: Dictionary = await _create_turn_fixture()
+	var no_blast_board: Board3D = no_blast_fixture["board"] as Board3D
+	var no_blast_resolver: CollisionResolver = no_blast_fixture["resolver"] as CollisionResolver
+	no_blast_resolver.proximity_reaction_scan_enabled = false
+	var first_l9: Orb3D = no_blast_board.spawn_orb(0, 9, Vector2(-100.0, 0.0))
+	var second_l9: Orb3D = no_blast_board.spawn_orb(1, 9, Vector2(100.0, 0.0))
+	first_l9.disable_physics()
+	second_l9.disable_physics()
+	var no_blast_reactions: Array[Dictionary] = []
+	no_blast_resolver.reaction_applied.connect(
+		func(reaction: Dictionary) -> void: no_blast_reactions.append(reaction)
+	)
+	no_blast_resolver.report_contact(first_l9, second_l9, "pair_top_l9_l9")
+	assert_eq(no_blast_resolver.flush(), 0, "L9+L9 does not resolve")
+	assert_eq(no_blast_reactions.size(), 0, "L9+L9 emits no reaction")
+	await _cleanup(no_blast_fixture["root"] as Node)
+
+	var blast_fixture: Dictionary = await _create_turn_fixture()
+	var blast_board: Board3D = blast_fixture["board"] as Board3D
+	var blast_resolver: CollisionResolver = blast_fixture["resolver"] as CollisionResolver
+	blast_resolver.proximity_reaction_scan_enabled = false
+	var blast_l9: Orb3D = blast_board.spawn_orb(0, 9, Vector2(-100.0, 0.0))
+	var blast_l10: Orb3D = blast_board.spawn_orb(1, 10, Vector2(100.0, 0.0))
+	blast_l9.disable_physics()
+	blast_l10.disable_physics()
+	var blast_reactions: Array[Dictionary] = []
+	blast_resolver.reaction_applied.connect(
+		func(reaction: Dictionary) -> void: blast_reactions.append(reaction)
+	)
+	blast_resolver.report_contact(blast_l9, blast_l10, "pair_top_l9_l10")
+	assert_eq(blast_resolver.flush(), 1, "L9+L10 resolves once")
+	assert_eq(blast_reactions.size(), 1, "L9+L10 emits one reaction")
+	if blast_reactions.size() == 1:
+		assert_eq(blast_reactions[0]["type"], ReactionRules.Type.BLAST, "L9+L10 is BLAST")
+	await _cleanup(blast_fixture["root"] as Node)
+
+	Config.data.jelly_blast_requires_same_level = original_requires_same
+	Config.data.jelly_blast_pair_top_min_level = original_pair_top
+	Config.data.jelly_blast_min_level = original_minimum
 	Config.data.game_mode = original_mode
 
 
@@ -899,7 +952,7 @@ func test_turn_manager_merge_extension_ends_immediately_without_pair_and_hard_ca
 	await _cleanup(fixture["root"] as Node)
 
 
-func test_level_eight_tap_blast_is_turn_free_and_settles_back_to_input() -> void:
+func test_default_tap_blast_is_turn_free_and_settles_back_to_input() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_tap_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
 	var original_clean_max: int = Config.data.jelly_tap_clean_max_level
@@ -927,7 +980,7 @@ func test_level_eight_tap_blast_is_turn_free_and_settles_back_to_input() -> void
 	manager.state = TurnManager.State.WAITING_INPUT
 	manager.final_move_pending = true
 	InputRouter.set_locked(false)
-	var tapped: Orb3D = board.spawn_orb(2, 8, Vector2.ZERO)
+	var tapped: Orb3D = board.spawn_orb(2, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	var nearby: Orb3D = board.spawn_orb(1, 1, Vector2(200.0, 0.0))
 	var reactions: Array[Dictionary] = []
 	var turn_starts: int = 0
@@ -937,7 +990,7 @@ func test_level_eight_tap_blast_is_turn_free_and_settles_back_to_input() -> void
 	manager.turn_finished.connect(func(_turn: int, _combo: int) -> void: turn_finishes += 1)
 	await tree.process_frame
 	manager.on_tap(camera.unproject_position(Orb3D.plane_position_to_world(Vector2.ZERO)))
-	assert_true(tapped.consumed, "tap removes selected L8")
+	assert_true(tapped.consumed, "tap removes selected threshold orb")
 	assert_eq(manager.state, TurnManager.State.SIMULATING, "tap enters settling")
 	assert_eq(manager.turn_index, 0, "tap consumes no turn")
 	assert_eq(manager.gravity, Vector2i.DOWN, "tap preserves gravity")
@@ -947,8 +1000,8 @@ func test_level_eight_tap_blast_is_turn_free_and_settles_back_to_input() -> void
 	if reactions.size() == 1:
 		assert_eq(reactions[0]["type"], ReactionRules.Type.TAP_BLAST, "tap reaction type")
 		assert_eq(reactions[0]["combo"], 1, "tap combo starts at one")
-		assert_eq(reactions[0]["levels"], [8], "tap reaction keeps source level")
-		assert_eq(reactions[0]["shock_level"], 8, "tap effect keeps source level")
+		assert_eq(reactions[0]["levels"], [Config.data.jelly_tap_blast_min_level], "tap reaction keeps source level")
+		assert_eq(reactions[0]["shock_level"], Config.data.jelly_tap_blast_min_level, "tap effect keeps source level")
 	if reactions.size() == 1:
 		var blast_targets: Array = reactions[0]["blast_targets"] as Array
 		var nearby_was_pushed: bool = false
@@ -976,7 +1029,7 @@ func test_level_eight_tap_blast_is_turn_free_and_settles_back_to_input() -> void
 	await _cleanup(fixture["root"] as Node)
 
 
-func test_level_eight_tap_blast_consumes_turn_spawns_next_and_keeps_gravity() -> void:
+func test_default_tap_blast_consumes_turn_spawns_next_and_keeps_gravity() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_tap_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
 	var original_clean_max: int = Config.data.jelly_tap_clean_max_level
@@ -1001,14 +1054,14 @@ func test_level_eight_tap_blast_consumes_turn_spawns_next_and_keeps_gravity() ->
 	var orb_count_before: int = board.get_orbs().size()
 	manager.state = TurnManager.State.WAITING_INPUT
 	InputRouter.set_locked(false)
-	var tapped: Orb3D = board.spawn_orb(2, 8, Vector2.ZERO)
+	var tapped: Orb3D = board.spawn_orb(2, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	var turn_starts: Array[int] = [0]
 	var turn_finishes: Array[int] = [0]
 	var gravity_changes: Array[int] = [0]
 	manager.turn_started.connect(func(_turn: int, _dir: Vector2i) -> void: turn_starts[0] += 1)
 	manager.turn_finished.connect(func(_turn: int, _combo: int) -> void: turn_finishes[0] += 1)
 	manager.gravity_changed.connect(func(_dir: Vector2i) -> void: gravity_changes[0] += 1)
-	assert_true(manager.try_tap_blast_orb(tapped), "L8 tap blast starts the turn")
+	assert_true(manager.try_tap_blast_orb(tapped), "threshold tap blast starts the turn")
 	assert_eq(manager.state, TurnManager.State.SPAWNING, "tap waits for current NEXT spawn")
 	assert_eq(manager.turn_index, 1, "tap consumes one turn")
 	assert_eq(manager.gravity, Vector2i.DOWN, "tap keeps gravity")
@@ -1057,7 +1110,7 @@ func test_tap_blast_spends_pending_final_move_without_spawning() -> void:
 	manager.state = TurnManager.State.WAITING_INPUT
 	manager.final_move_pending = true
 	InputRouter.set_locked(false)
-	var tapped: Orb3D = board.spawn_orb(2, 8, Vector2.ZERO)
+	var tapped: Orb3D = board.spawn_orb(2, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	var orb_count_before: int = board.get_orbs().size()
 	assert_true(manager.try_tap_blast_orb(tapped), "tap spends FINAL MOVE")
 	assert_eq(manager.state, TurnManager.State.SIMULATING, "FINAL MOVE tap skips SPAWNING")
@@ -1124,7 +1177,7 @@ func test_tap_blast_pending_final_move_fails_if_entrance_stays_blocked() -> void
 		blocker.get_physics_body().freeze = true
 		blocker_index += 1
 		offset += 45.0
-	var tapped: Orb3D = board.spawn_orb(2, 8, Vector2.ZERO)
+	var tapped: Orb3D = board.spawn_orb(2, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	var waiting: Orb3D = board.spawn_orb(1, 1, Vector2.ZERO)
 	waiting.enter_entrance_wait(origin, Vector2i.DOWN)
 	var orb_count_before: int = board.get_orbs().size()
@@ -1148,7 +1201,7 @@ func test_tap_blast_pending_final_move_fails_if_entrance_stays_blocked() -> void
 	await _cleanup(fixture["root"] as Node)
 
 
-func test_tap_blast_candidate_accepts_l8_to_l10_and_rejects_l7_waiting_ghost_and_locked() -> void:
+func test_tap_blast_candidate_accepts_l9_to_l10_and_rejects_l8_waiting_ghost_and_locked() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_tap_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
 	var original_clean_max: int = Config.data.jelly_tap_clean_max_level
@@ -1161,8 +1214,7 @@ func test_tap_blast_candidate_accepts_l8_to_l10_and_rejects_l7_waiting_ghost_and
 	var board: Board3D = fixture["board"] as Board3D
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
 	var manager: TurnManager = fixture["manager"] as TurnManager
-	var level_seven: Orb3D = board.spawn_orb(0, 7, Vector2(-400.0, 0.0))
-	var level_eight: Orb3D = board.spawn_orb(1, 8, Vector2(-240.0, 0.0))
+	var level_eight: Orb3D = board.spawn_orb(0, 8, Vector2(-400.0, 0.0))
 	var level_nine: Orb3D = board.spawn_orb(2, 9, Vector2(-80.0, 0.0))
 	var level_ten: Orb3D = board.spawn_orb(3, 10, Vector2(80.0, 0.0))
 	var waiting: Orb3D = board.spawn_orb(0, 8, Vector2(220.0, 0.0))
@@ -1171,8 +1223,7 @@ func test_tap_blast_candidate_accepts_l8_to_l10_and_rejects_l7_waiting_ghost_and
 	waiting.is_waiting_at_entrance = true
 	ghost.is_ghost = true
 	resolver._lock_reaction_result(locked)
-	assert_true(not resolver.is_jelly_tap_blast_candidate(level_seven), "L7 rejected")
-	assert_true(resolver.is_jelly_tap_blast_candidate(level_eight), "L8 accepted")
+	assert_true(not resolver.is_jelly_tap_blast_candidate(level_eight), "L8 rejected")
 	assert_true(resolver.is_jelly_tap_blast_candidate(level_nine), "L9 accepted")
 	assert_true(resolver.is_jelly_tap_blast_candidate(level_ten), "L10 accepted")
 	assert_true(not resolver.is_jelly_tap_blast_candidate(waiting), "entrance waiter rejected")
@@ -1181,8 +1232,8 @@ func test_tap_blast_candidate_accepts_l8_to_l10_and_rejects_l7_waiting_ghost_and
 	manager.state = TurnManager.State.WAITING_INPUT
 	InputRouter.set_locked(false)
 	var turn_before: int = manager.turn_index
-	assert_true(not manager.try_tap_blast_orb(level_seven), "L7 tap does not start a turn")
-	assert_eq(manager.turn_index, turn_before, "rejected L7 tap keeps turn index")
+	assert_true(not manager.try_tap_blast_orb(level_eight), "L8 tap does not start a turn")
+	assert_eq(manager.turn_index, turn_before, "rejected L8 tap keeps turn index")
 	Config.data.game_mode = original_mode
 	Config.data.jelly_tap_effect_modes = original_tap_modes
 	Config.data.jelly_tap_clean_max_level = original_clean_max
@@ -1240,7 +1291,7 @@ func test_tap_clean_removes_only_eligible_same_color_without_push() -> void:
 	var fixture: Dictionary = await _create_turn_fixture()
 	var board: Board3D = fixture["board"] as Board3D
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
-	var source: Orb3D = board.spawn_orb(0, 8, Vector2.ZERO)
+	var source: Orb3D = board.spawn_orb(0, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	var clean_one: Orb3D = board.spawn_orb(0, 1, Vector2(-400.0, 0.0))
 	var clean_two: Orb3D = board.spawn_orb(0, 2, Vector2(300.0, 0.0))
 	var same_three: Orb3D = board.spawn_orb(0, 3, Vector2(400.0, 0.0))
@@ -1291,7 +1342,7 @@ func test_tap_clean_zone_rules_follow_each_effect_and_current_gravity() -> void:
 	var board: Board3D = fixture["board"] as Board3D
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
 
-	var bomb: Orb3D = board.spawn_orb(0, 8, Vector2.ZERO)
+	var bomb: Orb3D = board.spawn_orb(0, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	var bomb_same: Orb3D = board.spawn_orb(0, 1, Vector2(0.0, 288.0))
 	var bomb_other: Orb3D = board.spawn_orb(1, 1, Vector2(288.0, 0.0))
 	var bomb_outside: Orb3D = board.spawn_orb(0, 1, Vector2(300.0, 0.0))
@@ -1304,7 +1355,7 @@ func test_tap_clean_zone_rules_follow_each_effect_and_current_gravity() -> void:
 	board.clear()
 	await tree.process_frame
 	board.set_gravity(Vector2i.DOWN)
-	var quake: Orb3D = board.spawn_orb(1, 8, Vector2.ZERO)
+	var quake: Orb3D = board.spawn_orb(1, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	var quake_floor_left: Orb3D = board.spawn_orb(1, 1, Vector2(-400.0, 450.0))
 	var quake_floor_right: Orb3D = board.spawn_orb(1, 1, Vector2(400.0, 450.0))
 	var quake_supported: Orb3D = board.spawn_orb(1, 1, Vector2(0.0, 400.0))
@@ -1317,7 +1368,7 @@ func test_tap_clean_zone_rules_follow_each_effect_and_current_gravity() -> void:
 	board.clear()
 	await tree.process_frame
 	board.set_gravity(Vector2i.LEFT)
-	var quake_left: Orb3D = board.spawn_orb(1, 8, Vector2.ZERO)
+	var quake_left: Orb3D = board.spawn_orb(1, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	var left_floor: Orb3D = board.spawn_orb(1, 1, Vector2(-450.0, 300.0))
 	var old_down_floor: Orb3D = board.spawn_orb(1, 1, Vector2(300.0, 450.0))
 	assert_eq(resolver.jelly_tap_clean_count(quake_left), 1, "quake follows left gravity floor")
@@ -1326,20 +1377,20 @@ func test_tap_clean_zone_rules_follow_each_effect_and_current_gravity() -> void:
 	board.clear()
 	await tree.process_frame
 	board.set_gravity(Vector2i.DOWN)
-	var rest: Orb3D = board.spawn_orb(2, 8, Vector2.ZERO)
+	var rest: Orb3D = board.spawn_orb(2, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	var rest_inside: Orb3D = board.spawn_orb(2, 1, Vector2(-200.0, -96.0))
 	var rest_outside: Orb3D = board.spawn_orb(2, 1, Vector2(200.0, -95.0))
 	assert_eq(resolver.jelly_tap_clean_count(rest), 1, "rest cleans green L1 within 384px of entrance")
 	assert_true(rest_inside.stable_spawn_id != rest_outside.stable_spawn_id, "rest fixture ids differ")
 	board.set_gravity(Vector2i.LEFT)
-	var rest_left: Orb3D = board.spawn_orb(2, 8, Vector2(-200.0, 200.0))
+	var rest_left: Orb3D = board.spawn_orb(2, Config.data.jelly_tap_blast_min_level, Vector2(-200.0, 200.0))
 	var rest_right_entrance: Orb3D = board.spawn_orb(2, 1, Vector2(96.0, 200.0))
 	assert_true(resolver.jelly_tap_clean_count(rest_left) >= 1, "rest entrance follows changed gravity")
 	assert_true(rest_right_entrance.stable_spawn_id > 0, "rest changed-gravity fixture is valid")
 
 	board.clear()
 	await tree.process_frame
-	var magnet: Orb3D = board.spawn_orb(3, 8, Vector2(-200.0, 0.0))
+	var magnet: Orb3D = board.spawn_orb(3, Config.data.jelly_tap_blast_min_level, Vector2(-200.0, 0.0))
 	var magnet_inside: Orb3D = board.spawn_orb(3, 1, Vector2(280.0, 0.0))
 	var magnet_outside: Orb3D = board.spawn_orb(3, 1, Vector2(281.0, 0.0))
 	var magnet_other: Orb3D = board.spawn_orb(0, 1, Vector2(0.0, 0.0))
@@ -1374,7 +1425,7 @@ func test_rest_clean_count_selects_nearest_entrance_orbs_deterministically() -> 
 	var spawner: Spawner = fixture["spawner"] as Spawner
 
 	board.set_gravity(Vector2i.DOWN)
-	var source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 8, Vector2.ZERO)
+	var source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	var lower_first: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(-180.0, 0.0))
 	var top_second: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(180.0, -200.0))
 	var lower_second: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(180.0, 200.0))
@@ -1409,7 +1460,7 @@ func test_rest_clean_count_selects_nearest_entrance_orbs_deterministically() -> 
 	board.clear()
 	await tree.process_frame
 	board.set_gravity(Vector2i.DOWN)
-	var one_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 8, Vector2.ZERO)
+	var one_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	var one_target: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(0.0, 200.0))
 	assert_eq(resolver.jelly_tap_clean_count(one_source), 1, "one valid green L1 yields one target")
 	var one_reactions: Array[Dictionary] = []
@@ -1434,14 +1485,14 @@ func test_rest_clean_count_selects_nearest_entrance_orbs_deterministically() -> 
 	assert_eq(spawner.peek_preview(), one_preview_before, "one-target REST preserves next preview")
 	board.clear()
 	await tree.process_frame
-	var zero_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 8, Vector2.ZERO)
+	var zero_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	board.spawn_orb(OrbTypes.OrbColor.GREEN, 2, Vector2(0.0, -300.0))
 	assert_eq(resolver.jelly_tap_clean_count(zero_source), 0, "no valid green L1 yields zero targets")
 
 	board.clear()
 	await tree.process_frame
 	board.set_gravity(Vector2i.LEFT)
-	var left_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 8, Vector2.ZERO)
+	var left_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	var right_nearest: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(420.0, -200.0))
 	var right_second: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(320.0, 200.0))
 	board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(-300.0, 0.0))
@@ -1453,7 +1504,7 @@ func test_rest_clean_count_selects_nearest_entrance_orbs_deterministically() -> 
 	board.clear()
 	await tree.process_frame
 	board.set_gravity(Vector2i.UP)
-	var up_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 8, Vector2.ZERO)
+	var up_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	var bottom_nearest: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(-200.0, 420.0))
 	var bottom_second: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(200.0, 320.0))
 	board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(0.0, -300.0))
@@ -1465,7 +1516,7 @@ func test_rest_clean_count_selects_nearest_entrance_orbs_deterministically() -> 
 	board.clear()
 	await tree.process_frame
 	board.set_gravity(Vector2i.RIGHT)
-	var right_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 8, Vector2.ZERO)
+	var right_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	var left_nearest: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(-420.0, -200.0))
 	var left_second: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(-320.0, 200.0))
 	board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(300.0, 0.0))
@@ -1478,7 +1529,7 @@ func test_rest_clean_count_selects_nearest_entrance_orbs_deterministically() -> 
 	await tree.process_frame
 	Config.data.jelly_tap_rest_clean_count = 2
 	board.set_gravity(Vector2i.LEFT)
-	var tie_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 8, Vector2.ZERO)
+	var tie_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	var closest: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(430.0, 0.0))
 	var lower_id: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(400.0, -150.0))
 	var higher_id: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(400.0, 150.0))
@@ -1510,7 +1561,7 @@ func test_rest_clean_count_fallback_and_other_effects_remain_independent() -> vo
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
 
 	board.set_gravity(Vector2i.DOWN)
-	var fallback_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 8, Vector2.ZERO)
+	var fallback_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(-200.0, -300.0))
 	board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(0.0, -200.0))
 	board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(200.0, -96.0))
@@ -1523,7 +1574,7 @@ func test_rest_clean_count_fallback_and_other_effects_remain_independent() -> vo
 	board.clear()
 	await tree.process_frame
 	Config.data.jelly_tap_rest_clean_count = 1
-	var bomb_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, 8, Vector2.ZERO)
+	var bomb_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	board.spawn_orb(OrbTypes.OrbColor.BLUE, 1, Vector2(100.0, 0.0))
 	board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(0.0, 100.0))
 	board.spawn_orb(OrbTypes.OrbColor.YELLOW, 1, Vector2(-100.0, 0.0))
@@ -1532,7 +1583,7 @@ func test_rest_clean_count_fallback_and_other_effects_remain_independent() -> vo
 	board.clear()
 	await tree.process_frame
 	board.set_gravity(Vector2i.DOWN)
-	var quake_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.BLUE, 8, Vector2.ZERO)
+	var quake_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.BLUE, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	board.spawn_orb(OrbTypes.OrbColor.BLUE, 1, Vector2(-200.0, 455.0))
 	board.spawn_orb(OrbTypes.OrbColor.BLUE, 1, Vector2(0.0, 455.0))
 	board.spawn_orb(OrbTypes.OrbColor.BLUE, 1, Vector2(200.0, 455.0))
@@ -1540,7 +1591,7 @@ func test_rest_clean_count_fallback_and_other_effects_remain_independent() -> vo
 
 	board.clear()
 	await tree.process_frame
-	var magnet_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.YELLOW, 8, Vector2.ZERO)
+	var magnet_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.YELLOW, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	board.spawn_orb(OrbTypes.OrbColor.YELLOW, 1, Vector2(100.0, 0.0))
 	board.spawn_orb(OrbTypes.OrbColor.YELLOW, 1, Vector2(200.0, 0.0))
 	board.spawn_orb(OrbTypes.OrbColor.YELLOW, 1, Vector2(300.0, 0.0))
@@ -1549,7 +1600,7 @@ func test_rest_clean_count_fallback_and_other_effects_remain_independent() -> vo
 	board.clear()
 	await tree.process_frame
 	Config.data.jelly_tap_clean_zone_rule = false
-	var legacy_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 8, Vector2.ZERO)
+	var legacy_source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(-400.0, 300.0))
 	board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(0.0, 300.0))
 	board.spawn_orb(OrbTypes.OrbColor.GREEN, 1, Vector2(400.0, 300.0))
@@ -1594,7 +1645,7 @@ func test_zero_match_zone_taps_keep_all_four_effects_and_turn_rules() -> void:
 		spawner.sync_next_batch_size(manager.turn_index + 1)
 		var preview_before: Array = spawner.peek_preview()
 		InputRouter.set_locked(false)
-		var source: Orb3D = board.spawn_orb(color, 8, Vector2.ZERO)
+		var source: Orb3D = board.spawn_orb(color, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 		var effect_target: Orb3D = board.spawn_orb((color + 1) % 4, 4, Vector2(150.0, 0.0))
 		assert_true(resolver.is_jelly_tap_blast_candidate(source), "color %d remains a tap candidate" % color)
 		assert_eq(resolver.jelly_tap_clean_count(source), 0, "color %d has zero matching clean targets" % color)
@@ -1782,7 +1833,7 @@ func test_tap_push_uses_dedicated_radius_speed_and_keeps_big_blast_profile() -> 
 	Config.data.blast_speed = 1350.0
 	Config.data.blast_far_factor = 0.5
 	var board: Board3D = await _create_board()
-	var source: Orb3D = board.spawn_orb(3, 8, Vector2.ZERO)
+	var source: Orb3D = board.spawn_orb(3, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	var side: Orb3D = board.spawn_orb(0, 4, Vector2(400.0, 0.0))
 	var below: Orb3D = board.spawn_orb(1, 4, Vector2(0.0, 400.0))
 	var outside: Orb3D = board.spawn_orb(2, 4, Vector2(500.0, 0.0))
@@ -1850,7 +1901,7 @@ func test_bomb_quake_and_grow_tap_effects_follow_color_rules() -> void:
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 
-	var red: Orb3D = board.spawn_orb(0, 8, Vector2.ZERO)
+	var red: Orb3D = board.spawn_orb(0, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	var red_far: Orb3D = board.spawn_orb(0, 1, Vector2(430.0, 0.0))
 	var blue_near: Orb3D = board.spawn_orb(1, 2, Vector2(200.0, 0.0))
 	var blue_far: Orb3D = board.spawn_orb(1, 2, Vector2(400.0, 0.0))
@@ -1875,7 +1926,7 @@ func test_bomb_quake_and_grow_tap_effects_follow_color_rules() -> void:
 
 	board.clear()
 	await tree.process_frame
-	var quake: Orb3D = board.spawn_orb(1, 8, Vector2.ZERO)
+	var quake: Orb3D = board.spawn_orb(1, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	var light: Orb3D = board.spawn_orb(0, 4, Vector2(100.0, 0.0))
 	var heavy: Orb3D = board.spawn_orb(3, 7, Vector2(-100.0, 0.0))
 	var outside: Orb3D = board.spawn_orb(4, 4, Vector2(400.0, 0.0))
@@ -1900,8 +1951,8 @@ func test_bomb_quake_and_grow_tap_effects_follow_color_rules() -> void:
 
 	board.clear()
 	await tree.process_frame
-	var empty_green: Orb3D = board.spawn_orb(2, 8, Vector2.ZERO)
-	assert_true(not resolver.is_jelly_tap_blast_candidate(empty_green), "empty L8 green rejects tap")
+	var empty_green: Orb3D = board.spawn_orb(2, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
+	assert_true(not resolver.is_jelly_tap_blast_candidate(empty_green), "empty threshold green rejects tap")
 	for index: int in range(2):
 		board.spawn_orb(2, 2, Vector2(-300.0 + float(index) * 120.0, 200.0))
 	assert_true(not resolver.is_jelly_tap_blast_candidate(empty_green), "green rejects two clean targets")
@@ -1910,9 +1961,9 @@ func test_bomb_quake_and_grow_tap_effects_follow_color_rules() -> void:
 	for index: int in range(5):
 		board.spawn_orb(2, 2, Vector2(60.0 + float(index) * 75.0, 200.0))
 	assert_true(resolver.apply_jelly_tap_blast(empty_green), "GROW tap applies")
-	assert_true(not empty_green.consumed, "L8 green source survives")
+	assert_true(not empty_green.consumed, "threshold green source survives")
 	assert_eq(empty_green.level, 9, "cleaned mass grows source to L9")
-	assert_near(empty_green.jelly_mass, 43.0, 0.001, "growth uses cleaned jelly mass")
+	assert_near(empty_green.jelly_mass, 58.0, 0.001, "growth uses cleaned jelly mass")
 	var max_green: Orb3D = board.spawn_orb(2, 10, Vector2(350.0, -200.0))
 	assert_true(resolver.is_jelly_tap_blast_candidate(max_green), "green L10 can tap empty")
 	assert_true(resolver.apply_jelly_tap_blast(max_green), "green L10 tap applies")
@@ -1933,7 +1984,7 @@ func test_default_yellow_magnet_and_green_rest_preserve_ramp_preview() -> void:
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
 	var spawner: Spawner = fixture["spawner"] as Spawner
 	var manager: TurnManager = fixture["manager"] as TurnManager
-	var yellow: Orb3D = board.spawn_orb(3, 8, Vector2.ZERO)
+	var yellow: Orb3D = board.spawn_orb(3, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	var target: Orb3D = board.spawn_orb(0, 4, Vector2(200.0, 0.0))
 	assert_true(resolver.apply_jelly_tap_blast(yellow), "yellow MAGNET tap applies")
 	assert_true(board.tap_magnet_active(), "magnet sequence starts")
@@ -1965,7 +2016,7 @@ func test_default_yellow_magnet_and_green_rest_preserve_ramp_preview() -> void:
 	manager.state = TurnManager.State.WAITING_INPUT
 	manager.turn_index = 29
 	InputRouter.set_locked(false)
-	var rest: Orb3D = board.spawn_orb(2, 8, Vector2.ZERO)
+	var rest: Orb3D = board.spawn_orb(2, Config.data.jelly_tap_blast_min_level, Vector2.ZERO)
 	assert_true(resolver.is_jelly_tap_blast_candidate(rest), "empty green REST is a tap candidate")
 	assert_true(manager.try_tap_blast_orb(rest), "green REST tap starts turn")
 	assert_eq(manager.state, TurnManager.State.SIMULATING, "REST skips SPAWNING")

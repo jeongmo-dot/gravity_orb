@@ -227,21 +227,28 @@ static func face_material_for(
 	level: int,
 	blast_ready: bool = false
 ) -> ShaderMaterial:
-	var uses_blast_face: bool = blast_ready and level < Config.data.orb_max_level
-	var key: String = "%d:%d:%s" % [color_index, level, uses_blast_face]
+	var uses_sparkle_face: bool = blast_ready and level < Config.data.orb_max_level
+	var uses_squeezed_face: bool = level >= Config.data.orb_max_level
+	var key: String = "%d:%d:%s:%s" % [
+		color_index,
+		level,
+		uses_sparkle_face,
+		uses_squeezed_face,
+	]
 	if not _face_materials.has(key):
 		var material: ShaderMaterial = ShaderMaterial.new()
-		material.resource_name = "jelly_face_c%d_l%d_b%s" % [
+		material.resource_name = "jelly_face_c%d_l%d_sp%s_sq%s" % [
 			color_index,
 			level,
-			uses_blast_face,
+			uses_sparkle_face,
+			uses_squeezed_face,
 		]
 		material.render_priority = 12
 		material.shader = _get_face_shader()
 		material.set_shader_parameter("jelly_color", color_for(color_index, level))
 		material.set_shader_parameter("color_id", color_index)
-		material.set_shader_parameter("is_max", level >= Config.data.orb_max_level)
-		material.set_shader_parameter("is_blast_ready", uses_blast_face)
+		material.set_shader_parameter("is_sparkle_face", uses_sparkle_face)
+		material.set_shader_parameter("is_squeezed_face", uses_squeezed_face)
 		material.set_shader_parameter("max_face_color", MAX_FACE_COLOR)
 		material.set_shader_parameter("max_blush_color", MAX_BLUSH_COLOR)
 		material.set_shader_parameter("max_eye_x", MAX_EYE_CENTER_X)
@@ -384,8 +391,8 @@ render_mode unshaded, cull_disabled, depth_prepass_alpha;
 
 uniform vec4 jelly_color : source_color = vec4(1.0);
 uniform int color_id = 0;
-uniform bool is_max = false;
-uniform bool is_blast_ready = false;
+uniform bool is_sparkle_face = false;
+uniform bool is_squeezed_face = false;
 uniform float animation_time = 0.0;
 uniform vec4 max_face_color : source_color = vec4(0.106, 0.086, 0.188, 1.0);
 uniform vec4 max_blush_color : source_color = vec4(1.0, 0.31, 0.50, 1.0);
@@ -449,7 +456,7 @@ void fragment() {
 	float blast_mouth = 0.0;
 	float blush = 0.0;
 	float max_highlight = 0.0;
-	if (is_max) {
+	if (is_sparkle_face) {
 		vec2 left_center = vec2(-max_eye_x, max_eye_y);
 		vec2 right_center = vec2(max_eye_x, max_eye_y);
 		float left_open = ellipse_mask(p, left_center, max_eye_radii, 0.08);
@@ -478,7 +485,7 @@ void fragment() {
 		smile = max(smile, circle_mask(p, vec2(max_mouth_radius * 2.0, max_mouth_y), max_mouth_width * 0.5, 0.008));
 		blush = ellipse_mask(p, vec2(-max_blush_x, max_blush_y), max_blush_radii, 0.12)
 			+ ellipse_mask(p, vec2(max_blush_x, max_blush_y), max_blush_radii, 0.12);
-	} else if (is_blast_ready) {
+	} else if (is_squeezed_face) {
 		float stroke_radius = blast_eye_stroke_width * 0.5;
 		vec2 left_outer_top = vec2(-blast_eye_outer_top.x, blast_eye_outer_top.y);
 		vec2 left_inner = vec2(-blast_eye_inner.x, blast_eye_inner.y);
@@ -506,18 +513,18 @@ void fragment() {
 	}
 	float eyes = clamp(left_eye + right_eye, 0.0, 1.0);
 	float highlight = 0.0;
-	if (!is_max && !is_blast_ready && blink < 0.72) {
+	if (!is_sparkle_face && !is_squeezed_face && blink < 0.72) {
 		highlight = circle_mask(p, vec2(-0.285, highlight_y), 0.034, 0.012)
 			+ circle_mask(p, vec2(0.215, highlight_y), 0.034, 0.012);
 	}
-	float blush_alpha = is_blast_ready ? blast_blush_alpha : max_blush_alpha;
+	float blush_alpha = is_squeezed_face ? blast_blush_alpha : max_blush_alpha;
 	float alpha = clamp(
 		eyes + smile + blast_mouth + blush * blush_alpha + highlight + max_highlight,
 		0.0,
 		1.0
 	);
 	vec3 dark = mix(vec3(0.055, 0.065, 0.11), jelly_color.rgb * 0.20, 0.22);
-	if (is_max || is_blast_ready) {
+	if (is_sparkle_face || is_squeezed_face) {
 		dark = max_face_color.rgb;
 	}
 	vec3 face_color = mix(dark, vec3(1.0), clamp(highlight, 0.0, 1.0));

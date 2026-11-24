@@ -20,6 +20,8 @@ foreach ($friction in @(0.15, 0.3, 0.45, 0.6)) {
         -RepoPath $repoPath `
         -Label "friction_$tag" `
         -Friction $friction `
+		-JellyBlastMinLevel 8 `
+		-JellyTapBlastMinLevel 8 `
         -Parallelism $Parallelism
     if ($LASTEXITCODE -ne 0) {
         throw "JELLY friction autoplay '$friction' failed with exit code $LASTEXITCODE"

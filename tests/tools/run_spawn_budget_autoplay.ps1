@@ -33,6 +33,8 @@ foreach ($variant in $variants) {
         Label = $label
         Parallelism = $Parallelism
         MaxTurns = $TurnCap
+		JellyBlastMinLevel = 8
+		JellyTapBlastMinLevel = 8
         SpawnCountMax = $variant.Max
         SpawnLevelCosts = $variant.Costs
     }

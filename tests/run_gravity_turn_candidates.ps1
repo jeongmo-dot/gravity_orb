@@ -16,6 +16,8 @@ foreach ($diagonalTime in @(0.1, 0.15, 0.25)) {
         -RepoPath $repoPath `
         -Label "gravity_turn_$tag" `
         -GravityTurnDiagonalTime $diagonalTime `
+		-JellyBlastMinLevel 8 `
+		-JellyTapBlastMinLevel 8 `
         -Parallelism $Parallelism
 }
 
