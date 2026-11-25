@@ -42,20 +42,22 @@
 ## 대기 중
 
 ### [2026-11-25 #161] 터치 소폭발 L5부터
-- 상태: **시작** — #160 PR을 올린 뒤 시작 (공유 트리). 사용자 2026-11-25 "L9 와 L10 차이가 적어서 문제인것 같아 소폭발 조건을 대폭 낮춰야 할 것 같아" → Claude 질문 → "L5로 바로" (측정 없이)
+- 상태: **시작** — #160 PR을 올린 뒤 시작 (공유 트리). 사용자 2026-11-25 "L9 와 L10 차이가 적어서 문제인것 같아 소폭발 조건을 대폭 낮춰야 할 것 같아" → Claude 질문 → "L5로 바로" (측정 없이). **같은 날 추가: 요구 2 시한 젤리 터치 막기** (사용자 "시한 젤리 터치는 당연히 막아야하지") — 이미 시작했으면 같은 브랜치에 더한다
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.49** "#161 요구"
-- 앵커: `config/GameConfig.gd`·`config/default_config.tres` `jelly_tap_blast_min_level`, 문턱을 읽는 곳 (터치 판정·색 청소·`TurnManager.gd` 약 365행 안내·봇), `tests/test_config.gd`·`test_rules.gd`·`test_callouts.gd`·`test_jolt_3d.gd`·`test_jelly_regression.gd`
-- 요구 요약 (§12-ONE.49 1~7):
+- 앵커: `config/GameConfig.gd`·`config/default_config.tres` `jelly_tap_blast_min_level`, `scripts/core/CollisionResolver.gd` `is_jelly_tap_blast_candidate()` (요구 2), 문턱을 읽는 곳 (터치 판정·색 청소·`TurnManager.gd` 약 365행 안내·봇), `tests/test_config.gd`·`test_rules.gd`·`test_callouts.gd`·`test_jolt_3d.gd`·`test_jelly_regression.gd`
+- 요구 요약 (§12-ONE.49 1~8):
   1. `jelly_tap_blast_min_level` 9 → **5** (`GameConfig.gd` 선언·`default_config.tres` 둘 다)
-  2. 코드·그림·소리·안내 그대로 — 문턱을 읽는 곳이 따른다. 레벨 숫자를 박아 둔 곳은 고치지 말고 회신에
-  3. 얼굴·깜빡임·NEXT 예고는 대폭발 문턱 9 그대로 (L5~L8 보통 얼굴). 표시는 #162
-  4. 측정 스모크 1판 — 요약 설정 터치 5·대폭발 9·짝 10·공 상한 6·레벨 차 2
-  5. 테스트: 기본값·터치 9 기대 테스트를 새 기본에 (목록 회신), 전체 회귀·스모크
-  6. 캡처 두 비율: 첫 색 효과 안내 (L5 글), L5·L7 터치 소폭발 순간
-  7. 빌드 없음
+  2. **시한 젤리 터치 막기**: `is_jelly_tap_blast_candidate()` 기본 조건에 `not orb.is_timed` — 숫자가 도는 동안 레벨·문턱 상관없이 후보 아님 (누르면 아무 일 없음, 턴 안 씀). 시한 성공 결과는 보통 젤리. 새 필드 없음
+  3. 그 밖의 코드·그림·소리·안내 그대로 — 문턱을 읽는 곳이 따른다. 레벨 숫자를 박아 둔 곳은 고치지 말고 회신에
+  4. 얼굴·깜빡임·NEXT 예고는 대폭발 문턱 9 그대로 (L5~L8 보통 얼굴). 표시는 #162
+  5. 측정 스모크 1판 — 요약 설정 터치 5·대폭발 9·짝 10·공 상한 6·레벨 차 2
+  6. 테스트: 기본값·터치 9 기대 테스트를 새 기본에 (목록 회신), 시한 젤리 터치 (후보 아님·겹친 보통 L5가 터짐·성공 결과는 후보·문턱 1에서도 아님), 전체 회귀·스모크
+  7. 캡처 두 비율: 첫 색 효과 안내 (L5 글), L5·L7 터치 소폭발 순간
+  8. 빌드 없음
 - 건드리지 말 것: 다른 값·규칙, 얼굴·그림·소리·안내 글, 고리 금지, 사용자 저장 파일, `project.godot` 버전·`build/windows/`, `docs/` (회신 파일 제외)
 - Done-when:
   - [ ] 기본값 5 (두 곳), 규칙 예시: 기본 설정에서 L5 터치 됨·L4 안 됨, L5~L8 대폭발 없음
+  - [ ] 숫자가 남은 시한 젤리는 터치 후보 아님 (테스트), 문턱 9 회귀 해시 그대로
   - [ ] 고친 테스트 목록, 전체 회귀·스모크
   - [ ] 측정 스모크 설정 일치
   - [ ] 캡처 두 비율 3장씩
