@@ -45,15 +45,7 @@ function Get-PngDimensions {
     return [pscustomobject]@{ Width = $width; Height = $height }
 }
 
-function Get-ResolutionDimensions {
-    param([Parameter(Mandatory = $true)][string]$Resolution)
-
-    if ($Resolution -notmatch '^(\d+)x(\d+)$') {
-        throw "Invalid capture resolution: $Resolution"
-    }
-    return [pscustomobject]@{ Width = [int]$Matches[1]; Height = [int]$Matches[2] }
-}
-$expectedFiles = @(
+$fullFrameFiles = @(
     "01_jelly_start.png",
     "02_jelly_ranking.png",
     "03_jelly_result.png",
@@ -73,12 +65,6 @@ $expectedFiles = @(
     "17_jelly_max_effect.png",
     "18_jelly_landing_strip.png",
     "19_jelly_crowded_rest.png",
-    "20_jelly_yellow_cheek_zoom.png",
-    "21_jelly_green_cheek_zoom.png",
-    "22_jelly_blue_cheek_zoom.png",
-    "23_jelly_belly_half_zoom.png",
-    "24_jelly_belly_three_quarter_zoom.png",
-    "25_jelly_max_effect_zoom.png",
     "26_settings.png",
     "27_start_no_record.png",
     "28_gravity_switch.png",
@@ -259,44 +245,39 @@ $expectedFiles = @(
     "207_jelly_timed_stone_1.png",
     "208_jelly_timed_stone_broken_settled.png",
     "209_jelly_timed_stone_first_callout.png",
-    "210_jelly_timed_stone_10.png"
-)
-$expectedZoomFiles = @(
-    "zoom\199_jelly_timed_4_5x.png",
-    "zoom\200_jelly_timed_1_5x.png",
-    "zoom\205_jelly_timed_stone_18_5x.png",
-    "zoom\207_jelly_timed_stone_1_5x.png",
-    "zoom\210_jelly_timed_stone_10_5x.png"
+    "210_jelly_timed_stone_10.png",
+    "211_jelly_timed_stone_broken_l4.png",
+    "212_jelly_timed_scatter_five.png"
 )
 
-if ($TimedOnly) {
-    $captureSpecs = @(
-        [ordered]@{ Name = "540x960"; Resolution = "540x960" }
-    )
-    $expectedFiles = @(
-        "199_jelly_timed_board_initial.png",
-        "205_jelly_timed_stone_after_harden.png",
-        "209_jelly_timed_stone_first_callout.png",
-        "211_jelly_timed_stone_broken_l4.png",
-        "212_jelly_timed_scatter_five.png"
-    )
-    $expectedZoomFiles = @()
-}
+$zoomFiles = @(
+    # capture_screens.gd: _capture_zoom() resizes the crop to 480x480.
+    @{ Path = "20_jelly_yellow_cheek_zoom.png"; Size = "480x480" },
+    @{ Path = "21_jelly_green_cheek_zoom.png"; Size = "480x480" },
+    @{ Path = "22_jelly_blue_cheek_zoom.png"; Size = "480x480" },
+    @{ Path = "23_jelly_belly_half_zoom.png"; Size = "480x480" },
+    @{ Path = "24_jelly_belly_three_quarter_zoom.png"; Size = "480x480" },
+    @{ Path = "25_jelly_max_effect_zoom.png"; Size = "480x480" },
+    # _capture_timed_number_zoom() crops 48x48 (half_size = 24) and scales by 5.
+    @{ Path = "zoom\199_jelly_timed_4_5x.png"; Size = "240x240" },
+    @{ Path = "zoom\200_jelly_timed_1_5x.png"; Size = "240x240" },
+    @{ Path = "zoom\205_jelly_timed_stone_18_5x.png"; Size = "240x240" },
+    @{ Path = "zoom\207_jelly_timed_stone_1_5x.png"; Size = "240x240" },
+    @{ Path = "zoom\210_jelly_timed_stone_10_5x.png"; Size = "240x240" }
+)
 
-if ($UiBOnly) {
-    $expectedFiles = @(
-        "213_ui_b_gameplay_combo_popup.png",
-        "214_ui_b_result_record.png",
-        "215_ui_b_final_move.png",
-        "216_ui_b_danger.png",
-        "217_ui_b_timed_callout.png",
-        "218_ui_b_gold_popup.png"
+# Match the capture scene's mode precedence.
+$modeArgument = $null
+if ($Gap2DefaultsOnly) {
+    $modeArgument = "--capture-gap2-defaults"
+    $fullFrameFiles = @("228_jelly_gap2_l8_l9_l10.png")
+    $zoomFiles = @(
+        # _capture_zoom() resizes the crop to 480x480.
+        @{ Path = "229_jelly_gap2_l8_l9_l10_zoom.png"; Size = "480x480" }
     )
-    $expectedZoomFiles = @()
-}
-
-if ($UiBBoardOnly) {
-    $expectedFiles = @(
+} elseif ($UiBBoardOnly) {
+    $modeArgument = "--capture-ui-b-board"
+    $fullFrameFiles = @(
         "219_ui_b_board_first.png",
         "220_ui_b_board_full.png",
         "221_ui_b_board_gravity_light.png",
@@ -307,17 +288,33 @@ if ($UiBBoardOnly) {
         "226_ui_b_board_danger_amber.png",
         "227_ui_b_board_danger_red.png"
     )
-    $expectedZoomFiles = @()
+    # _capture_ui_b_board_scenes() writes only full frames.
+    $zoomFiles = @()
+} elseif ($UiBOnly) {
+    $modeArgument = "--capture-ui-b"
+    $fullFrameFiles = @(
+        "213_ui_b_gameplay_combo_popup.png",
+        "214_ui_b_result_record.png",
+        "215_ui_b_final_move.png",
+        "216_ui_b_danger.png",
+        "217_ui_b_timed_callout.png",
+        "218_ui_b_gold_popup.png"
+    )
+    $zoomFiles = @()
+} elseif ($TimedOnly) {
+    $modeArgument = "--capture-timed-only"
+    $fullFrameFiles = @(
+        "199_jelly_timed_board_initial.png",
+        "205_jelly_timed_stone_after_harden.png",
+        "209_jelly_timed_stone_first_callout.png",
+        "211_jelly_timed_stone_broken_l4.png",
+        "212_jelly_timed_scatter_five.png"
+    )
+    # This mode calls only _capture_timed_fail_mode_scenes(), which writes no zooms.
+    $zoomFiles = @()
 }
 
-if ($Gap2DefaultsOnly) {
-    $expectedFiles = @(
-        "228_jelly_gap2_l8_l9_l10.png"
-    )
-    $expectedZoomFiles = @(
-        "229_jelly_gap2_l8_l9_l10_zoom.png"
-    )
-}
+$expectedFiles = @($fullFrameFiles | ForEach-Object { @{ Path = $_; Size = $null } }) + $zoomFiles
 
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {
     if (-not [string]::IsNullOrWhiteSpace($env:GODOT)) {
@@ -333,9 +330,8 @@ $capturedFileCount = 0
 foreach ($captureSpec in $captureSpecs) {
     $outputPath = Join-Path $outputRoot $captureSpec.Name
     New-Item -ItemType Directory -Path $outputPath -Force | Out-Null
-    $resolutionSize = Get-ResolutionDimensions -Resolution $captureSpec.Resolution
-    foreach ($relativePath in @($expectedFiles) + @($expectedZoomFiles)) {
-        $stalePath = Join-Path $outputPath $relativePath
+    foreach ($fileSpec in $expectedFiles) {
+        $stalePath = Join-Path $outputPath $fileSpec.Path
         if (Test-Path -LiteralPath $stalePath) {
             Remove-Item -LiteralPath $stalePath -Force
         }
@@ -355,74 +351,33 @@ foreach ($captureSpec in $captureSpecs) {
         "--capture-window-size=$($captureSpec.Resolution)",
         "--capture-expected-size=$($captureSpec.Resolution)"
     )
-    if ($TimedOnly) {
-        $arguments += "--capture-timed-only"
-    }
-    if ($UiBOnly) {
-        $arguments += "--capture-ui-b"
-    }
-    if ($UiBBoardOnly) {
-        $arguments += "--capture-ui-b-board"
-    }
-    if ($Gap2DefaultsOnly) {
-        $arguments += "--capture-gap2-defaults"
+    if ($modeArgument) {
+        $arguments += $modeArgument
     }
     & $GodotPath @arguments
     if ($LASTEXITCODE -ne 0) {
         throw "Screenshot capture $($captureSpec.Name) failed with exit code $LASTEXITCODE"
     }
-    foreach ($fileName in $expectedFiles) {
-        $filePath = Join-Path $outputPath $fileName
+    foreach ($fileSpec in $expectedFiles) {
+        $filePath = Join-Path $outputPath $fileSpec.Path
         if (-not (Test-Path -LiteralPath $filePath)) {
             throw "Screenshot capture did not create $filePath"
         }
-        $actualSize = Get-PngDimensions -LiteralPath $filePath
-        if (
-            $actualSize.Width -ne $resolutionSize.Width -or
-            $actualSize.Height -ne $resolutionSize.Height
-        ) {
-            throw (
-                "Capture size mismatch file={0} expected={1}x{2} actual={3}x{4}" -f `
-                    $filePath,
-                    $resolutionSize.Width,
-                    $resolutionSize.Height,
-                    $actualSize.Width,
-                    $actualSize.Height
-            )
-        }
-        Write-Output (
-            "SCREEN_CAPTURE_RESULT ratio={0} size={1}x{2} file={3}" -f `
-                $captureSpec.Name,
-                $actualSize.Width,
-                $actualSize.Height,
-                $filePath
-        )
-        $capturedFileCount += 1
-    }
-    foreach ($fileName in $expectedZoomFiles) {
-        $filePath = Join-Path $outputPath $fileName
-        if (-not (Test-Path -LiteralPath $filePath)) {
-            throw "Screenshot capture did not create $filePath"
+        $expectedSize = $captureSpec.Resolution
+        $resultType = "SCREEN_CAPTURE_RESULT"
+        if ($fileSpec.Size) {
+            $expectedSize = $fileSpec.Size
+            $resultType = "SCREEN_CAPTURE_ZOOM_RESULT"
         }
         $actualSize = Get-PngDimensions -LiteralPath $filePath
-        if ($actualSize.Width -ne 480 -or $actualSize.Height -ne 480) {
-            throw (
-                "Capture zoom size mismatch file={0} expected=480x480 actual={1}x{2}" -f `
-                    $filePath,
-                    $actualSize.Width,
-                    $actualSize.Height
-            )
+        $actualResolution = "{0}x{1}" -f $actualSize.Width, $actualSize.Height
+        if ($actualResolution -ne $expectedSize) {
+            throw "Capture size mismatch file=$filePath expected=$expectedSize actual=$actualResolution"
         }
-        Write-Output (
-            "SCREEN_CAPTURE_ZOOM_RESULT ratio={0} size={1}x{2} file={3}" -f `
-                $captureSpec.Name,
-                $actualSize.Width,
-                $actualSize.Height,
-                $filePath
-        )
+        Write-Output "$resultType ratio=$($captureSpec.Name) size=$actualResolution file=$filePath"
         $capturedFileCount += 1
     }
-    if (-not $TimedOnly -and -not $UiBOnly -and -not $UiBBoardOnly -and -not $Gap2DefaultsOnly) {
+    if (-not $modeArgument) {
         $landingFiles = @(1..10 | ForEach-Object {
             Join-Path $outputPath ("{0:D2}_jelly_motion_land_{1:D2}.png" -f (43 + $_), $_)
         })
