@@ -553,8 +553,11 @@ func test_jelly_default_blast_and_tap_thresholds() -> void:
 	assert_true(cfg.jelly_blast_enabled_for_pair(10, 9), "pair top minimum is order independent")
 	assert_true(cfg.jelly_blast_enabled_for_pair(10, 10), "L10+L10 satisfies pair top minimum")
 	assert_true(not cfg.jelly_blast_enabled_for_pair(8, 10), "both levels must pass blast minimum")
-	assert_true(cfg.jelly_tap_blast_enabled_for_level(9), "default L9 tap blasts")
-	assert_true(not cfg.jelly_tap_blast_enabled_for_level(8), "default L8 tap does nothing")
+	for level: int in range(5, 11):
+		assert_true(cfg.jelly_tap_blast_enabled_for_level(level), "default L%d tap blasts" % level)
+		if level < 9:
+			assert_true(not cfg.jelly_blast_enabled_for_pair(level, 10), "L%d cannot pair blast" % level)
+	assert_true(not cfg.jelly_tap_blast_enabled_for_level(4), "default L4 tap does nothing")
 	cfg.jelly_blast_pair_top_min_level = 0
 	assert_true(cfg.jelly_blast_enabled_for_pair(9, 9), "zero disables pair top condition")
 	cfg.jelly_blast_pair_top_min_level = 10

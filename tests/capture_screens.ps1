@@ -6,7 +6,8 @@ param(
     [switch]$TimedOnly,
     [switch]$UiBOnly,
     [switch]$UiBBoardOnly,
-    [switch]$Gap2DefaultsOnly
+    [switch]$Gap2DefaultsOnly,
+    [switch]$JellyTapSplitOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -268,7 +269,17 @@ $zoomFiles = @(
 
 # Match the capture scene's mode precedence.
 $modeArgument = $null
-if ($Gap2DefaultsOnly) {
+if ($JellyTapSplitOnly) {
+    $modeArgument = "--capture-jelly-tap-split"
+    $fullFrameFiles = @(
+        "230_jelly_tap_l5_unlock.png",
+        "231_jelly_tap_l5_blast.png",
+        "232_jelly_tap_l5_fragments.png",
+        "233_jelly_tap_l7_blast.png",
+        "234_jelly_tap_l10_fragments.png"
+    )
+    $zoomFiles = @()
+} elseif ($Gap2DefaultsOnly) {
     $modeArgument = "--capture-gap2-defaults"
     $fullFrameFiles = @("228_jelly_gap2_l8_l9_l10.png")
     $zoomFiles = @(

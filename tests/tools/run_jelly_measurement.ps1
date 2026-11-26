@@ -35,6 +35,10 @@ param(
 	[int]$JellyBlastPairTopMinLevel = -1,
 	[ValidateRange(-1, 10)]
 	[int]$JellyTapBlastMinLevel = -1,
+	[ValidateRange(-1, 10)]
+	[int]$JellyTapSplitLevel = -1,
+	[ValidateRange(-1, [int]::MaxValue)]
+	[int]$JellyTapSplitCount = -1,
 	[ValidateRange(0.0, 100.0)]
 	[double]$BlastScoreFactor = 15.0,
 	[ValidateRange(0.0, 100.0)]
@@ -152,6 +156,8 @@ if (-not $AggregateOnly) {
 					$(if ($JellyBlastMinLevel -ge 0) { "--jelly-blast-min-level=$JellyBlastMinLevel" } else { "" }),
 					$(if ($JellyBlastPairTopMinLevel -ge 0) { "--jelly-blast-pair-top-min-level=$JellyBlastPairTopMinLevel" } else { "" }),
 					$(if ($JellyTapBlastMinLevel -ge 0) { "--jelly-tap-blast-min-level=$JellyTapBlastMinLevel" } else { "" }),
+					$(if ($JellyTapSplitLevel -ge 0) { "--jelly-tap-split-level=$JellyTapSplitLevel" } else { "" }),
+					$(if ($JellyTapSplitCount -ge 0) { "--jelly-tap-split-count=$JellyTapSplitCount" } else { "" }),
 					"--blast-score-factor=$($BlastScoreFactor.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--jelly-tap-blast-score-factor=$($JellyTapBlastScoreFactor.ToString([Globalization.CultureInfo]::InvariantCulture))",
 					"--jelly-tap-blast-uses-turn=$($JellyTapBlastUsesTurn.ToLower())",
@@ -553,6 +559,8 @@ $effectiveJellyTimedMergeLevelGap = $null
 $effectiveJellyBlastMinLevel = $null
 $effectiveJellyBlastPairTopMinLevel = $null
 $effectiveJellyTapBlastMinLevel = $null
+$effectiveJellyTapSplitLevel = $null
+$effectiveJellyTapSplitCount = $null
 $effectiveSpawnCountMax = $null
 foreach ($strategy in @($rows.Keys)) {
     $shardSize = 1
@@ -576,6 +584,14 @@ foreach ($strategy in @($rows.Keys)) {
 		$reportedJellyBlastMinLevel = [int]$rawReport.jelly_blast_min_level
 		$reportedJellyBlastPairTopMinLevel = [int]$rawReport.jelly_blast_pair_top_min_level
 		$reportedJellyTapBlastMinLevel = [int]$rawReport.jelly_tap_blast_min_level
+		foreach ($propertyName in @('jelly_tap_split_level', 'jelly_tap_split_count')) {
+			if (-not $AggregateOnly -and $null -eq $rawReport.PSObject.Properties[$propertyName]) {
+				throw "$filePath is missing $propertyName"
+			}
+		}
+		# Archived reports predate splitting; missing fields in those reports mean disabled.
+		$reportedJellyTapSplitLevel = [int]$rawReport.jelly_tap_split_level
+		$reportedJellyTapSplitCount = [int]$rawReport.jelly_tap_split_count
 		$reportedSpawnCountMax = [int]$rawReport.spawn_count_max
 		if ($null -eq $effectiveJellyMergeLevelGap) {
 			$effectiveJellyMergeLevelGap = $reportedMergeLevelGap
@@ -583,6 +599,8 @@ foreach ($strategy in @($rows.Keys)) {
 			$effectiveJellyBlastMinLevel = $reportedJellyBlastMinLevel
 			$effectiveJellyBlastPairTopMinLevel = $reportedJellyBlastPairTopMinLevel
 			$effectiveJellyTapBlastMinLevel = $reportedJellyTapBlastMinLevel
+			$effectiveJellyTapSplitLevel = $reportedJellyTapSplitLevel
+			$effectiveJellyTapSplitCount = $reportedJellyTapSplitCount
 			$effectiveSpawnCountMax = $reportedSpawnCountMax
 		} elseif (
 			$effectiveJellyMergeLevelGap -ne $reportedMergeLevelGap -or
@@ -590,6 +608,8 @@ foreach ($strategy in @($rows.Keys)) {
 			$effectiveJellyBlastMinLevel -ne $reportedJellyBlastMinLevel -or
 			$effectiveJellyBlastPairTopMinLevel -ne $reportedJellyBlastPairTopMinLevel -or
 			$effectiveJellyTapBlastMinLevel -ne $reportedJellyTapBlastMinLevel -or
+			$effectiveJellyTapSplitLevel -ne $reportedJellyTapSplitLevel -or
+			$effectiveJellyTapSplitCount -ne $reportedJellyTapSplitCount -or
 			$effectiveSpawnCountMax -ne $reportedSpawnCountMax
 		) {
 			throw "Inconsistent merge level gaps in $filePath"
@@ -654,6 +674,8 @@ $report = [ordered]@{
 	jelly_blast_min_level = $effectiveJellyBlastMinLevel
 	jelly_blast_pair_top_min_level = $effectiveJellyBlastPairTopMinLevel
 	jelly_tap_blast_min_level = $effectiveJellyTapBlastMinLevel
+	jelly_tap_split_level = $effectiveJellyTapSplitLevel
+	jelly_tap_split_count = $effectiveJellyTapSplitCount
 	jelly_blast_requires_same_level = $JellyBlastRequiresSameLevel -eq "On"
 	jelly_tap_common_push = $JellyTapCommonPush -eq "On"
 	jelly_tap_lift_speed = $JellyTapLiftSpeed

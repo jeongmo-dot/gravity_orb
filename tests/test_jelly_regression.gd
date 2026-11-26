@@ -487,6 +487,7 @@ func _snapshot_level_profile() -> Dictionary:
 		"jelly_blast_pair_top_min_level": Config.data.jelly_blast_pair_top_min_level,
 		"jelly_blast_requires_same_level": Config.data.jelly_blast_requires_same_level,
 		"jelly_tap_blast_min_level": Config.data.jelly_tap_blast_min_level,
+		"jelly_tap_split_level": Config.data.jelly_tap_split_level,
 		"blast_score_factor": Config.data.blast_score_factor,
 		"jelly_tap_blast_score_factor": Config.data.jelly_tap_blast_score_factor,
 		"jelly_tap_blast_uses_turn": Config.data.jelly_tap_blast_uses_turn,
@@ -527,6 +528,7 @@ func _restore_level_profile(snapshot: Dictionary) -> void:
 	Config.data.jelly_blast_pair_top_min_level = int(snapshot["jelly_blast_pair_top_min_level"])
 	Config.data.jelly_blast_requires_same_level = bool(snapshot["jelly_blast_requires_same_level"])
 	Config.data.jelly_tap_blast_min_level = int(snapshot["jelly_tap_blast_min_level"])
+	Config.data.jelly_tap_split_level = int(snapshot["jelly_tap_split_level"])
 	Config.data.blast_score_factor = float(snapshot["blast_score_factor"])
 	Config.data.jelly_tap_blast_score_factor = float(snapshot["jelly_tap_blast_score_factor"])
 	Config.data.jelly_tap_blast_uses_turn = bool(snapshot["jelly_tap_blast_uses_turn"])
@@ -654,6 +656,7 @@ func _apply_legacy_blast_push_profile() -> void:
 
 
 func _apply_legacy_color_profile() -> void:
+	Config.data.jelly_tap_split_level = 0
 	Config.data.turn_color_unlock_turns.assign([30, 60])
 	Config.data.jelly_tap_effect_modes = PackedInt32Array([2, 3, 4, 5, 6, 7])
 	Config.data.jelly_blast_min_level = 10
@@ -665,6 +668,7 @@ func _apply_legacy_color_profile() -> void:
 
 
 func _apply_pre_gap2_defaults() -> void:
+	Config.data.jelly_tap_split_level = 0
 	Config.data.jelly_blast_min_level = 10
 	Config.data.jelly_blast_pair_top_min_level = 0
 	Config.data.jelly_tap_blast_min_level = 8
