@@ -5,6 +5,8 @@ const DEFAULT_OUTPUT_DIRECTORY: String = "res://artifacts/screens"
 const DEFAULT_USER_SAVE: String = "user://save.cfg"
 const OUTPUT_PREFIX: String = "--capture-output-directory="
 const SAVE_PREFIX: String = "--capture-save-path="
+const WINDOW_SIZE_PREFIX: String = "--capture-window-size="
+const EXPECTED_SIZE_PREFIX: String = "--capture-expected-size="
 const TIMED_ONLY_ARGUMENT: String = "--capture-timed-only"
 const UI_B_ONLY_ARGUMENT: String = "--capture-ui-b"
 const UI_B_BOARD_ONLY_ARGUMENT: String = "--capture-ui-b-board"
@@ -236,6 +238,8 @@ var _timed_only: bool = false
 var _ui_b_only: bool = false
 var _ui_b_board_only: bool = false
 var _gap2_defaults_only: bool = false
+var _requested_window_size: Vector2i = Vector2i.ZERO
+var _expected_capture_size: Vector2i = Vector2i.ZERO
 
 
 func _ready() -> void:
@@ -244,6 +248,10 @@ func _ready() -> void:
 
 func _run() -> void:
 	_parse_arguments()
+	if _failed:
+		get_tree().quit(1)
+		return
+	await _configure_capture_window()
 	if _temp_save_path == DEFAULT_USER_SAVE:
 		_fail("Capture save path must not be the user save path")
 		get_tree().quit(1)
@@ -801,14 +809,7 @@ func _capture_timed_jelly_scenes(
 	first.disable_physics()
 	second.disable_physics()
 	await _capture("202_jelly_timed_success_before.png")
-	var original_duration: float = Config.data.jelly_merge_duration
-	Config.data.jelly_merge_duration = 0.0
-	resolver.report_contact(first, second, "capture_timed_success")
-	if resolver.flush() != 1:
-		_fail("timed success capture did not resolve exactly once")
-	Config.data.jelly_merge_duration = original_duration
-	await get_tree().process_frame
-	var success_orbs: Array[Orb3D] = board.get_orbs()
+	# The merge consumes its inputs, so classify while both orbs still exist.
 	var classified: Dictionary = ReactionRules.classify(
 		OrbTypes.OrbColor.RED,
 		timed_level,
@@ -823,6 +824,14 @@ func _capture_timed_jelly_scenes(
 		int(classified["result_level"]) + Config.data.jelly_timed_bonus_levels,
 		Config.data.orb_max_level
 	)
+	var original_duration: float = Config.data.jelly_merge_duration
+	Config.data.jelly_merge_duration = 0.0
+	resolver.report_contact(first, second, "capture_timed_success")
+	if resolver.flush() != 1:
+		_fail("timed success capture did not resolve exactly once")
+	Config.data.jelly_merge_duration = original_duration
+	await get_tree().process_frame
+	var success_orbs: Array[Orb3D] = board.get_orbs()
 	if (
 		success_orbs.size() != 1
 		or success_orbs[0].level != expected_result_level
@@ -1665,10 +1674,19 @@ func _capture_blast_push_case(
 				)
 			board.spawn_orb(color, 3, position)
 	if kind == "big":
-		var first: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, 8, Vector2(-4.0, 0.0))
-		var second: Orb3D = board.spawn_orb(OrbTypes.OrbColor.BLUE, 8, Vector2(4.0, 0.0))
+		# K0/K4 compare impulse profiles using the original L8/L8 blast pair.
+		const FIXTURE_LEVEL: int = 8
+		var original_minimum: int = Config.data.jelly_blast_min_level
+		var original_pair_top_minimum: int = Config.data.jelly_blast_pair_top_min_level
+		Config.data.jelly_blast_min_level = FIXTURE_LEVEL
+		Config.data.jelly_blast_pair_top_min_level = 0
+		var first: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, FIXTURE_LEVEL, Vector2(-4.0, 0.0))
+		var second: Orb3D = board.spawn_orb(OrbTypes.OrbColor.BLUE, FIXTURE_LEVEL, Vector2(4.0, 0.0))
 		resolver.report_contact(first, second, "capture_blast_push_big")
-		if resolver.flush() != 1:
+		var reaction_count: int = resolver.flush()
+		Config.data.jelly_blast_pair_top_min_level = original_pair_top_minimum
+		Config.data.jelly_blast_min_level = original_minimum
+		if reaction_count != 1:
 			_fail("%s big blast evidence did not trigger" % profile_tag)
 	else:
 		var source_position: Vector2 = (
@@ -1958,28 +1976,23 @@ func _capture_overlay_detail_scenes(main: Main, board: Board3D) -> void:
 	director.clear_effects()
 	board.clear()
 	board.set_gravity(Vector2i.DOWN)
-	# The blast-face art is intentionally unreachable with the J7 default because
-	# L7 keeps the MAX face. Preserve its isolated visual regression fixture by
-	# lowering only this fixture's threshold, then restore the product default.
+	# Give the three L5 fixtures the sparkle face that blast-ready non-MAX orbs use.
 	var default_blast_min_level: int = Config.data.jelly_blast_min_level
 	Config.data.jelly_blast_min_level = 5
 	var cheek_specs: Array[Dictionary] = [
 		{
 			"color": OrbTypes.OrbColor.YELLOW,
 			"position": Vector2(-220.0, 0.0),
-			"expected": Color8(247, 133, 126),
 			"file": "20_jelly_yellow_cheek_zoom.png",
 		},
 		{
 			"color": OrbTypes.OrbColor.GREEN,
 			"position": Vector2.ZERO,
-			"expected": Color8(192, 131, 142),
 			"file": "21_jelly_green_cheek_zoom.png",
 		},
 		{
 			"color": OrbTypes.OrbColor.BLUE,
 			"position": Vector2(220.0, 0.0),
-			"expected": Color8(200, 112, 170),
 			"file": "22_jelly_blue_cheek_zoom.png",
 		},
 	]
@@ -1991,22 +2004,33 @@ func _capture_overlay_detail_scenes(main: Main, board: Board3D) -> void:
 			spec["position"] as Vector2
 		)
 		orb.disable_physics()
+		orb._face.visible = false
 		cheek_orbs.append(orb)
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var body_image: Image = get_viewport().get_texture().get_image()
+	var cheek_points: Array[Vector2] = []
+	for orb: Orb3D in cheek_orbs:
+		cheek_points.append(camera.unproject_position(
+			orb._face.global_transform * Vector3(
+				JellyOrbArt.MAX_BLUSH_CENTER_X,
+				-JellyOrbArt.MAX_BLUSH_CENTER_Y,
+				0.0
+			)
+		))
+		orb._face.visible = true
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 	var cheek_image: Image = get_viewport().get_texture().get_image()
 	for index: int in range(cheek_orbs.size()):
 		var orb: Orb3D = cheek_orbs[index]
 		var spec: Dictionary = cheek_specs[index]
-		var cheek_point: Vector2 = camera.unproject_position(
-			orb._face.global_transform * Vector3(
-				JellyOrbArt.BLAST_BLUSH_CENTER.x,
-				-JellyOrbArt.BLAST_BLUSH_CENTER.y,
-				0.0
-			)
+		var cheek_point: Vector2 = cheek_points[index]
+		var body_pixel: Color = _pixel_at(body_image, cheek_point)
+		var expected: Color = body_pixel.lerp(
+			JellyOrbArt.MAX_BLUSH_COLOR, JellyOrbArt.MAX_BLUSH_ALPHA
 		)
 		var actual: Color = _pixel_at(cheek_image, cheek_point)
-		var expected: Color = spec["expected"] as Color
 		print(
 			"JELLY_OVERLAY_PIXEL kind=cheek color=%d actual=%s expected=%s tolerance=12" % [
 				int(spec["color"]),
@@ -3214,6 +3238,8 @@ func _capture(file_name: String) -> void:
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 	var image: Image = get_viewport().get_texture().get_image()
+	if not _capture_source_size_matches(file_name, image):
+		return
 	var path: String = _output_directory.path_join(file_name)
 	var error: Error = image.save_png(path)
 	if error != OK:
@@ -3272,6 +3298,8 @@ func _capture_zoom(file_name: String, center: Vector2, half_size: int) -> void:
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 	var image: Image = get_viewport().get_texture().get_image()
+	if not _capture_source_size_matches(file_name, image):
+		return
 	center = _image_point(image, center)
 	var size: int = half_size * 2
 	var x: int = clampi(roundi(center.x) - half_size, 0, image.get_width() - size)
@@ -3294,6 +3322,8 @@ func _capture_timed_number_zoom(
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 	var image: Image = get_viewport().get_texture().get_image()
+	if not _capture_source_size_matches(file_name, image):
+		return
 	var label: Label3D = orb.get_node("TimedLabel") as Label3D
 	var center: Vector2 = _image_point(image, camera.unproject_position(label.global_position))
 	var half_size: int = 24
@@ -3395,6 +3425,16 @@ func _parse_arguments() -> void:
 			_output_directory = argument.trim_prefix(OUTPUT_PREFIX)
 		elif argument.begins_with(SAVE_PREFIX):
 			_temp_save_path = argument.trim_prefix(SAVE_PREFIX)
+		elif argument.begins_with(WINDOW_SIZE_PREFIX):
+			_requested_window_size = _parse_capture_size(
+				argument.trim_prefix(WINDOW_SIZE_PREFIX),
+				"window"
+			)
+		elif argument.begins_with(EXPECTED_SIZE_PREFIX):
+			_expected_capture_size = _parse_capture_size(
+				argument.trim_prefix(EXPECTED_SIZE_PREFIX),
+				"expected"
+			)
 		elif argument == TIMED_ONLY_ARGUMENT:
 			_timed_only = true
 		elif argument == UI_B_ONLY_ARGUMENT:
@@ -3403,6 +3443,77 @@ func _parse_arguments() -> void:
 			_ui_b_board_only = true
 		elif argument == GAP2_DEFAULTS_ONLY_ARGUMENT:
 			_gap2_defaults_only = true
+
+
+func _parse_capture_size(value: String, label: String) -> Vector2i:
+	var parts: PackedStringArray = value.to_lower().split("x", false, 1)
+	if (
+		parts.size() != 2
+		or not parts[0].is_valid_int()
+		or not parts[1].is_valid_int()
+	):
+		_fail("Invalid capture %s size: %s" % [label, value])
+		return Vector2i.ZERO
+	var parsed_size: Vector2i = Vector2i(parts[0].to_int(), parts[1].to_int())
+	if parsed_size.x <= 0 or parsed_size.y <= 0:
+		_fail("Capture %s size must be positive: %s" % [label, value])
+		return Vector2i.ZERO
+	return parsed_size
+
+
+func _configure_capture_window() -> void:
+	if (
+		_requested_window_size == Vector2i.ZERO
+		and _expected_capture_size == Vector2i.ZERO
+	):
+		return
+	var usable_rect: Rect2i = DisplayServer.screen_get_usable_rect()
+	if _requested_window_size != Vector2i.ZERO:
+		DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, true)
+		DisplayServer.window_set_position(usable_rect.position)
+		DisplayServer.window_set_size(_requested_window_size)
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	if _expected_capture_size == Vector2i.ZERO:
+		return
+	print(
+		(
+			"CAPTURE_DISPLAY_INFO requested=%s expected=%dx%d usable=%s "
+			+ "scale=%.3f window=%s viewport=%s"
+		) % [
+			_requested_window_size,
+			_expected_capture_size.x,
+			_expected_capture_size.y,
+			usable_rect,
+			DisplayServer.screen_get_scale(),
+			DisplayServer.window_get_size(),
+			Vector2i(get_viewport().get_visible_rect().size),
+		]
+	)
+
+
+func _capture_source_size_matches(file_name: String, image: Image) -> bool:
+	if _expected_capture_size == Vector2i.ZERO:
+		return true
+	var actual_size: Vector2i = Vector2i(image.get_width(), image.get_height())
+	if actual_size == _expected_capture_size:
+		return true
+	var message: String = (
+		"CAPTURE_SIZE_MISMATCH file=%s expected=%dx%d actual=%dx%d "
+		+ "usable=%s scale=%.3f window=%s"
+	) % [
+		file_name,
+		_expected_capture_size.x,
+		_expected_capture_size.y,
+		actual_size.x,
+		actual_size.y,
+		DisplayServer.screen_get_usable_rect(),
+		DisplayServer.screen_get_scale(),
+		DisplayServer.window_get_size(),
+	]
+	print(message)
+	_fail(message)
+	return false
 
 
 func _snapshot_user_save() -> void:
