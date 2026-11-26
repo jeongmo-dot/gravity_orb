@@ -41,6 +41,26 @@
 
 ## 대기 중
 
+### [2026-11-26 #162] 터치할 수 있는 젤리 표시 — B 반짝 별
+- 상태: **대기** — #161 병합 뒤 시작 (공유 트리. #161의 터치 후보 판정을 쓴다). 사용자 2026-11-25 "표시 넣기" → Claude 시안 A~D → 2026-11-26 **"B로 하자"**
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.49** "#162 터치할 수 있는 젤리 표시 — B 반짝 별" (수치 표)
+- 앵커: `scripts/spike/Orb3D.gd` (`_update_visual_transform()` 얼굴 판·`face_radius_ratio`, `_apply_visual_transparency()`), `scripts/core/JellyOrbArt.gd` (얼굴 재질·`face_mesh()`·`_apply_animation_time()`·배 셰이더 `instance uniform`), `scripts/core/TurnManager.gd` (`state`·`_set_state()`·`on_tap()`), `scripts/core/CollisionResolver.gd` `is_jelly_tap_blast_candidate()`, `tests/test_jelly_visuals.gd`·`test_jolt_3d.gd`, `tests/spike/capture_screens.gd`·`tests/capture_screens.ps1`
+- 요구 요약 (§12-ONE.49 "#162 요구" 1~6):
+  1. **보이는 조건** = `WAITING_INPUT`이고 `is_jelly_tap_blast_candidate()` 참 — 레벨로 켜지 않는다. `WAITING_INPUT` 동안 물리 프레임마다 다시 판정, 다른 상태면 모두 끔, 켜고 끌 때 0.15초
+  2. **모양·수치** (표): 끝 네 개 흰 별, s = 0.24 R, 중심 얼굴 기준 (0.66 R, −0.68 R), 테두리 `#E2789A` s × 0.125, 1.6초 깜빡임 (배율 0.7~1.15·불투명도 0.55~1), 시차 색 번호 × 1.6/6초. 얼굴 셰이더 밖 따로 판 (L5~L8 얼굴 판은 0.62 R라 별 자리가 밖), 얼굴 회전을 따름, 재질 하나 + `instance uniform`, `JellyOrbArt` 상수, 새 설정 필드 없음
+  3. 터치 판정 반지름·소리·안내·규칙 그대로
+  4. 테스트: 켜짐/꺼짐 (L4·L5·L8~L10·시한·유령·입구·굳음), 상태 전환, 문턱 따라감, 자리·회전, 시차, 해시 그대로
+  5. 캡처 두 비율: 나란히 장면·두 순간·L5 확대·중력 옆·발사 직후, 별이 새로 생긴 기존 파일 목록
+  6. 빌드 없음
+- 건드리지 말 것: 규칙·값, 얼굴·몸 그림·NEXT·HUD·안내 글·소리, 터치 판정 반지름, 고리 금지, 사용자 저장 파일, `project.godot` 버전·`build/windows/`, `docs/` (회신 파일 제외)
+- Done-when:
+  - [ ] 표시 = 터치 후보 판정 (테스트), `WAITING_INPUT` 밖에서는 없음
+  - [ ] 수치 표와 같음 (상수), 얼굴 회전을 따름 (테스트)
+  - [ ] 물리·회귀 해시 그대로, 전체 회귀·성능 (평일 기준)
+  - [ ] 캡처 두 비율 (크기 검사 통과), 별이 새로 생긴 기존 캡처 목록
+- 브랜치: #161 병합 뒤 main에서 새 브랜치 → PR
+- **회신 맨 앞에**: 물리·회귀 해시 변경, 성능 기준 넘음, 레벨로 켜는 곳, 캡처에서 별이 잘리거나 가려짐, 얼굴·몸 그림을 바꿈
+
 ### [2026-11-25 #161] 터치 소폭발 L5부터·L3 두 개로 나뉨
 - 상태: **시작** — #160 추가 요구 1을 마치고 그 PR을 갱신한 뒤 시작 (공유 트리). 사용자 2026-11-25 "L9 와 L10 차이가 적어서 문제인것 같아 소폭발 조건을 대폭 낮춰야 할 것 같아" → Claude 질문 → "L5로 바로" (측정 없이). **같은 날 추가 2건**: 요구 2 시한 젤리 터치 막기 (사용자 "시한 젤리 터치는 당연히 막아야하지"), 요구 3 터치하면 L3 두 개로 나뉨 (사용자 "작은 l3로 나뉘는 걸로" → "항상 2개"·"서로 다른 색"). 이미 시작했으면 같은 브랜치에 더한다
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.49** "#161 요구"
