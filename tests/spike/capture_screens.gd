@@ -809,14 +809,7 @@ func _capture_timed_jelly_scenes(
 	first.disable_physics()
 	second.disable_physics()
 	await _capture("202_jelly_timed_success_before.png")
-	var original_duration: float = Config.data.jelly_merge_duration
-	Config.data.jelly_merge_duration = 0.0
-	resolver.report_contact(first, second, "capture_timed_success")
-	if resolver.flush() != 1:
-		_fail("timed success capture did not resolve exactly once")
-	Config.data.jelly_merge_duration = original_duration
-	await get_tree().process_frame
-	var success_orbs: Array[Orb3D] = board.get_orbs()
+	# The merge consumes its inputs, so classify while both orbs still exist.
 	var classified: Dictionary = ReactionRules.classify(
 		OrbTypes.OrbColor.RED,
 		timed_level,
@@ -831,6 +824,14 @@ func _capture_timed_jelly_scenes(
 		int(classified["result_level"]) + Config.data.jelly_timed_bonus_levels,
 		Config.data.orb_max_level
 	)
+	var original_duration: float = Config.data.jelly_merge_duration
+	Config.data.jelly_merge_duration = 0.0
+	resolver.report_contact(first, second, "capture_timed_success")
+	if resolver.flush() != 1:
+		_fail("timed success capture did not resolve exactly once")
+	Config.data.jelly_merge_duration = original_duration
+	await get_tree().process_frame
+	var success_orbs: Array[Orb3D] = board.get_orbs()
 	if (
 		success_orbs.size() != 1
 		or success_orbs[0].level != expected_result_level
@@ -1673,10 +1674,19 @@ func _capture_blast_push_case(
 				)
 			board.spawn_orb(color, 3, position)
 	if kind == "big":
-		var first: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, 8, Vector2(-4.0, 0.0))
-		var second: Orb3D = board.spawn_orb(OrbTypes.OrbColor.BLUE, 8, Vector2(4.0, 0.0))
+		# K0/K4 compare impulse profiles using the original L8/L8 blast pair.
+		const FIXTURE_LEVEL: int = 8
+		var original_minimum: int = Config.data.jelly_blast_min_level
+		var original_pair_top_minimum: int = Config.data.jelly_blast_pair_top_min_level
+		Config.data.jelly_blast_min_level = FIXTURE_LEVEL
+		Config.data.jelly_blast_pair_top_min_level = 0
+		var first: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, FIXTURE_LEVEL, Vector2(-4.0, 0.0))
+		var second: Orb3D = board.spawn_orb(OrbTypes.OrbColor.BLUE, FIXTURE_LEVEL, Vector2(4.0, 0.0))
 		resolver.report_contact(first, second, "capture_blast_push_big")
-		if resolver.flush() != 1:
+		var reaction_count: int = resolver.flush()
+		Config.data.jelly_blast_pair_top_min_level = original_pair_top_minimum
+		Config.data.jelly_blast_min_level = original_minimum
+		if reaction_count != 1:
 			_fail("%s big blast evidence did not trigger" % profile_tag)
 	else:
 		var source_position: Vector2 = (
@@ -1966,28 +1976,23 @@ func _capture_overlay_detail_scenes(main: Main, board: Board3D) -> void:
 	director.clear_effects()
 	board.clear()
 	board.set_gravity(Vector2i.DOWN)
-	# The blast-face art is intentionally unreachable with the J7 default because
-	# L7 keeps the MAX face. Preserve its isolated visual regression fixture by
-	# lowering only this fixture's threshold, then restore the product default.
+	# Give the three L5 fixtures the sparkle face that blast-ready non-MAX orbs use.
 	var default_blast_min_level: int = Config.data.jelly_blast_min_level
 	Config.data.jelly_blast_min_level = 5
 	var cheek_specs: Array[Dictionary] = [
 		{
 			"color": OrbTypes.OrbColor.YELLOW,
 			"position": Vector2(-220.0, 0.0),
-			"expected": Color8(247, 133, 126),
 			"file": "20_jelly_yellow_cheek_zoom.png",
 		},
 		{
 			"color": OrbTypes.OrbColor.GREEN,
 			"position": Vector2.ZERO,
-			"expected": Color8(192, 131, 142),
 			"file": "21_jelly_green_cheek_zoom.png",
 		},
 		{
 			"color": OrbTypes.OrbColor.BLUE,
 			"position": Vector2(220.0, 0.0),
-			"expected": Color8(200, 112, 170),
 			"file": "22_jelly_blue_cheek_zoom.png",
 		},
 	]
@@ -1999,22 +2004,33 @@ func _capture_overlay_detail_scenes(main: Main, board: Board3D) -> void:
 			spec["position"] as Vector2
 		)
 		orb.disable_physics()
+		orb._face.visible = false
 		cheek_orbs.append(orb)
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var body_image: Image = get_viewport().get_texture().get_image()
+	var cheek_points: Array[Vector2] = []
+	for orb: Orb3D in cheek_orbs:
+		cheek_points.append(camera.unproject_position(
+			orb._face.global_transform * Vector3(
+				JellyOrbArt.MAX_BLUSH_CENTER_X,
+				-JellyOrbArt.MAX_BLUSH_CENTER_Y,
+				0.0
+			)
+		))
+		orb._face.visible = true
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 	var cheek_image: Image = get_viewport().get_texture().get_image()
 	for index: int in range(cheek_orbs.size()):
 		var orb: Orb3D = cheek_orbs[index]
 		var spec: Dictionary = cheek_specs[index]
-		var cheek_point: Vector2 = camera.unproject_position(
-			orb._face.global_transform * Vector3(
-				JellyOrbArt.BLAST_BLUSH_CENTER.x,
-				-JellyOrbArt.BLAST_BLUSH_CENTER.y,
-				0.0
-			)
+		var cheek_point: Vector2 = cheek_points[index]
+		var body_pixel: Color = _pixel_at(body_image, cheek_point)
+		var expected: Color = body_pixel.lerp(
+			JellyOrbArt.MAX_BLUSH_COLOR, JellyOrbArt.MAX_BLUSH_ALPHA
 		)
 		var actual: Color = _pixel_at(cheek_image, cheek_point)
-		var expected: Color = spec["expected"] as Color
 		print(
 			"JELLY_OVERLAY_PIXEL kind=cheek color=%d actual=%s expected=%s tolerance=12" % [
 				int(spec["color"]),
