@@ -6728,7 +6728,7 @@ G1 전략 봇 (시드 1~20, 600턴 상한, 턴 평균 / 총점 평균):
 - 건드리지 말 것: #162와 같다
 - 회신 맨 앞에: 해시 변경, 별이 오른쪽 위가 아닌 캡처, 성능 기준 넘음
 
-**#162 추가 요구 1 검수 (Claude, 2026-11-27, PR [#163](https://github.com/jeongmo-dot/gravity_orb/pull/163) `304abbc`) — 통과, 병합 대기**
+**#162 추가 요구 1 검수 (Claude, 2026-11-27, PR [#163](https://github.com/jeongmo-dot/gravity_orb/pull/163) `304abbc`) — 통과, 병합 `4bd42b5`**
 - 회신 맨 앞: 해시 변경 0, 오른쪽 위가 아닌 별 0, 성능 기준 넘음 0
 - 된 것 (Claude가 diff로 봄):
   - `Orb3D._update_visual_transform()`: 별 자리 (0.66 R, −0.68 R)를 돌리지 않는다. 출렁임·합치기 늘림 `jelly_upright_deform_basis(face_rotation, jelly_content_deform, 1.0)`만 자리에 준다. 판은 `Basis.from_scale(mark_radius, mark_radius, 1)`이라 회전이 없다. 합치는 동안도 같은 식이다. 요구 1과 같다
@@ -6744,6 +6744,7 @@ G1 전략 봇 (시드 1~20, 600턴 상한, 턴 평균 / 총점 평균):
   - `34` (중력 오른쪽): 별 넷 모두 오른쪽 위에 있다. 첫 검수 때 왼쪽 위였던 장면이다
   - 캡처 로그: `34`~`37`·`57`~`59` (중력 오른쪽)는 각 4개, `71` (아래)은 1개, `235`~`238`은 모두 `upper_right=true`
 - Done-when 모두 충족. 병합은 사용자 "병합" 뒤에 한다. 병합 때 기획서에 별 표시를 적는다 (§4 변경 없음)
+- 병합: 2026-11-27 22:57 (KST) 사용자 "병합" → PR #163 squash 병합 `4bd42b5`. 로컬 브랜치 `codex/jelly-tap-star` 삭제, 원격 브랜치는 남김. 기획서 0.16.39 (원본·`docs/reference/` 사본): 바뀐 점 한 줄, 터치 소폭발 항목의 표시 설명. §4 변경 없음
 
 ### 12-ONE.3 다음 (JELLY 개선)
 - CLASSIC 전용 분기 정리 (행성 그림·연출·규칙 — JELLY가 안 쓰는 것)
