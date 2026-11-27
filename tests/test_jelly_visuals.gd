@@ -4,6 +4,50 @@ const BOARD_SCENE: PackedScene = preload("res://scenes/Board3D.tscn")
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
 
 
+func test_tap_mark_follows_face_rotation_and_shares_material_across_colors() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var board: Board3D = await _create_board()
+	var orb: Orb3D = board.spawn_orb(0, 5, Vector2.ZERO)
+	var radius: float = orb.get_current_radius()
+	orb.set_tap_mark_enabled(true)
+	orb._advance_tap_mark(0.15)
+	orb._update_visual_transform()
+	var mark: MeshInstance3D = orb._tap_mark
+	var down_offset: Vector2 = Vector2(0.66, -0.68) * radius
+	var mark_plane: Vector2 = Orb3D.world_position_to_plane(mark.position - orb._mesh.position)
+	assert_true(mark_plane.distance_to(down_offset) < 0.001, "down: upper-right in face coordinates")
+	assert_true(mark.position.z > orb._symbol_mesh.position.z, "star plate is in front of the symbol")
+	orb.set_gravity(Vector2i.LEFT, Config.data.gravity_strength)
+	orb._update_visual_transform()
+	mark_plane = Orb3D.world_position_to_plane(mark.position - orb._mesh.position)
+	assert_true(mark_plane.distance_to(down_offset.rotated(PI / 2.0)) < 0.001, "left: follows face")
+	assert_near(mark.basis.x.length(), mark.basis.y.length(), 0.000001, "star plate is undistorted")
+	var phases: Array[float] = []
+	for color: int in range(JellyOrbArt.PALETTE.size()):
+		var other: Orb3D = board.spawn_orb(color, 5, Vector2.ZERO)
+		var phase: float = float(other._tap_mark.get_instance_shader_parameter("tap_mark_phase"))
+		assert_near(phase, float(color) * 1.6 / 6.0, 0.000001, "deterministic phase for color %d" % color)
+		assert_true(not phases.has(phase), "each color receives a distinct phase")
+		phases.append(phase)
+		assert_eq(other._tap_mark.material_override, mark.material_override, "all marks share one material")
+	var material_count: int = JellyOrbArt.shared_material_count()
+	var duplicate: Orb3D = board.spawn_orb(5, 5, Vector2.ZERO)
+	assert_eq(
+		duplicate._tap_mark.get_instance_shader_parameter("tap_mark_phase"),
+		phases[5],
+		"recreating the same color preserves its phase"
+	)
+	assert_eq(JellyOrbArt.shared_material_count(), material_count, "duplicate adds no material")
+	Config.data.game_mode = GameConfig.GameMode.TURN
+	var legacy: Orb3D = board.spawn_orb(0, 5, Vector2.ZERO)
+	legacy.set_tap_mark_enabled(true)
+	legacy._advance_tap_mark(0.15)
+	assert_true(not legacy._tap_mark.visible, "non-JELLY orbs do not display tap marks")
+	Config.data.game_mode = original_mode
+	await _cleanup(board)
+
+
 func test_jelly_scene_lighting_and_all_orb_meshes_disable_shadows() -> void:
 	var main: Main = MAIN_SCENE.instantiate() as Main
 	var key_light: DirectionalLight3D = main.get_node("KeyLight") as DirectionalLight3D

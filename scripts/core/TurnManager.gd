@@ -218,6 +218,9 @@ func try_tap_blast_orb(orb: Variant) -> bool:
 func _physics_process(delta: float) -> void:
 	var applied_reactions: int = _collision_resolver.flush(delta)
 
+	if state == State.WAITING_INPUT:
+		_update_jelly_tap_marks(true)
+
 	if state == State.SPAWNING:
 		var spawned: Array = _spawner.try_spawn(_board, gravity, turn_index)
 		for orb: Variant in spawned:
@@ -761,5 +764,15 @@ func _set_state(next_state: State) -> void:
 		_board.set_turn_resting(next_state == State.WAITING_INPUT)
 	if state == next_state:
 		return
+	var was_waiting: bool = state == State.WAITING_INPUT
 	state = next_state
+	if was_waiting or state == State.WAITING_INPUT:
+		_update_jelly_tap_marks(state == State.WAITING_INPUT)
 	state_changed.emit(state)
+
+
+func _update_jelly_tap_marks(waiting: bool) -> void:
+	if Config.data.game_mode != GameConfig.GameMode.JELLY or not (_board is Board3D):
+		return
+	for orb: Orb3D in _board.get_orbs():
+		orb.set_tap_mark_enabled(waiting and _collision_resolver.is_jelly_tap_blast_candidate(orb))

@@ -33,6 +33,7 @@ static var _shared_meshes: Dictionary = {}
 @onready var _belly: MeshInstance3D = %Belly
 @onready var _face: MeshInstance3D = %Face
 @onready var _symbol_mesh: MeshInstance3D = %Symbol
+@onready var _tap_mark: MeshInstance3D = %TapMark
 @onready var _timed_label: Label3D = %TimedLabel
 
 var color: int = 0
@@ -74,6 +75,8 @@ var _render_clamp_enabled: bool = true
 var _radius_resources_are_unique: bool = false
 var _visual_alpha: float = 1.0
 var _is_jelly_visual: bool = false
+var _tap_mark_target: float = 0.0
+var _tap_mark_strength: float = 0.0
 var _jelly_idle_elapsed: float = 0.0
 var _jelly_frame_rotation: float = 0.0
 var _jelly_frame_target_rotation: float = 0.0
@@ -280,6 +283,16 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	_face.mesh = JellyOrbArt.face_mesh()
 	_face.material_override = JellyOrbArt.face_material_for(color, level, _blast_armed)
 	_face.visible = _is_jelly_visual
+	_tap_mark_target = 0.0
+	_tap_mark_strength = 0.0
+	_tap_mark.visible = false
+	if _is_jelly_visual:
+		_tap_mark.mesh = JellyOrbArt.face_mesh()
+		_tap_mark.material_override = JellyOrbArt.tap_mark_material()
+		_tap_mark.set_instance_shader_parameter(
+			"tap_mark_phase", float(color) * JellyOrbArt.TAP_MARK_PERIOD / JellyOrbArt.PALETTE.size()
+		)
+		_tap_mark.set_instance_shader_parameter("tap_mark_strength", 0.0)
 	_apply_visual_transparency()
 	if _is_jelly_visual or _current_radius < _radius:
 		_ensure_unique_radius_resources()
@@ -382,8 +395,23 @@ func _process(delta: float) -> void:
 		_jelly_idle_elapsed += maxf(delta, 0.0)
 		_advance_jelly_visual(delta)
 		_advance_jelly_belly(delta)
+		_advance_tap_mark(delta)
 		JellyOrbArt.advance_animation(delta)
 	_update_visual_transform()
+
+
+func set_tap_mark_enabled(enabled: bool) -> void:
+	_tap_mark_target = 1.0 if enabled and _is_jelly_visual else 0.0
+
+
+func _advance_tap_mark(delta: float) -> void:
+	if _tap_mark_strength == _tap_mark_target:
+		return
+	_tap_mark_strength = move_toward(
+		_tap_mark_strength, _tap_mark_target, delta / JellyOrbArt.TAP_MARK_FADE_SECONDS
+	)
+	_tap_mark.visible = _tap_mark_strength > 0.0
+	_tap_mark.set_instance_shader_parameter("tap_mark_strength", _tap_mark_strength)
 
 
 func configure_physics_profile(
@@ -836,6 +864,8 @@ func _apply_visual_transparency() -> void:
 		"visual_alpha",
 		clampf(_visual_alpha, 0.0, 1.0)
 	)
+	if _is_jelly_visual:
+		_tap_mark.set_instance_shader_parameter("visual_alpha", _visual_alpha)
 	_symbol_mesh.transparency = base_transparency
 
 
@@ -1134,9 +1164,10 @@ func _update_visual_transform() -> void:
 	var face_scale_m: float = radius_m * face_radius_ratio
 	if _merge_visual_active:
 		jelly_content_deform *= _merge_visual_scale
+	var face_rotation: float = _merge_visual_rotation if _merge_visual_active else _jelly_frame_rotation
 	_face.basis = (
 		jelly_upright_deform_basis(
-			_merge_visual_rotation if _merge_visual_active else _jelly_frame_rotation,
+			face_rotation,
 			jelly_content_deform,
 			face_scale_m
 		)
@@ -1147,6 +1178,22 @@ func _update_visual_transform() -> void:
 			1.0
 		))
 	)
+	if _tap_mark.visible:
+		var center: Vector2 = JellyOrbArt.TAP_MARK_CENTER * radius_m
+		var face_offset: Vector3 = Vector3(center.x, -center.y, 0.0).rotated(
+			Vector3.BACK, face_rotation
+		)
+		var deformed_center: Vector3 = (
+			jelly_upright_deform_basis(face_rotation, jelly_content_deform, 1.0) * face_offset
+		)
+		_tap_mark.position = _front_overlay_position(
+			render_world_position + deformed_center,
+			body_front_offset + JellyOrbArt.TAP_MARK_FRONT_OFFSET
+		)
+		var mark_radius: float = radius_m * JellyOrbArt.TAP_MARK_PLANE_RATIO
+		_tap_mark.basis = Basis(Vector3.BACK, face_rotation).scaled(
+			Vector3(mark_radius, mark_radius, 1.0)
+		)
 	var symbol_y_offset: float = radius_m * 0.54 if _is_jelly_visual else 0.0
 	_symbol_mesh.position = (
 		_front_overlay_position(

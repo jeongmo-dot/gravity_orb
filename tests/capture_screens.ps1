@@ -248,7 +248,11 @@ $fullFrameFiles = @(
     "209_jelly_timed_stone_first_callout.png",
     "210_jelly_timed_stone_10.png",
     "211_jelly_timed_stone_broken_l4.png",
-    "212_jelly_timed_scatter_five.png"
+    "212_jelly_timed_scatter_five.png",
+    "235_jelly_tap_mark_peak.png",
+    "236_jelly_tap_mark_low.png",
+    "238_jelly_tap_mark_left.png",
+    "239_jelly_tap_mark_simulating.png"
 )
 
 $zoomFiles = @(
@@ -259,6 +263,7 @@ $zoomFiles = @(
     @{ Path = "23_jelly_belly_half_zoom.png"; Size = "480x480" },
     @{ Path = "24_jelly_belly_three_quarter_zoom.png"; Size = "480x480" },
     @{ Path = "25_jelly_max_effect_zoom.png"; Size = "480x480" },
+    @{ Path = "237_jelly_tap_mark_l5_zoom.png"; Size = "480x480" },
     # _capture_timed_number_zoom() crops 48x48 (half_size = 24) and scales by 5.
     @{ Path = "zoom\199_jelly_timed_4_5x.png"; Size = "240x240" },
     @{ Path = "zoom\200_jelly_timed_1_5x.png"; Size = "240x240" },
