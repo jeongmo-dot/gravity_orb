@@ -402,6 +402,9 @@ func apply_jelly_tap_blast(orb: Variant) -> bool:
 		shock_targets,
 		blast_targets
 	)
+	var tap_split_count: int = 0
+	if not source_survives:
+		tap_split_count = _spawn_jelly_tap_fragments(color, position)
 	var reaction: Dictionary = {
 		"type": ReactionRules.Type.TAP_BLAST,
 		"chain": 1,
@@ -426,6 +429,7 @@ func apply_jelly_tap_blast(orb: Variant) -> bool:
 		"contact_path": "tap_blast",
 		"tap_blast": true,
 		"tap_effect": tap_effect,
+		"tap_split_count": tap_split_count,
 		"clean_levels": clean_levels,
 		"clean_colors": clean_colors,
 		"clean_stable_spawn_ids": clean_stable_spawn_ids,
@@ -437,6 +441,36 @@ func apply_jelly_tap_blast(orb: Variant) -> bool:
 	}
 	reaction_applied.emit(reaction)
 	return true
+
+
+func _spawn_jelly_tap_fragments(source_color: int, center: Vector2) -> int:
+	var cfg: GameConfig = Config.data
+	var count: int = cfg.jelly_tap_split_count
+	if cfg.jelly_tap_split_level <= 0 or count <= 0:
+		return 0
+	var level: int = mini(cfg.jelly_tap_split_level, cfg.orb_max_level)
+	var radius: float = cfg.radius_for_level(level)
+	var center_limit: float = maxf(cfg.board_size * 0.5 - radius, 0.0)
+	var min_center: Vector2 = Vector2(-center_limit, -center_limit)
+	var max_center: Vector2 = -min_center
+	var gravity: Vector2i = _board.gravity_direction()
+	var axis: Vector2 = Vector2(OrbTypes.perpendicular(gravity))
+	var active_colors: Array[int] = []
+	var weights: PackedFloat32Array = cfg.spawn_color_weights
+	for offset: int in range(1, weights.size()):
+		var candidate_color: int = posmod(source_color + offset, weights.size())
+		if weights[candidate_color] > 0.0:
+			active_colors.append(candidate_color)
+	for index: int in range(count):
+		var color: int = source_color
+		if index > 0 and not active_colors.is_empty():
+			color = active_colors[(index - 1) % active_colors.size()]
+		var offset: float = (2.0 * float(index) - float(count - 1)) * radius
+		var position: Vector2 = (center + axis * offset).clamp(min_center, max_center)
+		var fragment: Variant = _board.spawn_orb(color, level, position, Vector2.ZERO, 0)
+		fragment.enter_ghost_state(cfg.ghost_alpha)
+		fragment.note_diagnostic_event("tap_split")
+	return count
 
 
 func remove_jelly_with_clean_visual(orb: Variant) -> void:
@@ -479,6 +513,7 @@ func is_jelly_tap_blast_candidate(orb: Variant) -> bool:
 	var base_candidate: bool = (
 		Config.data.game_mode == GameConfig.GameMode.JELLY
 		and _is_valid_reaction_orb(orb)
+		and not orb.is_timed
 		and not orb.is_ghost
 		and not orb.is_waiting_at_entrance
 		and Config.data.jelly_tap_blast_enabled_for_level(int(orb.level))

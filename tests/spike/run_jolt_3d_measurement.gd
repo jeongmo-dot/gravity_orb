@@ -61,6 +61,7 @@ var _turn_reaction_count: int = 0
 var _turn_merge_count: int = 0
 var _turn_blast_count: int = 0
 var _turn_tap_blast_count: int = 0
+var _turn_tap_split_count: int = 0
 var _preview_fixture_serial: int = 0
 var _seed_seen_colors: Dictionary = {}
 var _seed_merge_count: int = 0
@@ -132,6 +133,8 @@ func _run() -> void:
 		"jelly_blast_requires_same_level": Config.data.jelly_blast_requires_same_level,
 		"jelly_blast_pair_top_min_level": Config.data.jelly_blast_pair_top_min_level,
 		"jelly_tap_blast_min_level": Config.data.jelly_tap_blast_min_level,
+		"jelly_tap_split_level": Config.data.jelly_tap_split_level,
+		"jelly_tap_split_count": Config.data.jelly_tap_split_count,
 		"jelly_tap_blast_score_factor": Config.data.jelly_tap_blast_score_factor,
 		"jelly_tap_blast_uses_turn": Config.data.jelly_tap_blast_uses_turn,
 		"jelly_tap_clean_max_level": Config.data.jelly_tap_clean_max_level,
@@ -387,8 +390,10 @@ func _run_seed(
 		_turn_merge_count = 0
 		_turn_blast_count = 0
 		_turn_tap_blast_count = 0
+		_turn_tap_split_count = 0
 		var score_before: int = score_manager.score
 		var spawned_before: int = _seed_spawn_count
+		var capped_before: int = manager.capped_turn_count
 		var tap_turn_orb: Orb3D = null
 		if _should_use_tap_blast_bot(manager, board):
 			if Config.data.jelly_tap_blast_uses_turn:
@@ -489,6 +494,9 @@ func _run_seed(
 			"score_gain": score_manager.score - score_before,
 			"blast_count": _turn_blast_count,
 			"tap_blast_count": _turn_tap_blast_count,
+			"tap_split_count": _turn_tap_split_count,
+			"departures": frame_metrics["departures"],
+			"forced_settle": manager.capped_turn_count > capped_before,
 			"entrance_waiting_count": entrance_waiting_count,
 			"input_waiting_touching_merge_pairs": input_waiting_touching_merge_pairs,
 		})
@@ -1143,6 +1151,7 @@ func _record_shock_event(reaction: Dictionary) -> void:
 		})
 		_seed_tap_blast_count += 1
 		_turn_tap_blast_count += 1
+		_turn_tap_split_count += int(reaction.get("tap_split_count", 0))
 		var tap_levels: Array = reaction.get("levels", []) as Array
 		var tap_level: int = int(tap_levels[0]) if not tap_levels.is_empty() else 0
 		var tap_key: String = "L%d" % tap_level
@@ -2379,6 +2388,14 @@ func _apply_arguments() -> void:
 				0,
 				Config.data.orb_max_level
 			)
+		elif argument.begins_with("--jelly-tap-split-level="):
+			var level: int = argument.trim_prefix("--jelly-tap-split-level=").to_int()
+			if level >= 0:
+				Config.data.jelly_tap_split_level = mini(level, Config.data.orb_max_level)
+		elif argument.begins_with("--jelly-tap-split-count="):
+			var count: int = argument.trim_prefix("--jelly-tap-split-count=").to_int()
+			if count >= 0:
+				Config.data.jelly_tap_split_count = count
 		elif argument.begins_with("--blast-score-factor="):
 			Config.data.blast_score_factor = maxf(
 				argument.trim_prefix("--blast-score-factor=").to_float(),

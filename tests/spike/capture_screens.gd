@@ -11,6 +11,7 @@ const TIMED_ONLY_ARGUMENT: String = "--capture-timed-only"
 const UI_B_ONLY_ARGUMENT: String = "--capture-ui-b"
 const UI_B_BOARD_ONLY_ARGUMENT: String = "--capture-ui-b-board"
 const GAP2_DEFAULTS_ONLY_ARGUMENT: String = "--capture-gap2-defaults"
+const JELLY_TAP_SPLIT_ONLY_ARGUMENT: String = "--capture-jelly-tap-split"
 const PILE_JITTER_SEED: int = 11620261030
 const SPAWN_RAMP_CAPTURE_SEED: int = 11920261031
 const CAPTURE_FILES: Array[String] = [
@@ -228,6 +229,13 @@ const GAP2_DEFAULTS_ONLY_FILES: Array[String] = [
 	"228_jelly_gap2_l8_l9_l10.png",
 	"229_jelly_gap2_l8_l9_l10_zoom.png",
 ]
+const JELLY_TAP_SPLIT_ONLY_FILES: Array[String] = [
+	"230_jelly_tap_l5_unlock.png",
+	"231_jelly_tap_l5_blast.png",
+	"232_jelly_tap_l5_fragments.png",
+	"233_jelly_tap_l7_blast.png",
+	"234_jelly_tap_l10_fragments.png",
+]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
 var _temp_save_path: String = "res://artifacts/screens/capture_save.tmp.cfg"
@@ -238,6 +246,7 @@ var _timed_only: bool = false
 var _ui_b_only: bool = false
 var _ui_b_board_only: bool = false
 var _gap2_defaults_only: bool = false
+var _jelly_tap_split_only: bool = false
 var _requested_window_size: Vector2i = Vector2i.ZERO
 var _expected_capture_size: Vector2i = Vector2i.ZERO
 
@@ -262,7 +271,9 @@ func _run() -> void:
 	Config.data.sfx_enabled = false
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.rng_seed = 5050
-	if _gap2_defaults_only:
+	if _jelly_tap_split_only:
+		await _capture_jelly_tap_split_scenes()
+	elif _gap2_defaults_only:
 		await _capture_gap2_default_scenes()
 	elif _ui_b_board_only:
 		await _capture_ui_b_board_scenes()
@@ -277,7 +288,9 @@ func _run() -> void:
 	_verify_user_save_unchanged()
 	_remove_file(_temp_save_path)
 	var expected_files: Array[String] = CAPTURE_FILES
-	if _gap2_defaults_only:
+	if _jelly_tap_split_only:
+		expected_files = JELLY_TAP_SPLIT_ONLY_FILES
+	elif _gap2_defaults_only:
 		expected_files = GAP2_DEFAULTS_ONLY_FILES
 	elif _ui_b_board_only:
 		expected_files = UI_B_BOARD_ONLY_FILES
@@ -387,6 +400,62 @@ func _capture_ui_b_scenes() -> void:
 	manager.game_over.emit()
 	await get_tree().create_timer(0.85).timeout
 	await _capture("214_ui_b_result_record.png")
+	await _destroy_main(main)
+
+
+func _capture_jelly_tap_split_scenes() -> void:
+	var main: Main = await _create_main(true)
+	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
+	var resolver: CollisionResolver = main.get_node("CollisionResolver") as CollisionResolver
+	var board: Board3D = main.get_node("Board") as Board3D
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	var director: FeedbackDirector = main.get_node("FeedbackDirector") as FeedbackDirector
+	manager.set_physics_process(false)
+	board.clear()
+	manager._set_state(TurnManager.State.SIMULATING)
+	var first: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, 4, Vector2(-68.0, 0.0))
+	var second: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, 4, Vector2(68.0, 0.0))
+	var merge_duration: float = Config.data.jelly_merge_duration
+	Config.data.jelly_merge_duration = 0.0
+	resolver.report_contact(first, second, "tap_l5_unlock_capture")
+	var merge_count: int = resolver.flush()
+	Config.data.jelly_merge_duration = merge_duration
+	if merge_count != 1 or board.get_orbs().size() != 1 or board.get_orbs()[0].level != 5:
+		_fail("L5 tap unlock capture expected an L4+L4 merge")
+	manager._set_state(TurnManager.State.WAITING_INPUT)
+	await get_tree().create_timer(0.16).timeout
+	if not hud._callout_label.visible or not hud._callout_label.text.contains("L5:"):
+		_fail("L5 tap unlock capture expected a visible L5 hint")
+	await _capture(JELLY_TAP_SPLIT_ONLY_FILES[0])
+
+	for index: int in range(3):
+		var levels: Array[int] = [5, 7, 10]
+		board.clear()
+		director.clear_effects()
+		_clear_capture_hud_residue(hud)
+		manager._set_state(TurnManager.State.WAITING_INPUT)
+		var source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, levels[index], Vector2.ZERO)
+		var target: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 4, Vector2(180.0, 50.0))
+		if not manager.try_tap_blast_orb(source):
+			_fail("L%d tap capture did not start" % levels[index])
+			continue
+		var fragments: Array[Orb3D] = []
+		for orb: Orb3D in board.get_orbs():
+			if orb.diagnostic_last_event == "tap_split":
+				fragments.append(orb)
+		if (
+			not source.consumed or target.consumed or fragments.size() != 2
+			or fragments[0].level != 3 or fragments[1].level != 3
+			or fragments[0].color == fragments[1].color
+		):
+			_fail("L%d tap capture expected two distinct L3 fragments" % levels[index])
+		await get_tree().create_timer(0.08 if index < 2 else 0.35).timeout
+		if index == 0:
+			await _capture(JELLY_TAP_SPLIT_ONLY_FILES[1])
+			await get_tree().create_timer(0.27).timeout
+			await _capture(JELLY_TAP_SPLIT_ONLY_FILES[2])
+		else:
+			await _capture(JELLY_TAP_SPLIT_ONLY_FILES[index + 2])
 	await _destroy_main(main)
 
 
@@ -3443,6 +3512,8 @@ func _parse_arguments() -> void:
 			_ui_b_board_only = true
 		elif argument == GAP2_DEFAULTS_ONLY_ARGUMENT:
 			_gap2_defaults_only = true
+		elif argument == JELLY_TAP_SPLIT_ONLY_ARGUMENT:
+			_jelly_tap_split_only = true
 
 
 func _parse_capture_size(value: String, label: String) -> Vector2i:

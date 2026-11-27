@@ -1123,7 +1123,7 @@ func test_tap_blast_spends_pending_final_move_without_spawning() -> void:
 		await tree.physics_frame
 	assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "open entrance succeeds FINAL MOVE")
 	assert_eq(manager.final_move_success_count, 1, "tap FINAL MOVE success is counted")
-	assert_true(board.get_orbs().size() < orb_count_before, "FINAL MOVE tap removes source and spawns nothing")
+	assert_eq(board.get_orbs().size(), orb_count_before + 1, "FINAL MOVE replaces source with two fragments")
 	Config.data.game_mode = original_mode
 	Config.data.jelly_tap_effect_modes = original_tap_modes
 	Config.data.jelly_tap_clean_max_level = original_clean_max
@@ -1190,7 +1190,7 @@ func test_tap_blast_pending_final_move_fails_if_entrance_stays_blocked() -> void
 		await tree.physics_frame
 	assert_eq(manager.state, TurnManager.State.GAME_OVER, "blocked entrance fails FINAL MOVE")
 	assert_eq(manager.final_move_success_count, 0, "failed FINAL MOVE is not counted as success")
-	assert_true(board.get_orbs().size() < orb_count_before, "failed FINAL MOVE removes source and spawns nothing")
+	assert_eq(board.get_orbs().size(), orb_count_before + 1, "failed FINAL MOVE only adds the two fragments")
 	Config.data.game_mode = original_mode
 	Config.data.jelly_tap_effect_modes = original_tap_modes
 	Config.data.jelly_tap_clean_max_level = original_clean_max
@@ -1201,7 +1201,7 @@ func test_tap_blast_pending_final_move_fails_if_entrance_stays_blocked() -> void
 	await _cleanup(fixture["root"] as Node)
 
 
-func test_tap_blast_candidate_accepts_l9_to_l10_and_rejects_l8_waiting_ghost_and_locked() -> void:
+func test_tap_blast_candidate_accepts_l5_to_l10_and_rejects_l4_waiting_ghost_and_locked() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_tap_modes: PackedInt32Array = Config.data.jelly_tap_effect_modes.duplicate()
 	var original_clean_max: int = Config.data.jelly_tap_clean_max_level
@@ -1214,7 +1214,9 @@ func test_tap_blast_candidate_accepts_l9_to_l10_and_rejects_l8_waiting_ghost_and
 	var board: Board3D = fixture["board"] as Board3D
 	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
 	var manager: TurnManager = fixture["manager"] as TurnManager
-	var level_eight: Orb3D = board.spawn_orb(0, 8, Vector2(-400.0, 0.0))
+	var level_four: Orb3D = board.spawn_orb(0, 4, Vector2(-400.0, 0.0))
+	var level_five: Orb3D = board.spawn_orb(0, 5, Vector2(-250.0, 0.0))
+	var level_eight: Orb3D = board.spawn_orb(0, 8, Vector2(-180.0, 0.0))
 	var level_nine: Orb3D = board.spawn_orb(2, 9, Vector2(-80.0, 0.0))
 	var level_ten: Orb3D = board.spawn_orb(3, 10, Vector2(80.0, 0.0))
 	var waiting: Orb3D = board.spawn_orb(0, 8, Vector2(220.0, 0.0))
@@ -1223,7 +1225,9 @@ func test_tap_blast_candidate_accepts_l9_to_l10_and_rejects_l8_waiting_ghost_and
 	waiting.is_waiting_at_entrance = true
 	ghost.is_ghost = true
 	resolver._lock_reaction_result(locked)
-	assert_true(not resolver.is_jelly_tap_blast_candidate(level_eight), "L8 rejected")
+	assert_true(not resolver.is_jelly_tap_blast_candidate(level_four), "L4 rejected")
+	assert_true(resolver.is_jelly_tap_blast_candidate(level_five), "L5 accepted")
+	assert_true(resolver.is_jelly_tap_blast_candidate(level_eight), "L8 accepted")
 	assert_true(resolver.is_jelly_tap_blast_candidate(level_nine), "L9 accepted")
 	assert_true(resolver.is_jelly_tap_blast_candidate(level_ten), "L10 accepted")
 	assert_true(not resolver.is_jelly_tap_blast_candidate(waiting), "entrance waiter rejected")
@@ -1232,12 +1236,169 @@ func test_tap_blast_candidate_accepts_l9_to_l10_and_rejects_l8_waiting_ghost_and
 	manager.state = TurnManager.State.WAITING_INPUT
 	InputRouter.set_locked(false)
 	var turn_before: int = manager.turn_index
-	assert_true(not manager.try_tap_blast_orb(level_eight), "L8 tap does not start a turn")
-	assert_eq(manager.turn_index, turn_before, "rejected L8 tap keeps turn index")
+	assert_true(not manager.try_tap_blast_orb(level_four), "L4 tap does not start a turn")
+	assert_eq(manager.turn_index, turn_before, "rejected L4 tap keeps turn index")
 	Config.data.game_mode = original_mode
 	Config.data.jelly_tap_effect_modes = original_tap_modes
 	Config.data.jelly_tap_clean_max_level = original_clean_max
 	Config.data.jelly_tap_blast_uses_turn = original_uses_turn
+	await _cleanup(fixture["root"] as Node)
+
+
+func test_timed_tap_is_ignored_and_overlap_selects_normal_jelly() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_minimum: int = Config.data.jelly_tap_blast_min_level
+	var original_merge_duration: float = Config.data.jelly_merge_duration
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var fixture: Dictionary = await _create_turn_fixture()
+	var root: Node3D = fixture["root"] as Node3D
+	var board: Board3D = fixture["board"] as Board3D
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	manager.set_physics_process(false)
+	var camera: Camera3D = Camera3D.new()
+	camera.position = Vector3(0.0, 0.0, 42.0)
+	camera.current = true
+	root.add_child(camera)
+	await tree.process_frame
+	manager.state = TurnManager.State.WAITING_INPUT
+	InputRouter.set_locked(false)
+	var reactions: Array[Dictionary] = []
+	resolver.reaction_applied.connect(func(reaction: Dictionary) -> void: reactions.append(reaction))
+	var timed: Orb3D = board.spawn_orb(OrbTypes.OrbColor.BLUE, 5, Vector2.ZERO)
+	timed.set_timed(6, 20)
+	var screen_center: Vector2 = camera.unproject_position(Orb3D.plane_position_to_world(Vector2.ZERO))
+	var turn_before: int = manager.turn_index
+	assert_true(not resolver.is_jelly_tap_blast_candidate(timed), "timed L5 is excluded")
+	assert_true(not manager.try_tap_blast_orb(timed), "direct timed tap is rejected")
+	manager.on_tap(screen_center)
+	assert_eq(manager.turn_index, turn_before, "timed tap does not spend a turn")
+	assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "timed tap does not leave input")
+	assert_eq(reactions.size(), 0, "timed tap does not emit a reaction")
+	Config.data.jelly_tap_blast_min_level = 1
+	assert_true(not resolver.is_jelly_tap_blast_candidate(timed), "timed excluded even at minimum L1")
+	Config.data.jelly_tap_blast_min_level = original_minimum
+	var normal: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, 5, Vector2(12.0, 0.0))
+	manager.on_tap(screen_center)
+	assert_true(normal.consumed and not timed.consumed, "tap skips closer timed orb")
+	assert_eq(manager.turn_index, turn_before + 1, "normal jelly spends one turn")
+	board.clear()
+	manager.state = TurnManager.State.WAITING_INPUT
+	var first: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, 5, Vector2(-80.0, 0.0))
+	var second: Orb3D = board.spawn_orb(OrbTypes.OrbColor.RED, 5, Vector2(80.0, 0.0))
+	first.set_timed(6, 20)
+	Config.data.jelly_merge_duration = 0.0
+	resolver.report_contact(first, second, "timed_tap_candidate_test")
+	assert_eq(resolver.flush(), 1, "timed jellies can still merge")
+	var results: Array[Orb3D] = board.get_orbs()
+	assert_eq(results.size(), 1, "timed merge creates one orb")
+	if results.size() == 1:
+		resolver._advance_reaction_locks(Config.data.chain_reaction_delay + 0.01)
+		assert_true(not results[0].is_timed, "merge result is not timed")
+		assert_true(resolver.is_jelly_tap_blast_candidate(results[0]), "normal timed-merge result is eligible")
+		results[0].set_timed_stone(0, true)
+		assert_true(not resolver.is_jelly_tap_blast_candidate(results[0]), "hardened jelly is excluded")
+	Config.data.jelly_merge_duration = original_merge_duration
+	Config.data.game_mode = original_mode
+	InputRouter.set_locked(false)
+	await _cleanup(root)
+
+
+func test_default_tap_split_keeps_turn_and_score_and_uses_gravity_perpendicular() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var fixture: Dictionary = await _create_turn_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var manager: TurnManager = fixture["manager"] as TurnManager
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var spawner: Spawner = fixture["spawner"] as Spawner
+	manager.set_physics_process(false)
+	board.set_gravity(Vector2i.RIGHT)
+	manager.gravity = Vector2i.RIGHT
+	manager.state = TurnManager.State.WAITING_INPUT
+	spawner.init_rng(161)
+	var source: Orb3D = board.spawn_orb(OrbTypes.OrbColor.BLUE, 5, Vector2(30.0, 40.0))
+	var center: Vector2 = source.position
+	var reactions: Array[Dictionary] = []
+	resolver.reaction_applied.connect(func(reaction: Dictionary) -> void: reactions.append(reaction))
+	assert_true(manager.try_tap_blast_orb(source), "default L5 tap succeeds")
+	assert_true(source.consumed, "source is removed")
+	assert_eq(manager.turn_index, 1, "tap spends exactly one turn")
+	var fragments: Array[Orb3D] = board.get_orbs()
+	assert_eq(fragments.size(), 2, "exactly two fragments exist before preview spawning")
+	if fragments.size() == 2:
+		var radius: float = Config.data.radius_for_level(3)
+		assert_eq(fragments[0].color, OrbTypes.OrbColor.BLUE, "first fragment keeps source color")
+		assert_eq(fragments[1].color, OrbTypes.OrbColor.GREEN, "second fragment is next active color")
+		assert_eq(fragments[0].position, center - Vector2(0.0, radius), "first center is above source")
+		assert_eq(fragments[1].position, center + Vector2(0.0, radius), "second center is below source")
+		for fragment: Orb3D in fragments:
+			assert_eq(fragment.level, 3, "fragment level")
+			assert_true(fragment.is_ghost and not fragment.is_timed and not fragment.is_timed_stone, "starts as ordinary ghost")
+			assert_eq(fragment.linear_velocity, Vector2.ZERO, "tap impulse does not hit fragments")
+			assert_eq(fragment.diagnostic_last_event, "tap_split", "fragment diagnostic")
+			assert_true(not resolver.is_jelly_tap_blast_candidate(fragment), "ghost fragment is not a tap candidate")
+		fragments[0].exit_ghost_state()
+		assert_true(not resolver.is_jelly_tap_blast_candidate(fragments[0]), "released L3 is below tap threshold")
+	assert_eq(reactions.size(), 1, "only source tap emits a reaction")
+	if reactions.size() == 1:
+		var expected_score: int = int(float(Config.data.score_for_level(5)) * Config.data.jelly_tap_blast_score_factor)
+		assert_eq(ScoreManager.points_for(reactions[0].duplicate(), Config.data), expected_score, "fragments award no score")
+	Config.data.game_mode = original_mode
+	InputRouter.set_locked(false)
+	await _cleanup(fixture["root"] as Node)
+
+
+func test_tap_fragments_wrap_colors_stay_inside_and_can_be_disabled() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_weights: PackedFloat32Array = Config.data.spawn_color_weights
+	var original_level: int = Config.data.jelly_tap_split_level
+	var original_count: int = Config.data.jelly_tap_split_count
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var fixture: Dictionary = await _create_turn_fixture()
+	var board: Board3D = fixture["board"] as Board3D
+	var resolver: CollisionResolver = fixture["resolver"] as CollisionResolver
+	var limit: float = board.half_size() - Config.data.radius_for_level(3)
+	var edge_center: Vector2 = Vector2(board.half_size() - Config.data.radius_for_level(10), 0.0)
+	var max_orb: Orb3D = board.spawn_orb(OrbTypes.OrbColor.CYAN, 10, edge_center)
+	assert_true(resolver.apply_jelly_tap_blast(max_orb), "L10 tap splits")
+	var fragments: Array[Orb3D] = board.get_orbs()
+	assert_eq(fragments.size(), 2, "L10 creates the same fragment count")
+	if fragments.size() == 2:
+		assert_eq([fragments[0].color, fragments[1].color], [5, 0], "active colors wrap from 5 to 0")
+		for fragment: Orb3D in fragments:
+			assert_eq(fragment.level, 3, "L10 still creates L3")
+	board.clear()
+	var edge_orb: Orb3D = board.spawn_orb(0, 5, Vector2(board.half_size() - Config.data.radius_for_level(5), 0.0))
+	assert_true(resolver.apply_jelly_tap_blast(edge_orb), "edge tap splits")
+	fragments = board.get_orbs()
+	assert_eq(fragments.size(), 2, "both edge fragments are placed")
+	if fragments.size() == 2:
+		assert_near(fragments[0].position.x, limit, 0.001, "outer fragment is clamped inside board")
+	for fragment: Orb3D in fragments:
+		assert_true(
+			absf(fragment.position.x) <= limit + 0.001 and absf(fragment.position.y) <= limit + 0.001,
+			"center inside board within world conversion tolerance"
+		)
+	board.clear()
+	Config.data.spawn_color_weights = PackedFloat32Array([0.0, 0.0, 0.0, 0.0, 0.0, 1.0])
+	var solo: Orb3D = board.spawn_orb(OrbTypes.OrbColor.CYAN, 5, Vector2.ZERO)
+	assert_true(resolver.apply_jelly_tap_blast(solo), "single active color tap splits")
+	fragments = board.get_orbs()
+	assert_eq(fragments.size(), 2, "single active color still makes two")
+	for fragment: Orb3D in fragments:
+		assert_eq(fragment.color, OrbTypes.OrbColor.CYAN, "single color falls back to the source color")
+	board.clear()
+	for level: int in [0, original_level]:
+		Config.data.jelly_tap_split_level = level
+		Config.data.jelly_tap_split_count = original_count if level == 0 else 0
+		var disabled: Orb3D = board.spawn_orb(OrbTypes.OrbColor.CYAN, 5, Vector2.ZERO)
+		assert_true(resolver.apply_jelly_tap_blast(disabled), "disabled split still blasts")
+		assert_eq(board.get_orbs().size(), 0, "zero level or count leaves no fragments")
+	Config.data.jelly_tap_split_level = original_level
+	Config.data.jelly_tap_split_count = original_count
+	Config.data.spawn_color_weights = original_weights
+	Config.data.game_mode = original_mode
 	await _cleanup(fixture["root"] as Node)
 
 
@@ -1962,8 +2123,8 @@ func test_bomb_quake_and_grow_tap_effects_follow_color_rules() -> void:
 		board.spawn_orb(2, 2, Vector2(60.0 + float(index) * 75.0, 200.0))
 	assert_true(resolver.apply_jelly_tap_blast(empty_green), "GROW tap applies")
 	assert_true(not empty_green.consumed, "threshold green source survives")
-	assert_eq(empty_green.level, 9, "cleaned mass grows source to L9")
-	assert_near(empty_green.jelly_mass, 58.0, 0.001, "growth uses cleaned jelly mass")
+	assert_eq(empty_green.level, 7, "cleaned mass grows L5 source to L7")
+	assert_near(empty_green.jelly_mass, 23.0, 0.001, "growth uses cleaned jelly mass")
 	var max_green: Orb3D = board.spawn_orb(2, 10, Vector2(350.0, -200.0))
 	assert_true(resolver.is_jelly_tap_blast_candidate(max_green), "green L10 can tap empty")
 	assert_true(resolver.apply_jelly_tap_blast(max_green), "green L10 tap applies")
@@ -2024,6 +2185,10 @@ func test_default_yellow_magnet_and_green_rest_preserve_ramp_preview() -> void:
 	assert_true(rest.consumed, "green REST source is removed")
 	assert_eq(spawner.peek_preview(), preview_before, "REST preserves NEXT and THEN")
 	var expected_next: Array = (preview_before[0] as Array).duplicate(true)
+	var split_ids: Array[int] = []
+	for fragment: Orb3D in board.get_orbs():
+		split_ids.append(fragment.stable_spawn_id)
+	assert_eq(split_ids.size(), 2, "REST adds only two fragments before the next swipe")
 	manager.state = TurnManager.State.WAITING_INPUT
 	InputRouter.set_locked(false)
 	manager.on_swipe(Vector2i.RIGHT)
@@ -2036,7 +2201,8 @@ func test_default_yellow_magnet_and_green_rest_preserve_ramp_preview() -> void:
 		func(a: Orb3D, b: Orb3D) -> bool: return a.stable_spawn_id < b.stable_spawn_id
 	)
 	for spawned_orb: Orb3D in spawned_orbs:
-		actual_next.append({"color": spawned_orb.color, "level": spawned_orb.level})
+		if spawned_orb.stable_spawn_id not in split_ids:
+			actual_next.append({"color": spawned_orb.color, "level": spawned_orb.level})
 	assert_eq((preview_before[0] as Array).size(), 3, "turn 30 preview keeps three-orb ramp budget")
 	assert_eq(actual_next, expected_next, "turn 31 spawns the exact NEXT shown before REST")
 	assert_eq(preview_after_spawn[0], preview_before[1], "next turn consumed the previewed NEXT exactly")

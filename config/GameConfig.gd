@@ -146,7 +146,9 @@ enum GameMode {
 @export var blast_push_radius_by_level: PackedFloat32Array = PackedFloat32Array(
 	[0.0, 0.0, 0.0, 0.3, 0.55, 1.0, 1.0, 1.0, 1.0, 1.0]
 )
-@export var jelly_tap_blast_min_level: int = 9
+@export var jelly_tap_blast_min_level: int = 5
+@export var jelly_tap_split_level: int = 3
+@export var jelly_tap_split_count: int = 2
 @export var jelly_tap_blast_radius_factor: float = 0.3
 @export var jelly_tap_blast_score_factor: float = 0.5
 @export var jelly_tap_blast_uses_turn: bool = true
