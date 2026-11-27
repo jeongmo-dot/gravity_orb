@@ -38,6 +38,21 @@
 
 ## 미확인
 
+### [2026-11-27] 대상 #162 추가 요구 1 — 별을 화면 오른쪽 위에 고정
+- **먼저 볼 것:** 기준 회귀 해시 변경 0건, 캡처에서 오른쪽 위를 벗어난 별 0건, 성능 기준 초과 0건.
+- 상태: 완료 — §12-ONE.49 #162 추가 요구 1 반영.
+- 브랜치 / PR: `codex/jelly-tap-star` / https://github.com/jeongmo-dot/gravity_orb/pull/163 — 최신 `origin/main` `502fb58` 병합.
+- Done-when 대조:
+  - [x] 별 위치의 기준 벡터를 화면 축에 고정하고 얼굴과 같은 출렁임·합치기 변형을 중심 위치에만 적용한다. 별 판에는 균일 배율만 적용한다.
+  - [x] `test_tap_mark_follows_face_rotation_and_shares_material_across_colors`를 `test_tap_mark_stays_upper_right_and_shares_material_across_colors`로 변경했다. 네 중력 방향의 변형 없는 위치와 판 basis, 왼쪽 중력의 비균일 늘림, 합치기 중 위치와 판 basis를 검증한다.
+- 캡처 관측값:
+  - Godot 일반 빌드 `4.8.dev3.official.51105ccbe`로 기본 `tests/capture_screens.ps1` 한 차례 실행. `SCREEN_CAPTURE_SUITE exit=0 ratios=2 files=436`, 크기 불일치·누락·오른쪽 위를 벗어난 별 0건. 로그 `artifacts/inbox-162-followup-capture.log`.
+  - `235`(아래 중력)와 `238`(왼쪽 중력) 모두 보통 L5·L8·L9·L10의 오른쪽 위에 별 4개. 두 화면비에서 L5 별 흰색 픽셀의 중심점 차이는 약 0.35px(540×960), 0.16px(540×1170)이었다.
+  - 오른쪽 중력인 기존 장면 `34, 35, 36, 37, 57, 58, 59`는 각 장면 별 4개 모두 화면 오른쪽 위였다. `71`은 아래 중력이며 별 1개가 오른쪽 위에 있었다. 캡처 검사에 표시 중인 별의 투영 위치와 실제 중력 방향을 기록하도록 추가했다.
+- 회귀 관측값: `tests/run_tests.ps1` 일반 388/388·장기 4/4·성능 5/5, 총 397/397, 종료 코드 0. 직전 회귀 로그의 JELLY 해시 21개와 모두 일치했다. 200구 근접 탐색 best p95 0.788ms (기준 1.5ms). 임포트와 기본·블리츠 헤드리스 스모크 종료 코드 각각 0. PowerShell 구문 검사 및 `git diff --check` 오류 0건. 회귀 로그 `artifacts/inbox-162-followup-regression.log`.
+- 수동 확인 절차: JELLY에서 일반 L5를 만든 후 입력 대기와 스와이프 뒤 다음 입력 대기에서 별이 모두 화면 오른쪽 위에 나타나는지 확인한다. 캡처 `235`와 `238`에는 각각 아래·왼쪽 중력의 별 위치가 보인다.
+- 빌드와 봇 측정은 미실행.
+
 ### [2026-11-27] 대상 #162 — 터치할 수 있는 젤리의 반짝 별
 - 상태: 완료 — §12-ONE.49 #162 요구 1~6 반영.
 - 브랜치: `codex/jelly-tap-star`, #161의 PR #162를 스쿼시 병합한 `main` `b97b639` 기준. [변경 비교](https://github.com/jeongmo-dot/gravity_orb/compare/main...codex/jelly-tap-star)

@@ -1180,9 +1180,7 @@ func _update_visual_transform() -> void:
 	)
 	if _tap_mark.visible:
 		var center: Vector2 = JellyOrbArt.TAP_MARK_CENTER * radius_m
-		var face_offset: Vector3 = Vector3(center.x, -center.y, 0.0).rotated(
-			Vector3.BACK, face_rotation
-		)
+		var face_offset: Vector3 = Vector3(center.x, -center.y, 0.0)
 		var deformed_center: Vector3 = (
 			jelly_upright_deform_basis(face_rotation, jelly_content_deform, 1.0) * face_offset
 		)
@@ -1191,9 +1189,7 @@ func _update_visual_transform() -> void:
 			body_front_offset + JellyOrbArt.TAP_MARK_FRONT_OFFSET
 		)
 		var mark_radius: float = radius_m * JellyOrbArt.TAP_MARK_PLANE_RATIO
-		_tap_mark.basis = Basis(Vector3.BACK, face_rotation).scaled(
-			Vector3(mark_radius, mark_radius, 1.0)
-		)
+		_tap_mark.basis = Basis.from_scale(Vector3(mark_radius, mark_radius, 1.0))
 	var symbol_y_offset: float = radius_m * 0.54 if _is_jelly_visual else 0.0
 	_symbol_mesh.position = (
 		_front_overlay_position(

@@ -3451,12 +3451,23 @@ func _report_capture_tap_marks(file_name: String) -> void:
 	if not is_instance_valid(_capture_main):
 		return
 	var board: Board3D = _capture_main.get_node("Board") as Board3D
+	var camera: Camera3D = _capture_main.get_node("Camera3D") as Camera3D
 	var marked_count: int = 0
 	for orb: Orb3D in board.get_orbs():
-		if orb._tap_mark.visible:
-			marked_count += 1
+		if not orb._tap_mark.visible:
+			continue
+		marked_count += 1
+		var offset: Vector2 = (
+			camera.unproject_position(orb._tap_mark.global_position)
+			- camera.unproject_position(orb._mesh.global_position)
+		)
+		if offset.x <= 0.0 or offset.y >= 0.0:
+			_fail("Tap mark is outside the upper-right quadrant in %s: %s" % [file_name, offset])
+			return
 	if marked_count > 0:
-		print("SCREEN_CAPTURE_TAP_MARKS file=%s orbs=%d" % [file_name, marked_count])
+		print("SCREEN_CAPTURE_TAP_MARKS file=%s orbs=%d gravity=%s upper_right=true" % [
+			file_name, marked_count, board.gravity_direction()
+		])
 
 
 func _capture_timed_number_zoom(
