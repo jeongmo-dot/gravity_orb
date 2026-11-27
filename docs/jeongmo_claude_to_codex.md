@@ -42,7 +42,7 @@
 ## 대기 중
 
 ### [2026-11-26 #162] 터치할 수 있는 젤리 표시 — B 반짝 별
-- 상태: **추가 요구 1** (2026-11-27) — PR [#163](https://github.com/jeongmo-dot/gravity_orb/pull/163) `90bdefc` 검수: 보이는 조건·모양·수치·시차·0.15초·테스트·캡처 크기는 명세대로. 문제 = 중력이 바뀌면 별만 다른 모서리로 간다 (`238` 오른쪽 아래, `34` 왼쪽 위 — 얼굴은 늘 똑바로다. Claude 명세 요구 2의 잘못된 전제). 같은 브랜치·같은 PR. 처음: #161 병합 뒤 시작 (공유 트리. #161의 터치 후보 판정을 쓴다). 사용자 2026-11-25 "표시 넣기" → Claude 시안 A~D → 2026-11-26 **"B로 하자"**
+- 상태: **검수 통과 — 병합 대기** (2026-11-27) — 추가 요구 1 회신 `304abbc` 검수 통과: 별이 네 중력 방향 모두 화면 오른쪽 위 (`238` = `235`, `34` 오른쪽 위), 전체 회귀 397/397·해시 그대로·캡처 실패 0. 병합은 사용자 "병합" 뒤. 첫 검수 (PR [#163](https://github.com/jeongmo-dot/gravity_orb/pull/163) `90bdefc`): 보이는 조건·모양·수치·시차·0.15초·테스트·캡처 크기는 명세대로. 문제 = 중력이 바뀌면 별만 다른 모서리로 간다 (`238` 오른쪽 아래, `34` 왼쪽 위 — 얼굴은 늘 똑바로다. Claude 명세 요구 2의 잘못된 전제). 같은 브랜치·같은 PR. 처음: #161 병합 뒤 시작 (공유 트리. #161의 터치 후보 판정을 쓴다). 사용자 2026-11-25 "표시 넣기" → Claude 시안 A~D → 2026-11-26 **"B로 하자"**
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.49** "#162 터치할 수 있는 젤리 표시 — B 반짝 별" (수치 표)
 - 앵커: `scripts/spike/Orb3D.gd` (`_update_visual_transform()` 얼굴 판·`face_radius_ratio`, `_apply_visual_transparency()`), `scripts/core/JellyOrbArt.gd` (얼굴 재질·`face_mesh()`·`_apply_animation_time()`·배 셰이더 `instance uniform`), `scripts/core/TurnManager.gd` (`state`·`_set_state()`·`on_tap()`), `scripts/core/CollisionResolver.gd` `is_jelly_tap_blast_candidate()`, `tests/test_jelly_visuals.gd`·`test_jolt_3d.gd`, `tests/spike/capture_screens.gd`·`tests/capture_screens.ps1`
 - 요구 요약 (§12-ONE.49 "#162 요구" 1~6):
@@ -56,7 +56,7 @@
 - Done-when:
   - [x] 표시 = 터치 후보 판정 (테스트), `WAITING_INPUT` 밖에서는 없음
   - [x] 수치 표와 같음 (상수)
-  - [ ] 별이 얼굴처럼 늘 화면 오른쪽 위 — 중력이 바뀌어도 그대로 (테스트·캡처, 추가 요구 1. 처음 명세 "얼굴 회전을 따름"은 잘못)
+  - [x] 별이 얼굴처럼 늘 화면 오른쪽 위 — 중력이 바뀌어도 그대로 (테스트·캡처, 추가 요구 1. 처음 명세 "얼굴 회전을 따름"은 잘못)
   - [x] 물리·회귀 해시 그대로, 전체 회귀·성능 (평일 기준)
   - [x] 캡처 두 비율 (크기 검사 통과), 별이 새로 생긴 기존 캡처 목록
 - 브랜치: #161 병합 뒤 main에서 새 브랜치 → PR

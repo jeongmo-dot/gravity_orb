@@ -6728,6 +6728,23 @@ G1 전략 봇 (시드 1~20, 600턴 상한, 턴 평균 / 총점 평균):
 - 건드리지 말 것: #162와 같다
 - 회신 맨 앞에: 해시 변경, 별이 오른쪽 위가 아닌 캡처, 성능 기준 넘음
 
+**#162 추가 요구 1 검수 (Claude, 2026-11-27, PR [#163](https://github.com/jeongmo-dot/gravity_orb/pull/163) `304abbc`) — 통과, 병합 대기**
+- 회신 맨 앞: 해시 변경 0, 오른쪽 위가 아닌 별 0, 성능 기준 넘음 0
+- 된 것 (Claude가 diff로 봄):
+  - `Orb3D._update_visual_transform()`: 별 자리 (0.66 R, −0.68 R)를 돌리지 않는다. 출렁임·합치기 늘림 `jelly_upright_deform_basis(face_rotation, jelly_content_deform, 1.0)`만 자리에 준다. 판은 `Basis.from_scale(mark_radius, mark_radius, 1)`이라 회전이 없다. 합치는 동안도 같은 식이다. 요구 1과 같다
+  - 테스트 `test_tap_mark_follows_face_rotation_and_shares_material_across_colors` → `test_tap_mark_stays_upper_right_and_shares_material_across_colors`. 네 중력 방향에서 별 중심과 판 basis를 본다. 중력 왼쪽·늘림 (1.12, 1.04)에서 중심 = (0.66 R, −0.68 R) × (1.04, 1.12)인지 본다. 합치는 동안 중심과 판도 본다
+  - 캡처 검사 `_report_capture_tap_marks()`: 보이는 별마다 화면 투영 자리가 젤리 중심의 오른쪽 위가 아니면 실패한다. 로그에 중력 방향을 적는다
+- Codex 결과:
+  - 기본 전체 캡처 두 비율 `exit=0 ratios=2 files=436`
+  - 전체 회귀 397/397 (일반 388·장기 4·성능 5). JELLY 해시 21개 그대로
+  - 200구 근접 탐색 best p95 0.788ms (< 1.5ms)
+  - 빌드 없음
+- Claude 확인 (다시 실행하지 않고 Codex 캡처·로그로):
+  - `238` (중력 왼쪽): 별 넷 (L5 분홍·L8 초록·L9 노랑·L10 보라)이 `235`와 같은 오른쪽 위에 있다. L5 분홍을 나란히 확대해도 자리·모양이 같다
+  - `34` (중력 오른쪽): 별 넷 모두 오른쪽 위에 있다. 첫 검수 때 왼쪽 위였던 장면이다
+  - 캡처 로그: `34`~`37`·`57`~`59` (중력 오른쪽)는 각 4개, `71` (아래)은 1개, `235`~`238`은 모두 `upper_right=true`
+- Done-when 모두 충족. 병합은 사용자 "병합" 뒤에 한다. 병합 때 기획서에 별 표시를 적는다 (§4 변경 없음)
+
 ### 12-ONE.3 다음 (JELLY 개선)
 - CLASSIC 전용 분기 정리 (행성 그림·연출·규칙 — JELLY가 안 쓰는 것)
 - 결정 대기에서 이어지는 것: 효과음 (합성·녹음), 시작 화면 그림 (지금 행성 — JELLY에 맞게?)
