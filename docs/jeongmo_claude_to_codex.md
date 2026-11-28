@@ -41,8 +41,14 @@
 
 ## 대기 중
 
-### [2026-11-28 #163] 터치할 수 있는 젤리 표시 — 별 대신 지나가는 광택
-- 상태: **검수 통과 — 병합 대기** (2026-11-28) — PR [#164](https://github.com/jeongmo-dot/gravity_orb/pull/164) `0382254` 검수 통과: 별 제거, 몸 셰이더 띠 수치·시차·원근 보정이 명세대로. 캡처 두 비율에서 띠가 몸 안·눈 아래에 있고, 중력과 상관없이 기울기가 같다 (`237b` 픽셀: 자리·폭·밝기가 계산과 같음). 핵심 테스트 통과. 전체 회귀·기본 전체 캡처는 평일에. 병합은 사용자 "병합" 뒤
+(없음)
+
+---
+
+## 처리 완료
+
+### [2026-11-28 #163] 터치할 수 있는 젤리 표시 — 별 대신 지나가는 광택 — 완료
+- 상태: **완료** — 2026-11-28 12:18 사용자 "병합" → PR [#164](https://github.com/jeongmo-dot/gravity_orb/pull/164) squash 병합 `bdaa6ca`. 검수 (`0382254`) 통과: 별 제거, 몸 셰이더 띠 수치·시차·원근 보정이 명세대로. 캡처 두 비율에서 띠가 몸 안·눈 아래에 있고, 중력과 상관없이 기울기가 같다 (`237b` 픽셀: 자리·폭·밝기가 계산과 같음). 핵심 테스트 통과. 전체 회귀·기본 전체 캡처는 평일에. 로컬 브랜치 삭제, 원격 브랜치는 남김. 기획서 0.16.40
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.49** "#163 터치할 수 있는 젤리 표시 — 별 대신 지나가는 광택 (시안 C)" (수치 표). 사용자 2026-11-28 "별이 뜨기보다 반투명한 광택이 지나가는 방식으로 해줘"
 - 앵커: `scenes/Orb3D.tscn` `TapMark`, `scripts/spike/Orb3D.gd` (`_tap_mark`·`set_tap_mark_enabled()`·`_advance_tap_mark()`·`_update_visual_transform()`·`_apply_visual_transparency()`), `scripts/core/JellyOrbArt.gd` (`TAP_MARK_*`·`tap_mark_material()`·`_get_body_shader()`·`body_material_for()`·`stone_body_material()`·`_apply_animation_time()`·`shared_material_count()`·`prewarm()`), `tests/test_jelly_visuals.gd`·`test_jolt_3d.gd`, `tests/spike/capture_screens.gd` (`_report_capture_tap_marks()`)·`tests/capture_screens.ps1`
 - 요구 요약 (§12-ONE.49 "#163 요구" 1~6):
@@ -61,10 +67,6 @@
   - [x] 항목 캡처 두 비율 (크기 검사 통과): 띠가 몸 안·눈 아래, 기울기가 중력과 상관없이 같다
 - 브랜치: main에서 새 브랜치 → PR
 - **회신 맨 앞에**: 핵심 테스트 실패나 해시 변경, 띠가 몸 밖으로 나감, 띠가 눈·입 위, 후보가 아닌 젤리에 띠, 별이 남은 곳
-
----
-
-## 처리 완료
 
 ### [2026-11-26 #162] 터치할 수 있는 젤리 표시 — B 반짝 별 — 완료
 - 상태: **완료** — 2026-11-27 22:57 사용자 "병합" → PR [#163](https://github.com/jeongmo-dot/gravity_orb/pull/163) squash 병합 `4bd42b5`. 추가 요구 1 회신 `304abbc` 검수 통과: 별이 네 중력 방향 모두 화면 오른쪽 위 (`238` = `235`, `34` 오른쪽 위), 전체 회귀 397/397·해시 그대로·캡처 실패 0. 로컬 브랜치 삭제, 원격 브랜치는 남김. 기획서 0.16.39. 첫 검수 (PR [#163](https://github.com/jeongmo-dot/gravity_orb/pull/163) `90bdefc`): 보이는 조건·모양·수치·시차·0.15초·테스트·캡처 크기는 명세대로. 문제 = 중력이 바뀌면 별만 다른 모서리로 간다 (`238` 오른쪽 아래, `34` 왼쪽 위 — 얼굴은 늘 똑바로다. Claude 명세 요구 2의 잘못된 전제). 같은 브랜치·같은 PR. 처음: #161 병합 뒤 시작 (공유 트리. #161의 터치 후보 판정을 쓴다). 사용자 2026-11-25 "표시 넣기" → Claude 시안 A~D → 2026-11-26 **"B로 하자"**
