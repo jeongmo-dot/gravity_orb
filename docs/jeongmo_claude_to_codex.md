@@ -41,7 +41,26 @@
 
 ## 대기 중
 
-(없음)
+### [2026-11-28 #163] 터치할 수 있는 젤리 표시 — 별 대신 지나가는 광택
+- 상태: 대기
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.49** "#163 터치할 수 있는 젤리 표시 — 별 대신 지나가는 광택 (시안 C)" (수치 표). 사용자 2026-11-28 "별이 뜨기보다 반투명한 광택이 지나가는 방식으로 해줘"
+- 앵커: `scenes/Orb3D.tscn` `TapMark`, `scripts/spike/Orb3D.gd` (`_tap_mark`·`set_tap_mark_enabled()`·`_advance_tap_mark()`·`_update_visual_transform()`·`_apply_visual_transparency()`), `scripts/core/JellyOrbArt.gd` (`TAP_MARK_*`·`tap_mark_material()`·`_get_body_shader()`·`body_material_for()`·`stone_body_material()`·`_apply_animation_time()`·`shared_material_count()`·`prewarm()`), `tests/test_jelly_visuals.gd`·`test_jolt_3d.gd`, `tests/spike/capture_screens.gd` (`_report_capture_tap_marks()`)·`tests/capture_screens.ps1`
+- 요구 요약 (§12-ONE.49 "#163 요구" 1~6):
+  1. 별 (노드·재질·셰이더·별 상수)을 없앤다. 0.15초 켜고 끄기는 남긴다
+  2. 몸 셰이더에 광택 띠: 화면 기준 25° 기운 흰 띠 (폭 0.36 R, 가운데 0.75 → 끝 0). 2.8초마다 앞 1.54초에 왼쪽 위 밖 → 오른쪽 아래 밖으로 지나간다. 시차는 색 번호 × 0.7초. 켜짐 세기는 `instance uniform`, 시차는 재질 uniform. 원근 보정 (c = 0이면 띠가 젤리 중심을 지남). 세기 0이면 몸 색 그대로. 얼굴·배 속 그림은 띠 위
+  3. 보이는 조건·터치 판정·규칙·얼굴 그대로
+  4. 테스트 (주말 핵심): 별 없음, 세기 0 ↔ 1 (0.15초), 상수, 재질이 바뀌어도 세기 유지. 전체 회귀는 평일에
+  5. 캡처 두 비율 (항목 장면만, 새 스위치): t = 0.77초 나란히, 1.47초 노랑, L5 확대 세 순간, 중력 왼쪽, 발사 직후. 기본 전체 캡처는 평일에
+  6. 빌드 없음
+- 건드리지 말 것: 규칙·값, 얼굴·몸 그림 (세기 0일 때), NEXT·HUD·안내 글·소리, 터치 판정 반지름, 고리 금지, 사용자 저장 파일, `project.godot` 버전·`build/windows/`, `docs/` (회신 파일 제외)
+- Done-when:
+  - [ ] 별이 없다 (노드·재질·상수)
+  - [ ] 광택 수치가 표와 같다 (상수·테스트)
+  - [ ] 표시 = 터치 후보 판정 그대로, `WAITING_INPUT` 밖에서는 세기 0
+  - [ ] 핵심 테스트 통과
+  - [ ] 항목 캡처 두 비율 (크기 검사 통과): 띠가 몸 안·눈 아래, 기울기가 중력과 상관없이 같다
+- 브랜치: main에서 새 브랜치 → PR
+- **회신 맨 앞에**: 핵심 테스트 실패나 해시 변경, 띠가 몸 밖으로 나감, 띠가 눈·입 위, 후보가 아닌 젤리에 띠, 별이 남은 곳
 
 ---
 
