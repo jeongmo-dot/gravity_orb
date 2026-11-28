@@ -296,7 +296,13 @@ if ($JellyLookOnly) {
     )
     $zoomFiles = $tapSheenZoomFiles + @(
         $jellyLookEdgeSpec,
-        @{ Path = "42_jelly_look_absorption_next_zoom.png"; Size = "480x480" }
+        @{ Path = "42_jelly_look_absorption_next_zoom.png"; Size = "480x480" },
+        @{ Path = "241a_jelly_look_l10_sheen_005.png"; Size = "480x480" },
+        @{ Path = "241b_jelly_look_l10_sheen_012.png"; Size = "480x480" },
+        @{ Path = "241c_jelly_look_l10_sheen_020.png"; Size = "480x480" },
+        @{ Path = "241d_jelly_look_l10_sheen_028.png"; Size = "480x480" },
+        @{ Path = "241e_jelly_look_l10_sheen_036.png"; Size = "480x480" },
+        @{ Path = "241f_jelly_look_l10_sheen_050.png"; Size = "480x480" }
     )
 } elseif ($JellyTapSheenOnly) {
     $modeArgument = "--capture-jelly-tap-sheen"

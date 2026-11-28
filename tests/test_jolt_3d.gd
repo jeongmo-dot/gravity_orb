@@ -1232,6 +1232,7 @@ func test_tap_blast_candidate_accepts_l5_to_l10_and_rejects_l4_waiting_ghost_and
 	for orb: Orb3D in [level_four, waiting, ghost, locked]:
 		orb._advance_tap_mark(0.15)
 		assert_true(_tap_sheen_strength(orb) == 0.0, "ineligible orb has no tap mark")
+		assert_true(not orb._sheen.visible, "ineligible orb overlay is hidden")
 	ghost.exit_ghost_state()
 	manager._physics_process(0.0)
 	ghost._advance_tap_mark(0.15)
@@ -1357,6 +1358,7 @@ func test_jelly_tap_sheen_follows_turn_and_configured_threshold() -> void:
 	for orb: Orb3D in original_orbs:
 		orb._advance_tap_mark(0.15)
 		assert_true(_tap_sheen_strength(orb) == 0.0, "mark is off while simulating")
+		assert_true(not orb._sheen.visible, "overlay is hidden after fade-out")
 	manager._on_settled()
 	assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "turn settles back to input")
 	manager._physics_process(0.0)
@@ -2362,7 +2364,7 @@ func _assert_orb_visual_and_collision_radius(orb: Orb3D, context: String) -> voi
 
 
 func _tap_sheen_strength(orb: Orb3D) -> float:
-	return float(orb._mesh.get_instance_shader_parameter("tap_sheen_strength"))
+	return float(orb._sheen.get_instance_shader_parameter("tap_sheen_strength"))
 
 
 func _cleanup(node: Node) -> void:

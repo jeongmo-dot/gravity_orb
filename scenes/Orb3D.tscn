@@ -22,6 +22,11 @@ unique_name_in_owner = true
 unique_name_in_owner = true
 cast_shadow = 0
 
+[node name="Sheen" type="MeshInstance3D" parent="Mesh"]
+unique_name_in_owner = true
+visible = false
+cast_shadow = 0
+
 [node name="Shadow" type="MeshInstance3D" parent="."]
 unique_name_in_owner = true
 visible = false

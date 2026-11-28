@@ -4,55 +4,95 @@ const BOARD_SCENE: PackedScene = preload("res://scenes/Board3D.tscn")
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
 
 
-func test_tap_sheen_uses_body_uniforms_and_survives_material_changes() -> void:
+func test_tap_sheen_overlay_material_and_profile() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	JellyOrbArt.clear_cache()
 	JellyOrbArt.prewarm(Config.data)
 	assert_eq(
 		JellyOrbArt.shared_material_count(),
-		JellyOrbArt.PALETTE.size() * Config.data.orb_max_level * 3 + 1,
-		"prewarm adds one shared shadow material"
+		JellyOrbArt.PALETTE.size() * Config.data.orb_max_level * 3 + 2,
+		"prewarm adds one shadow and one sheen material"
 	)
 	var board: Board3D = await _create_board()
 	var orb: Orb3D = board.spawn_orb(2, 5, Vector2.ZERO)
-	assert_true(not orb.has_node("TapMark"), "the separate star node is gone")
 	var body: ShaderMaterial = orb.visual_material_resource()
-	var axis: Vector2 = body.get_shader_parameter("tap_sheen_axis")
-	assert_near(rad_to_deg(axis.angle()), 25.0, 0.0001, "25-degree screen sweep axis")
-	assert_near(axis.length(), 1.0, 0.0001, "unit screen sweep axis")
+	assert_true(not body.shader.code.contains("sheen"), "body shader does not render the old sheen")
+	assert_true(
+		not JellyOrbArt.stone_body_material(5).shader.code.contains("sheen"),
+		"stone body uses the same clear shader"
+	)
+	var sheen: ShaderMaterial = orb._sheen.material_override as ShaderMaterial
+	assert_eq(orb._sheen.get_parent(), orb._mesh, "overlay inherits body transform")
+	assert_eq(orb._sheen.transform, Transform3D.IDENTITY, "overlay has no extra local transform")
+	assert_eq(orb._sheen.mesh, orb._mesh.mesh, "overlay shares the body mesh")
+	assert_eq(sheen.render_priority, 13, "overlay renders above the face")
+	assert_true(sheen.shader.code.contains("depth_test_disabled"), "the face does not cut through the overlay")
+	assert_eq(sheen.get_shader_parameter("sheen_color"), Color8(244, 236, 198), "cream color")
+	assert_eq(sheen.get_shader_parameter("sheen_afterglow_times"), Vector3(0.30, 0.44, 0.80), "afterglow")
+	var direction: Vector2 = sheen.get_shader_parameter("sheen_direction")
+	assert_near(rad_to_deg(direction.angle()), 45.0, 0.0001, "screen sweep direction")
 	var uniforms: Dictionary = {
-		"tap_sheen_period": 2.8,
-		"tap_sheen_sweep_fraction": 0.55,
-		"tap_sheen_travel": 2.0,
-		"tap_sheen_half_width": 0.60,
-		"tap_sheen_brightness": 0.50,
-		"tap_sheen_streak_offset": 0.30,
-		"tap_sheen_streak_half_width": 0.025,
-		"tap_sheen_streak_brightness": 0.65,
+		"edge_feather_px": 1.5,
+		"sheen_period": 2.0,
+		"sheen_sweep_seconds": 0.40,
+		"sheen_peak": 0.90,
+		"sheen_tail": 1.20,
+		"sheen_plateau": 0.30,
+		"sheen_lead": 0.32,
+		"sheen_tail_power": 1.5,
+		"sheen_afterglow_peak": 0.20,
 	}
 	for uniform: String in uniforms:
-		assert_near(float(body.get_shader_parameter(uniform)), float(uniforms[uniform]), 0.0001, uniform)
-	for color: int in range(JellyOrbArt.PALETTE.size()):
-		var material: ShaderMaterial = JellyOrbArt.body_material_for(color, 5)
-		assert_near(float(material.get_shader_parameter("tap_sheen_phase")), float(color) * 0.7, 0.0001, "color phase")
-	assert_eq(orb._mesh.get_instance_shader_parameter("tap_sheen_strength"), 0.0, "starts clear")
+		assert_near(float(sheen.get_shader_parameter(uniform)), float(uniforms[uniform]), 0.0001, uniform)
+	assert_near(float(orb._sheen.get_instance_shader_parameter("tap_sheen_phase")), 1.4, 0.0001, "color phase")
+	_assert_sheen_profile_samples(sheen)
+	assert_true(not orb._sheen.visible, "starts hidden")
 	orb.set_tap_mark_enabled(true)
 	orb._advance_tap_mark(0.15)
-	assert_eq(orb._mesh.get_instance_shader_parameter("tap_sheen_strength"), 1.0, "fully on at 0.15s")
+	assert_true(orb._sheen.visible, "eligible orb shows sheen")
+	assert_eq(orb._sheen.get_instance_shader_parameter("tap_sheen_strength"), 1.0, "fully on at 0.15s")
 	orb.set_jelly_mass(Config.data.jelly_mass_for_level(6), Config.data)
 	assert_true(orb.visual_material_resource() != body, "level changes the body material")
-	assert_eq(orb._mesh.get_instance_shader_parameter("tap_sheen_strength"), 1.0, "level retains strength")
+	assert_eq(orb._sheen.mesh, orb._mesh.mesh, "overlay follows radius growth")
+	assert_eq(orb._sheen.get_instance_shader_parameter("tap_sheen_strength"), 1.0, "level retains strength")
+	var symbol: StandardMaterial3D = (orb._symbol_mesh.mesh as QuadMesh).material as StandardMaterial3D
+	assert_eq(symbol.render_priority, sheen.render_priority, "symbol shares priority")
+	assert_true(orb._symbol_mesh.position.z > orb._sheen.position.z, "symbol is closer at equal priority")
 	orb.set_timed_stone(7)
-	var stone: ShaderMaterial = orb.visual_material_resource()
-	assert_true(not bool(stone.get_shader_parameter("tap_sheen_enabled")), "stone never renders sheen")
-	assert_eq(float(stone.get_shader_parameter("tap_sheen_phase")), 0.0, "stone phase is zero")
-	assert_eq(orb._mesh.get_instance_shader_parameter("tap_sheen_strength"), 1.0, "stone retains instance strength")
+	assert_true(not orb._sheen.visible, "stone never renders sheen")
+	assert_eq(orb._sheen.get_instance_shader_parameter("tap_sheen_strength"), 1.0, "material swap retains strength")
 	orb.set_tap_mark_enabled(false)
 	orb._advance_tap_mark(0.15)
-	assert_eq(orb._mesh.get_instance_shader_parameter("tap_sheen_strength"), 0.0, "fully off at 0.15s")
+	assert_eq(orb._sheen.get_instance_shader_parameter("tap_sheen_strength"), 0.0, "fully off at 0.15s")
+	assert_true(not orb._sheen.visible, "zero strength hides overlay")
 	Config.data.game_mode = original_mode
 	await _cleanup(board)
+
+
+func _assert_sheen_profile_samples(material: ShaderMaterial) -> void:
+	var tail: float = material.get_shader_parameter("sheen_tail")
+	var plateau_end: float = tail + float(material.get_shader_parameter("sheen_plateau"))
+	var lead: float = material.get_shader_parameter("sheen_lead")
+	var peak: float = material.get_shader_parameter("sheen_peak")
+	var power: float = material.get_shader_parameter("sheen_tail_power")
+	var positions: Array[float] = [0.0, 0.6, 1.2, 1.35, 1.66, 1.82]
+	var expected_band: Array[float] = [0.0, 0.318, 0.90, 0.90, 0.45, 0.0]
+	for index: int in range(positions.size()):
+		var x: float = positions[index]
+		var alpha: float = peak * (
+			pow(x / tail, power) if x < tail else 1.0 - smoothstep(0.0, lead, x - plateau_end)
+		)
+		assert_near(alpha, expected_band[index], 0.001, "band at %.2f" % x)
+	var times: Vector3 = material.get_shader_parameter("sheen_afterglow_times")
+	var glow_peak: float = material.get_shader_parameter("sheen_afterglow_peak")
+	var samples: Array[float] = [0.20, 0.44, 0.62, 0.90]
+	var expected_glow: Array[float] = [0.0, 0.20, 0.10, 0.0]
+	for index: int in range(samples.size()):
+		var time: float = samples[index]
+		var rise: float = clampf(inverse_lerp(times.x, times.y, time), 0.0, 1.0)
+		var fall: float = clampf(inverse_lerp(times.z, times.y, time), 0.0, 1.0)
+		assert_near(glow_peak * minf(rise, fall), expected_glow[index], 0.001, "glow at %.2f" % time)
 
 
 func test_jelly_body_palette_layers_and_preview_pixels() -> void:
@@ -78,6 +118,7 @@ func test_jelly_body_palette_layers_and_preview_pixels() -> void:
 		assert_eq(body.get_shader_parameter("body_gradient"), Vector4(0.12, 0.28, 1.36, 0.50), "gradient")
 		assert_eq(body.get_shader_parameter("body_deep_stop"), 0.86, "deep stop")
 		assert_eq(body.get_shader_parameter("body_alpha"), Vector4(0.95, 0.90, 0.93, 0.97), "alpha stops")
+		assert_eq(body.get_shader_parameter("edge_feather_px"), 1.5, "body edge feather width")
 		assert_eq(body.get_shader_parameter("body_ellipses"), PackedVector4Array([
 			Vector4(0.12, 0.42, 0.60, 0.40),
 			Vector4(0.50, 0.52, 0.16, 0.06),

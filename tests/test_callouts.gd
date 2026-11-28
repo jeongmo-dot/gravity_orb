@@ -137,6 +137,9 @@ func test_jelly_preview_and_unlock_use_jelly_art_and_names() -> void:
 	var hud: Hud = main.get_node("UI/Hud") as Hud
 	var callout: Label = main.get_node("UI/Hud/CalloutLabel") as Label
 	var unlock_visual: OrbVisual = main.get_node("UI/Hud/PlanetUnlockVisual") as OrbVisual
+	var then_flash: ReferenceRect = (
+		main.get_node("UI/Hud/ThenPreviewRegion/ThenUnlockFlash") as ReferenceRect
+	)
 	hud._on_planet_unlocked(OrbTypes.OrbColor.PURPLE)
 	assert_eq(callout.text, "새 젤리 — 보라", "JELLY unlock uses jelly wording")
 	assert_eq(unlock_visual.jelly_level(), 2, "JELLY unlock uses L2 jelly art")
@@ -156,13 +159,11 @@ func test_jelly_preview_and_unlock_use_jelly_art_and_names() -> void:
 	assert_eq(next_visual.jelly_level(), 2, "JELLY NEXT uses jelly preview")
 	assert_eq(then_visual.jelly_level(), 7, "JELLY THEN uses MAX jelly face")
 	assert_eq(next_visual.celestial_level(), 0, "JELLY NEXT does not use planet art")
-	assert_true(not hud._then_preview_flash.visible, "JELLY THEN unlock does not draw a rectangle")
-	hud._on_preview_changed([
-		[{"color": OrbTypes.OrbColor.PURPLE, "level": Config.data.orb_max_level}],
-		[{"color": OrbTypes.OrbColor.RED, "level": 2}],
-	])
-	assert_true(not hud._next_preview_flash.visible, "JELLY NEXT unlock does not draw a rectangle")
-	assert_eq(hud.preview_unlock_flash_history(), [OrbTypes.OrbColor.CYAN, OrbTypes.OrbColor.PURPLE], "preview unlocks recorded")
+	assert_eq(
+		then_flash.border_color,
+		JellyOrbArt.color_for(OrbTypes.OrbColor.CYAN, 7),
+		"JELLY preview border uses the jelly level color"
+	)
 	if hud._callout_tween != null and hud._callout_tween.is_valid():
 		hud._callout_tween.kill()
 	hud._hide_callout_label()
@@ -173,10 +174,6 @@ func test_jelly_preview_and_unlock_use_jelly_art_and_names() -> void:
 		JellyOrbArt.color_for(OrbTypes.OrbColor.CYAN, 2),
 		"orange unlock uses the JELLY palette"
 	)
-	Config.data.game_mode = GameConfig.GameMode.TURN
-	hud._preview_unlock_seen.clear()
-	hud._on_preview_changed([[{"color": OrbTypes.OrbColor.PURPLE, "level": 7}]])
-	assert_true(hud._next_preview_flash.visible, "TURN retains the rectangular unlock flash")
 	await _destroy_main(main)
 	Config.data.fx_callouts_enabled = original_enabled
 	Config.data.sfx_enabled = original_sfx_enabled

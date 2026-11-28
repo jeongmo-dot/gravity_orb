@@ -650,12 +650,16 @@ func _track_preview_unlocks(batches: Array) -> void:
 				continue
 			_preview_unlock_seen[color_index] = true
 			_preview_unlock_flash_history.append(color_index)
-			if Config.data.fx_callouts_enabled and Config.data.game_mode == GameConfig.GameMode.TURN:
-				_flash_preview_slot(batch_index, color_index)
+			if Config.data.fx_callouts_enabled:
+				_flash_preview_slot(
+					batch_index,
+					color_index,
+					int(candidate.get("level", 1))
+				)
 			break
 
 
-func _flash_preview_slot(batch_index: int, color_index: int) -> void:
+func _flash_preview_slot(batch_index: int, color_index: int, level: int) -> void:
 	var flash: ReferenceRect = (
 		_next_preview_flash if batch_index == 0 else _then_preview_flash
 	)
@@ -664,7 +668,11 @@ func _flash_preview_slot(batch_index: int, color_index: int) -> void:
 	)
 	if active_tween != null and active_tween.is_valid():
 		active_tween.kill()
-	flash.border_color = Config.data.color_display[color_index]
+	flash.border_color = (
+		JellyOrbArt.color_for(color_index, level)
+		if Config.data.game_mode == GameConfig.GameMode.JELLY
+		else Config.data.color_display[color_index]
+	)
 	flash.modulate = Color.WHITE
 	flash.visible = true
 	var tween: Tween = create_tween()

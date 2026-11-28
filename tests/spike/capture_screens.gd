@@ -249,6 +249,14 @@ const JELLY_TAP_SHEEN_FILES: Array[String] = [
 ]
 const JELLY_LOOK_EDGE_FILE: String = "240_jelly_look_l10_edge_zoom.png"
 const JELLY_LOOK_NEXT_ZOOM_FILE: String = "42_jelly_look_absorption_next_zoom.png"
+const JELLY_LOOK_SHEEN_CYCLE_FILES: Array[String] = [
+	"241a_jelly_look_l10_sheen_005.png",
+	"241b_jelly_look_l10_sheen_012.png",
+	"241c_jelly_look_l10_sheen_020.png",
+	"241d_jelly_look_l10_sheen_028.png",
+	"241e_jelly_look_l10_sheen_036.png",
+	"241f_jelly_look_l10_sheen_050.png",
+]
 const JELLY_LOOK_LEGACY_FILES: Array[String] = [
 	"40_jelly_look_max.png",
 	"42_jelly_look_absorption.png",
@@ -293,7 +301,7 @@ func _run() -> void:
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.rng_seed = 5050
 	if _jelly_look_only:
-		await _capture_jelly_tap_sheens(true)
+		await _capture_jelly_tap_sheens(true, true)
 		await _capture_jelly_look_legacy_scenes()
 	elif _jelly_tap_sheen_only:
 		await _capture_jelly_tap_sheens()
@@ -317,7 +325,7 @@ func _run() -> void:
 	var expected_files: Array[String] = CAPTURE_FILES + JELLY_TAP_SHEEN_FILES
 	expected_files.append(JELLY_LOOK_EDGE_FILE)
 	if _jelly_look_only:
-		expected_files = JELLY_TAP_SHEEN_FILES + JELLY_LOOK_LEGACY_FILES
+		expected_files = JELLY_TAP_SHEEN_FILES + JELLY_LOOK_LEGACY_FILES + JELLY_LOOK_SHEEN_CYCLE_FILES
 		expected_files.append(JELLY_LOOK_EDGE_FILE)
 		expected_files.append(JELLY_LOOK_NEXT_ZOOM_FILE)
 	elif _jelly_tap_sheen_only:
@@ -493,7 +501,7 @@ func _capture_jelly_tap_split_scenes() -> void:
 	await _destroy_main(main)
 
 
-func _capture_jelly_tap_sheens(capture_edge: bool = false) -> void:
+func _capture_jelly_tap_sheens(capture_edge: bool = false, capture_cycle: bool = false) -> void:
 	var main: Main = await _create_main(true)
 	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
 	var board: Board3D = main.get_node("Board") as Board3D
@@ -512,7 +520,9 @@ func _capture_jelly_tap_sheens(capture_edge: bool = false) -> void:
 	for orb: Orb3D in board.get_orbs():
 		orb.disable_physics()
 	manager._set_state(TurnManager.State.WAITING_INPUT)
-	JellyOrbArt.freeze_animation_for_capture(0.77)
+	var purple_phase: float = float(level_ten.color) * JellyOrbArt.TAP_SHEEN_PHASE_STEP
+	var purple_center_time: float = fposmod(0.20 - purple_phase, JellyOrbArt.TAP_SHEEN_PERIOD)
+	JellyOrbArt.freeze_animation_for_capture(purple_center_time)
 	await get_tree().create_timer(0.20).timeout
 	var candidates: Array[Orb3D] = [level_five, level_eight, level_nine, level_ten]
 	_verify_tap_sheen_capture(JELLY_TAP_SHEEN_FILES[0], board, candidates)
@@ -529,10 +539,11 @@ func _capture_jelly_tap_sheens(capture_edge: bool = false) -> void:
 		])
 		# Enlarge edge coverage without the bright overshoot from Lanczos.
 		await _capture_zoom(JELLY_LOOK_EDGE_FILE, edge_center, 35, Image.INTERPOLATE_BILINEAR)
-	JellyOrbArt.freeze_animation_for_capture(1.47)
+	var yellow_phase: float = float(level_nine.color) * JellyOrbArt.TAP_SHEEN_PHASE_STEP
+	JellyOrbArt.freeze_animation_for_capture(fposmod(0.20 - yellow_phase, JellyOrbArt.TAP_SHEEN_PERIOD))
 	_verify_tap_sheen_capture(JELLY_TAP_SHEEN_FILES[1], board, candidates)
 	await _capture(JELLY_TAP_SHEEN_FILES[1])
-	var zoom_times: Array[float] = [0.613860, 0.77, 0.926140]
+	var zoom_times: Array[float] = [0.12, 0.20, 0.28]
 	for index: int in range(zoom_times.size()):
 		JellyOrbArt.freeze_animation_for_capture(zoom_times[index])
 		var file_name: String = JELLY_TAP_SHEEN_FILES[index + 2]
@@ -541,7 +552,19 @@ func _capture_jelly_tap_sheens(capture_edge: bool = false) -> void:
 			file_name, camera.unproject_position(level_five._mesh.global_position), 55
 		)
 
-	JellyOrbArt.freeze_animation_for_capture(0.77)
+	if capture_cycle:
+		var purple_times: Array[float] = [0.05, 0.12, 0.20, 0.28, 0.36, 0.50]
+		for index: int in range(purple_times.size()):
+			JellyOrbArt.freeze_animation_for_capture(
+				fposmod(purple_times[index] - purple_phase, JellyOrbArt.TAP_SHEEN_PERIOD)
+			)
+			var file_name: String = JELLY_LOOK_SHEEN_CYCLE_FILES[index]
+			_verify_tap_sheen_capture(file_name, board, candidates)
+			await _capture_zoom(
+				file_name, camera.unproject_position(level_ten._mesh.global_position), 82
+			)
+
+	JellyOrbArt.freeze_animation_for_capture(purple_center_time)
 	var diagonal_time: float = Config.data.gravity_turn_diagonal_time
 	Config.data.gravity_turn_diagonal_time = 0.0
 	manager.gravity = Vector2i.LEFT
@@ -563,9 +586,10 @@ func _capture_jelly_tap_sheens(capture_edge: bool = false) -> void:
 func _verify_tap_sheen_capture(file_name: String, board: Board3D, candidates: Array[Orb3D]) -> void:
 	var strengths: Array[float] = []
 	for orb: Orb3D in board.get_orbs():
-		var strength: float = float(orb._mesh.get_instance_shader_parameter("tap_sheen_strength"))
+		var strength: float = float(orb._sheen.get_instance_shader_parameter("tap_sheen_strength"))
 		strengths.append(strength)
-		if strength != (1.0 if orb in candidates else 0.0):
+		var expected: bool = orb in candidates
+		if strength != (1.0 if expected else 0.0) or orb._sheen.visible != expected:
 			_fail("Tap sheen strength mismatch for orb %d in %s" % [orb.stable_spawn_id, file_name])
 	print("SCREEN_CAPTURE_TAP_SHEEN file=%s t=%.3f gravity=%s candidates=%d strengths=%s" % [
 		file_name, JellyOrbArt.animation_time(), board.gravity_direction(), candidates.size(), strengths

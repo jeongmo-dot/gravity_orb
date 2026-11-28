@@ -52,6 +52,7 @@ const JELLY_BODY_EDGE_SV: Vector2 = Vector2(1.36, 0.79)
 const JELLY_BODY_GRADIENT: Vector4 = Vector4(0.12, 0.28, 1.36, 0.50)
 const JELLY_BODY_DEEP_STOP: float = 0.86
 const JELLY_BODY_ALPHA: Vector4 = Vector4(0.95, 0.90, 0.93, 0.97)
+const JELLY_BODY_EDGE_FEATHER_PX: float = 1.5
 # Ellipses store center and radii. Styles store angle, falloff bounds and opacity.
 const JELLY_BODY_ELLIPSES: Array[Vector4] = [
 	Vector4(0.12, 0.42, 0.60, 0.40),
@@ -71,24 +72,53 @@ const JELLY_BODY_SHADOW_OFFSET: float = 1.06
 const JELLY_BODY_SHADOW_RADII: Vector2 = Vector2(0.78, 0.11)
 const JELLY_BODY_SHADOW_FALLOFF: Vector2 = Vector2(0.64, 1.36)
 const JELLY_BODY_SHADOW_ALPHA: float = 0.25
-const TAP_SHEEN_ANGLE_DEGREES: float = 25.0
-const TAP_SHEEN_PERIOD: float = 2.8
-const TAP_SHEEN_SWEEP_FRACTION: float = 0.55
-const TAP_SHEEN_TRAVEL: float = 2.0
-const TAP_SHEEN_HALF_WIDTH: float = 0.60
-const TAP_SHEEN_BRIGHTNESS: float = 0.50
-const TAP_SHEEN_STREAK_OFFSET: float = 0.30
-const TAP_SHEEN_STREAK_HALF_WIDTH: float = 0.025
-const TAP_SHEEN_STREAK_BRIGHTNESS: float = 0.65
+const TAP_SHEEN_COLOR: Color = Color(244.0 / 255.0, 236.0 / 255.0, 198.0 / 255.0)
+const TAP_SHEEN_PERIOD: float = 2.0
+const TAP_SHEEN_SWEEP_SECONDS: float = 0.40
+const TAP_SHEEN_DIRECTION_DEGREES: float = 45.0
+const TAP_SHEEN_PEAK: float = 0.90
+const TAP_SHEEN_TAIL: float = 1.20
+const TAP_SHEEN_PLATEAU: float = 0.30
+const TAP_SHEEN_LEAD: float = 0.32
+const TAP_SHEEN_TAIL_POWER: float = 1.5
+const TAP_SHEEN_AFTERGLOW_TIMES: Vector3 = Vector3(0.30, 0.44, 0.80)
+const TAP_SHEEN_AFTERGLOW_PEAK: float = 0.20
 const TAP_SHEEN_PHASE_STEP: float = 0.7
 const TAP_SHEEN_FADE_SECONDS: float = 0.15
 const PREVIEW_TEXTURE_SIZE: int = 384
 const PREVIEW_MAX_TEXTURE_SIZE: int = 512
+const SCREEN_BODY_SHADER: String = """
+varying float sphere_radius;
+varying vec3 sphere_center_view;
+
+void vertex() {
+	sphere_radius = length(VERTEX);
+	sphere_center_view = MODELVIEW_MATRIX[3].xyz;
+}
+
+vec2 screen_body_point(vec3 point, bool perspective) {
+	vec2 offset = point.xy - sphere_center_view.xy;
+	if (perspective) {
+		offset = point.xy * (sphere_center_view.z / point.z) - sphere_center_view.xy;
+	}
+	return offset * vec2(1.0, -1.0) / sphere_radius;
+}
+"""
+const EDGE_FEATHER_SHADER: String = """
+uniform float edge_feather_px;
+
+float body_edge_alpha(vec3 normal, vec3 view) {
+	float facing = dot(normalize(normal), normalize(view));
+	float facing_step = max(length(vec2(dFdx(facing), dFdy(facing))), 0.000001);
+	return smoothstep(0.0, 1.0, facing / (2.0 * edge_feather_px * facing_step));
+}
+"""
 
 static var _body_shader: Shader
 static var _face_shader: Shader
 static var _belly_shader: Shader
 static var _shadow_material: ShaderMaterial
+static var _sheen_material: ShaderMaterial
 static var _body_materials: Dictionary = {}
 static var _stone_body_materials: Dictionary = {}
 static var _face_materials: Dictionary = {}
@@ -114,6 +144,7 @@ static func color_for(color_index: int, level: int = 1) -> Color:
 static func prewarm(cfg: GameConfig) -> void:
 	face_mesh()
 	shadow_material()
+	sheen_material()
 	for color_index: int in range(PALETTE.size()):
 		for level_index: int in range(1, cfg.orb_max_level + 1):
 			body_material_for(color_index, level_index)
@@ -131,6 +162,7 @@ static func clear_cache() -> void:
 	_face_shader = null
 	_belly_shader = null
 	_shadow_material = null
+	_sheen_material = null
 	_face_mesh = null
 	_last_animation_frame = -1
 	if not _animation_frozen:
@@ -144,6 +176,7 @@ static func shared_material_count() -> int:
 		+ _face_materials.size()
 		+ _belly_materials.size()
 		+ (1 if _shadow_material != null else 0)
+		+ (1 if _sheen_material != null else 0)
 	)
 
 
@@ -281,6 +314,7 @@ static func _new_body_material(name: String, base: Color, level: int) -> ShaderM
 	material.set_shader_parameter("body_gradient", JELLY_BODY_GRADIENT)
 	material.set_shader_parameter("body_deep_stop", JELLY_BODY_DEEP_STOP)
 	material.set_shader_parameter("body_alpha", JELLY_BODY_ALPHA)
+	material.set_shader_parameter("edge_feather_px", JELLY_BODY_EDGE_FEATHER_PX)
 	material.set_shader_parameter("body_ellipses", PackedVector4Array(JELLY_BODY_ELLIPSES))
 	var styles: PackedVector4Array = PackedVector4Array()
 	for style: Vector4 in JELLY_BODY_ELLIPSE_STYLES:
@@ -298,19 +332,6 @@ static func body_material_for(color_index: int, level: int) -> ShaderMaterial:
 		var material: ShaderMaterial = _new_body_material(
 			"jelly_body_c%d_l%d" % [color_index, level], color_for(color_index, level), level
 		)
-		material.set_shader_parameter(
-			"tap_sheen_axis", Vector2.from_angle(deg_to_rad(TAP_SHEEN_ANGLE_DEGREES))
-		)
-		material.set_shader_parameter("tap_sheen_period", TAP_SHEEN_PERIOD)
-		material.set_shader_parameter("tap_sheen_sweep_fraction", TAP_SHEEN_SWEEP_FRACTION)
-		material.set_shader_parameter("tap_sheen_travel", TAP_SHEEN_TRAVEL)
-		material.set_shader_parameter("tap_sheen_half_width", TAP_SHEEN_HALF_WIDTH)
-		material.set_shader_parameter("tap_sheen_brightness", TAP_SHEEN_BRIGHTNESS)
-		material.set_shader_parameter("tap_sheen_streak_offset", TAP_SHEEN_STREAK_OFFSET)
-		material.set_shader_parameter("tap_sheen_streak_half_width", TAP_SHEEN_STREAK_HALF_WIDTH)
-		material.set_shader_parameter("tap_sheen_streak_brightness", TAP_SHEEN_STREAK_BRIGHTNESS)
-		material.set_shader_parameter("tap_sheen_phase", float(color_index) * TAP_SHEEN_PHASE_STEP)
-		material.set_shader_parameter("tap_sheen_enabled", true)
 		_body_materials[key] = material
 	return _body_materials[key] as ShaderMaterial
 
@@ -321,8 +342,6 @@ static func stone_body_material(level: int) -> ShaderMaterial:
 		var material: ShaderMaterial = _new_body_material(
 			"jelly_stone_body_l%d" % safe_level, STONE_BODY_COLOR, safe_level
 		)
-		material.set_shader_parameter("tap_sheen_phase", 0.0)
-		material.set_shader_parameter("tap_sheen_enabled", false)
 		_stone_body_materials[safe_level] = material
 	return _stone_body_materials[safe_level] as ShaderMaterial
 
@@ -442,6 +461,8 @@ static func _apply_animation_time() -> void:
 		(value as ShaderMaterial).set_shader_parameter("animation_time", _animation_time)
 	for value: Variant in _face_materials.values():
 		(value as ShaderMaterial).set_shader_parameter("animation_time", _animation_time)
+	if _sheen_material != null:
+		_sheen_material.set_shader_parameter("animation_time", _animation_time)
 
 
 static func shadow_material() -> ShaderMaterial:
@@ -474,6 +495,88 @@ void fragment() {
 	return _shadow_material
 
 
+static func sheen_material() -> ShaderMaterial:
+	if _sheen_material != null:
+		return _sheen_material
+	var shader: Shader = Shader.new()
+	shader.resource_name = "jelly_sheen_shader"
+	shader.code = """
+shader_type spatial;
+render_mode unshaded, blend_mix, depth_draw_never, depth_test_disabled, cull_back;
+
+uniform vec4 sheen_color : source_color;
+uniform float animation_time;
+uniform float sheen_period;
+uniform float sheen_sweep_seconds;
+uniform vec2 sheen_direction;
+uniform float sheen_peak;
+uniform float sheen_tail;
+uniform float sheen_plateau;
+uniform float sheen_lead;
+uniform float sheen_tail_power;
+uniform vec3 sheen_afterglow_times;
+uniform float sheen_afterglow_peak;
+instance uniform float tap_sheen_phase = 0.0;
+instance uniform float tap_sheen_strength = 0.0;
+""" + SCREEN_BODY_SHADER + EDGE_FEATHER_SHADER + """
+
+float sheen_band(float x) {
+	float plateau_end = sheen_tail + sheen_plateau;
+	if (x < 0.0 || x >= plateau_end + sheen_lead) {
+		return 0.0;
+	}
+	if (x < sheen_tail) {
+		return sheen_peak * pow(x / sheen_tail, sheen_tail_power);
+	}
+	return sheen_peak * (1.0 - smoothstep(0.0, sheen_lead, x - plateau_end));
+}
+
+float sheen_afterglow(float time) {
+	float rise = clamp(
+		(time - sheen_afterglow_times.x) / (sheen_afterglow_times.y - sheen_afterglow_times.x),
+		0.0, 1.0
+	);
+	float fall = clamp(
+		(sheen_afterglow_times.z - time) / (sheen_afterglow_times.z - sheen_afterglow_times.y),
+		0.0, 1.0
+	);
+	return sheen_afterglow_peak * min(rise, fall);
+}
+
+void fragment() {
+	float time = mod(animation_time + tap_sheen_phase, sheen_period);
+	float progress = smoothstep(0.0, sheen_sweep_seconds, time);
+	float rear = mix(-1.0 - sheen_tail - sheen_plateau - sheen_lead, 1.0, progress);
+	vec2 p = screen_body_point(VERTEX, PROJECTION_MATRIX[3][3] == 0.0);
+	float band = sheen_band(dot(p, sheen_direction) - rear);
+	float glow = sheen_afterglow(time);
+	float alpha = 1.0 - (1.0 - band) * (1.0 - glow);
+	ALBEDO = sheen_color.rgb;
+	ALPHA = alpha * tap_sheen_strength * body_edge_alpha(NORMAL, VIEW);
+}
+"""
+	_sheen_material = ShaderMaterial.new()
+	_sheen_material.resource_name = "jelly_sheen_material"
+	_sheen_material.render_priority = 13
+	_sheen_material.shader = shader
+	_sheen_material.set_shader_parameter("edge_feather_px", JELLY_BODY_EDGE_FEATHER_PX)
+	_sheen_material.set_shader_parameter("sheen_color", TAP_SHEEN_COLOR)
+	_sheen_material.set_shader_parameter("animation_time", _animation_time)
+	_sheen_material.set_shader_parameter("sheen_period", TAP_SHEEN_PERIOD)
+	_sheen_material.set_shader_parameter("sheen_sweep_seconds", TAP_SHEEN_SWEEP_SECONDS)
+	_sheen_material.set_shader_parameter(
+		"sheen_direction", Vector2.from_angle(deg_to_rad(TAP_SHEEN_DIRECTION_DEGREES))
+	)
+	_sheen_material.set_shader_parameter("sheen_peak", TAP_SHEEN_PEAK)
+	_sheen_material.set_shader_parameter("sheen_tail", TAP_SHEEN_TAIL)
+	_sheen_material.set_shader_parameter("sheen_plateau", TAP_SHEEN_PLATEAU)
+	_sheen_material.set_shader_parameter("sheen_lead", TAP_SHEEN_LEAD)
+	_sheen_material.set_shader_parameter("sheen_tail_power", TAP_SHEEN_TAIL_POWER)
+	_sheen_material.set_shader_parameter("sheen_afterglow_times", TAP_SHEEN_AFTERGLOW_TIMES)
+	_sheen_material.set_shader_parameter("sheen_afterglow_peak", TAP_SHEEN_AFTERGLOW_PEAK)
+	return _sheen_material
+
+
 static func _get_body_shader() -> Shader:
 	if _body_shader != null:
 		return _body_shader
@@ -495,25 +598,7 @@ uniform vec4 body_ellipse_styles[5];
 uniform int level_id = 1;
 uniform int max_level_id = 10;
 uniform float animation_time = 0.0;
-uniform bool tap_sheen_enabled = false;
-uniform vec2 tap_sheen_axis;
-uniform float tap_sheen_period;
-uniform float tap_sheen_sweep_fraction;
-uniform float tap_sheen_travel;
-uniform float tap_sheen_half_width;
-uniform float tap_sheen_brightness;
-uniform float tap_sheen_streak_offset;
-uniform float tap_sheen_streak_half_width;
-uniform float tap_sheen_streak_brightness;
-uniform float tap_sheen_phase = 0.0;
-instance uniform float tap_sheen_strength = 0.0;
-varying float sphere_radius;
-varying vec3 sphere_center_view;
-
-void vertex() {
-	sphere_radius = length(VERTEX);
-	sphere_center_view = MODELVIEW_MATRIX[3].xyz;
-}
+""" + SCREEN_BODY_SHADER + EDGE_FEATHER_SHADER + """
 
 float ellipse_distance(vec2 p, vec4 ellipse, float angle) {
 	vec2 offset = p - ellipse.xy;
@@ -537,12 +622,7 @@ float sharp_reflection(vec2 p, int index) {
 }
 
 void fragment() {
-	// Project the surface and center on the screen axes in radii at the center depth.
-	vec2 offset = VERTEX.xy - sphere_center_view.xy;
-	if (PROJECTION_MATRIX[3][3] == 0.0) {
-		offset = VERTEX.xy * (sphere_center_view.z / VERTEX.z) - sphere_center_view.xy;
-	}
-	vec2 p = offset * vec2(1.0, -1.0) / sphere_radius;
+	vec2 p = screen_body_point(VERTEX, PROJECTION_MATRIX[3][3] == 0.0);
 	float t = min(1.0, length(p - body_gradient.xy) / body_gradient.z);
 	vec4 body;
 	if (t < body_gradient.w) {
@@ -558,17 +638,6 @@ void fragment() {
 	vec3 color = mix(body.rgb, light_color.rgb, soft_reflection(p, 0));
 	color = mix(color, vec3(1.0), soft_reflection(p, 1));
 	color = mix(color, vec3(1.0), soft_reflection(p, 2));
-	if (tap_sheen_enabled && tap_sheen_strength > 0.0) {
-		float cycle = fract((animation_time + tap_sheen_phase) / tap_sheen_period);
-		float progress = min(1.0, cycle / tap_sheen_sweep_fraction);
-		float center = mix(-tap_sheen_travel, tap_sheen_travel, smoothstep(0.0, 1.0, progress));
-		float d = dot(p, tap_sheen_axis) - center;
-		float broad = tap_sheen_brightness * max(0.0, 1.0 - abs(d) / tap_sheen_half_width);
-		float streak = tap_sheen_streak_brightness
-			* max(0.0, 1.0 - abs(d - tap_sheen_streak_offset) / tap_sheen_streak_half_width);
-		color = mix(color, vec3(1.0), broad * tap_sheen_strength);
-		color = mix(color, vec3(1.0), streak * tap_sheen_strength);
-	}
 	color = mix(color, vec3(1.0), sharp_reflection(p, 3));
 	color = mix(color, vec3(1.0), sharp_reflection(p, 4));
 	if (level_id >= max_level_id) {
@@ -577,7 +646,7 @@ void fragment() {
 		color += vec3(1.0) * rim * max_pulse * 0.30;
 	}
 	ALBEDO = color;
-	ALPHA = body.a;
+	ALPHA = body.a * body_edge_alpha(NORMAL, VIEW);
 }
 """
 	return _body_shader
