@@ -30,6 +30,8 @@ static var _shared_meshes: Dictionary = {}
 @onready var _body: RigidBody3D = %Body
 @onready var _collision_shape: CollisionShape3D = %CollisionShape3D
 @onready var _mesh: MeshInstance3D = %Mesh
+@onready var _sheen: MeshInstance3D = %Sheen
+@onready var _shadow: MeshInstance3D = %Shadow
 @onready var _belly: MeshInstance3D = %Belly
 @onready var _face: MeshInstance3D = %Face
 @onready var _symbol_mesh: MeshInstance3D = %Symbol
@@ -276,6 +278,15 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 		else CelestialOrbArt.material_for(cfg, color, level)
 	)
 	_mesh.material_override = visual_material
+	_sheen.visible = false
+	_shadow.visible = _is_jelly_visual
+	if _is_jelly_visual:
+		_sheen.material_override = JellyOrbArt.sheen_material()
+		_sheen.set_instance_shader_parameter(
+			"tap_sheen_phase", float(color) * JellyOrbArt.TAP_SHEEN_PHASE_STEP
+		)
+		_shadow.mesh = JellyOrbArt.face_mesh()
+		_shadow.material_override = JellyOrbArt.shadow_material()
 	_belly.mesh = JellyOrbArt.face_mesh()
 	_belly.material_override = JellyOrbArt.belly_material_for(color, level)
 	_belly.visible = false
@@ -401,7 +412,12 @@ func _advance_tap_mark(delta: float) -> void:
 	_tap_mark_strength = move_toward(
 		_tap_mark_strength, _tap_mark_target, delta / JellyOrbArt.TAP_SHEEN_FADE_SECONDS
 	)
-	_mesh.set_instance_shader_parameter("tap_sheen_strength", _tap_mark_strength)
+	_update_tap_sheen()
+
+
+func _update_tap_sheen() -> void:
+	_sheen.set_instance_shader_parameter("tap_sheen_strength", _tap_mark_strength)
+	_sheen.visible = _is_jelly_visual and not is_timed_stone and _tap_mark_strength > 0.0
 
 
 func configure_physics_profile(
@@ -855,7 +871,11 @@ func _apply_visual_transparency() -> void:
 		clampf(_visual_alpha, 0.0, 1.0)
 	)
 	if _is_jelly_visual:
-		_mesh.set_instance_shader_parameter("tap_sheen_strength", _tap_mark_strength)
+		_sheen.transparency = base_transparency
+		_update_tap_sheen()
+		var body_material: ShaderMaterial = _mesh.material_override as ShaderMaterial
+		_shadow.set_instance_shader_parameter("shadow_color", body_material.get_shader_parameter("deep_color"))
+		_shadow.set_instance_shader_parameter("shadow_visual_alpha", _visual_alpha)
 	_symbol_mesh.transparency = base_transparency
 
 
@@ -1021,6 +1041,8 @@ func _ensure_unique_radius_resources() -> void:
 	var shared_mesh: SphereMesh = _mesh.mesh as SphereMesh
 	if shared_mesh != null:
 		_mesh.mesh = shared_mesh.duplicate(true) as SphereMesh
+		if _is_jelly_visual:
+			_sheen.mesh = _mesh.mesh
 	_radius_resources_are_unique = true
 
 
@@ -1048,14 +1070,15 @@ static func _shared_shape_for_level(cfg: GameConfig, level_index: int) -> Sphere
 static func _shared_mesh_for_level(cfg: GameConfig, level_index: int) -> SphereMesh:
 	var radius_m: float = cfg.radius_for_level(level_index) / PIXELS_PER_METER
 	var visual_radius_m: float = radius_m * CelestialOrbArt.body_radius_ratio(level_index)
-	var key: String = "%d:%.6f" % [level_index, visual_radius_m]
+	var jelly: bool = cfg.game_mode == GameConfig.GameMode.JELLY
+	var key: String = "%d:%.6f:%s" % [level_index, visual_radius_m, jelly]
 	if not _shared_meshes.has(key):
 		var mesh: SphereMesh = SphereMesh.new()
 		mesh.resource_name = "celestial_%s_mesh" % CelestialOrbArt.level_name(level_index)
 		mesh.radius = visual_radius_m
 		mesh.height = visual_radius_m * 2.0
-		mesh.radial_segments = 14 if level_index == 1 else 32
-		mesh.rings = 8 if level_index == 1 else 16
+		mesh.radial_segments = 64 if jelly else (14 if level_index == 1 else 32)
+		mesh.rings = 32 if jelly else (8 if level_index == 1 else 16)
 		_shared_meshes[key] = mesh
 	return _shared_meshes[key] as SphereMesh
 
@@ -1110,6 +1133,16 @@ func _update_visual_transform() -> void:
 		* merge_scale
 	)
 	_mesh.position = render_world_position
+	if _shadow.visible:
+		var shadow_radius: Vector2 = _merge_visual_scale * radius_m
+		_shadow.position = render_world_position + Vector3(
+			0.0, -shadow_radius.y * JellyOrbArt.JELLY_BODY_SHADOW_OFFSET, 0.0
+		)
+		var extent: Vector2 = (
+			shadow_radius * JellyOrbArt.JELLY_BODY_SHADOW_RADII
+			* JellyOrbArt.JELLY_BODY_SHADOW_FALLOFF.y
+		)
+		_shadow.scale = Vector3(extent.x, extent.y, 1.0)
 	var body_front_offset: float = radius_m * _mesh.scale.z
 	_belly.position = _front_overlay_position(
 		render_world_position,

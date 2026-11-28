@@ -89,7 +89,10 @@ func play(
 	_point_material.set_shader_parameter("alpha_multiplier", 1.0)
 	active = true
 	visible = true
-	_points.visible = mode in [GameConfig.ShockMode.PUSH, GameConfig.ShockMode.PULL, GameConfig.ShockMode.LIFT]
+	_points.visible = (
+		Config.data.game_mode != GameConfig.GameMode.JELLY
+		and mode in [GameConfig.ShockMode.PUSH, GameConfig.ShockMode.PULL, GameConfig.ShockMode.LIFT]
+	)
 	_configure_point_count()
 	_configure_stardust(p_seed)
 	advance(0.0)

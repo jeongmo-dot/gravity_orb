@@ -4,50 +4,221 @@ const BOARD_SCENE: PackedScene = preload("res://scenes/Board3D.tscn")
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
 
 
-func test_tap_sheen_uses_body_uniforms_and_survives_material_changes() -> void:
+func test_jelly_project_uses_bilinear_3d_supersampling() -> void:
+	assert_eq(
+		ProjectSettings.get_setting("rendering/scaling_3d/mode"),
+		Viewport.SCALING_3D_MODE_BILINEAR,
+		"3D supersampling uses bilinear downsampling"
+	)
+	assert_eq(ProjectSettings.get_setting("rendering/scaling_3d/scale"), 2.0, "3D render scale")
+
+
+func test_tap_sheen_overlay_material_and_profile() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	JellyOrbArt.clear_cache()
 	JellyOrbArt.prewarm(Config.data)
 	assert_eq(
 		JellyOrbArt.shared_material_count(),
-		JellyOrbArt.PALETTE.size() * Config.data.orb_max_level * 3,
-		"prewarm allocates only body, face and belly materials"
+		JellyOrbArt.PALETTE.size() * Config.data.orb_max_level * 3 + 2,
+		"prewarm adds one shadow and one sheen material"
 	)
 	var board: Board3D = await _create_board()
 	var orb: Orb3D = board.spawn_orb(2, 5, Vector2.ZERO)
-	assert_true(not orb.has_node("TapMark"), "the separate star node is gone")
 	var body: ShaderMaterial = orb.visual_material_resource()
-	var axis: Vector2 = body.get_shader_parameter("tap_sheen_axis")
-	assert_near(rad_to_deg(axis.angle()), 25.0, 0.0001, "25-degree screen sweep axis")
-	assert_near(axis.length(), 1.0, 0.0001, "unit screen sweep axis")
+	assert_true(not body.shader.code.contains("sheen"), "body shader does not render the old sheen")
+	assert_true(
+		not JellyOrbArt.stone_body_material(5).shader.code.contains("sheen"),
+		"stone body uses the same clear shader"
+	)
+	var sheen: ShaderMaterial = orb._sheen.material_override as ShaderMaterial
+	assert_eq(orb._sheen.get_parent(), orb._mesh, "overlay inherits body transform")
+	assert_eq(orb._sheen.transform, Transform3D.IDENTITY, "overlay has no extra local transform")
+	assert_eq(orb._sheen.mesh, orb._mesh.mesh, "overlay shares the body mesh")
+	assert_eq(sheen.render_priority, 13, "overlay renders above the face")
+	assert_true(sheen.shader.code.contains("depth_test_disabled"), "the face does not cut through the overlay")
+	assert_eq(sheen.get_shader_parameter("sheen_color"), Color8(244, 236, 198), "cream color")
+	assert_eq(sheen.get_shader_parameter("sheen_afterglow_times"), Vector3(0.30, 0.44, 0.80), "afterglow")
+	var direction: Vector2 = sheen.get_shader_parameter("sheen_direction")
+	assert_near(rad_to_deg(direction.angle()), 45.0, 0.0001, "screen sweep direction")
 	var uniforms: Dictionary = {
-		"tap_sheen_period": 2.8,
-		"tap_sheen_sweep_fraction": 0.55,
-		"tap_sheen_travel": 1.7,
-		"tap_sheen_half_width": 0.18,
-		"tap_sheen_brightness": 0.75,
+		"edge_feather_px": 1.5,
+		"sheen_period": 2.0,
+		"sheen_sweep_seconds": 0.40,
+		"sheen_peak": 0.90,
+		"sheen_tail": 1.20,
+		"sheen_plateau": 0.30,
+		"sheen_lead": 0.32,
+		"sheen_tail_power": 1.5,
+		"sheen_afterglow_peak": 0.20,
 	}
 	for uniform: String in uniforms:
-		assert_near(float(body.get_shader_parameter(uniform)), float(uniforms[uniform]), 0.0001, uniform)
-	for color: int in range(JellyOrbArt.PALETTE.size()):
-		var material: ShaderMaterial = JellyOrbArt.body_material_for(color, 5)
-		assert_near(float(material.get_shader_parameter("tap_sheen_phase")), float(color) * 0.7, 0.0001, "color phase")
-	assert_eq(orb._mesh.get_instance_shader_parameter("tap_sheen_strength"), 0.0, "starts clear")
+		assert_near(float(sheen.get_shader_parameter(uniform)), float(uniforms[uniform]), 0.0001, uniform)
+	assert_near(float(orb._sheen.get_instance_shader_parameter("tap_sheen_phase")), 1.4, 0.0001, "color phase")
+	_assert_sheen_profile_samples(sheen)
+	assert_true(not orb._sheen.visible, "starts hidden")
 	orb.set_tap_mark_enabled(true)
 	orb._advance_tap_mark(0.15)
-	assert_eq(orb._mesh.get_instance_shader_parameter("tap_sheen_strength"), 1.0, "fully on at 0.15s")
+	assert_true(orb._sheen.visible, "eligible orb shows sheen")
+	assert_eq(orb._sheen.get_instance_shader_parameter("tap_sheen_strength"), 1.0, "fully on at 0.15s")
 	orb.set_jelly_mass(Config.data.jelly_mass_for_level(6), Config.data)
 	assert_true(orb.visual_material_resource() != body, "level changes the body material")
-	assert_eq(orb._mesh.get_instance_shader_parameter("tap_sheen_strength"), 1.0, "level retains strength")
+	assert_eq(orb._sheen.mesh, orb._mesh.mesh, "overlay follows radius growth")
+	assert_eq(orb._sheen.get_instance_shader_parameter("tap_sheen_strength"), 1.0, "level retains strength")
+	var symbol: StandardMaterial3D = (orb._symbol_mesh.mesh as QuadMesh).material as StandardMaterial3D
+	assert_eq(symbol.render_priority, sheen.render_priority, "symbol shares priority")
+	assert_true(orb._symbol_mesh.position.z > orb._sheen.position.z, "symbol is closer at equal priority")
 	orb.set_timed_stone(7)
-	var stone: ShaderMaterial = orb.visual_material_resource()
-	assert_true(not bool(stone.get_shader_parameter("tap_sheen_enabled")), "stone never renders sheen")
-	assert_eq(float(stone.get_shader_parameter("tap_sheen_phase")), 0.0, "stone phase is zero")
-	assert_eq(orb._mesh.get_instance_shader_parameter("tap_sheen_strength"), 1.0, "stone retains instance strength")
+	assert_true(not orb._sheen.visible, "stone never renders sheen")
+	assert_eq(orb._sheen.get_instance_shader_parameter("tap_sheen_strength"), 1.0, "material swap retains strength")
 	orb.set_tap_mark_enabled(false)
 	orb._advance_tap_mark(0.15)
-	assert_eq(orb._mesh.get_instance_shader_parameter("tap_sheen_strength"), 0.0, "fully off at 0.15s")
+	assert_eq(orb._sheen.get_instance_shader_parameter("tap_sheen_strength"), 0.0, "fully off at 0.15s")
+	assert_true(not orb._sheen.visible, "zero strength hides overlay")
+	Config.data.game_mode = original_mode
+	await _cleanup(board)
+
+
+func _assert_sheen_profile_samples(material: ShaderMaterial) -> void:
+	var tail: float = material.get_shader_parameter("sheen_tail")
+	var plateau_end: float = tail + float(material.get_shader_parameter("sheen_plateau"))
+	var lead: float = material.get_shader_parameter("sheen_lead")
+	var peak: float = material.get_shader_parameter("sheen_peak")
+	var power: float = material.get_shader_parameter("sheen_tail_power")
+	var positions: Array[float] = [0.0, 0.6, 1.2, 1.35, 1.66, 1.82]
+	var expected_band: Array[float] = [0.0, 0.318, 0.90, 0.90, 0.45, 0.0]
+	for index: int in range(positions.size()):
+		var x: float = positions[index]
+		var alpha: float = peak * (
+			pow(x / tail, power) if x < tail else 1.0 - smoothstep(0.0, lead, x - plateau_end)
+		)
+		assert_near(alpha, expected_band[index], 0.001, "band at %.2f" % x)
+	var times: Vector3 = material.get_shader_parameter("sheen_afterglow_times")
+	var glow_peak: float = material.get_shader_parameter("sheen_afterglow_peak")
+	var samples: Array[float] = [0.20, 0.44, 0.62, 0.90]
+	var expected_glow: Array[float] = [0.0, 0.20, 0.10, 0.0]
+	for index: int in range(samples.size()):
+		var time: float = samples[index]
+		var rise: float = clampf(inverse_lerp(times.x, times.y, time), 0.0, 1.0)
+		var fall: float = clampf(inverse_lerp(times.z, times.y, time), 0.0, 1.0)
+		assert_near(glow_peak * minf(rise, fall), expected_glow[index], 0.001, "glow at %.2f" % time)
+
+
+func test_jelly_body_palette_layers_and_preview_pixels() -> void:
+	var pink_base: Color = JellyOrbArt.color_for(0, 5)
+	var materials: Array[ShaderMaterial] = [
+		JellyOrbArt.body_material_for(0, 5),
+		JellyOrbArt.stone_body_material(5),
+	]
+	var base_colors: Array[Color] = [pink_base, JellyOrbArt.STONE_BODY_COLOR]
+	for index: int in range(materials.size()):
+		var body: ShaderMaterial = materials[index]
+		var base: Color = base_colors[index]
+		assert_eq(body.get_shader_parameter("base_color"), base, "base palette")
+		assert_eq(body.get_shader_parameter("light_color"), base.lerp(Color.WHITE, 0.66), "light palette")
+		var deep: Color = body.get_shader_parameter("deep_color")
+		var edge: Color = body.get_shader_parameter("edge_color")
+		assert_true(deep.is_equal_approx(
+			Color.from_hsv(base.h, minf(1.0, base.s * 1.20), base.v * 0.88)
+		), "deep palette")
+		assert_true(edge.is_equal_approx(
+			Color.from_hsv(base.h, minf(1.0, base.s * 1.36), base.v * 0.79)
+		), "edge palette")
+		assert_eq(body.get_shader_parameter("body_gradient"), Vector4(0.12, 0.28, 1.36, 0.50), "gradient")
+		assert_eq(body.get_shader_parameter("body_deep_stop"), 0.86, "deep stop")
+		assert_eq(body.get_shader_parameter("body_alpha"), Vector4(0.95, 0.90, 0.93, 0.97), "alpha stops")
+		assert_eq(body.get_shader_parameter("edge_feather_px"), 1.5, "body edge feather width")
+		assert_eq(body.get_shader_parameter("body_ellipses"), PackedVector4Array([
+			Vector4(0.12, 0.42, 0.60, 0.40),
+			Vector4(0.50, 0.52, 0.16, 0.06),
+			Vector4(-0.36, -0.50, 0.38, 0.20),
+			Vector4(-0.50, -0.38, 0.10, 0.065),
+			Vector4(-0.27, -0.66, 0.035, 0.035),
+		]), "layer geometry")
+		assert_eq(body.get_shader_parameter("body_ellipse_styles"), PackedVector4Array([
+			Vector4(0.0, 0.55, 1.45, 0.55),
+			Vector4(deg_to_rad(-45.0), 0.40, 1.60, 0.40),
+			Vector4(deg_to_rad(-32.0), 0.80, 1.20, 0.50),
+			Vector4(deg_to_rad(-32.0), 1.0, 1.0, 0.95),
+			Vector4(0.0, 1.0, 1.0, 0.90),
+		]), "layer styles")
+	var preview: Image = JellyOrbArt.preview_texture_for(0, 5).get_image()
+	var samples: Dictionary = {Vector2i(192, 192): Color8(255, 182, 199), Vector2i(60, 60): Color8(214, 77, 109)}
+	for point: Vector2i in samples:
+		var pixel: Color = preview.get_pixelv(point)
+		var expected: Color = samples[point]
+		assert_near(pixel.r, expected.r, 2.0 / 255.0, "preview red at %s" % [point])
+		assert_near(pixel.g, expected.g, 2.0 / 255.0, "preview green at %s" % [point])
+		assert_near(pixel.b, expected.b, 2.0 / 255.0, "preview blue at %s" % [point])
+	assert_eq(preview.get_pixel(0, 0).a, 0.0, "preview outside the circle stays transparent")
+
+
+func test_jelly_preview_has_clear_corners_circle_exterior_and_perimeter() -> void:
+	var preview_levels: Array[int] = [7, Config.data.orb_max_level]
+	var expected_sizes: Array[int] = [384, 512]
+	for stone: bool in [false, true]:
+		for index: int in range(preview_levels.size()):
+			var level: int = preview_levels[index]
+			var texture: Texture2D = (
+				JellyOrbArt.stone_preview_texture_for(level) if stone
+				else JellyOrbArt.preview_texture_for(OrbTypes.OrbColor.PURPLE, level)
+			)
+			var image: Image = texture.get_image()
+			var size: int = expected_sizes[index]
+			assert_eq(image.get_size(), Vector2i(size, size), "preview dimensions")
+			assert_eq(image.get_format(), Image.FORMAT_RGBA8, "preview RGBA format")
+			var data: PackedByteArray = image.get_data()
+			assert_true(image.get_pixel(size / 2, size / 2).a > 0.0, "preview body is visible")
+			var nonzero: int = 0
+			for y: int in range(size):
+				var dy: int = 2 * y + 1 - size
+				for x: int in range(size):
+					var dx: int = 2 * x + 1 - size
+					var perimeter: bool = x == 0 or y == 0 or x == size - 1 or y == size - 1
+					var outside: bool = dx * dx + dy * dy >= size * size
+					if (perimeter or outside) and data[4 * (y * size + x) + 3] != 0:
+						nonzero += 1
+			assert_eq(nonzero, 0, "no outside or perimeter alpha (%d px, stone %s)" % [size, stone])
+
+
+func test_jelly_shadow_follows_radius_and_ghost_alpha_below_bodies() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var board: Board3D = await _create_board()
+	var orb: Orb3D = board.spawn_orb(0, 5, Vector2.ZERO)
+	var small: Orb3D = board.spawn_orb(1, 1, Vector2(260.0, 0.0))
+	var shadow: MeshInstance3D = orb._shadow
+	var material: ShaderMaterial = shadow.material_override as ShaderMaterial
+	assert_true(shadow.visible, "JELLY shadow is visible")
+	assert_eq(material, small._shadow.material_override, "shadow material is shared")
+	assert_true(material.render_priority < orb.visual_material_resource().render_priority, "shadow draws first")
+	assert_eq(material.get_shader_parameter("shadow_falloff"), Vector2(0.64, 1.36), "shadow falloff")
+	assert_eq(material.get_shader_parameter("shadow_alpha"), 0.25, "shadow alpha")
+	assert_eq(
+		shadow.get_instance_shader_parameter("shadow_color"),
+		orb.visual_material_resource().get_shader_parameter("deep_color"),
+		"shadow uses deep body color"
+	)
+	orb.set_gravity(Vector2i.LEFT, Config.data.gravity_strength)
+	orb._jelly_deform = Vector2(1.2, 1.1)
+	orb._update_visual_transform()
+	var radius: float = orb.get_current_radius() / Orb3D.PIXELS_PER_METER
+	assert_true(
+		(shadow.position - orb._mesh.position).is_equal_approx(Vector3(0.0, -1.06 * radius, 0.0)),
+		"shadow stays below the body on the screen"
+	)
+	assert_near(shadow.scale.x / 1.36, 0.78 * radius, 0.0001, "shadow horizontal radius")
+	assert_near(shadow.scale.y / 1.36, 0.11 * radius, 0.0001, "shadow vertical radius")
+	orb.enter_ghost_state(0.4)
+	assert_eq(shadow.get_instance_shader_parameter("shadow_visual_alpha"), 0.4, "ghost shadow fades")
+	assert_eq(ProjectSettings.get_setting("rendering/anti_aliasing/quality/msaa_3d"), Viewport.MSAA_4X, "4x MSAA")
+	for jelly: Orb3D in [small, orb]:
+		assert_eq(jelly.mesh_resource().radial_segments, 64, "JELLY sphere radial segments")
+		assert_eq(jelly.mesh_resource().rings, 32, "JELLY sphere rings")
+	Config.data.game_mode = GameConfig.GameMode.TURN
+	var legacy: Orb3D = board.spawn_orb(1, 1, Vector2(-260.0, 0.0))
+	assert_true(not legacy._shadow.visible, "legacy orb shadow is hidden")
+	assert_eq(legacy.mesh_resource().radial_segments, 14, "legacy mesh keeps its tessellation")
 	Config.data.game_mode = original_mode
 	await _cleanup(board)
 
@@ -123,7 +294,7 @@ func test_jelly_orb_uses_face_shader_without_ring_geometry() -> void:
 	var orb: Orb3D = board.spawn_orb(2, 7, Vector2.ZERO)
 	assert_true(orb._face.visible, "JELLY face billboard visible")
 	assert_eq(_forbidden_geometry_count(orb), 0, "JELLY orb has no ring geometry")
-	assert_true(orb.visual_material_resource().shader.code.contains("lower_scatter"), "JELLY body shader")
+	assert_true(orb.visual_material_resource().shader.code.contains("soft_reflection"), "JELLY body shader")
 	assert_eq(orb.visual_material_resource().render_priority, 10, "JELLY body renders after board glass")
 	assert_eq(
 		(orb._belly.material_override as ShaderMaterial).render_priority,
@@ -782,7 +953,7 @@ func test_non_jelly_modes_keep_planet_visuals_and_stretch_gate() -> void:
 	Config.data.fx_orb_stretch_enabled = original_stretch
 
 
-func test_jelly_jackpot_uses_max_sparkle_and_cloud_without_ring_geometry() -> void:
+func test_jelly_jackpot_uses_max_cloud_without_cross_sparkles_or_ring_geometry() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_fx: bool = Config.data.fx_enabled
 	var original_hitstop: bool = Config.data.fx_hitstop_enabled
@@ -805,8 +976,64 @@ func test_jelly_jackpot_uses_max_sparkle_and_cloud_without_ring_geometry() -> vo
 		"colors": [4, 4],
 	})
 	assert_eq(director.active_glow_count(), 1, "JELLY jackpot has one MAX soft cloud")
-	assert_eq(director.active_particle_count(), 1, "JELLY jackpot has white sparkles")
+	assert_eq(director.active_particle_count(), 0, "JELLY jackpot has no cross sparkles")
 	assert_eq(_forbidden_geometry_count(root), 0, "JELLY jackpot has no ring geometry")
+	await _cleanup(root)
+	Config.data.game_mode = original_mode
+	Config.data.fx_enabled = original_fx
+	Config.data.fx_hitstop_enabled = original_hitstop
+
+
+func test_jelly_feedback_removes_cross_particles_and_color_effect_points() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_fx: bool = Config.data.fx_enabled
+	var original_hitstop: bool = Config.data.fx_hitstop_enabled
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.fx_enabled = true
+	Config.data.fx_hitstop_enabled = false
+	var root: Node3D = Node3D.new()
+	var camera: Camera3D = Camera3D.new()
+	camera.name = "Camera3D"
+	root.add_child(camera)
+	var director: FeedbackDirector = FeedbackDirector.new()
+	root.add_child(director)
+	tree.root.add_child(root)
+	await tree.process_frame
+	var reactions: Array[Dictionary] = [
+		{
+			"type": ReactionRules.Type.MERGE,
+			"result_level": 3,
+			"result_color": OrbTypes.OrbColor.RED,
+			"position": Vector2.ZERO,
+			"shock_targets": [],
+		},
+		{
+			"type": ReactionRules.Type.BLAST,
+			"levels": [6, 6],
+			"colors": [OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE],
+			"position": Vector2.ZERO,
+		},
+		{
+			"type": ReactionRules.Type.BLAST,
+			"levels": [Config.data.orb_max_level, Config.data.orb_max_level],
+			"colors": [OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE],
+			"position": Vector2.ZERO,
+		},
+		{
+			"type": ReactionRules.Type.MAX_CLEAR,
+			"levels": [Config.data.orb_max_level, Config.data.orb_max_level],
+			"colors": [OrbTypes.OrbColor.PURPLE, OrbTypes.OrbColor.PURPLE],
+			"result_color": OrbTypes.OrbColor.PURPLE,
+			"position": Vector2.ZERO,
+			"shock_targets": [],
+		},
+	]
+	for reaction: Dictionary in reactions:
+		director.play_reaction_visuals(reaction)
+		assert_eq(director.active_particle_count(), 0, "JELLY reaction has no cross particle emitters")
+		for effect: ColorEffectVisual in director._active_color_effects:
+			assert_eq(effect.stardust_count(), 0, "JELLY color effect hides cross points")
+		director.clear_effects()
 	await _cleanup(root)
 	Config.data.game_mode = original_mode
 	Config.data.fx_enabled = original_fx

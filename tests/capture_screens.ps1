@@ -8,7 +8,9 @@ param(
     [switch]$UiBBoardOnly,
     [switch]$Gap2DefaultsOnly,
     [switch]$JellyTapSplitOnly,
-    [switch]$JellyTapSheenOnly
+    [switch]$JellyTapSheenOnly,
+    [switch]$JellyLookOnly,
+    [switch]$JellyEffectsOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -279,12 +281,40 @@ $tapSheenZoomFiles = @(
     @{ Path = "237b_jelly_tap_sheen_l5_center_zoom.png"; Size = "480x480" },
     @{ Path = "237c_jelly_tap_sheen_l5_exit_zoom.png"; Size = "480x480" }
 )
+$jellyLookEdgeSpec = @{ Path = "240_jelly_look_l10_edge_zoom.png"; Size = "480x480" }
 $fullFrameFiles += $tapSheenFrameFiles
-$zoomFiles += $tapSheenZoomFiles
+$zoomFiles += $tapSheenZoomFiles + @($jellyLookEdgeSpec)
 
 # Match the capture scene's mode precedence.
 $modeArgument = $null
-if ($JellyTapSheenOnly) {
+if ($JellyEffectsOnly) {
+    $modeArgument = "--capture-jelly-effects"
+    $fullFrameFiles = @(
+        "13_jelly_merge_effect.png",
+        "14_jelly_absorption_effect.png",
+        "15_jelly_blast_effect.png",
+        "16_jelly_jackpot_effect.png"
+    )
+    $zoomFiles = @()
+} elseif ($JellyLookOnly) {
+    $modeArgument = "--capture-jelly-look"
+    $fullFrameFiles = $tapSheenFrameFiles + @(
+        "40_jelly_look_max.png",
+        "42_jelly_look_absorption.png",
+        "71_jelly_turn_hud_three_digit.png",
+        "205_jelly_timed_stone_after_harden.png"
+    )
+    $zoomFiles = $tapSheenZoomFiles + @(
+        $jellyLookEdgeSpec,
+        @{ Path = "42_jelly_look_absorption_next_zoom.png"; Size = "480x480" },
+        @{ Path = "241a_jelly_look_l10_sheen_005.png"; Size = "480x480" },
+        @{ Path = "241b_jelly_look_l10_sheen_012.png"; Size = "480x480" },
+        @{ Path = "241c_jelly_look_l10_sheen_020.png"; Size = "480x480" },
+        @{ Path = "241d_jelly_look_l10_sheen_028.png"; Size = "480x480" },
+        @{ Path = "241e_jelly_look_l10_sheen_036.png"; Size = "480x480" },
+        @{ Path = "241f_jelly_look_l10_sheen_050.png"; Size = "480x480" }
+    )
+} elseif ($JellyTapSheenOnly) {
     $modeArgument = "--capture-jelly-tap-sheen"
     $fullFrameFiles = $tapSheenFrameFiles
     $zoomFiles = $tapSheenZoomFiles

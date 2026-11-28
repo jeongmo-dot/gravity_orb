@@ -450,14 +450,6 @@ func _play_merge_feedback(reaction: Dictionary) -> void:
 	if is_instance_valid(result_orb) and result_orb.has_method("get_current_radius"):
 		result_radius_m = float(result_orb.get_current_radius()) / Orb3D.PIXELS_PER_METER
 	if Config.data.game_mode == GameConfig.GameMode.JELLY:
-		_create_particles(
-			origin,
-			color_value,
-			MERGE_STARDUST_COUNT,
-			1.0,
-			"JellyMergeStardust",
-			"stardust"
-		)
 		if result_level >= Config.data.orb_max_level:
 			_create_jelly_max_feedback(origin, color_value, result_radius_m)
 	elif result_level <= 5:
@@ -517,14 +509,6 @@ func _create_jelly_max_feedback(
 	color_value: Color,
 	radius_m: float
 ) -> void:
-	_create_particles(
-		origin,
-		Color.WHITE,
-		WHITE_SPARK_COUNT,
-		1.15,
-		"JellyMaxSparkle",
-		"stars"
-	)
 	_create_glow(
 		origin,
 		Color.WHITE,
@@ -736,24 +720,25 @@ func _play_blast_feedback(
 		nebula_inner = _display_color(int(colors[0]), level)
 	if colors.size() > 1:
 		nebula_outer = _display_color(int(colors[1]), level)
-	for color_value: Variant in colors:
-		var color_index: int = int(color_value)
+	if Config.data.game_mode != GameConfig.GameMode.JELLY:
+		for color_value: Variant in colors:
+			var color_index: int = int(color_value)
+			_create_particles(
+				origin,
+				_display_color(color_index, level),
+				maxi(roundi(float(Config.data.fx_debris_per_orb) * intensity), 1),
+				level_scale,
+				"BlastDebris",
+				"debris"
+			)
 		_create_particles(
 			origin,
-			_display_color(color_index, level),
-			maxi(roundi(float(Config.data.fx_debris_per_orb) * intensity), 1),
+			Color.WHITE,
+			maxi(roundi(float(WHITE_SPARK_COUNT) * intensity), 1),
 			level_scale,
-			"BlastDebris",
+			"BlastSparks",
 			"debris"
 		)
-	_create_particles(
-		origin,
-		Color.WHITE,
-		maxi(roundi(float(WHITE_SPARK_COUNT) * intensity), 1),
-		level_scale,
-		"BlastSparks",
-		"debris"
-	)
 	if level == 6:
 		_create_glow(
 			origin,
@@ -789,14 +774,15 @@ func _play_blast_feedback(
 			"BlastLocalFlash",
 			intensity
 		)
-		_create_particles(
-			origin,
-			Color.WHITE,
-			maxi(roundi(float(SUPERNOVA_STAR_COUNT) * intensity), 1),
-			level_scale,
-			"BlastTwinklingStars",
-			"stars"
-		)
+		if Config.data.game_mode != GameConfig.GameMode.JELLY:
+			_create_particles(
+				origin,
+				Color.WHITE,
+				maxi(roundi(float(SUPERNOVA_STAR_COUNT) * intensity), 1),
+				level_scale,
+				"BlastTwinklingStars",
+				"stars"
+			)
 	_create_light(origin, level_scale * intensity)
 	if level >= 9:
 		_create_flash(intensity)

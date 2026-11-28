@@ -328,6 +328,9 @@ jolt_physics_3d/simulation/baumgarte_stabilization_factor=0.2
 
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+scaling_3d/mode=0
+scaling_3d/scale=2.0
+anti_aliasing/quality/msaa_3d=2
 
 [threading]
 
