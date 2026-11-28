@@ -48,7 +48,7 @@
 ## 처리 완료
 
 ### [2026-11-28 #163] 터치할 수 있는 젤리 표시 — 별 대신 지나가는 광택 — 완료
-- 상태: **완료** — 2026-11-28 12:18 사용자 "병합" → PR [#164](https://github.com/jeongmo-dot/gravity_orb/pull/164) squash 병합 `bdaa6ca`. 검수 (`0382254`) 통과: 별 제거, 몸 셰이더 띠 수치·시차·원근 보정이 명세대로. 캡처 두 비율에서 띠가 몸 안·눈 아래에 있고, 중력과 상관없이 기울기가 같다 (`237b` 픽셀: 자리·폭·밝기가 계산과 같음). 핵심 테스트 통과. 전체 회귀·기본 전체 캡처는 평일에. 로컬 브랜치 삭제, 원격 브랜치는 남김. 기획서 0.16.40
+- 상태: **완료** — 2026-11-28 12:18 사용자 "병합" → PR [#164](https://github.com/jeongmo-dot/gravity_orb/pull/164) squash 병합 `bdaa6ca`. 검수 (`0382254`) 통과: 별 제거, 몸 셰이더 띠 수치·시차·원근 보정이 명세대로. 캡처 두 비율에서 띠가 몸 안·눈 아래에 있고, 중력과 상관없이 기울기가 같다 (`237b` 픽셀: 자리·폭·밝기가 계산과 같음). 핵심 테스트 통과. 병합 뒤 전체 회귀 397/397·해시 그대로·기본 전체 캡처 실패 0 (사용자 "지금 돌려줘" — Claude 실행, §12-ONE.49 #163 "병합 뒤 전체 확인"). 로컬 브랜치 삭제, 원격 브랜치는 남김. 기획서 0.16.40
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.49** "#163 터치할 수 있는 젤리 표시 — 별 대신 지나가는 광택 (시안 C)" (수치 표). 사용자 2026-11-28 "별이 뜨기보다 반투명한 광택이 지나가는 방식으로 해줘"
 - 앵커: `scenes/Orb3D.tscn` `TapMark`, `scripts/spike/Orb3D.gd` (`_tap_mark`·`set_tap_mark_enabled()`·`_advance_tap_mark()`·`_update_visual_transform()`·`_apply_visual_transparency()`), `scripts/core/JellyOrbArt.gd` (`TAP_MARK_*`·`tap_mark_material()`·`_get_body_shader()`·`body_material_for()`·`stone_body_material()`·`_apply_animation_time()`·`shared_material_count()`·`prewarm()`), `tests/test_jelly_visuals.gd`·`test_jolt_3d.gd`, `tests/spike/capture_screens.gd` (`_report_capture_tap_marks()`)·`tests/capture_screens.ps1`
 - 요구 요약 (§12-ONE.49 "#163 요구" 1~6):
