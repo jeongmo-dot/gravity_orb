@@ -38,6 +38,23 @@
 
 ## 미확인
 
+### [2026-11-28] 대상 #164 추가 요구 5 — 3D 2배 해상도 적용
+- **먼저 볼 것:** 핵심 테스트 실패·시각 상태 해시 변경 0건. 2배에서 합체·흡수·터짐의 작은 십자 입자, 시한 숫자 7, 3D 배경 점의 외곽 밝기·혼합이 달라진다. 캡처에서 입자 배치와 전체 효과 범위는 같은 위치에 보였다. HUD 점수 글자·NEXT·THEN 영역의 RGB 차이는 두 화면비 모두 0픽셀이었다.
+- 상태: 완료 — §12-ONE.49 #164 추가 요구 5 반영. `origin/main` `0f2ef87`를 `codex/jelly-body-look`에 병합했다. [PR #165](https://github.com/jeongmo-dot/gravity_orb/pull/165)
+- 적용: `project.godot`의 bilinear(`mode=0)) 및 `scale=2.0`. 외곽 1.5px, 4배 MSAA, 64×32 메시를 유지했다. 비교 장면의 시작 뷰포트 값 `scale=2.0 mode=0`과 깊이 텍스처 진단을 두 비율에서 확인했다. 출력 PNG 540×960·540×1170, 내부 3D 깊이 텍스처 1080×1920·1080×2340.
+- 화면 픽셀 감사:
+  - `JellyOrbArt.gd` 몸·덮개의 가장자리 알파는 `dFdx/dFdy`, 또렷한 반사와 배 속 경계는 `fwidth`로 계산한다. 화면 투영 좌표는 화면 축과 구 반지름에 정규화한다. `240`과 같은 자리의 원본 최근접 비교에서 픽셀 혼합이 달라진다.
+  - `SpaceBackdrop.gd`의 `SCREEN_UV * viewport_size`는 논리 뷰포트 기반 점 격자와 시차 계산이다. 235의 배경 점 표본에서 안쪽 배치가 같고 가장자리의 최대 채널 차는 9였다.
+  - `Orb3D.gd`·`Orb3D.tscn`의 `TimedLabel3D`는 `fixed_size` 및 `pixel_size=0.00045`를 쓴다. 시한 숫자 7의 외곽에서 혼합 픽셀이 달라졌다. `pixel-effects-540x960.png`·`pixel-effects-540x1170.png`에 숫자와 배경 점을 나란히 뒀다.
+  - `FeedbackDirector.gd`의 빛·입자와 `ColorEffectVisual.gd`의 별은 UV 기반이다. `SwipeTrail.gd`의 화살표 폭은 3D 거리, `PIXELS_PER_METER`는 판 좌표→월드 단위 환산이다. 프로덕션 셰이더에서 직접 `SCREEN_PIXEL_SIZE` 또는 `FRAGCOORD`를 쓰는 경로는 발견하지 못했다. 효과 코드는 수정하지 않았다.
+  - 2D: `235` 점수 글자 포함 안쪽 (177,20)~(368,74), NEXT·THEN 표본에서 RGB가 완전히 일치했다. 점수 카드 바깥까지 포함한 영역에는 3D 배경과 맞닿는 곳의 작은 차이 40/38픽셀(최대 채널 차 9)이 있었다.
+- QA 관측값:
+  - Godot 일반 빌드 `4.8.dev3.official.51105ccbe`. `test_jelly_visuals.gd` 26/26(프로젝트 배율·모드 검사 포함), `test_jolt_3d.gd` 44/44, 합계 70/70. `JELLY_VISUAL_STATE_HASH` `70dde5ab…` 일치. 기본·블리츠·젤리 헤드리스 스모크 종료 코드 0. `git diff --check` 오류 0건.
+  - `-JellyLookOnly` 두 화면비 38장, `240_jelly_look_l10_edge_zoom.png` 포함, 종료 코드 0. 같은 프레임의 1배·2배 원본 16장을 추가로 검증했다.
+  - `artifacts/inbox-164-scale2/`에 `effects-540x960.png`·`effects-540x1170.png`(기존 `13` 합체·`14` 흡수·`15` 터짐), `edge-540x960.png`·`edge-540x1170.png`(경계 최근접 5배), `pixel-diff.csv`, 원본과 실행 로그를 보관했다. 비교 도구에서 장면 처리를 멈춘 뒤 배율만 전환해 입자 시간이 같도록 했다.
+- 수동 확인 절차: 각 비율의 `effects-*.png`에서 입자 위치와 밝기를 비교하고, `edge-*.png`로 몸 가장자리, `pixel-effects-*.png`로 숫자와 배경 점을 확인한다. 보라 L10의 최종 출력 확대는 `240`이다.
+- 주말 범위에 따라 전체 회귀·성능, 기본 전체 캡처와 빌드는 미실행.
+
 ### [2026-11-28] 대상 #164 추가 요구 4 — 외곽 1.5px·3.0px·3D 2배 비교
 - **먼저 볼 것:** B 적용 확인. Compatibility + `canvas_items`에서 3D 깊이 텍스처가 540×960 → 1080×1920, 최종 PNG는 540×960이었다. 5배 확대에서 A는 외곽 픽셀 전이가 넓고 조금 흐리며, B는 A보다 외곽이 선명하면서 일부 계단의 들쭉날쭉한 밝기가 줄었다. B에도 개별 픽셀 계단은 보인다. L10 지름은 현행 142.81px, A 141.42px, B 143.30px. 프레임 간격은 현행 평균 0.598ms·최대 1.994ms, B 평균 0.636ms·최대 1.813ms였다.
 - 상태: 비교 완료, 적용 설정 선택 대기. `origin/main` `614eab1` 병합. 브랜치 `codex/jelly-body-look`, [PR #165](https://github.com/jeongmo-dot/gravity_orb/pull/165).

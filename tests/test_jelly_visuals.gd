@@ -4,6 +4,15 @@ const BOARD_SCENE: PackedScene = preload("res://scenes/Board3D.tscn")
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
 
 
+func test_jelly_project_uses_bilinear_3d_supersampling() -> void:
+	assert_eq(
+		ProjectSettings.get_setting("rendering/scaling_3d/mode"),
+		Viewport.SCALING_3D_MODE_BILINEAR,
+		"3D supersampling uses bilinear downsampling"
+	)
+	assert_eq(ProjectSettings.get_setting("rendering/scaling_3d/scale"), 2.0, "3D render scale")
+
+
 func test_tap_sheen_overlay_material_and_profile() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	Config.data.game_mode = GameConfig.GameMode.JELLY
