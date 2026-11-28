@@ -11,8 +11,8 @@ func test_tap_sheen_uses_body_uniforms_and_survives_material_changes() -> void:
 	JellyOrbArt.prewarm(Config.data)
 	assert_eq(
 		JellyOrbArt.shared_material_count(),
-		JellyOrbArt.PALETTE.size() * Config.data.orb_max_level * 3,
-		"prewarm allocates only body, face and belly materials"
+		JellyOrbArt.PALETTE.size() * Config.data.orb_max_level * 3 + 1,
+		"prewarm adds one shared shadow material"
 	)
 	var board: Board3D = await _create_board()
 	var orb: Orb3D = board.spawn_orb(2, 5, Vector2.ZERO)
@@ -24,9 +24,12 @@ func test_tap_sheen_uses_body_uniforms_and_survives_material_changes() -> void:
 	var uniforms: Dictionary = {
 		"tap_sheen_period": 2.8,
 		"tap_sheen_sweep_fraction": 0.55,
-		"tap_sheen_travel": 1.7,
-		"tap_sheen_half_width": 0.18,
-		"tap_sheen_brightness": 0.75,
+		"tap_sheen_travel": 2.0,
+		"tap_sheen_half_width": 0.45,
+		"tap_sheen_brightness": 0.30,
+		"tap_sheen_streak_offset": 0.30,
+		"tap_sheen_streak_half_width": 0.025,
+		"tap_sheen_streak_brightness": 0.65,
 	}
 	for uniform: String in uniforms:
 		assert_near(float(body.get_shader_parameter(uniform)), float(uniforms[uniform]), 0.0001, uniform)
@@ -48,6 +51,96 @@ func test_tap_sheen_uses_body_uniforms_and_survives_material_changes() -> void:
 	orb.set_tap_mark_enabled(false)
 	orb._advance_tap_mark(0.15)
 	assert_eq(orb._mesh.get_instance_shader_parameter("tap_sheen_strength"), 0.0, "fully off at 0.15s")
+	Config.data.game_mode = original_mode
+	await _cleanup(board)
+
+
+func test_jelly_body_palette_layers_and_preview_pixels() -> void:
+	var pink_base: Color = JellyOrbArt.color_for(0, 5)
+	var materials: Array[ShaderMaterial] = [
+		JellyOrbArt.body_material_for(0, 5),
+		JellyOrbArt.stone_body_material(5),
+	]
+	var base_colors: Array[Color] = [pink_base, JellyOrbArt.STONE_BODY_COLOR]
+	for index: int in range(materials.size()):
+		var body: ShaderMaterial = materials[index]
+		var base: Color = base_colors[index]
+		assert_eq(body.get_shader_parameter("base_color"), base, "base palette")
+		assert_eq(body.get_shader_parameter("light_color"), base.lerp(Color.WHITE, 0.66), "light palette")
+		var deep: Color = body.get_shader_parameter("deep_color")
+		var edge: Color = body.get_shader_parameter("edge_color")
+		assert_true(deep.is_equal_approx(
+			Color.from_hsv(base.h, minf(1.0, base.s * 1.20), base.v * 0.88)
+		), "deep palette")
+		assert_true(edge.is_equal_approx(
+			Color.from_hsv(base.h, minf(1.0, base.s * 1.36), base.v * 0.79)
+		), "edge palette")
+		assert_eq(body.get_shader_parameter("body_gradient"), Vector4(0.12, 0.28, 1.36, 0.50), "gradient")
+		assert_eq(body.get_shader_parameter("body_deep_stop"), 0.86, "deep stop")
+		assert_eq(body.get_shader_parameter("body_alpha"), Vector4(0.95, 0.90, 0.93, 0.97), "alpha stops")
+		assert_eq(body.get_shader_parameter("body_ellipses"), PackedVector4Array([
+			Vector4(0.12, 0.42, 0.60, 0.40),
+			Vector4(0.50, 0.52, 0.16, 0.06),
+			Vector4(-0.36, -0.50, 0.38, 0.20),
+			Vector4(-0.50, -0.38, 0.10, 0.065),
+			Vector4(-0.27, -0.66, 0.035, 0.035),
+		]), "layer geometry")
+		assert_eq(body.get_shader_parameter("body_ellipse_styles"), PackedVector4Array([
+			Vector4(0.0, 0.55, 1.45, 0.55),
+			Vector4(deg_to_rad(-45.0), 0.40, 1.60, 0.40),
+			Vector4(deg_to_rad(-32.0), 0.80, 1.20, 0.50),
+			Vector4(deg_to_rad(-32.0), 1.0, 1.0, 0.95),
+			Vector4(0.0, 1.0, 1.0, 0.90),
+		]), "layer styles")
+	var preview: Image = JellyOrbArt.preview_texture_for(0, 5).get_image()
+	var samples: Dictionary = {Vector2i(192, 192): Color8(255, 182, 199), Vector2i(60, 60): Color8(214, 77, 109)}
+	for point: Vector2i in samples:
+		var pixel: Color = preview.get_pixelv(point)
+		var expected: Color = samples[point]
+		assert_near(pixel.r, expected.r, 2.0 / 255.0, "preview red at %s" % [point])
+		assert_near(pixel.g, expected.g, 2.0 / 255.0, "preview green at %s" % [point])
+		assert_near(pixel.b, expected.b, 2.0 / 255.0, "preview blue at %s" % [point])
+	assert_eq(preview.get_pixel(0, 0).a, 0.0, "preview outside the circle stays transparent")
+
+
+func test_jelly_shadow_follows_radius_and_ghost_alpha_below_bodies() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	var board: Board3D = await _create_board()
+	var orb: Orb3D = board.spawn_orb(0, 5, Vector2.ZERO)
+	var small: Orb3D = board.spawn_orb(1, 1, Vector2(260.0, 0.0))
+	var shadow: MeshInstance3D = orb._shadow
+	var material: ShaderMaterial = shadow.material_override as ShaderMaterial
+	assert_true(shadow.visible, "JELLY shadow is visible")
+	assert_eq(material, small._shadow.material_override, "shadow material is shared")
+	assert_true(material.render_priority < orb.visual_material_resource().render_priority, "shadow draws first")
+	assert_eq(material.get_shader_parameter("shadow_falloff"), Vector2(0.64, 1.36), "shadow falloff")
+	assert_eq(material.get_shader_parameter("shadow_alpha"), 0.25, "shadow alpha")
+	assert_eq(
+		shadow.get_instance_shader_parameter("shadow_color"),
+		orb.visual_material_resource().get_shader_parameter("deep_color"),
+		"shadow uses deep body color"
+	)
+	orb.set_gravity(Vector2i.LEFT, Config.data.gravity_strength)
+	orb._jelly_deform = Vector2(1.2, 1.1)
+	orb._update_visual_transform()
+	var radius: float = orb.get_current_radius() / Orb3D.PIXELS_PER_METER
+	assert_true(
+		(shadow.position - orb._mesh.position).is_equal_approx(Vector3(0.0, -1.06 * radius, 0.0)),
+		"shadow stays below the body on the screen"
+	)
+	assert_near(shadow.scale.x / 1.36, 0.78 * radius, 0.0001, "shadow horizontal radius")
+	assert_near(shadow.scale.y / 1.36, 0.11 * radius, 0.0001, "shadow vertical radius")
+	orb.enter_ghost_state(0.4)
+	assert_eq(shadow.get_instance_shader_parameter("shadow_visual_alpha"), 0.4, "ghost shadow fades")
+	assert_eq(ProjectSettings.get_setting("rendering/anti_aliasing/quality/msaa_3d"), Viewport.MSAA_4X, "4x MSAA")
+	for jelly: Orb3D in [small, orb]:
+		assert_eq(jelly.mesh_resource().radial_segments, 64, "JELLY sphere radial segments")
+		assert_eq(jelly.mesh_resource().rings, 32, "JELLY sphere rings")
+	Config.data.game_mode = GameConfig.GameMode.TURN
+	var legacy: Orb3D = board.spawn_orb(1, 1, Vector2(-260.0, 0.0))
+	assert_true(not legacy._shadow.visible, "legacy orb shadow is hidden")
+	assert_eq(legacy.mesh_resource().radial_segments, 14, "legacy mesh keeps its tessellation")
 	Config.data.game_mode = original_mode
 	await _cleanup(board)
 
@@ -123,7 +216,7 @@ func test_jelly_orb_uses_face_shader_without_ring_geometry() -> void:
 	var orb: Orb3D = board.spawn_orb(2, 7, Vector2.ZERO)
 	assert_true(orb._face.visible, "JELLY face billboard visible")
 	assert_eq(_forbidden_geometry_count(orb), 0, "JELLY orb has no ring geometry")
-	assert_true(orb.visual_material_resource().shader.code.contains("lower_scatter"), "JELLY body shader")
+	assert_true(orb.visual_material_resource().shader.code.contains("soft_reflection"), "JELLY body shader")
 	assert_eq(orb.visual_material_resource().render_priority, 10, "JELLY body renders after board glass")
 	assert_eq(
 		(orb._belly.material_override as ShaderMaterial).render_priority,

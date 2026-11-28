@@ -13,6 +13,7 @@ const UI_B_BOARD_ONLY_ARGUMENT: String = "--capture-ui-b-board"
 const GAP2_DEFAULTS_ONLY_ARGUMENT: String = "--capture-gap2-defaults"
 const JELLY_TAP_SPLIT_ONLY_ARGUMENT: String = "--capture-jelly-tap-split"
 const JELLY_TAP_SHEEN_ONLY_ARGUMENT: String = "--capture-jelly-tap-sheen"
+const JELLY_LOOK_ONLY_ARGUMENT: String = "--capture-jelly-look"
 const PILE_JITTER_SEED: int = 11620261030
 const SPAWN_RAMP_CAPTURE_SEED: int = 11920261031
 const CAPTURE_FILES: Array[String] = [
@@ -246,6 +247,13 @@ const JELLY_TAP_SHEEN_FILES: Array[String] = [
 	"238_jelly_tap_sheen_left.png",
 	"239_jelly_tap_sheen_simulating.png",
 ]
+const JELLY_LOOK_EDGE_FILE: String = "240_jelly_look_l10_edge_zoom.png"
+const JELLY_LOOK_LEGACY_FILES: Array[String] = [
+	"40_jelly_look_max.png",
+	"42_jelly_look_absorption.png",
+	"71_jelly_turn_hud_three_digit.png",
+	"205_jelly_timed_stone_after_harden.png",
+]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
 var _temp_save_path: String = "res://artifacts/screens/capture_save.tmp.cfg"
@@ -258,6 +266,7 @@ var _ui_b_board_only: bool = false
 var _gap2_defaults_only: bool = false
 var _jelly_tap_split_only: bool = false
 var _jelly_tap_sheen_only: bool = false
+var _jelly_look_only: bool = false
 var _requested_window_size: Vector2i = Vector2i.ZERO
 var _expected_capture_size: Vector2i = Vector2i.ZERO
 
@@ -282,7 +291,10 @@ func _run() -> void:
 	Config.data.sfx_enabled = false
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.rng_seed = 5050
-	if _jelly_tap_sheen_only:
+	if _jelly_look_only:
+		await _capture_jelly_tap_sheens(true)
+		await _capture_jelly_look_legacy_scenes()
+	elif _jelly_tap_sheen_only:
 		await _capture_jelly_tap_sheens()
 	elif _jelly_tap_split_only:
 		await _capture_jelly_tap_split_scenes()
@@ -295,14 +307,18 @@ func _run() -> void:
 	elif _timed_only:
 		await _capture_timed_only_scenes()
 	else:
-		await _capture_jelly_tap_sheens()
+		await _capture_jelly_tap_sheens(true)
 		await _capture_shell_scenes()
 		await _capture_gameplay_scenes()
 	Config.data.sfx_enabled = original_sfx_enabled
 	_verify_user_save_unchanged()
 	_remove_file(_temp_save_path)
 	var expected_files: Array[String] = CAPTURE_FILES + JELLY_TAP_SHEEN_FILES
-	if _jelly_tap_sheen_only:
+	expected_files.append(JELLY_LOOK_EDGE_FILE)
+	if _jelly_look_only:
+		expected_files = JELLY_TAP_SHEEN_FILES + JELLY_LOOK_LEGACY_FILES
+		expected_files.append(JELLY_LOOK_EDGE_FILE)
+	elif _jelly_tap_sheen_only:
 		expected_files = JELLY_TAP_SHEEN_FILES
 	elif _jelly_tap_split_only:
 		expected_files = JELLY_TAP_SPLIT_ONLY_FILES
@@ -475,7 +491,7 @@ func _capture_jelly_tap_split_scenes() -> void:
 	await _destroy_main(main)
 
 
-func _capture_jelly_tap_sheens() -> void:
+func _capture_jelly_tap_sheens(capture_edge: bool = false) -> void:
 	var main: Main = await _create_main(true)
 	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
 	var board: Board3D = main.get_node("Board") as Board3D
@@ -499,10 +515,22 @@ func _capture_jelly_tap_sheens() -> void:
 	var candidates: Array[Orb3D] = [level_five, level_eight, level_nine, level_ten]
 	_verify_tap_sheen_capture(JELLY_TAP_SHEEN_FILES[0], board, candidates)
 	await _capture(JELLY_TAP_SHEEN_FILES[0])
+	if capture_edge:
+		var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+		var edge_center: Vector2 = Vector2(
+			viewport_size.x * 330.0 / 540.0,
+			viewport_size.y * 0.5 - viewport_size.x * 40.0 / 540.0
+		)
+		print("JELLY_LOOK_CAPTURE msaa_3d=%d radial_segments=%d rings=%d" % [
+			get_viewport().msaa_3d, level_ten.mesh_resource().radial_segments,
+			level_ten.mesh_resource().rings,
+		])
+		# Enlarge edge coverage without the bright overshoot from Lanczos.
+		await _capture_zoom(JELLY_LOOK_EDGE_FILE, edge_center, 35, Image.INTERPOLATE_BILINEAR)
 	JellyOrbArt.freeze_animation_for_capture(1.47)
 	_verify_tap_sheen_capture(JELLY_TAP_SHEEN_FILES[1], board, candidates)
 	await _capture(JELLY_TAP_SHEEN_FILES[1])
-	var zoom_times: Array[float] = [0.585, 0.77, 0.955]
+	var zoom_times: Array[float] = [0.613860, 0.77, 0.926140]
 	for index: int in range(zoom_times.size()):
 		JellyOrbArt.freeze_animation_for_capture(zoom_times[index])
 		var file_name: String = JELLY_TAP_SHEEN_FILES[index + 2]
@@ -540,6 +568,88 @@ func _verify_tap_sheen_capture(file_name: String, board: Board3D, candidates: Ar
 	print("SCREEN_CAPTURE_TAP_SHEEN file=%s t=%.3f gravity=%s candidates=%d strengths=%s" % [
 		file_name, JellyOrbArt.animation_time(), board.gravity_direction(), candidates.size(), strengths
 	])
+
+
+func _capture_jelly_look_legacy_scenes() -> void:
+	var main: Main = await _create_main(true)
+	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
+	var board: Board3D = main.get_node("Board") as Board3D
+	var hud: Hud = main.get_node("UI/Hud") as Hud
+	var feedback: FeedbackDirector = main.get_node("FeedbackDirector") as FeedbackDirector
+	manager.set_physics_process(false)
+	await _capture_jelly_look_max(board, hud, feedback)
+	await _capture_jelly_look_absorption(board, feedback)
+	feedback.clear_effects()
+	await _capture_turn_hud_scene(main, manager, hud)
+	board.clear()
+	var original_fail_mode: int = Config.data.jelly_timed_fail_mode
+	await _capture_jelly_look_stone(board, manager)
+	Config.data.jelly_timed_fail_mode = original_fail_mode
+	await _destroy_main(main)
+
+
+func _capture_jelly_look_max(board: Board3D, hud: Hud, feedback: FeedbackDirector) -> void:
+	board.clear()
+	feedback.clear_effects()
+	var maximum: Orb3D = board.spawn_orb(OrbTypes.OrbColor.PURPLE, 7, Vector2.ZERO)
+	maximum.disable_physics()
+	feedback.play_reaction_visuals({
+		"type": ReactionRules.Type.MERGE,
+		"position": Vector2.ZERO,
+		"result_level": 7,
+		"result_color": OrbTypes.OrbColor.PURPLE,
+		"result_orb": maximum,
+		"levels": [6, 6],
+		"colors": [OrbTypes.OrbColor.PURPLE, OrbTypes.OrbColor.PURPLE],
+		"shock_targets": [],
+	})
+	hud._on_preview_changed([
+		[{"color": OrbTypes.OrbColor.PURPLE, "level": 7}],
+		[{"color": OrbTypes.OrbColor.RED, "level": 7}],
+	])
+	await get_tree().create_timer(0.16).timeout
+	await _capture("40_jelly_look_max.png")
+
+
+func _capture_jelly_look_absorption(board: Board3D, feedback: FeedbackDirector) -> void:
+	board.clear()
+	var absorber: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 4, Vector2(115.0, 0.0))
+	absorber.disable_physics()
+	feedback.play_reaction_visuals({
+		"type": ReactionRules.Type.MERGE,
+		"position": Vector2(115.0, 0.0),
+		"result_level": 4,
+		"result_color": OrbTypes.OrbColor.GREEN,
+		"result_orb": absorber,
+		"jelly_absorption": true,
+		"source_positions": [Vector2(-180.0, 0.0), Vector2(115.0, 0.0)],
+		"source_radii": [Config.data.radius_for_level(3), Config.data.radius_for_level(4)],
+		"levels": [3, 4],
+		"colors": [OrbTypes.OrbColor.GREEN, OrbTypes.OrbColor.GREEN],
+		"shock_targets": [],
+	})
+	await get_tree().create_timer(0.05).timeout
+	await _capture("42_jelly_look_absorption.png")
+
+
+func _capture_jelly_look_stone(board: Board3D, manager: TurnManager) -> Orb3D:
+	Config.data.jelly_timed_fail_mode = 2
+	var hardened: Orb3D = board.spawn_orb(
+		OrbTypes.OrbColor.GREEN,
+		Config.data.jelly_timed_level,
+		Vector2.ZERO
+	)
+	hardened.set_timed(1, Config.data.jelly_timed_first_turn)
+	hardened.disable_physics()
+	manager._timed_stone_callout_seen = true
+	manager._harden_timed_jelly(hardened, true)
+	await get_tree().process_frame
+	if not hardened.is_timed_stone or not hardened.timed_stone_permanent:
+		_fail("mode two capture expected a permanent stone")
+	if (hardened.get_node("TimedLabel") as Label3D).visible:
+		_fail("mode two capture stone must not show a number")
+	await _capture("205_jelly_timed_stone_after_harden.png")
+	return hardened
 
 
 func _capture_gap2_default_scenes() -> void:
@@ -1094,22 +1204,7 @@ func _capture_timed_fail_mode_scenes(
 	director.clear_effects()
 	board.clear()
 	_clear_capture_hud_residue(hud)
-	Config.data.jelly_timed_fail_mode = 2
-	var hardened: Orb3D = board.spawn_orb(
-		OrbTypes.OrbColor.GREEN,
-		Config.data.jelly_timed_level,
-		Vector2.ZERO
-	)
-	hardened.set_timed(1, Config.data.jelly_timed_first_turn)
-	hardened.disable_physics()
-	manager._timed_stone_callout_seen = true
-	manager._harden_timed_jelly(hardened, true)
-	await get_tree().process_frame
-	if not hardened.is_timed_stone or not hardened.timed_stone_permanent:
-		_fail("mode two capture expected a permanent stone")
-	if (hardened.get_node("TimedLabel") as Label3D).visible:
-		_fail("mode two capture stone must not show a number")
-	await _capture("205_jelly_timed_stone_after_harden.png")
+	var hardened: Orb3D = await _capture_jelly_look_stone(board, manager)
 
 	var blast_rows: Array[Dictionary] = board.apply_blast_with_radius_factor(
 		Vector2(-80.0, 0.0),
@@ -2423,26 +2518,7 @@ func _capture_recovered_jelly_scenes(
 	await _capture("60_popup_crowded.png")
 	await _measure_hud_face_overlap(main, board, hud)
 
-	board.clear()
-	feedback.clear_effects()
-	var maximum: Orb3D = board.spawn_orb(OrbTypes.OrbColor.PURPLE, 7, Vector2.ZERO)
-	maximum.disable_physics()
-	feedback.play_reaction_visuals({
-		"type": ReactionRules.Type.MERGE,
-		"position": Vector2.ZERO,
-		"result_level": 7,
-		"result_color": OrbTypes.OrbColor.PURPLE,
-		"result_orb": maximum,
-		"levels": [6, 6],
-		"colors": [OrbTypes.OrbColor.PURPLE, OrbTypes.OrbColor.PURPLE],
-		"shock_targets": [],
-	})
-	hud._on_preview_changed([
-		[{"color": OrbTypes.OrbColor.PURPLE, "level": 7}],
-		[{"color": OrbTypes.OrbColor.RED, "level": 7}],
-	])
-	await get_tree().create_timer(0.16).timeout
-	await _capture("40_jelly_look_max.png")
+	await _capture_jelly_look_max(board, hud, feedback)
 
 	board.clear()
 	feedback.clear_effects()
@@ -2462,24 +2538,7 @@ func _capture_recovered_jelly_scenes(
 		stretch_orb._update_visual_transform()
 	await _capture("41_jelly_look_stretch.png")
 
-	board.clear()
-	var absorber: Orb3D = board.spawn_orb(OrbTypes.OrbColor.GREEN, 4, Vector2(115.0, 0.0))
-	absorber.disable_physics()
-	feedback.play_reaction_visuals({
-		"type": ReactionRules.Type.MERGE,
-		"position": Vector2(115.0, 0.0),
-		"result_level": 4,
-		"result_color": OrbTypes.OrbColor.GREEN,
-		"result_orb": absorber,
-		"jelly_absorption": true,
-		"source_positions": [Vector2(-180.0, 0.0), Vector2(115.0, 0.0)],
-		"source_radii": [Config.data.radius_for_level(3), Config.data.radius_for_level(4)],
-		"levels": [3, 4],
-		"colors": [OrbTypes.OrbColor.GREEN, OrbTypes.OrbColor.GREEN],
-		"shock_targets": [],
-	})
-	await get_tree().create_timer(0.05).timeout
-	await _capture("42_jelly_look_absorption.png")
+	await _capture_jelly_look_absorption(board, feedback)
 
 	board.clear()
 	feedback.clear_effects()
@@ -3446,7 +3505,12 @@ func _report_callout_fit(scene_name: String, hud: Hud) -> void:
 		_fail("callout text is outside the viewport in %s" % scene_name)
 
 
-func _capture_zoom(file_name: String, center: Vector2, half_size: int) -> void:
+func _capture_zoom(
+	file_name: String,
+	center: Vector2,
+	half_size: int,
+	interpolation: Image.Interpolation = Image.INTERPOLATE_LANCZOS
+) -> void:
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 	var image: Image = get_viewport().get_texture().get_image()
@@ -3457,7 +3521,7 @@ func _capture_zoom(file_name: String, center: Vector2, half_size: int) -> void:
 	var x: int = clampi(roundi(center.x) - half_size, 0, image.get_width() - size)
 	var y: int = clampi(roundi(center.y) - half_size, 0, image.get_height() - size)
 	var zoom: Image = image.get_region(Rect2i(x, y, size, size))
-	zoom.resize(480, 480, Image.INTERPOLATE_LANCZOS)
+	zoom.resize(480, 480, interpolation)
 	var path: String = _output_directory.path_join(file_name)
 	var error: Error = zoom.save_png(path)
 	if error != OK:
@@ -3599,6 +3663,8 @@ func _parse_arguments() -> void:
 			_jelly_tap_split_only = true
 		elif argument == JELLY_TAP_SHEEN_ONLY_ARGUMENT:
 			_jelly_tap_sheen_only = true
+		elif argument == JELLY_LOOK_ONLY_ARGUMENT:
+			_jelly_look_only = true
 
 
 func _parse_capture_size(value: String, label: String) -> Vector2i:

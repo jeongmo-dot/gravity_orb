@@ -38,6 +38,23 @@
 
 ## 미확인
 
+### [2026-11-28] 대상 #164 — 말랑 젤리 몸과 두 겹 광택
+- **먼저 볼 것:** 핵심 테스트 실패·시각 상태 해시 차이 0건. Compatibility 실제 창 두 비율에서 4배 MSAA 설정과 64×32 메시를 확인했다. 최종 원본·확대에서 흰 테두리, 몸 위에 그려지는 그림자, 몸 층 때문에 가려진 얼굴, 고리 없음.
+- 상태: 완료 — §12-ONE.49 #164 요구 1~9 반영. `main` `5e764ab` 기준. [변경 비교](https://github.com/jeongmo-dot/gravity_orb/compare/main...codex/jelly-body-look)
+- Done-when 대조:
+  - [x] 몸은 바탕·속 빛·반사·광택·L10 맥동을 층 순서로 합성한다. 광택은 ±2.0 범위에서 넓은 띠와 앞 빛줄로 이동한다. 미리보기에는 같은 팔레트와 정적 층을 적용하고 기존 가장자리 알파를 사용한다.
+  - [x] 모든 JELLY 레벨에 64×32 구 메시, 3D MSAA 4배. 공유 그림자 재질은 우선순위 9 (몸 10)이며 색은 deep, 투명도는 유령 세기를 따른다. 그림자는 화면 아래에 고정되고 성장·합체 반지름을 따른다.
+  - [x] 핵심 테스트에서 색·균일값, 분홍 L5 미리보기 픽셀 두 곳(채널 허용 차 2/255), L1·L5 메시, 그림자 위치·크기·재질·투명도, 터치 세기를 확인했다. 기존 얼굴·배 속·기호·규칙 경로에는 변경이 없다.
+- QA 관측값:
+  - Godot 일반 빌드 `4.8.dev3.official.51105ccbe`. `test_jelly_visuals.gd` 24/24, `test_jolt_3d.gd` 44/44, 종료 코드 0. `JELLY_VISUAL_STATE_HASH` `70dde5ab…`는 #163과 일치. 임포트와 기본·블리츠·젤리 헤드리스 스모크 종료 코드 0. PowerShell 구문·`git diff --check` 오류 0건.
+  - `tests/capture_screens.ps1 -JellyLookOnly` 종료 코드 0. `SCREEN_CAPTURE_SUITE exit=0 ratios=2 files=24`이며 각 비율 전체 8장·480×480 확대 4장. 크기 불일치·누락 0건. `artifacts/inbox-164-capture.log`에서 Compatibility의 Viewport MSAA 값 2(4배)와 64×32 메시를 두 번 확인했다.
+  - `235_jelly_tap_sheen_center.png` 분홍·보라 0.77초, `236_jelly_tap_sheen_yellow.png` 노랑 1.47초. `237a_jelly_tap_sheen_l5_enter_zoom.png`·`237b_jelly_tap_sheen_l5_center_zoom.png`·`237c_jelly_tap_sheen_l5_exit_zoom.png`는 넓은 띠 중심 −0.6·0·+0.6 기준 0.613860·0.770000·0.926140초.
+  - `238_jelly_tap_sheen_left.png`에서는 같은 화면 기울기, `239_jelly_tap_sheen_simulating.png`에서는 발사 후 전체 세기 0을 확인했다. `240_jelly_look_l10_edge_zoom.png`는 보라 L10 오른쪽 위 원본 70×70 확대이며 원본에는 흰 테두리가 없고 경계에는 중간색 픽셀이 관측됐다.
+  - 기존 `40_jelly_look_max.png`, `42_jelly_look_absorption.png`, NEXT·THEN의 `71_jelly_turn_hud_three_digit.png`, 돌 `205_jelly_timed_stone_after_harden.png`를 같은 장면 함수로 다시 찍었다. 두 화면비에서 얼굴이 읽히고 그림자는 판 쪽에 보인다.
+- 결정 사항: 그림자는 몸 중심 깊이의 화면 평행 판에 두고 먼저 합성한다. 경계 확대는 선형 보간을 사용했다. 초안 Lanczos 확대는 원본 녹색 채널 최대 248인 경계 주변을 255까지 밝게 만들어 흰 줄처럼 보였고 원본에는 그 줄이 없었다. 다른 확대 장면은 기존 Lanczos 보간을 사용한다.
+- 수동 확인 절차: JELLY에서 L1과 L5를 놓고 몸의 윤곽·눈 아래 두 겹 광택·젤리 밑 그림자를 본다. 옆으로 발사한 뒤 다음 입력 대기에서 광택이 같은 기울기로 지나가는지, NEXT·THEN에 같은 몸 반사가 나타나는지 확인한다. 경계는 `240`과 `235`의 원본을 함께 비교한다.
+- 전체 회귀·성능과 기본 전체 캡처 미실행 — 주말, 평일에. 빌드와 봇 측정 미실행.
+
 ### [2026-11-28] 대상 #163 — 터치 후보 젤리의 지나가는 광택
 - **먼저 볼 것:** 핵심 테스트 실패 0건, 핵심 시각 상태 해시 변경 0건. 확인한 장면에서 몸 밖 띠·얼굴 위 띠·후보가 아닌 젤리의 띠·별 표시 0건.
 - 상태: 완료 — §12-ONE.49 #163 요구 1~6 반영. `main` `7cb018e` 기준. [변경 비교](https://github.com/jeongmo-dot/gravity_orb/compare/main...codex/jelly-tap-sheen)

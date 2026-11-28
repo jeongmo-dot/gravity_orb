@@ -46,12 +46,40 @@ const BELLY_RADIUS_SCALE: float = 0.54
 const BELLY_LIGHTEN_AMOUNT: float = 0.35
 const BELLY_ALPHA: float = 0.85
 const BELLY_HIGHLIGHT_ALPHA: float = 0.70
+const JELLY_BODY_LIGHT_MIX: float = 0.66
+const JELLY_BODY_DEEP_SV: Vector2 = Vector2(1.20, 0.88)
+const JELLY_BODY_EDGE_SV: Vector2 = Vector2(1.36, 0.79)
+const JELLY_BODY_GRADIENT: Vector4 = Vector4(0.12, 0.28, 1.36, 0.50)
+const JELLY_BODY_DEEP_STOP: float = 0.86
+const JELLY_BODY_ALPHA: Vector4 = Vector4(0.95, 0.90, 0.93, 0.97)
+# Ellipses store center and radii. Styles store angle, falloff bounds and opacity.
+const JELLY_BODY_ELLIPSES: Array[Vector4] = [
+	Vector4(0.12, 0.42, 0.60, 0.40),
+	Vector4(0.50, 0.52, 0.16, 0.06),
+	Vector4(-0.36, -0.50, 0.38, 0.20),
+	Vector4(-0.50, -0.38, 0.10, 0.065),
+	Vector4(-0.27, -0.66, 0.035, 0.035),
+]
+const JELLY_BODY_ELLIPSE_STYLES: Array[Vector4] = [
+	Vector4(0.0, 0.55, 1.45, 0.55),
+	Vector4(-45.0, 0.40, 1.60, 0.40),
+	Vector4(-32.0, 0.80, 1.20, 0.50),
+	Vector4(-32.0, 1.0, 1.0, 0.95),
+	Vector4(0.0, 1.0, 1.0, 0.90),
+]
+const JELLY_BODY_SHADOW_OFFSET: float = 1.06
+const JELLY_BODY_SHADOW_RADII: Vector2 = Vector2(0.78, 0.11)
+const JELLY_BODY_SHADOW_FALLOFF: Vector2 = Vector2(0.64, 1.36)
+const JELLY_BODY_SHADOW_ALPHA: float = 0.25
 const TAP_SHEEN_ANGLE_DEGREES: float = 25.0
 const TAP_SHEEN_PERIOD: float = 2.8
 const TAP_SHEEN_SWEEP_FRACTION: float = 0.55
-const TAP_SHEEN_TRAVEL: float = 1.7
-const TAP_SHEEN_HALF_WIDTH: float = 0.18
-const TAP_SHEEN_BRIGHTNESS: float = 0.75
+const TAP_SHEEN_TRAVEL: float = 2.0
+const TAP_SHEEN_HALF_WIDTH: float = 0.45
+const TAP_SHEEN_BRIGHTNESS: float = 0.30
+const TAP_SHEEN_STREAK_OFFSET: float = 0.30
+const TAP_SHEEN_STREAK_HALF_WIDTH: float = 0.025
+const TAP_SHEEN_STREAK_BRIGHTNESS: float = 0.65
 const TAP_SHEEN_PHASE_STEP: float = 0.7
 const TAP_SHEEN_FADE_SECONDS: float = 0.15
 const PREVIEW_TEXTURE_SIZE: int = 384
@@ -60,6 +88,7 @@ const PREVIEW_MAX_TEXTURE_SIZE: int = 512
 static var _body_shader: Shader
 static var _face_shader: Shader
 static var _belly_shader: Shader
+static var _shadow_material: ShaderMaterial
 static var _body_materials: Dictionary = {}
 static var _stone_body_materials: Dictionary = {}
 static var _face_materials: Dictionary = {}
@@ -84,6 +113,7 @@ static func color_for(color_index: int, level: int = 1) -> Color:
 
 static func prewarm(cfg: GameConfig) -> void:
 	face_mesh()
+	shadow_material()
 	for color_index: int in range(PALETTE.size()):
 		for level_index: int in range(1, cfg.orb_max_level + 1):
 			body_material_for(color_index, level_index)
@@ -100,6 +130,7 @@ static func clear_cache() -> void:
 	_body_shader = null
 	_face_shader = null
 	_belly_shader = null
+	_shadow_material = null
 	_face_mesh = null
 	_last_animation_frame = -1
 	if not _animation_frozen:
@@ -112,6 +143,7 @@ static func shared_material_count() -> int:
 		+ _stone_body_materials.size()
 		+ _face_materials.size()
 		+ _belly_materials.size()
+		+ (1 if _shadow_material != null else 0)
 	)
 
 
@@ -169,48 +201,102 @@ static func _preview_texture_for_base(
 		if safe_level == Config.data.orb_max_level
 		else PREVIEW_TEXTURE_SIZE
 	)
-	var image: Image = Image.create(texture_size, texture_size, false, Image.FORMAT_RGBA8)
-	var light: Vector3 = Vector3(-0.20, -0.86, 0.48).normalized()
-	var half_vector: Vector3 = (light + Vector3(0.0, 0.0, 1.0)).normalized()
+	var image: Image = Image.create(texture_size, texture_size, false, Image.FORMAT_RGBAF)
+	var pixel_step: float = 2.0 / float(texture_size)
+	var light: Color = base_color.lerp(Color.WHITE, JELLY_BODY_LIGHT_MIX)
+	var deep: Color = _body_hsv_color(base_color, JELLY_BODY_DEEP_SV)
+	var edge: Color = _body_hsv_color(base_color, JELLY_BODY_EDGE_SV)
+	var gradient_center: Vector2 = Vector2(JELLY_BODY_GRADIENT.x, JELLY_BODY_GRADIENT.y)
 	for y: int in range(texture_size):
-		var unit_y: float = (float(y) + 0.5) / float(texture_size) * 2.0 - 1.0
+		var unit_y: float = (float(y) + 0.5) * pixel_step - 1.0
 		for x: int in range(texture_size):
-			var unit_x: float = (float(x) + 0.5) / float(texture_size) * 2.0 - 1.0
-			var radial_squared: float = unit_x * unit_x + unit_y * unit_y
-			if radial_squared >= 1.0:
-				image.set_pixel(x, y, Color.TRANSPARENT)
+			var point: Vector2 = Vector2((float(x) + 0.5) * pixel_step - 1.0, unit_y)
+			if point.length_squared() >= 1.0:
 				continue
-			var z: float = sqrt(1.0 - radial_squared)
-			var normal: Vector3 = Vector3(unit_x, unit_y, z)
-			var diffuse: float = maxf(0.0, normal.dot(light))
-			var half_dot: float = maxf(0.0, normal.dot(half_vector))
-			var specular: float = pow(half_dot, 72.0)
-			var broad: float = pow(half_dot, 11.0)
-			var rim: float = pow(1.0 - z, 2.2)
-			var scatter: float = maxf(0.0, unit_y) * (1.0 - z) * 0.15
-			var illumination: float = 0.60 + diffuse * 0.34 + broad * 0.055
-			image.set_pixel(x, y, Color(
-				clampf(base_color.r * illumination + specular * 0.62 + rim * base_color.r * 0.10 + scatter * base_color.r, 0.0, 1.0),
-				clampf(base_color.g * illumination + specular * 0.66 + rim * base_color.g * 0.11 + scatter * base_color.g, 0.0, 1.0),
-				clampf(base_color.b * illumination + specular * 0.72 + rim * base_color.b * 0.13 + scatter * base_color.b, 0.0, 1.0),
-				clampf((1.0 - sqrt(radial_squared)) * float(texture_size) * 0.52, 0.0, 1.0)
-			))
+			var t: float = minf(point.distance_to(gradient_center) / JELLY_BODY_GRADIENT.z, 1.0)
+			var color: Color
+			if t < JELLY_BODY_GRADIENT.w:
+				color = light.lerp(base_color, t / JELLY_BODY_GRADIENT.w)
+			elif t < JELLY_BODY_DEEP_STOP:
+				color = base_color.lerp(deep, inverse_lerp(JELLY_BODY_GRADIENT.w, JELLY_BODY_DEEP_STOP, t))
+			else:
+				color = deep.lerp(edge, inverse_lerp(JELLY_BODY_DEEP_STOP, 1.0, t))
+			color.a = clampf((1.0 - point.length()) * float(texture_size) * 0.52, 0.0, 1.0)
+			image.set_pixel(x, y, color)
+	for index: int in range(JELLY_BODY_ELLIPSES.size()):
+		_draw_preview_reflection(image, pixel_step, index, light if index == 0 else Color.WHITE)
+	image.convert(Image.FORMAT_RGBA8)
 	var texture: ImageTexture = ImageTexture.create_from_image(image)
 	_preview_textures[key] = texture
 	return texture
 
 
+static func _draw_preview_reflection(image: Image, pixel_step: float, index: int, tint: Color) -> void:
+	var ellipse: Vector4 = JELLY_BODY_ELLIPSES[index]
+	var style: Vector4 = JELLY_BODY_ELLIPSE_STYLES[index]
+	var center: Vector2 = Vector2(ellipse.x, ellipse.y)
+	var radii: Vector2 = Vector2(ellipse.z, ellipse.w)
+	var axis: Vector2 = Vector2.from_angle(deg_to_rad(style.x))
+	var hard_edge: bool = style.y == style.z
+	var bound: float = maxf(radii.x, radii.y) * style.z + 2.0 * pixel_step
+	var size: int = image.get_width()
+	var first: Vector2i = Vector2i(((center + Vector2.ONE * (1.0 - bound)) / pixel_step).floor())
+	var limit: Vector2i = Vector2i(((center + Vector2.ONE * (1.0 + bound)) / pixel_step).ceil())
+	for y: int in range(maxi(0, first.y), mini(size, limit.y)):
+		for x: int in range(maxi(0, first.x), mini(size, limit.x)):
+			var offset: Vector2 = (Vector2(x, y) + Vector2.ONE * 0.5) * pixel_step - Vector2.ONE - center
+			var q: Vector2 = Vector2(offset.dot(axis), offset.dot(axis.orthogonal())) / radii
+			var distance: float = q.length()
+			var lower: float = style.y
+			var upper: float = style.z
+			if hard_edge:
+				var gradient: Vector2 = (q / radii).rotated(deg_to_rad(style.x)) / maxf(distance, 0.000001)
+				var width: float = maxf((absf(gradient.x) + absf(gradient.y)) * pixel_step, 0.000001)
+				lower -= width
+				upper += width
+			if distance >= upper:
+				continue
+			var color: Color = image.get_pixel(x, y)
+			if color.a == 0.0:
+				continue
+			var result: Color = color.lerp(tint, style.w * (1.0 - smoothstep(lower, upper, distance)))
+			result.a = color.a
+			image.set_pixel(x, y, result)
+
+
+static func _body_hsv_color(base: Color, sv: Vector2) -> Color:
+	return Color.from_hsv(base.h, minf(1.0, base.s * sv.x), base.v * sv.y)
+
+
+static func _new_body_material(name: String, base: Color, level: int) -> ShaderMaterial:
+	var material: ShaderMaterial = ShaderMaterial.new()
+	material.resource_name = name
+	material.render_priority = 10
+	material.shader = _get_body_shader()
+	material.set_shader_parameter("base_color", base)
+	material.set_shader_parameter("light_color", base.lerp(Color.WHITE, JELLY_BODY_LIGHT_MIX))
+	material.set_shader_parameter("deep_color", _body_hsv_color(base, JELLY_BODY_DEEP_SV))
+	material.set_shader_parameter("edge_color", _body_hsv_color(base, JELLY_BODY_EDGE_SV))
+	material.set_shader_parameter("body_gradient", JELLY_BODY_GRADIENT)
+	material.set_shader_parameter("body_deep_stop", JELLY_BODY_DEEP_STOP)
+	material.set_shader_parameter("body_alpha", JELLY_BODY_ALPHA)
+	material.set_shader_parameter("body_ellipses", PackedVector4Array(JELLY_BODY_ELLIPSES))
+	var styles: PackedVector4Array = PackedVector4Array()
+	for style: Vector4 in JELLY_BODY_ELLIPSE_STYLES:
+		styles.append(Vector4(deg_to_rad(style.x), style.y, style.z, style.w))
+	material.set_shader_parameter("body_ellipse_styles", styles)
+	material.set_shader_parameter("level_id", level)
+	material.set_shader_parameter("max_level_id", Config.data.orb_max_level)
+	material.set_shader_parameter("animation_time", _animation_time)
+	return material
+
+
 static func body_material_for(color_index: int, level: int) -> ShaderMaterial:
 	var key: String = "%d:%d" % [color_index, level]
 	if not _body_materials.has(key):
-		var material: ShaderMaterial = ShaderMaterial.new()
-		material.resource_name = "jelly_body_c%d_l%d" % [color_index, level]
-		material.render_priority = 10
-		material.shader = _get_body_shader()
-		material.set_shader_parameter("base_color", color_for(color_index, level))
-		material.set_shader_parameter("level_id", level)
-		material.set_shader_parameter("max_level_id", Config.data.orb_max_level)
-		material.set_shader_parameter("animation_time", _animation_time)
+		var material: ShaderMaterial = _new_body_material(
+			"jelly_body_c%d_l%d" % [color_index, level], color_for(color_index, level), level
+		)
 		material.set_shader_parameter(
 			"tap_sheen_axis", Vector2.from_angle(deg_to_rad(TAP_SHEEN_ANGLE_DEGREES))
 		)
@@ -219,6 +305,9 @@ static func body_material_for(color_index: int, level: int) -> ShaderMaterial:
 		material.set_shader_parameter("tap_sheen_travel", TAP_SHEEN_TRAVEL)
 		material.set_shader_parameter("tap_sheen_half_width", TAP_SHEEN_HALF_WIDTH)
 		material.set_shader_parameter("tap_sheen_brightness", TAP_SHEEN_BRIGHTNESS)
+		material.set_shader_parameter("tap_sheen_streak_offset", TAP_SHEEN_STREAK_OFFSET)
+		material.set_shader_parameter("tap_sheen_streak_half_width", TAP_SHEEN_STREAK_HALF_WIDTH)
+		material.set_shader_parameter("tap_sheen_streak_brightness", TAP_SHEEN_STREAK_BRIGHTNESS)
 		material.set_shader_parameter("tap_sheen_phase", float(color_index) * TAP_SHEEN_PHASE_STEP)
 		material.set_shader_parameter("tap_sheen_enabled", true)
 		_body_materials[key] = material
@@ -228,14 +317,9 @@ static func body_material_for(color_index: int, level: int) -> ShaderMaterial:
 static func stone_body_material(level: int) -> ShaderMaterial:
 	var safe_level: int = clampi(level, 1, Config.data.orb_max_level)
 	if not _stone_body_materials.has(safe_level):
-		var material: ShaderMaterial = ShaderMaterial.new()
-		material.resource_name = "jelly_stone_body_l%d" % safe_level
-		material.render_priority = 10
-		material.shader = _get_body_shader()
-		material.set_shader_parameter("base_color", STONE_BODY_COLOR)
-		material.set_shader_parameter("level_id", safe_level)
-		material.set_shader_parameter("max_level_id", Config.data.orb_max_level)
-		material.set_shader_parameter("animation_time", _animation_time)
+		var material: ShaderMaterial = _new_body_material(
+			"jelly_stone_body_l%d" % safe_level, STONE_BODY_COLOR, safe_level
+		)
 		material.set_shader_parameter("tap_sheen_phase", 0.0)
 		material.set_shader_parameter("tap_sheen_enabled", false)
 		_stone_body_materials[safe_level] = material
@@ -359,6 +443,36 @@ static func _apply_animation_time() -> void:
 		(value as ShaderMaterial).set_shader_parameter("animation_time", _animation_time)
 
 
+static func shadow_material() -> ShaderMaterial:
+	if _shadow_material != null:
+		return _shadow_material
+	var shader: Shader = Shader.new()
+	shader.resource_name = "jelly_shadow_shader"
+	shader.code = """
+shader_type spatial;
+render_mode unshaded, cull_disabled, depth_draw_never;
+
+uniform vec2 shadow_falloff;
+uniform float shadow_alpha;
+instance uniform vec4 shadow_color : source_color = vec4(0.0, 0.0, 0.0, 1.0);
+instance uniform float shadow_visual_alpha = 1.0;
+
+void fragment() {
+	float distance = length(UV * 2.0 - 1.0) * shadow_falloff.y;
+	ALBEDO = shadow_color.rgb;
+	ALPHA = shadow_alpha * (1.0 - smoothstep(shadow_falloff.x, shadow_falloff.y, distance))
+		* shadow_visual_alpha;
+}
+"""
+	_shadow_material = ShaderMaterial.new()
+	_shadow_material.resource_name = "jelly_shadow_material"
+	_shadow_material.render_priority = 9
+	_shadow_material.shader = shader
+	_shadow_material.set_shader_parameter("shadow_falloff", JELLY_BODY_SHADOW_FALLOFF)
+	_shadow_material.set_shader_parameter("shadow_alpha", JELLY_BODY_SHADOW_ALPHA)
+	return _shadow_material
+
+
 static func _get_body_shader() -> Shader:
 	if _body_shader != null:
 		return _body_shader
@@ -368,7 +482,15 @@ static func _get_body_shader() -> Shader:
 shader_type spatial;
 render_mode unshaded, depth_prepass_alpha, cull_back;
 
-uniform vec4 base_color : source_color = vec4(1.0);
+uniform vec4 base_color : source_color;
+uniform vec4 light_color : source_color;
+uniform vec4 deep_color : source_color;
+uniform vec4 edge_color : source_color;
+uniform vec4 body_gradient;
+uniform float body_deep_stop;
+uniform vec4 body_alpha;
+uniform vec4 body_ellipses[5];
+uniform vec4 body_ellipse_styles[5];
 uniform int level_id = 1;
 uniform int max_level_id = 10;
 uniform float animation_time = 0.0;
@@ -379,6 +501,9 @@ uniform float tap_sheen_sweep_fraction;
 uniform float tap_sheen_travel;
 uniform float tap_sheen_half_width;
 uniform float tap_sheen_brightness;
+uniform float tap_sheen_streak_offset;
+uniform float tap_sheen_streak_half_width;
+uniform float tap_sheen_streak_brightness;
 uniform float tap_sheen_phase = 0.0;
 instance uniform float tap_sheen_strength = 0.0;
 varying float sphere_radius;
@@ -389,42 +514,69 @@ void vertex() {
 	sphere_center_view = MODELVIEW_MATRIX[3].xyz;
 }
 
+float ellipse_distance(vec2 p, vec4 ellipse, float angle) {
+	vec2 offset = p - ellipse.xy;
+	float cosine = cos(angle);
+	float sine = sin(angle);
+	vec2 rotated = vec2(dot(offset, vec2(cosine, sine)), dot(offset, vec2(-sine, cosine)));
+	return length(rotated / ellipse.zw);
+}
+
+float soft_reflection(vec2 p, int index) {
+	vec4 style = body_ellipse_styles[index];
+	float distance = ellipse_distance(p, body_ellipses[index], style.x);
+	return style.w * (1.0 - smoothstep(style.y, style.z, distance));
+}
+
+float sharp_reflection(vec2 p, int index) {
+	vec4 style = body_ellipse_styles[index];
+	float distance = ellipse_distance(p, body_ellipses[index], style.x);
+	float width = max(fwidth(distance), 0.000001);
+	return style.w * (1.0 - smoothstep(style.y - width, style.z + width, distance));
+}
+
 void fragment() {
-	vec3 n = normalize(NORMAL);
-	vec3 light_dir = normalize(vec3(-0.24, 0.66, 0.71));
-	vec3 view_dir = vec3(0.0, 0.0, 1.0);
-	vec3 half_dir = normalize(light_dir + view_dir);
-	float diffuse = max(dot(n, light_dir), 0.0);
-	float broad = pow(max(dot(n, half_dir), 0.0), 11.0) * 0.055;
-	float sharp = pow(max(dot(n, half_dir), 0.0), 72.0);
-	float facing = clamp(dot(n, view_dir), 0.0, 1.0);
-	float rim = pow(1.0 - facing, 2.2);
-	float lower_scatter = smoothstep(0.58, -0.78, n.y) * 0.12;
-	vec3 base = base_color.rgb;
-	vec3 interior = base * (0.72 + diffuse * 0.34 + lower_scatter);
-	interior += mix(base, vec3(1.0), 0.72) * broad;
-	interior += vec3(1.0) * sharp * 0.48;
-	interior += mix(base, vec3(1.0), 0.44) * rim * 0.23;
-	float max_pulse = level_id >= max_level_id ? (0.5 + 0.5 * sin(animation_time * 2.15)) : 0.0;
-	interior += vec3(1.0) * rim * max_pulse * 0.30;
-	ALBEDO = interior;
-	EMISSION = interior * (0.08 + rim * (0.08 + max_pulse * 0.32));
+	// Project the surface and center on the screen axes in radii at the center depth.
+	vec2 offset = VERTEX.xy - sphere_center_view.xy;
+	if (PROJECTION_MATRIX[3][3] == 0.0) {
+		offset = VERTEX.xy * (sphere_center_view.z / VERTEX.z) - sphere_center_view.xy;
+	}
+	vec2 p = offset * vec2(1.0, -1.0) / sphere_radius;
+	float t = min(1.0, length(p - body_gradient.xy) / body_gradient.z);
+	vec4 body;
+	if (t < body_gradient.w) {
+		body = mix(vec4(light_color.rgb, body_alpha.x), vec4(base_color.rgb, body_alpha.y),
+			t / body_gradient.w);
+	} else if (t < body_deep_stop) {
+		body = mix(vec4(base_color.rgb, body_alpha.y), vec4(deep_color.rgb, body_alpha.z),
+			(t - body_gradient.w) / (body_deep_stop - body_gradient.w));
+	} else {
+		body = mix(vec4(deep_color.rgb, body_alpha.z), vec4(edge_color.rgb, body_alpha.w),
+			(t - body_deep_stop) / (1.0 - body_deep_stop));
+	}
+	vec3 color = mix(body.rgb, light_color.rgb, soft_reflection(p, 0));
+	color = mix(color, vec3(1.0), soft_reflection(p, 1));
+	color = mix(color, vec3(1.0), soft_reflection(p, 2));
 	if (tap_sheen_enabled && tap_sheen_strength > 0.0) {
 		float cycle = fract((animation_time + tap_sheen_phase) / tap_sheen_period);
 		float progress = min(1.0, cycle / tap_sheen_sweep_fraction);
 		float center = mix(-tap_sheen_travel, tap_sheen_travel, smoothstep(0.0, 1.0, progress));
-		// Project the surface and center on the screen axes, in radii at the center depth.
-		vec2 offset = VERTEX.xy - sphere_center_view.xy;
-		if (PROJECTION_MATRIX[3][3] == 0.0) {
-			offset = VERTEX.xy * (sphere_center_view.z / VERTEX.z) - sphere_center_view.xy;
-		}
-		vec2 p = offset * vec2(1.0, -1.0) / sphere_radius;
-		float distance = abs(dot(p, tap_sheen_axis) - center);
-		float brightness = tap_sheen_brightness * max(0.0, 1.0 - distance / tap_sheen_half_width);
-		ALBEDO = mix(interior, vec3(1.0), brightness * tap_sheen_strength);
+		float d = dot(p, tap_sheen_axis) - center;
+		float broad = tap_sheen_brightness * max(0.0, 1.0 - abs(d) / tap_sheen_half_width);
+		float streak = tap_sheen_streak_brightness
+			* max(0.0, 1.0 - abs(d - tap_sheen_streak_offset) / tap_sheen_streak_half_width);
+		color = mix(color, vec3(1.0), broad * tap_sheen_strength);
+		color = mix(color, vec3(1.0), streak * tap_sheen_strength);
 	}
-	ROUGHNESS = 0.20;
-	ALPHA = mix(0.90, 1.0, smoothstep(0.0, 0.72, facing));
+	color = mix(color, vec3(1.0), sharp_reflection(p, 3));
+	color = mix(color, vec3(1.0), sharp_reflection(p, 4));
+	if (level_id >= max_level_id) {
+		float rim = pow(1.0 - clamp(normalize(NORMAL).z, 0.0, 1.0), 2.2);
+		float max_pulse = 0.5 + 0.5 * sin(animation_time * 2.15);
+		color += vec3(1.0) * rim * max_pulse * 0.30;
+	}
+	ALBEDO = color;
+	ALPHA = body.a;
 }
 """
 	return _body_shader

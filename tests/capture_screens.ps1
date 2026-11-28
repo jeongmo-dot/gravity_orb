@@ -8,7 +8,8 @@ param(
     [switch]$UiBBoardOnly,
     [switch]$Gap2DefaultsOnly,
     [switch]$JellyTapSplitOnly,
-    [switch]$JellyTapSheenOnly
+    [switch]$JellyTapSheenOnly,
+    [switch]$JellyLookOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -279,12 +280,22 @@ $tapSheenZoomFiles = @(
     @{ Path = "237b_jelly_tap_sheen_l5_center_zoom.png"; Size = "480x480" },
     @{ Path = "237c_jelly_tap_sheen_l5_exit_zoom.png"; Size = "480x480" }
 )
+$jellyLookEdgeSpec = @{ Path = "240_jelly_look_l10_edge_zoom.png"; Size = "480x480" }
 $fullFrameFiles += $tapSheenFrameFiles
-$zoomFiles += $tapSheenZoomFiles
+$zoomFiles += $tapSheenZoomFiles + @($jellyLookEdgeSpec)
 
 # Match the capture scene's mode precedence.
 $modeArgument = $null
-if ($JellyTapSheenOnly) {
+if ($JellyLookOnly) {
+    $modeArgument = "--capture-jelly-look"
+    $fullFrameFiles = $tapSheenFrameFiles + @(
+        "40_jelly_look_max.png",
+        "42_jelly_look_absorption.png",
+        "71_jelly_turn_hud_three_digit.png",
+        "205_jelly_timed_stone_after_harden.png"
+    )
+    $zoomFiles = $tapSheenZoomFiles + @($jellyLookEdgeSpec)
+} elseif ($JellyTapSheenOnly) {
     $modeArgument = "--capture-jelly-tap-sheen"
     $fullFrameFiles = $tapSheenFrameFiles
     $zoomFiles = $tapSheenZoomFiles
