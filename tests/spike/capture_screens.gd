@@ -12,6 +12,7 @@ const UI_B_ONLY_ARGUMENT: String = "--capture-ui-b"
 const UI_B_BOARD_ONLY_ARGUMENT: String = "--capture-ui-b-board"
 const GAP2_DEFAULTS_ONLY_ARGUMENT: String = "--capture-gap2-defaults"
 const JELLY_TAP_SPLIT_ONLY_ARGUMENT: String = "--capture-jelly-tap-split"
+const JELLY_TAP_SHEEN_ONLY_ARGUMENT: String = "--capture-jelly-tap-sheen"
 const PILE_JITTER_SEED: int = 11620261030
 const SPAWN_RAMP_CAPTURE_SEED: int = 11920261031
 const CAPTURE_FILES: Array[String] = [
@@ -236,16 +237,17 @@ const JELLY_TAP_SPLIT_ONLY_FILES: Array[String] = [
 	"233_jelly_tap_l7_blast.png",
 	"234_jelly_tap_l10_fragments.png",
 ]
-const JELLY_TAP_MARK_FILES: Array[String] = [
-	"235_jelly_tap_mark_peak.png",
-	"236_jelly_tap_mark_low.png",
-	"237_jelly_tap_mark_l5_zoom.png",
-	"238_jelly_tap_mark_left.png",
-	"239_jelly_tap_mark_simulating.png",
+const JELLY_TAP_SHEEN_FILES: Array[String] = [
+	"235_jelly_tap_sheen_center.png",
+	"236_jelly_tap_sheen_yellow.png",
+	"237a_jelly_tap_sheen_l5_enter_zoom.png",
+	"237b_jelly_tap_sheen_l5_center_zoom.png",
+	"237c_jelly_tap_sheen_l5_exit_zoom.png",
+	"238_jelly_tap_sheen_left.png",
+	"239_jelly_tap_sheen_simulating.png",
 ]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
-var _capture_main: Main
 var _temp_save_path: String = "res://artifacts/screens/capture_save.tmp.cfg"
 var _failed: bool = false
 var _user_save_existed: bool = false
@@ -255,6 +257,7 @@ var _ui_b_only: bool = false
 var _ui_b_board_only: bool = false
 var _gap2_defaults_only: bool = false
 var _jelly_tap_split_only: bool = false
+var _jelly_tap_sheen_only: bool = false
 var _requested_window_size: Vector2i = Vector2i.ZERO
 var _expected_capture_size: Vector2i = Vector2i.ZERO
 
@@ -279,7 +282,9 @@ func _run() -> void:
 	Config.data.sfx_enabled = false
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.rng_seed = 5050
-	if _jelly_tap_split_only:
+	if _jelly_tap_sheen_only:
+		await _capture_jelly_tap_sheens()
+	elif _jelly_tap_split_only:
 		await _capture_jelly_tap_split_scenes()
 	elif _gap2_defaults_only:
 		await _capture_gap2_default_scenes()
@@ -290,14 +295,16 @@ func _run() -> void:
 	elif _timed_only:
 		await _capture_timed_only_scenes()
 	else:
-		await _capture_jelly_tap_marks()
+		await _capture_jelly_tap_sheens()
 		await _capture_shell_scenes()
 		await _capture_gameplay_scenes()
 	Config.data.sfx_enabled = original_sfx_enabled
 	_verify_user_save_unchanged()
 	_remove_file(_temp_save_path)
-	var expected_files: Array[String] = CAPTURE_FILES + JELLY_TAP_MARK_FILES
-	if _jelly_tap_split_only:
+	var expected_files: Array[String] = CAPTURE_FILES + JELLY_TAP_SHEEN_FILES
+	if _jelly_tap_sheen_only:
+		expected_files = JELLY_TAP_SHEEN_FILES
+	elif _jelly_tap_split_only:
 		expected_files = JELLY_TAP_SPLIT_ONLY_FILES
 	elif _gap2_defaults_only:
 		expected_files = GAP2_DEFAULTS_ONLY_FILES
@@ -468,14 +475,14 @@ func _capture_jelly_tap_split_scenes() -> void:
 	await _destroy_main(main)
 
 
-func _capture_jelly_tap_marks() -> void:
+func _capture_jelly_tap_sheens() -> void:
 	var main: Main = await _create_main(true)
 	var manager: TurnManager = main.get_node("TurnManager") as TurnManager
 	var board: Board3D = main.get_node("Board") as Board3D
 	var camera: Camera3D = main.get_node("Camera3D") as Camera3D
 	board.set_physics_process(false)
 	board.clear()
-	var level_four: Orb3D = board.spawn_orb(1, 4, Vector2(-310.0, -225.0))
+	board.spawn_orb(1, 4, Vector2(-310.0, -225.0))
 	var level_five: Orb3D = board.spawn_orb(0, 5, Vector2(-95.0, -225.0))
 	var level_eight: Orb3D = board.spawn_orb(2, 8, Vector2(180.0, -225.0))
 	var level_nine: Orb3D = board.spawn_orb(3, 9, Vector2(-240.0, 65.0))
@@ -487,36 +494,52 @@ func _capture_jelly_tap_marks() -> void:
 	for orb: Orb3D in board.get_orbs():
 		orb.disable_physics()
 	manager._set_state(TurnManager.State.WAITING_INPUT)
-	JellyOrbArt.freeze_animation_for_capture(JellyOrbArt.TAP_MARK_PERIOD * 0.5)
+	JellyOrbArt.freeze_animation_for_capture(0.77)
 	await get_tree().create_timer(0.20).timeout
-	for orb: Orb3D in [level_four, level_five, level_eight, level_nine, level_ten, timed, ghost]:
-		var expected: bool = orb in [level_five, level_eight, level_nine, level_ten]
-		if orb._tap_mark.visible != expected:
-			_fail("Waiting tap mark mismatch for orb %d at level %d" % [orb.stable_spawn_id, orb.level])
-	await _capture(JELLY_TAP_MARK_FILES[0])
-	await _capture_zoom(
-		JELLY_TAP_MARK_FILES[2], camera.unproject_position(level_five._tap_mark.global_position), 35
-	)
-	JellyOrbArt.freeze_animation_for_capture(0.0)
-	await _capture(JELLY_TAP_MARK_FILES[1])
+	var candidates: Array[Orb3D] = [level_five, level_eight, level_nine, level_ten]
+	_verify_tap_sheen_capture(JELLY_TAP_SHEEN_FILES[0], board, candidates)
+	await _capture(JELLY_TAP_SHEEN_FILES[0])
+	JellyOrbArt.freeze_animation_for_capture(1.47)
+	_verify_tap_sheen_capture(JELLY_TAP_SHEEN_FILES[1], board, candidates)
+	await _capture(JELLY_TAP_SHEEN_FILES[1])
+	var zoom_times: Array[float] = [0.585, 0.77, 0.955]
+	for index: int in range(zoom_times.size()):
+		JellyOrbArt.freeze_animation_for_capture(zoom_times[index])
+		var file_name: String = JELLY_TAP_SHEEN_FILES[index + 2]
+		_verify_tap_sheen_capture(file_name, board, candidates)
+		await _capture_zoom(
+			file_name, camera.unproject_position(level_five._mesh.global_position), 55
+		)
 
-	JellyOrbArt.freeze_animation_for_capture(JellyOrbArt.TAP_MARK_PERIOD * 0.5)
+	JellyOrbArt.freeze_animation_for_capture(0.77)
 	var diagonal_time: float = Config.data.gravity_turn_diagonal_time
 	Config.data.gravity_turn_diagonal_time = 0.0
 	manager.gravity = Vector2i.LEFT
 	board.set_gravity(manager.gravity)
 	Config.data.gravity_turn_diagonal_time = diagonal_time
-	await _capture(JELLY_TAP_MARK_FILES[3])
+	_verify_tap_sheen_capture(JELLY_TAP_SHEEN_FILES[5], board, candidates)
+	await _capture(JELLY_TAP_SHEEN_FILES[5])
 	manager.on_swipe(Vector2i.DOWN)
 	await get_tree().create_timer(0.20).timeout
 	if manager.state != TurnManager.State.SIMULATING:
-		_fail("Tap mark swipe capture expected SIMULATING")
-	for orb: Orb3D in board.get_orbs():
-		if orb._tap_mark.visible:
-			_fail("Tap mark remained visible after swipe fade-out")
-	await _capture(JELLY_TAP_MARK_FILES[4])
+		_fail("Tap sheen swipe capture expected SIMULATING")
+	candidates.clear()
+	_verify_tap_sheen_capture(JELLY_TAP_SHEEN_FILES[6], board, candidates)
+	await _capture(JELLY_TAP_SHEEN_FILES[6])
 	JellyOrbArt.unfreeze_animation()
 	await _destroy_main(main)
+
+
+func _verify_tap_sheen_capture(file_name: String, board: Board3D, candidates: Array[Orb3D]) -> void:
+	var strengths: Array[float] = []
+	for orb: Orb3D in board.get_orbs():
+		var strength: float = float(orb._mesh.get_instance_shader_parameter("tap_sheen_strength"))
+		strengths.append(strength)
+		if strength != (1.0 if orb in candidates else 0.0):
+			_fail("Tap sheen strength mismatch for orb %d in %s" % [orb.stable_spawn_id, file_name])
+	print("SCREEN_CAPTURE_TAP_SHEEN file=%s t=%.3f gravity=%s candidates=%d strengths=%s" % [
+		file_name, JellyOrbArt.animation_time(), board.gravity_direction(), candidates.size(), strengths
+	])
 
 
 func _capture_gap2_default_scenes() -> void:
@@ -3352,14 +3375,12 @@ func _create_main(play: bool) -> Main:
 	(main.get_node("ScoreManager") as ScoreManager).save_path = _temp_save_path
 	(main.get_node("FeedbackDirector/SfxBank") as SfxBank).save_path = _temp_save_path
 	get_tree().root.add_child(main)
-	_capture_main = main
 	await get_tree().process_frame
 	await get_tree().process_frame
 	return main
 
 
 func _destroy_main(main: Main) -> void:
-	_capture_main = null
 	main.queue_free()
 	await get_tree().process_frame
 	InputRouter.set_locked(false)
@@ -3377,7 +3398,6 @@ func _capture(file_name: String) -> void:
 		_fail("Could not save %s: %s" % [path, error_string(error)])
 		return
 	print("SCREEN_CAPTURE file=%s size=%dx%d" % [path, image.get_width(), image.get_height()])
-	_report_capture_tap_marks(file_name)
 
 
 func _report_callout_fit(scene_name: String, hud: Hud) -> void:
@@ -3444,30 +3464,6 @@ func _capture_zoom(file_name: String, center: Vector2, half_size: int) -> void:
 		_fail("Could not save %s: %s" % [path, error_string(error)])
 		return
 	print("SCREEN_CAPTURE_ZOOM file=%s source=%dx%d output=480x480" % [path, size, size])
-	_report_capture_tap_marks(file_name)
-
-
-func _report_capture_tap_marks(file_name: String) -> void:
-	if not is_instance_valid(_capture_main):
-		return
-	var board: Board3D = _capture_main.get_node("Board") as Board3D
-	var camera: Camera3D = _capture_main.get_node("Camera3D") as Camera3D
-	var marked_count: int = 0
-	for orb: Orb3D in board.get_orbs():
-		if not orb._tap_mark.visible:
-			continue
-		marked_count += 1
-		var offset: Vector2 = (
-			camera.unproject_position(orb._tap_mark.global_position)
-			- camera.unproject_position(orb._mesh.global_position)
-		)
-		if offset.x <= 0.0 or offset.y >= 0.0:
-			_fail("Tap mark is outside the upper-right quadrant in %s: %s" % [file_name, offset])
-			return
-	if marked_count > 0:
-		print("SCREEN_CAPTURE_TAP_MARKS file=%s orbs=%d gravity=%s upper_right=true" % [
-			file_name, marked_count, board.gravity_direction()
-		])
 
 
 func _capture_timed_number_zoom(
@@ -3601,6 +3597,8 @@ func _parse_arguments() -> void:
 			_gap2_defaults_only = true
 		elif argument == JELLY_TAP_SPLIT_ONLY_ARGUMENT:
 			_jelly_tap_split_only = true
+		elif argument == JELLY_TAP_SHEEN_ONLY_ARGUMENT:
+			_jelly_tap_sheen_only = true
 
 
 func _parse_capture_size(value: String, label: String) -> Vector2i:

@@ -38,6 +38,25 @@
 
 ## 미확인
 
+### [2026-11-28] 대상 #163 — 터치 후보 젤리의 지나가는 광택
+- **먼저 볼 것:** 핵심 테스트 실패 0건, 핵심 시각 상태 해시 변경 0건. 확인한 장면에서 몸 밖 띠·얼굴 위 띠·후보가 아닌 젤리의 띠·별 표시 0건.
+- 상태: 완료 — §12-ONE.49 #163 요구 1~6 반영. `main` `7cb018e` 기준. [변경 비교](https://github.com/jeongmo-dot/gravity_orb/compare/main...codex/jelly-tap-sheen)
+- Done-when 대조:
+  - [x] 별 노드·셰이더·재질·수치를 제거했다. 사전 준비 공유 재질 181 → 180개. 몸 재질에 띠 수치와 색별 0.7초 시차를 넣고 기존 터치 후보 및 0.15초 페이드를 적용한다. 레벨 변화와 돌 재질 전환 뒤에도 몸 인스턴스의 값은 이어지며 돌 재질은 띠를 그리지 않는다.
+  - [x] 핵심 테스트 두 파일과 헤드리스 스모크를 실행했다. 실제 창에서 항목 캡처 4개 전체 화면·3개 확대를 두 화면비로 검증했다.
+- 테스트 변경:
+  - `test_tap_mark_stays_upper_right_and_shares_material_across_colors`는 제거하고 `test_tap_sheen_uses_body_uniforms_and_survives_material_changes`로 대체했다. 별 노드 제거, 사전 준비 재질 수, 균일값, 켜짐·꺼짐, 레벨·돌 재질 변경 시 인스턴스 값을 검사한다.
+  - `test_jelly_tap_marks_follow_turn_and_configured_threshold`는 `test_jelly_tap_sheen_follows_turn_and_configured_threshold`로 바꿨다. `test_tap_blast_candidate_accepts_l5_to_l10_and_rejects_l4_waiting_ghost_and_locked`, `test_timed_tap_is_ignored_and_overlap_selects_normal_jelly`, `test_bomb_quake_and_grow_tap_effects_follow_color_rules`와 함께 몸의 인스턴스 세기를 확인한다.
+- QA 관측값:
+  - Godot 일반 빌드 `4.8.dev3.official.51105ccbe`. `test_jelly_visuals.gd` 22/22, `test_jolt_3d.gd` 44/44, 각각 종료 코드 0. `JELLY_VISUAL_STATE_HASH` `70dde5ab…`가 #162 회귀 로그와 일치했다. 임포트와 기본·블리츠·젤리 헤드리스 스모크 종료 코드 0, 스크립트·구문 오류 0건. PowerShell 구문 검사와 `git diff --check` 오류 0건.
+  - `tests/capture_screens.ps1 -JellyTapSheenOnly` → `SCREEN_CAPTURE_SUITE exit=0 ratios=2 files=14`. 540×960·540×1170 전체 화면과 확대 480×480 검사에서 누락·오류 0건. `artifacts/inbox-163-capture.log`에 시각·중력·후보 수·몸 인스턴스 세기를 기록했다.
+  - `235_jelly_tap_sheen_center.png`는 분홍 L5와 보라 L10 중심(0.770초), `236_jelly_tap_sheen_yellow.png`는 노랑 L9 중심(1.470초). 두 시각에 띠는 몸 윤곽 안에 있고 눈·입은 그대로 보인다. 입력 대기 장면의 후보 4개는 세기 1, L4·시한 L5·유령 L5는 세기 0이었다.
+  - `237a_jelly_tap_sheen_l5_enter_zoom.png`, `237b_jelly_tap_sheen_l5_center_zoom.png`, `237c_jelly_tap_sheen_l5_exit_zoom.png`는 분홍 L5의 진입·중심·이탈(0.585·0.770·0.955초).
+  - `238_jelly_tap_sheen_left.png`는 왼쪽 중력(0.770초). `235`와 `238`의 분홍 띠 기울기는 픽셀 표본 기준 각각 약 25.23°와 25.22°(수직선으로부터)로 두 화면비에서 같았다. `239_jelly_tap_sheen_simulating.png`는 발사 후 0.20초, 모든 젤리 세기 0이었다.
+- 결정 사항: 몸 표면과 젤리 중심을 카메라 투영으로 같은 깊이에 놓고 화면 축의 차이를 몸 반지름 단위로 계산했다. 주기 중심 시각에 원근 시차 없이 띠가 몸 중심을 지나며 몸 셰이더에 직접 합성된다. 기존 얼굴과 배 속 그림의 렌더 순서를 사용한다.
+- 수동 확인 절차: JELLY에서 일반 L5를 만들어 입력 대기 상태로 둔다. 광택이 판 중력과 상관없이 왼쪽 위에서 오른쪽 아래로 몸을 통과하고, 눈·입과 몸 윤곽이 읽히는지 본다. 발사 후 0.15초가 지나면 광택이 사라지는지 확인한다.
+- 전체 회귀·성능과 기본 전체 캡처 미실행 — 주말, 평일에. 빌드와 봇 측정 미실행.
+
 ### [2026-11-27] 대상 #162 추가 요구 1 — 별을 화면 오른쪽 위에 고정
 - **먼저 볼 것:** 기준 회귀 해시 변경 0건, 캡처에서 오른쪽 위를 벗어난 별 0건, 성능 기준 초과 0건.
 - 상태: 완료 — §12-ONE.49 #162 추가 요구 1 반영.

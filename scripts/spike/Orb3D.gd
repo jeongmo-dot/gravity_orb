@@ -33,7 +33,6 @@ static var _shared_meshes: Dictionary = {}
 @onready var _belly: MeshInstance3D = %Belly
 @onready var _face: MeshInstance3D = %Face
 @onready var _symbol_mesh: MeshInstance3D = %Symbol
-@onready var _tap_mark: MeshInstance3D = %TapMark
 @onready var _timed_label: Label3D = %TimedLabel
 
 var color: int = 0
@@ -285,14 +284,6 @@ func setup(p_color: int, p_level: int, cfg: GameConfig) -> void:
 	_face.visible = _is_jelly_visual
 	_tap_mark_target = 0.0
 	_tap_mark_strength = 0.0
-	_tap_mark.visible = false
-	if _is_jelly_visual:
-		_tap_mark.mesh = JellyOrbArt.face_mesh()
-		_tap_mark.material_override = JellyOrbArt.tap_mark_material()
-		_tap_mark.set_instance_shader_parameter(
-			"tap_mark_phase", float(color) * JellyOrbArt.TAP_MARK_PERIOD / JellyOrbArt.PALETTE.size()
-		)
-		_tap_mark.set_instance_shader_parameter("tap_mark_strength", 0.0)
 	_apply_visual_transparency()
 	if _is_jelly_visual or _current_radius < _radius:
 		_ensure_unique_radius_resources()
@@ -408,10 +399,9 @@ func _advance_tap_mark(delta: float) -> void:
 	if _tap_mark_strength == _tap_mark_target:
 		return
 	_tap_mark_strength = move_toward(
-		_tap_mark_strength, _tap_mark_target, delta / JellyOrbArt.TAP_MARK_FADE_SECONDS
+		_tap_mark_strength, _tap_mark_target, delta / JellyOrbArt.TAP_SHEEN_FADE_SECONDS
 	)
-	_tap_mark.visible = _tap_mark_strength > 0.0
-	_tap_mark.set_instance_shader_parameter("tap_mark_strength", _tap_mark_strength)
+	_mesh.set_instance_shader_parameter("tap_sheen_strength", _tap_mark_strength)
 
 
 func configure_physics_profile(
@@ -865,7 +855,7 @@ func _apply_visual_transparency() -> void:
 		clampf(_visual_alpha, 0.0, 1.0)
 	)
 	if _is_jelly_visual:
-		_tap_mark.set_instance_shader_parameter("visual_alpha", _visual_alpha)
+		_mesh.set_instance_shader_parameter("tap_sheen_strength", _tap_mark_strength)
 	_symbol_mesh.transparency = base_transparency
 
 
@@ -1178,18 +1168,6 @@ func _update_visual_transform() -> void:
 			1.0
 		))
 	)
-	if _tap_mark.visible:
-		var center: Vector2 = JellyOrbArt.TAP_MARK_CENTER * radius_m
-		var face_offset: Vector3 = Vector3(center.x, -center.y, 0.0)
-		var deformed_center: Vector3 = (
-			jelly_upright_deform_basis(face_rotation, jelly_content_deform, 1.0) * face_offset
-		)
-		_tap_mark.position = _front_overlay_position(
-			render_world_position + deformed_center,
-			body_front_offset + JellyOrbArt.TAP_MARK_FRONT_OFFSET
-		)
-		var mark_radius: float = radius_m * JellyOrbArt.TAP_MARK_PLANE_RATIO
-		_tap_mark.basis = Basis.from_scale(Vector3(mark_radius, mark_radius, 1.0))
 	var symbol_y_offset: float = radius_m * 0.54 if _is_jelly_visual else 0.0
 	_symbol_mesh.position = (
 		_front_overlay_position(

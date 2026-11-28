@@ -1228,14 +1228,14 @@ func test_tap_blast_candidate_accepts_l5_to_l10_and_rejects_l4_waiting_ghost_and
 	manager._physics_process(0.0)
 	for orb: Orb3D in [level_five, level_eight, level_nine, level_ten]:
 		orb._advance_tap_mark(0.15)
-		assert_true(orb._tap_mark.visible, "candidate L%d has a tap mark" % orb.level)
+		assert_true(_tap_sheen_strength(orb) == 1.0, "candidate L%d has a tap mark" % orb.level)
 	for orb: Orb3D in [level_four, waiting, ghost, locked]:
 		orb._advance_tap_mark(0.15)
-		assert_true(not orb._tap_mark.visible, "ineligible orb has no tap mark")
+		assert_true(_tap_sheen_strength(orb) == 0.0, "ineligible orb has no tap mark")
 	ghost.exit_ghost_state()
 	manager._physics_process(0.0)
 	ghost._advance_tap_mark(0.15)
-	assert_true(ghost._tap_mark.visible, "the same orb gains its mark when ghost state ends")
+	assert_true(_tap_sheen_strength(ghost) == 1.0, "the same orb gains its mark when ghost state ends")
 	ghost.enter_ghost_state(Config.data.ghost_alpha)
 	assert_true(not resolver.is_jelly_tap_blast_candidate(level_four), "L4 rejected")
 	assert_true(resolver.is_jelly_tap_blast_candidate(level_five), "L5 accepted")
@@ -1281,7 +1281,7 @@ func test_timed_tap_is_ignored_and_overlap_selects_normal_jelly() -> void:
 	timed.set_timed(6, 20)
 	manager._physics_process(0.0)
 	timed._advance_tap_mark(0.15)
-	assert_true(not timed._tap_mark.visible, "timed L5 has no tap mark")
+	assert_true(_tap_sheen_strength(timed) == 0.0, "timed L5 has no tap mark")
 	var screen_center: Vector2 = camera.unproject_position(Orb3D.plane_position_to_world(Vector2.ZERO))
 	var turn_before: int = manager.turn_index
 	assert_true(not resolver.is_jelly_tap_blast_candidate(timed), "timed L5 is excluded")
@@ -1313,19 +1313,19 @@ func test_timed_tap_is_ignored_and_overlap_selects_normal_jelly() -> void:
 		assert_true(resolver.is_jelly_tap_blast_candidate(results[0]), "normal timed-merge result is eligible")
 		manager._physics_process(0.0)
 		results[0]._advance_tap_mark(0.15)
-		assert_true(results[0]._tap_mark.visible, "normal timed-merge result gains a tap mark")
+		assert_true(_tap_sheen_strength(results[0]) == 1.0, "normal timed-merge result gains a tap mark")
 		results[0].set_timed_stone(0, true)
 		assert_true(not resolver.is_jelly_tap_blast_candidate(results[0]), "hardened jelly is excluded")
 		manager._physics_process(0.0)
 		results[0]._advance_tap_mark(0.15)
-		assert_true(not results[0]._tap_mark.visible, "hardened jelly loses the tap mark")
+		assert_true(_tap_sheen_strength(results[0]) == 0.0, "hardened jelly loses the tap mark")
 	Config.data.jelly_merge_duration = original_merge_duration
 	Config.data.game_mode = original_mode
 	InputRouter.set_locked(false)
 	await _cleanup(root)
 
 
-func test_jelly_tap_marks_follow_turn_and_configured_threshold() -> void:
+func test_jelly_tap_sheen_follows_turn_and_configured_threshold() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_minimum: int = Config.data.jelly_tap_blast_min_level
 	Config.data.game_mode = GameConfig.GameMode.JELLY
@@ -1341,27 +1341,27 @@ func test_jelly_tap_marks_follow_turn_and_configured_threshold() -> void:
 	manager._physics_process(0.0)
 	for orb: Orb3D in original_orbs:
 		orb._advance_tap_mark(0.15)
-		assert_eq(orb._tap_mark.visible, orb == green, "raised threshold follows the candidate check")
+		assert_eq(_tap_sheen_strength(orb), 1.0 if orb == green else 0.0, "raised threshold follows the candidate check")
 	Config.data.jelly_tap_blast_min_level = original_minimum
 	manager._physics_process(0.0)
 	pink._advance_tap_mark(0.075)
-	assert_near(pink._tap_mark_strength, 0.5, 0.001, "mark fades in over 0.15 seconds")
+	assert_near(_tap_sheen_strength(pink), 0.5, 0.001, "mark fades in over 0.15 seconds")
 	for orb: Orb3D in original_orbs:
 		orb._advance_tap_mark(0.15)
-		assert_true(orb._tap_mark.visible, "eligible jelly gains a mark while waiting")
+		assert_true(_tap_sheen_strength(orb) == 1.0, "eligible jelly gains a mark while waiting")
 	manager.on_swipe(Vector2i.LEFT)
 	manager._physics_process(0.0)
 	assert_eq(manager.state, TurnManager.State.SIMULATING, "swipe starts simulation")
 	pink._advance_tap_mark(0.075)
-	assert_near(pink._tap_mark_strength, 0.5, 0.001, "mark fades out over 0.15 seconds")
+	assert_near(_tap_sheen_strength(pink), 0.5, 0.001, "mark fades out over 0.15 seconds")
 	for orb: Orb3D in original_orbs:
 		orb._advance_tap_mark(0.15)
-		assert_true(not orb._tap_mark.visible, "mark is off while simulating")
+		assert_true(_tap_sheen_strength(orb) == 0.0, "mark is off while simulating")
 	manager._on_settled()
 	assert_eq(manager.state, TurnManager.State.WAITING_INPUT, "turn settles back to input")
 	manager._physics_process(0.0)
 	pink._advance_tap_mark(0.15)
-	assert_true(pink._tap_mark.visible, "mark returns after settling")
+	assert_true(_tap_sheen_strength(pink) == 1.0, "mark returns after settling")
 	assert_true(manager.try_tap_blast_orb(pink), "marked L5 can be tapped")
 	assert_true(pink.consumed, "tap removes original L5")
 	var fragments: int = 0
@@ -1371,7 +1371,7 @@ func test_jelly_tap_marks_follow_turn_and_configured_threshold() -> void:
 		fragments += 1
 		orb._advance_tap_mark(0.15)
 		assert_eq(orb.level, 3, "L3 fragment")
-		assert_true(not orb._tap_mark.visible, "fragment has no tap mark")
+		assert_true(_tap_sheen_strength(orb) == 0.0, "fragment has no tap mark")
 	assert_eq(fragments, 2, "two fragments after L5 tap")
 	Config.data.game_mode = original_mode
 	InputRouter.set_locked(false)
@@ -2191,7 +2191,7 @@ func test_bomb_quake_and_grow_tap_effects_follow_color_rules() -> void:
 	var manager: TurnManager = fixture["manager"] as TurnManager
 	manager._physics_process(0.0)
 	empty_green._advance_tap_mark(0.15)
-	assert_true(not empty_green._tap_mark.visible, "GROW needs clean targets before showing a mark")
+	assert_true(_tap_sheen_strength(empty_green) == 0.0, "GROW needs clean targets before showing a mark")
 	for index: int in range(2):
 		board.spawn_orb(2, 2, Vector2(-300.0 + float(index) * 120.0, 200.0))
 	assert_true(not resolver.is_jelly_tap_blast_candidate(empty_green), "green rejects two clean targets")
@@ -2199,7 +2199,7 @@ func test_bomb_quake_and_grow_tap_effects_follow_color_rules() -> void:
 	assert_true(resolver.is_jelly_tap_blast_candidate(empty_green), "green accepts three clean targets")
 	manager._physics_process(0.0)
 	empty_green._advance_tap_mark(0.15)
-	assert_true(empty_green._tap_mark.visible, "GROW shows its mark after gaining enough clean targets")
+	assert_true(_tap_sheen_strength(empty_green) == 1.0, "GROW shows its mark after gaining enough clean targets")
 	for index: int in range(5):
 		board.spawn_orb(2, 2, Vector2(60.0 + float(index) * 75.0, 200.0))
 	assert_true(resolver.apply_jelly_tap_blast(empty_green), "GROW tap applies")
@@ -2359,6 +2359,10 @@ func _assert_orb_visual_and_collision_radius(orb: Orb3D, context: String) -> voi
 		0.001,
 		"%s visual radius" % context
 	)
+
+
+func _tap_sheen_strength(orb: Orb3D) -> float:
+	return float(orb._mesh.get_instance_shader_parameter("tap_sheen_strength"))
 
 
 func _cleanup(node: Node) -> void:

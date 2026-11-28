@@ -4,70 +4,53 @@ const BOARD_SCENE: PackedScene = preload("res://scenes/Board3D.tscn")
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main3D.tscn")
 
 
-func test_tap_mark_stays_upper_right_and_shares_material_across_colors() -> void:
+func test_tap_sheen_uses_body_uniforms_and_survives_material_changes() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	Config.data.game_mode = GameConfig.GameMode.JELLY
+	JellyOrbArt.clear_cache()
+	JellyOrbArt.prewarm(Config.data)
+	assert_eq(
+		JellyOrbArt.shared_material_count(),
+		JellyOrbArt.PALETTE.size() * Config.data.orb_max_level * 3,
+		"prewarm allocates only body, face and belly materials"
+	)
 	var board: Board3D = await _create_board()
-	var orb: Orb3D = board.spawn_orb(0, 5, Vector2.ZERO)
-	var radius: float = orb.get_current_radius()
+	var orb: Orb3D = board.spawn_orb(2, 5, Vector2.ZERO)
+	assert_true(not orb.has_node("TapMark"), "the separate star node is gone")
+	var body: ShaderMaterial = orb.visual_material_resource()
+	var axis: Vector2 = body.get_shader_parameter("tap_sheen_axis")
+	assert_near(rad_to_deg(axis.angle()), 25.0, 0.0001, "25-degree screen sweep axis")
+	assert_near(axis.length(), 1.0, 0.0001, "unit screen sweep axis")
+	var uniforms: Dictionary = {
+		"tap_sheen_period": 2.8,
+		"tap_sheen_sweep_fraction": 0.55,
+		"tap_sheen_travel": 1.7,
+		"tap_sheen_half_width": 0.18,
+		"tap_sheen_brightness": 0.75,
+	}
+	for uniform: String in uniforms:
+		assert_near(float(body.get_shader_parameter(uniform)), float(uniforms[uniform]), 0.0001, uniform)
+	for color: int in range(JellyOrbArt.PALETTE.size()):
+		var material: ShaderMaterial = JellyOrbArt.body_material_for(color, 5)
+		assert_near(float(material.get_shader_parameter("tap_sheen_phase")), float(color) * 0.7, 0.0001, "color phase")
+	assert_eq(orb._mesh.get_instance_shader_parameter("tap_sheen_strength"), 0.0, "starts clear")
 	orb.set_tap_mark_enabled(true)
 	orb._advance_tap_mark(0.15)
-	orb._update_visual_transform()
-	var mark: MeshInstance3D = orb._tap_mark
-	var upper_right: Vector2 = Vector2(0.66, -0.68) * radius
-	var mark_radius: float = radius * JellyOrbArt.TAP_MARK_PLANE_RATIO / Orb3D.PIXELS_PER_METER
-	var mark_basis: Basis = Basis.from_scale(Vector3(mark_radius, mark_radius, 1.0))
-	assert_true(mark.position.z > orb._symbol_mesh.position.z, "star plate is in front of the symbol")
-	for gravity: Vector2i in [Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP]:
-		orb.set_gravity(gravity, Config.data.gravity_strength)
-		orb._update_visual_transform()
-		var mark_plane: Vector2 = Orb3D.world_position_to_plane(mark.position - orb._mesh.position)
-		assert_true(mark_plane.distance_to(upper_right) < 0.001, "%s: upper-right" % [gravity])
-		assert_true(mark.basis.is_equal_approx(mark_basis), "%s: upright star plate" % [gravity])
-	orb._jelly_deform = Vector2(1.12, 1.04)
-	orb.set_gravity(Vector2i.LEFT, Config.data.gravity_strength)
-	orb._update_visual_transform()
-	var stretched: Vector2 = Orb3D.world_position_to_plane(mark.position - orb._mesh.position)
-	assert_true(
-		stretched.distance_to(upper_right * Vector2(1.04, 1.12)) < 0.001,
-		"left: face deformation scales the upright center offset"
-	)
-	orb.begin_merge_visual()
-	orb.update_merge_visual(Vector2.ZERO, Vector2(1.0, 1.0), 0.5)
-	var face_scale: float = radius * 0.62 / Orb3D.PIXELS_PER_METER
-	var merge_offset: Vector3 = orb._face.basis * (
-		Orb3D.plane_vector_to_world(upper_right) / face_scale
-	)
-	assert_true(
-		Orb3D.world_position_to_plane(mark.position - orb._mesh.position).distance_to(
-			Orb3D.world_position_to_plane(merge_offset)
-		) < 0.001,
-		"merge: center follows the upright face deformation"
-	)
-	assert_true(mark.basis.is_equal_approx(mark_basis), "merge: upright, undistorted star plate")
-	var phases: Array[float] = []
-	for color: int in range(JellyOrbArt.PALETTE.size()):
-		var other: Orb3D = board.spawn_orb(color, 5, Vector2.ZERO)
-		var phase: float = float(other._tap_mark.get_instance_shader_parameter("tap_mark_phase"))
-		assert_near(phase, float(color) * 1.6 / 6.0, 0.000001, "deterministic phase for color %d" % color)
-		assert_true(not phases.has(phase), "each color receives a distinct phase")
-		phases.append(phase)
-		assert_eq(other._tap_mark.material_override, mark.material_override, "all marks share one material")
-	var material_count: int = JellyOrbArt.shared_material_count()
-	var duplicate: Orb3D = board.spawn_orb(5, 5, Vector2.ZERO)
-	assert_eq(
-		duplicate._tap_mark.get_instance_shader_parameter("tap_mark_phase"),
-		phases[5],
-		"recreating the same color preserves its phase"
-	)
-	assert_eq(JellyOrbArt.shared_material_count(), material_count, "duplicate adds no material")
-	Config.data.game_mode = GameConfig.GameMode.TURN
-	var legacy: Orb3D = board.spawn_orb(0, 5, Vector2.ZERO)
-	legacy.set_tap_mark_enabled(true)
-	legacy._advance_tap_mark(0.15)
-	assert_true(not legacy._tap_mark.visible, "non-JELLY orbs do not display tap marks")
+	assert_eq(orb._mesh.get_instance_shader_parameter("tap_sheen_strength"), 1.0, "fully on at 0.15s")
+	orb.set_jelly_mass(Config.data.jelly_mass_for_level(6), Config.data)
+	assert_true(orb.visual_material_resource() != body, "level changes the body material")
+	assert_eq(orb._mesh.get_instance_shader_parameter("tap_sheen_strength"), 1.0, "level retains strength")
+	orb.set_timed_stone(7)
+	var stone: ShaderMaterial = orb.visual_material_resource()
+	assert_true(not bool(stone.get_shader_parameter("tap_sheen_enabled")), "stone never renders sheen")
+	assert_eq(float(stone.get_shader_parameter("tap_sheen_phase")), 0.0, "stone phase is zero")
+	assert_eq(orb._mesh.get_instance_shader_parameter("tap_sheen_strength"), 1.0, "stone retains instance strength")
+	orb.set_tap_mark_enabled(false)
+	orb._advance_tap_mark(0.15)
+	assert_eq(orb._mesh.get_instance_shader_parameter("tap_sheen_strength"), 0.0, "fully off at 0.15s")
 	Config.data.game_mode = original_mode
 	await _cleanup(board)
+
 
 
 func test_jelly_scene_lighting_and_all_orb_meshes_disable_shadows() -> void:
