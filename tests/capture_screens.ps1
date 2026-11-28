@@ -294,7 +294,10 @@ if ($JellyLookOnly) {
         "71_jelly_turn_hud_three_digit.png",
         "205_jelly_timed_stone_after_harden.png"
     )
-    $zoomFiles = $tapSheenZoomFiles + @($jellyLookEdgeSpec)
+    $zoomFiles = $tapSheenZoomFiles + @(
+        $jellyLookEdgeSpec,
+        @{ Path = "42_jelly_look_absorption_next_zoom.png"; Size = "480x480" }
+    )
 } elseif ($JellyTapSheenOnly) {
     $modeArgument = "--capture-jelly-tap-sheen"
     $fullFrameFiles = $tapSheenFrameFiles

@@ -248,6 +248,7 @@ const JELLY_TAP_SHEEN_FILES: Array[String] = [
 	"239_jelly_tap_sheen_simulating.png",
 ]
 const JELLY_LOOK_EDGE_FILE: String = "240_jelly_look_l10_edge_zoom.png"
+const JELLY_LOOK_NEXT_ZOOM_FILE: String = "42_jelly_look_absorption_next_zoom.png"
 const JELLY_LOOK_LEGACY_FILES: Array[String] = [
 	"40_jelly_look_max.png",
 	"42_jelly_look_absorption.png",
@@ -318,6 +319,7 @@ func _run() -> void:
 	if _jelly_look_only:
 		expected_files = JELLY_TAP_SHEEN_FILES + JELLY_LOOK_LEGACY_FILES
 		expected_files.append(JELLY_LOOK_EDGE_FILE)
+		expected_files.append(JELLY_LOOK_NEXT_ZOOM_FILE)
 	elif _jelly_tap_sheen_only:
 		expected_files = JELLY_TAP_SHEEN_FILES
 	elif _jelly_tap_split_only:
@@ -579,6 +581,8 @@ func _capture_jelly_look_legacy_scenes() -> void:
 	manager.set_physics_process(false)
 	await _capture_jelly_look_max(board, hud, feedback)
 	await _capture_jelly_look_absorption(board, feedback)
+	var next_center: Vector2 = hud._next_preview.get_global_transform_with_canvas().origin
+	await _capture_zoom(JELLY_LOOK_NEXT_ZOOM_FILE, next_center, 66, Image.INTERPOLATE_BILINEAR)
 	feedback.clear_effects()
 	await _capture_turn_hud_scene(main, manager, hud)
 	board.clear()

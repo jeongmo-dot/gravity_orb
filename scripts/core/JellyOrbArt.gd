@@ -75,8 +75,8 @@ const TAP_SHEEN_ANGLE_DEGREES: float = 25.0
 const TAP_SHEEN_PERIOD: float = 2.8
 const TAP_SHEEN_SWEEP_FRACTION: float = 0.55
 const TAP_SHEEN_TRAVEL: float = 2.0
-const TAP_SHEEN_HALF_WIDTH: float = 0.45
-const TAP_SHEEN_BRIGHTNESS: float = 0.30
+const TAP_SHEEN_HALF_WIDTH: float = 0.60
+const TAP_SHEEN_BRIGHTNESS: float = 0.50
 const TAP_SHEEN_STREAK_OFFSET: float = 0.30
 const TAP_SHEEN_STREAK_HALF_WIDTH: float = 0.025
 const TAP_SHEEN_STREAK_BRIGHTNESS: float = 0.65
@@ -202,14 +202,15 @@ static func _preview_texture_for_base(
 		else PREVIEW_TEXTURE_SIZE
 	)
 	var image: Image = Image.create(texture_size, texture_size, false, Image.FORMAT_RGBAF)
+	image.fill(Color.TRANSPARENT)
 	var pixel_step: float = 2.0 / float(texture_size)
 	var light: Color = base_color.lerp(Color.WHITE, JELLY_BODY_LIGHT_MIX)
 	var deep: Color = _body_hsv_color(base_color, JELLY_BODY_DEEP_SV)
 	var edge: Color = _body_hsv_color(base_color, JELLY_BODY_EDGE_SV)
 	var gradient_center: Vector2 = Vector2(JELLY_BODY_GRADIENT.x, JELLY_BODY_GRADIENT.y)
-	for y: int in range(texture_size):
+	for y: int in range(1, texture_size - 1):
 		var unit_y: float = (float(y) + 0.5) * pixel_step - 1.0
-		for x: int in range(texture_size):
+		for x: int in range(1, texture_size - 1):
 			var point: Vector2 = Vector2((float(x) + 0.5) * pixel_step - 1.0, unit_y)
 			if point.length_squared() >= 1.0:
 				continue

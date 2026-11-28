@@ -25,8 +25,8 @@ func test_tap_sheen_uses_body_uniforms_and_survives_material_changes() -> void:
 		"tap_sheen_period": 2.8,
 		"tap_sheen_sweep_fraction": 0.55,
 		"tap_sheen_travel": 2.0,
-		"tap_sheen_half_width": 0.45,
-		"tap_sheen_brightness": 0.30,
+		"tap_sheen_half_width": 0.60,
+		"tap_sheen_brightness": 0.50,
 		"tap_sheen_streak_offset": 0.30,
 		"tap_sheen_streak_half_width": 0.025,
 		"tap_sheen_streak_brightness": 0.65,
@@ -101,6 +101,34 @@ func test_jelly_body_palette_layers_and_preview_pixels() -> void:
 		assert_near(pixel.g, expected.g, 2.0 / 255.0, "preview green at %s" % [point])
 		assert_near(pixel.b, expected.b, 2.0 / 255.0, "preview blue at %s" % [point])
 	assert_eq(preview.get_pixel(0, 0).a, 0.0, "preview outside the circle stays transparent")
+
+
+func test_jelly_preview_has_clear_corners_circle_exterior_and_perimeter() -> void:
+	var preview_levels: Array[int] = [7, Config.data.orb_max_level]
+	var expected_sizes: Array[int] = [384, 512]
+	for stone: bool in [false, true]:
+		for index: int in range(preview_levels.size()):
+			var level: int = preview_levels[index]
+			var texture: Texture2D = (
+				JellyOrbArt.stone_preview_texture_for(level) if stone
+				else JellyOrbArt.preview_texture_for(OrbTypes.OrbColor.PURPLE, level)
+			)
+			var image: Image = texture.get_image()
+			var size: int = expected_sizes[index]
+			assert_eq(image.get_size(), Vector2i(size, size), "preview dimensions")
+			assert_eq(image.get_format(), Image.FORMAT_RGBA8, "preview RGBA format")
+			var data: PackedByteArray = image.get_data()
+			assert_true(image.get_pixel(size / 2, size / 2).a > 0.0, "preview body is visible")
+			var nonzero: int = 0
+			for y: int in range(size):
+				var dy: int = 2 * y + 1 - size
+				for x: int in range(size):
+					var dx: int = 2 * x + 1 - size
+					var perimeter: bool = x == 0 or y == 0 or x == size - 1 or y == size - 1
+					var outside: bool = dx * dx + dy * dy >= size * size
+					if (perimeter or outside) and data[4 * (y * size + x) + 3] != 0:
+						nonzero += 1
+			assert_eq(nonzero, 0, "no outside or perimeter alpha (%d px, stone %s)" % [size, stone])
 
 
 func test_jelly_shadow_follows_radius_and_ghost_alpha_below_bodies() -> void:
