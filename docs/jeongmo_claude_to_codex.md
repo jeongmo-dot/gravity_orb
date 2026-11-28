@@ -41,7 +41,29 @@
 
 ## 대기 중
 
-(없음)
+### [2026-11-28 #164] 젤리 몸 다시 그리기 — A 말랑 젤리 + C 광택 + 매끈한 경계
+- 상태: 대기
+- 근거: [technical_design.md](technical_design.md) **§12-ONE.49** "#164 젤리 몸 다시 그리기 — A 말랑 젤리 + C 광택 + 매끈한 경계" (층 표·그 밖 표). 사용자 2026-11-28 "광택이 너무 안예쁘네.. 더 다층의 레이어로 하고 전체적인 젤리 비주얼이 프로토 수준이야 … 경계면도 깔끔하지 않고, 젤리 느낌이 나지 않아" → 시안 → "젤리는 A", "광택은 C"
+- 앵커: `scripts/core/JellyOrbArt.gd` (`_get_body_shader()`·`body_material_for()`·`stone_body_material()`·`color_for()`·`_preview_texture_for_base()`·`TAP_SHEEN_*`), `scripts/spike/Orb3D.gd` (`_shared_mesh_for_level()`·`setup()`·`_update_visual_transform()`·`_apply_visual_transparency()`), `scenes/Orb3D.tscn`, `project.godot` (`rendering/anti_aliasing/quality/msaa_3d`), `tests/test_jelly_visuals.gd`·`test_jolt_3d.gd`, `tests/spike/capture_screens.gd`·`tests/capture_screens.ps1`
+- 요구 요약 (§12-ONE.49 "#164 요구" 1~9):
+  1. 몸 셰이더를 층 0~7로 (반투명 몸 바탕·속 빛·오른쪽 아래 반사·흐린 창 반사·광택·또렷한 반사·작은 점·L10 깜빡임). light·deep·edge 색 규칙. 지금 빛 계산·가장자리 0.90·`EMISSION` 지움
+  2. 광택 C: 이동 ±2.0, 넓은 층 (반 폭 0.45·0.30) + 앞 빛줄 (+0.30·반 폭 0.025·0.65)
+  3. 경계: 3D MSAA 4배, 구 메시 64 × 32 (L1 포함). 안 먹으면 회신
+  4. 그림자: 화면 아래 1.06 R, 타원 (0.78 R, 0.11 R), deep·0.25, 모든 몸보다 먼저
+  5. NEXT·THEN 미리보기도 같은 층 (광택·그림자 없음)
+  6. 얼굴·배 속·기호·규칙 그대로
+  7. 테스트 (주말 핵심): 색 규칙, 재질 수치, 그림자, MSAA·메시, 미리보기 픽셀, 해시. 전체 회귀는 평일에
+  8. 캡처 두 비율 (항목 장면만, 새 스위치): 나란히 두 시각, L5 확대 세 장, 경계 확대, 중력 왼쪽, 발사 직후, 기존 `40`·`42`·NEXT 장면·돌 장면. 기본 전체 캡처는 평일에
+  9. 빌드 없음
+- 건드리지 말 것: 규칙·값, 얼굴·배 속 그림·기호·시한 숫자, HUD·안내 글·소리, 터치 판정, 광택 보이는 조건, 고리 금지, 사용자 저장 파일, `project.godot` 버전·`build/windows/`, `docs/` (회신 파일 제외)
+- Done-when:
+  - [ ] 몸·광택·그림자·미리보기 수치가 표와 같다 (상수·테스트)
+  - [ ] 경계: MSAA 4배·메시 64 × 32, 경계 확대 캡처에서 계단과 하얀 선이 없다
+  - [ ] 그림자가 다른 젤리 위에 올라오지 않는다
+  - [ ] 얼굴·배 속 그림·규칙 그대로, 핵심 테스트 통과 (해시 그대로)
+  - [ ] 항목 캡처 두 비율 (크기 검사 통과)
+- 브랜치: main에서 새 브랜치 → PR
+- **회신 맨 앞에**: 핵심 테스트 실패나 해시 변경, MSAA가 안 먹는 곳, 경계에 하얀 선이 남은 캡처, 그림자가 다른 젤리 위, 얼굴이 가려지거나 흐려진 곳, 고리처럼 보이는 것
 
 ---
 
