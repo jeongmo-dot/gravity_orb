@@ -7031,6 +7031,29 @@ G1 전략 봇 (시드 1~20, 600턴 상한, 턴 평균 / 총점 평균):
 - 회신 맨 앞에: 핵심 테스트 실패나 해시 변경, 화면 픽셀에 기대어 모양이 바뀐 3D 셰이더·효과, 2D (HUD·미리보기)가 흐려지거나 바뀐 곳
 - 그 뒤: Claude 검수 → 사용자 "병합" → squash 병합. 기획서 (원본·`docs/reference/` 사본)의 젤리 그림 설명 (몸 A·광택 덮개·외곽)은 Claude가 병합 때 고친다
 
+**#164 추가 요구 5 검수 (Claude, 2026-11-28, PR [#165](https://github.com/jeongmo-dot/gravity_orb/pull/165) `e2be12a`) — 병합 보류, 추가 요구 6**
+- 된 것: `project.godot`에 `scaling_3d/mode=0`·`scaling_3d/scale=2.0` 두 줄만 (코드 변경 없음). `test_jelly_visuals.gd` 26/26 (배율·모드 검사), `test_jolt_3d.gd` 44/44, 해시 그대로, 스모크 0, `-JellyLookOnly` 두 비율 38장 종료 0. 화면 픽셀 감사: 프로덕션 셰이더에 `SCREEN_PIXEL_SIZE`·`FRAGCOORD` 없음, `SpaceBackdrop`은 논리 뷰포트 기준, `TimedLabel3D`는 `fixed_size`
+- Claude 확인 (Codex 캡처): `edge-540x960.png` L10 가장자리 계단이 부드러워졌다. 시한 숫자 7·배경 점은 테두리가 살짝 부드러워진 정도. HUD 점수·NEXT·THEN은 픽셀이 같다 (Codex 측정)
+- **문제 — 작은 십자 반짝이가 가늘고 옅어졌다**: `effects-540x960.png`의 합체 (`13`)·흡수 (`14`)·터짐 (`15`)에서 십자 입자가 2배 쪽이 눈에 띄게 옅다 (흡수 장면 3배 확대로 확인). 입자 선 두께가 화면 약 1픽셀이라 2배로 그린 뒤 줄이면 반 픽셀이 되어 절반쯤 옅어진다. 위치·범위는 같다
+- 사용자에게 보여 주고 물었다 (두께를 되돌리기 / 그대로) → **"반짝이는 없애줘"**
+
+**#164 추가 요구 6** — JELLY의 십자 반짝이 입자 없애기 (같은 브랜치·같은 PR #165. 2026-11-28 토요일 — 주말 가벼운 모드):
+1. JELLY 모드에서 아래 입자를 만들지 않는다 (모두 같은 십자 별 모양 — `_new_effect_particle_shader()`·`ColorEffectVisual._star_material()`):
+
+   | 어디서 | 노드 이름 | 언제 |
+   |---|---|---|
+   | `FeedbackDirector` 합체 | `JellyMergeStardust` | 합체·흡수 |
+   | `FeedbackDirector._create_jelly_max_feedback()` | `JellyMaxSparkle` | 최고 레벨 합체·MAX 정리 (잭팟) |
+   | `FeedbackDirector._play_blast_feedback()` | `BlastDebris`·`BlastSparks`·`BlastTwinklingStars` | 대폭발·톡 터짐·FINAL MOVE |
+   | `ColorEffectVisual` | `ModeStardust` 점 (PUSH·PULL·LIFT) | 합체·MAX 정리 색 효과 |
+
+   - JELLY가 아닌 모드 (보관용)는 그대로 둔다 — 모드로 갈라 막는다 (설정 값 `fx_color_effect_visuals_enabled`를 끄면 PULL 펀치까지 사라지므로 쓰지 않는다)
+2. 그대로: 빛 구름 (`JellyMaxCloudPulse`·`BlastNebulaL4`·`BlastSupernova`·`BlastLocalFlash`), 빛 (`_create_light`), 화면 번쩍 (L9 이상), 흔들림·히트스톱, 젤리 펀치 (`play_visual_punch`·`play_visual_pull_punch`), 소리, 색 효과의 물리 (밀기·당기기·흔들기), 젤리 얼굴의 반짝 눈·L10 깜빡임, 광택 덮개
+3. 테스트 (핵심): JELLY에서 합체·흡수·최고 레벨 합체·대폭발·톡 터짐·MAX 정리 때 위 이름의 입자가 0개이고 `ColorEffectVisual` 점이 보이지 않는다 (빛 구름·빛은 그대로 생긴다). 지금 이 입자 수를 확인하는 기존 테스트는 JELLY 기대값을 0으로 고친다 (보관 모드 기대값은 그대로). 해시가 바뀌면 이유와 새 값을 회신
+4. 캡처 (두 비율): 기존 `13` 합체·`14` 흡수·`15` 터짐과 MAX 정리 (잭팟) 장면을 지금 (`e2be12a`)과 나란히. `-JellyLookOnly`는 이번에 다시 하지 않아도 된다
+5. 빌드 없음
+- 회신 맨 앞에: 핵심 테스트 실패나 해시 변경, 위 표 밖에서 찾은 십자 입자 (있으면 지우지 말고 이름·장면을 회신), 지운 뒤 효과가 비어 보이는 장면
+
 ### 12-ONE.3 다음 (JELLY 개선)
 - CLASSIC 전용 분기 정리 (행성 그림·연출·규칙 — JELLY가 안 쓰는 것)
 - 결정 대기에서 이어지는 것: 효과음 (합성·녹음), 시작 화면 그림 (지금 행성 — JELLY에 맞게?)
