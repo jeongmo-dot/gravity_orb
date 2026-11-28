@@ -38,6 +38,28 @@
 
 ## 미확인
 
+### [2026-11-28] 대상 #164 추가 요구 6 — JELLY 십자 반짝이 입자 제거
+- **먼저 볼 것:** 핵심 테스트 실패 0건, `JELLY_VISUAL_STATE_HASH` 변경 0건. JELLY 합체·흡수·L6 및 L10 폭발·MAX 정리에서 `feedback_particles` 활성 수와 `ModeStardust` 보이는 점 수는 모두 0이었다. 빛 구름·빛·화면 효과·펀치·소리 경로는 남겼다.
+- 상태: 완료 — `origin/main` `efd460f`를 현재 `codex/jelly-body-look` 브랜치에 병합한 뒤 §12-ONE.49 추가 요구 6을 반영했다. [PR #165](https://github.com/jeongmo-dot/gravity_orb/pull/165)
+- 변경:
+  - `FeedbackDirector.gd`에서 JELLY 합체의 `JellyMergeStardust`, MAX의 `JellyMaxSparkle`, 폭발의 `BlastDebris`·`BlastSparks`·`BlastTwinklingStars` 생성을 건너뛴다. 빛 구름·로컬 빛·화면 번쩍·흔들림은 같은 분기에서 계속 생성한다.
+  - `ColorEffectVisual.gd`는 JELLY일 때 `ModeStardust`를 숨긴다. 색 효과의 PUSH·PULL·LIFT 물리 계산과 젤리 펀치를 끄지 않았다. 보관 모드의 입자 경로는 그대로다.
+  - 전체 캡처 대신 지정된 네 장면만 두 화면비로 찍는 `-JellyEffectsOnly` 캡처 스위치를 추가했다.
+- Done-when 대조:
+  - [x] JELLY 합체·흡수·MAX 합체·L6·L10 폭발에서 표의 십자 입자 0개 — `test_jelly_feedback_removes_cross_particles_and_color_effect_points()`
+  - [x] MAX 정리의 `JellyMaxCloudPulse` 빛 구름은 1개, 십자 반짝이는 0개 — `test_jelly_jackpot_uses_max_cloud_without_cross_sparkles_or_ring_geometry()`
+  - [x] 기존 보관 모드 효과 테스트 14/14 통과
+  - [x] 540×960·540×1170에서 `13` 합체·`14` 흡수·`15` 터짐·`16` MAX 정리 캡처 크기 검사 통과
+- QA 관측값:
+  - Godot 일반 빌드 `4.8.dev3.official.51105ccbe`. `test_feedback.gd` 14/14, `test_jelly_visuals.gd` 27/27, `test_jolt_3d.gd` 44/44, 합계 85/85, 종료 코드 0. 시각 상태 해시 `70dde5abef0b71328778a672d919fd1519e0027a00b23206070d7aa9c7fa0bf2`는 이전과 같다.
+  - `tests/capture_screens.ps1 -JellyEffectsOnly` 종료 코드 0. 두 비율 모두 내부 3D 뷰포트가 1080×1920·1080×2340이고, 요구한 8개 PNG의 출력 크기는 각각 540×960·540×1170이다. `17_jelly_max_effect.png`도 캡처 함수가 함께 썼으나 이번 전용 목록에는 넣지 않았다.
+  - 직접 본 `13`·`14`에는 십자 입자가 없고, 결과 젤리와 펀치 외의 잔여 장식은 거의 없다. `15`·`16`에도 십자 입자는 없으며, 기존 빛 구름·광원만 남는다. 표 밖 십자 입자는 발견하지 못했다.
+- 수동 확인 절차:
+  1. `artifacts/screens/540x960/`와 `540x1170/`의 `13`·`14`·`15`·`16`을 PR 직전 `e2be12a` 캡처와 나란히 본다.
+  2. 합체·흡수·터짐·MAX 정리에서 십자 모양 점이 없는지, 폭발과 MAX 정리에서 빛 구름·번쩍임·흔들림은 남는지 확인한다.
+- 알려진 관측: 합체·흡수는 십자 입자를 뺀 뒤 결과 젤리와 짧은 펀치 외에 보이는 장식이 매우 적다. 요구대로 추가 연출은 넣지 않았다.
+- 주말 가벼운 모드에 따라 전체 회귀·기본 전체 캡처·빌드·반복 봇 측정은 미실행.
+
 ### [2026-11-28] 대상 #164 추가 요구 5 — 3D 2배 해상도 적용
 - **먼저 볼 것:** 핵심 테스트 실패·시각 상태 해시 변경 0건. 2배에서 합체·흡수·터짐의 작은 십자 입자, 시한 숫자 7, 3D 배경 점의 외곽 밝기·혼합이 달라진다. 캡처에서 입자 배치와 전체 효과 범위는 같은 위치에 보였다. HUD 점수 글자·NEXT·THEN 영역의 RGB 차이는 두 화면비 모두 0픽셀이었다.
 - 상태: 완료 — §12-ONE.49 #164 추가 요구 5 반영. `origin/main` `0f2ef87`를 `codex/jelly-body-look`에 병합했다. [PR #165](https://github.com/jeongmo-dot/gravity_orb/pull/165)

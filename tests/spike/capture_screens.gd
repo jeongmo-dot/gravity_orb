@@ -14,6 +14,7 @@ const GAP2_DEFAULTS_ONLY_ARGUMENT: String = "--capture-gap2-defaults"
 const JELLY_TAP_SPLIT_ONLY_ARGUMENT: String = "--capture-jelly-tap-split"
 const JELLY_TAP_SHEEN_ONLY_ARGUMENT: String = "--capture-jelly-tap-sheen"
 const JELLY_LOOK_ONLY_ARGUMENT: String = "--capture-jelly-look"
+const JELLY_EFFECTS_ONLY_ARGUMENT: String = "--capture-jelly-effects"
 const PILE_JITTER_SEED: int = 11620261030
 const SPAWN_RAMP_CAPTURE_SEED: int = 11920261031
 const CAPTURE_FILES: Array[String] = [
@@ -263,6 +264,12 @@ const JELLY_LOOK_LEGACY_FILES: Array[String] = [
 	"71_jelly_turn_hud_three_digit.png",
 	"205_jelly_timed_stone_after_harden.png",
 ]
+const JELLY_EFFECTS_ONLY_FILES: Array[String] = [
+	"13_jelly_merge_effect.png",
+	"14_jelly_absorption_effect.png",
+	"15_jelly_blast_effect.png",
+	"16_jelly_jackpot_effect.png",
+]
 
 var _output_directory: String = DEFAULT_OUTPUT_DIRECTORY
 var _temp_save_path: String = "res://artifacts/screens/capture_save.tmp.cfg"
@@ -276,6 +283,7 @@ var _gap2_defaults_only: bool = false
 var _jelly_tap_split_only: bool = false
 var _jelly_tap_sheen_only: bool = false
 var _jelly_look_only: bool = false
+var _jelly_effects_only: bool = false
 var _requested_window_size: Vector2i = Vector2i.ZERO
 var _expected_capture_size: Vector2i = Vector2i.ZERO
 
@@ -300,7 +308,11 @@ func _run() -> void:
 	Config.data.sfx_enabled = false
 	Config.data.game_mode = GameConfig.GameMode.JELLY
 	Config.data.rng_seed = 5050
-	if _jelly_look_only:
+	if _jelly_effects_only:
+		var effects_main: Main = await _create_main(true)
+		await _capture_effect_scenes(effects_main, effects_main.get_node("Board") as Board3D)
+		await _destroy_main(effects_main)
+	elif _jelly_look_only:
 		await _capture_jelly_tap_sheens(true, true)
 		await _capture_jelly_look_legacy_scenes()
 	elif _jelly_tap_sheen_only:
@@ -324,7 +336,9 @@ func _run() -> void:
 	_remove_file(_temp_save_path)
 	var expected_files: Array[String] = CAPTURE_FILES + JELLY_TAP_SHEEN_FILES
 	expected_files.append(JELLY_LOOK_EDGE_FILE)
-	if _jelly_look_only:
+	if _jelly_effects_only:
+		expected_files = JELLY_EFFECTS_ONLY_FILES
+	elif _jelly_look_only:
 		expected_files = JELLY_TAP_SHEEN_FILES + JELLY_LOOK_LEGACY_FILES + JELLY_LOOK_SHEEN_CYCLE_FILES
 		expected_files.append(JELLY_LOOK_EDGE_FILE)
 		expected_files.append(JELLY_LOOK_NEXT_ZOOM_FILE)
@@ -3693,6 +3707,8 @@ func _parse_arguments() -> void:
 			_jelly_tap_sheen_only = true
 		elif argument == JELLY_LOOK_ONLY_ARGUMENT:
 			_jelly_look_only = true
+		elif argument == JELLY_EFFECTS_ONLY_ARGUMENT:
+			_jelly_effects_only = true
 
 
 func _parse_capture_size(value: String, label: String) -> Vector2i:

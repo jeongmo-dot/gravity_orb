@@ -953,7 +953,7 @@ func test_non_jelly_modes_keep_planet_visuals_and_stretch_gate() -> void:
 	Config.data.fx_orb_stretch_enabled = original_stretch
 
 
-func test_jelly_jackpot_uses_max_sparkle_and_cloud_without_ring_geometry() -> void:
+func test_jelly_jackpot_uses_max_cloud_without_cross_sparkles_or_ring_geometry() -> void:
 	var original_mode: GameConfig.GameMode = Config.data.game_mode
 	var original_fx: bool = Config.data.fx_enabled
 	var original_hitstop: bool = Config.data.fx_hitstop_enabled
@@ -976,8 +976,64 @@ func test_jelly_jackpot_uses_max_sparkle_and_cloud_without_ring_geometry() -> vo
 		"colors": [4, 4],
 	})
 	assert_eq(director.active_glow_count(), 1, "JELLY jackpot has one MAX soft cloud")
-	assert_eq(director.active_particle_count(), 1, "JELLY jackpot has white sparkles")
+	assert_eq(director.active_particle_count(), 0, "JELLY jackpot has no cross sparkles")
 	assert_eq(_forbidden_geometry_count(root), 0, "JELLY jackpot has no ring geometry")
+	await _cleanup(root)
+	Config.data.game_mode = original_mode
+	Config.data.fx_enabled = original_fx
+	Config.data.fx_hitstop_enabled = original_hitstop
+
+
+func test_jelly_feedback_removes_cross_particles_and_color_effect_points() -> void:
+	var original_mode: GameConfig.GameMode = Config.data.game_mode
+	var original_fx: bool = Config.data.fx_enabled
+	var original_hitstop: bool = Config.data.fx_hitstop_enabled
+	Config.data.game_mode = GameConfig.GameMode.JELLY
+	Config.data.fx_enabled = true
+	Config.data.fx_hitstop_enabled = false
+	var root: Node3D = Node3D.new()
+	var camera: Camera3D = Camera3D.new()
+	camera.name = "Camera3D"
+	root.add_child(camera)
+	var director: FeedbackDirector = FeedbackDirector.new()
+	root.add_child(director)
+	tree.root.add_child(root)
+	await tree.process_frame
+	var reactions: Array[Dictionary] = [
+		{
+			"type": ReactionRules.Type.MERGE,
+			"result_level": 3,
+			"result_color": OrbTypes.OrbColor.RED,
+			"position": Vector2.ZERO,
+			"shock_targets": [],
+		},
+		{
+			"type": ReactionRules.Type.BLAST,
+			"levels": [6, 6],
+			"colors": [OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE],
+			"position": Vector2.ZERO,
+		},
+		{
+			"type": ReactionRules.Type.BLAST,
+			"levels": [Config.data.orb_max_level, Config.data.orb_max_level],
+			"colors": [OrbTypes.OrbColor.RED, OrbTypes.OrbColor.BLUE],
+			"position": Vector2.ZERO,
+		},
+		{
+			"type": ReactionRules.Type.MAX_CLEAR,
+			"levels": [Config.data.orb_max_level, Config.data.orb_max_level],
+			"colors": [OrbTypes.OrbColor.PURPLE, OrbTypes.OrbColor.PURPLE],
+			"result_color": OrbTypes.OrbColor.PURPLE,
+			"position": Vector2.ZERO,
+			"shock_targets": [],
+		},
+	]
+	for reaction: Dictionary in reactions:
+		director.play_reaction_visuals(reaction)
+		assert_eq(director.active_particle_count(), 0, "JELLY reaction has no cross particle emitters")
+		for effect: ColorEffectVisual in director._active_color_effects:
+			assert_eq(effect.stardust_count(), 0, "JELLY color effect hides cross points")
+		director.clear_effects()
 	await _cleanup(root)
 	Config.data.game_mode = original_mode
 	Config.data.fx_enabled = original_fx

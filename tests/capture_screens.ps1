@@ -9,7 +9,8 @@ param(
     [switch]$Gap2DefaultsOnly,
     [switch]$JellyTapSplitOnly,
     [switch]$JellyTapSheenOnly,
-    [switch]$JellyLookOnly
+    [switch]$JellyLookOnly,
+    [switch]$JellyEffectsOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -286,7 +287,16 @@ $zoomFiles += $tapSheenZoomFiles + @($jellyLookEdgeSpec)
 
 # Match the capture scene's mode precedence.
 $modeArgument = $null
-if ($JellyLookOnly) {
+if ($JellyEffectsOnly) {
+    $modeArgument = "--capture-jelly-effects"
+    $fullFrameFiles = @(
+        "13_jelly_merge_effect.png",
+        "14_jelly_absorption_effect.png",
+        "15_jelly_blast_effect.png",
+        "16_jelly_jackpot_effect.png"
+    )
+    $zoomFiles = @()
+} elseif ($JellyLookOnly) {
     $modeArgument = "--capture-jelly-look"
     $fullFrameFiles = $tapSheenFrameFiles + @(
         "40_jelly_look_max.png",
