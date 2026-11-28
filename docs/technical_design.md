@@ -7054,6 +7054,12 @@ G1 전략 봇 (시드 1~20, 600턴 상한, 턴 평균 / 총점 평균):
 5. 빌드 없음
 - 회신 맨 앞에: 핵심 테스트 실패나 해시 변경, 위 표 밖에서 찾은 십자 입자 (있으면 지우지 말고 이름·장면을 회신), 지운 뒤 효과가 비어 보이는 장면
 
+**#164 마무리 (Claude, 2026-11-28)**
+- 추가 요구 6 검수 (`28f5410`): `FeedbackDirector`는 JELLY에서 `JellyMergeStardust`·`JellyMaxSparkle`·`BlastDebris`·`BlastSparks`·`BlastTwinklingStars`를 만들지 않고, `ColorEffectVisual`은 JELLY에서 점을 숨긴다 (보관 모드 그대로). 빛 구름·빛·번쩍임·흔들림은 같은 분기에 남았다. `test_feedback.gd` 14/14·`test_jelly_visuals.gd` 27/27·`test_jolt_3d.gd` 44/44, 해시 그대로. `13`~`16` 두 비율에서 십자 입자 없음 — 합체·흡수는 결과 젤리와 짧은 펀치 외 연출이 거의 남지 않는다 (사용자에게 알림, 추가 연출 없음)
+- 사용자 "병합" → PR [#165](https://github.com/jeongmo-dot/gravity_orb/pull/165) squash 병합 `9c3cbca`. 로컬 브랜치 삭제, 원격 브랜치는 남김
+- 기획서 0.16.41 (원본·`docs/reference/` 사본): 몸 A·그림자·미리보기, 외곽 3D 2배, 크림색 광택 덮개, 십자 반짝이 입자 없음
+- 평일에: 전체 회귀·기본 전체 캡처 (3D 2배 해상도가 모든 장면에 걸린다)
+
 ### 12-ONE.3 다음 (JELLY 개선)
 - CLASSIC 전용 분기 정리 (행성 그림·연출·규칙 — JELLY가 안 쓰는 것)
 - 결정 대기에서 이어지는 것: 효과음 (합성·녹음), 시작 화면 그림 (지금 행성 — JELLY에 맞게?)
