@@ -46,25 +46,20 @@ const BELLY_RADIUS_SCALE: float = 0.54
 const BELLY_LIGHTEN_AMOUNT: float = 0.35
 const BELLY_ALPHA: float = 0.85
 const BELLY_HIGHLIGHT_ALPHA: float = 0.70
-const TAP_MARK_CENTER: Vector2 = Vector2(0.66, -0.68)
-const TAP_MARK_SIZE: float = 0.24
-const TAP_MARK_CONTROL: float = 1.0 / 6.0
-const TAP_MARK_STROKE_RATIO: float = 0.125
-const TAP_MARK_STROKE: Color = Color("e2789a")
-const TAP_MARK_PERIOD: float = 1.6
-const TAP_MARK_MIN_SCALE: float = 0.7
-const TAP_MARK_SCALE_RANGE: float = 0.45
-const TAP_MARK_MIN_ALPHA: float = 0.55
-const TAP_MARK_FADE_SECONDS: float = 0.15
-const TAP_MARK_PLANE_RATIO: float = 0.36
-const TAP_MARK_FRONT_OFFSET: float = 0.010
+const TAP_SHEEN_ANGLE_DEGREES: float = 25.0
+const TAP_SHEEN_PERIOD: float = 2.8
+const TAP_SHEEN_SWEEP_FRACTION: float = 0.55
+const TAP_SHEEN_TRAVEL: float = 1.7
+const TAP_SHEEN_HALF_WIDTH: float = 0.18
+const TAP_SHEEN_BRIGHTNESS: float = 0.75
+const TAP_SHEEN_PHASE_STEP: float = 0.7
+const TAP_SHEEN_FADE_SECONDS: float = 0.15
 const PREVIEW_TEXTURE_SIZE: int = 384
 const PREVIEW_MAX_TEXTURE_SIZE: int = 512
 
 static var _body_shader: Shader
 static var _face_shader: Shader
 static var _belly_shader: Shader
-static var _tap_mark_material: ShaderMaterial
 static var _body_materials: Dictionary = {}
 static var _stone_body_materials: Dictionary = {}
 static var _face_materials: Dictionary = {}
@@ -89,7 +84,6 @@ static func color_for(color_index: int, level: int = 1) -> Color:
 
 static func prewarm(cfg: GameConfig) -> void:
 	face_mesh()
-	tap_mark_material()
 	for color_index: int in range(PALETTE.size()):
 		for level_index: int in range(1, cfg.orb_max_level + 1):
 			body_material_for(color_index, level_index)
@@ -106,7 +100,6 @@ static func clear_cache() -> void:
 	_body_shader = null
 	_face_shader = null
 	_belly_shader = null
-	_tap_mark_material = null
 	_face_mesh = null
 	_last_animation_frame = -1
 	if not _animation_frozen:
@@ -119,7 +112,6 @@ static func shared_material_count() -> int:
 		+ _stone_body_materials.size()
 		+ _face_materials.size()
 		+ _belly_materials.size()
-		+ (1 if _tap_mark_material != null else 0)
 	)
 
 
@@ -219,6 +211,16 @@ static func body_material_for(color_index: int, level: int) -> ShaderMaterial:
 		material.set_shader_parameter("level_id", level)
 		material.set_shader_parameter("max_level_id", Config.data.orb_max_level)
 		material.set_shader_parameter("animation_time", _animation_time)
+		material.set_shader_parameter(
+			"tap_sheen_axis", Vector2.from_angle(deg_to_rad(TAP_SHEEN_ANGLE_DEGREES))
+		)
+		material.set_shader_parameter("tap_sheen_period", TAP_SHEEN_PERIOD)
+		material.set_shader_parameter("tap_sheen_sweep_fraction", TAP_SHEEN_SWEEP_FRACTION)
+		material.set_shader_parameter("tap_sheen_travel", TAP_SHEEN_TRAVEL)
+		material.set_shader_parameter("tap_sheen_half_width", TAP_SHEEN_HALF_WIDTH)
+		material.set_shader_parameter("tap_sheen_brightness", TAP_SHEEN_BRIGHTNESS)
+		material.set_shader_parameter("tap_sheen_phase", float(color_index) * TAP_SHEEN_PHASE_STEP)
+		material.set_shader_parameter("tap_sheen_enabled", true)
 		_body_materials[key] = material
 	return _body_materials[key] as ShaderMaterial
 
@@ -234,6 +236,8 @@ static func stone_body_material(level: int) -> ShaderMaterial:
 		material.set_shader_parameter("level_id", safe_level)
 		material.set_shader_parameter("max_level_id", Config.data.orb_max_level)
 		material.set_shader_parameter("animation_time", _animation_time)
+		material.set_shader_parameter("tap_sheen_phase", 0.0)
+		material.set_shader_parameter("tap_sheen_enabled", false)
 		_stone_body_materials[safe_level] = material
 	return _stone_body_materials[safe_level] as ShaderMaterial
 
@@ -346,67 +350,6 @@ static func face_mesh() -> ArrayMesh:
 	return _face_mesh
 
 
-static func tap_mark_material() -> ShaderMaterial:
-	if _tap_mark_material == null:
-		var shader: Shader = Shader.new()
-		shader.resource_name = "jelly_tap_mark_shader"
-		shader.code = """
-shader_type spatial;
-render_mode unshaded, cull_disabled, depth_draw_never;
-
-uniform float animation_time;
-uniform float period;
-uniform float size_in_plane;
-uniform float control_ratio;
-uniform float stroke_ratio;
-uniform vec4 stroke_color : source_color;
-uniform float min_scale;
-uniform float scale_range;
-uniform float min_alpha;
-instance uniform float tap_mark_phase = 0.0;
-instance uniform float tap_mark_strength = 0.0;
-instance uniform float visual_alpha = 1.0;
-
-void fragment() {
-	float wave = 0.5 - 0.5 * cos(TAU * (animation_time + tap_mark_phase) / period);
-	float size = size_in_plane * (min_scale + scale_range * wave);
-	vec2 p = abs(UV * 2.0 - 1.0) / size;
-	// In each quadrant, the quadratic from (1, 0) to (0, 1) with
-	// control point (c, c) has x+y = 0.5+c + (0.5-c)*(x-y)^2.
-	float axis_difference = p.x - p.y;
-	float curve = 0.5 - control_ratio;
-	float implicit_edge = p.x + p.y - (0.5 + control_ratio)
-		- curve * axis_difference * axis_difference;
-	float slope = 2.0 * curve * axis_difference;
-	float edge_distance = implicit_edge / length(vec2(1.0 - slope, 1.0 + slope));
-	if (abs(axis_difference) > 1.0) {
-		vec2 tip = p.x > p.y ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
-		edge_distance = length(p - tip);
-	}
-	float half_stroke = stroke_ratio * 0.5;
-	float antialias = max(fwidth(edge_distance) * 0.5, 0.000001);
-	float fill = 1.0 - smoothstep(-half_stroke - antialias, -half_stroke + antialias, edge_distance);
-	float mask = 1.0 - smoothstep(half_stroke - antialias, half_stroke + antialias, edge_distance);
-	ALBEDO = mix(stroke_color.rgb, vec3(1.0), fill);
-	ALPHA = mask * mix(min_alpha, 1.0, wave) * tap_mark_strength * visual_alpha;
-}
-"""
-		_tap_mark_material = ShaderMaterial.new()
-		_tap_mark_material.resource_name = "jelly_tap_mark_material"
-		_tap_mark_material.render_priority = 14
-		_tap_mark_material.shader = shader
-		_tap_mark_material.set_shader_parameter("animation_time", _animation_time)
-		_tap_mark_material.set_shader_parameter("period", TAP_MARK_PERIOD)
-		_tap_mark_material.set_shader_parameter("size_in_plane", TAP_MARK_SIZE / TAP_MARK_PLANE_RATIO)
-		_tap_mark_material.set_shader_parameter("control_ratio", TAP_MARK_CONTROL)
-		_tap_mark_material.set_shader_parameter("stroke_ratio", TAP_MARK_STROKE_RATIO)
-		_tap_mark_material.set_shader_parameter("stroke_color", TAP_MARK_STROKE)
-		_tap_mark_material.set_shader_parameter("min_scale", TAP_MARK_MIN_SCALE)
-		_tap_mark_material.set_shader_parameter("scale_range", TAP_MARK_SCALE_RANGE)
-		_tap_mark_material.set_shader_parameter("min_alpha", TAP_MARK_MIN_ALPHA)
-	return _tap_mark_material
-
-
 static func _apply_animation_time() -> void:
 	for value: Variant in _body_materials.values():
 		(value as ShaderMaterial).set_shader_parameter("animation_time", _animation_time)
@@ -414,8 +357,6 @@ static func _apply_animation_time() -> void:
 		(value as ShaderMaterial).set_shader_parameter("animation_time", _animation_time)
 	for value: Variant in _face_materials.values():
 		(value as ShaderMaterial).set_shader_parameter("animation_time", _animation_time)
-	if _tap_mark_material != null:
-		_tap_mark_material.set_shader_parameter("animation_time", _animation_time)
 
 
 static func _get_body_shader() -> Shader:
@@ -431,6 +372,22 @@ uniform vec4 base_color : source_color = vec4(1.0);
 uniform int level_id = 1;
 uniform int max_level_id = 10;
 uniform float animation_time = 0.0;
+uniform bool tap_sheen_enabled = false;
+uniform vec2 tap_sheen_axis;
+uniform float tap_sheen_period;
+uniform float tap_sheen_sweep_fraction;
+uniform float tap_sheen_travel;
+uniform float tap_sheen_half_width;
+uniform float tap_sheen_brightness;
+uniform float tap_sheen_phase = 0.0;
+instance uniform float tap_sheen_strength = 0.0;
+varying float sphere_radius;
+varying vec3 sphere_center_view;
+
+void vertex() {
+	sphere_radius = length(VERTEX);
+	sphere_center_view = MODELVIEW_MATRIX[3].xyz;
+}
 
 void fragment() {
 	vec3 n = normalize(NORMAL);
@@ -452,6 +409,20 @@ void fragment() {
 	interior += vec3(1.0) * rim * max_pulse * 0.30;
 	ALBEDO = interior;
 	EMISSION = interior * (0.08 + rim * (0.08 + max_pulse * 0.32));
+	if (tap_sheen_enabled && tap_sheen_strength > 0.0) {
+		float cycle = fract((animation_time + tap_sheen_phase) / tap_sheen_period);
+		float progress = min(1.0, cycle / tap_sheen_sweep_fraction);
+		float center = mix(-tap_sheen_travel, tap_sheen_travel, smoothstep(0.0, 1.0, progress));
+		// Project the surface and center on the screen axes, in radii at the center depth.
+		vec2 offset = VERTEX.xy - sphere_center_view.xy;
+		if (PROJECTION_MATRIX[3][3] == 0.0) {
+			offset = VERTEX.xy * (sphere_center_view.z / VERTEX.z) - sphere_center_view.xy;
+		}
+		vec2 p = offset * vec2(1.0, -1.0) / sphere_radius;
+		float distance = abs(dot(p, tap_sheen_axis) - center);
+		float brightness = tap_sheen_brightness * max(0.0, 1.0 - distance / tap_sheen_half_width);
+		ALBEDO = mix(interior, vec3(1.0), brightness * tap_sheen_strength);
+	}
 	ROUGHNESS = 0.20;
 	ALPHA = mix(0.90, 1.0, smoothstep(0.0, 0.72, facing));
 }
