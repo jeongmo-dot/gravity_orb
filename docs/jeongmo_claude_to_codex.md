@@ -42,7 +42,7 @@
 ## 대기 중
 
 ### [2026-11-28 #163] 터치할 수 있는 젤리 표시 — 별 대신 지나가는 광택
-- 상태: 대기
+- 상태: **검수 통과 — 병합 대기** (2026-11-28) — PR [#164](https://github.com/jeongmo-dot/gravity_orb/pull/164) `0382254` 검수 통과: 별 제거, 몸 셰이더 띠 수치·시차·원근 보정이 명세대로. 캡처 두 비율에서 띠가 몸 안·눈 아래에 있고, 중력과 상관없이 기울기가 같다 (`237b` 픽셀: 자리·폭·밝기가 계산과 같음). 핵심 테스트 통과. 전체 회귀·기본 전체 캡처는 평일에. 병합은 사용자 "병합" 뒤
 - 근거: [technical_design.md](technical_design.md) **§12-ONE.49** "#163 터치할 수 있는 젤리 표시 — 별 대신 지나가는 광택 (시안 C)" (수치 표). 사용자 2026-11-28 "별이 뜨기보다 반투명한 광택이 지나가는 방식으로 해줘"
 - 앵커: `scenes/Orb3D.tscn` `TapMark`, `scripts/spike/Orb3D.gd` (`_tap_mark`·`set_tap_mark_enabled()`·`_advance_tap_mark()`·`_update_visual_transform()`·`_apply_visual_transparency()`), `scripts/core/JellyOrbArt.gd` (`TAP_MARK_*`·`tap_mark_material()`·`_get_body_shader()`·`body_material_for()`·`stone_body_material()`·`_apply_animation_time()`·`shared_material_count()`·`prewarm()`), `tests/test_jelly_visuals.gd`·`test_jolt_3d.gd`, `tests/spike/capture_screens.gd` (`_report_capture_tap_marks()`)·`tests/capture_screens.ps1`
 - 요구 요약 (§12-ONE.49 "#163 요구" 1~6):
@@ -54,11 +54,11 @@
   6. 빌드 없음
 - 건드리지 말 것: 규칙·값, 얼굴·몸 그림 (세기 0일 때), NEXT·HUD·안내 글·소리, 터치 판정 반지름, 고리 금지, 사용자 저장 파일, `project.godot` 버전·`build/windows/`, `docs/` (회신 파일 제외)
 - Done-when:
-  - [ ] 별이 없다 (노드·재질·상수)
-  - [ ] 광택 수치가 표와 같다 (상수·테스트)
-  - [ ] 표시 = 터치 후보 판정 그대로, `WAITING_INPUT` 밖에서는 세기 0
-  - [ ] 핵심 테스트 통과
-  - [ ] 항목 캡처 두 비율 (크기 검사 통과): 띠가 몸 안·눈 아래, 기울기가 중력과 상관없이 같다
+  - [x] 별이 없다 (노드·재질·상수)
+  - [x] 광택 수치가 표와 같다 (상수·테스트)
+  - [x] 표시 = 터치 후보 판정 그대로, `WAITING_INPUT` 밖에서는 세기 0
+  - [x] 핵심 테스트 통과
+  - [x] 항목 캡처 두 비율 (크기 검사 통과): 띠가 몸 안·눈 아래, 기울기가 중력과 상관없이 같다
 - 브랜치: main에서 새 브랜치 → PR
 - **회신 맨 앞에**: 핵심 테스트 실패나 해시 변경, 띠가 몸 밖으로 나감, 띠가 눈·입 위, 후보가 아닌 젤리에 띠, 별이 남은 곳
 
